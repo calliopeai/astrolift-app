@@ -5774,7 +5774,7 @@ type Query {
   astroliftSearchableUsers(query: String!): [AstroliftSearchableUser!]!
   astroliftRolesICanGrant: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage.")
-  astroliftRoleBindingsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftRoleBindingPage!
+  astroliftRoleBindingsPage(search: String = null, appSlug: String = null, limit: Int! = 50, after: String = null): AstroliftRoleBindingPage!
   astroliftApiTokens: [AstroliftApiToken!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage.")
   astroliftApiTokensPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftApiTokenPage!
   astroliftPolicies: [AstroliftPolicy!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage.")
@@ -5843,7 +5843,7 @@ type Query {
   astroliftCommandRunsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftCommandRunPage!
   astroliftCommandRun(id: String!): AstroliftCommandRun
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage.")
-  astroliftPreviewEnvironmentsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftPreviewEnvironmentPage!
+  astroliftPreviewEnvironmentsPage(appSlug: String = null, search: String = null, statuses: [String!] = null, limit: Int! = 50, after: String = null): AstroliftPreviewEnvironmentPage!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
