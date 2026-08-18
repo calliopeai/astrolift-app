@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Make `cache` reachable on every cloud with an in-cluster Memcached variant,
+  `k8s_native/cache/memcached`. The kind was executable on AWS only: GCP sells
+  Memorystore for Memcached, Azure sells nothing equivalent, so one in-cluster
+  variant covers both holes instead of one of them. It emits the same envelope
+  the ElastiCache Memcached variants emit, `CACHE_NODES` included, so a
+  manifest moves between them without the app reading different variables.
+  Memcached authenticates nobody, so the driver always ships an ingress
+  NetworkPolicy scoped to the app's own namespace and its organization's agent
+  namespace; there is no switch to turn that off. The `cache/gcp` and
+  `cache/azure` rows are gone from the declared-gap ledger.
+
 - Stop reporting managed-service config changes as applied when the driver
   cannot apply them. Fifteen drivers (S3, CloudFront, GCS, Pub/Sub, Blob x2,
   Service Bus, CNPG, MySQL/MongoDB/RabbitMQ/Redis/Strimzi/NATS operators, NFS)

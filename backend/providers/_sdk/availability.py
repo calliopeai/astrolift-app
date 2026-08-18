@@ -2005,6 +2005,22 @@ MATRIX = AvailabilityMatrix(
             binding_envs=("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD"),
         ),
         ManagedServiceEntry(
+            kind="cache",
+            variant="memcached",
+            plugin_id="k8s_native",
+            status="preview",
+            description="In-cluster Memcached ring with stable per-pod endpoints",
+            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "CACHE_HOST",
+                "CACHE_PORT",
+                "CACHE_PROTOCOL",
+                "CACHE_NODES",
+                "CACHE_TLS",
+                "CACHE_RESOURCE_ARN",
+            ),
+        ),
+        ManagedServiceEntry(
             kind="mysql",
             variant="operator",
             plugin_id="k8s_native",

@@ -1013,6 +1013,13 @@ def _k8s_managed_config_for(
             storage_class=str(pc.get("redis_storage_class", "")),
             persistent=bool(pc.get("redis_persistent", True)),
         )
+    if pair == ("cache", "memcached"):
+        from k8s_native.managed.cache_memcached import DEFAULT_IMAGE, MemcachedConfig
+
+        return MemcachedConfig(
+            cluster_driver=cluster_driver,
+            image=str(pc.get("memcached_image") or DEFAULT_IMAGE),
+        )
     if pair == ("mysql", "operator"):
         from k8s_native.managed.mysql_operator import MySQLOperatorConfig
 

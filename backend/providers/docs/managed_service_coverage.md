@@ -19,15 +19,15 @@ Every gap that is left must appear in the ledger below or the guard test
 Opt-in kinds: `api_gateway`, `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `time_series`, `warehouse`, `wide_column`.
 
 32 kinds; 20 executable on all three public clouds;
-23 reachable on every cloud once in-cluster variants count;
-3 gaps across 2 kinds.
+24 reachable on every cloud once in-cluster variants count;
+1 gaps across 1 kinds.
 
 ## Coverage
 
 | Kind | AWS | GCP | Azure | In-cluster (k8s_native) |
 | --- | --- | --- | --- | --- |
 | `api_gateway` (opt-in) | `http_api`, `rest_api`, `websocket_api` | `api_gateway` | `api_management` | `gateway_api` |
-| `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | - |
+| `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | `memcached` |
 | `cdn` (opt-in) | `cloudfront` | `cloud_cdn` | planned: `front_door` | - |
 | `database_proxy` (opt-in) | `rds_proxy` | - | - | - |
 | `document_db` | `documentdb`, `documentdb_serverless_v2` | `firestore_native` | `cosmos_mongodb`, `cosmos_nosql` | `mongodb_operator` |
@@ -65,8 +65,6 @@ Each row explains one hole above. The reference is the tracking issue.
 
 | Kind | Cloud | Classification | Reference |
 | --- | --- | --- | --- |
-| `cache` | gcp | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
-| `cache` | azure | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
 | `email` | gcp | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1453 |
 
 ### Classifications
