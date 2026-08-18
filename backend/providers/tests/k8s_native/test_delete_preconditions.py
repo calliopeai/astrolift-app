@@ -253,3 +253,51 @@ def test_one_conflict_does_not_stop_the_other_deletes():
 
     assert result.deleted == ["Secret/b"]
     assert len(result.conflicts) == 1
+
+
+# ---- a managed-service reconciliation path -----------------------------------
+
+
+def test_kube_prometheus_child_deletes_carry_the_observed_uid():
+    """The path #1389 was found on.
+
+    ``_owned_child_stubs`` reads each child, asserts ownership, then builds a
+    delete stub. Building it by name alone threw away the identity the check
+    had just established, so the delete removed whatever held the name at
+    delete time rather than the object that was inspected.
+    """
+    from k8s_native.managed.observability_kube_prometheus import KubePrometheusStackDriver
+
+    observed = {
+        "apiVersion": "monitoring.coreos.com/v1",
+        "kind": "ServiceMonitor",
+        "metadata": {"name": "sm", "namespace": "ns", "uid": "uid-1", "resourceVersion": "7"},
+    }
+
+    stub = KubePrometheusStackDriver._stub("monitoring.coreos.com/v1", "ServiceMonitor", "sm", "ns", observed=observed)
+
+    assert stub["metadata"]["uid"] == "uid-1"
+
+
+def test_a_stub_without_an_observation_stays_name_only():
+    """Callers that never read the object keep the old behaviour, so adopting
+    this is per-call-site rather than a flag day."""
+    from k8s_native.managed.observability_kube_prometheus import KubePrometheusStackDriver
+
+    stub = KubePrometheusStackDriver._stub("v1", "ConfigMap", "cm", "ns")
+
+    assert "uid" not in stub["metadata"]
+
+
+def test_the_stub_flows_into_a_conditional_delete():
+    """End to end: what the driver builds is what the cluster driver conditions
+    on. If these two ever disagree the precondition silently stops applying."""
+    from k8s_native.managed.observability_kube_prometheus import KubePrometheusStackDriver
+
+    observed = {"metadata": {"name": "sm", "namespace": "ns", "uid": "uid-9"}}
+    stub = KubePrometheusStackDriver._stub("v1", "ConfigMap", "sm", "ns", observed=observed)
+
+    k8s = RecordingK8s()
+    _driver(k8s).delete_manifests("c1", "ns", [stub])
+
+    assert k8s.calls[0]["uid"] == "uid-9"

@@ -1124,7 +1124,17 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             if current is None:
                 continue
             self._assert_child_owned(current, owner_id)
-            stubs.append(self._stub(ref["apiVersion"], ref["kind"], ref["name"], parsed.namespace))
+            # Pass the manifest ownership was validated against, so the delete
+            # is conditional on it still being the same object.
+            stubs.append(
+                self._stub(
+                    ref["apiVersion"],
+                    ref["kind"],
+                    ref["name"],
+                    parsed.namespace,
+                    observed=current,
+                )
+            )
         return stubs
 
     def _stale_children(
@@ -1227,8 +1237,28 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
         }
 
     @staticmethod
-    def _stub(api_version: str, kind: str, name: str, namespace: str) -> dict[str, Any]:
-        return {"apiVersion": api_version, "kind": kind, "metadata": {"name": name, "namespace": namespace}}
+    def _stub(
+        api_version: str,
+        kind: str,
+        name: str,
+        namespace: str,
+        *,
+        observed: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """A delete stub, carrying the identity of the object that was inspected.
+
+        ``observed`` is the manifest the ownership check ran against. Its uid
+        travels into the stub so the delete is conditional on still being that
+        object (#1389): a name-only stub deletes whatever holds the name at
+        delete time, and between the GET and the delete a reconciler can have
+        recreated it. Omitted, the stub behaves exactly as before.
+        """
+        metadata: dict[str, Any] = {"name": name, "namespace": namespace}
+        observed_metadata = (observed or {}).get("metadata") or {}
+        uid = observed_metadata.get("uid")
+        if uid:
+            metadata["uid"] = uid
+        return {"apiVersion": api_version, "kind": kind, "metadata": metadata}
 
     def _bundle_document(self, root: dict[str, Any]) -> dict[str, Any]:
         raw = (root.get("data") or {}).get("bundle.json")
