@@ -7,7 +7,9 @@ then exchanges the projected SA token for STS credentials so the pod reaches
 the service with no static keys. This activity:
 
 * aggregates the IAM grants every active managed service declares in its
-  driver ``binding().iam_grants`` into one inline policy,
+  driver ``binding().iam_grants`` into the target cloud's grant shape — an
+  inline policy on AWS, IAM roles on GCP, ``(role definition, ARM scope)``
+  pairs on Azure,
 * creates/updates the scoped IAM role (idempotent) via the cluster's
   WorkloadIdentityDriver, and
 * binds it to the app's ServiceAccount (adds the ``(namespace, sa)`` subject
@@ -40,12 +42,14 @@ def _permissions_from_bindings(
 ) -> list[dict[str, Any]]:
     """Translate portable binding grants into the provider identity shape.
 
-    AWS consumes policy statements. GCP consumes predefined/custom IAM roles;
-    accepting a raw GCP permission here would make provisioning appear to work
-    while granting nothing, so that path fails closed.
+    AWS consumes policy statements. GCP consumes predefined/custom IAM roles
+    and Azure consumes ``(role definition, ARM scope)`` pairs; handing either
+    of them an AWS policy statement makes provisioning appear to work while
+    granting nothing, so both paths translate explicitly and fail closed.
     """
     permissions: list[dict[str, Any]] = []
     gcp_roles: set[str] = set()
+    azure_seen: set[tuple[str, str]] = set()
     for binding in bindings:
         if binding is None:
             continue
@@ -53,6 +57,15 @@ def _permissions_from_bindings(
             actions = list(getattr(grant, "actions", None) or [])
             resource = getattr(grant, "resource", None)
             if not actions or not resource:
+                continue
+            if plugin_slug == "azure":
+                permissions.extend(
+                    _azure_role_assignments(
+                        actions=actions,
+                        resource=str(resource),
+                        seen=azure_seen,
+                    ),
+                )
                 continue
             if plugin_slug == "gcp":
                 for action in actions:
@@ -76,6 +89,47 @@ def _permissions_from_bindings(
                 },
             )
     return permissions
+
+
+def _azure_role_assignments(
+    *,
+    actions: list[str],
+    resource: str,
+    seen: set[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    """Resolve one Azure grant into deduplicated ``(role, scope)`` pairs.
+
+    Grants classified as control-plane work contribute nothing: the pod reads
+    that material from its projected Secret, so assigning the workload a role
+    for it would be over-permission. Anything the catalog cannot classify
+    raises out of the activity.
+    """
+    from azure.role_catalog import (
+        ControlPlaneGrant,
+        resolve_grant_action,
+        validate_arm_scope,
+    )
+
+    assignments: list[dict[str, Any]] = []
+    resolved = [resolve_grant_action(action) for action in actions]
+    roles = [entry for entry in resolved if not isinstance(entry, ControlPlaneGrant)]
+    if not roles:
+        return assignments
+
+    scope = validate_arm_scope(resource)
+    for role in roles:
+        key = (role.role_definition_guid, scope)
+        if key in seen:
+            continue
+        seen.add(key)
+        assignments.append(
+            {
+                "role_definition_id": role.role_definition_guid,
+                "role_name": role.role_name,
+                "scope": scope,
+            },
+        )
+    return assignments
 
 
 def _ensure_cluster_oidc_issuer(cluster: Any) -> None:

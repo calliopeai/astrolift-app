@@ -432,6 +432,7 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
                 subscription_id=subscription_id,
                 resource_group=resource_group,
                 cluster_oidc_issuer=issuer,
+                location=str(pc.get("location") or region or "eastus"),
             )
         if capability == "secrets":
             from azure.secrets_keyvault import KeyVaultConfig
