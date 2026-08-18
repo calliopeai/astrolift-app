@@ -680,3 +680,4 @@ export const DESTROY_AGENT_BOX = gql`
     }
   }
 `;
+

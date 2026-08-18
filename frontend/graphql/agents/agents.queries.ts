@@ -463,11 +463,14 @@ export const LIST_AGENT_BOXES = gql`
       sessionName
       attachCommand
       namespace
+      podName
       ownerEmail
       lastError
       startedAt
+      endedAt
       lastAttachedAt
       createdAt
     }
   }
 `;
+

@@ -274,6 +274,10 @@ class AgentBoxType:
     attach_command: list[str]
     namespace: str
     pod_name: str
+    # Whose box this is. An org surface that cannot say which node belongs to
+    # whom cannot answer "can I destroy this one". Empty for a box ensured by
+    # an API token, which has no human owner and is shared org-wide.
+    owner_email: str
     # Non-empty only on a box that failed to start or whose teardown did not
     # complete; it is the sentence an operator needs, not a stack trace.
     last_error: str
@@ -299,6 +303,7 @@ def agent_box_to_type(box) -> AgentBoxType:
         attach_command=box_attach_command(box),
         namespace=box.namespace or "",
         pod_name=box.pod_name or "",
+        owner_email=(getattr(box.owner, "email", "") or "" if box.owner_id is not None else ""),
         last_error=box.last_error or "",
         created_at=box.created_at,
         started_at=box.started_at,

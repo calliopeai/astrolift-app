@@ -377,9 +377,11 @@ export type AstroliftAgentBox = Pick<
   | "sessionName"
   | "attachCommand"
   | "namespace"
+  | "podName"
   | "ownerEmail"
   | "lastError"
   | "startedAt"
+  | "endedAt"
   | "lastAttachedAt"
   | "createdAt"
 >;
