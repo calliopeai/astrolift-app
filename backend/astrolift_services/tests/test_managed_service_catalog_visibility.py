@@ -41,9 +41,7 @@ def test_planned_variants_are_not_offered(plugin_slug):
 def test_planned_variants_are_still_visible_when_asked_for(plugin_slug):
     """Hidden from the catalogue, not deleted from it. Callers that need to
     distinguish "not offered here" from "no such variant" ask for everything."""
-    everything = {
-        (row.kind, row.variant) for row in list_catalog(plugin_slug, include_unprovisionable=True)
-    }
+    everything = {(row.kind, row.variant) for row in list_catalog(plugin_slug, include_unprovisionable=True)}
 
     for key in _planned(plugin_slug):
         assert key in everything
@@ -76,17 +74,13 @@ def test_deprecated_variants_stay_visible():
     """An operator may already be running one, and the catalogue describes
     their estate as well as their choices."""
     deprecated = [
-        (e.plugin_id, e.kind, e.variant)
-        for e in MATRIX.managed_services
-        if e.status == "deprecated"
+        (e.plugin_id, e.kind, e.variant) for e in MATRIX.managed_services if e.status == "deprecated"
     ]
     if not deprecated:
         pytest.skip("no deprecated entries in the matrix")
 
     for plugin_slug, kind, variant in deprecated:
-        everything = {
-            (r.kind, r.variant) for r in list_catalog(plugin_slug, include_unprovisionable=True)
-        }
+        everything = {(r.kind, r.variant) for r in list_catalog(plugin_slug, include_unprovisionable=True)}
         assert (kind, variant) in everything
 
 
@@ -110,9 +104,7 @@ def test_hiding_does_not_change_which_variant_is_default():
     """Defaults are computed from what is available, so filtering the list must
     not shift the default for a kind that had a planned sibling."""
     for plugin_slug in PLUGINS_WITH_PLANNED:
-        offered = {
-            (r.kind, r.variant) for r in list_catalog(plugin_slug) if r.is_default_for_kind
-        }
+        offered = {(r.kind, r.variant) for r in list_catalog(plugin_slug) if r.is_default_for_kind}
         everything = {
             (r.kind, r.variant)
             for r in list_catalog(plugin_slug, include_unprovisionable=True)

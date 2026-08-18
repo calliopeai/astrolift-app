@@ -724,10 +724,23 @@ def test_k8s_object_store_catalog_distinguishes_executable_and_planned_variants(
     assert rows["s3_compatible_existing"].available is True
     assert rows["s3_compatible_existing"].status == "preview"
     assert rows["s3_compatible_existing"].is_default_for_kind is False
+    # Deprecated stays in the catalogue: an operator may already be running one,
+    # and the catalogue describes their estate as well as their choices.
     assert rows["minio_operator"].available is False
     assert rows["minio_operator"].status == "deprecated"
     assert "retired" in rows["minio_operator"].unavailable_reason
-    assert rows["minio_aistor_operator"].available is False
+
+    # Planned does not. It is roadmap metadata with no driver and none being
+    # installed, and "planned" reads to most people as "available soon".
+    assert "minio_aistor_operator" not in rows
+
+    everything = {
+        row.variant: row
+        for row in list_catalog("k8s_native", include_unprovisionable=True)
+        if row.kind == "object_store"
+    }
+    assert everything["minio_aistor_operator"].status == "planned"
+    assert everything["minio_aistor_operator"].available is False
 
 
 def test_kube_prometheus_is_an_executable_preview_catalog_entry() -> None:
