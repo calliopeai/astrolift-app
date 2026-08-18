@@ -86,6 +86,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from astrolift_manifest.env_injection import _ENVELOPES, envelope_keys_for
 
+from _sdk import binding_policy
 from _sdk.managed_service import Binding, ValueRef
 from aws.plugin import PLUGIN as AWS_PLUGIN
 from azure.plugin import PLUGIN as AZURE_PLUGIN
@@ -1469,3 +1470,33 @@ def test_a_secret_reference_has_no_knowable_encoding() -> None:
     encodings = {_value_encoding(expr, scope) for expr in env["REDIS_URL"]}
 
     assert encodings == {_OPAQUE, "scalar"}
+
+
+@pytest.mark.parametrize("kind", sorted(_ENVELOPES), ids=lambda k: k)
+def test_every_binding_value_follows_the_provenance_rule(kind: str) -> None:
+    """Not just the keys drivers disagree about (#1410).
+
+    The divergence ledger above only sees a key when two drivers answer
+    differently. A single driver inlining a credential, or referencing a port,
+    is wrong on its own and passes that check unnoticed because nobody
+    contradicts it.
+
+    ``_sdk.binding_policy`` states the rule the ledger was an unwritten
+    approximation of, so this applies it to every emission.
+    """
+    offences: list[str] = []
+    for driver, env, scope in _readable_drivers():
+        if driver.kind != kind:
+            continue
+        for key, exprs in env.items():
+            provenance = _driver_provenance(exprs, scope)
+            if provenance not in (binding_policy.LITERAL, binding_policy.SECRET_REF):
+                # ``conditional`` means the driver emits both depending on a
+                # branch, which is the correct shape for a connection string
+                # whose credential content depends on configuration.
+                continue
+            message = binding_policy.violation(key, driver.label, provenance)
+            if message:
+                offences.append(message)
+
+    assert not offences, "\n".join(offences)
