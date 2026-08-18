@@ -818,15 +818,47 @@ class SecretHistoryEntryType:
     request didn't carry one (system actors, scheduled jobs)."""
 
 
-def _editable_fields_for(svc) -> list[str]:
-    """Resolve the driver for this service and call ``editable_fields()``.
+#: ``editable_fields()`` answers depend only on the driver class, so one
+#: resolution per (plugin, kind, variant) serves every row. Keyed on the class
+#: rather than the tuple would be equivalent; the tuple is what callers have.
+_EDITABLE_FIELDS_CACHE: dict[tuple[str, str, str], list[str]] = {}
 
-    Returns ``["*"]`` (all fields editable) when the driver can't be
-    resolved — safe fallback that doesn't restrict the update surface
-    for services whose cluster binding isn't loaded yet."""
+
+def _editable_fields_uncached(driver_cls) -> list[str] | None:
+    """Call ``editable_fields()`` without constructing a cloud client.
+
+    ``editable_fields`` is a pure contract method: all 82 implementations
+    return a literal and none reads ``self``. Calling it against an
+    uninitialised instance, the same idiom ``managed_service_catalog`` uses for
+    ``config_schema`` and ``binding_schema``, avoids building a driver (and its
+    SDK clients) per row, which is what made this too expensive to resolve on
+    list queries.
+
+    Returns None when the call did not produce a usable answer, so the caller
+    can decide the fallback rather than having one baked in here.
+    """
+    try:
+        method = driver_cls.editable_fields
+        raw = getattr(method, "__wrapped__", method)
+        result = raw(object.__new__(driver_cls))
+    except Exception:  # noqa: BLE001 - a rendering path must stay readable
+        return None
+    return list(result) if result is not None else None
+
+
+def _editable_fields_for(svc) -> list[str]:
+    """The config keys this service's driver can apply in place.
+
+    Falls back to ``["*"]`` when the driver cannot be resolved. That is
+    fail-open at this layer, deliberately: it only widens what the UI *offers*,
+    and ``updateManagedService`` re-resolves before starting a workflow while
+    the driver itself refuses with ``unsupported_update()`` (#1376). Narrowing
+    to ``[]`` on a transient resolution failure would tell an operator their
+    service can never be edited, which is worse and less recoverable than
+    offering an edit that is then refused.
+    """
     try:
         from astrolift_drivers.registry import DriverNotFound, plugins
-        from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
         cluster = svc.effective_cluster
         if cluster is None:
@@ -835,6 +867,12 @@ def _editable_fields_for(svc) -> list[str]:
         if plugin is None:
             return ["*"]
         variant = getattr(svc, "variant", "") or ""
+
+        key = (plugin.slug, svc.kind, variant)
+        cached = _EDITABLE_FIELDS_CACHE.get(key)
+        if cached is not None:
+            return list(cached)
+
         try:
             driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:{variant}")
         except DriverNotFound:
@@ -842,15 +880,41 @@ def _editable_fields_for(svc) -> list[str]:
                 driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:")
             except DriverNotFound:
                 return ["*"]
-        cfg = _config_for(plugin.slug, cluster)
-        driver = driver_cls(config=cfg)
-        result = driver.editable_fields()
-        return list(result) if result is not None else ["*"]
+
+        result = _editable_fields_uncached(driver_cls)
+        if result is None:
+            # A driver whose editable_fields is not pure after all. Build it
+            # properly rather than reporting the permissive default, which is
+            # the bug this function exists to fix.
+            try:
+                from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+
+                driver = driver_cls(config=_config_for(plugin.slug, cluster))
+                raw = driver.editable_fields()
+                result = list(raw) if raw is not None else ["*"]
+            except Exception:  # noqa: BLE001
+                return ["*"]
+
+        _EDITABLE_FIELDS_CACHE[key] = list(result)
+        return list(result)
     except Exception:  # noqa: BLE001
         return ["*"]
 
 
-def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> ManagedServiceType:
+def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> ManagedServiceType:
+    """Render a managed service for GraphQL.
+
+    ``resolve_editable_fields`` now defaults on. It was opt-in because resolving
+    meant constructing a driver per row, and no call site ever opted in, so
+    every service reported ``["*"]`` regardless of what its driver said (#1414).
+    The client handles the honest answers already: an empty list disables Edit
+    and points at Re-provision, and a restricted list renders one input per key
+    instead of a single input labelled ``*``. None of that could run.
+
+    Resolution no longer constructs anything (see ``_editable_fields_uncached``)
+    and is cached per (plugin, kind, variant), so a list query costs one
+    resolution per distinct variant rather than one per row.
+    """
     editable = _editable_fields_for(svc) if resolve_editable_fields else ["*"]
     return ManagedServiceType(
         id=GUID(str(svc.guid)),
