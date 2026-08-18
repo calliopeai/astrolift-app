@@ -38,11 +38,31 @@ IN_CLUSTER = "k8s_native"
 #: surface Astrolift guarantees across clouds, so their coverage holes are not
 #: tracked as work.
 #:
-#: ``cdn`` is the one worth explaining: the capability is not lost. CloudFront
-#: ships with the ``static_site`` topology, so a CDN arrives with the thing
-#: that needs one rather than being a resource a manifest asks for.
+#: Two are worth explaining, because in both cases the capability is not lost,
+#: it simply is not a resource a manifest books.
+#:
+#: ``cdn`` -- CloudFront ships with the ``static_site`` topology, so a CDN
+#: arrives with the thing that needs one.
+#:
+#: ``api_gateway`` -- Astrolift already terminates ingress and routes to
+#: workloads. A bookable gateway alongside that is a second answer to a
+#: question the platform has already answered.
+#:
+#: ``time_series`` overlaps ``observability`` almost entirely; two of its three
+#: variants are managed Prometheus, which is what ``kube_prometheus_stack``
+#: already provides in-cluster.
 OPT_IN_TIER: frozenset[str] = frozenset(
-    {"cdn", "database_proxy", "mq", "sms", "stream", "warehouse", "wide_column"},
+    {
+        "api_gateway",
+        "cdn",
+        "database_proxy",
+        "mq",
+        "sms",
+        "stream",
+        "time_series",
+        "warehouse",
+        "wide_column",
+    },
 )
 
 COLUMNS: tuple[str, ...] = (*CLOUDS, IN_CLUSTER)
