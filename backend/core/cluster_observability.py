@@ -1212,6 +1212,33 @@ def _k8s_managed_config_for(
                 pc.get("argo_workflows_max_ttl_seconds", 604800),
             ),
         )
+    if pair == ("workflow_engine", "temporal"):
+        from django.conf import settings
+        from k8s_native.managed._temporal_isolation import ControlPlaneTemporal
+        from k8s_native.managed.workflow_temporal import (
+            DEFAULT_POSTGRES_IMAGE,
+            DEFAULT_SERVER_VERSION,
+            TemporalConfig,
+        )
+
+        # The coordinates the driver must never collide with are read from the
+        # settings the control plane's own Temporal client uses, not from
+        # provider config an operator fills in by hand. A hand-copied address
+        # can go stale; this one cannot be wrong without the control plane
+        # itself being pointed somewhere else.
+        return TemporalConfig(
+            cluster_driver=cluster_driver,
+            control_plane=ControlPlaneTemporal(
+                address=str(settings.TEMPORAL_ADDRESS),
+                namespaces=(str(settings.TEMPORAL_NAMESPACE),),
+                kubernetes_namespaces=tuple(
+                    str(value) for value in pc.get("temporal_control_plane_kubernetes_namespaces", [])
+                ),
+            ),
+            server_version=str(pc.get("temporal_server_version", DEFAULT_SERVER_VERSION)),
+            postgres_image=str(pc.get("temporal_postgres_image", DEFAULT_POSTGRES_IMAGE)),
+            storage_class=str(pc.get("temporal_storage_class", "")),
+        )
     if pair == ("model_endpoint", "kserve"):
         from k8s_native.managed.model_endpoint_kserve import KServeConfig
 

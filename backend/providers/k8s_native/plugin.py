@@ -53,6 +53,13 @@ from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
 from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
 from k8s_native.managed.workflow_argo import ArgoWorkflowsDriver
+from k8s_native.managed.workflow_temporal import (
+    DEFAULT_POSTGRES_IMAGE as DEFAULT_TEMPORAL_POSTGRES_IMAGE,
+)
+from k8s_native.managed.workflow_temporal import (
+    DEFAULT_SERVER_VERSION as DEFAULT_TEMPORAL_SERVER_VERSION,
+)
+from k8s_native.managed.workflow_temporal import TemporalWorkflowEngineDriver
 from k8s_native.notification_otlp import WebhookSMTPNotificationDriver
 from k8s_native.registry_oci import OCIRegistryDriver
 from k8s_native.secrets_vault import VaultSecretsBackend
@@ -83,6 +90,7 @@ PLUGIN = ProviderPlugin(
         ("api_gateway", "gateway_api"): GatewayAPIDriver,
         ("event_bus", "knative_eventing"): KnativeEventingDriver,
         ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
+        ("workflow_engine", "temporal"): TemporalWorkflowEngineDriver,
         ("model_endpoint", "kserve"): KServeDriver,
         ("observability", "kube_prometheus_stack"): KubePrometheusStackDriver,
         ("object_store", "s3_compatible_existing"): ExistingS3ObjectStoreDriver,
@@ -353,6 +361,28 @@ PLUGIN = ProviderPlugin(
                 "minimum": 0,
                 "default": 604800,
             },
+            "temporal_control_plane_kubernetes_namespaces": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+                "description": (
+                    "Kubernetes namespaces in this cluster that host Astrolift's own control plane. "
+                    "A tenant Temporal is never deployed into or addressed in one of them. The "
+                    "control-plane frontend address and namespace come from the install's live "
+                    "Temporal settings, not from this config, so the two cannot drift."
+                ),
+            },
+            "temporal_server_version": {
+                "type": "string",
+                "default": DEFAULT_TEMPORAL_SERVER_VERSION,
+                "description": "Temporal server version the operator reconciles for tenant clusters.",
+            },
+            "temporal_postgres_image": {
+                "type": "string",
+                "default": DEFAULT_TEMPORAL_POSTGRES_IMAGE,
+                "description": "CNPG image backing the driver-managed Temporal persistence.",
+            },
+            "temporal_storage_class": {"type": "string"},
             "kserve_namespace": {
                 "type": "string",
                 "description": ("Optional fixed namespace; otherwise each model endpoint uses its project namespace."),
