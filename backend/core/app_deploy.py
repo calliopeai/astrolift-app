@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from core.cluster_credentials import CREDENTIAL_REFUSALS, assert_credential_supported
 from core.cluster_management import (
     ClusterManagementError,
     _context_for_cluster,
@@ -534,6 +535,10 @@ def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
     from astrolift_drivers.registry import DriverNotFound, plugins
 
     plugin_slug = cluster.provider_plugin.slug
+    try:
+        assert_credential_supported(cluster, capability=capability)
+    except CREDENTIAL_REFUSALS as exc:
+        raise AppDeployError(str(exc)) from exc
     try:
         driver_cls = plugins.get(plugin_slug, capability)
     except DriverNotFound as exc:

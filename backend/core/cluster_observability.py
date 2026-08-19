@@ -30,6 +30,7 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from astrolift_drivers.registry import DriverNotFound, plugins
+from core.cluster_credentials import CREDENTIAL_REFUSALS, assert_credential_supported
 
 if TYPE_CHECKING:
     from astrolift_clusters.models import TenantCluster
@@ -238,6 +239,10 @@ def _driver_for_cluster(cluster: TenantCluster) -> Any:
         )
 
     plugin_slug = cluster.provider_plugin.slug
+    try:
+        assert_credential_supported(cluster, capability="cluster")
+    except CREDENTIAL_REFUSALS as exc:
+        raise ClusterObservabilityError(str(exc)) from exc
     try:
         driver_cls = plugins.get(plugin_slug, "cluster")
     except DriverNotFound as exc:
@@ -2314,6 +2319,11 @@ def managed_config_for(
     from ``provider_config`` if pinned, else the platform discovers the
     cluster VPC and creates them itself — never out-of-band terraform.
     """
+    try:
+        assert_credential_supported(cluster, capability=f"managed:{kind}")
+    except CREDENTIAL_REFUSALS as exc:
+        raise ClusterObservabilityError(str(exc)) from exc
+
     pc = cluster.provider_config or {}
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
