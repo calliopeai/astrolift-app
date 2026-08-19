@@ -237,6 +237,13 @@ def workload_status_from_object(
     but has not started would report as up. Calling a box attachable
     before it is, is the same lie as never calling it attachable at all,
     just pointing the other way.
+
+    ``status.ready`` is GA from Kubernetes 1.26 and beta from 1.24 behind the
+    ``JobReadyPods`` gate. On anything older the field is simply absent, maps
+    to 0, and a running Job never reports ready -- which is this bug again, on
+    an older tenant cluster. Not worth engineering around while every cluster
+    we run is well past it, but worth recognising in seconds rather than
+    rediscovering.
     """
     status = obj.get("status") or {}
     spec = obj.get("spec") or {}
