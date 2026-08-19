@@ -23,6 +23,12 @@ the SA annotation points at exactly the role this activity creates.
 Password-authed services (postgres/redis) declare no ``iam_grants``. Apps with
 only those still receive an empty cloud identity because deploy rendering is
 deterministic and cannot depend on an activity's transient return value.
+
+Where a cloud expresses a grant as its own object — Azure's role assignments —
+this activity also persists what became of each one against the binding that
+declared it (:class:`~astrolift_services.models.WorkloadIdentityGrant`), so no
+surface can report a binding ready while its authorization is still
+propagating or was rejected (#1367).
 """
 
 from __future__ import annotations
@@ -48,46 +54,76 @@ def _permissions_from_bindings(
     granting nothing, so both paths translate explicitly and fail closed.
     """
     permissions: list[dict[str, Any]] = []
-    gcp_roles: set[str] = set()
-    azure_seen: set[tuple[str, str]] = set()
+    seen: set[Any] = set()
     for binding in bindings:
-        if binding is None:
+        permissions.extend(
+            _permissions_for_binding(binding, plugin_slug=plugin_slug, seen=seen),
+        )
+    return permissions
+
+
+def _permissions_by_binding(
+    bindings: list[Any],
+    *,
+    plugin_slug: str = "aws",
+) -> list[list[dict[str, Any]]]:
+    """The same translation, kept split per binding.
+
+    :func:`_permissions_from_bindings` is what the driver consumes and
+    deduplicates globally, which loses who declared what. Attributing a
+    pending or failed assignment back to the binding that needs it requires
+    the unflattened view, and duplicates must survive it: two services that
+    both declare Blob Data Contributor on the same container each depend on
+    that one assignment, so it is required for both.
+    """
+    return [_permissions_for_binding(binding, plugin_slug=plugin_slug, seen=set()) for binding in bindings]
+
+
+def _permissions_for_binding(
+    binding: Any,
+    *,
+    plugin_slug: str,
+    seen: set[Any],
+) -> list[dict[str, Any]]:
+    """Translate one binding's grants, skipping anything already in ``seen``."""
+    permissions: list[dict[str, Any]] = []
+    if binding is None:
+        return permissions
+    for grant in getattr(binding, "iam_grants", None) or []:
+        actions = list(getattr(grant, "actions", None) or [])
+        resource = getattr(grant, "resource", None)
+        if not actions or not resource:
             continue
-        for grant in getattr(binding, "iam_grants", None) or []:
-            actions = list(getattr(grant, "actions", None) or [])
-            resource = getattr(grant, "resource", None)
-            if not actions or not resource:
-                continue
-            if plugin_slug == "azure":
-                permissions.extend(
-                    _azure_role_assignments(
-                        actions=actions,
-                        resource=str(resource),
-                        seen=azure_seen,
-                    ),
-                )
-                continue
-            if plugin_slug == "gcp":
-                for action in actions:
-                    if not (
-                        action.startswith("roles/")
-                        or (action.startswith(("projects/", "organizations/")) and "/roles/" in action)
-                    ):
-                        raise ValueError(
-                            "GCP managed-service grants must declare IAM roles, "
-                            f"not raw permissions; received {action!r} for {resource!r}",
-                        )
-                    if action not in gcp_roles:
-                        permissions.append({"role": action})
-                        gcp_roles.add(action)
-                continue
-            permissions.append(
-                {
-                    "Effect": "Allow",
-                    "Action": actions,
-                    "Resource": resource,
-                },
+        if plugin_slug == "azure":
+            permissions.extend(
+                _azure_role_assignments(
+                    actions=actions,
+                    resource=str(resource),
+                    seen=seen,
+                ),
             )
+            continue
+        if plugin_slug == "gcp":
+            for action in actions:
+                if not (
+                    action.startswith("roles/")
+                    or (action.startswith(("projects/", "organizations/")) and "/roles/" in action)
+                ):
+                    raise ValueError(
+                        "GCP managed-service grants must declare IAM roles, "
+                        f"not raw permissions; received {action!r} for {resource!r}",
+                    )
+                if action not in seen:
+                    permissions.append({"role": action})
+                    seen.add(action)
+            continue
+        permissions.append(
+            {
+                "Effect": "Allow",
+                "Action": actions,
+                "Resource": resource,
+            },
+        )
     return permissions
 
 
@@ -95,7 +131,7 @@ def _azure_role_assignments(
     *,
     actions: list[str],
     resource: str,
-    seen: set[tuple[str, str]],
+    seen: set[Any],
 ) -> list[dict[str, Any]]:
     """Resolve one Azure grant into deduplicated ``(role, scope)`` pairs.
 
@@ -211,10 +247,9 @@ def _ensure_workload_identity_sync(
         }
 
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
-    permissions = _permissions_from_bindings(
-        [_managed_binding_for(svc) for svc in services],
-        plugin_slug=plugin_slug,
-    )
+    bindings = [_managed_binding_for(svc) for svc in services]
+    permissions = _permissions_from_bindings(bindings, plugin_slug=plugin_slug)
+    declared_by_service = _permissions_by_binding(bindings, plugin_slug=plugin_slug)
     # Self-sufficient: the IRSA trust policy needs the cluster's OIDC issuer.
     # Discover it from EKS + cache on the cluster row when absent, so the
     # trust isn't malformed by an empty issuer (which yields a broken
@@ -227,7 +262,37 @@ def _ensure_workload_identity_sync(
 
     # Idempotent: create_identity_role returns the existing ARN if present;
     # bind_service_account adds this (namespace, sa) subject to the trust.
-    role_arn = identity_driver.create_identity_role(role_name, permissions)
+    #
+    # The reconcile records what became of each grant before it raises, so the
+    # per-assignment state is persisted on the failing path too — that is the
+    # path an operator most needs it on.
+    try:
+        role_arn = identity_driver.create_identity_role(role_name, permissions)
+    except Exception:
+        _persist_grant_state(
+            environment=environment,
+            services=services,
+            declared_by_service=declared_by_service,
+            driver=identity_driver,
+            plugin_slug=plugin_slug,
+            identity_role_name=role_name,
+        )
+        raise
+    states = _persist_grant_state(
+        environment=environment,
+        services=services,
+        declared_by_service=declared_by_service,
+        driver=identity_driver,
+        plugin_slug=plugin_slug,
+        identity_role_name=role_name,
+    )
+    refusals = list(getattr(identity_driver, "prune_refusals", list)())
+    for refusal in refusals:
+        log.warning(
+            "workload identity %s: refused to prune a role assignment: %s",
+            role_name,
+            refusal,
+        )
     annotation = identity_driver.bind_service_account(
         cluster.slug,
         namespace,
@@ -241,8 +306,87 @@ def _ensure_workload_identity_sync(
         "namespace": namespace,
         "cluster_slug": cluster.slug,
         "grants": len(permissions),
+        "grants_pending": states.get("pending", 0),
+        "grants_failed": states.get("failed", 0),
+        "prune_refusals": len(refusals),
         "annotation": annotation,
     }
+
+
+def _persist_grant_state(
+    *,
+    environment: Any,
+    services: list[Any],
+    declared_by_service: list[list[dict[str, Any]]],
+    driver: Any,
+    plugin_slug: str,
+    identity_role_name: str,
+) -> dict[str, int]:
+    """Write each binding's assignment state, and drop what it no longer declares.
+
+    Only clouds that write a discrete assignment object per grant get rows.
+    AWS and GCP fold the grants into the identity's own policy document in the
+    same call that creates it, so there is no second object whose state could
+    differ from the identity's.
+
+    An assignment the driver reported nothing about is recorded ``pending``
+    rather than assumed applied: silence is exactly what this issue exists to
+    stop reading as success.
+    """
+    from django.utils import timezone
+
+    from astrolift_services.models import WorkloadIdentityGrant
+
+    counts: dict[str, int] = {}
+    if plugin_slug != "azure":
+        return counts
+
+    outcomes = {
+        (str(o.role_definition_id).lower(), str(o.scope).rstrip("/")): o
+        for o in getattr(driver, "grant_assignments", list)()
+    }
+    now = timezone.now()
+    for service, permissions in zip(services, declared_by_service, strict=True):
+        declared: set[tuple[str, str]] = set()
+        for permission in permissions:
+            guid = str(permission.get("role_definition_id", "") or "").lower()
+            scope = str(permission.get("scope", "") or "").rstrip("/")
+            if not guid or not scope:
+                continue
+            declared.add((guid, scope))
+            outcome = outcomes.get((guid, scope))
+            state = getattr(outcome, "state", WorkloadIdentityGrant.State.PENDING.value)
+            reason = getattr(
+                outcome,
+                "reason",
+                "the identity reconcile reported nothing about this assignment",
+            )
+            counts[state] = counts.get(state, 0) + 1
+            applied = state == WorkloadIdentityGrant.State.APPLIED.value
+            WorkloadIdentityGrant.objects.update_or_create(
+                managed_service=service,
+                app_environment=environment,
+                role_definition_id=guid,
+                scope=scope,
+                defaults={
+                    "provider_plugin_slug": plugin_slug,
+                    "identity_role_name": identity_role_name,
+                    "role_name": str(permission.get("role_name", "") or ""),
+                    "assignment_name": str(getattr(outcome, "assignment_name", "") or ""),
+                    "state": state,
+                    "reason": "" if applied else reason,
+                    "last_attempted_at": now,
+                    "applied_at": now if applied else None,
+                },
+            )
+        stale = WorkloadIdentityGrant.objects.filter(
+            managed_service=service,
+            app_environment=environment,
+        )
+        for row in stale:
+            if (row.role_definition_id.lower(), row.scope.rstrip("/")) not in declared:
+                row.soft_delete()
+    return counts
 
 
 @activity.defn(name="astrolift.workload_identity.ensure")

@@ -672,3 +672,186 @@ def test_delete_missing_raises_not_found(
 ) -> None:
     with pytest.raises(NotFoundError):
         driver.delete_identity_role("never")
+
+
+# ---- per-assignment state (#1367) -----------------------------------------
+
+
+class _PrincipalNotFound(Exception):
+    """ARM's answer while a fresh UAMI's service principal replicates."""
+
+    def __init__(self) -> None:
+        super().__init__("Principal 9999 does not exist in the directory tenant-1.")
+
+
+_PrincipalNotFound.__name__ = "HttpResponseError"
+
+
+@dataclass
+class _FlakyRoleAssignments(FakeRoleAssignments):
+    """Refuses the first ``fail_times`` creates the way AAD replication does."""
+
+    fail_times: int = 1
+    attempts: int = 0
+
+    def create(
+        self,
+        *,
+        scope: str,
+        role_assignment_name: str,
+        parameters: dict[str, Any],
+    ) -> Any:
+        self.attempts += 1
+        if self.attempts <= self.fail_times:
+            raise _PrincipalNotFound
+        return super().create(
+            scope=scope,
+            role_assignment_name=role_assignment_name,
+            parameters=parameters,
+        )
+
+
+def _driver_with(
+    assignments: FakeRoleAssignments,
+    **overrides: Any,
+) -> AzureFederatedIdentityDriver:
+    return AzureFederatedIdentityDriver(
+        config=FederatedIdentityConfig(
+            tenant_id="tenant-1",
+            subscription_id=_SUB,
+            resource_group=_RG,
+            cluster_oidc_issuer="https://oidc.prod.azure.com/abc",
+            msi_client=FakeMSI(),
+            authz_client=FakeAuthz(role_assignments=assignments),
+            **overrides,
+        ),
+    )
+
+
+def test_an_applied_grant_reports_the_assignment_it_produced(
+    driver: AzureFederatedIdentityDriver,
+) -> None:
+    driver.create_identity_role(
+        "api",
+        permissions=[
+            _permission(
+                _BLOB_ROLE,
+                _CONTAINER_SCOPE,
+                role_name="Storage Blob Data Contributor",
+            ),
+        ],
+    )
+
+    (grant,) = driver.grant_assignments()
+    assert grant.state == "applied"
+    assert grant.reason == ""
+    assert grant.role_name == "Storage Blob Data Contributor"
+    assert grant.scope == _CONTAINER_SCOPE
+    assert grant.assignment_name == _blob_assignment_name(_CONTAINER_SCOPE)
+
+
+def test_a_replicating_principal_is_pending_not_failed() -> None:
+    # No settle window: the first refusal is this call's final answer, and the
+    # deploy must not blow up over a directory that is merely catching up.
+    driver = _driver_with(_FlakyRoleAssignments(fail_times=99), grant_settle_seconds=0)
+
+    driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, _CONTAINER_SCOPE)])
+
+    (grant,) = driver.grant_assignments()
+    assert grant.state == "pending"
+    assert "has not replicated" in grant.reason
+
+
+def test_the_settle_window_retries_until_the_principal_lands(monkeypatch: Any) -> None:
+    monkeypatch.setattr("azure.identity_federated._SETTLE_POLL_SECONDS", 0)
+    assignments = _FlakyRoleAssignments(fail_times=2)
+    driver = _driver_with(assignments, grant_settle_seconds=30)
+
+    driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, _CONTAINER_SCOPE)])
+
+    assert assignments.attempts == 3
+    assert [grant.state for grant in driver.grant_assignments()] == ["applied"]
+
+
+def test_a_rejected_grant_is_failed_with_the_reason_and_still_raises(
+    driver: AzureFederatedIdentityDriver,
+) -> None:
+    outside = (
+        "/subscriptions/other-sub/resourceGroups/rg/providers/Microsoft.Storage"
+        "/storageAccounts/a/blobServices/default/containers/c"
+    )
+
+    with pytest.raises(AzureRoleAssignmentError, match="outside the identity's subscription"):
+        driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, outside)])
+
+    (grant,) = driver.grant_assignments()
+    assert grant.state == "failed"
+    assert "outside the identity's subscription" in grant.reason
+
+
+def test_one_rejected_grant_does_not_erase_the_state_of_the_others(
+    driver: AzureFederatedIdentityDriver,
+) -> None:
+    # The point of banking outcomes: an operator needs to know *which* grant is
+    # broken, not merely that one of them is.
+    outside = f"/subscriptions/other-sub/resourceGroups/{_RG}/providers/Microsoft.ServiceBus/namespaces/ns/queues/jobs"
+
+    with pytest.raises(AzureRoleAssignmentError):
+        driver.create_identity_role(
+            "api",
+            permissions=[
+                _permission(_BLOB_ROLE, _CONTAINER_SCOPE),
+                _permission(_QUEUE_ROLE, outside),
+            ],
+        )
+
+    by_scope = {grant.scope: grant.state for grant in driver.grant_assignments()}
+    assert by_scope == {_CONTAINER_SCOPE: "applied", outside: "failed"}
+
+
+def test_a_name_collision_refused_by_the_pruner_is_reported(
+    driver: AzureFederatedIdentityDriver,
+    fake_authz: FakeAuthz,
+) -> None:
+    # #1444 made this refusal fail closed but silent; an operator who dropped
+    # the grant has to be able to learn it is still in force.
+    fake_authz.role_assignments.seed(
+        FakeAssignment(
+            name=role_assignment_name(
+                principal_id="principal-9999",
+                role_definition_guid=_QUEUE_ROLE,
+                scope=_QUEUE_SCOPE,
+            ),
+            scope=_QUEUE_SCOPE,
+            role_definition_id=_role_definition_id(_QUEUE_ROLE),
+            principal_id="principal-9999",
+            description="",
+        ),
+    )
+
+    driver.create_identity_role("api", permissions=[])
+
+    (refusal,) = driver.prune_refusals()
+    assert _QUEUE_SCOPE in refusal
+    assert "still in force" in refusal
+
+
+def test_an_operator_assignment_is_left_alone_without_crying_wolf(
+    driver: AzureFederatedIdentityDriver,
+    fake_authz: FakeAuthz,
+) -> None:
+    # A randomly-named operator grant shows up on every reconcile. Reporting it
+    # as a refusal would bury the collision case above in noise.
+    fake_authz.role_assignments.seed(
+        FakeAssignment(
+            name=str(uuid.uuid4()),
+            scope=f"/subscriptions/{_SUB}/resourceGroups/{_RG}",
+            role_definition_id=_role_definition_id(AZURE_BUILTIN_ROLE_IDS["Reader"]),
+            principal_id="principal-9999",
+            description="granted by hand during the incident",
+        ),
+    )
+
+    driver.create_identity_role("api", permissions=[])
+
+    assert driver.prune_refusals() == []

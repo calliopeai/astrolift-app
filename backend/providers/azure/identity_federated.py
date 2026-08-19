@@ -15,17 +15,33 @@ assignment this driver creates is named with a UUIDv5 derived from
 ``(scope, roleDefinitionId, principalId)``, which makes creation idempotent and
 makes ownership decidable later: an assignment whose name equals that
 derivation is ours, anything else belongs to the operator and is never touched.
+
+Assignment *state* (#1367 follow-up): every attempt records a
+:class:`GrantAssignment` before it can raise, so the control plane can persist
+what actually happened per grant rather than inferring it from one all-or-
+nothing exception. AAD principal replication is the normal reason an
+assignment is not there yet, and it is reported as ``pending`` — a fresh
+identity is settling, not broken — while anything ARM actually rejected is
+``failed`` with the reason attached.
 """
 
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_tags import serialize_azure_arm_tags
-from _sdk.identity import WorkloadIdentityDriver
+from _sdk.identity import (
+    GRANT_APPLIED,
+    GRANT_FAILED,
+    GRANT_PENDING,
+    GrantAssignment,
+    WorkloadIdentityDriver,
+)
 from azure._errors import NotFoundError, ProviderError, map_api_error
 from azure.role_catalog import (
     AZURE_BUILTIN_ROLE_IDS,
@@ -36,7 +52,20 @@ from azure.role_catalog import (
     validate_arm_scope,
 )
 
+log = logging.getLogger("providers.azure.identity_federated")
+
 _ASSIGNMENT_NAME_NAMESPACE = uuid.NAMESPACE_URL
+
+# AAD replicates a freshly created UAMI's service principal asynchronously, so
+# ARM rejects an assignment naming it until the directory catches up. That is
+# eventual consistency, not a misconfiguration: the same call succeeds moments
+# later without anything changing.
+_REPLICATION_LAG_MARKERS = (
+    "principalnotfound",
+    "does not exist in the directory",
+)
+
+_SETTLE_POLL_SECONDS = 5.0
 
 # Stamped on every assignment we create. Not an ownership proof on its own
 # (descriptions are operator-writable); it exists so a human reading the portal
@@ -90,6 +119,13 @@ class FederatedIdentityConfig:
     """AuthorizationManagementClient — injected for tests; production builds a
     real one lazily. Required to grant the workload any data-plane access."""
 
+    grant_settle_seconds: float = 60.0
+    """How long to keep retrying an assignment ARM refuses because the
+    identity's service principal has not replicated yet. Bounded: past it the
+    assignment is reported ``pending`` rather than ``failed``, because nothing
+    is wrong with it — the directory is still catching up. Tests set 0 so no
+    test ever sleeps."""
+
 
 class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
     def __init__(self, *, config: FederatedIdentityConfig) -> None:
@@ -97,6 +133,8 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         self._msi = config.msi_client
         self._graph = config.graph_client
         self._authz = config.authz_client
+        self._grant_assignments: list[GrantAssignment] = []
+        self._prune_refusals: list[str] = []
 
     @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
@@ -195,11 +233,18 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
             )
         scope = f"/subscriptions/{self._config.subscription_id}/resourceGroups/{self._config.resource_group}"
         identity = self.describe_identity_role(role)
-        self._ensure_role_assignment(
+        outcome = self._ensure_role_assignment(
             identity=identity,
             role_definition_guid=guid,
+            role_name=getattr(resolved, "role_name", ""),
             scope=validate_arm_scope(scope),
         )
+        self._grant_assignments = [outcome]
+        if outcome.state != GRANT_APPLIED:
+            # No persistence hangs off this entry point, so an unconfirmed
+            # grant here would be lost rather than merely unapplied. The
+            # caller retries; the reason says whether that is worth doing.
+            raise AzureRoleAssignmentError(outcome.reason)
 
     @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
@@ -241,6 +286,25 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
 
     # ---- role assignments -------------------------------------------------
 
+    def grant_assignments(self) -> list[GrantAssignment]:
+        """Per-assignment state left by the last reconcile (#1367).
+
+        Populated even when the reconcile raises: the control plane needs to
+        record *which* grant failed and why, and an exception carries only
+        the first one.
+        """
+        return list(self._grant_assignments)
+
+    def prune_refusals(self) -> list[str]:
+        """Assignments the last reconcile refused to prune, with the reason.
+
+        Fail-closed removal is right, but a refusal that only ever happens in
+        silence is the same shape of problem as a binding that reports ready
+        while unauthorized: nothing complains and the operator never learns
+        that a grant they thought was revoked is still in place.
+        """
+        return list(self._prune_refusals)
+
     def _reconcile_role_assignments(
         self,
         *,
@@ -255,43 +319,116 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         removable when its name equals the UUIDv5 we derive from its own
         ``(scope, roleDefinitionId, principalId)`` *and* its description is
         ours. Anything else is treated as an operator's and left alone.
+
+        Every attempt is recorded before anything raises. A rejected grant
+        still fails the reconcile loudly — that is what #1444 bought — but it
+        fails with all of the outcomes already banked, so the caller can
+        persist which grant is broken instead of only that one was.
         """
-        for (guid, scope), _role_name in sorted(desired.items()):
+        self._grant_assignments = []
+        self._prune_refusals = []
+        if desired and not identity.principal_id:
+            raise AzureRoleAssignmentError(
+                f"managed identity {identity.name} exposes no principalId; refusing to "
+                "report a configured binding with no authorization behind it",
+            )
+        outcomes = [
             self._ensure_role_assignment(
                 identity=identity,
                 role_definition_guid=guid,
+                role_name=role_name,
                 scope=scope,
             )
-        self._prune_role_assignments(identity=identity, desired=set(desired))
+            for (guid, scope), role_name in sorted(desired.items())
+        ]
+        self._grant_assignments = outcomes
+        if identity.principal_id:
+            self._prune_role_assignments(identity=identity, desired=set(desired))
+        failures = [outcome for outcome in outcomes if outcome.state == GRANT_FAILED]
+        if failures:
+            raise AzureRoleAssignmentError("; ".join(outcome.reason for outcome in failures))
 
     def _ensure_role_assignment(
         self,
         *,
         identity: AzureManagedIdentity,
         role_definition_guid: str,
+        role_name: str,
         scope: str,
-    ) -> None:
+    ) -> GrantAssignment:
+        """Apply one grant and report what became of it.
+
+        Never raises: a rejected grant is an outcome the caller has to be able
+        to record. ``_reconcile_role_assignments`` turns the failures back
+        into one exception once every outcome is banked.
+        """
+        assignment_name = ""
+        if identity.principal_id:
+            assignment_name = role_assignment_name(
+                principal_id=identity.principal_id,
+                role_definition_guid=role_definition_guid,
+                scope=scope,
+            )
+
+        def outcome(state: str, reason: str = "") -> GrantAssignment:
+            return GrantAssignment(
+                role_definition_id=role_definition_guid,
+                role_name=role_name,
+                scope=scope,
+                assignment_name=assignment_name,
+                state=state,
+                reason=reason,
+            )
+
         if not identity.principal_id:
-            raise AzureRoleAssignmentError(
+            return outcome(
+                GRANT_FAILED,
                 f"managed identity {identity.name} exposes no principalId; refusing to "
                 "report a configured binding with no authorization behind it",
             )
-        scope_subscription = subscription_of(scope)
-        if scope_subscription.lower() != self._config.subscription_id.lower():
-            raise AzureRoleAssignmentError(
+        if subscription_of(scope).lower() != self._config.subscription_id.lower():
+            return outcome(
+                GRANT_FAILED,
                 f"grant scope {scope!r} is outside the identity's subscription "
                 f"{self._config.subscription_id!r}; the declaring driver must emit a "
                 "real ARM resource ID for the subscription it provisions into",
             )
+
+        deadline = time.monotonic() + max(self._config.grant_settle_seconds, 0.0)
+        while True:
+            try:
+                self._write_role_assignment(
+                    identity=identity,
+                    role_definition_guid=role_definition_guid,
+                    scope=scope,
+                    assignment_name=assignment_name,
+                )
+            except Exception as exc:
+                if not _is_replication_lag(exc):
+                    return outcome(GRANT_FAILED, f"{type(exc).__name__}: {exc}")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return outcome(
+                        GRANT_PENDING,
+                        "the identity's service principal has not replicated to the "
+                        f"directory yet; ARM answered: {exc}",
+                    )
+                time.sleep(min(_SETTLE_POLL_SECONDS, remaining))
+                continue
+            return outcome(GRANT_APPLIED)
+
+    def _write_role_assignment(
+        self,
+        *,
+        identity: AzureManagedIdentity,
+        role_definition_guid: str,
+        scope: str,
+        assignment_name: str,
+    ) -> None:
         authz = self._authorization_client()
         role_definition_id = role_definition_resource_id(
             subscription_id=self._config.subscription_id,
             role_definition_guid=role_definition_guid,
-        )
-        assignment_name = role_assignment_name(
-            principal_id=identity.principal_id,
-            role_definition_guid=role_definition_guid,
-            scope=scope,
         )
         try:
             authz.role_assignments.create(
@@ -348,12 +485,20 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 continue
             if (guid, scope.rstrip("/")) in desired:
                 continue
+            name = str(getattr(assignment, "name", "") or "")
             if not _is_ours(
                 assignment,
                 principal_id=principal_id,
                 role_definition_guid=guid,
                 scope=scope,
             ):
+                self._record_prune_refusal(
+                    assignment=assignment,
+                    name=name,
+                    principal_id=principal_id,
+                    role_definition_guid=guid,
+                    scope=scope,
+                )
                 continue
             try:
                 authz.role_assignments.delete(
@@ -364,6 +509,46 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 if type(exc).__name__ == "ResourceNotFoundError":
                     continue
                 raise map_api_error(exc) from exc
+
+    def _record_prune_refusal(
+        self,
+        *,
+        assignment: Any,
+        name: str,
+        principal_id: str,
+        role_definition_guid: str,
+        scope: str,
+    ) -> None:
+        """Make a refused prune audible.
+
+        An operator's own assignment carries a random name and shows up here
+        on every reconcile; that is expected and only worth a debug line. An
+        assignment sitting under the exact name we would derive but *without*
+        our marker is the interesting one — the grant looks revoked from the
+        platform's side and is still in force in the subscription.
+        """
+        expected = role_assignment_name(
+            principal_id=principal_id,
+            role_definition_guid=role_definition_guid,
+            scope=scope,
+        )
+        if name != expected:
+            log.debug(
+                "leaving unmanaged role assignment %s (role %s at %s) on principal %s",
+                name,
+                role_definition_guid,
+                scope,
+                principal_id,
+            )
+            return
+        description = str(getattr(_assignment_properties(assignment), "description", "") or "")
+        refusal = (
+            f"role assignment {name} (role {role_definition_guid} at {scope}) carries this "
+            f"platform's derived name but its description is {description!r}, not the platform "
+            "marker; left in place, so the grant is still in force despite no longer being declared"
+        )
+        self._prune_refusals.append(refusal)
+        log.warning("refusing to prune role assignment: %s", refusal)
 
     def _resolve_existing_assignment(
         self,
@@ -506,6 +691,23 @@ def _desired_assignments(
             )
         desired[(guid, validate_arm_scope(scope))] = str(permission.get("role_name", "") or guid)
     return desired
+
+
+def _is_replication_lag(exc: BaseException) -> bool:
+    """Is this ARM rejection just the directory not having caught up yet?
+
+    Checked across the cause chain because ``map_api_error`` re-raises a typed
+    provider error whose text is the SDK's, and the SDK's own ``error.code``
+    only exists on the original.
+    """
+    current: BaseException | None = exc
+    while current is not None:
+        code = str(getattr(getattr(current, "error", None), "code", "") or "")
+        haystack = f"{code} {current}".lower()
+        if any(marker in haystack for marker in _REPLICATION_LAG_MARKERS):
+            return True
+        current = current.__cause__
+    return False
 
 
 def _assignment_properties(assignment: Any) -> Any:

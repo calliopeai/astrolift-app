@@ -146,6 +146,11 @@ _EXCLUDED_METHODS = {
     "login_server",  # ACR property
     "render_endpoint",  # k8s_native/dns_external pure helper
     "render_certificate",  # k8s_native/tls_certmanager pure helper
+    # In-memory read-backs of what the *previous* instrumented call already
+    # recorded (#1367). They touch no cloud API, so a span here would time an
+    # attribute copy and double-count the work the reconcile already reported.
+    "grant_assignments",
+    "prune_refusals",
 }
 
 

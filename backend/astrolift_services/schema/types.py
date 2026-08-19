@@ -7,6 +7,7 @@ import datetime as dt
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_services.models import WorkloadIdentityGrant, grant_state_for
 
 JSON = strawberry.scalars.JSON
 
@@ -154,6 +155,35 @@ class AppSecretBundleAttachmentType:
     attached_at: dt.datetime | None = None
 
 
+@strawberry.type(name="AstroliftWorkloadIdentityGrant")
+class WorkloadIdentityGrantType:
+    """One authorization a binding needs, and whether the cloud has it (#1367).
+
+    A federated credential proves who the pod is; on Azure a separate role
+    assignment says what it may touch, and that object can still be
+    propagating or have been rejected after the service itself is active.
+    """
+
+    id: GUID
+    managed_service_id: GUID
+    environment_name: str
+    provider_plugin_slug: str
+    identity_role_name: str
+    role_name: str
+    role_definition_id: str
+    scope: str
+    assignment_name: str
+    state: str
+    """``pending`` | ``applied`` | ``failed``. ``pending`` is the settling
+    window, not a fault: ARM assignments take seconds to replicate."""
+
+    reason: str
+    """Why it is not applied yet. Empty once it is."""
+
+    last_attempted_at: dt.datetime | None
+    applied_at: dt.datetime | None
+
+
 @strawberry.type(name="AstroliftManagedService")
 class ManagedServiceType:
     id: GUID
@@ -184,6 +214,27 @@ class ManagedServiceType:
     """Config keys the driver accepts via ``update()`` without full
     reprovision. ``["*"]`` means all fields; ``[]`` means all changes
     require ``reprovisionManagedService``."""
+
+    grant_state: str = "not_required"
+    """``not_required`` | ``pending`` | ``applied`` | ``failed`` (#1367).
+
+    ``status`` describes the resource; this describes the workload's
+    authorization to reach it, which is a separate object on Azure and can
+    lag or fail on its own. ``not_required`` means the binding declares no
+    assignable grant — on AWS/GCP the grants live in the identity's own
+    policy, and several Azure drivers resolve entirely to control-plane work
+    whose material reaches the pod as a projected Secret."""
+
+    binding_ready: bool = True
+    """False while any required grant is unapplied.
+
+    Derived rather than left to each client: a green badge next to a workload
+    that cannot reach its data plane is the exact failure this field exists
+    to prevent, and every surface would otherwise have to re-derive it."""
+
+    workload_identity_grants: list[WorkloadIdentityGrantType] = strawberry.field(
+        default_factory=list,
+    )
 
 
 @strawberry.type(name="AstroliftManagedServiceCatalogEntry")
@@ -925,6 +976,8 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
     resolution per distinct variant rather than one per row.
     """
     editable = _editable_fields_for(svc) if resolve_editable_fields else ["*"]
+    grants = [row for row in svc.workload_identity_grants.all() if row.deleted_at is None]
+    state = grant_state_for(grants)
     return ManagedServiceType(
         id=GUID(str(svc.guid)),
         name=svc.name,
@@ -955,6 +1008,31 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
             for row in svc.volume_bindings.all()
             if row.deleted_at is None
         ],
+        grant_state=state,
+        binding_ready=state
+        not in {
+            WorkloadIdentityGrant.State.PENDING.value,
+            WorkloadIdentityGrant.State.FAILED.value,
+        },
+        workload_identity_grants=[workload_identity_grant_to_type(row) for row in grants],
+    )
+
+
+def workload_identity_grant_to_type(row) -> WorkloadIdentityGrantType:
+    return WorkloadIdentityGrantType(
+        id=GUID(str(row.guid)),
+        managed_service_id=GUID(str(row.managed_service.guid)),
+        environment_name=row.app_environment.name,
+        provider_plugin_slug=row.provider_plugin_slug,
+        identity_role_name=row.identity_role_name,
+        role_name=row.role_name,
+        role_definition_id=row.role_definition_id,
+        scope=row.scope,
+        assignment_name=row.assignment_name,
+        state=row.state,
+        reason=row.reason,
+        last_attempted_at=row.last_attempted_at,
+        applied_at=row.applied_at,
     )
 
 
