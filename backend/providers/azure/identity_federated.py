@@ -541,11 +541,11 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 principal_id,
             )
             return
+        description = str(getattr(_assignment_properties(assignment), "description", "") or "")
         refusal = (
             f"role assignment {name} (role {role_definition_guid} at {scope}) carries this "
-            f"platform's derived name but not its marker "
-            f"{str(getattr(_assignment_properties(assignment), 'description', '') or '')!r}; "
-            "left in place, so the grant is still in force despite no longer being declared"
+            f"platform's derived name but its description is {description!r}, not the platform "
+            "marker; left in place, so the grant is still in force despite no longer being declared"
         )
         self._prune_refusals.append(refusal)
         log.warning("refusing to prune role assignment: %s", refusal)
