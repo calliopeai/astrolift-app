@@ -89,8 +89,13 @@ codegen:
 
 codegen-all: schema codegen
 
+# Render the frontend's permission-slug mirror from core.permissions.
+# The backend container mounts only ./backend, so the generator prints the
+# module and the host writes it — same split as `schema`.
 perms:
-	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py make_perms
+	$(COMPOSE) exec -T $(CONTAINER) $(PYTHON) manage.py make_perms --print \
+		> frontend/lib/permissions/permissions.generated.ts
+	@echo "→ frontend/lib/permissions/permissions.generated.ts"
 
 # ---- frontend (next.js) --------------------------------------------
 
