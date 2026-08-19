@@ -160,6 +160,18 @@ const table = useCursorTable<Deployment>({
 />;
 ```
 
+### The allowlist
+
+`no-raw-table` runs at **error**. The surfaces that still import the
+primitives are named, one per line with the blocker that keeps them there,
+in `eslint/raw-table-allowlist.mjs` — matched by exact path, because
+minimatch reads the `[slug]` in a route directory as a character class.
+
+`eslint/raw-table-allowlist.test.ts` asserts the list is exactly the set of
+files importing `@/components/ui/table`. Migrating a surface therefore
+includes deleting its entry, or the test fails; adding a raw table fails
+lint until an entry is added in review. The list may only shrink.
+
 ## Design system
 
 The theme lives in `app/globals.css`. Brand seeds (`--brand-*`, the teal +
