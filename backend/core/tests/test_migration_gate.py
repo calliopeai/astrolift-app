@@ -168,3 +168,42 @@ def test_destructive_set_matches_django_op_names():
 def test_risky_set_includes_runpython_and_runsql():
     assert "RunPython" in RISKY_OPS
     assert "RunSQL" in RISKY_OPS
+
+
+# ---- the graph itself, not the operations in it ------------------------------
+
+
+def test_the_migration_graph_has_exactly_one_leaf_per_app():
+    """Two concurrently-authored migrations numbering themselves alike (#1495).
+
+    #1488 and #1489 were both cut from a main whose last `astrolift_services`
+    migration was 0019, each numbered its own 0020, and each was green on its
+    own branch because neither branch held the other's file. They merged an
+    hour apart and the conflict existed only in the result: Django refuses to
+    build a graph with two leaves, so `setup_databases` raised and all 562
+    database-backed tests in every shard errored before one ran.
+
+    This assertion needs no database and takes about a second, where the
+    failure it replaces took a full shard matrix to surface. It also fails on
+    the first PR re-run after the bad merge rather than on every PR opened
+    afterwards, which is while it is still cheap to fix.
+
+    `MigrationLoader(None)` reads the on-disk migrations without a connection,
+    which is the whole point -- a check that needed the database could not run
+    in the job where this breaks.
+    """
+    from django.db.migrations.loader import MigrationLoader
+
+    leaves: dict[str, list[str]] = {}
+    for app_label, name in MigrationLoader(None).graph.leaf_nodes():
+        leaves.setdefault(app_label, []).append(name)
+
+    forked = {app: sorted(names) for app, names in leaves.items() if len(names) > 1}
+
+    assert not forked, (
+        "apps with more than one leaf migration: "
+        + "; ".join(f"{app}: {', '.join(names)}" for app, names in sorted(forked.items()))
+        + ". Two branches numbered a migration alike and both merged. Run "
+        "`python manage.py makemigrations --merge <app>` to write a "
+        "dependencies-only merge migration."
+    )
