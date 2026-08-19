@@ -34,8 +34,8 @@ from _sdk.cluster import (
     RolloutResult,
     StorageClassInfo,
     TeardownReport,
-    WorkloadStatus,
     classify_apply_error,
+    workload_status_from_object,
 )
 from _sdk.k8s_dynamic_client import (
     KubernetesDynamicClient as _RealK8sClient,
@@ -446,18 +446,7 @@ class AKSClusterDriver(ClusterDriver):
             raise NotFoundError(
                 f"{kind}/{name} in namespace {namespace}",
             ) from exc
-        status = obj.get("status", {})
-        spec = obj.get("spec", {})
-        return WorkloadStatus(
-            kind=kind,
-            name=name,
-            namespace=namespace,
-            ready_replicas=int(status.get("readyReplicas", 0)),
-            desired_replicas=int(
-                spec.get("replicas", status.get("replicas", 0)),
-            ),
-            conditions=status.get("conditions", []) or [],
-        )
+        return workload_status_from_object(kind, name, namespace, obj)
 
     @driver_op(cloud="azure", driver="cluster")
     def poll_rollout(

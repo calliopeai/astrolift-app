@@ -63,6 +63,7 @@ from _sdk.cluster import (
     TeardownReport,
     WorkloadStatus,
     classify_apply_error,
+    workload_status_from_object,
 )
 
 # Shared helper re-exports. ``_RealK8sClient`` + ``_NotFoundError`` are
@@ -690,18 +691,7 @@ class EKSClusterDriver(ClusterDriver):
                 f"{kind}/{name} in namespace {namespace}",
             ) from exc
 
-        status = obj.get("status", {})
-        spec = obj.get("spec", {})
-        return WorkloadStatus(
-            kind=kind,
-            name=name,
-            namespace=namespace,
-            ready_replicas=int(status.get("readyReplicas", 0)),
-            desired_replicas=int(
-                spec.get("replicas", status.get("replicas", 0)),
-            ),
-            conditions=status.get("conditions", []) or [],
-        )
+        return workload_status_from_object(kind, name, namespace, obj)
 
     @driver_op(cloud="aws", driver="cluster")
     def poll_rollout(

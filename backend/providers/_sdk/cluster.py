@@ -188,12 +188,75 @@ class Namespace:
 
 @dataclass(frozen=True)
 class WorkloadStatus:
+    """How many instances of a workload are wanted, and how many are up.
+
+    ``ready_replicas`` / ``desired_replicas`` are counts of *pods*, not of
+    any one kind's spelling of them. A Deployment spells them
+    ``status.readyReplicas`` / ``spec.replicas``; a Job spells them
+    ``status.ready`` / ``spec.parallelism``. Build one with
+    :func:`workload_status_from_object` so the same two numbers mean the
+    same thing whatever kind the caller asked about (#133).
+    """
+
     kind: str
     name: str
     namespace: str
     ready_replicas: int
     desired_replicas: int
     conditions: list[dict[str, Any]]
+
+
+def workload_status_from_object(
+    kind: str,
+    name: str,
+    namespace: str,
+    obj: dict[str, Any],
+) -> WorkloadStatus:
+    """Project a raw Kubernetes object onto :class:`WorkloadStatus`.
+
+    Every cluster driver shares this so a workload does not read
+    differently depending on which cloud it happens to be running in.
+
+    A Job's status is ``{"active":1,"ready":1,"startTime":...}`` — no
+    ``readyReplicas``, no ``spec.replicas``. Projected with the Deployment
+    keys it reads 0/0, which is indistinguishable from a Deployment scaled
+    to zero, so a caller polling for liveness waits on a healthy Job
+    forever (#133: an attachable agent-box that never left ``provisioning``).
+
+    Mapping the Job onto the existing two fields is deliberate, in
+    preference to growing ``WorkloadStatus`` a second, Job-shaped set of
+    counters. New fields would only help a caller that already knew to
+    read them; every caller that did not would keep silently reading 0/0,
+    which is the trap itself rather than a fix for it. A Job's terminal
+    state is not lost either way — that lives in ``conditions``
+    (``Complete`` / ``Failed``), which is what every Job caller in the
+    tree already reads it from.
+
+    Readiness comes from ``status.ready``, never from ``status.active``:
+    ``active`` counts Pending pods, so a Job whose pod has been scheduled
+    but has not started would report as up. Calling a box attachable
+    before it is, is the same lie as never calling it attachable at all,
+    just pointing the other way.
+    """
+    status = obj.get("status") or {}
+    spec = obj.get("spec") or {}
+    if kind == "Job":
+        # Absent parallelism means 1, per the Job spec's own default, so a
+        # plain one-shot Job reads as "1 wanted" from the moment it exists.
+        parallelism = spec.get("parallelism")
+        desired = 1 if parallelism is None else int(parallelism)
+        ready = int(status.get("ready") or 0)
+    else:
+        ready = int(status.get("readyReplicas") or 0)
+        desired = int(spec.get("replicas", status.get("replicas", 0)) or 0)
+    return WorkloadStatus(
+        kind=kind,
+        name=name,
+        namespace=namespace,
+        ready_replicas=ready,
+        desired_replicas=desired,
+        conditions=status.get("conditions", []) or [],
+    )
 
 
 @dataclass(frozen=True)

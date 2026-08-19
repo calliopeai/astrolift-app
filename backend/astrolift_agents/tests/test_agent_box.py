@@ -85,13 +85,28 @@ class _ApplyResult:
 class _FakeDriver:
     """Records what the platform tried to put on / take off the cluster."""
 
-    def __init__(self, *, apply_ok=True, job_conditions=None, job_missing=False):
+    #: What the apiserver returns in ``status`` for a box Job whose pod is
+    #: up, verbatim from prd. There is no ``readyReplicas`` and the spec has
+    #: no ``replicas`` because a Job has neither; a fake that invented them
+    #: would go green against the bug in #133, which is what the old one did.
+    RUNNING_JOB_STATUS = {
+        "active": 1,
+        "ready": 1,
+        "startTime": "2026-08-19T01:10:49Z",
+        "terminating": 0,
+    }
+
+    #: The same Job before the kubelet has started its pod.
+    PENDING_JOB_STATUS = {"startTime": "2026-08-19T01:10:47Z"}
+
+    def __init__(self, *, apply_ok=True, job_conditions=None, job_missing=False, job_status=None):
         self.applied: list[list[dict]] = []
         self.deleted: list[list[dict]] = []
         self.namespaces: list[str] = []
         self._apply_ok = apply_ok
         self._job_conditions = job_conditions or []
         self._job_missing = job_missing
+        self.job_status = dict(self.RUNNING_JOB_STATUS if job_status is None else job_status)
 
     def ensure_namespace(self, cluster_slug, namespace, labels, annotations):
         self.namespaces.append(namespace)
@@ -107,15 +122,21 @@ class _FakeDriver:
     def get_workload_status(self, cluster_slug, namespace, kind, name):
         if self._job_missing:
             raise RuntimeError("job not found")
-        from _sdk.cluster import WorkloadStatus
+        # Projected by the real SDK helper off a real Job object, so the
+        # reaper here reads exactly what it reads against a cluster.
+        from _sdk.cluster import workload_status_from_object
 
-        return WorkloadStatus(
-            kind=kind,
-            name=name,
-            namespace=namespace,
-            ready_replicas=1,
-            desired_replicas=1,
-            conditions=list(self._job_conditions),
+        return workload_status_from_object(
+            kind,
+            name,
+            namespace,
+            {
+                "spec": {"backoffLimit": 0, "completions": 1, "parallelism": 1},
+                "status": {
+                    **self.job_status,
+                    "conditions": list(self._job_conditions),
+                },
+            },
         )
 
 
@@ -377,6 +398,62 @@ def test_a_never_reap_box_stays_up(org):
     finally:
         proc.kill()
         subprocess.run(["tmux", "-L", socket, "kill-server"], capture_output=True, check=False)
+
+
+def test_a_healthy_job_backed_box_reaches_running(org, cluster, pod_backend):
+    """#133. The box was up, tmux was holding the session, and the row sat
+    at ``provisioning`` indefinitely.
+
+    ``observe_box`` decided RUNNING off ``ready_replicas`` / ``desired_replicas``,
+    which a Job does not report — it reports ``active`` / ``ready``. Both
+    mapped to 0, ``0 or 0`` was falsy, and the sweep returned "leave it
+    alone" on every pass. ``astro box ls`` misreported, ``pod_name`` was
+    never stamped because that write lives in this branch, and
+    ``astro box attach`` waited out its five-minute timeout against a box
+    that had been attachable the whole time.
+    """
+    pod_backend(_BoxPodBackend())
+    box = _box(
+        org,
+        status=AgentBox.Status.PROVISIONING,
+        external_id="agent-box-01a0179226c370ac",
+        namespace="astrolift-agents-box-org",
+    )
+    assert cluster.driver.job_status == _FakeDriver.RUNNING_JOB_STATUS
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["running"] == 1
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert box.pod_name == "agent-box-abc123-x9k2p"
+
+
+def test_a_box_whose_pod_has_not_started_stays_provisioning(org, cluster, pod_backend):
+    """The same lie pointing the other way.
+
+    A Job exists before its pod does, and its ``parallelism`` is 1 from
+    that instant. Reading "one pod wanted" as "one pod up" would report a
+    box attachable while nothing was listening, so a client would dial a
+    relay that is not there.
+    """
+    backend = pod_backend(_BoxPodBackend())
+    cluster.driver.job_status = dict(_FakeDriver.PENDING_JOB_STATUS)
+    box = _box(
+        org,
+        status=AgentBox.Status.PROVISIONING,
+        external_id="agent-box-cold",
+        namespace="astrolift-agents-box-org",
+    )
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["running"] == 0
+    assert box.status == AgentBox.Status.PROVISIONING.value
+    assert box.pod_name == ""
+    # Nothing was claimed about the box, so nothing was spent looking.
+    assert backend.calls == []
 
 
 def test_the_reaper_settles_a_box_whose_pod_has_gone(org, cluster, monkeypatch):
