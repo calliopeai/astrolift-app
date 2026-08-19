@@ -249,7 +249,10 @@ class AzureResourceAdopter:
                 ref.name,
             )
             return _string_map(_attr(share, "metadata"))
-        except Exception as exc:  # noqa: BLE001 -- surfaced verbatim to the operator
+        # Broad by intent: every SDK failure becomes one operator-readable
+        # refusal, and an unreadable resource must never fall through as
+        # "no markers found", which classifies as an approved takeover.
+        except Exception as exc:
             raise AzureAdoptionError(f"reading ownership markers on {ref.resource_id}: {exc}") from exc
 
     # ---- writes -----------------------------------------------------
@@ -285,7 +288,10 @@ class AzureResourceAdopter:
                 ref.name,
                 file_share={"metadata": merged},
             )
-        except Exception as exc:  # noqa: BLE001 -- surfaced verbatim to the operator
+        # Broad by intent: every SDK failure becomes one operator-readable
+        # refusal, and an unreadable resource must never fall through as
+        # "no markers found", which classifies as an approved takeover.
+        except Exception as exc:
             raise AzureAdoptionError(f"stamping the identity envelope on {ref.resource_id}: {exc}") from exc
 
 

@@ -21,9 +21,7 @@ MANAGED = Path(filesystem_files_classic.__file__).parent
 #: it is the authorized adoption operation's cloud half, deliberately outside
 #: the lifecycle so no driver path can reach it (#1365). Its own guard test
 #: asserts that separation from the other direction.
-DRIVERS = sorted(
-    path for path in MANAGED.glob("*.py") if path.name not in {"__init__.py", "tags.py", "adoption.py"}
-)
+DRIVERS = sorted(path for path in MANAGED.glob("*.py") if path.name not in {"__init__.py", "tags.py", "adoption.py"})
 
 
 def _assertion_functions(tree: ast.AST) -> list[ast.FunctionDef]:
