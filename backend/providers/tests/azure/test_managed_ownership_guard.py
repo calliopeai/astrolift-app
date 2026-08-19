@@ -17,7 +17,13 @@ from _sdk.azure_ownership import METADATA_KEYS
 from azure.managed import filesystem_files_classic
 
 MANAGED = Path(filesystem_files_classic.__file__).parent
-DRIVERS = sorted(path for path in MANAGED.glob("*.py") if path.name not in {"__init__.py", "tags.py"})
+#: ``adoption.py`` is excluded with the tag helper because it is not a driver:
+#: it is the authorized adoption operation's cloud half, deliberately outside
+#: the lifecycle so no driver path can reach it (#1365). Its own guard test
+#: asserts that separation from the other direction.
+DRIVERS = sorted(
+    path for path in MANAGED.glob("*.py") if path.name not in {"__init__.py", "tags.py", "adoption.py"}
+)
 
 
 def _assertion_functions(tree: ast.AST) -> list[ast.FunctionDef]:

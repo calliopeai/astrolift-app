@@ -154,7 +154,6 @@ _MANAGED_CONFIG_PROPERTIES = {
     "apim_allow_custom_domains": {"type": "boolean", "default": False},
     "apim_allow_subscriptions": {"type": "boolean", "default": False},
     "apim_allow_child_pruning": {"type": "boolean", "default": False},
-    "apim_allow_adoption": {"type": "boolean", "default": False},
     "apim_deletion_protection_default": {"type": "boolean", "default": True},
     "apim_max_apis": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 50},
     "apim_max_routes_per_api": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},

@@ -88,6 +88,14 @@ OWNERSHIP_KEYS: dict[str, dict[str, str]] = {
         "env": "astrolift-env",
         "cluster": "astrolift-cluster",
         "isolation": "astrolift-isolation",
+        # Adoption markers (#1365). Written only by the authorized adoption
+        # operation, never by a driver's provision path, and read by teardown
+        # guards that treat an adopted resource as more dangerous to delete
+        # than one the platform created. Declared here so the two spellings
+        # have one owner rather than living as a literal in the one driver
+        # that first needed them.
+        "adopted": "astrolift-adopted",
+        "adopted_at": "astrolift-adopted-at",
     },
 }
 

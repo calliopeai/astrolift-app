@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Close #1365 with explicit, separately authorized adoption of an existing
+  Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
+  refuses every mutating path against a resource whose identity tags do not
+  name the calling managed service, teardown included, which left anything
+  provisioned before its driver stamped an identity tag removable only by
+  hand — a bill the platform cannot stop. `adoptManagedResource` is the
+  migration path: it reads the resource's markers, records them, and stamps
+  the same envelope `arm_tags_for` writes on provision, so the resource is
+  ordinary afterwards. It carries its own grant, `managed_service.adopt`,
+  rather than reusing the provisioning grants, because booking a service and
+  taking over somebody else's resource are different capabilities; migration
+  `astrolift_identity/0023` re-upserts the system roles for it. Every attempt
+  writes a `ManagedResourceAdoption` row — actor, reason, resource, and the
+  prior ownership markers verbatim, since "it had no tag" and "it had another
+  service's tag" are different things to have approved and the cloud forgets
+  the difference the moment the envelope is merged. Taking a resource from
+  another managed service additionally requires naming that owner in the
+  request. Refusals are recorded too.
+- Delete API Management's `adopt_existing` config flag and its
+  `apim_allow_adoption` install policy. It was the last route by which a name
+  collision could become a takeover with no record of what was taken, which is
+  the hazard #1365 exists to remove; the config validator now rejects the key
+  rather than ignoring it, so an operator who asks for the old behaviour is
+  told. The driver's adopted-resource teardown guard and its `delete_adopted`
+  escape hatch survive and become the first consumer of the shared
+  `astrolift-adopted` marker the new operation writes.
+  A reconcile also stops replacing the service's tag map wholesale, which
+  would otherwise have stripped that marker — and the operator's own tags —
+  off an adopted service on the next provision.
+
 - Make `cache` reachable on every cloud with an in-cluster Memcached variant,
   `k8s_native/cache/memcached`. The kind was executable on AWS only: GCP sells
   Memorystore for Memcached, Azure sells nothing equivalent, so one in-cluster

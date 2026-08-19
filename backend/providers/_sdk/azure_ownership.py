@@ -24,10 +24,14 @@ and environment collide precisely because those tags agree.
 
 The contract here is deliberately narrow. Ownership is proven from the ARM tags
 the platform stamps at create, and nothing else. An absent marker and a
-conflicting marker both refuse, before any cloud call. Adoption of an unowned
-resource is not implemented on purpose: it needs its own authorization and
-audit record, and a convenience version of it is the hazard this module exists
-to remove.
+conflicting marker both refuse, before any cloud call.
+
+Adoption of an unowned resource lives in ``_sdk.azure_adoption`` and reaches
+the cloud only through the control plane's authorized ``adoptManagedResource``
+operation, which carries its own permission and writes an audit record naming
+the markers it displaced. Nothing in this module calls it, and no driver
+lifecycle path may: a convenience version of adoption is the hazard this module
+exists to remove.
 
 Idempotency falls out of the rule rather than being special-cased. The check is
 a pure comparison against tags the resource already carries, so replaying our
@@ -67,6 +71,10 @@ class AzureOwnershipKeys:
     managed_by: str
     binding: str
     managed_service_id: str
+    #: Written only by the authorized adoption operation (#1365), so every
+    #: surface names them even though no driver's provision path emits them.
+    adopted: str = ""
+    adopted_at: str = ""
 
 
 #: Post-serialization ARM tag names, taken from the same table the write path
@@ -77,6 +85,8 @@ ARM_TAG_KEYS = AzureOwnershipKeys(
     managed_by=ownership_key("azure", "managed_by"),
     binding=ownership_key("azure", "binding"),
     managed_service_id=canonical_key("azure"),
+    adopted=ownership_key("azure", "adopted"),
+    adopted_at=ownership_key("azure", "adopted_at"),
 )
 
 #: Blob-container and file-share metadata keys. ``read_managed_service_id``
@@ -86,6 +96,8 @@ METADATA_KEYS = AzureOwnershipKeys(
     managed_by="astrolift_managed_by",
     binding="astrolift_binding",
     managed_service_id="astrolift_managed_service_id",
+    adopted="astrolift_adopted",
+    adopted_at="astrolift_adopted_at",
 )
 
 #: Blob-container metadata keys, a third spelling again: the flattened
@@ -97,6 +109,8 @@ BLOB_METADATA_KEYS = AzureOwnershipKeys(
     managed_by="astrolift_io_managed_by",
     binding="astrolift_io_binding",
     managed_service_id="astrolift_io_managed_service_id",
+    adopted="astrolift_io_adopted",
+    adopted_at="astrolift_io_adopted_at",
 )
 
 #: Backwards-compatible aliases for the ARM names.
