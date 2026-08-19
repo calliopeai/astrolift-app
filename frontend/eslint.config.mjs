@@ -1,7 +1,11 @@
+import path from "node:path";
+
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
+
+import { RAW_TABLE_ALLOWLIST_FILES } from "./eslint/raw-table-allowlist.mjs";
 
 /**
  * Design-system guardrail (#1050 / epic #1046).
@@ -37,17 +41,17 @@ const VARIANT_HELPERS = new Set(["cva", "tv"]);
  *   - `no-raw-table` — `@/components/ui/table` is DataTable's private
  *     dependency. Import `DataTable` instead; a surface that reaches for
  *     the primitives is re-deriving pagination, empty states and loading
- *     behaviour that the component already gets right. Ships at `warn`
- *     until the wave migrations land, then flips to `error`.
+ *     behaviour that the component already gets right.
  *   - `no-native-confirm` — `window.confirm` blocks the event loop, cannot
  *     be styled or tested, and gives destructive actions no pending state.
  *     Use `ConfirmDialog` / `useConfirm`. The imperative `useConfirm()`
  *     binding is resolved by scope analysis, not by name, so it is not
  *     flagged.
  *
- * `no-native-confirm` is at `error` — that sweep is finished. `no-raw-table`
- * stays at `warn` until the residual backlog is triaged; see the rule config
- * below for why it cannot simply be flipped.
+ * Both are at `error`. `no-raw-table` carries an explicit allowlist
+ * (`eslint/raw-table-allowlist.mjs`) naming every file that still imports
+ * the primitives and why; it is matched by exact path, not by glob, and a
+ * test asserts it stays exactly in step with the tree.
  */
 const dataSurfacePlugin = {
   rules: {
@@ -60,11 +64,21 @@ const dataSurfacePlugin = {
         },
         messages: {
           rawTable:
-            "Raw `ui/table` import. Use `DataTable` from @/components/data-table — it carries the pagination, empty, loading and error states this surface would otherwise re-derive. See frontend/bootstrap.md 'Data surfaces'.",
+            "Raw `ui/table` import. Use `DataTable` from @/components/data-table — it carries the pagination, empty, loading and error states this surface would otherwise re-derive. See frontend/bootstrap.md 'Data surfaces'. If this surface genuinely cannot use DataTable, add it to eslint/raw-table-allowlist.mjs with the blocker written out.",
         },
-        schema: [],
+        // The allowlist is passed as exact repo-relative paths rather than
+        // matched with a `files` override: several of these live under
+        // `app/(app)/apps/[slug]/…`, and minimatch reads `[slug]` as a
+        // character class, so a glob override would silently miss them.
+        schema: [{ type: "array", items: { type: "string" }, uniqueItems: true }],
       },
       create(context) {
+        const allowlist = context.options[0] ?? [];
+        const relative = path.relative(context.cwd, context.filename).split(path.sep).join("/");
+        const exempt = allowlist.some(
+          (entry) => relative === entry || relative.endsWith(`/${entry}`)
+        );
+        if (exempt) return {};
         return {
           ImportDeclaration(node) {
             if (node.source.value === "@/components/ui/table") {
@@ -193,19 +207,18 @@ const eslintConfig = defineConfig([
     plugins: { astrolift: designTokensPlugin },
     rules: { "astrolift/no-raw-design-values": "error" },
   },
-  // Data-surface guardrail — see the rule's doc block above. Ships at
-  // `warn` while the wave migrations land, then flips to `error`.
+  // Data-surface guardrail — see the rule's doc block above.
   {
     files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     ignores: ["components/data-table/**"],
     plugins: { astroliftData: dataSurfacePlugin },
     rules: {
-      // Still `warn`: the residual backlog is not all list surfaces. A chunk
-      // of it is detail / key-value tables where DataTable is the wrong tool
-      // and `DefinitionList` is the right home, so flipping this to `error`
-      // before that population is triaged would force those through a
-      // pagination component that makes no sense for them.
-      "astroliftData/no-raw-table": "warn",
+      // `error`: at `warn` the count went 59 → 38 → 35 across three waves
+      // while new surfaces kept shipping past it. The residue is enumerated
+      // in eslint/raw-table-allowlist.mjs, one entry per file with its
+      // blocker; that list may only shrink, and a test holds it in step
+      // with the tree.
+      "astroliftData/no-raw-table": ["error", RAW_TABLE_ALLOWLIST_FILES],
       // `error`: the sweep is done, every call site is a ConfirmDialog, and
       // there is no legitimate reason to add a new one.
       "astroliftData/no-native-confirm": "error",
