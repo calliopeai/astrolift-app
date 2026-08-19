@@ -25,6 +25,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from astrolift_drivers.registry import DriverNotFound, plugins
+from core.cluster_credentials import CREDENTIAL_REFUSALS, assert_credential_supported
 from core.cluster_observability import (
     ClusterObservabilityError,
     _config_for,  # type: ignore[attr-defined]
@@ -134,6 +135,10 @@ def _driver_for_cluster(cluster: TenantCluster) -> Any:
         return _OverrideManagementDriver(backend=_MANAGEMENT_BACKEND_OVERRIDE)
 
     plugin_slug = cluster.provider_plugin.slug
+    try:
+        assert_credential_supported(cluster, capability="cluster")
+    except CREDENTIAL_REFUSALS as exc:
+        raise ClusterManagementError(str(exc)) from exc
     try:
         driver_cls = plugins.get(plugin_slug, "cluster")
     except DriverNotFound as exc:

@@ -134,21 +134,27 @@ class CloudWatchLogsQueryDriver:
 
 def _build_logs_client(*, region: str, role_arn: str | None) -> Any:
     """Build a boto3 CloudWatch Logs client using ambient credentials,
-    assuming ``role_arn`` first for a cross-account tenant cluster."""
-    import boto3
+    assuming ``role_arn`` first for a cross-account tenant cluster.
+
+    Delegates to ``aws.session`` (#1422) rather than assuming inline. This
+    driver had the tree's only cross-account path, and hand-rolling it meant
+    an AssumeRole per query with no expiry handling; the shared factory caches
+    the session and is the seam the remaining AWS drivers migrate onto.
+    Imported lazily for the same reason boto3 was: an ``_sdk`` consumer that
+    never touches AWS must not need the AWS extra installed."""
+    from _sdk.cloud_credentials import CloudCredential, CredentialMode
+    from aws.session import aws_client
 
     if not role_arn:
-        return boto3.client("logs", region_name=region)
+        return aws_client("logs", region=region)
 
-    sts = boto3.client("sts", region_name=region)
-    creds = sts.assume_role(RoleArn=role_arn, RoleSessionName="astrolift-log-query")["Credentials"]
-    return boto3.client(
-        "logs",
-        region_name=region,
-        aws_access_key_id=creds["AccessKeyId"],
-        aws_secret_access_key=creds["SecretAccessKey"],
-        aws_session_token=creds["SessionToken"],
+    credential = CloudCredential(
+        cloud="aws",
+        mode=CredentialMode.AWS_ASSUME_ROLE,
+        role_arn=role_arn,
+        session_name="astrolift-log-query",
     )
+    return aws_client("logs", region=region, credential=credential)
 
 
 def _parse_selector(query: str) -> dict[str, str]:
