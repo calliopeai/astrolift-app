@@ -464,7 +464,6 @@ def test_api_management_controls_are_preserved() -> None:
             apim_allow_custom_domains=True,
             apim_allow_subscriptions=True,
             apim_allow_child_pruning=True,
-            apim_allow_adoption=True,
             apim_deletion_protection_default=False,
             apim_max_apis=25,
             apim_max_routes_per_api=40,
@@ -486,7 +485,6 @@ def test_api_management_controls_are_preserved() -> None:
     assert config.allow_custom_domains is True
     assert config.allow_subscriptions is True
     assert config.allow_child_pruning is True
-    assert config.allow_adoption is True
     assert config.deletion_protection_default is False
     assert (config.max_apis, config.max_routes_per_api, config.max_backends, config.max_subscriptions) == (
         25,

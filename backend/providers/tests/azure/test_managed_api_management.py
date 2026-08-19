@@ -145,7 +145,6 @@ def config(client: FakeAPIMClient) -> AzureAPIMConfig:
         allow_custom_domains=True,
         allow_subscriptions=True,
         allow_child_pruning=True,
-        allow_adoption=True,
         client=client,
     )
 
@@ -394,10 +393,18 @@ def test_update_reconciles_and_prunes_only_owned_prefix_children(
     assert external in client.resources
 
 
-def test_collision_requires_adoption_and_marks_service(
+def test_collision_is_refused_and_no_config_flag_adopts(
     driver: AzureAPIMDriver,
     client: FakeAPIMClient,
 ) -> None:
+    """Provision never adopts, whatever the caller puts in config (#1365).
+
+    The driver used to carry ``adopt_existing``: a config flag that turned a
+    name collision into a takeover, with no record of what was taken. That is
+    the implicit adoption the ownership contract exists to refuse, so the flag
+    is gone and the config validator rejects it rather than ignoring it --
+    an ignored flag reads as "asked for and granted" at the call site.
+    """
     client.resources[SERVICE_PATH] = {
         "name": SERVICE_PATH.rsplit("/", 1)[-1],
         "location": "eastus2",
@@ -406,10 +413,15 @@ def test_collision_requires_adoption_and_marks_service(
         "tags": {"owner": "customer"},
     }
     denied = driver.provision(replace(SPEC, config=_declaration()))
-    assert not denied.ok and "adopting it requires adopt_existing=true" in denied.message
-    adopted = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
-    assert adopted.ok
-    assert client.resources[SERVICE_PATH]["tags"]["astrolift-adopted"] == "true"
+    assert not denied.ok
+    assert denied.errors == ["external_resource_collision"]
+    assert "astrolift-managed-by=platform marker" in denied.message
+    assert "astrolift-adopted" not in client.resources[SERVICE_PATH]["tags"]
+
+    still_denied = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
+    assert not still_denied.ok
+    assert "unsupported fields: adopt_existing" in still_denied.message
+    assert client.resources[SERVICE_PATH]["tags"] == {"owner": "customer"}
 
 
 def test_foreign_owned_collision_is_never_reassigned(
@@ -423,7 +435,7 @@ def test_foreign_owned_collision_is_never_reassigned(
             "astrolift-managed-service-id": "someone-else",
         },
     }
-    result = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
+    result = driver.provision(replace(SPEC, config=_declaration()))
     assert not result.ok and "belongs to managed service someone-else, not managed-id" in result.message
 
 
@@ -449,12 +461,28 @@ def test_adopted_teardown_requires_delete_adopted(
     driver: AzureAPIMDriver,
     client: FakeAPIMClient,
 ) -> None:
+    """The teardown guard now keys off the shared adoption marker (#1365).
+
+    ``astrolift-adopted`` is written by the authorized adoption operation, not
+    by this driver, so the resource below is seeded the way that operation
+    leaves it: the ordinary identity envelope plus the marker. The guard is
+    what keeps a resource an operator built from being deleted by a routine
+    teardown that would have been fine against one the platform created.
+    """
     client.resources[SERVICE_PATH] = {
         "name": SERVICE_PATH.rsplit("/", 1)[-1],
         "properties": {"provisioningState": "Succeeded"},
-        "tags": {},
+        "tags": {
+            "astrolift-managed-by": "platform",
+            "astrolift-managed-service-id": "managed-id",
+            "astrolift-adopted": "true",
+            "astrolift-adopted-at": "2026-08-18T00:00:00+00:00",
+        },
     }
-    result = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
+    result = driver.provision(replace(SPEC, config=_declaration()))
+    assert result.ok
+    # A reconcile must not strip the adoption marker off the resource.
+    assert client.resources[SERVICE_PATH]["tags"]["astrolift-adopted"] == "true"
     blocked = driver.deprovision(
         DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
         force_destroy=True,

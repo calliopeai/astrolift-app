@@ -50,6 +50,7 @@ export type AstroliftPermission =
   | "managed_service.create"
   | "managed_service.update"
   | "managed_service.destroy"
+  | "managed_service.adopt"
   // Tokens
   | "deploy_token.create"
   | "deploy_token.rotate"

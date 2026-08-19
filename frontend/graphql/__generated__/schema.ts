@@ -64,6 +64,13 @@ export type AddWildcardDomainInput = {
   validationMethod: Scalars['String']['input'];
 };
 
+export type AdoptManagedResourceInput = {
+  acknowledgedPriorOwner: Scalars['String']['input'];
+  id: Scalars['GUID']['input'];
+  reason: Scalars['String']['input'];
+  resourceId: Scalars['String']['input'];
+};
+
 export type AgentRunFamily =
   | 'SERVICE'
   | 'TASK';
@@ -4918,6 +4925,31 @@ export type LogoutAllSessionsInput = {
   keepCurrent: Scalars['Boolean']['input'];
 };
 
+export type Managedresourceadoptionpayload = {
+  acknowledgedPriorOwner: Scalars['String']['output'];
+  actorDisplay: Scalars['String']['output'];
+  adoptedAt: Scalars['DateTime']['output'];
+  classification: Scalars['String']['output'];
+  cloud: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  priorBindingId: Scalars['String']['output'];
+  priorManagedBy: Scalars['String']['output'];
+  priorManagedServiceId: Scalars['String']['output'];
+  priorMarkers: Scalars['JSON']['output'];
+  reason: Scalars['String']['output'];
+  resourceId: Scalars['String']['output'];
+  stampedMarkers: Scalars['JSON']['output'];
+  status: Scalars['String']['output'];
+  surface: Scalars['String']['output'];
+};
+
+export type ManagedresourceadoptionpayloadMutationResult = {
+  data?: Maybe<Managedresourceadoptionpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type Managedservicedeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -4994,6 +5026,7 @@ export type Mutation = {
   addEmailSuppressionEntry: EmailsuppressionaddpayloadMutationResult;
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   addWildcardDomain: AstroliftAppDomainMutationResult;
+  adoptManagedResource: ManagedresourceadoptionpayloadMutationResult;
   adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
@@ -5395,6 +5428,11 @@ export type MutationAddOrganizationAllowlistDomainArgs = {
 
 export type MutationAddWildcardDomainArgs = {
   input: AddWildcardDomainInput;
+};
+
+
+export type MutationAdoptManagedResourceArgs = {
+  input: AdoptManagedResourceInput;
 };
 
 

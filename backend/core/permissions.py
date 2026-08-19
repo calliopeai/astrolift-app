@@ -69,6 +69,19 @@ class Permission(enum.StrEnum):
     MANAGED_SERVICE_UPDATE = "managed_service.update"
     MANAGED_SERVICE_DESTROY = "managed_service.destroy"
 
+    # Take an existing cloud resource the platform cannot prove it owns and
+    # stamp the platform's identity onto it (#1365). Its own grant, not
+    # ``managed_service.create``: provisioning creates a resource whose whole
+    # history the platform knows, while adoption reaches into a resource
+    # somebody else built -- possibly another Astrolift managed service --
+    # and asserts ownership of it. Following the precedent ``agent_box.attach``
+    # set, a distinct capability gets a distinct grant. Seeded only to the
+    # roles holding the full enum (``org_owner``, ``org_admin``): the blast
+    # radius of a wrong adoption is a live resource pointed at the wrong
+    # service, so it stays above the app-deploy tier until an install asks
+    # otherwise via a custom role.
+    MANAGED_SERVICE_ADOPT = "managed_service.adopt"
+
     # --- Tokens ----------------------------------------------------
     DEPLOY_TOKEN_CREATE = "deploy_token.create"
     DEPLOY_TOKEN_ROTATE = "deploy_token.rotate"

@@ -2203,7 +2203,6 @@ def _azure_managed_config_for(
             allow_custom_domains=bool(pc.get("apim_allow_custom_domains", False)),
             allow_subscriptions=bool(pc.get("apim_allow_subscriptions", False)),
             allow_child_pruning=bool(pc.get("apim_allow_child_pruning", False)),
-            allow_adoption=bool(pc.get("apim_allow_adoption", False)),
             deletion_protection_default=bool(
                 pc.get("apim_deletion_protection_default", True),
             ),

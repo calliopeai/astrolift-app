@@ -1,4 +1,5 @@
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
+from astrolift_services.models.managed_resource_adoption import ManagedResourceAdoption
 from astrolift_services.models.managed_service import (
     ManagedService,
     ManagedServiceAttachment,
@@ -21,6 +22,7 @@ __all__ = [
     "AppSecretMetadata",
     "EmailEvent",
     "EmailEventKind",
+    "ManagedResourceAdoption",
     "ManagedService",
     "ManagedServiceAttachment",
     "ManagedServiceBinding",

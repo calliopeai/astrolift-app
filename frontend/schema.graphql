@@ -37,6 +37,13 @@ input AddWildcardDomainInput {
   sniCertRef: String! = ""
 }
 
+input AdoptManagedResourceInput {
+  id: GUID!
+  resourceId: String!
+  reason: String!
+  acknowledgedPriorOwner: String! = ""
+}
+
 enum AgentRunFamily {
   TASK
   SERVICE
@@ -4984,6 +4991,31 @@ input LogoutAllSessionsInput {
   keepCurrent: Boolean! = true
 }
 
+type Managedresourceadoptionpayload {
+  id: GUID!
+  managedServiceId: GUID!
+  cloud: String!
+  resourceId: String!
+  surface: String!
+  classification: String!
+  priorManagedBy: String!
+  priorManagedServiceId: String!
+  priorBindingId: String!
+  priorMarkers: JSON!
+  stampedMarkers: JSON!
+  acknowledgedPriorOwner: String!
+  reason: String!
+  actorDisplay: String!
+  status: String!
+  adoptedAt: DateTime!
+}
+
+type ManagedresourceadoptionpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Managedresourceadoptionpayload
+}
+
 type Managedservicedeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -5366,6 +5398,7 @@ type Mutation {
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   reprovisionManagedService(input: ReprovisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
+  adoptManagedResource(input: AdoptManagedResourceInput!): ManagedresourceadoptionpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!

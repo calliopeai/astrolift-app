@@ -510,3 +510,67 @@ class _AttachmentRemovedPayload:
     pending_proposal_id: GUID | None = None
     """Set when the app requires secret approval — the detach didn't
     apply; the caller polls the proposal id for approval state."""
+
+
+@strawberry.input
+class AdoptManagedResourceInput:
+    """Explicitly authorized takeover of an existing cloud resource (#1365).
+
+    Adoption is the migration path off a pre-identity-tag resource. #1443 and
+    #1446 made every Azure driver refuse a resource whose ownership tags do
+    not name the calling managed service, teardown included, so anything
+    provisioned before its driver stamped that tag can currently only be
+    removed out of band. This is how such a resource is brought back under
+    management, and it is also how a resource an operator built by hand is
+    handed to the platform.
+
+    It is never implicit. There is no config flag that reaches it, and
+    provision, update and deprovision all still refuse on their own paths.
+    """
+
+    id: GUID
+    """The managed service that will own the resource afterwards."""
+
+    resource_id: str
+    """The cloud resource being adopted — on Azure the full ARM resource id.
+    Named explicitly rather than derived from the row's ``backendRef`` so the
+    operator states which resource they inspected, and a stale or wrong
+    ``backendRef`` cannot silently redirect the takeover."""
+
+    reason: str
+    """Why. Required: an adoption with no stated reason records a click
+    rather than a decision, and this row is read during incidents."""
+
+    acknowledged_prior_owner: str = ""
+    """Required, and equal to the displaced identity, when the resource
+    already belongs to a different Astrolift managed service or binding. A
+    boolean confirmation could be satisfied without ever looking at the
+    resource; naming the owner means the caller read what they are taking."""
+
+
+@strawberry.type
+class _ManagedResourceAdoptionPayload:
+    """The audit record, returned so the caller sees what they approved."""
+
+    id: GUID
+    managed_service_id: GUID
+    cloud: str
+    resource_id: str
+    surface: str
+    classification: str
+    """One of ``unmanaged`` / ``unstamped`` / ``foreign_owner`` /
+    ``already_owned`` — what the resource looked like before the write."""
+
+    prior_managed_by: str
+    prior_managed_service_id: str
+    prior_binding_id: str
+    prior_markers: strawberry.scalars.JSON
+    """Every ``astrolift*`` tag or metadata key found before the envelope was
+    merged. The cloud no longer holds this once adoption writes."""
+
+    stamped_markers: strawberry.scalars.JSON
+    acknowledged_prior_owner: str
+    reason: str
+    actor_display: str
+    status: str
+    adopted_at: dt.datetime

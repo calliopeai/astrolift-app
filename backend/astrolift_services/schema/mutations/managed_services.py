@@ -10,7 +10,7 @@ from strawberry.types import Info
 
 from astrolift_agents.models import AgentEnvironmentSpec
 from astrolift_clusters.models import TenantCluster
-from astrolift_graphql import MutationResultType
+from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
@@ -27,6 +27,7 @@ from astrolift_services.schema.mutations.helpers import (
     _is_envelope_key_public,
 )
 from astrolift_services.schema.mutations.types import (
+    AdoptManagedResourceInput,
     AttachProjectManagedServiceInput,
     DeprovisionManagedServiceInput,
     DetachProjectManagedServiceInput,
@@ -35,6 +36,7 @@ from astrolift_services.schema.mutations.types import (
     ReprovisionManagedServiceInput,
     RevealManagedServiceConnectionInput,
     UpdateManagedServiceInput,
+    _ManagedResourceAdoptionPayload,
     _ManagedServiceDeletedPayload,
 )
 from astrolift_services.schema.types import (
@@ -90,6 +92,39 @@ def _project_service_rows_for_caller(service_id):
 
 def _project_service_for_caller(service_id):
     return _project_service_rows_for_caller(service_id).first()
+
+
+def _managed_service_for_caller(service_id):
+    """One managed service in the caller's org, whichever scope owns it.
+
+    Explicitly org-filtered on *both* ownership branches. ``@tenant_scoped()``
+    asserts a tenant context and filters nothing, and ``_caller_org_id()``
+    returns ``None`` with no tenant, which an unguarded ``filter()`` would read
+    as "every organization". The ``org is None`` guard makes that deny rather
+    than match, which is the difference between a not-found and a cross-tenant
+    takeover of somebody else's cloud resource (#1042 / #1183).
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return None
+    rows = ManagedService.objects.select_related(
+        "registered_app__organization",
+        "project__organization",
+        "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
+    ).filter(
+        Q(registered_app__organization_id=org_id) | Q(project__organization_id=org_id),
+        guid=str(service_id),
+        deleted_at__isnull=True,
+    )
+    # Narrow a project-owned row to the tenant's team the same way
+    # ``_project_service_rows_for_caller`` does. App-owned rows keep the
+    # organization scope the app mutations use, so this tightens the project
+    # branch rather than changing what an app-scoped caller can already reach.
+    tenant = get_current_tenant()
+    if tenant is not None and tenant.team_id is not None:
+        rows = rows.filter(Q(project__isnull=True) | Q(project__team_id=tenant.team_id))
+    return rows.first()
 
 
 def _workflow_actor(info: Info):
@@ -908,6 +943,95 @@ class ManagedServiceMutations:
             _ManagedServiceDeletedPayload(
                 id=input.id,
                 deleted=False,  # workflow finalizes the soft-delete
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.resource.adopt",
+        extras=lambda result: (
+            {
+                "resource_id": result.data.resource_id,
+                "classification": result.data.classification,
+                "prior_managed_service_id": result.data.prior_managed_service_id,
+                "surface": result.data.surface,
+            }
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @requires_elevation(action_label="managed_service.resource.adopt")
+    @require_permission(Permission.MANAGED_SERVICE_ADOPT)
+    @tenant_scoped()
+    def adopt_managed_resource(
+        self,
+        info: Info,
+        input: AdoptManagedResourceInput,
+    ) -> MutationResultType[_ManagedResourceAdoptionPayload]:
+        """Bring an existing cloud resource under a managed service (#1365).
+
+        The last acceptance criterion of #1365 and the migration path off the
+        fail-closed change #1443 / #1446 shipped: a resource provisioned before
+        its driver stamped an identity tag is refused on every mutating path,
+        teardown included, and this is the only way to make it normal again.
+
+        Gated on ``managed_service.adopt`` and nothing else. Reusing
+        ``app.update`` (which provisioning takes) would mean every role that
+        can book a database can also point one at somebody else's server, and
+        adoption is the one operation that writes ownership onto a resource
+        the platform cannot already prove is its own.
+        """
+        from astrolift_services.managed_resource_adoption import (
+            AdoptionFailed,
+            AdoptionRefused,
+            AdoptionUnsupported,
+            adopt_managed_resource,
+        )
+
+        svc = _managed_service_for_caller(input.id)
+        if svc is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "managed service not found")
+
+        request = info.context.request  # type: ignore[attr-defined]
+        user = getattr(request, "user", None)
+        try:
+            outcome = adopt_managed_resource(
+                svc=svc,
+                resource_id=input.resource_id,
+                reason=input.reason,
+                acknowledged_prior_owner=input.acknowledged_prior_owner,
+                actor=user,
+            )
+        except AdoptionUnsupported as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        except AdoptionRefused as exc:
+            # PRECONDITION rather than VALIDATION: the request is well formed,
+            # and what is missing is authority over the resource -- either the
+            # caller has to name the owner they are displacing, or there is
+            # nothing here that may be adopted at all.
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except AdoptionFailed as exc:
+            return gql_failure(ErrorCode.INTERNAL.value, str(exc))
+
+        record = outcome.record
+        return gql_success(
+            _ManagedResourceAdoptionPayload(
+                id=GUID(str(record.guid)),
+                managed_service_id=GUID(str(svc.guid)),
+                cloud=record.cloud,
+                resource_id=record.resource_id,
+                surface=record.surface,
+                classification=record.classification,
+                prior_managed_by=record.prior_managed_by,
+                prior_managed_service_id=record.prior_managed_service_id,
+                prior_binding_id=record.prior_binding_id,
+                prior_markers=record.prior_markers,
+                stamped_markers=record.stamped_markers,
+                acknowledged_prior_owner=record.acknowledged_prior_owner,
+                reason=record.reason,
+                actor_display=record.actor_display,
+                status=record.status,
+                adopted_at=record.created_at,
             )
         )
 

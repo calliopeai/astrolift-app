@@ -72,6 +72,42 @@ def _service_identity(svc: Any) -> str:
     return guid
 
 
+def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
+    """The ``ProvisionSpec`` this managed-service row provisions through.
+
+    Shared rather than inlined because the identity envelope stamped onto the
+    cloud resource is derived entirely from this spec, and the authorized
+    adoption operation (#1365) has to write *the same* envelope a provision
+    would have written. Two builders would mean an adopted resource carrying a
+    subtly different envelope from a created one, which fails its own ownership
+    check on the next update and is permanent, because the check fails closed.
+    """
+
+    from _sdk.managed_service import ProvisionSpec
+
+    env = svc.app_environment
+    app = svc.registered_app
+    project = svc.project
+    owner = app or project
+    org = app.organization if app is not None else project.organization
+    environment_id = str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
+    environment_name = env.name if env is not None else svc.effective_environment_name
+    svc_config = dict(svc.config or {})
+    return ProvisionSpec(
+        organization_id=str(getattr(org, "guid", "") or ""),
+        organization_slug=getattr(org, "slug", "") or "",
+        app_id=str(getattr(owner, "guid", "") or ""),
+        app_slug=owner.slug,
+        environment_id=environment_id,
+        environment_name=environment_name,
+        tenant_cluster_id=str(getattr(cluster, "guid", "") or ""),
+        service_handle_hint=svc.name or svc.kind,
+        size=str(svc_config.get("size", "small")),
+        config=svc_config,
+        managed_service_id=_service_identity(svc),
+    )
+
+
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
@@ -473,7 +509,6 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
         "app_environment__tenant_cluster__provider_plugin",
         "tenant_cluster__provider_plugin",
     ).get(pk=managed_service_id)
-    env = svc.app_environment
     cluster = _service_cluster(svc)
     if cluster is None:
         raise RuntimeError(
@@ -494,28 +529,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
-    from _sdk.managed_service import ProvisionSpec
-
-    app = svc.registered_app
-    project = svc.project
-    owner = app or project
-    org = app.organization if app is not None else project.organization
-    environment_id = str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
-    environment_name = env.name if env is not None else svc.effective_environment_name
-    svc_config = dict(svc.config or {})
-    spec = ProvisionSpec(
-        organization_id=str(getattr(org, "guid", "") or ""),
-        organization_slug=getattr(org, "slug", "") or "",
-        app_id=str(getattr(owner, "guid", "") or ""),
-        app_slug=owner.slug,
-        environment_id=environment_id,
-        environment_name=environment_name,
-        tenant_cluster_id=str(getattr(cluster, "guid", "") or ""),
-        service_handle_hint=svc.name or svc.kind,
-        size=str(svc_config.get("size", "small")),
-        config=svc_config,
-        managed_service_id=_service_identity(svc),
-    )
+    spec = build_provision_spec(svc, cluster=cluster)
     result = driver.provision(spec)
     return {
         "ok": bool(getattr(result, "ok", False)),

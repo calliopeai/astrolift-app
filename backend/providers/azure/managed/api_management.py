@@ -46,6 +46,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import ownership_key
 from azure.managed.tags import arm_tags_for
 
 KIND = "api_gateway"
@@ -73,8 +74,11 @@ _SKUS = frozenset(
 )
 _INTERNAL_SKUS = frozenset({"Developer", "Premium"})
 _POLICY_KINDS = frozenset({"backend", "cors", "managed_identity"})
-_OWNERSHIP_TAG = "astrolift-managed-service-id"
-_ADOPTED_TAG = "astrolift-adopted"
+#: Written by the authorized adoption operation (#1365), never by this driver.
+#: The teardown guard below is its first consumer: a resource the platform
+#: adopted was built by somebody else, so deleting it needs a louder yes than
+#: deleting one the platform created.
+_ADOPTED_TAG = ownership_key("azure", "adopted")
 _CHILD_PREFIX = "astrolift-"
 
 
@@ -279,7 +283,6 @@ class AzureAPIMConfig:
     allow_custom_domains: bool = False
     allow_subscriptions: bool = False
     allow_child_pruning: bool = False
-    allow_adoption: bool = False
     deletion_protection_default: bool = True
     max_apis: int = 50
     max_routes_per_api: int = 100
@@ -322,7 +325,7 @@ class AzureAPIMDriver(ManagedServiceDriver):
         existing = self._get(path)
         try:
             if existing is not None:
-                self._assert_owned_or_adoptable(existing, spec, cfg, service_name)
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, service_name)
             body = self._service_body(spec, cfg, existing)
             service = self._api.put(path, body)
             self._reconcile_children(service_name, cfg)
@@ -605,7 +608,6 @@ class AzureAPIMDriver(ManagedServiceDriver):
                     },
                 },
                 "prune_children": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
             },
@@ -678,7 +680,6 @@ class AzureAPIMDriver(ManagedServiceDriver):
         if forbidden:
             return f"APIM config cannot contain raw policies or credentials: {', '.join(forbidden)}"
         allowed = {
-            "adopt_existing",
             "apis",
             "backends",
             "capacity",
@@ -906,8 +907,6 @@ class AzureAPIMDriver(ManagedServiceDriver):
                 return "APIM custom_domains may select at most one default_ssl_binding"
         if cfg.get("prune_children") and not self._config.allow_child_pruning:
             return "APIM child pruning is disabled by install policy"
-        if cfg.get("adopt_existing") and not self._config.allow_adoption:
-            return "APIM adoption is disabled by install policy"
         return ""
 
     def _validate_child_id(self, child_id: str, label: str) -> str:
@@ -987,9 +986,15 @@ class AzureAPIMDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         existing: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        tags = arm_tags_for(spec)
-        if existing is not None and cfg.get("adopt_existing") and _ownership(existing) != self._owner(spec):
-            tags = {**_tags(existing), **tags, _ADOPTED_TAG: "true"}
+        # Merge over what the service already carries rather than replacing it.
+        # A PUT sends the whole tag map, so a reconcile that sent only the
+        # provision envelope would strip the operator's own tags and, worse,
+        # the ``astrolift-adopted`` marker the authorized adoption operation
+        # wrote -- silently downgrading an adopted resource to one teardown
+        # will delete without the extra confirmation (#1365). Ownership has
+        # already been verified above, and the fresh envelope wins every key it
+        # defines, so nothing foreign can be carried forward.
+        tags = {**_tags(existing or {}), **arm_tags_for(spec)}
         properties: dict[str, Any] = {
             "publisherEmail": self._config.publisher_email,
             "publisherName": self._config.publisher_name,
@@ -1213,27 +1218,6 @@ class AzureAPIMDriver(ManagedServiceDriver):
             if item_id.startswith(_CHILD_PREFIX) and item_id not in desired_ids:
                 self._api.delete(f"{parent}/{collection}/{_segment(item_id)}")
 
-    def _assert_owned_or_adoptable(
-        self,
-        resource: dict[str, Any],
-        spec: ProvisionSpec,
-        cfg: dict[str, Any],
-        service_name: str,
-    ) -> None:
-        # ``adopt_existing`` is the driver's pre-existing, doubly opt-in
-        # adoption path: an install policy must allow it and the operator must
-        # ask for it, and the result is stamped ``astrolift-adopted``. It stays
-        # as-is until #1365's authorized adoption operation replaces it; the
-        # shared verifier governs every other route to a mutation.
-        if cfg.get("adopt_existing") and not _ownership(resource):
-            return
-        try:
-            self._assert_owned(resource, spec, AzureOperation.PROVISION, service_name)
-        except AzureOwnershipError as exc:
-            if _ownership(resource):
-                raise
-            raise AzureOwnershipError(f"{exc}; adopting it requires adopt_existing=true") from exc
-
     @staticmethod
     def _assert_owned(
         resource: dict[str, Any],
@@ -1274,14 +1258,6 @@ class AzureAPIMDriver(ManagedServiceDriver):
             raise AzureAPIMError("derived API Management service name is invalid")
         return safe
 
-    def _owner(self, spec: ProvisionSpec) -> str:
-        return (
-            spec.managed_service_id
-            or hashlib.sha256(
-                f"{spec.organization_id}:{spec.app_id}:{spec.environment_id}:{spec.service_handle_hint}".encode(),
-            ).hexdigest()[:32]
-        )
-
     def _service_path(self, service_name: str) -> str:
         return (
             f"/subscriptions/{_segment(self._config.subscription_id)}/resourceGroups/"
@@ -1316,10 +1292,6 @@ def _segment(value: str) -> str:
 
 def _tags(resource: dict[str, Any]) -> dict[str, str]:
     return {str(key): str(value) for key, value in dict(resource.get("tags") or {}).items()}
-
-
-def _ownership(resource: dict[str, Any]) -> str:
-    return _tags(resource).get(_OWNERSHIP_TAG, "")
 
 
 def _provisioning_state(resource: dict[str, Any]) -> str:
