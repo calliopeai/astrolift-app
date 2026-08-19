@@ -271,6 +271,47 @@ def test_to_container_statuses_populates_kind_resources_and_restart_history() ->
     assert sidecar.last_restart_at is None
 
 
+def test_to_container_statuses_carries_the_terminated_exit_code() -> None:
+    """``reason`` alone is routinely the generic ``Error``; the exit code
+    is the part that identifies the failure (#131). Exit 0 must survive
+    as 0 rather than collapsing into "not set", which is the difference
+    between a clean completion and an unknown one."""
+    died = SimpleNamespace(
+        name="agent",
+        ready=False,
+        restart_count=0,
+        image="ghcr.io/acme/agent:v1",
+        state=SimpleNamespace(
+            running=None,
+            waiting=None,
+            terminated=SimpleNamespace(reason="Error", exit_code=127),
+        ),
+        last_state=None,
+    )
+    finished = SimpleNamespace(
+        name="migrate",
+        ready=True,
+        restart_count=0,
+        image="ghcr.io/acme/migrate:v1",
+        state=SimpleNamespace(
+            running=None,
+            waiting=None,
+            terminated=SimpleNamespace(reason="Completed", exit_code=0),
+        ),
+        last_state=None,
+    )
+    running = _running_status("web")
+
+    by_name = {c.name: c for c in _to_container_statuses([died, finished, running])}
+
+    assert by_name["agent"].terminated_reason == "Error"
+    assert by_name["agent"].terminated_exit_code == 127
+    assert by_name["migrate"].terminated_exit_code == 0
+    # Nothing to report for a container that has not terminated, and a
+    # terminated payload without the field degrades to the same.
+    assert by_name["web"].terminated_exit_code is None
+
+
 # ---- build_api_client errors --------------------------------------
 
 

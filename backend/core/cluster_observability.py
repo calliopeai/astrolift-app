@@ -3258,6 +3258,37 @@ async def fetch_task_pod_logs(
     if not pod_name:
         return []
 
+    return await fetch_pod_log_tail(
+        cluster=cluster,
+        namespace=namespace,
+        pod_name=pod_name,
+        tail=tail,
+    )
+
+
+async def fetch_pod_log_tail(
+    *,
+    cluster: TenantCluster,
+    namespace: str,
+    pod_name: str,
+    tail: int = 200,
+) -> list[str]:
+    """One-shot read of the last ``tail`` message lines from ``pod_name``.
+
+    The read half of :func:`fetch_task_pod_logs`, split out because
+    callers that already know their pod (the agent-box reaper, which is
+    holding the pod it just found dead) should not have to re-run task
+    discovery to reach it.
+
+    Never raises: every failure — unusable driver, refused stream,
+    mid-stream error, a driver that will not terminate — degrades to
+    the lines collected so far. A log read is diagnostics, and
+    diagnostics failing must not become the caller's problem.
+    """
+    tail = max(0, int(tail))
+    if tail == 0:
+        return []
+
     try:
         inner = stream_app_logs(
             cluster=cluster,
@@ -3270,7 +3301,7 @@ async def fetch_task_pod_logs(
     except ClusterObservabilityError:
         return []
     except Exception:
-        logger.exception("fetch_task_pod_logs: failed to open log stream for pod %s", pod_name)
+        logger.exception("fetch_pod_log_tail: failed to open log stream for pod %s", pod_name)
         return []
 
     lines: list[str] = []
@@ -3290,14 +3321,14 @@ async def fetch_task_pod_logs(
         await asyncio.wait_for(_collect(), timeout=_TASK_LOG_READ_TIMEOUT_SECONDS)
     except TimeoutError:
         logger.warning(
-            "fetch_task_pod_logs: read exceeded %ss for pod %s; returning partial tail",
+            "fetch_pod_log_tail: read exceeded %ss for pod %s; returning partial tail",
             _TASK_LOG_READ_TIMEOUT_SECONDS,
             pod_name,
         )
     except Exception:
         # A mid-stream failure still returns whatever we collected —
         # partial logs beat a hard error on an operator-facing read.
-        logger.exception("fetch_task_pod_logs: stream raised for pod %s", pod_name)
+        logger.exception("fetch_pod_log_tail: stream raised for pod %s", pod_name)
     finally:
         # Explicit aclose so the kubelet socket releases even when we
         # break out early after hitting the tail cap — async for does
@@ -3305,7 +3336,7 @@ async def fetch_task_pod_logs(
         try:
             await inner.aclose()
         except Exception:
-            logger.exception("fetch_task_pod_logs: aclose failed for pod %s", pod_name)
+            logger.exception("fetch_pod_log_tail: aclose failed for pod %s", pod_name)
 
     return lines
 

@@ -349,6 +349,7 @@ def _to_container_statuses(
         state = "unknown"
         waiting_reason = ""
         terminated_reason = ""
+        terminated_exit_code: int | None = None
         s = getattr(cs, "state", None)
         if s is not None:
             if getattr(s, "running", None) is not None:
@@ -366,6 +367,16 @@ def _to_container_statuses(
                     )
                     or ""
                 )
+                raw_exit = getattr(s.terminated, "exit_code", None)
+                if raw_exit is None:
+                    raw_exit = getattr(s.terminated, "exitCode", None)
+                # Exit 0 is meaningful (a clean Completed), so the guard is
+                # against a missing field, not against a falsy one.
+                if raw_exit is not None:
+                    try:
+                        terminated_exit_code = int(raw_exit)
+                    except (TypeError, ValueError):
+                        terminated_exit_code = None
         name = getattr(cs, "name", "") or ""
         restart_count = int(getattr(cs, "restart_count", 0) or 0)
         reasons, last_restart_at = _last_restart_reasons(cs, restart_count)
@@ -386,6 +397,7 @@ def _to_container_statuses(
                 last_restart_reasons=reasons,
                 last_restart_at=last_restart_at,
                 resources=_resources_for_spec(lookup.get(name)),
+                terminated_exit_code=terminated_exit_code,
             )
         )
     return out

@@ -320,7 +320,14 @@ class ContainerStatusInfo:
 
     ``resources`` carries the spec-side requests + limits joined into
     the status payload at backend-build time. We join on container
-    name so the resolver only has to fan out one query per pod."""
+    name so the resolver only has to fan out one query per pod.
+
+    ``terminated_exit_code`` is ``state.terminated.exitCode``, and
+    ``None`` when the container is not terminated. Carried alongside
+    the reason because the reason alone is frequently the useless
+    generic ``Error`` — the exit code is what separates "the command
+    is not in the image" (127) from "OOM" from "the process chose to
+    quit"."""
 
     name: str
     ready: bool
@@ -333,6 +340,7 @@ class ContainerStatusInfo:
     last_restart_reasons: list[str] = field(default_factory=list)
     last_restart_at: datetime | None = None
     resources: ContainerResources = field(default_factory=ContainerResources)
+    terminated_exit_code: int | None = None
 
 
 @dataclass(frozen=True)

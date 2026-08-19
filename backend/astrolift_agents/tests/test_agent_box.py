@@ -584,6 +584,247 @@ def test_restarting_a_settled_box_clears_the_dead_pod_name(org, cluster):
 
 
 # ---------------------------------------------------------------------------
+# last_error on the FAILED path — the box's own cause of death (#131)
+# ---------------------------------------------------------------------------
+
+
+def _dead_pod_info(name="agent-box-dead-x1", *, reason="Error", exit_code=127):
+    """A pod whose only container has terminated, the shape the reaper
+    reads off a box Job that ran and died."""
+    from datetime import UTC, datetime
+
+    from _sdk.cluster import ContainerStatusInfo, PodInfo
+
+    return PodInfo(
+        name=name,
+        workload="agent-box",
+        status="Error",
+        phase="Failed",
+        ready=False,
+        restarts=0,
+        age=datetime.now(UTC),
+        node="ip-10-0-0-12",
+        container_statuses=[
+            ContainerStatusInfo(
+                name="agent",
+                ready=False,
+                restart_count=0,
+                image="ghcr.io/acme/agent-claude-code:latest",
+                state="terminated",
+                terminated_reason=reason,
+                terminated_exit_code=exit_code,
+            )
+        ],
+    )
+
+
+class _BoxLogBackend:
+    def __init__(self, lines, *, explode=False):
+        self.calls: list[dict] = []
+        self._lines = list(lines)
+        self._explode = explode
+
+    async def stream(self, *, auth, namespace, pod_name, container, tail_lines, follow):  # noqa: ARG002
+        self.calls.append({"pod_name": pod_name, "tail_lines": tail_lines, "follow": follow})
+        if self._explode:
+            raise RuntimeError("kubelet said no")
+        from datetime import UTC, datetime
+
+        from _sdk.cluster import PodLogLine
+
+        # Honour ``tail_lines`` the way the kubelet does — the cap has to
+        # bite at the driver, not after the whole stream is in memory.
+        for message in self._lines[-tail_lines:] if tail_lines else self._lines:
+            yield PodLogLine(
+                pod_name=pod_name,
+                container=container or "agent",
+                timestamp=datetime.now(UTC),
+                message=message,
+                stream="stdout",
+            )
+
+
+@pytest.fixture
+def log_backend():
+    from core.cluster_observability import (
+        reset_log_backend_for_tests,
+        set_log_backend_for_tests,
+    )
+
+    def _install(backend):
+        set_log_backend_for_tests(backend)
+        return backend
+
+    yield _install
+    reset_log_backend_for_tests()
+
+
+def _failed_box(org):
+    return _box(
+        org,
+        status=AgentBox.Status.RUNNING,
+        external_id="agent-box-dead",
+        namespace="astrolift-agents-box-org",
+        environment_spec=_spec(org),
+    )
+
+
+def test_a_failed_box_records_the_reason_the_exit_code_and_the_log_line(
+    org, cluster, pod_backend, log_backend
+):
+    """The ticket, exactly. A box that came up and then hit
+    ``tmux: not found`` settled FAILED with an empty ``last_error``, so
+    the one line that explained it was only reachable by ``kubectl``.
+
+    The assertion is on the content, not on the field being non-empty:
+    the terminated reason, the exit code that identifies it, and the
+    sentence the container actually printed.
+    """
+    pods = pod_backend(_BoxPodBackend([_dead_pod_info()]))
+    logs = log_backend(_BoxLogBackend(["+ tmux new-session", "/bin/sh: 2: tmux: not found"]))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["failed"] == 1
+    assert box.status == AgentBox.Status.FAILED.value
+    assert "/bin/sh: 2: tmux: not found" in box.last_error
+    assert "Error" in box.last_error
+    assert "exit 127" in box.last_error
+    # Read off the pod the sweep found, in the namespace frozen on the
+    # row, and bounded at the driver rather than after the fact.
+    assert pods.calls == [{"namespace": "astrolift-agents-box-org", "app_slug": str(box.guid)}]
+    assert logs.calls == [
+        {
+            "pod_name": "agent-box-dead-x1",
+            "tail_lines": box_service.BOX_FAILURE_LOG_LINES,
+            "follow": False,
+        }
+    ]
+
+
+def test_a_failed_log_read_still_records_the_reason_it_does_know(org, cluster, pod_backend, log_backend):
+    """An observability failure is not a verdict and not an excuse for
+    recording nothing. The terminated reason and exit code came off the
+    pod read that already succeeded; losing the log tail must not lose
+    them too."""
+    pod_backend(_BoxPodBackend([_dead_pod_info(reason="OOMKilled", exit_code=137)]))
+    log_backend(_BoxLogBackend([], explode=True))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["failed"] == 1
+    assert summary["errors"] == 0
+    assert box.status == AgentBox.Status.FAILED.value
+    assert "OOMKilled" in box.last_error
+    assert "exit 137" in box.last_error
+
+
+def test_an_unreadable_pod_still_settles_the_box_and_says_so(org, cluster, pod_backend):
+    """The floor of the degradation ladder. Nothing about the pod is
+    readable, so the row says the cause could not be read — which is a
+    different fact from 'it failed for no reason' and points the
+    operator at the cluster rather than at the box."""
+    pod_backend(_BoxPodBackend(explode=True))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["failed"] == 1
+    assert box.status == AgentBox.Status.FAILED.value
+    assert "could not be read" in box.last_error
+
+
+def test_a_chatty_box_cannot_turn_last_error_into_a_log_archive(org, cluster, pod_backend, log_backend):
+    """The field is rendered inline in ``astro box ls``; an unbounded
+    tail is both a database problem and an unreadable one. The excerpt
+    is capped and keeps its *tail*, because a container that dies on
+    startup says why with the last thing it prints."""
+    noise = [f"chatter line {i} " + "x" * 200 for i in range(200)]
+    pod_backend(_BoxPodBackend([_dead_pod_info()]))
+    log_backend(_BoxLogBackend([*noise, "/bin/sh: 2: tmux: not found"]))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert len(box.last_error) <= box_service.LAST_ERROR_MAX_CHARS
+    # The cap kept the end of the output, so the death line survived and
+    # the first of the chatter did not.
+    assert box.last_error.endswith("/bin/sh: 2: tmux: not found")
+    assert "chatter line 0 " not in box.last_error
+
+
+def test_a_teardown_failure_is_recorded_alongside_the_cause_not_instead_of_it(
+    org, cluster, pod_backend, log_backend, monkeypatch
+):
+    """Two independent facts: the box died of X, and its Job is still on
+    the cluster. Before #131 the teardown result was the only one that
+    could reach the row."""
+    pod_backend(_BoxPodBackend([_dead_pod_info()]))
+    log_backend(_BoxLogBackend(["/bin/sh: 2: tmux: not found"]))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    def _explode(*_args, **_kwargs):
+        raise RuntimeError("apiserver unreachable")
+
+    monkeypatch.setattr(box_service, "_delete_box_objects", _explode)
+
+    box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert "/bin/sh: 2: tmux: not found" in box.last_error
+    assert "cluster teardown did not complete" in box.last_error
+
+
+def test_an_expired_box_is_not_billed_for_a_post_mortem(org, cluster, pod_backend, log_backend):
+    """The idle timeout firing is the normal case, not a failure, and it
+    is the common one. The reaper must not spend a pod read and a log
+    read on every box that reaps itself, nor write a cause onto a row
+    that has none."""
+    pods = pod_backend(_BoxPodBackend([_dead_pod_info()]))
+    logs = log_backend(_BoxLogBackend(["irrelevant"]))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Complete", "status": "True"}]
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["expired"] == 1
+    assert box.status == AgentBox.Status.EXPIRED.value
+    assert box.last_error == ""
+    assert pods.calls == []
+    assert logs.calls == []
+
+
+def test_the_recorded_cause_reaches_the_api_surface(org, cluster, pod_backend, log_backend):
+    """``last_error`` is already projected onto ``AgentBoxType``, so the
+    CLI's ``lastError=`` column and the Boxes tab pick this up with no
+    further wiring. Asserted rather than assumed — the projection is the
+    only reason this fix is visible to anyone."""
+    from astrolift_agents.schema.types import agent_box_to_type
+
+    pod_backend(_BoxPodBackend([_dead_pod_info()]))
+    log_backend(_BoxLogBackend(["/bin/sh: 2: tmux: not found"]))
+    box = _failed_box(org)
+    cluster.driver._job_conditions = [{"type": "Failed", "status": "True"}]
+
+    box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert "/bin/sh: 2: tmux: not found" in agent_box_to_type(box).last_error
+
+
+# ---------------------------------------------------------------------------
 # The secret packet reaches the pod
 # ---------------------------------------------------------------------------
 

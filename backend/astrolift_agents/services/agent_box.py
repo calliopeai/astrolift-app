@@ -43,6 +43,23 @@ log = logging.getLogger("astrolift_agents.services.agent_box")
 #: accumulate as clutter in the namespace.
 FINISHED_JOB_TTL_SECONDS = 600
 
+#: How much of a dead box's own output is worth keeping on the row (#131).
+#:
+#: ``last_error`` is a diagnosis rendered inline — one column in
+#: ``astro box ls``, one block in the Boxes tab — not a log archive; the
+#: platform already has a log surface for the archive. The line count is
+#: what the driver is *asked* for, so a chatty box never streams more than
+#: this into the reaper in the first place, and the character budget is
+#: what survives onto the row, keeping the whole message inside the
+#: 2000-char ceiling every other write in this module truncates to. The
+#: excerpt keeps its tail rather than its head: a container that dies on
+#: startup says why with the last thing it prints.
+BOX_FAILURE_LOG_LINES = 20
+BOX_FAILURE_LOG_CHARS = 1200
+
+#: The ceiling every ``last_error`` write in this module shares.
+LAST_ERROR_MAX_CHARS = 2000
+
 #: Env the platform owns on every box. Registered as reserved agent
 #: environment names so an env spec cannot shadow them.
 BOX_ENV_MARKER = "ASTROLIFT_AGENT_BOX"
@@ -309,13 +326,19 @@ def start_agent_box(box) -> None:
     log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
 
 
-def stop_agent_box(box, *, status: str | None = None) -> None:
+def stop_agent_box(box, *, status: str | None = None, reason: str = "") -> None:
     """Delete the box's cluster objects and settle the row.
 
     Cluster teardown is best-effort on purpose: a box whose cluster is
     unreachable must still be removable from the platform, otherwise an
     operator is stuck with a row they cannot clear. The failure is recorded
     on the row rather than raised.
+
+    ``reason`` is the box's own cause of death, when the caller observed
+    one (#131). It leads ``last_error`` because it is what an operator is
+    looking for; a teardown failure is appended after it rather than
+    replacing it, since "it died of X and the Job is still on the cluster"
+    is two facts and losing either one costs a round-trip.
     """
     from astrolift_agents.models import AgentBox
     from astrolift_agents.services.agent_cluster import resolve_agent_cluster
@@ -332,7 +355,7 @@ def stop_agent_box(box, *, status: str | None = None) -> None:
 
     box.status = target
     box.ended_at = timezone.now()
-    box.last_error = error[:2000]
+    box.last_error = "\n".join(p for p in (reason, error) if p)[:LAST_ERROR_MAX_CHARS]
     box.save(update_fields=["status", "ended_at", "last_error", "updated_at", "version"])
 
 
@@ -364,7 +387,7 @@ def _fail(box, message: str) -> None:
 
     box.status = AgentBox.Status.FAILED
     box.ended_at = timezone.now()
-    box.last_error = message[:2000]
+    box.last_error = message[:LAST_ERROR_MAX_CHARS]
     box.save(update_fields=["status", "ended_at", "last_error", "updated_at", "version"])
 
 
@@ -451,6 +474,124 @@ def _record_pod_name(box, *, cluster, namespace: str) -> None:
     box.save(update_fields=["pod_name", "updated_at", "version"])
 
 
+def describe_box_failure(box) -> str:
+    """Why a box the reaper just called FAILED actually died (#131).
+
+    The Job's ``Failed`` condition says a pod died; it never says of what.
+    That sentence was only ever in the pod, so a box that came up and then
+    hit ``tmux: not found`` settled with an empty ``last_error`` and the
+    operator had to reach for ``kubectl`` — on the one class of failure
+    they cannot infer from the request they made.
+
+    Best-effort in the same shape as :func:`_record_pod_name`: this is
+    observability, and observability failing is never a verdict about the
+    box. Every layer degrades to the layer below rather than raising, so
+    the worst case is a thinner sentence, never a changed reap outcome:
+
+    * pod read fails      → one sentence saying the pod could not be read
+    * log read fails      → terminated reason and exit code alone
+    * everything works    → reason, exit code, and the log tail
+
+    The pod is still there to read because the box Job carries
+    ``ttlSecondsAfterFinished``, so the object outlives the container by
+    long enough for the next sweep to see it.
+    """
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+    from core.cluster_observability import list_app_pods
+
+    namespace = box.namespace or box_namespace(box)
+    try:
+        cluster = resolve_agent_cluster(box.organization)
+        pods = list_app_pods(cluster=cluster, namespace=namespace, app_slug=str(box.guid))
+    except Exception:  # noqa: BLE001 — k8s lib and cluster lookup raise many subtypes
+        log.warning("agent_box: could not read the failed pod for box %s", box.slug, exc_info=True)
+        return "the box's Job reported Failed; its pod could not be read for a cause"
+
+    pod = _dead_pod(pods)
+    if pod is None:
+        return "the box's Job reported Failed; no pod remained to read a cause from"
+
+    parts = [_terminated_sentence(pod)]
+    excerpt = _pod_log_excerpt(cluster=cluster, namespace=namespace, pod_name=pod.name)
+    if excerpt:
+        parts.append(excerpt)
+    return "\n".join(parts)
+
+
+def _dead_pod(pods):
+    """The pod that carries the cause, out of what the namespace returned.
+
+    A box Job is ``backoffLimit: 0`` / ``restartPolicy: Never``, so there
+    is one pod per incarnation. Prefer one with a terminated container
+    anyway, so a leftover from a previous incarnation that is still
+    Running can never be mistaken for the corpse.
+    """
+    pods = [p for p in pods if getattr(p, "name", "")]
+    return next((p for p in pods if _terminated_container(p) is not None), None) or next(iter(pods), None)
+
+
+def _terminated_container(pod):
+    """The pod's most informative terminated container, or ``None``.
+
+    A container that exited non-zero outranks one that exited clean: an
+    init or sidecar slot reporting ``Completed`` says nothing about why
+    the box is gone, and on a box the interesting corpse is whichever
+    slot refused to run.
+    """
+    statuses = [
+        c for c in (getattr(pod, "container_statuses", None) or []) if getattr(c, "state", "") == "terminated"
+    ]
+    return next((c for c in statuses if (c.terminated_exit_code or 0) != 0), None) or next(
+        iter(statuses), None
+    )
+
+
+def _terminated_sentence(pod) -> str:
+    container = _terminated_container(pod)
+    if container is None:
+        phase = getattr(pod, "phase", "") or getattr(pod, "status", "") or "unknown"
+        return f"pod {pod.name} is {phase}; no container reported a terminated state"
+
+    detail = []
+    if container.terminated_reason:
+        detail.append(container.terminated_reason)
+    if container.terminated_exit_code is not None:
+        detail.append(f"exit {container.terminated_exit_code}")
+    # A terminated container with neither field is a shape k8s should not
+    # produce, but the sentence still has to name the container.
+    suffix = f": {', '.join(detail)}" if detail else ""
+    return f"container {container.name} terminated{suffix}"
+
+
+def _pod_log_excerpt(*, cluster, namespace: str, pod_name: str) -> str:
+    """The tail of a dead pod's output, capped, or ``""``.
+
+    Bridged with ``async_to_sync`` for the same reason the agent-task log
+    resolver does it: the reader is async and the reaper is not.
+    """
+    from asgiref.sync import async_to_sync
+
+    from core.cluster_observability import fetch_pod_log_tail
+
+    try:
+        lines = async_to_sync(fetch_pod_log_tail)(
+            cluster=cluster,
+            namespace=namespace,
+            pod_name=pod_name,
+            tail=BOX_FAILURE_LOG_LINES,
+        )
+    except Exception:  # noqa: BLE001 — a log read must not cost us the reason
+        log.warning("agent_box: could not read logs for failed pod %s", pod_name, exc_info=True)
+        return ""
+
+    body = "\n".join(line for line in lines if line and line.strip())
+    if not body:
+        return ""
+    if len(body) > BOX_FAILURE_LOG_CHARS:
+        body = "…" + body[-BOX_FAILURE_LOG_CHARS:]
+    return body
+
+
 def reap_agent_boxes() -> dict[str, int]:
     """One sweep: settle every live box against its Job.
 
@@ -486,8 +627,12 @@ def reap_agent_boxes() -> dict[str, int]:
             box.save(update_fields=["status", "updated_at", "version"])
             summary["running"] += 1
             continue
-        stop_agent_box(box, status=observed)
-        summary["expired" if observed == AgentBox.Status.EXPIRED.value else "failed"] += 1
+        failed = observed == AgentBox.Status.FAILED.value
+        # Read the cause before teardown: the pod holding it is one of the
+        # objects stop_agent_box is about to delete.
+        reason = describe_box_failure(box) if failed else ""
+        stop_agent_box(box, status=observed, reason=reason)
+        summary["failed" if failed else "expired"] += 1
     return summary
 
 
