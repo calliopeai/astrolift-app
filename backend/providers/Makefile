@@ -1,4 +1,4 @@
-.PHONY: fmt lint test typecheck verify clean coverage-matrix verification-manifests
+.PHONY: fmt lint test typecheck verify clean coverage-matrix verification-manifests campaign-spend
 
 fmt:
 	ruff format .
@@ -18,6 +18,12 @@ coverage-matrix:
 # ledger. tests/_cert/test_collection.py fails when the committed tree drifts.
 verification-manifests:
 	python -m _cert.collection
+
+# Regenerates docs/campaign_spend.md, the #1417 spend estimate. Offline by
+# construction: it prices nothing, because prices come from the live pricing API.
+# tests/_cert/test_spend.py fails when the committed report drifts.
+campaign-spend:
+	python -m scripts.campaign_spend
 
 typecheck:
 	mypy _sdk/ aws/ gcp/ azure/ k8s_native/
