@@ -428,7 +428,10 @@ def observe_box(box) -> str | None:
         # fired or whoever was attached exited the shell. Both mean the box
         # is gone and the node is free.
         return AgentBox.Status.EXPIRED.value
-    if getattr(status, "ready_replicas", 0) or getattr(status, "desired_replicas", 0):
+    # Ready pods only. ``desired_replicas`` is 1 from the instant the Job
+    # exists, so counting it would call a box RUNNING — and therefore
+    # attachable — before its pod had started (#133).
+    if getattr(status, "ready_replicas", 0) > 0:
         _record_pod_name(box, cluster=cluster, namespace=namespace)
         return AgentBox.Status.RUNNING.value
     return None
