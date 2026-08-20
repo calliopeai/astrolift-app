@@ -1,6 +1,6 @@
 # astrolift-app
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Django](https://img.shields.io/badge/django-5.x-092E20.svg)](https://www.djangoproject.com/)
 [![Next.js](https://img.shields.io/badge/next.js-16-000000.svg)](https://nextjs.org/)
 [![Strawberry](https://img.shields.io/badge/strawberry-graphql-E91E63.svg)](https://strawberry.rocks/)
@@ -187,11 +187,7 @@ real-DB tests, no rebases, no co-author trailers).
 
 ## License
 
-AGPL-3.0. See [LICENSE](LICENSE).
-
-Astrolift is also available under a commercial license, including terms for
-hosting it as a service without publishing your modifications. See
-[astrolift.ai](https://astrolift.ai).
+MIT. See [LICENSE](LICENSE).
 
 Copyright (c) 2026 Calliope Labs Inc. Calliope AI and Astrolift are trademarks
 of Calliope Labs Inc.

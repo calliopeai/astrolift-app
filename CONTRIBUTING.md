@@ -86,24 +86,26 @@ cd frontend && npm run codegen
 - For features: explain the use case before proposing an implementation
 - For security: see [`SECURITY.md`](SECURITY.md) — do not file public issues for vulnerabilities
 
-## License and the CLA
+## License
 
-Astrolift is licensed to the public under **AGPL-3.0** (see [`LICENSE`](LICENSE))
-and to commercial customers under separate terms. Contributions are accepted on
-that basis.
+Astrolift is **MIT-licensed** (see [`LICENSE`](LICENSE)). Contributions are
+accepted under the same terms: by opening a pull request you agree your work is
+contributed under the MIT license.
 
-Because of the dual license, every outside contributor signs a
-[Contributor License Agreement](CLA.md) once, before their first change is
-merged. You keep the copyright in your work; the agreement grants Calliope Labs
-Inc. the right to distribute your contribution under both licenses.
+**There is no CLA, deliberately.** The MIT grant already covers sublicensing and
+sale, so contributed code can be commercialised without collecting signatures
+from every past contributor. That is one of the reasons the project is MIT
+rather than copyleft.
 
-> **Not yet in force.** The CLA is a draft pending review by counsel, and this
-> repository is private. No signature is being collected today. The requirement
-> takes effect when the repository is opened to outside contributions.
+Two things to know before you write code:
 
-One consequence worth knowing before you write code: **copyleft third-party code
-cannot be accepted**, because it cannot be relicensed. If a change depends on
-GPL, AGPL or similarly licensed code, raise it in the issue before implementing.
+- **Sign off your commits** with `git commit -s`. That adds a
+  `Signed-off-by:` line asserting you wrote the patch or otherwise have the
+  right to submit it under the MIT license (the
+  [Developer Certificate of Origin](https://developercertificate.org/)).
+- **Copyleft third-party code cannot be accepted.** GPL or AGPL code cannot be
+  redistributed under MIT. If a change depends on any, raise it in the issue
+  before implementing rather than after.
 
 ## Questions
 
