@@ -18,14 +18,40 @@ Three layers:
   symbols; GCP requires lowercase + hyphen + 63-char limit; Azure
   is case-insensitive but forbids several characters, including ``/``).
   Caller doesn't worry about it.
-* **Required-tag enforcement** (``MIN_REQUIRED_KEYS``) — a CI test
-  in the providers repo asserts every freshly-provisioned cloud
-  resource carries these. Catches plugin authors who forgot to
-  pass tags through.
+* **Required-tag enforcement** (``MIN_REQUIRED_KEYS``) — the set a
+  freshly-provisioned resource is meant to carry.
+
+.. warning::
+
+   Nothing in this module has a production caller. The only callers
+   of ``assert_required_tags`` are this package's own tests, and no
+   driver builds a ``CloudTagSet`` (#1500).
+
+   The header above describes an intended design, not shipped
+   behaviour, and the previous version of this text claimed a
+   providers-repo CI test enforced ``MIN_REQUIRED_KEYS``. No such
+   test exists here. That claim is the reason the gap read as
+   covered for as long as it did.
+
+   What actually happens: platform tags *are* applied on provision,
+   by per-cloud builders that read ``ProvisionSpec`` scalar fields
+   and hand-roll their own dicts — ``aws/managed/_base.tags_for``,
+   ``azure/managed/tags.arm_tags_for``, and per-driver GCP labels.
+   Their spellings differ from each other and from this module's, so
+   ``assert_required_tags`` would reject every resource the platform
+   has ever created; ``astrolift.io/install`` in particular is
+   written by no builder on any cloud.
+
+   ``providers/_sdk/managed_service_tags.py`` is the narrow fix that
+   did ship (#1419), scoped to the one key cost attribution groups
+   on. Read it before treating anything here as authoritative.
 
 Pairs with:
-  * #11 ``ProvisionSpec.tags`` — drivers receive the platform tags
-    via this field; cloud_tags formats them.
+  * #11 ``ProvisionSpec.tags`` — *not* the platform envelope. It is
+    the operator custom-tag channel (AWS namespaces it under
+    ``astrolift.io/extra/``, Azure passes it as ``custom_tags``), and
+    ``build_provision_spec`` never populates it, so ``cost_center``
+    and operator-defined tags currently reach no resource (#1500).
   * #30 ``CostSnapshot.managed_service_binding_id`` — the cost
     collector queries the cloud billing API by tag, joins on
     ``astrolift.io/binding`` to write the snapshot.
