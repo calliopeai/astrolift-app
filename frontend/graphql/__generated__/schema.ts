@@ -2398,6 +2398,7 @@ export type AstroliftManagedServiceCatalogEntry = {
   providerPluginSlug: Scalars['String']['output'];
   sizeOptions: Array<Scalars['String']['output']>;
   status: Scalars['String']['output'];
+  tier: Scalars['String']['output'];
   unavailableReason: Scalars['String']['output'];
   variant: Scalars['String']['output'];
 };

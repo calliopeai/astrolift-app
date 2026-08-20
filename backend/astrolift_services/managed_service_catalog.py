@@ -347,9 +347,7 @@ def resolve_variant(*, plugin_slug: str, kind: str, requested_variant: str | Non
     # already using it (#1470).
     rows = [
         row
-        for row in list_catalog(
-            plugin_slug, include_unprovisionable=True, include_extended=True
-        )
+        for row in list_catalog(plugin_slug, include_unprovisionable=True, include_extended=True)
         if row.kind == kind
     ]
     if not rows:

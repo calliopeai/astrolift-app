@@ -555,8 +555,14 @@ def test_plugin_catalogue_preflight_and_contract_are_executable(_registered_plug
             crd_inventory_probed=True,
         ),
     )
+    # include_extended, because api_gateway is opt-in tier: Astrolift already
+    # terminates ingress and routes to workloads, so a bookable gateway is a
+    # second answer to a question the platform has answered (#1470). The driver
+    # is unaffected by that cut, which is exactly what this asserts.
     row = next(
-        item for item in list_catalog("k8s_native") if (item.kind, item.variant) == ("api_gateway", "gateway_api")
+        item
+        for item in list_catalog("k8s_native", include_extended=True)
+        if (item.kind, item.variant) == ("api_gateway", "gateway_api")
     )
 
     assert missing.ok is False

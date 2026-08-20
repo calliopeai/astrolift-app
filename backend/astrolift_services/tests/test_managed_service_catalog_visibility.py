@@ -15,6 +15,7 @@ from astrolift_services.managed_service_catalog import (
     resolve_variant,
 )
 from providers._sdk.availability import MATRIX
+from providers._sdk.coverage import OPT_IN_TIER
 
 
 def _planned(plugin_slug: str) -> list[tuple[str, str]]:
@@ -25,7 +26,30 @@ def _planned(plugin_slug: str) -> list[tuple[str, str]]:
     ]
 
 
+def _opt_in(plugin_slug: str) -> list[tuple[str, str]]:
+    return [
+        (e.kind, e.variant)
+        for e in MATRIX.managed_services
+        if e.plugin_id == plugin_slug and e.status != "planned" and e.kind in OPT_IN_TIER
+    ]
+
+
+def _everything(plugin_slug: str) -> set[tuple[str, str]]:
+    """Every row the catalogue knows, including the ones it does not offer by default.
+
+    Both filters, because they are separate axes: a planned row has no driver,
+    an opt-in row has one and is fully provisionable but sits outside the
+    surface Astrolift guarantees across clouds. Asking for one of the two and
+    calling the result "everything" is what broke these tests when tiering
+    landed, so the idiom lives in one place and a third filter has one call
+    site to update rather than four.
+    """
+    rows = list_catalog(plugin_slug, include_unprovisionable=True, include_extended=True)
+    return {(row.kind, row.variant) for row in rows}
+
+
 PLUGINS_WITH_PLANNED = [slug for slug in ("gcp", "azure", "k8s_native") if _planned(slug)]
+PLUGINS_WITH_OPT_IN = [slug for slug in ("aws", "gcp", "azure", "k8s_native") if _opt_in(slug)]
 
 
 @pytest.mark.parametrize("plugin_slug", PLUGINS_WITH_PLANNED)
@@ -41,7 +65,7 @@ def test_planned_variants_are_not_offered(plugin_slug):
 def test_planned_variants_are_still_visible_when_asked_for(plugin_slug):
     """Hidden from the catalogue, not deleted from it. Callers that need to
     distinguish "not offered here" from "no such variant" ask for everything."""
-    everything = {(row.kind, row.variant) for row in list_catalog(plugin_slug, include_unprovisionable=True)}
+    everything = _everything(plugin_slug)
 
     for key in _planned(plugin_slug):
         assert key in everything
@@ -53,7 +77,7 @@ def test_an_unavailable_row_always_says_why():
     installed" rather than an empty one. That only helps if each row carries
     the reason."""
     for plugin_slug in ("aws", "gcp", "azure", "k8s_native"):
-        for row in list_catalog(plugin_slug):
+        for row in list_catalog(plugin_slug, include_extended=True):
             if not row.available:
                 assert row.unavailable_reason, f"{plugin_slug} {row.kind}:{row.variant}"
 
@@ -65,18 +89,39 @@ def test_a_registry_that_loaded_nothing_does_not_render_an_empty_catalogue():
 
     A cloud catalogue is a superset of that plugin's own matrix rows rather
     than an exact match, because a cloud-hosted cluster also books the
-    in-cluster drivers (#1484). The next test pins what the extras may be."""
+    in-cluster drivers (#1484). The next test pins what the extras may be.
+
+    Opt-in kinds are excluded here for the same reason planned ones are: the
+    default catalogue is not meant to carry them (#1470). That is a narrowing
+    of this guard, so the test below holds the other half and asserts they are
+    still reachable -- between them nothing real can go missing unnoticed."""
     for plugin_slug in ("aws", "gcp", "azure", "k8s_native"):
         own = {
             (e.kind, e.variant)
             for e in MATRIX.managed_services
-            if e.plugin_id == plugin_slug and e.status != "planned"
+            if e.plugin_id == plugin_slug and e.status != "planned" and e.kind not in OPT_IN_TIER
         }
         if not own:
             continue
         offered = {(row.kind, row.variant) for row in list_catalog(plugin_slug)}
 
         assert own <= offered, f"{plugin_slug} drops {sorted(own - offered)}"
+
+
+@pytest.mark.parametrize("plugin_slug", PLUGINS_WITH_OPT_IN)
+def test_opt_in_kinds_are_hidden_by_default_but_not_lost(plugin_slug):
+    """Cut from the default catalogue, still in the tree and still bookable.
+
+    The drivers work and someone may already depend on one, so the cut is a
+    statement about the guaranteed surface rather than a removal. Without this
+    the completeness guard above could be narrowed until it asserted nothing.
+    """
+    offered = {(row.kind, row.variant) for row in list_catalog(plugin_slug)}
+    everything = _everything(plugin_slug)
+
+    for key in _opt_in(plugin_slug):
+        assert key not in offered, f"{plugin_slug} {key[0]}:{key[1]} is opt-in but offered by default"
+        assert key in everything, f"{plugin_slug} {key[0]}:{key[1]} is unreachable"
 
 
 @pytest.mark.parametrize("plugin_slug", ["aws", "gcp", "azure"])
@@ -101,7 +146,7 @@ def test_deprecated_variants_stay_visible():
         pytest.skip("no deprecated entries in the matrix")
 
     for plugin_slug, kind, variant in deprecated:
-        everything = {(r.kind, r.variant) for r in list_catalog(plugin_slug, include_unprovisionable=True)}
+        everything = _everything(plugin_slug)
         assert (kind, variant) in everything
 
 
