@@ -108,6 +108,49 @@ def test_a_registry_that_loaded_nothing_does_not_render_an_empty_catalogue():
         assert own <= offered, f"{plugin_slug} drops {sorted(own - offered)}"
 
 
+def test_a_planned_row_is_never_reported_as_a_broken_install():
+    """The reason a planned variant cannot be provisioned is that nobody has
+    written it, not that this control plane is missing a plugin.
+
+    A planned row has no driver by definition, so testing for the driver first
+    matched every one of them and sent operators to check an install that was
+    fine. Eight of the nine planned rows in the matrix said so, and the planned
+    message was reachable only by the single planned variant that ships a stub
+    (#1470).
+    """
+    seen = 0
+    for plugin_slug in ("aws", "gcp", "azure", "k8s_native"):
+        rows = {
+            (r.kind, r.variant): r
+            for r in list_catalog(plugin_slug, include_unprovisionable=True, include_extended=True)
+        }
+        for key in _planned(plugin_slug):
+            row = rows[key]
+            seen += 1
+            assert "not installed" not in row.unavailable_reason, f"{plugin_slug} {key[0]}:{key[1]}"
+    assert seen, "no planned rows in the matrix; this test would assert nothing"
+
+
+def test_a_planned_variant_of_a_cut_kind_does_not_read_as_roadmap():
+    """ "Planned" reads as "available soon". For a kind that has been cut it
+    means the opposite: nobody intends to build it. The row stays for the
+    record and has to say which of the two it is (#1470)."""
+    checked = 0
+    for plugin_slug in ("aws", "gcp", "azure", "k8s_native"):
+        rows = {
+            (r.kind, r.variant): r
+            for r in list_catalog(plugin_slug, include_unprovisionable=True, include_extended=True)
+        }
+        for kind, variant in _planned(plugin_slug):
+            if kind not in OPT_IN_TIER:
+                continue
+            checked += 1
+            assert (
+                "not planned" in rows[(kind, variant)].unavailable_reason
+            ), f"{plugin_slug} {kind}:{variant}"
+    assert checked, "no planned rows on cut kinds; this test would assert nothing"
+
+
 @pytest.mark.parametrize("plugin_slug", PLUGINS_WITH_OPT_IN)
 def test_opt_in_kinds_are_hidden_by_default_but_not_lost(plugin_slug):
     """Cut from the default catalogue, still in the tree and still bookable.

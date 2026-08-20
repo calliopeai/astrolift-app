@@ -286,12 +286,29 @@ def list_catalog(
         driver_cls = drivers.get((kind, variant))
         status = meta.status if meta is not None else "experimental"
         available = driver_cls is not None and status in {"ga", "preview", "experimental"}
+        # Order matters. ``planned`` is checked before the missing-driver case
+        # because a planned row has no driver *by definition*, so testing for
+        # the driver first claimed the install was incomplete on eight of the
+        # nine planned rows in the matrix and left the planned message reachable
+        # only by the one planned variant that happens to ship a stub. "Not
+        # installed in this control plane" sends an operator to check their
+        # plugin install for a variant nobody has written (#1470).
         if status == "deprecated":
             unavailable_reason = "This provider variant is deprecated or retired and cannot be provisioned."
+        elif status == "planned":
+            if kind_tier(kind) == TIER_EXTENDED:
+                # Roadmap metadata for a kind that has since been cut. Saying
+                # "planned" here reads as "available soon" for something nobody
+                # intends to build, which is the specific thing #1470 asked to
+                # stop. The row stays for the record.
+                unavailable_reason = (
+                    f"{kind} sits outside the tier Astrolift guarantees across clouds, "
+                    "and this variant is not planned. The row is kept for the record."
+                )
+            else:
+                unavailable_reason = "Driver is a non-provisioning stub or planned capability."
         elif driver_cls is None:
             unavailable_reason = "Provider driver is not installed in this control plane."
-        elif status == "planned":
-            unavailable_reason = "Driver is a non-provisioning stub or planned capability."
         else:
             unavailable_reason = ""
         default_pool = native_by_kind.get(kind) or available_by_kind.get(kind, [])
