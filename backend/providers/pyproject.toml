@@ -3,7 +3,13 @@ name = "astrolift-providers"
 version = "0.2.0"
 description = "Astrolift provider plugin SDK and per-cloud driver implementations"
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
+# AGPL-3.0-only, matching the repository. This package is not published
+# separately, so an Apache-2.0 declaration here granted nothing to anyone
+# while implying that ~14k lines of provider SDK plus the per-cloud drivers
+# sat outside the repo's copyleft. If a third-party driver ecosystem ever
+# justifies it, carve out the protocol interfaces alone under Apache-2.0
+# then: loosening later is free, tightening later is not.
+license = { text = "AGPL-3.0-only" }
 # Core SDK has zero runtime deps. Per-cloud plugin extras are optional
 # so installs that only need k8s_native don't pull in boto3 + every
 # cloud SDK.
