@@ -86,6 +86,25 @@ cd frontend && npm run codegen
 - For features: explain the use case before proposing an implementation
 - For security: see [`SECURITY.md`](SECURITY.md) — do not file public issues for vulnerabilities
 
+## License and the CLA
+
+Astrolift is licensed to the public under **AGPL-3.0** (see [`LICENSE`](LICENSE))
+and to commercial customers under separate terms. Contributions are accepted on
+that basis.
+
+Because of the dual license, every outside contributor signs a
+[Contributor License Agreement](CLA.md) once, before their first change is
+merged. You keep the copyright in your work; the agreement grants Calliope Labs
+Inc. the right to distribute your contribution under both licenses.
+
+> **Not yet in force.** The CLA is a draft pending review by counsel, and this
+> repository is private. No signature is being collected today. The requirement
+> takes effect when the repository is opened to outside contributions.
+
+One consequence worth knowing before you write code: **copyleft third-party code
+cannot be accepted**, because it cannot be relicensed. If a change depends on
+GPL, AGPL or similarly licensed code, raise it in the issue before implementing.
+
 ## Questions
 
 Open an issue or start a discussion in this repository.

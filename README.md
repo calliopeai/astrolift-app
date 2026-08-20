@@ -187,8 +187,13 @@ real-DB tests, no rebases, no co-author trailers).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+AGPL-3.0. See [LICENSE](LICENSE).
 
-Copyright (c) 2026 Calliope Labs Inc. All Rights Reserved. Calliope AI is a trademark of Calliope Labs Inc.
+Astrolift is also available under a commercial license, including terms for
+hosting it as a service without publishing your modifications. See
+[astrolift.ai](https://astrolift.ai).
+
+Copyright (c) 2026 Calliope Labs Inc. Calliope AI and Astrolift are trademarks
+of Calliope Labs Inc.
 
 Portions of the framework underlying this repo are derived from **[boilerworks-django-nextjs](https://github.com/ConflictHQ/boilerworks-django-nextjs)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
