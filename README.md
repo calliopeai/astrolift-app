@@ -1,6 +1,6 @@
 # astrolift-app
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Django](https://img.shields.io/badge/django-5.x-092E20.svg)](https://www.djangoproject.com/)
 [![Next.js](https://img.shields.io/badge/next.js-16-000000.svg)](https://nextjs.org/)
 [![Strawberry](https://img.shields.io/badge/strawberry-graphql-E91E63.svg)](https://strawberry.rocks/)
