@@ -20,6 +20,7 @@ from collections import defaultdict
 from typing import Any
 
 from _sdk.availability import MATRIX, ManagedServiceEntry
+from _sdk.coverage import OPT_IN_TIER
 
 from astrolift_drivers.managed_resolution import IN_CLUSTER_PLUGIN
 from astrolift_drivers.registry import plugins
@@ -70,6 +71,11 @@ class CatalogItem:
     display_name: str
     description: str
     status: str
+    tier: str
+    """``default`` or ``extended``. Extended kinds are real and provisionable;
+    they are outside the set Astrolift guarantees on every cloud, so they are
+    opt-in rather than listed by default (#1470)."""
+
     available: bool
     unavailable_reason: str
     is_default_for_kind: bool
@@ -199,13 +205,49 @@ def _binding_envs(driver_cls: type | Any | None, matrix: ManagedServiceEntry | N
     return tuple(sorted(keys))
 
 
-def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> tuple[CatalogItem, ...]:
+#: The tier a kind belongs to. ``OPT_IN_TIER`` is the canonical set and lives
+#: in ``_sdk.coverage`` because the declared-gap guard already reads it: a kind
+#: outside the guaranteed surface is not a portability defect there, and is not
+#: a default catalogue row here. Imported rather than restated, because #1470
+#: asked for one mechanism and a second frozenset would drift the moment either
+#: side gained a kind. It carries nine, not the seven #1470 listed:
+#: ``api_gateway`` and ``time_series`` were already cut for overlapping
+#: capabilities the platform answers another way.
+#:
+#: ``cdn`` is the one to be careful with. The capability is not lost: it ships
+#: with the ``static_site`` topology through
+#: ``providers/aws/managed/cdn_cloudfront.py`` (#1010), so cutting the kind
+#: removes a requestable resource and leaves the topology untouched.
+
+TIER_DEFAULT = "default"
+TIER_EXTENDED = "extended"
+
+
+def kind_tier(kind: str) -> str:
+    """Which tier a kind belongs to. One place, so nothing drifts."""
+    return TIER_EXTENDED if kind in OPT_IN_TIER else TIER_DEFAULT
+
+
+def list_catalog(
+    plugin_slug: str,
+    *,
+    include_unprovisionable: bool = False,
+    include_extended: bool = False,
+) -> tuple[CatalogItem, ...]:
     """The managed-service catalogue for one provider plugin.
 
     By default ``planned`` rows are left out. They are roadmap metadata: no
     driver exists and none is being installed, so the entry documents an
     intention rather than a choice, and "planned" reads to most people as
     "available soon".
+
+    Extended-tier kinds are left out too, and ``include_extended`` is a
+    *separate* flag from ``include_unprovisionable`` on purpose. They are
+    different axes and conflating them would be wrong in both directions: an
+    extended kind is fully provisionable, and asking to see one should not also
+    surface planned stubs that cannot be provisioned at all. One filter, two
+    questions, which is what #1470 asked for when it said not to add a second
+    mechanism.
 
     Rows whose driver is missing are deliberately still shown, as unavailable
     with the reason. Hiding those would mean a control plane whose plugin
@@ -260,6 +302,9 @@ def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> 
         description = meta.description if meta is not None else "Installed third-party provider driver."
         if not include_unprovisionable and status == "planned":
             continue
+        tier = kind_tier(kind)
+        if not include_extended and tier == TIER_EXTENDED:
+            continue
         rows.append(
             CatalogItem(
                 provider_plugin_slug=plugin_slug,
@@ -268,6 +313,7 @@ def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> 
                 display_name=description or f"{kind} / {variant}",
                 description=description,
                 status=status,
+                tier=tier,
                 available=available,
                 unavailable_reason=unavailable_reason,
                 is_default_for_kind=is_default,
@@ -292,7 +338,20 @@ def resolve_variant(*, plugin_slug: str, kind: str, requested_variant: str | Non
     # The full list, including planned and driverless variants: an explicit
     # request for one should be refused with the reason it is unavailable
     # rather than with "does not support", which reads as a typo.
-    rows = [row for row in list_catalog(plugin_slug, include_unprovisionable=True) if row.kind == kind]
+    #
+    # ``include_extended`` for the same reason, and it is load-bearing. Cutting
+    # a kind from the default tier is a statement about what the browse list
+    # promises, not a removal: the driver still works and an author who names
+    # ``warehouse`` outright is entitled to get it. Leaving it out here would
+    # turn an opt-in kind into an unsupported one and break every manifest
+    # already using it (#1470).
+    rows = [
+        row
+        for row in list_catalog(
+            plugin_slug, include_unprovisionable=True, include_extended=True
+        )
+        if row.kind == kind
+    ]
     if not rows:
         known_plugin = any(entry.plugin_id == plugin_slug for entry in MATRIX.managed_services) or any(
             manifest.plugin_id == plugin_slug for manifest in plugins.list()

@@ -246,6 +246,7 @@ class ManagedServiceCatalogEntryType:
     display_name: str
     description: str
     status: str
+    tier: str
     available: bool
     unavailable_reason: str
     is_default_for_kind: bool
@@ -1045,6 +1046,7 @@ def managed_service_catalog_entry_to_type(row) -> ManagedServiceCatalogEntryType
         display_name=row.display_name,
         description=row.description,
         status=row.status,
+        tier=row.tier,
         available=row.available,
         unavailable_reason=row.unavailable_reason,
         is_default_for_kind=row.is_default_for_kind,

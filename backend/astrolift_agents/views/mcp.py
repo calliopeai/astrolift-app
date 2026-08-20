@@ -566,6 +566,7 @@ def _serialize_catalog_item(row) -> dict[str, Any]:
         "display_name": row.display_name,
         "description": row.description,
         "status": row.status,
+        "tier": row.tier,
         "available": row.available,
         "unavailable_reason": row.unavailable_reason,
         "is_default_for_kind": row.is_default_for_kind,

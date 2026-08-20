@@ -2395,6 +2395,7 @@ type AstroliftManagedServiceCatalogEntry {
   displayName: String!
   description: String!
   status: String!
+  tier: String!
   available: Boolean!
   unavailableReason: String!
   isDefaultForKind: Boolean!
