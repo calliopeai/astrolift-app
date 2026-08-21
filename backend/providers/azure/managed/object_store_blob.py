@@ -77,6 +77,13 @@ KIND = "object_store"
 @dataclass(frozen=True)
 class BlobStorageConfig:
     storage_account: str
+    # Needed to build the container's ARM id for the role assignment. This
+    # driver emitted `/subscriptions/SUB_ID/resourceGroups/RG/...` — a
+    # literal placeholder — and its config had nothing to build a real one
+    # from, so every binding it produced carried a grant that could not be
+    # applied (#1470). `AzureBlobConfig` below has always had both.
+    subscription_id: str = ""
+    resource_group: str = ""
     container_name_prefix: str = "astrolift"
     versioning_enabled: bool = True
     blob_service_client: Any | None = None
@@ -239,18 +246,39 @@ class BlobStorageDriver(ManagedServiceDriver):
             },
             iam_grants=[
                 Grant(
-                    resource=(
-                        f"/subscriptions/SUB_ID/resourceGroups/RG"
-                        f"/providers/Microsoft.Storage"
-                        f"/storageAccounts/{self._config.storage_account}"
-                        f"/blobServices/default/containers/{container_name}"
-                    ),
+                    resource=self._container_scope(container_name),
                     actions=["Storage Blob Data Contributor"],
                 ),
             ],
             notes=(
                 "Workload Identity grants Storage Blob Data Contributor via Microsoft.Authorization/roleAssignments."
             ),
+        )
+
+    def _container_scope(self, container_name: str) -> str:
+        """The container's ARM id, which is what a role assignment is scoped to.
+
+        Refuses rather than emitting a placeholder. A grant naming a
+        subscription that does not exist is not a smaller version of a
+        correct grant: it fails at assignment time, far from the config
+        that caused it, and the binding reports ready until it does.
+        """
+        if not self._config.subscription_id or not self._config.resource_group:
+            # A backstop. The config builder refuses first, and is the only
+            # production constructor; this stops a hand-built config from
+            # reintroducing a placeholder scope.
+            raise ValueError(
+                "azure object_store/blob needs subscription_id and resource_group "
+                "to scope its Storage Blob Data Contributor assignment to the "
+                "container; without them the grant names a subscription that "
+                "does not exist",
+            )
+        return (
+            f"/subscriptions/{self._config.subscription_id}"
+            f"/resourceGroups/{self._config.resource_group}"
+            f"/providers/Microsoft.Storage"
+            f"/storageAccounts/{self._config.storage_account}"
+            f"/blobServices/default/containers/{container_name}"
         )
 
     @driver_op(cloud="azure", driver="object_store_blob")

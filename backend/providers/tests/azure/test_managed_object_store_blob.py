@@ -92,6 +92,13 @@ def driver(fake_client: FakeBlobServiceClient) -> BlobStorageDriver:
     return BlobStorageDriver(
         config=BlobStorageConfig(
             storage_account="acmeprod",
+            # Both are needed to scope the container's role assignment.
+            # Without them this driver used to emit a literal SUB_ID/RG
+            # placeholder; it refuses now (#1470), so a fixture that omits
+            # them is building a config that could only produce a grant
+            # nobody could apply.
+            subscription_id="00000000-1111-2222-3333-444444444444",
+            resource_group="rg-acme-prod",
             blob_service_client=fake_client,
         ),
     )
