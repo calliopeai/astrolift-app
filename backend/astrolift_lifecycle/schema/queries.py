@@ -473,12 +473,20 @@ def _scheduled_job_runs_qs(
     app_slug: str | None,
     environment_name: str | None,
     search: str | None = None,
+    workload_slug: str | None = None,
 ):
     """Filtered, unordered cron-run stream for the caller's org.
 
     Shared by the list field and its paginated sibling so the two can
     never disagree about what a run row is. Ordering is deliberately
     not applied here — ``keyset_page`` imposes it from the seek key.
+
+    ``workload_slug`` narrows to one scheduled job's own history, which
+    is what a cronjob's page shows. Without it that surface fetched the
+    app's newest runs and kept this workload's in the browser, so a job
+    firing less often than its neighbours read as never having fired
+    (#1512). ``app_slug`` alone is not enough: workload slugs are unique
+    within an app, not across the org.
     """
     # Org-scope to the active tenant. ScheduledJobRun has no org FK of
     # its own (it hangs off workload → registered_app) and its default
@@ -494,6 +502,8 @@ def _scheduled_job_runs_qs(
     ).filter(workload__registered_app__organization_id=org_id)
     if app_slug:
         qs = qs.filter(workload__registered_app__slug=app_slug)
+    if workload_slug:
+        qs = qs.filter(workload__slug=workload_slug)
     if environment_name:
         qs = qs.filter(app_environment__name=environment_name)
     if search:
@@ -1135,6 +1145,7 @@ class LifecycleQuery:
         info: Info,
         app_slug: str | None = None,
         environment_name: str | None = None,
+        workload_slug: str | None = None,
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
@@ -1147,11 +1158,16 @@ class LifecycleQuery:
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
         workload, environment, status, and the ``batch/v1`` Job name an
         operator reads off ``kubectl``.
+
+        ``workload_slug`` narrows to one scheduled job, which is what a
+        cronjob's own page shows (#1512). Pass ``app_slug`` with it:
+        workload slugs are unique within an app, not across the org.
         """
         page = keyset_page(
             _scheduled_job_runs_qs(
                 app_slug=app_slug,
                 environment_name=environment_name,
+                workload_slug=workload_slug,
                 search=search,
             ),
             cursor=after,

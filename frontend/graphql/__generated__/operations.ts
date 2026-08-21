@@ -8628,6 +8628,7 @@ export type QueryAstroliftScheduledJobRunsPageArgs = {
   environmentName?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -11000,6 +11001,7 @@ export type ScheduledJobRunFieldsFragment = { id: string, registeredAppSlug: str
 export type ListScheduledJobRunsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;

@@ -49,11 +49,6 @@ const NO_PAGE_FIELD = [
       "Two of its three tables read agentTasks, unpaginated; the third is still on the legacy useListControls.",
   },
   {
-    file: "app/(app)/apps/[slug]/components/homes/cronjob-home.tsx",
-    reason:
-      "astroliftScheduledJobRunsPage filters on appSlug, not workloadSlug, and a cronjob's history is one workload's. It filters the app's runs in the browser today (#1512), which useCursorTable cannot express.",
-  },
-  {
     file: "app/(app)/apps/[slug]/domains/domains-client.tsx",
     reason: "All three tables read astroliftAppDomains, an unpaginated list field.",
   },

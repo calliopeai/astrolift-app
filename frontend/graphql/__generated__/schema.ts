@@ -8628,6 +8628,7 @@ export type QueryAstroliftScheduledJobRunsPageArgs = {
   environmentName?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

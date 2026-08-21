@@ -360,6 +360,7 @@ export const LIST_SCHEDULED_JOB_RUNS_PAGE = gql`
   query ListScheduledJobRunsPage(
     $appSlug: String
     $environmentName: String
+    $workloadSlug: String
     $search: String
     $limit: Int
     $after: String
@@ -367,6 +368,7 @@ export const LIST_SCHEDULED_JOB_RUNS_PAGE = gql`
     astroliftScheduledJobRunsPage(
       appSlug: $appSlug
       environmentName: $environmentName
+      workloadSlug: $workloadSlug
       search: $search
       limit: $limit
       after: $after
