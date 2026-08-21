@@ -459,6 +459,80 @@ def test_scheduled_job_runs_environment_filter_and_total(
     assert {i.environment_name for i in staged.items} == {"staging"}
 
 
+def test_scheduled_job_runs_workload_filter_isolates_a_quiet_job(
+    app, cron_workload, env, org, permission_resolver
+):
+    """The bug #1512 was filed on, from the server's side.
+
+    A cronjob's page used to fetch the *app's* newest runs and keep its
+    own in the browser. A job firing less often than its neighbours fell
+    off the end of that fetch entirely, so its page said "no runs
+    recorded yet" while its runs sat one query away.
+
+    The noisy job here is given enough runs to bury the quiet one under
+    any plausible client-side limit, and the quiet one is created first
+    so it is oldest by the `-created_at` seek key.
+    """
+    permission_resolver.grant(Permission.APP_READ_LOGS)
+    quiet = Workload.objects.create(
+        registered_app=app, name="Weekly", slug="weekly", kind=Workload.Kind.CRONJOB
+    )
+    quiet_run = _cron_run(quiet, env, k8s_job_name="weekly-000")
+    for n in range(40):
+        _cron_run(cron_workload, env, k8s_job_name=f"nightly-{n:03d}")
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        page = LifecycleQuery().astrolift_scheduled_job_runs_page(
+            _info(), app_slug=app.slug, workload_slug="weekly"
+        )
+        unfiltered = LifecycleQuery().astrolift_scheduled_job_runs_page(_info(), app_slug=app.slug, limit=30)
+
+    assert page.total_count == 1
+    assert [i.id for i in page.items] == [str(quiet_run.guid)]
+    assert {i.workload_slug for i in page.items} == {"weekly"}
+
+    # The shape of the bug: the quiet job is absent from the app-scoped
+    # fetch the page used to filter, so no browser-side pass could find it.
+    assert "weekly" not in {i.workload_slug for i in unfiltered.items}
+
+
+def test_scheduled_job_runs_workload_filter_needs_its_app(
+    app, cron_workload, env, org, permission_resolver, rival
+):
+    """Workload slugs are unique within an app, not across the org.
+
+    `workload_slug` alone would pull a same-named job from another app,
+    which is why the resolver's docstring says to pass `app_slug` with
+    it. Tenant scoping still holds either way; this is about two apps in
+    the *same* org.
+    """
+    permission_resolver.grant(Permission.APP_READ_LOGS)
+    other_app = RegisteredApp.objects.create(
+        organization=org,
+        team=app.team,
+        name="Other",
+        slug="other-app",
+        provisioning_status="ready",
+    )
+    twin = Workload.objects.create(
+        registered_app=other_app, name="Nightly", slug="nightly", kind=Workload.Kind.CRONJOB
+    )
+    other_env = AppEnvironment.objects.create(
+        registered_app=other_app, tenant_cluster=env.tenant_cluster, name="production"
+    )
+    _cron_run(cron_workload, env, k8s_job_name="ours")
+    _cron_run(twin, other_env, k8s_job_name="theirs")
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        scoped = LifecycleQuery().astrolift_scheduled_job_runs_page(
+            _info(), app_slug=app.slug, workload_slug="nightly"
+        )
+        unscoped = LifecycleQuery().astrolift_scheduled_job_runs_page(_info(), workload_slug="nightly")
+
+    assert scoped.total_count == 1
+    assert unscoped.total_count == 2
+
+
 def test_scheduled_job_runs_search_narrows_total_count(app, cron_workload, env, org, permission_resolver):
     permission_resolver.grant(Permission.APP_READ_LOGS)
     wanted = _cron_run(cron_workload, env, k8s_job_name="nightly-28471234")

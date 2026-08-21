@@ -1,30 +1,30 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
 import cronstrue from "cronstrue";
-import { HistoryIcon, Loader2Icon, RepeatIcon, TimerIcon } from "lucide-react";
+import { HistoryIcon, RepeatIcon, TimerIcon } from "lucide-react";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { AppTabs } from "../app-tabs";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_SCHEDULED_JOB_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { nextCronRun } from "@/lib/cron";
 import { formatRelativeAge } from "@/lib/format";
 import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
+
+interface RunsPageResp {
+  astroliftScheduledJobRunsPage: CursorPage<AstroliftScheduledJobRun>;
+}
 
 interface CronjobHomeProps {
   slug: string;
@@ -73,15 +73,56 @@ export function CronjobHome({ slug, name, workload }: CronjobHomeProps) {
     [schedule, now]
   );
 
-  // Real run history from ScheduledJobRun (DB-backed). Poll so a fresh run
-  // surfaces without a reload; scope to this workload.
-  const { data, loading } = useQuery<{ astroliftScheduledJobRuns: AstroliftScheduledJobRun[] }>(
-    LIST_SCHEDULED_JOB_RUNS,
-    { variables: { appSlug: slug, limit: 30 }, fetchPolicy: "cache-and-network", pollInterval: 15000 }
-  );
-  const runs = (data?.astroliftScheduledJobRuns ?? []).filter(
-    (r) => r.workloadSlug === workload.slug
-  );
+  // Scoped to this workload on the server (#1512). It used to fetch the
+  // app's 30 newest runs and keep this workload's in the browser, so a job
+  // firing less often than its neighbours showed "no runs recorded yet"
+  // while its runs existed. Poll so a fresh run surfaces without a reload.
+  // No `urlKey`: several cronjob pages share the app's URL space.
+  const table = useCursorTable<AstroliftScheduledJobRun>({
+    query: LIST_SCHEDULED_JOB_RUNS_PAGE,
+    variables: { appSlug: slug, workloadSlug: workload.slug },
+    extract: (d) => (d as RunsPageResp | undefined)?.astroliftScheduledJobRunsPage,
+    searchVariable: "search",
+    pageSize: 10,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 15000,
+  });
+
+  const columns: Column<AstroliftScheduledJobRun>[] = [
+    {
+      id: "status",
+      header: "Status",
+      cell: (r) => (
+        <Badge
+          variant={runStatusDot(r.status) === "error" ? "destructive" : "secondary"}
+          className="gap-1.5"
+        >
+          <StatusDot status={runStatusDot(r.status)} />
+          {titleCaseStatus(r.status)}
+        </Badge>
+      ),
+    },
+    {
+      id: "started",
+      header: "Started",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (r) =>
+        r.startedAt ? <span title={r.startedAt}>{formatRelativeAge(r.startedAt)}</span> : "—",
+    },
+    {
+      id: "duration",
+      header: "Duration",
+      cellClassName: "text-muted-foreground text-sm tabular-nums",
+      cell: (r) => formatDuration(r.durationSeconds),
+    },
+    {
+      id: "exit",
+      header: "Exit",
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => (r.exitCode == null ? "—" : r.exitCode),
+    },
+  ];
 
   return (
     <PageShell
@@ -150,64 +191,31 @@ export function CronjobHome({ slug, name, workload }: CronjobHomeProps) {
             <CardTitle className="flex items-center gap-2 text-base">
               <HistoryIcon className="size-4" />
               Run history
-              {runs.length > 0 && (
-                <span className="text-muted-foreground text-xs font-normal">
-                  last {runs.length}
+              {table.totalCount != null && (
+                <span className="text-muted-foreground text-xs font-normal tabular-nums">
+                  {table.totalCount} total
                 </span>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className={runs.length > 0 ? "p-0" : undefined}>
-            {loading && runs.length === 0 ? (
-              <div className="text-muted-foreground flex items-center gap-2 p-2 text-sm">
-                <Loader2Icon className="size-4 animate-spin" /> Loading runs…
-              </div>
-            ) : runs.length === 0 ? (
-              <EmptyState
-                icon={<HistoryIcon className="size-5" />}
-                title="No runs recorded yet"
-                description="Each scheduled execution will appear here once it fires."
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead className="text-right">Exit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {runs.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell>
-                        <Badge
-                          variant={runStatusDot(r.status) === "error" ? "destructive" : "secondary"}
-                          className="gap-1.5"
-                        >
-                          <StatusDot status={runStatusDot(r.status)} />
-                          {titleCaseStatus(r.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {r.startedAt ? (
-                          <span title={r.startedAt}>{formatRelativeAge(r.startedAt)}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm tabular-nums">
-                        {formatDuration(r.durationSeconds)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {r.exitCode == null ? "—" : r.exitCode}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <CardContent>
+            <DataTable
+              label="Run history"
+              controller={table}
+              columns={columns}
+              getRowId={(r) => r.id}
+              searchPlaceholder="Search runs by status or Job name…"
+              empty={{
+                icon: <HistoryIcon className="size-5" />,
+                title: "No runs recorded yet",
+                description: "Each scheduled execution will appear here once it fires.",
+              }}
+              emptyFiltered={{
+                title: "No matching runs",
+                description:
+                  "No run of this job matches that search. The server matches the status and the batch/v1 Job name.",
+              }}
+            />
           </CardContent>
         </Card>
       </div>
