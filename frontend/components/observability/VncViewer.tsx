@@ -102,7 +102,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         return;
       }
       applyViewMode(client, viewModeRef.current);
-      client.background = "#052b25";
+      client.background = "#0a1310";
       rfb = client;
       rfbRef.current = client;
 
@@ -218,7 +218,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         // literal set above; not tokenizable.
         // eslint-disable-next-line astrolift/no-raw-design-values
         className={cn(
-          "min-h-[24rem] flex-1 rounded-md border bg-[#052b25]",
+          "min-h-[24rem] flex-1 rounded-md border bg-[#0a1310]",
           // actual size scrolls native pixels; fit scales within the pane.
           viewMode === "actual" ? "overflow-auto" : "overflow-hidden"
         )}

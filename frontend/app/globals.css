@@ -93,24 +93,27 @@
 }
 
 :root {
-  /* ── Brand seeds — Astrolift emerald planet palette ───────────────────
+  /* ── Brand seeds — Astrolift, app tuning of the planet palette ────────
    *
-   * Canonical hex values, shared with astrolift-site and astrolift-docs
-   * (deep-emerald dark theme, emerald accent, lime used only as light):
-   *   accent        #1EA97B   emerald — actions, links, focus, active
-   *   accent-press  #17916A   hover / pressed
-   *   accent-deep   #17805C   accent on light bands
-   *   bg            #04231A   dark-mode page canvas (never pure black)
-   *   surface-deep  #053438   sidebar / deepest band
-   *   code-bg       #052B25   panels, terminals, admin data surfaces
-   *   card          #0A5A46   raised marketing card (sparingly in-app)
-   *   fg            #EAF6EF   dark-mode foreground
-   *   on-accent     #04241B   text on emerald
-   *   err           #FF6B6B   the ONE permitted warm colour — errors only
+   * The marketing site runs the full emerald canvas; the app is denser and
+   * calmer, so it inverts the weight: a near-black canvas carries the work,
+   * the deep planet green is spent on the sidebar, and green appears in the
+   * content area only as accent. Greens sit at the leaf/lime end — nothing
+   * cyan-leaning, which read as teal against the dark chrome.
+   *
+   *   action       #2F9E52   leaf green — buttons, links, focus, active
+   *   action-deep  #26803F   action on light bands
+   *   canvas       #050B08   dark-mode page canvas (never pure black)
+   *   sidebar      #04231A   deep planet green — the one green surface
+   *   panel        #0A1310   cards, terminals, admin data surfaces
+   *   lime         #8FD82A   data + "ok" status
+   *   fg           #EAF6EF   dark-mode foreground
+   *   on-action    #04241B   text on the action green
+   *   err          #FF6B6B   the ONE permitted warm colour — errors only
    * ───────────────────────────────────────────────────────────────────── */
-  --brand-primary: #17805c; /* accent-deep — emerald on light bands */
-  --brand-primary-dark: #1ea97b; /* full emerald on dark surfaces */
-  --brand-on-primary: #04241b; /* text/icon when sitting on emerald */
+  --brand-primary: #26803f; /* action-deep — on light bands */
+  --brand-primary-dark: #2f9e52; /* leaf green on dark surfaces */
+  --brand-on-primary: #04241b; /* text/icon when sitting on the action green */
   --brand-text: oklch(0.24 0.02 165); /* deep green-black body text */
   --brand-muted: oklch(0.45 0.02 165); /* muted green-grey foreground */
   /* ─────────────────────────────────────────────────────────────────── */
@@ -127,23 +130,23 @@
   --secondary-foreground: var(--brand-text);
   --muted: oklch(0.955 0.01 165);
   --muted-foreground: var(--brand-muted);
-  --accent: oklch(0.94 0.03 168);
+  --accent: oklch(0.94 0.03 148);
   --accent-foreground: var(--brand-text);
   --destructive: oklch(0.55 0.22 27);
   --border: oklch(0.91 0.01 165);
   --input: oklch(0.91 0.01 165);
   --ring: var(--brand-primary);
-  --chart-1: #17805c;
-  --chart-2: #72c613;
-  --chart-3: #3bb673;
-  --chart-4: #f0c34e;
-  --chart-5: #0b6644;
+  --chart-1: #5c9c1a; /* lime, darkened for a light canvas */
+  --chart-2: #26803f; /* leaf */
+  --chart-3: #8ab545; /* pale lime */
+  --chart-4: #b8860b; /* amber */
+  --chart-5: #145236; /* deep green */
   --radius: 0.625rem;
   --sidebar: oklch(0.97 0.008 165);
   --sidebar-foreground: var(--brand-text);
   --sidebar-primary: var(--brand-primary);
   --sidebar-primary-foreground: oklch(0.98 0.01 165);
-  --sidebar-accent: oklch(0.94 0.03 168);
+  --sidebar-accent: oklch(0.94 0.03 148);
   --sidebar-accent-foreground: var(--brand-text);
   --sidebar-border: oklch(0.91 0.01 165);
   --sidebar-ring: var(--brand-primary);
@@ -152,18 +155,18 @@
    *    on the matching `-bg` tint; the bare token is the solid accent
    *    (dots, chart series, filled indicators). Info is emerald — the
    *    brand permits no blue; danger red is the one warm exception. ──── */
-  --success: oklch(0.6 0.14 163);
-  --success-fg: oklch(0.43 0.1 163);
-  --success-bg: oklch(0.95 0.03 163);
-  --success-border: oklch(0.84 0.07 163);
+  --success: oklch(0.58 0.15 135);
+  --success-fg: oklch(0.42 0.11 135);
+  --success-bg: oklch(0.95 0.04 135);
+  --success-border: oklch(0.84 0.08 135);
   --warning: oklch(0.66 0.16 70);
   --warning-fg: oklch(0.47 0.1 61);
   --warning-bg: oklch(0.96 0.04 85);
   --warning-border: oklch(0.83 0.09 78);
-  --info: oklch(0.58 0.11 175);
-  --info-fg: oklch(0.45 0.09 175);
-  --info-bg: oklch(0.95 0.03 175);
-  --info-border: oklch(0.84 0.07 175);
+  --info: oklch(0.55 0.13 148);
+  --info-fg: oklch(0.44 0.11 148);
+  --info-bg: oklch(0.95 0.03 148);
+  --info-border: oklch(0.84 0.07 148);
   --danger: oklch(0.58 0.22 27);
   --danger-fg: oklch(0.5 0.2 27);
   --danger-bg: oklch(0.96 0.03 22);
@@ -189,59 +192,59 @@
 }
 
 .dark {
-  /* Astrolift dark — the emerald "night side" palette shared with the
-   * marketing site (astrolift.ai) and docs site (astrolift.dev).
-   * Deep-emerald canvas, quiet code-green panels, emerald accent; glow
-   * is reserved for status and focus, never decorative fill. */
+  /* Astrolift dark — near-black canvas, one green surface.
+   * The deep planet green is spent on the sidebar; the content area is a
+   * near-black with a faint green cast (never pure black) so dense data
+   * reads calmly. Green returns as accent only: actions, focus, status,
+   * chart series. Glow stays reserved for status dots and focus rings. */
   --brand-primary: var(--brand-primary-dark);
 
-  --background: #04231a; /* bg — deepest emerald canvas */
+  --background: #050b08; /* canvas — near-black, faint green cast */
   --foreground: #eaf6ef;
-  --card: #052b25; /* code-bg — panels / data surfaces */
+  --card: #0a1310; /* panel — cards / data surfaces */
   --card-foreground: #eaf6ef;
-  --popover: #053438; /* surface-deep */
+  --popover: #0d1814; /* raised above panels */
   --popover-foreground: #eaf6ef;
   --primary: var(--brand-primary);
   --primary-foreground: var(--brand-on-primary);
-  --secondary: #0a4535; /* between card and raised card */
+  --secondary: #121d18;
   --secondary-foreground: #eaf6ef;
-  --muted: #05372a; /* raised band */
+  --muted: #101a15;
   --muted-foreground: #8ba199; /* fg at 55% over the canvas */
-  --accent: #0a5a46; /* card — hover / selected surfaces */
+  --accent: #16261f; /* hover / selected surfaces */
   --accent-foreground: #eaf6ef;
   --destructive: #ff6b6b; /* err — the one permitted warm colour */
-  --border: rgba(255, 255, 255, 0.1); /* line */
-  --input: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.09); /* line */
+  --input: rgba(255, 255, 255, 0.09);
   --ring: var(--brand-primary);
-  --chart-1: var(--brand-primary);
-  --chart-2: #8fd82a;
-  --chart-3: #3fd98a;
-  --chart-4: #f0c34e;
-  --chart-5: #cbf39d;
-  --sidebar: #053438; /* surface-deep — matches admin recipe chrome */
+  --chart-1: #8fd82a; /* lime */
+  --chart-2: #2f9e52; /* leaf */
+  --chart-3: #cbf39d; /* pale lime */
+  --chart-4: #f0c34e; /* amber */
+  --chart-5: #0b6644; /* deep green */
+  --sidebar: #04231a; /* deep planet green — the one green surface */
   --sidebar-foreground: #eaf6ef;
   --sidebar-primary: var(--brand-primary);
   --sidebar-primary-foreground: var(--brand-on-primary);
-  --sidebar-accent: rgba(30, 169, 123, 0.12); /* active nav tint */
+  --sidebar-accent: rgba(47, 158, 82, 0.16); /* active nav tint */
   --sidebar-accent-foreground: #eaf6ef;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: var(--brand-primary);
 
-  /* ── Semantic status — dark. Brand status set (ok/warn/err/info) with
-   *    translucent tints per the admin badge recipe; the badge dot glow
-   *    is the only permitted aura. ──────────────────────────────────── */
-  --success: #3fd98a;
-  --success-fg: #3fd98a;
-  --success-bg: rgba(63, 217, 138, 0.1);
-  --success-border: rgba(63, 217, 138, 0.35);
+  /* ── Semantic status — dark. Translucent tints per the admin badge
+   *    recipe; the badge dot glow is the only permitted aura. ──────── */
+  --success: #8fd82a;
+  --success-fg: #a6e34d;
+  --success-bg: rgba(143, 216, 42, 0.1);
+  --success-border: rgba(143, 216, 42, 0.35);
   --warning: #f0c34e;
   --warning-fg: #f0c34e;
   --warning-bg: rgba(240, 195, 78, 0.1);
   --warning-border: rgba(240, 195, 78, 0.35);
-  --info: #1ea97b;
-  --info-fg: #4dc99c;
-  --info-bg: rgba(30, 169, 123, 0.12);
-  --info-border: rgba(30, 169, 123, 0.4);
+  --info: #2f9e52;
+  --info-fg: #5cbb79;
+  --info-bg: rgba(47, 158, 82, 0.14);
+  --info-border: rgba(47, 158, 82, 0.4);
   --danger: #ff6b6b;
   --danger-fg: #ff8a8a;
   --danger-bg: rgba(255, 107, 107, 0.1);

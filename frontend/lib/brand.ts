@@ -14,15 +14,16 @@
 
 export const brand = {
   name: "Astrolift",
-  primary: "#17805c",
-  primaryDark: "#1ea97b",
+  primary: "#26803f",
+  primaryDark: "#2f9e52",
   onPrimary: "#04241b",
-  emerald: {
-    bg: "#04231a",
-    codeBg: "#052b25",
-    surfaceDeep: "#053438",
-    card: "#0a5a46",
+  surfaces: {
+    canvas: "#050b08",
+    panel: "#0a1310",
+    raised: "#0d1814",
+    sidebar: "#04231a",
   },
+  lime: "#8fd82a",
   fg: "#eaf6ef",
   fgMuted: "#8ba199",
 } as const;

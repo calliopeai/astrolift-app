@@ -89,11 +89,11 @@ export function LiveLogTerminal({
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       fontSize: 13,
       theme: {
-        background: "#052b25",
+        background: "#0a1310",
         foreground: "#eaf6ef",
         // Read-only surface: paint the (unused) cursor into the background so it
         // doesn't read as a live interactive prompt.
-        cursor: "#052b25",
+        cursor: "#0a1310",
       },
     });
     const fit = new FitAddon();
@@ -182,7 +182,7 @@ export function LiveLogTerminal({
           // exact terminal-canvas background — must match the xterm
           // theme.background literal above; not tokenizable.
           // eslint-disable-next-line astrolift/no-raw-design-values
-          className="h-full w-full rounded-md border bg-[#052b25] p-2 [&_.xterm-viewport]:!overflow-y-auto"
+          className="h-full w-full rounded-md border bg-[#0a1310] p-2 [&_.xterm-viewport]:!overflow-y-auto"
         />
         {!hasOutput && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
