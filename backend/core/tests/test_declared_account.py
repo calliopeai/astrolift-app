@@ -22,6 +22,7 @@ import pytest
 from core.cluster_credentials import (
     ClusterAccountMismatch,
     assert_declared_account,
+    record_verified_account,
 )
 
 
@@ -109,7 +110,7 @@ def test_bring_into_management_runs_the_check_before_the_probe(monkeypatch):
 
     import core.cluster_credentials as creds
 
-    monkeypatch.setattr(creds, "assert_declared_account", lambda cluster: order.append("account"))
+    monkeypatch.setattr(creds, "record_verified_account", lambda cluster: order.append("account") or "")
     monkeypatch.setattr(
         "core.cluster_management.probe_cluster_capabilities_dispatch",
         lambda **kw: order.append("probe"),
@@ -142,3 +143,87 @@ def test_bring_into_management_runs_the_check_before_the_probe(monkeypatch):
     mod._verify_reachability_sync(cluster.pk)
 
     assert order == ["account", "probe"]
+
+
+# ---------------------------------------------------------------------------
+# The cluster carries its own account (#1422)
+# ---------------------------------------------------------------------------
+
+
+class _SavableCluster(_Cluster):
+    """A cluster that records what was written to it, without a database."""
+
+    def __init__(self, **kw):
+        verified = kw.pop("verified", "") or ""
+        super().__init__(**kw)
+        self.cloud_account_id = verified
+        self.cloud_account_verified_at = None
+        self.saved_fields: list[str] = []
+
+    def save(self, update_fields=None, **_kw):
+        self.saved_fields = list(update_fields or [])
+
+
+def test_bringing_a_cluster_into_management_saves_the_account_it_is_in(monkeypatch):
+    """Proved, not declared. The saved value is what ARNs are built from."""
+    import aws.session as session
+
+    monkeypatch.setattr(session, "caller_account", lambda *a, **k: "111111111111")
+    cluster = _SavableCluster(account="111111111111")
+
+    assert record_verified_account(cluster) == "111111111111"
+    assert cluster.cloud_account_id == "111111111111"
+    assert cluster.cloud_account_verified_at is not None
+    assert "cloud_account_id" in cluster.saved_fields
+
+
+def test_a_declared_account_that_disagrees_is_refused(monkeypatch):
+    import aws.session as session
+
+    monkeypatch.setattr(session, "caller_account", lambda *a, **k: "999999999999")
+    cluster = _SavableCluster(account="111111111111")
+
+    with pytest.raises(ClusterAccountMismatch):
+        record_verified_account(cluster)
+
+    assert cluster.cloud_account_id == "", "nothing should be recorded on a refusal"
+
+
+def test_a_cluster_cannot_move_between_accounts(monkeypatch):
+    """The invariant. Re-stamping would silently move every app bound to it.
+
+    A row that was verified in one account and now answers with another is
+    not a cluster being corrected — it is a different cluster wearing this
+    row's name.
+    """
+    import aws.session as session
+
+    monkeypatch.setattr(session, "caller_account", lambda *a, **k: "222222222222")
+    cluster = _SavableCluster(account=None, verified="111111111111")
+
+    with pytest.raises(ClusterAccountMismatch, match="cannot move between accounts"):
+        record_verified_account(cluster)
+
+    assert cluster.cloud_account_id == "111111111111", "the original must survive the refusal"
+
+
+def test_re_verifying_the_same_account_does_not_rewrite_the_row(monkeypatch):
+    import aws.session as session
+
+    monkeypatch.setattr(session, "caller_account", lambda *a, **k: "111111111111")
+    cluster = _SavableCluster(account=None, verified="111111111111")
+
+    assert record_verified_account(cluster) == "111111111111"
+    assert cluster.saved_fields == [], "an unchanged account is not a write"
+
+
+@pytest.mark.parametrize("cloud", ["gcp", "azure", "k8s_native"])
+def test_only_aws_records_an_account(cloud, monkeypatch):
+    import aws.session as session
+
+    called = []
+    monkeypatch.setattr(session, "caller_account", lambda *a, **k: called.append(1) or "x")
+    cluster = _SavableCluster(cloud=cloud)
+
+    assert record_verified_account(cluster) == ""
+    assert called == []

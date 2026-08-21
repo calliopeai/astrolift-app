@@ -2340,6 +2340,17 @@ def managed_config_for(
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
 
+    # Every AWS driver builds ARNs by interpolating `account_id`. Prefer the
+    # account the cluster was *proved* to be in when it was brought into
+    # management over the one the operator declared (#1422) — the declaration
+    # is unverified, and an ARN naming the wrong account fails much later
+    # with nothing pointing back at the cluster row. Overlaid here rather
+    # than at each of the seventeen driver configs that read it, so the two
+    # cannot disagree.
+    verified_account = str(getattr(cluster, "cloud_account_id", "") or "")
+    if verified_account and pc.get("account_id") != verified_account:
+        pc = {**pc, "account_id": verified_account}
+
     if plugin_slug == "gcp":
         return _gcp_managed_config_for(
             cluster,
