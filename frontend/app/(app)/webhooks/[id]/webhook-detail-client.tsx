@@ -1,22 +1,17 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
+import { SendIcon } from "lucide-react";
 import * as React from "react";
 
+import { DataTable, useCursorTable, type Column, type CursorPage } from "@/components/data-table";
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { LIST_WEBHOOK_DELIVERIES, LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
+  LIST_WEBHOOK_DELIVERIES_PAGE,
+  LIST_WEBHOOKS,
+} from "@/graphql/operations/operations.queries";
 import type {
   AstroliftWebhookDelivery,
   AstroliftWebhookSubscription,
@@ -25,22 +20,16 @@ import type {
 interface Resp {
   astroliftWebhookSubscriptions: AstroliftWebhookSubscription[];
 }
-interface DeliveriesResp {
-  astroliftWebhookDeliveries: AstroliftWebhookDelivery[];
+interface DeliveriesPageResp {
+  astroliftWebhookDeliveriesPage: CursorPage<AstroliftWebhookDelivery>;
 }
-
-const DELIVERIES_LIMIT = 50;
-
-const ROW_NAV_CLASS =
-  "hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]";
 
 /**
  * Webhook subscription detail (#1106). Reuses the global LIST_WEBHOOKS window
- * (no singular query exists) plus LIST_WEBHOOK_DELIVERIES for the recent
+ * (no singular query exists) plus LIST_WEBHOOK_DELIVERIES_PAGE for the recent
  * deliveries table, whose rows drill into the per-delivery detail.
  */
 export function WebhookDetailClient({ id }: { id: string }) {
-  const router = useRouter();
   const { data, loading } = useQuery<Resp>(LIST_WEBHOOKS, {
     variables: { appSlug: null },
     fetchPolicy: "cache-and-network",
@@ -51,12 +40,69 @@ export function WebhookDetailClient({ id }: { id: string }) {
     [data, id]
   );
 
-  const deliveries = useQuery<DeliveriesResp>(LIST_WEBHOOK_DELIVERIES, {
-    variables: { subscriptionId: id, limit: DELIVERIES_LIMIT },
+  // Skipped until the subscription resolves: `subscriptionId` is
+  // non-null on the field, and this page reaches it through the global
+  // LIST_WEBHOOKS window rather than a singular query. No `urlKey` —
+  // the search and page size belong to this panel, not to the URL an
+  // operator shares for the subscription.
+  const deliveries = useCursorTable<AstroliftWebhookDelivery>({
+    query: LIST_WEBHOOK_DELIVERIES_PAGE,
+    variables: { subscriptionId: id },
+    extract: (d) => (d as DeliveriesPageResp | undefined)?.astroliftWebhookDeliveriesPage,
+    searchVariable: "search",
     fetchPolicy: "cache-and-network",
     skip: !s,
   });
-  const deliveryRows = deliveries.data?.astroliftWebhookDeliveries ?? [];
+
+  const columns: Column<AstroliftWebhookDelivery>[] = [
+    {
+      id: "attempt",
+      header: "#",
+      width: "w-12",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => d.retryAttempt,
+    },
+    {
+      id: "when",
+      header: "When",
+      cellClassName: "text-xs",
+      cell: (d) => <DetailTimestamp iso={d.deliveredAt} />,
+    },
+    {
+      id: "event",
+      header: "Event",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => d.eventType,
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: "w-16",
+      cell: (d) => (
+        <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
+          {d.statusCode ?? "ERR"}
+        </Badge>
+      ),
+    },
+    {
+      id: "latency",
+      header: "Latency",
+      width: "w-20",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => `${d.latencyMs}ms`,
+    },
+    {
+      id: "test",
+      header: "Test?",
+      width: "w-16",
+      cell: (d) =>
+        d.isTest ? (
+          <Badge variant="outline" className="text-2xs">
+            test
+          </Badge>
+        ) : null,
+    },
+  ];
 
   return (
     <EntityDetailShell
@@ -123,66 +169,30 @@ export function WebhookDetailClient({ id }: { id: string }) {
           <CardHeader>
             <CardTitle className="text-base">Recent deliveries</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            {deliveries.loading && deliveryRows.length === 0 ? (
-              <div className="p-6">
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : deliveryRows.length === 0 ? (
-              <p className="text-muted-foreground p-6 text-sm">
-                No deliveries yet. Use the Send test event action on the webhooks list to fire one.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>When</TableHead>
-                    <TableHead>Event</TableHead>
-                    <TableHead className="w-16">Status</TableHead>
-                    <TableHead className="w-20">Latency</TableHead>
-                    <TableHead className="w-16">Test?</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {deliveryRows.map((d) => (
-                    <TableRow
-                      key={d.id}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Open delivery ${d.id.slice(0, 8)}`}
-                      onClick={() => router.push(`/webhooks/${id}/deliveries/${d.id}`)}
-                      onKeyDown={(ev) => {
-                        if (ev.key === "Enter" || ev.key === " ") {
-                          ev.preventDefault();
-                          router.push(`/webhooks/${id}/deliveries/${d.id}`);
-                        }
-                      }}
-                      className={ROW_NAV_CLASS}
-                    >
-                      <TableCell className="font-mono text-xs">{d.retryAttempt}</TableCell>
-                      <TableCell className="text-xs">
-                        <DetailTimestamp iso={d.deliveredAt} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{d.eventType}</TableCell>
-                      <TableCell>
-                        <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
-                          {d.statusCode ?? "ERR"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{d.latencyMs}ms</TableCell>
-                      <TableCell>
-                        {d.isTest && (
-                          <Badge variant="outline" className="text-2xs">
-                            test
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <CardContent>
+            <DataTable
+              label="Deliveries"
+              controller={deliveries}
+              columns={columns}
+              getRowId={(d) => d.id}
+              // A real link, so a delivery can be opened in a new tab. The
+              // hand-rolled row was `role="link"` on a <tr> with a
+              // `router.push`, which middle-click and copy-link could not
+              // reach.
+              rowHref={(d) => `/webhooks/${id}/deliveries/${d.id}`}
+              searchPlaceholder="Search deliveries…"
+              empty={{
+                icon: <SendIcon className="size-5" />,
+                title: "No deliveries yet",
+                description:
+                  "Use the Send test event action on the webhooks list to fire one.",
+              }}
+              emptyFiltered={{
+                title: "No matching deliveries",
+                description:
+                  "No attempt matches that search. The server matches the event type, the delivery id, and the error text.",
+              }}
+            />
           </CardContent>
         </Card>
       ) : null}
