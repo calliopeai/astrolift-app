@@ -129,6 +129,18 @@ class PipelineRunWorkflow:
         )
         self._run_status = "running"
 
+        # The definition could not be read at all — distinct from a
+        # definition that declares no jobs, and the run must not pass.
+        definition_error = run_meta.get("error")
+        if definition_error:
+            await workflow.execute_activity(
+                mark_pipeline_run_failed,
+                args=[pipeline_run_id, definition_error],
+                start_to_close_timeout=_MARK_TIMEOUT,
+            )
+            self._run_status = "failure"
+            return WorkflowResult(ok=False, message=definition_error)
+
         jobs: list[dict] = run_meta.get("jobs", [])
         if not jobs:
             # No jobs → trivially successful.
