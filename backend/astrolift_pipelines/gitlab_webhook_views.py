@@ -70,22 +70,27 @@ def verify_signature(secret: str, provided: str) -> bool:
     return hmac.compare_digest(secret.encode(), provided.encode())
 
 
-def _extract_gitlab_info(event: str, payload: dict) -> tuple[str, str, str, str]:
-    """Extract (clone_url, http_url, ref, actor) from a GitLab payload."""
+def _extract_gitlab_info(event: str, payload: dict) -> tuple[str, str, str, str, str]:
+    """Extract (clone_url, http_url, ref, actor, commit_sha) from a GitLab payload."""
     project = payload.get("project") or {}
     clone_url = project.get("git_ssh_url", "")
     http_url = project.get("http_url", "")
     actor = payload.get("user_username", "")
 
+    commit_sha = ""
     if event in ("Push Hook", "Tag Push Hook"):
         ref = payload.get("ref", "")  # already "refs/heads/..." or "refs/tags/..."
+        # GitLab calls it `checkout_sha`; `after` is also present and is the
+        # same value for a normal push, but is all-zeroes on a branch delete.
+        commit_sha = str(payload.get("checkout_sha") or "")
     elif event == "Merge Request Hook":
         attrs = payload.get("object_attributes") or {}
         ref = attrs.get("source_branch", "")  # bare branch name, not refs/heads/
+        commit_sha = str((attrs.get("last_commit") or {}).get("id") or "")
     else:
         ref = ""
 
-    return clone_url, http_url, ref, actor
+    return clone_url, http_url, ref, actor, commit_sha
 
 
 def _gitlab_event_to_canonical(event: str, payload: dict) -> str | None:
@@ -136,7 +141,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     if canonical_kind is None:
         return JsonResponse({"status": "not handled", "event": event, "reason": "action ignored"})
 
-    clone_url, http_url, ref, actor = _extract_gitlab_info(event, payload)
+    clone_url, http_url, ref, actor, commit_sha = _extract_gitlab_info(event, payload)
 
     # Normalize ref for push events (GitLab always sends full ref)
     if canonical_kind == "push" and not ref.startswith("refs/"):
@@ -160,6 +165,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                     run_number=_next_run_number(pipeline),
                     trigger_kind=canonical_kind,
                     trigger_ref=ref,
+                    commit_sha=commit_sha,
                     trigger_actor=actor,
                     status="pending",
                     temporal_workflow_id="",

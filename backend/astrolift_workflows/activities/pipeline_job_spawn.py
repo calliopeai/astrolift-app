@@ -76,19 +76,32 @@ _DEFAULT_RESOURCE_QUOTA = {
 def _mark_pipeline_run_running_sync(pipeline_run_id: int) -> dict:
     from django.utils import timezone
 
-    from astrolift_pipelines.models import Job, PipelineRun
+    from astrolift_ci_convert.common.toml_reader import TomlReadError, read_toml
+    from astrolift_pipelines.job_sync import jobs_for_run, sync_definition
+    from astrolift_pipelines.models import PipelineRun
+    from astrolift_pipelines.toml_fetcher import TomlFetchError, fetch_pipeline_toml
 
     run = PipelineRun.objects.select_related("pipeline__organization").get(pk=pipeline_run_id)
     run.status = PipelineRun.Status.RUNNING
     run.started_at = timezone.now()
     run.save(update_fields=["status", "started_at", "updated_at", "version"])
 
-    jobs = list(
-        Job.objects.filter(
-            pipeline=run.pipeline,
-            deleted_at__isnull=True,
-        ).values("id", "job_id", "name", "container_image", "runs_on", "needs")
-    )
+    # Load the definition the run is actually of. Until #1531 nothing did
+    # this: the fetcher had no callers, there was no parser to hand it to,
+    # and no code path created a Job row. The query below always came back
+    # empty and the workflow marked the run SUCCESS for having nothing to
+    # do.
+    try:
+        toml_text = fetch_pipeline_toml(run)
+        definition = read_toml(toml_text)
+        sync_definition(run, definition)
+    except (TomlFetchError, TomlReadError) as exc:
+        # Distinct from "the definition declares no jobs", which is a
+        # legitimately empty run. Returning an empty job list here would
+        # report a pipeline whose TOML could not be read as green.
+        return {"jobs": [], "error": str(exc)}
+
+    jobs = list(jobs_for_run(run).values("id", "job_id", "name", "container_image", "runs_on", "needs"))
 
     return {"jobs": jobs}
 
@@ -124,13 +137,17 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     """Create a JobRun row, render the K8s Job manifest, and apply it."""
     from django.utils import timezone
 
-    from astrolift_pipelines.models import Job, JobRun, PipelineRun, Step, StepRun
+    from astrolift_pipelines.job_sync import job_for_run
+    from astrolift_pipelines.models import JobRun, PipelineRun, Step, StepRun
     from astrolift_pipelines.step_script import render_step_script
 
     run = PipelineRun.objects.select_related(
         "pipeline__organization",
     ).get(pk=pipeline_run_id)
-    job = Job.objects.get(pipeline=run.pipeline, job_id=job_id_str, deleted_at__isnull=True)
+    # Not a plain Job lookup by pipeline: under snapshot mode every run
+    # holds its own row for this job_id, and filtering by pipeline alone
+    # would raise MultipleObjectsReturned on the second run.
+    job = job_for_run(run, job_id_str)
 
     steps = list(Step.objects.filter(job=job, deleted_at__isnull=True).order_by("position"))
     script = render_step_script(steps)

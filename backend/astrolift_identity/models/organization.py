@@ -66,6 +66,25 @@ class Organization(NamedBaseCoreModel):
     metrics_rollup_retention_days_default = models.PositiveIntegerField(default=365)
     trace_retention_days_default = models.PositiveIntegerField(default=14)
 
+    # Where a pipeline run's Job/Step rows live (#1531).
+    #
+    # SNAPSHOT copies the definition onto each PipelineRun, so a run keeps
+    # the jobs it actually ran and a push landing mid-run cannot retarget a
+    # fan-out already in flight. SHARED keeps one set of rows on the
+    # Pipeline and rewrites them in place, which costs a fixed number of
+    # rows however often the pipeline runs.
+    #
+    # This sits on the organization because a pipeline has no cluster to
+    # carry it: a CI-only pipeline never deploys anywhere, and the ones
+    # that do reach a cluster per deploy step rather than as a property of
+    # the pipeline. The organization is the narrowest scope that is always
+    # present.
+    pipeline_definition_mode = models.CharField(
+        max_length=16,
+        choices=[("snapshot", "Snapshot per run"), ("shared", "Shared across runs")],
+        default="snapshot",
+    )
+
     # When True, users can edit their own profile fields (display
     # name, email, avatar, locale) on /settings/profile via
     # updateMyProfile. When False (default for SSO-only installs),

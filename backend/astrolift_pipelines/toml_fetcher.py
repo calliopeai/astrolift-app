@@ -36,7 +36,11 @@ def fetch_pipeline_toml(pipeline_run: PipelineRun) -> str:
     Returns the raw TOML string. Raises TomlFetchError on failure.
     """
     pipeline = pipeline_run.pipeline
-    ref = pipeline_run.trigger_ref or pipeline.default_branch
+    # The commit first, the branch name only as a fallback. A ref is a name
+    # that moves: fetching "main" resolves to whatever main points at when
+    # the fetch happens, which is not necessarily the code that triggered
+    # the run.
+    ref = pipeline_run.commit_sha or pipeline_run.trigger_ref or pipeline.default_branch
     toml_path = pipeline.toml_path or f".astrolift/pipelines/{pipeline.name}.toml"
 
     # Detect provider from repo URL
