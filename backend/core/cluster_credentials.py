@@ -51,11 +51,22 @@ class ClusterCredentialInvalid(ValueError):
     """
 
 
-#: The two ways a credential declaration stops an operation. Grouped so a
-#: funnel can translate both into its own error type in one clause.
+class ClusterAccountMismatch(ValueError):
+    """The cluster names an AWS account its credential does not resolve to.
+
+    Its own type rather than a flavour of ``Invalid``: the declaration is
+    well-formed and the credential works. What is wrong is that they disagree,
+    and the operator's fix is to correct one of the two rather than to remove
+    anything.
+    """
+
+
+#: The ways a credential declaration stops an operation. Grouped so a funnel
+#: can translate them into its own error type in one clause.
 CREDENTIAL_REFUSALS: tuple[type[Exception], ...] = (
     ClusterCredentialUnsupported,
     ClusterCredentialInvalid,
+    ClusterAccountMismatch,
 )
 
 
@@ -101,6 +112,49 @@ def assert_credential_supported(cluster: TenantCluster, *, capability: str) -> N
         f"{capability!r} path still authenticates with the control plane's own identity. "
         f"Running it would act on the wrong account without saying so.",
     )
+
+
+def assert_declared_account(cluster: TenantCluster) -> None:
+    """Refuse when the cluster names an AWS account its credential is not in.
+
+    `account_id` is `required` in the AWS plugin's `config_schema` and sits on
+    every AWS cluster row, and until now nothing checked it. Every use of it in
+    `providers/aws/` interpolates it into an ARN string, so a row declaring
+    account B while the process authenticates into account A provisions into A
+    and hands back ARNs naming B — every IRSA trust policy and cross-service
+    grant built from them wrong, surfacing much later as a permissions failure
+    with no obvious cause (#1422).
+
+    AWS only, and that is not an oversight. GCP puts `project_id` and Azure
+    `subscription_id` / `resource_group` into the request itself, so a row
+    naming the wrong one fails at the call. AWS has nowhere in the request to
+    put an account: it is a property of the credential alone, which is why it
+    is the one cloud where the row and the reality can disagree in silence.
+
+    Never called per operation. One `GetCallerIdentity` at the point a cluster
+    is first trusted, where the answer is actionable, rather than a network
+    round trip on every driver call.
+    """
+    from _sdk.cloud_credentials import CloudCredentialError
+
+    if _cloud_for(cluster) != "aws":
+        return
+
+    credential = credential_for_cluster(cluster)
+    if not credential.declared_account:
+        # Most rows predate the field being load-bearing; an undeclared
+        # account is unverifiable, not wrong.
+        return
+
+    from aws.session import AwsAccountMismatch, verify_account
+
+    region = str(_as_dict(getattr(cluster, "provider_config", None)).get("region") or "") or "us-east-1"
+    try:
+        verify_account(credential, region=region)
+    except AwsAccountMismatch as exc:
+        raise ClusterAccountMismatch(f"cluster {_slug_for(cluster)}: {exc}") from exc
+    except CloudCredentialError as exc:
+        raise ClusterCredentialInvalid(f"cluster {_slug_for(cluster)}: {exc}") from exc
 
 
 def _cloud_for(cluster: TenantCluster) -> str:
