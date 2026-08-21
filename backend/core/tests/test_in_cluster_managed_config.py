@@ -31,14 +31,13 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def eks_cluster() -> TenantCluster:
     org = Organization.objects.create(name="Acme", slug="acme-icmc")
-    # bulk_create bypasses BaseCoreModel.save(), whose integer optimistic-version
-    # bump collides with ProviderPlugin's CharField ``version``.
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name="AWS",
                 slug="aws",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),

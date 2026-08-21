@@ -67,16 +67,11 @@ class Command(BaseCommand):
                     "managed_service_kinds": managed_kinds,
                 }
 
-                # ProviderPlugin.version is a CharField ("0.0.0") that
-                # shadows TrackingMixin.version (the optimistic-lock
-                # IntegerField). BaseCoreModel.save() does
-                # ``self.version = (self.version or 0) + 1`` and crashes
-                # with TypeError when version is a string. Upstream's
-                # test fixture in 2853cd3 uses bulk_create to skirt the
-                # collision; do the same here — bulk_create + .update()
-                # both bypass .save(). Right long-term fix is to rename
-                # the semver field on ProviderPlugin (e.g. plugin_version)
-                # so it stops colliding with the mixin's int version.
+                # Ordinary ORM calls. This used to go through bulk_create
+                # and .update() only because ProviderPlugin.version was a
+                # semver CharField shadowing the mixin's lock counter, so
+                # .save() raised TypeError. The rename in #1517 removed
+                # that, and the workaround with it.
                 row_fields = {
                     "name": manifest.display_name,
                     "capabilities_manifest": capabilities,
@@ -86,21 +81,19 @@ class Command(BaseCommand):
                 }
                 existing = ProviderPlugin.all_objects.filter(slug=manifest.plugin_id).first()
                 if existing is None:
-                    ProviderPlugin.all_objects.bulk_create(
-                        [
-                            ProviderPlugin(
-                                slug=manifest.plugin_id,
-                                version=manifest.version,
-                                **row_fields,
-                            )
-                        ]
+                    ProviderPlugin.all_objects.create(
+                        slug=manifest.plugin_id,
+                        plugin_version=manifest.version,
+                        **row_fields,
                     )
                     action = "created"
                 else:
-                    # Don't overwrite the CharField semver on update — the
+                    # Still not overwriting the semver on update — the
                     # operator may have stamped it themselves. Touch only
-                    # the catalog-derived fields.
-                    ProviderPlugin.all_objects.filter(pk=existing.pk).update(**row_fields)
+                    # the catalogue-derived fields.
+                    for field, value in row_fields.items():
+                        setattr(existing, field, value)
+                    existing.save(update_fields=[*row_fields, "updated_at", "version"])
                     action = "updated"
 
                 self.stdout.write(

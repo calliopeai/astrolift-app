@@ -52,7 +52,7 @@ def _scaffold() -> tuple[Organization, RegisteredApp, AppEnvironment]:
     plugin = ProviderPlugin(
         name="K8s probe",
         slug="dummy-probe",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

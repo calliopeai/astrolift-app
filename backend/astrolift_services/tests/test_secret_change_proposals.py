@@ -82,7 +82,7 @@ def _scaffold(*, requires_secret_approval: bool = True, min_approvals: int = 1):
             ProviderPlugin(
                 name="K8s Native",
                 slug="k8s-native",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

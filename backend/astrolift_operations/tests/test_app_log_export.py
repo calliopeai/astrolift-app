@@ -116,7 +116,7 @@ def _scaffold(
     plugin = ProviderPlugin(
         name="K8s",
         slug=f"k8s-{slug_suffix}",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

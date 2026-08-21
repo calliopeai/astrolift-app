@@ -15,7 +15,12 @@ from core.models.base import NamedBaseCoreModel
 
 
 class ProviderPlugin(NamedBaseCoreModel):
-    version = models.CharField(max_length=64, default="0.0.0")
+    # The plugin's own semver, not to be confused with
+    # ``BaseCoreModel.version`` — the optimistic-lock counter this used to
+    # shadow. While it was called ``version``, ``save()`` evaluated
+    # ``"0.0.0" + 1`` and raised, so the model could not be written through
+    # the ORM at all and every caller reached for ``bulk_create`` (#1517).
+    plugin_version = models.CharField(max_length=64, default="0.0.0")
     capabilities_manifest = models.JSONField(default=dict, blank=True)
     config_schema = models.JSONField(default=dict, blank=True)
     is_enabled = models.BooleanField(default=True)

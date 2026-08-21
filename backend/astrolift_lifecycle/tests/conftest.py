@@ -74,14 +74,11 @@ def other_actor():
 
 @pytest.fixture
 def provider_plugin():
-    # bulk_create bypasses BaseCoreModel.save(), which fights with
-    # ProviderPlugin's CharField('version') override (it shadows the
-    # base int version field used for optimistic locking — a known
-    # data-model bug separately tracked).
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="Test Provider",
         slug="test-provider",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

@@ -43,7 +43,7 @@ def _scaffold(
     plugin_obj = ProviderPlugin(
         name="K8s",
         slug="k8s-prom-exec",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

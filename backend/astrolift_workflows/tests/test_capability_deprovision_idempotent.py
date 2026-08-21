@@ -62,14 +62,13 @@ def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme-cap")
     team = Team.objects.create(organization=org, name="Eng", slug="eng-cap")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-cap")
-    # bulk_create bypasses BaseCoreModel.save (ProviderPlugin.version is a
-    # CharField the base's int version-bump would choke on).
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name="AWS",
                 slug="aws-cap",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

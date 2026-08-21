@@ -65,7 +65,7 @@ def _azure_cluster(org: Organization) -> TenantCluster:
             ProviderPlugin(
                 name="Azure",
                 slug="azure",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )
@@ -316,7 +316,7 @@ def test_a_non_azure_service_is_refused_rather_than_reported_adopted():
             ProviderPlugin(
                 name="K8s Native",
                 slug="k8s_native",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

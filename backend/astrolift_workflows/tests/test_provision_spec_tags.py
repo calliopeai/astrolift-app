@@ -33,17 +33,13 @@ def _scaffold(suffix: str, *, tags: dict | None = None):
     )
     team = Team.objects.create(organization=org, name="Eng", slug=f"eng-tags-{suffix}")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug=f"demo-tags-{suffix}")
-    # bulk_create, not create: ProviderPlugin.version is a semver
-    # CharField that shadows BaseCoreModel.version, the optimistic-lock
-    # integer, so save() evaluates `"0.0.1" + 1` and raises. bulk_create
-    # skips save(). The rest of the suite routes around it the same way
-    # (#1517).
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name="AWS",
                 slug="aws",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

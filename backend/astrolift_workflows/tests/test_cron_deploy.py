@@ -142,7 +142,7 @@ def cron_app_stack(db):
     team = Team.objects.create(organization=org, name="Eng", slug="eng-cron")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-cron")
     plugin = ProviderPlugin(
-        name="K8s", slug="k8s-cron", version="0.0.1", capabilities_manifest={}, config_schema={}
+        name="K8s", slug="k8s-cron", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
     )
     ProviderPlugin.objects.bulk_create([plugin])
     plugin = ProviderPlugin.objects.get(slug="k8s-cron")

@@ -44,8 +44,7 @@ def _plugin(slug: str) -> ProviderPlugin:
     existing = ProviderPlugin.objects.filter(slug=slug).first()
     if existing is not None:
         return existing
-    # bulk_create, not create: ProviderPlugin.version is the plugin's
-    # semver string, which the base model's save() tries to increment.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [plugin] = ProviderPlugin.objects.bulk_create(
         [ProviderPlugin(name=slug, slug=slug, capabilities_manifest={}, config_schema={})],
     )

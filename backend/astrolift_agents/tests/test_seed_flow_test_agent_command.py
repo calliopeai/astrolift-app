@@ -39,13 +39,11 @@ def _no_opensearch_profile_index(monkeypatch):
 @pytest.fixture
 def org_and_cluster():
     org = Organization.objects.create(name="Seed Org", slug="seed-cmd-org")
-    # bulk_create bypasses BaseCoreModel.save() — ProviderPlugin shadows the
-    # int ``version`` counter with a semver string, so save() raises
-    # TypeError (mirrors test_log_queries' workaround).
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="K8s",
         slug="k8s-seed",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )
