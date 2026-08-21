@@ -1616,8 +1616,20 @@ def _azure_managed_config_for(
             raise ClusterObservabilityError(
                 f"cluster {cluster.slug}: Azure object_store/blob requires provider_config.storage_account",
             )
+        # Both are needed to scope the container's role assignment. The
+        # driver used to emit a literal `SUB_ID`/`RG` placeholder because
+        # its config had nothing to build a real id from (#1470), so a
+        # binding reported ready and its grant failed at assignment.
+        if not subscription_id or not resource_group:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure object_store/blob requires "
+                "provider_config.subscription_id and provider_config.resource_group "
+                "to scope its Storage Blob Data Contributor assignment",
+            )
         return BlobStorageConfig(
             storage_account=storage_account,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
             container_name_prefix=str(pc.get("blob_container_name_prefix", "astrolift")),
             versioning_enabled=bool(pc.get("blob_versioning_enabled", True)),
         )
