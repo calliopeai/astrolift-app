@@ -84,6 +84,17 @@ class Organization(NamedBaseCoreModel):
     # an already-bootstrapped org doesn't get prompted to redo it.
     onboarding_completed_at = models.DateTimeField(null=True, blank=True)
 
+    # Operator-defined tags stamped on every cloud resource this org
+    # provisions, e.g. {"cost_center": "platform-rnd"} (#1505). They ride
+    # ProvisionSpec.tags, which AWS namespaces under astrolift.io/extra/,
+    # Azure passes as custom_tags and GCP merges into labels — the
+    # platform envelope (org / app / env) is separate and always applied.
+    #
+    # Validated on the way in by core.resource_tags against the tightest
+    # of the three clouds, so a tag either provisions everywhere or is
+    # refused in front of the person who typed it.
+    default_resource_tags = models.JSONField(default=dict, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

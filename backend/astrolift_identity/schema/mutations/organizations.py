@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
 )
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.resource_tags import ResourceTagError, validate_resource_tags
 from core.tenancy import get_current_tenant
 
 
@@ -89,6 +90,19 @@ class OrganizationMutations:
             org.audit_log_retention_days = days
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
+        if input.default_resource_tags is not None:
+            # Refused here rather than at provision time. A tag that only
+            # AWS accepts would otherwise provision fine for weeks and then
+            # fail the first GCP resource, with the resource half made and
+            # nothing pointing at the tag as the cause.
+            try:
+                org.default_resource_tags = validate_resource_tags(input.default_resource_tags)
+            except ResourceTagError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="defaultResourceTags",
+                )
         org.save()
         return gql_success(organization_to_type(org))
 

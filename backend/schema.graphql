@@ -2697,6 +2697,7 @@ type AstroliftOrganization {
   previewMaxActiveDefault: Int!
   logRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
+  defaultResourceTags: JSON!
   onboardingCompletedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -6794,6 +6795,7 @@ input UpdateOrganizationInput {
   website: String = null
   auditLogRetentionDays: Int = null
   allowUserProfileEdit: Boolean = null
+  defaultResourceTags: JSON = null
 }
 
 input UpdatePipelineInput {

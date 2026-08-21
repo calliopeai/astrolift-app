@@ -105,6 +105,12 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         size=str(svc_config.get("size", "small")),
         config=svc_config,
         managed_service_id=_service_identity(svc),
+        # The operator's tag channel, distinct from the platform envelope
+        # each cloud's own builder stamps. Twenty-one drivers read this and
+        # nothing ever set it, so no operator-defined tag — `cost_center`
+        # among them — had a path to a resource (#1505). Validated on the
+        # way into the org, so it is portable by the time it lands here.
+        tags=dict(getattr(org, "default_resource_tags", None) or {}),
     )
 
 

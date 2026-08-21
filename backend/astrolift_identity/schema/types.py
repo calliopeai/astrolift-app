@@ -27,6 +27,10 @@ class OrganizationType:
     preview_max_active_default: int
     log_retention_days_default: int
     allow_user_profile_edit: bool
+    # Operator tags stamped on every cloud resource this org provisions
+    # (#1505). Portable by construction: refused on write unless all three
+    # clouds would accept them.
+    default_resource_tags: strawberry.scalars.JSON
     # Non-null once the first-run wizard has been completed or
     # explicitly skipped. The FE opens the onboarding wizard when
     # this is null AND the operator has zero team memberships.
@@ -95,6 +99,7 @@ def organization_to_type(org) -> OrganizationType:
         preview_max_active_default=org.preview_max_active_default,
         log_retention_days_default=org.log_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
+        default_resource_tags=dict(org.default_resource_tags or {}),
         onboarding_completed_at=org.onboarding_completed_at,
         created_at=org.created_at,
         updated_at=org.updated_at,
