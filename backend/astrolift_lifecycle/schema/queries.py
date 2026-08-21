@@ -2376,7 +2376,7 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
     cache here (we don't want to cache stale numbers across orgs)."""
     from astrolift_lifecycle.preview_cost import (
         aggregate_pod_resources,
-        estimate_daily_cost_usd,
+        estimate_daily_cost,
     )
     from astrolift_lifecycle.schema.types import PreviewAggregateResourcesType
 
@@ -2402,9 +2402,9 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
             pods = []
 
     aggregate = aggregate_pod_resources(pods)
-    cost: float | None = None
+    estimate = None
     if cluster is not None and aggregate.pod_count > 0:
-        cost = estimate_daily_cost_usd(
+        estimate = estimate_daily_cost(
             cluster=cluster,
             aggregate=aggregate,
             region=getattr(cluster, "region", "") or "",
@@ -2417,7 +2417,9 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
             memory_bytes=aggregate.memory_bytes,
             pod_count=aggregate.pod_count,
         ),
-        estimated_daily_cost_usd=cost,
+        estimated_daily_cost_usd=estimate.daily_usd if estimate else None,
+        estimated_cost_notes=list(estimate.notes) if estimate else [],
+        estimated_cost_approximate=bool(estimate and estimate.approximate),
     )
 
 

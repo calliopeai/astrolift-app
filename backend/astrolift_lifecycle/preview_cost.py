@@ -251,14 +251,30 @@ def cost_estimator_for_cluster(cluster: Any) -> Any | None:
     return None
 
 
-def estimate_daily_cost_usd(
+@dataclass(frozen=True)
+class PreviewCostEstimate:
+    """A daily figure and what an operator needs to know about it.
+
+    The number used to travel alone: every caveat a driver attached to
+    ``CostEstimate.notes`` was dropped here, including the GCP estimator's
+    ``APPROXIMATE`` label on the fourteen variants that over-count by
+    construction. An operator saw a confident figure that could be out by
+    an order of magnitude with nothing saying so (#1509).
+    """
+
+    daily_usd: float
+    notes: tuple[str, ...] = ()
+    approximate: bool = False
+
+
+def estimate_daily_cost(
     *,
     cluster: Any,
     aggregate: PreviewAggregateResources,
     region: str = "",
-) -> float | None:
+) -> PreviewCostEstimate | None:
     """Ask the cluster's provider plugin for a live compute SKU price
-    and turn the aggregate into a daily $ figure.
+    and turn the aggregate into a daily $ figure with its caveats.
 
     Returns ``None`` when:
       - the cluster has no cost driver registered
@@ -325,4 +341,11 @@ def estimate_daily_cost_usd(
     # 30-day month — matches the AWS Pricing API convention (720h)
     # so the daily / monthly arithmetic stays consistent end-to-end.
     daily = monthly / 30.0
-    return round(daily, 2)
+    return PreviewCostEstimate(
+        daily_usd=round(daily, 2),
+        # Carried, not summarised: these are the driver's own words about
+        # its own number, and every one of them is something the operator
+        # would want before acting on the figure.
+        notes=tuple(str(n) for n in (getattr(result, "notes", None) or []) if str(n).strip()),
+        approximate=bool(getattr(result, "approximate", False)),
+    )
