@@ -343,6 +343,9 @@ function AggregatedList({ toolbar }: { toolbar: React.ReactNode }) {
         // Buckets are folds, not rows, so they have no URL of their own to
         // link to: activating one opens its members instead of navigating.
         onRowActivate={(b) => setOpenBucket(b)}
+        // The bucket's own identity, which is what the first cell shows:
+        // the event type, plus the fold size when it folded anything.
+        rowLabel={(b) => (b.count > 1 ? `${b.eventType} (${b.count})` : b.eventType)}
         toolbar={toolbar}
         searchPlaceholder={t("filterPlaceholder")}
         empty={{

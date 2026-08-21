@@ -50,9 +50,27 @@ import type { CursorTableController } from "./use-cursor-table";
 import type { RowSelection } from "./use-row-selection";
 
 type RowActivation<TRow> =
-  | { rowHref: (row: TRow) => string; onRowActivate?: never }
-  | { onRowActivate: (row: TRow) => void; rowHref?: never }
-  | { rowHref?: never; onRowActivate?: never };
+  | { rowHref: (row: TRow) => string; onRowActivate?: never; rowLabel?: never }
+  | {
+      onRowActivate: (row: TRow) => void;
+      /**
+       * Names this row's activator. It is the button's accessible name,
+       * so it is all a screen-reader user hears before deciding to press
+       * it, and it must contain the row's visible first-cell text.
+       *
+       * Identify the row rather than describe the gesture: the element is
+       * a button and its role already supplies the verb. Building the
+       * name out of the row's own fields also keeps it out of the message
+       * catalogues, where a new key means eight locales.
+       *
+       * Required rather than optional because a stretched activator with
+       * no name reads as an unlabelled button on every row, which is
+       * worse than the mouse-only row it replaces.
+       */
+      rowLabel: (row: TRow) => string;
+      rowHref?: never;
+    }
+  | { rowHref?: never; onRowActivate?: never; rowLabel?: never };
 
 type DataTableBaseProps<TRow> = {
   /** Names the table for screen readers and for the bulk-selection copy. */
@@ -96,6 +114,7 @@ export function DataTable<TRow>({
   toolbar,
   rowHref,
   onRowActivate,
+  rowLabel,
   rowClassName,
   className,
 }: DataTableProps<TRow>) {
@@ -183,18 +202,16 @@ export function DataTable<TRow>({
             <TableRow
               key={id}
               data-state={selected ? "selected" : undefined}
-              // `relative`: the row link below is stretched with
+              // `relative`: the row's activator below is stretched with
               // `after:inset-0`, which reaches exactly as far as the nearest
               // positioned ancestor. Without it the row is not one and
               // `table-container` is, so every row's overlay covers the whole
               // table and the last row in the DOM swallows every click
               // (#1502).
               className={cn(
-                rowHref && "relative",
-                (rowHref || onRowActivate) && "cursor-pointer",
+                (rowHref || onRowActivate) && "relative cursor-pointer",
                 rowClassName?.(row)
               )}
-              onClick={onRowActivate ? () => onRowActivate(row) : undefined}
             >
               {selection && (
                 <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
@@ -214,12 +231,27 @@ export function DataTable<TRow>({
                     column.cellClassName
                   )}
                 >
-                  {/* One link per row, stretched over the cell, so the whole
-                      row is clickable without nesting an anchor per cell. */}
-                  {rowHref && column.id === columns[0].id ? (
+                  {/* One control per row, stretched over the row, so the
+                      whole row is activatable without nesting a control per
+                      cell — and so it is reachable by keyboard, which a
+                      handler on the <tr> never was (#1503). */}
+                  {column.id === columns[0].id && rowHref ? (
                     <Link href={rowHref(row)} className="after:absolute after:inset-0">
                       {column.cell(row)}
                     </Link>
+                  ) : column.id === columns[0].id && onRowActivate ? (
+                    <button
+                      type="button"
+                      // Optional at runtime although the prop types require
+                      // it: an unlabelled button still falls back to the
+                      // cell's own text, and a reachable row with a thin
+                      // name beats a row no keyboard can reach.
+                      aria-label={rowLabel?.(row)}
+                      onClick={() => onRowActivate(row)}
+                      className="text-left after:absolute after:inset-0"
+                    >
+                      {column.cell(row)}
+                    </button>
                   ) : (
                     column.cell(row)
                   )}

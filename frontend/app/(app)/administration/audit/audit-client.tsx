@@ -332,6 +332,9 @@ export function AuditClient() {
         // Rows open the detail sheet; they are not links, so they must
         // not pretend to be.
         onRowActivate={setActiveRow}
+        // Action and timestamp: what distinguishes one audit row from the
+        // next, and it carries the first cell's visible text.
+        rowLabel={(row) => `${row.action} ${fmt.formatDateTime(row.occurredAt)}`}
         // DataTable owns the search box, so the field names itself in
         // its own placeholder: it is the action filter, not a free-text
         // search across the row.

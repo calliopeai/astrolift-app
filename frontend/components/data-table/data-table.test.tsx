@@ -161,22 +161,33 @@ describe("DataTable", () => {
       expect(screen.getByRole("link", { name: "api" })).toHaveAttribute("href", "/apps/1");
     });
 
-    it("positions a rowHref row so its stretched link cannot escape it", () => {
-      // `after:inset-0` resolves against the nearest positioned ancestor.
-      // `table-container` is positioned and the row is not, so dropping
-      // this class puts every row's overlay across the entire table and
-      // the last row answers every click (#1502).
+    it("stretches each activator over its own row and no further", () => {
+      // Two halves of the same guarantee, and jsdom can hold neither as
+      // geometry: the activator is stretched with `after:inset-0`, and the
+      // row is the positioned ancestor that stretch resolves against.
+      // Drop the first and the hit area shrinks to the first cell's text;
+      // drop the second and it grows to the whole table, where the last
+      // row swallows every click (#1502).
       //
-      // jsdom computes no layout, so the class is the only thing a test
-      // in this repo can hold. It was verified as the fix in a browser:
-      // `position: relative` on the row gives each row its own extent,
-      // full width; on the cell it confines the link to the first cell
-      // and deadens the rest of the row.
-      renderTable(controller({ rows, state: "ready" }), {
-        rowHref: (r: Row) => `/apps/${r.id}`,
-      });
-      for (const row of screen.getAllByRole("row").slice(1)) {
-        expect(row).toHaveClass("relative");
+      // Verified as the fix in a browser: `position: relative` on the row
+      // gives each row its own extent, full width; on the cell it confines
+      // the activator to the first cell and deadens the rest of the row.
+      const cases = [
+        { props: { rowHref: (r: Row) => `/apps/${r.id}` }, role: "link" as const },
+        {
+          props: { onRowActivate: vi.fn(), rowLabel: (r: Row) => r.name },
+          role: "button" as const,
+        },
+      ];
+      for (const { props, role } of cases) {
+        const { unmount } = renderTable(controller({ rows, state: "ready" }), props);
+        for (const row of screen.getAllByRole("row").slice(1)) {
+          expect(row).toHaveClass("relative");
+        }
+        for (const activator of screen.getAllByRole(role)) {
+          expect(activator).toHaveClass("after:absolute", "after:inset-0");
+        }
+        unmount();
       }
     });
 
@@ -187,6 +198,32 @@ describe("DataTable", () => {
 
       screen.getByText("api").click();
       expect(onRowActivate).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it("activates an onRowActivate row through a named button", () => {
+      // The activator used to be an `onClick` on the <tr>: no keyboard
+      // could reach it and no screen reader announced it (#1503). What
+      // fixes that is the control being a real button with a real name,
+      // so that is what this holds. Tab order and Enter are the browser's
+      // to provide once it is one, and simulating them in jsdom would be
+      // testing jsdom.
+      const onRowActivate = vi.fn();
+      renderTable(controller({ rows, state: "ready" }), {
+        onRowActivate,
+        rowLabel: (r: Row) => `${r.name} ${r.status}`,
+      });
+
+      const button = screen.getByRole("button", { name: "api running" });
+      button.click();
+      expect(onRowActivate).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it("keeps the row's own text as the name when rowLabel is absent", () => {
+      // Types require `rowLabel` beside `onRowActivate`; an untyped caller
+      // can still omit it, and the row must stay reachable rather than
+      // falling back to the unreachable <tr> handler.
+      renderTable(controller({ rows, state: "ready" }), { onRowActivate: vi.fn() });
+      expect(screen.getByRole("button", { name: "api" })).toBeInTheDocument();
     });
   });
 
