@@ -113,6 +113,11 @@ const SCOPE_CHOICES = [
     hint: "Start workflow runs without granting workflow configuration writes.",
   },
   {
+    value: "app:onboard",
+    label: "Onboard apps",
+    hint: "Register apps and run CI setup (webhook, secrets, workflow) without deploy or delete rights.",
+  },
+  {
     value: "admin",
     label: "Admin",
     hint: "Full power — implies every other scope. Use sparingly.",

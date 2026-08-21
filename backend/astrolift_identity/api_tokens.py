@@ -46,6 +46,7 @@ SCOPE_MCP_DISPATCH = "mcp:dispatch"
 SCOPE_MCP_WRITE = "mcp:write"
 SCOPE_WORKFLOW_WRITE = "workflow:write"
 SCOPE_WORKFLOW_TRIGGER = "workflow:trigger"
+SCOPE_APP_ONBOARD = "app:onboard"
 SCOPE_ADMIN = "admin"
 
 ALLOWED_SCOPES: frozenset[str] = frozenset(
@@ -62,6 +63,7 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_MCP_WRITE,
         SCOPE_WORKFLOW_WRITE,
         SCOPE_WORKFLOW_TRIGGER,
+        SCOPE_APP_ONBOARD,
         SCOPE_ADMIN,
     }
 )
@@ -75,7 +77,9 @@ DEFAULT_SCOPES: tuple[str, ...] = (
 # Browser-approved CLI sessions need to exercise the CLI's documented
 # operator commands. Keep this separate from DEFAULT_SCOPES: generic API
 # tokens and mobile/browser enrollment stay read-only unless the operator
-# explicitly selects a stronger scope.
+# explicitly selects a stronger scope. ``app:onboard`` covers exactly
+# ``astro app register`` + ``astro ci setup`` (#1533) — deliberately NOT
+# ``write:apps``, which would also flip app.deploy/app.delete on.
 CLI_DEVICE_SCOPES: tuple[str, ...] = (
     *DEFAULT_SCOPES,
     SCOPE_AGENT_ENV_SPEC_WRITE,
@@ -85,6 +89,7 @@ CLI_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_MCP_WRITE,
     SCOPE_WORKFLOW_WRITE,
     SCOPE_WORKFLOW_TRIGGER,
+    SCOPE_APP_ONBOARD,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
@@ -162,6 +167,8 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     }:
         return True
     if SCOPE_WORKFLOW_TRIGGER in scopes and permission == "workflow.trigger":
+        return True
+    if SCOPE_APP_ONBOARD in scopes and permission in {"app.create", "app.update"}:
         return True
     return False
 

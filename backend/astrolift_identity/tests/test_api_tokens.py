@@ -37,6 +37,7 @@ from astrolift_identity.api_tokens import (
     PLAINTEXT_PREFIX,
     SCOPE_ADMIN,
     SCOPE_AGENT_ENV_SPEC_WRITE,
+    SCOPE_APP_ONBOARD,
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_READ,
     SCOPE_MCP_WRITE,
@@ -410,6 +411,9 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert SCOPE_PROJECT_WRITE in token.scopes
     assert SCOPE_WORKFLOW_WRITE in token.scopes
     assert SCOPE_WORKFLOW_TRIGGER in token.scopes
+    assert SCOPE_APP_ONBOARD in token.scopes
+    assert token_scope_allows_permission(token, Permission.APP_CREATE)
+    assert token_scope_allows_permission(token, Permission.APP_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
     assert token_scope_allows_permission(token, Permission.AGENT_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_UPDATE)
@@ -428,6 +432,20 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert not token_scope_allows_permission(token, Permission.APP_DELETE)
     assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
+
+
+def test_app_onboard_scope_maps_only_to_register_and_update():
+    """``app:onboard`` exists so the CLI can register apps + run ci setup
+    (#1533) WITHOUT the ``write:apps`` blast radius — deploy/delete stay
+    denied."""
+    token = SimpleNamespace(scopes=[SCOPE_APP_ONBOARD])
+
+    assert token_scope_allows_permission(token, Permission.APP_CREATE)
+    assert token_scope_allows_permission(token, Permission.APP_UPDATE)
+    assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
+    assert not token_scope_allows_permission(token, Permission.APP_DELETE)
+    assert not token_scope_allows_permission(token, Permission.APP_READ)
+    assert not token_scope_allows_permission(token, Permission.SECRET_WRITE)
 
 
 def test_workflow_scopes_are_narrow_write_and_trigger_ceilings():
