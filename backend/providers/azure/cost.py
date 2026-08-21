@@ -608,13 +608,19 @@ class AzureBillingActualsConfig:
 
 
 class AzureBillingActuals:
-    """Reads actual Azure spend grouped by the
-    ``astrolift-binding`` tag via the Cost Management Query API.
+    """Reads actual Azure spend grouped by ``AZURE_MANAGED_SERVICE_TAG_KEY``
+    via the Cost Management Query API.
+
+    That is ``astrolift-managed-service-id``. This text used to say
+    ``astrolift-binding``, which the code has not grouped on since #1419
+    moved attribution onto the managed-service id — and which no resource
+    carries anyway, because ``ProvisionSpec.binding_id`` is set by nothing
+    (#1470).
 
     Cost Management's ``Query`` endpoint accepts a ``Dimensions``
     grouping on tag names; the query returns one row per tag value
     with the summed cost in the account's currency. Resources missing
-    the tag are emitted under an empty-string binding bucket.
+    the tag are emitted under an empty-string bucket.
 
     Returns :class:`BillingActualsUnavailable` when the scope isn't
     configured (operator hasn't supplied a subscription id) or when
