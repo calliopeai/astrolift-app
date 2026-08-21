@@ -2292,6 +2292,7 @@ export type AstroliftJobRun = {
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   job: AstroliftJob;
+  logExcerpt: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   stepRuns: Array<AstroliftStepRun>;

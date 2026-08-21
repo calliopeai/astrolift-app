@@ -17,7 +17,7 @@ import pytest
 
 from astrolift_identity.models import Organization
 from astrolift_pipelines.models import Job, JobRun, Pipeline, PipelineRun, Step, StepRun
-from astrolift_workflows.activities.pipeline_job_spawn import _settle_step_runs
+from astrolift_workflows.activities.pipeline_job_spawn import _read_job_pod, _settle_step_runs
 
 pytestmark = pytest.mark.django_db
 
@@ -25,34 +25,31 @@ NAMESPACE = "astrolift-pipelines-acme"
 K8S_JOB = "pl-1-build"
 
 
+def _pod(message: str | None):
+    """The Job's pod, carrying *message* on its `main` container."""
+    return {
+        "metadata": {"name": "pl-1-build-abcde", "labels": {"job-name": K8S_JOB}},
+        "status": {"containerStatuses": [{"name": "main", "state": {"terminated": {"message": message}}}]},
+    }
+
+
 class FakeClient:
-    """Returns one pod for the Job, carrying *message* on its `main` container."""
+    """Lists the Job's pod alongside another job's, in the shared namespace."""
 
     def __init__(self, message: str | None, *, pod: bool = True) -> None:
         self.message = message
         self.pod = pod
 
     def list(self, *, kind, namespace):  # noqa: ARG002 — mirrors the real signature
-        if not self.pod:
-            return []
-        return [
+        others = [
             {
-                "metadata": {"labels": {"job-name": K8S_JOB}},
-                "status": {
-                    "containerStatuses": [
-                        {"name": "main", "state": {"terminated": {"message": self.message}}}
-                    ]
-                },
-            },
-            # A pod from something else in the same namespace, to prove the
-            # label is what selects ours.
-            {
-                "metadata": {"labels": {"job-name": "pl-9-other"}},
+                "metadata": {"name": "pl-9-other-zzzzz", "labels": {"job-name": "pl-9-other"}},
                 "status": {
                     "containerStatuses": [{"name": "main", "state": {"terminated": {"message": "0 ran 99"}}}]
                 },
-            },
+            }
         ]
+        return ([_pod(self.message)] if self.pod else []) + others
 
 
 class ExplodingClient:
@@ -96,9 +93,7 @@ def test_every_step_settles_from_its_record():
 
     failing = _settle_step_runs(
         job_run=job_run,
-        client=FakeClient("0 ran 0\n1 skipped 0\n2 ran 0\n"),
-        namespace=NAMESPACE,
-        k8s_job_name=K8S_JOB,
+        pod=_pod("0 ran 0\n1 skipped 0\n2 ran 0\n"),
         job_failed=False,
     )
 
@@ -127,9 +122,7 @@ def test_a_failed_step_carries_its_exit_code_and_the_rest_are_skipped():
 
     failing = _settle_step_runs(
         job_run=job_run,
-        client=FakeClient("0 ran 0\n1 ran 42\n"),
-        namespace=NAMESPACE,
-        k8s_job_name=K8S_JOB,
+        pod=_pod("0 ran 0\n1 ran 42\n"),
         job_failed=True,
     )
 
@@ -150,9 +143,7 @@ def test_an_unreadable_pod_still_settles_from_the_jobs_verdict():
 
     _settle_step_runs(
         job_run=job_run,
-        client=ExplodingClient(),
-        namespace=NAMESPACE,
-        k8s_job_name=K8S_JOB,
+        pod=None,
         job_failed=False,
     )
 
@@ -164,9 +155,7 @@ def test_a_failed_job_with_no_records_marks_its_steps_failed_not_pending():
 
     _settle_step_runs(
         job_run=job_run,
-        client=FakeClient(None, pod=False),
-        namespace=NAMESPACE,
-        k8s_job_name=K8S_JOB,
+        pod=None,
         job_failed=True,
     )
 
@@ -180,14 +169,85 @@ def test_the_pod_is_selected_by_its_job_label():
 
     failing = _settle_step_runs(
         job_run=job_run,
-        client=FakeClient("0 ran 0\n"),
-        namespace=NAMESPACE,
-        k8s_job_name=K8S_JOB,
+        pod=_read_job_pod(FakeClient("0 ran 0\n"), NAMESPACE, K8S_JOB),
         job_failed=False,
     )
 
     assert failing is None
     assert _statuses(job_run) == [StepRun.Status.SUCCESS]
+
+
+def test_the_pods_output_is_kept_on_the_job_run(monkeypatch):
+    """#1218: nothing captured a pipeline's logs anywhere.
+
+    The window is narrow and this is it — `poll_pipeline_job` deletes the
+    Job with `propagation_policy="Foreground"` on both terminal branches,
+    so the pod and its output go with it.
+    """
+    from astrolift_workflows.activities import pipeline_job_spawn as mod
+
+    job_run = _scaffold("g", [{"position": 0, "run": "echo hi"}])
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: object())
+
+    async def _fake_tail(*, cluster, namespace, pod_name, tail):  # noqa: ARG001
+        return ["building…", "", "   ", "done"]
+
+    monkeypatch.setattr("core.cluster_observability.fetch_pod_log_tail", _fake_tail)
+
+    mod._capture_job_logs(job_run=job_run, run=job_run.pipeline_run, pod=_pod("0 ran 0\n"))
+
+    job_run.refresh_from_db()
+    # Blank lines dropped, order preserved.
+    assert job_run.log_excerpt == "building…\ndone"
+
+
+def test_a_log_read_that_fails_does_not_cost_the_run(monkeypatch):
+    from astrolift_workflows.activities import pipeline_job_spawn as mod
+
+    job_run = _scaffold("h", [{"position": 0, "run": "true"}])
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: (_ for _ in ()).throw(RuntimeError("gone")))
+
+    mod._capture_job_logs(job_run=job_run, run=job_run.pipeline_run, pod=_pod("0 ran 0\n"))
+
+    job_run.refresh_from_db()
+    assert job_run.log_excerpt == ""
+
+
+def test_a_long_build_is_truncated_from_the_front(monkeypatch):
+    """The tail is what an operator needs — a failure is at the end."""
+    from astrolift_workflows.activities import pipeline_job_spawn as mod
+
+    job_run = _scaffold("i", [{"position": 0, "run": "true"}])
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: object())
+
+    async def _fake_tail(*, cluster, namespace, pod_name, tail):  # noqa: ARG001
+        return ["x" * 100 for _ in range(2000)] + ["THE-LAST-LINE"]
+
+    monkeypatch.setattr("core.cluster_observability.fetch_pod_log_tail", _fake_tail)
+
+    mod._capture_job_logs(job_run=job_run, run=job_run.pipeline_run, pod=_pod(""))
+
+    job_run.refresh_from_db()
+    assert len(job_run.log_excerpt) <= mod.PIPELINE_LOG_CHARS + 1
+    assert job_run.log_excerpt.startswith("…")
+    assert job_run.log_excerpt.endswith("THE-LAST-LINE")
+
+
+def test_no_pod_means_nothing_to_capture(monkeypatch):
+    from astrolift_workflows.activities import pipeline_job_spawn as mod
+
+    job_run = _scaffold("j", [{"position": 0, "run": "true"}])
+
+    mod._capture_job_logs(job_run=job_run, run=job_run.pipeline_run, pod=None)
+
+    job_run.refresh_from_db()
+    assert job_run.log_excerpt == ""
+
+
+def test_a_cluster_that_will_not_list_pods_is_not_fatal():
+    """`_read_job_pod` is the only place the k8s read happens now, and a
+    settled run must not be lost to a cluster that stopped answering."""
+    assert _read_job_pod(ExplodingClient(), NAMESPACE, K8S_JOB) is None
 
 
 def test_a_run_with_no_steps_is_not_an_error():
@@ -196,9 +256,7 @@ def test_a_run_with_no_steps_is_not_an_error():
     assert (
         _settle_step_runs(
             job_run=job_run,
-            client=ExplodingClient(),
-            namespace=NAMESPACE,
-            k8s_job_name=K8S_JOB,
+            pod=None,
             job_failed=False,
         )
         is None

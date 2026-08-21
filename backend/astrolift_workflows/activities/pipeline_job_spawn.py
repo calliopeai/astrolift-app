@@ -53,6 +53,12 @@ log = logging.getLogger("astrolift_workflows.activities.pipeline_job_spawn")
 # Pipeline jobs run in a dedicated namespace, separate from app namespaces.
 _PIPELINE_NS_PREFIX = "astrolift-pipelines-"
 
+# How much of a pipeline pod's output is kept. The pod is deleted with its
+# Job, so this excerpt is the only record of what the build printed; the
+# caps keep a chatty build from turning a JobRun row into a liability.
+PIPELINE_LOG_LINES = 500
+PIPELINE_LOG_CHARS = 64_000
+
 # Resource quota applied to every pipeline namespace.
 _DEFAULT_RESOURCE_QUOTA = {
     "requests.cpu": "8",
@@ -216,15 +222,12 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
     job_failed = any(c.get("type") == "Failed" and c.get("status") == "True" for c in conditions)
 
     if complete or succeeded > 0:
-        # Before the delete: the per-step records live on the pod's
-        # terminated container state, and the pod goes with the Job.
-        _settle_step_runs(
-            job_run=job_run,
-            client=client,
-            namespace=namespace,
-            k8s_job_name=k8s_job_name,
-            job_failed=False,
-        )
+        # Everything the pod can tell us has to be read here: the delete
+        # below is `propagation_policy="Foreground"`, so the pod and its
+        # logs go with the Job.
+        pod = _read_job_pod(client, namespace, k8s_job_name)
+        _settle_step_runs(job_run=job_run, pod=pod, job_failed=False)
+        _capture_job_logs(job_run=job_run, run=run, pod=pod)
         job_run.status = JobRun.Status.SUCCESS
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
@@ -233,13 +236,11 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         return {"completed": True, "failed": False, "exit_code": 0}
 
     if job_failed or (failed_count > 0 and active == 0):
-        settled = _settle_step_runs(
-            job_run=job_run,
-            client=client,
-            namespace=namespace,
-            k8s_job_name=k8s_job_name,
-            job_failed=True,
-        )
+        pod = _read_job_pod(client, namespace, k8s_job_name)
+        settled = _settle_step_runs(job_run=job_run, pod=pod, job_failed=True)
+        # A failed build is the case an operator actually goes looking at,
+        # so the logs matter more here than on the green path.
+        _capture_job_logs(job_run=job_run, run=run, pod=pod)
         # The pod's own exit code beats parsing it out of a Job condition
         # message, which is what `_extract_exit_code` has to do and which
         # had never run against a real failure while the container was a
@@ -258,9 +259,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
 def _settle_step_runs(
     *,
     job_run: Any,
-    client: Any,
-    namespace: str,
-    k8s_job_name: str,
+    pod: dict | None,
     job_failed: bool,
 ) -> int | None:
     """Settle this job run's StepRun rows from the pod's exit records.
@@ -285,16 +284,7 @@ def _settle_step_runs(
     if not step_runs:
         return None
 
-    records: dict[int, tuple[str, int]] = {}
-    try:
-        message = _terminated_message(client, namespace, k8s_job_name)
-        records = parse_step_records(message)
-    except Exception:  # noqa: BLE001 — many k8s subtypes; see docstring
-        log.warning(
-            "settle_step_runs: could not read the pod's records for %s",
-            k8s_job_name,
-            exc_info=True,
-        )
+    records = parse_step_records(_terminated_message(pod))
 
     now = timezone.now()
     failing_exit: int | None = None
@@ -332,23 +322,85 @@ def _settle_step_runs(
     return failing_exit
 
 
-def _terminated_message(client: Any, namespace: str, k8s_job_name: str) -> str:
-    """The `main` container's termination message for this Job's pod.
+def _read_job_pod(client: Any, namespace: str, k8s_job_name: str) -> dict | None:
+    """:func:`_job_pod`, but a cluster that will not answer is not fatal.
+
+    Both callers are settling a run whose verdict the Job status already
+    decided. Losing the pod costs detail, never the verdict.
+    """
+    try:
+        return _job_pod(client, namespace, k8s_job_name)
+    except Exception:  # noqa: BLE001 — k8s client raises many subtypes
+        log.warning("read_job_pod: could not list pods for %s", k8s_job_name, exc_info=True)
+        return None
+
+
+def _job_pod(client: Any, namespace: str, k8s_job_name: str) -> dict | None:
+    """This Job's pod.
 
     `backoffLimit: 0` and `restartPolicy: Never`, so there is one pod per
     Job. It is found by the label the pod template already carries rather
-    than by name, which the Job generates.
+    than by name, which the Job generates. The namespace is shared by every
+    pipeline the org runs, so taking the first pod would read another job's
+    results.
     """
     for pod in client.list(kind="Pod", namespace=namespace) or []:
         labels = ((pod.get("metadata") or {}).get("labels")) or {}
-        if labels.get("job-name") != k8s_job_name:
+        if labels.get("job-name") == k8s_job_name:
+            return pod
+    return None
+
+
+def _terminated_message(pod: dict | None) -> str:
+    """The `main` container's termination message, or ``""``."""
+    for status in (((pod or {}).get("status") or {}).get("containerStatuses")) or []:
+        if status.get("name") != "main":
             continue
-        for status in ((pod.get("status") or {}).get("containerStatuses")) or []:
-            if status.get("name") != "main":
-                continue
-            terminated = (status.get("state") or {}).get("terminated") or {}
-            return str(terminated.get("message") or "")
+        terminated = (status.get("state") or {}).get("terminated") or {}
+        return str(terminated.get("message") or "")
     return ""
+
+
+def _capture_job_logs(*, job_run: Any, run: Any, pod: dict | None) -> None:
+    """Store the tail of the pod's output on the JobRun.
+
+    Called before ``_delete_k8s_job``, which is the only window there is:
+    the delete is ``propagation_policy="Foreground"``, so the pod goes with
+    the Job and its logs go with the pod. ``ttlSecondsAfterFinished`` never
+    gets a chance to matter.
+
+    Never raises. A log read is diagnostics, and diagnostics failing must
+    not change a run's verdict — which the Job status has already decided
+    by the time this runs.
+    """
+    pod_name = ((pod or {}).get("metadata") or {}).get("name") or ""
+    if not pod_name:
+        return
+
+    from asgiref.sync import async_to_sync
+
+    from core.cluster_observability import fetch_pod_log_tail
+
+    try:
+        cluster = _resolve_cluster(run)
+        lines = async_to_sync(fetch_pod_log_tail)(
+            cluster=cluster,
+            namespace=_pipeline_namespace(run.pipeline.organization.slug),
+            pod_name=pod_name,
+            tail=PIPELINE_LOG_LINES,
+        )
+    except Exception:  # noqa: BLE001 — the read must not cost us the run
+        log.warning("capture_job_logs: could not read logs for pod %s", pod_name, exc_info=True)
+        return
+
+    body = "\n".join(line for line in lines if line and line.strip())
+    if not body:
+        return
+    if len(body) > PIPELINE_LOG_CHARS:
+        body = "…" + body[-PIPELINE_LOG_CHARS:]
+
+    job_run.log_excerpt = body
+    job_run.save(update_fields=["log_excerpt", "updated_at", "version"])
 
 
 def _cancel_pipeline_job_sync(job_run_id: int) -> None:
@@ -428,17 +480,18 @@ def _k8s_job_name(run: Any, job: Any) -> str:
     return raw[:63].rstrip("-")
 
 
-def _get_cluster_client(run: Any) -> Any:
-    """Resolve the KubernetesDynamicClient for the pipeline run's org cluster.
+def _resolve_cluster(run: Any) -> Any:
+    """The org cluster a pipeline run's jobs land on.
 
     Pipeline jobs run on the org's default cluster (the first active cluster
     bound to the organization). The spawner does NOT require a specific
     AppEnvironment cluster binding — pipelines are org-scoped, not app-scoped.
-    """
 
+    Split out from :func:`_get_cluster_client` because the log capture needs
+    the ``TenantCluster`` itself, not the dynamic client:
+    ``fetch_pod_log_tail`` speaks the observability layer's driver lookup.
+    """
     from astrolift_clusters.models import TenantCluster
-    from astrolift_drivers.registry import plugins
-    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
     org = run.pipeline.organization
     cluster = (
@@ -454,6 +507,16 @@ def _get_cluster_client(run: Any) -> Any:
         raise RuntimeError(
             f"organization {org.slug!r} has no managed cluster — pipeline jobs cannot be scheduled"
         )
+    return cluster
+
+
+def _get_cluster_client(run: Any) -> Any:
+    """Resolve the KubernetesDynamicClient for the pipeline run's org cluster."""
+
+    from astrolift_drivers.registry import plugins
+    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+
+    cluster = _resolve_cluster(run)
 
     plugin = plugins.get(cluster.provider_plugin_id)
     if plugin is None:

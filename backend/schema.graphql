@@ -2293,6 +2293,7 @@ type AstroliftJobRun {
   job: AstroliftJob!
   status: String!
   stepRuns: [AstroliftStepRun!]!
+  logExcerpt: String!
   startedAt: DateTime
   finishedAt: DateTime
   createdAt: DateTime!

@@ -30,6 +30,12 @@ class JobRun(BaseCoreModel):
         default=Status.PENDING,
     )
     temporal_activity_id = models.CharField(max_length=512, blank=True, default="")
+    # The tail of the pod's output, captured when the Job settles and
+    # before it is deleted (#1218). On JobRun rather than StepRun because
+    # a job is one container: every step writes to the same stream, and
+    # splitting it per step would mean inventing boundaries the stream
+    # does not carry.
+    log_excerpt = models.TextField(blank=True, default="")
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 

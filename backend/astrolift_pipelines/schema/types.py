@@ -62,6 +62,11 @@ class JobRunType:
     job: JobType
     status: str
     step_runs: list[StepRunType]
+    # The tail of what the job's pod printed, captured before the K8s Job
+    # is deleted (#1218). On the job rather than the step because a job is
+    # one container: every step writes to the same stream. This is what
+    # `astro pipeline logs` reads.
+    log_excerpt: str
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
     created_at: dt.datetime
@@ -182,6 +187,7 @@ def job_run_to_type(jr) -> JobRunType:
         job=job_to_type(jr.job),
         status=jr.status,
         step_runs=[step_run_to_type(sr) for sr in step_runs],
+        log_excerpt=jr.log_excerpt or "",
         started_at=jr.started_at,
         finished_at=jr.finished_at,
         created_at=jr.created_at,
