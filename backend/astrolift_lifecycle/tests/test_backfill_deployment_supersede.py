@@ -96,3 +96,48 @@ def test_rerun_is_noop(app, env):
     assert oldest.status == Deployment.Status.SUPERSEDED.value
     # The still-RUNNING deploy was not touched again.
     assert newest.updated_at == superseded_after_first
+
+
+def _in_flight_deploy(app, env, *, status, created_at) -> Deployment:
+    dep = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        trigger_kind=Deployment.TriggerKind.MANUAL.value,
+        status=status,
+        image_tag="v1",
+    )
+    Deployment.objects.filter(pk=dep.pk).update(created_at=created_at)
+    dep.refresh_from_db()
+    return dep
+
+
+def test_stale_in_flight_rows_fail_out_behind_the_flag(app, env):
+    """--stale-in-flight-hours clears rows stranded before deploys learned
+    to supersede on start (#1536); fresh in-flight rows stay untouched."""
+    now = timezone.now()
+    stranded = _in_flight_deploy(
+        app, env, status=Deployment.Status.DEPLOYING.value, created_at=now - timedelta(days=2)
+    )
+    fresh = _in_flight_deploy(
+        app, env, status=Deployment.Status.DEPLOYING.value, created_at=now - timedelta(minutes=10)
+    )
+
+    call_command("backfill_deployment_supersede", "--stale-in-flight-hours", "24")
+
+    stranded.refresh_from_db()
+    fresh.refresh_from_db()
+    assert stranded.status == Deployment.Status.FAILED.value
+    assert "stale in-flight" in stranded.aborted_reason
+    assert fresh.status == Deployment.Status.DEPLOYING.value
+
+
+def test_stale_sweep_off_by_default(app, env):
+    now = timezone.now()
+    stranded = _in_flight_deploy(
+        app, env, status=Deployment.Status.PENDING.value, created_at=now - timedelta(days=3)
+    )
+
+    call_command("backfill_deployment_supersede")
+
+    stranded.refresh_from_db()
+    assert stranded.status == Deployment.Status.PENDING.value

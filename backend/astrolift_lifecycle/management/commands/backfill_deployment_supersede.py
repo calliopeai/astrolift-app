@@ -43,6 +43,19 @@ class Command(BaseCommand):
             default=False,
             help="Print what would change without writing to the DB.",
         )
+        parser.add_argument(
+            "--stale-in-flight-hours",
+            type=int,
+            default=None,
+            metavar="HOURS",
+            help=(
+                "Also fail out PENDING/DEPLOYING/REDEPLOYING deployments older "
+                "than HOURS (#1536). Deploys now supersede in-flight rows on "
+                "start, so this only clears rows stranded before that fix on "
+                "apps that haven't deployed since. A live deploy legitimately "
+                "runs ~30m; pick a margin well above that."
+            ),
+        )
 
     def handle(self, *args, **options):
         from astrolift_lifecycle.models import Deployment
@@ -88,10 +101,46 @@ class Command(BaseCommand):
                 else:
                     superseded_duplicates += 1
 
+        stale_failed = 0
+        stale_hours = options["stale_in_flight_hours"]
+        if stale_hours is not None:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            cutoff = timezone.now() - timedelta(hours=stale_hours)
+            stale = (
+                Deployment.objects.filter(
+                    status__in=(
+                        Deployment.Status.PENDING.value,
+                        Deployment.Status.DEPLOYING.value,
+                        Deployment.Status.REDEPLOYING.value,
+                    ),
+                    created_at__lt=cutoff,
+                )
+                .select_related("registered_app")
+                .order_by("created_at")
+            )
+            for dep in stale:
+                self.stdout.write(
+                    f"  {prefix}FAIL-OUT [STALE-{dep.status.upper()}] deployment={dep.guid} "
+                    f"app={dep.registered_app.slug} env_id={dep.app_environment_id} "
+                    f"created_at={dep.created_at.isoformat()}"
+                )
+                if not dry_run:
+                    if not dep.aborted_reason:
+                        dep.aborted_reason = (
+                            f"stale in-flight deploy (older than {stale_hours}h), failed out by backfill"
+                        )
+                        dep.save(update_fields=["aborted_reason", "updated_at", "version"])
+                    dep.transition_to(Deployment.Status.FAILED)
+                stale_failed += 1
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"{prefix}Done — {len(groups)} app/env group(s) scanned, "
                 f"{superseded_duplicates} duplicate deployment(s) superseded, "
-                f"{superseded_dead_app} dead-app deployment(s) closed."
+                f"{superseded_dead_app} dead-app deployment(s) closed, "
+                f"{stale_failed} stale in-flight deployment(s) failed out."
             )
         )
