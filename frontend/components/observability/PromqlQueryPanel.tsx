@@ -1,6 +1,6 @@
 "use client";
 
-import { useLazyQuery } from "@apollo/client/react";
+import { useLazyQuery, useQuery } from "@apollo/client/react";
 import { AlertTriangleIcon, ChevronDownIcon, ChevronRightIcon, SearchCodeIcon } from "lucide-react";
 import * as React from "react";
 import {
@@ -15,6 +15,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Collapsible,
   CollapsibleContent,
@@ -29,7 +31,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { EXECUTE_PROMQL } from "@/graphql/observability/observability.queries";
+import {
+  APP_METRIC_NAMES,
+  EXECUTE_PROMQL,
+} from "@/graphql/observability/observability.queries";
 import type {
   AstroliftExecutePromqlResult,
   AstroliftPromqlSeries,
@@ -38,6 +43,16 @@ import type {
 
 interface PromqlResp {
   astroliftExecutePromql: AstroliftExecutePromqlResult;
+}
+
+interface MetricNamesResp {
+  astroliftAppMetricNames: {
+    ok: boolean;
+    error?: string | null;
+    names: string[];
+    truncated: boolean;
+    limit: number;
+  };
 }
 
 export interface PromqlQueryPanelProps {
@@ -64,6 +79,101 @@ const SERIES_COLORS = [
   "var(--chart-5)",
 ];
 
+interface MetricNamePickerProps {
+  discovery: {
+    ok: boolean;
+    error?: string | null;
+    names: string[];
+    truncated: boolean;
+    limit: number;
+  } | null;
+  loading: boolean;
+  onPick: (metric: string) => void;
+}
+
+/**
+ * The app's own metric names, as clickable chips (#1226).
+ *
+ * The Query box could always run PromQL; what an operator lacked was any
+ * way to know what their app exposes. Everything the platform emits into
+ * the same namespace — cAdvisor, kube-state-metrics, the ingress
+ * controller — is filtered server-side, because those have their own
+ * panels and would bury the app's handful of business metrics.
+ */
+function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps) {
+  const [filter, setFilter] = React.useState("");
+
+  if (loading) {
+    return <p className="text-muted-foreground text-xs">Looking up what this app exposes…</p>;
+  }
+  if (discovery === null) return null;
+
+  if (!discovery.ok) {
+    // Not an error state for the panel: free-form PromQL still works
+    // without discovery, so this says what is missing and gets out of
+    // the way.
+    return (
+      <p className="text-muted-foreground text-xs">
+        Can&apos;t list this app&apos;s metrics ({discovery.error ?? "unknown reason"}). You can
+        still run a query below.
+      </p>
+    );
+  }
+
+  if (discovery.names.length === 0) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        This app exposes no metrics of its own yet. Add{" "}
+        <code className="font-mono">[workloads.&lt;name&gt;.metrics]</code> with a{" "}
+        <code className="font-mono">port</code> to your astrolift.toml and redeploy.
+      </p>
+    );
+  }
+
+  const needle = filter.trim().toLowerCase();
+  const shown = needle
+    ? discovery.names.filter((n) => n.toLowerCase().includes(needle))
+    : discovery.names;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-muted-foreground text-xs">This app exposes</Label>
+        <Input
+          aria-label="Filter metrics"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter metrics…"
+          className="h-7 max-w-56 text-xs"
+        />
+        {discovery.truncated && (
+          <span className="text-muted-foreground text-2xs">
+            showing the first {discovery.limit} — this app emits more distinct metric names than
+            that, which usually means a label belongs in a label rather than in the name
+          </span>
+        )}
+      </div>
+      <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+        {shown.map((name) => (
+          <button
+            key={name}
+            type="button"
+            onClick={() => onPick(name)}
+            className="border-border hover:bg-accent rounded border px-2 py-0.5 font-mono text-2xs"
+          >
+            {name}
+          </button>
+        ))}
+        {shown.length === 0 && (
+          <span className="text-muted-foreground text-xs">
+            No metric matches &ldquo;{filter}&rdquo;.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -72,6 +182,23 @@ export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelP
   const [execute, { data, loading, error }] = useLazyQuery<PromqlResp>(EXECUTE_PROMQL, {
     fetchPolicy: "network-only",
   });
+
+  // What the app exposes (#1226). Fetched only once the panel is open —
+  // it is a Prometheus round trip and the panel is collapsed by default.
+  const names = useQuery<MetricNamesResp>(APP_METRIC_NAMES, {
+    variables: { appSlug, environmentName: environmentName ?? null, limit: 200 },
+    skip: !open,
+    fetchPolicy: "cache-first",
+  });
+  const discovery = names.data?.astroliftAppMetricNames ?? null;
+
+  // Clicking a name writes the simplest expression that charts it rather
+  // than the bare name: a counter graphed raw is a monotonic ramp, which
+  // tells an operator nothing. They can edit it — the box is still a box.
+  const onPickMetric = (metric: string) => {
+    const expr = metric.endsWith("_total") ? `sum(rate(${metric}[5m]))` : `sum(${metric})`;
+    setQuery(expr);
+  };
 
   const onRun = () => {
     if (!query.trim()) return;
@@ -115,9 +242,16 @@ export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelP
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="space-y-4">
+            <MetricNamePicker discovery={discovery} loading={names.loading} onPick={onPickMetric} />
+
             <div className="space-y-2">
               <Textarea
                 rows={2}
+                // A textarea whose only description is a placeholder has no
+                // accessible name, and the picker's filter box above it is
+                // also a textbox — so a screen reader had two unlabelled
+                // fields to tell apart.
+                aria-label="PromQL query"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder='sum by (route) (rate(http_requests_total{job="myapp"}[5m]))'

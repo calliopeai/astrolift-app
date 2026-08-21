@@ -40,6 +40,7 @@ from astrolift_observability.schema.types import (
     AppEndpointMetric,
     AppGoldenSignal,
     AppGoldenSignalsResult,
+    AppMetricNamesResult,
     AppTrace,
     AppUrlHealth,
     ExecutePromqlResult,
@@ -1170,6 +1171,96 @@ class GoldenSignalsQuery:
             samples=samples,
             restart_count=restart_count,
             last_restart_at=last_restart_at,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_metric_names(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        lookback_seconds: int = 3600,
+        limit: int = 200,
+    ) -> AppMetricNamesResult:
+        """The metric names this app's own workloads expose (#1226).
+
+        Reads ``/api/v1/label/__name__/values`` restricted to the app's
+        namespace, then drops the families the platform emits into that
+        namespace — cAdvisor, kube-state-metrics, node-exporter, the
+        ingress controller — because those already have dedicated panels
+        and are not what "my app's metrics" means.
+
+        Scoped by namespace at the Prometheus end rather than filtered
+        here: an unrestricted name enumeration on a busy cluster returns
+        tens of thousands of entries.
+
+        ``lookback_seconds`` bounds the window, so a metric an app stopped
+        emitting a month ago does not linger in the picker forever.
+
+        Permission: ``APP_READ`` — the same gate as the golden signals and
+        ``astroliftExecutePromql``, and strictly narrower than the latter,
+        which takes arbitrary PromQL.
+        """
+        limit = max(1, min(int(limit), 1000))
+        lookback = max(60, min(int(lookback_seconds), 7 * 24 * 3600))
+
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug", "k8s_namespace", "organization__slug")
+            .first()
+        )
+        if app is None:
+            return AppMetricNamesResult(
+                ok=False, names=[], truncated=False, limit=limit, error="app not found"
+            )
+
+        namespace = namespace_for_app(app)
+        if not namespace:
+            return AppMetricNamesResult(
+                ok=False,
+                names=[],
+                truncated=False,
+                limit=limit,
+                error="app has no namespace to read metrics from",
+            )
+
+        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
+        if endpoint is None:
+            return AppMetricNamesResult(
+                ok=False,
+                names=[],
+                truncated=False,
+                limit=limit,
+                error="no Prometheus endpoint configured for this app's cluster",
+            )
+
+        end_unix = int(_now_utc().timestamp())
+        try:
+            found, truncated = prometheus_client.metric_names(
+                endpoint=endpoint,
+                match=prom_queries.build_namespace_series_match(namespace),
+                start_unix=end_unix - lookback,
+                end_unix=end_unix,
+                # Asked for more than we return, so the platform families
+                # dropped below do not eat into the operator's budget.
+                limit=limit * 4,
+            )
+        except prometheus_client.PrometheusError as exc:
+            return AppMetricNamesResult(ok=False, names=[], truncated=False, limit=limit, error=str(exc))
+
+        owned = [n for n in found if prom_queries.is_app_owned_metric(n)]
+        return AppMetricNamesResult(
+            ok=True,
+            names=owned[:limit],
+            truncated=truncated or len(owned) > limit,
+            limit=limit,
         )
 
     @strawberry.field

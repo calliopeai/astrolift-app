@@ -246,6 +246,60 @@ class RangeQueryResult:
     """List of (unix_seconds, value) points."""
 
 
+def metric_names(
+    *,
+    endpoint: str,
+    match: str,
+    start_unix: int,
+    end_unix: int,
+    limit: int,
+    timeout: float = 5.0,
+    auth: str | None = None,
+) -> tuple[list[str], bool]:
+    """``GET /api/v1/label/__name__/values`` restricted by ``match`` (#1226).
+
+    Returns ``(names, truncated)`` — names sorted, and a flag saying the
+    series set was larger than ``limit``.
+
+    ``match`` is a PromQL selector such as ``{namespace="astrolift-shop"}``.
+    It is what keeps this scoped: without it Prometheus enumerates every
+    metric name in the cluster, which for an app-scoped panel is both wrong
+    and enormous.
+
+    ``limit`` is applied here rather than in the caller so that the cap is
+    part of the read. A mis-instrumented app emitting tens of thousands of
+    names would otherwise be truncated only after the whole list crossed
+    the wire and was parsed.
+    """
+    base = endpoint.rstrip("/")
+    qs = urllib.parse.urlencode(
+        {
+            "match[]": match,
+            "start": str(int(start_unix)),
+            "end": str(int(end_unix)),
+        }
+    )
+    url = f"{base}/api/v1/label/__name__/values?{qs}"
+
+    cache_key = ("names", base, match, int(start_unix), int(end_unix), int(limit))
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        names, truncated = cached  # type: ignore[misc]
+        return list(names), bool(truncated)
+
+    payload = _request_json(url, timeout=timeout, auth=auth)
+    data = payload.get("data")
+    if not isinstance(data, list):
+        raise PrometheusQueryError("label values result malformed")
+
+    found = sorted({str(v) for v in data if isinstance(v, str) and v})
+    truncated = len(found) > limit
+    names = found[:limit]
+
+    _cache.set(cache_key, (tuple(names), truncated))
+    return names, truncated
+
+
 def query_instant(
     *,
     endpoint: str,

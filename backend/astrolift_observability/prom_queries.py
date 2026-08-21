@@ -857,3 +857,91 @@ def build_endpoint_latency_quantile_query(
         f"sum by (http_route, le)(rate(http_request_duration_seconds_bucket{match}[{rate_window}])))"
     )
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+# ---------------------------------------------------------------------------
+# App-owned metric discovery (#1226)
+# ---------------------------------------------------------------------------
+
+#: Metric-name prefixes the platform itself puts in an app's namespace, or
+#: that describe the app from outside it. An app browsing "its own metrics"
+#: does not mean cAdvisor's container gauges or the ingress controller's
+#: request counters — those already have dedicated panels.
+#:
+#: Deliberately conservative. Over-filtering hides a metric with no sign that
+#: it happened, which is unfalsifiable from the UI; under-filtering shows a
+#: row the operator can ignore. So this excludes only families the platform
+#: is known to emit, and leaves anything ambiguous visible.
+#:
+#: ``go_*`` and ``process_*`` are NOT excluded. They are boilerplate, but they
+#: are the app's own process emitting them, and an operator debugging a
+#: goroutine leak wants them.
+PLATFORM_METRIC_PREFIXES: tuple[str, ...] = (
+    # cAdvisor / kubelet. Enumerated by sub-family rather than a blanket
+    # `container_`, which would eat an app's own `container_ship_*` — the
+    # first thing this filter's tests caught it doing.
+    "container_cpu_",
+    "container_memory_",
+    "container_network_",
+    "container_fs_",
+    "container_blkio_",
+    "container_spec_",
+    "container_tasks_",
+    "container_threads",
+    "container_sockets",
+    "container_processes",
+    "container_file_descriptors",
+    "container_ulimits_",
+    "container_oom_",
+    "container_start_time_",
+    "container_last_seen",
+    "container_scrape_",
+    "machine_",
+    # kube-state-metrics
+    "kube_",
+    # node-exporter. Same treatment as `container_`: a bare `node_` would
+    # take an app that counts nodes of its own.
+    "node_cpu_",
+    "node_memory_",
+    "node_filesystem_",
+    "node_disk_",
+    "node_network_",
+    "node_load",
+    "node_boot_time_",
+    "node_time_",
+    "node_scrape_",
+    "node_exporter_",
+    # Prometheus' own bookkeeping, injected into every scrape
+    "scrape_",
+    "prometheus_",
+    "promhttp_",
+    # ingress / edge, which the golden-signals panels already read
+    "nginx_ingress_controller_",
+    "traefik_",
+    "haproxy_",
+    "aws_applicationelb_",
+    "envoy_",
+    "istio_",
+)
+
+#: Exact names, not prefixes: `up` and `ALERTS` are single metrics rather
+#: than families, and a prefix match on "up" would eat an app's `uptime_*`.
+PLATFORM_METRIC_NAMES: frozenset[str] = frozenset({"up", "ALERTS", "ALERTS_FOR_STATE"})
+
+
+def is_app_owned_metric(name: str) -> bool:
+    """True when *name* looks like the app's own instrumentation."""
+    if name in PLATFORM_METRIC_NAMES:
+        return False
+    return not name.startswith(PLATFORM_METRIC_PREFIXES)
+
+
+def build_namespace_series_match(namespace: str) -> str:
+    """The selector restricting metric-name discovery to one namespace.
+
+    The namespace label is what makes this app-scoped, and it is applied
+    server-side by Prometheus rather than by filtering a cluster-wide list
+    here — an unrestricted `__name__` enumeration on a busy cluster returns
+    tens of thousands of names.
+    """
+    return _render_label_match({"namespace": namespace})

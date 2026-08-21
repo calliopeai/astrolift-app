@@ -904,6 +904,14 @@ type AstroliftAppLogQueryLine {
   stream: String!
 }
 
+type AstroliftAppMetricNames {
+  ok: Boolean!
+  names: [String!]!
+  truncated: Boolean!
+  limit: Int!
+  error: String
+}
+
 type AstroliftAppMetrics {
   appSlug: String!
   timeRange: String!
@@ -6019,6 +6027,7 @@ type Query {
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null): AstroliftManagedServiceMetrics
   astroliftPodResourceUsage(appSlug: String!, podName: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftPodResourceUsage
+  astroliftAppMetricNames(appSlug: String!, environmentName: String = null, lookbackSeconds: Int! = 3600, limit: Int! = 200): AstroliftAppMetricNames!
   astroliftExecutePromql(appSlug: String!, query: String!, startUnix: Int!, endUnix: Int!, stepSeconds: Int!, environmentName: String = null): AstroliftExecutePromqlResult!
   astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
   astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
