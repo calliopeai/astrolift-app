@@ -452,10 +452,17 @@ const ROLE_BINDING_FIELDS = gql`
   }
 `;
 
+/**
+ * ``appSlug`` narrows to the bindings scoped to one app, which is what the
+ * app Members tab shows. The argument shipped on the field in #1241 and no
+ * document declared it, so that surface went on client-filtering the
+ * org-wide list. Omitted, the field is org-wide, which is what the
+ * assignments tab wants.
+ */
 export const LIST_ROLE_BINDINGS_PAGE = gql`
   ${ROLE_BINDING_FIELDS}
-  query ListRoleBindingsPage($search: String, $limit: Int, $after: String) {
-    astroliftRoleBindingsPage(search: $search, limit: $limit, after: $after) {
+  query ListRoleBindingsPage($search: String, $appSlug: String, $limit: Int, $after: String) {
+    astroliftRoleBindingsPage(search: $search, appSlug: $appSlug, limit: $limit, after: $after) {
       items {
         ...RoleBindingFields
       }

@@ -8,25 +8,23 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
 import {
   LIST_ROLES,
   LIST_ROLE_BINDINGS,
+  LIST_ROLE_BINDINGS_PAGE,
 } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftRole,
@@ -35,16 +33,14 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
-import { useListControls } from "@/hooks/use-list-controls";
-import type { SortState } from "@/hooks/use-list-controls";
 
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
 }
-interface BindingsResp {
-  astroliftRoleBindings: AstroliftRoleBinding[];
+interface BindingsPageResp {
+  astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
 }
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
@@ -54,55 +50,98 @@ export function AppMembersClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.members");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
-  const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
+
+  // `appSlug` narrows server-side to `scope_kind=APP, scope_id=<this app>`,
+  // which is exactly what this page filtered for in the browser. The
+  // argument was added to the field for this surface (#1241) and no
+  // document had declared it, so the page went on fetching every binding
+  // in the org to keep a handful. The field takes no sort argument, so no
+  // column declares a `sortKey`.
+  const table = useCursorTable<AstroliftRoleBinding>({
+    query: LIST_ROLE_BINDINGS_PAGE,
+    variables: { appSlug: slug },
+    extract: (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    searchVariable: "search",
+    urlKey: "mem",
+    fetchPolicy: "cache-and-network",
+  });
 
   const [revoke, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_ROLE_BINDING, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    // The paginated document by operation name, so the revoke lands on the
+    // cursor and search in effect, plus the deprecated flat list that
+    // /members and the member detail page still read from the cache.
+    refetchQueries: ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }],
     awaitRefetchQueries: true,
   });
 
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
 
   const a = app.data?.astroliftApp ?? null;
-  const allBindings = bindings.data?.astroliftRoleBindings ?? [];
-  const roleList = roles.data?.astroliftRoles ?? [];
-
-  // Filter to bindings scoped to this app. The schema doesn't have an
-  // app-scoped query yet, so we client-filter the org-wide list.
-  const appBindings = React.useMemo(() => {
-    if (!a) return [];
-    return allBindings.filter(
-      (rb) => rb.scopeKind === "APP" && rb.scopeId === a.id,
-    );
-  }, [allBindings, a]);
 
   // Roles relevant to APP scope.
-  const appRoles = roleList.filter((r) => r.scopeLevel === "APP");
+  const appRoles = (roles.data?.astroliftRoles ?? []).filter((r) => r.scopeLevel === "APP");
 
-  const ctrl = useListControls({
-    data: appBindings,
-    searchFn: (rb) =>
-      [rb.user?.username ?? "", rb.user?.email ?? "", rb.groupExternalId ?? "", rb.role.slug].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort: SortState) => {
-      const dir = sort.dir === "asc" ? 1 : -1;
-      if (sort.key === "user") {
-        const aVal = a.user?.username ?? a.groupExternalId ?? "";
-        const bVal = b.user?.username ?? b.groupExternalId ?? "";
-        return aVal.localeCompare(bVal) * dir;
-      }
-      if (sort.key === "role") {
-        return a.role.slug.localeCompare(b.role.slug) * dir;
-      }
-      if (sort.key === "grantedAt") {
-        return (new Date(a.grantedAt).getTime() - new Date(b.grantedAt).getTime()) * dir;
-      }
-      return 0;
+  const columns: Column<AstroliftRoleBinding>[] = [
+    {
+      id: "user",
+      header: t("columns.user"),
+      cell: (rb) =>
+        rb.user ? (
+          <>
+            <div className="font-medium">{rb.user.username}</div>
+            <div className="text-muted-foreground text-xs">{rb.user.email}</div>
+          </>
+        ) : (
+          <span className="font-mono text-xs">
+            {t("groupPrefix")} {rb.groupExternalId}
+          </span>
+        ),
     },
-  });
+    {
+      id: "role",
+      header: t("columns.role"),
+      cell: (rb) => (
+        <Badge variant="secondary" className="font-mono text-2xs">
+          {rb.role.slug}
+        </Badge>
+      ),
+    },
+    {
+      id: "granted",
+      header: t("columns.granted"),
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (rb) => new Date(rb.grantedAt).toLocaleDateString(),
+    },
+    {
+      id: "expires",
+      header: t("columns.expires"),
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (rb) => (rb.expiresAt ? new Date(rb.expiresAt).toLocaleDateString() : t("never")),
+    },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      width: "w-16",
+      cell: (rb) => (
+        <Can permission="org.manage_members">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => setRevokeTarget(rb)}
+            disabled={revoking}
+          >
+            <Trash2Icon className="size-4" />
+            <span className="sr-only">{t("revoke")}</span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
     const { data } = await revoke({ variables: { input: { id: rb.id } } });
@@ -168,97 +207,25 @@ export function AppMembersClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
 
-      <ListControls controls={ctrl} searchPlaceholder={t("searchPlaceholder")} />
-
-      <Card>
-        <CardContent className="p-0">
-          {bindings.loading && appBindings.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : appBindings.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ShieldIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-                actionHref="/administration/members"
-                actionLabel={t("openMembers")}
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <SortableHeader sortKey="user" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      {t("columns.user")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="role" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      {t("columns.role")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="grantedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      {t("columns.granted")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>{t("columns.expires")}</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ctrl.rows.map((rb) => (
-                  <TableRow key={rb.id}>
-                    <TableCell>
-                      {rb.user ? (
-                        <>
-                          <div className="font-medium">{rb.user.username}</div>
-                          <div className="text-muted-foreground text-xs">
-                            {rb.user.email}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="font-mono text-xs">
-                          {t("groupPrefix")} {rb.groupExternalId}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-mono text-2xs">
-                        {rb.role.slug}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {new Date(rb.grantedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {rb.expiresAt ? new Date(rb.expiresAt).toLocaleDateString() : t("never")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Can permission="org.manage_members">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => setRevokeTarget(rb)}
-                          disabled={revoking}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">{t("revoke")}</span>
-                        </Button>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        label="App members"
+        controller={table}
+        columns={columns}
+        getRowId={(rb) => rb.id}
+        searchPlaceholder={t("searchPlaceholder")}
+        empty={{
+          icon: <ShieldIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          actionHref: "/administration/members",
+          actionLabel: t("openMembers"),
+        }}
+        emptyFiltered={{
+          title: "No matching members",
+          description:
+            "No grant on this app matches that search. The server matches the user, the group, and the role.",
+        }}
+      />
 
       <ConfirmDialog
         open={revokeTarget !== null}
