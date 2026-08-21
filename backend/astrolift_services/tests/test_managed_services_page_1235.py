@@ -61,7 +61,7 @@ def _graph(suffix: str, *, app_slug: str | None = None) -> SimpleNamespace:
             ProviderPlugin(
                 name="AWS",
                 slug="aws",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

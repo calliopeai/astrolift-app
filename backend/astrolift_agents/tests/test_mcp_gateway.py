@@ -127,7 +127,7 @@ def _resource_graph(org, team, *, suffix: str):
             ProviderPlugin(
                 name=f"Resource Provider {suffix}",
                 slug=f"resource-provider-{suffix}",
-                version="1.0.0",
+                plugin_version="1.0.0",
             )
         ]
     )

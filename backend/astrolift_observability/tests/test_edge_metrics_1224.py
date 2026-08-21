@@ -176,7 +176,7 @@ def test_resolve_edge_metrics_from_cluster_ingress_class():
     plugin = ProviderPlugin(
         name="Test Provider",
         slug="test-provider-em",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

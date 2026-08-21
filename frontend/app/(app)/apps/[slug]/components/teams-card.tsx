@@ -14,7 +14,12 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,15 +39,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
 import {
@@ -53,12 +49,16 @@ import {
 import {
   GET_APP,
   LIST_APP_TEAM_ACCESSES,
+  LIST_APP_TEAM_ACCESSES_PAGE,
 } from "@/graphql/registry/registry.queries";
 import type {
   AppTeamAccessLevel,
   AstroliftAppTeamAccess,
 } from "@/graphql/registry/registry.types";
 
+interface TeamAccessesPageResp {
+  astroliftAppTeamAccessesPage: CursorPage<AstroliftAppTeamAccess>;
+}
 interface TeamAccessesResp {
   astroliftAppTeamAccesses: AstroliftAppTeamAccess[];
 }
@@ -87,6 +87,22 @@ const LEVEL_BADGE: Record<AppTeamAccessLevel, string> = {
 };
 
 export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
+  // The table's rows. `astroliftAppTeamAccessesPage` searches the team's
+  // name and slug and takes no sort argument, so no column declares a
+  // `sortKey`. First consumer this field has had.
+  const table = useCursorTable<AstroliftAppTeamAccess>({
+    query: LIST_APP_TEAM_ACCESSES_PAGE,
+    variables: { appSlug },
+    extract: (d) => (d as TeamAccessesPageResp | undefined)?.astroliftAppTeamAccessesPage,
+    searchVariable: "search",
+    fetchPolicy: "cache-and-network",
+  });
+
+  // The flat list stays, and it is not the table's source. It is what the
+  // Add-Team picker subtracts from the org's teams to find candidates, so
+  // deriving it from whichever page is on screen would offer teams that
+  // already hold a grant — and granting one that exists is not a no-op,
+  // it silently changes that team's access level.
   const accesses = useQuery<TeamAccessesResp>(LIST_APP_TEAM_ACCESSES, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
@@ -94,6 +110,7 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
   const teams = useQuery<TeamsResp>(LIST_TEAMS, { fetchPolicy: "cache-first" });
 
   const refetch = [
+    "ListAppTeamAccessesPage",
     { query: LIST_APP_TEAM_ACCESSES, variables: { appSlug } },
     { query: GET_APP, variables: { slug: appSlug } },
   ];
@@ -131,6 +148,96 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
   // here because LIST_TEAMS already returns the active-tenant's teams.
   const grantedTeamIds = new Set(list.map((a) => a.teamId));
   const candidateTeams = teamList.filter((t) => !grantedTeamIds.has(t.id));
+
+  const columns: Column<AstroliftAppTeamAccess>[] = [
+    {
+      id: "team",
+      header: "Team",
+      cell: (a) => (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="font-medium">{a.teamName}</div>
+            {a.isHome && (
+              <Badge
+                variant="outline"
+                className="border-warning-border bg-warning/10 text-warning-fg"
+              >
+                <HomeIcon className="size-3" />
+                Home
+              </Badge>
+            )}
+          </div>
+          <div className="text-muted-foreground font-mono text-xs">{a.teamSlug}</div>
+        </>
+      ),
+    },
+    {
+      id: "level",
+      header: "Access level",
+      cell: (a) => (
+        <>
+          <Can
+            permission="app.update"
+            fallback={
+              <Badge variant="outline" className={LEVEL_BADGE[a.accessLevel]}>
+                {a.accessLevel}
+              </Badge>
+            }
+          >
+            <Select
+              value={a.accessLevel}
+              onValueChange={(v) => handleLevelChange(a, v as AppTeamAccessLevel)}
+              disabled={granting || a.isHome}
+            >
+              <SelectTrigger
+                className="h-8 w-[140px]"
+                title={
+                  a.isHome
+                    ? "Home team access is fixed at OWNER. Move the app to a different team to change this."
+                    : undefined
+                }
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="deployer">Deployer</SelectItem>
+                <SelectItem value="owner">Owner</SelectItem>
+              </SelectContent>
+            </Select>
+          </Can>
+          <p className="text-muted-foreground mt-1 text-2xs">
+            {LEVEL_DESCRIPTIONS[a.accessLevel]}
+          </p>
+        </>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      width: "w-16",
+      cell: (a) => (
+        <Can permission="app.update">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8"
+            onClick={() => setRevokeTarget(a)}
+            disabled={revoking || a.isHome}
+            title={
+              a.isHome
+                ? "Cannot revoke the home team. Move the app to a different team first."
+                : "Revoke access"
+            }
+          >
+            <Trash2Icon className="size-4" />
+            <span className="sr-only">Revoke</span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   async function handleLevelChange(access: AstroliftAppTeamAccess, level: AppTeamAccessLevel) {
     if (access.accessLevel === level) return;
@@ -200,106 +307,24 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
           </Can>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        {accesses.loading && list.length === 0 ? (
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : list.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={<UsersIcon className="size-5" />}
-              title="No team access grants"
-              description="Add a team to give it visibility and operational rights on this app."
-            />
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Team</TableHead>
-                <TableHead>Access level</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium">{a.teamName}</div>
-                      {a.isHome && (
-                        <Badge
-                          variant="outline"
-                          className="border-warning-border bg-warning/10 text-warning-fg"
-                        >
-                          <HomeIcon className="size-3" />
-                          Home
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-muted-foreground font-mono text-xs">{a.teamSlug}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Can
-                      permission="app.update"
-                      fallback={
-                        <Badge variant="outline" className={LEVEL_BADGE[a.accessLevel]}>
-                          {a.accessLevel}
-                        </Badge>
-                      }
-                    >
-                      <Select
-                        value={a.accessLevel}
-                        onValueChange={(v) => handleLevelChange(a, v as AppTeamAccessLevel)}
-                        disabled={granting || a.isHome}
-                      >
-                        <SelectTrigger
-                          className="h-8 w-[140px]"
-                          title={
-                            a.isHome
-                              ? "Home team access is fixed at OWNER. Move the app to a different team to change this."
-                              : undefined
-                          }
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                          <SelectItem value="deployer">Deployer</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Can>
-                    <p className="text-muted-foreground mt-1 text-2xs">
-                      {LEVEL_DESCRIPTIONS[a.accessLevel]}
-                    </p>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Can permission="app.update">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-8"
-                        onClick={() => setRevokeTarget(a)}
-                        disabled={revoking || a.isHome}
-                        title={
-                          a.isHome
-                            ? "Cannot revoke the home team. Move the app to a different team first."
-                            : "Revoke access"
-                        }
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Revoke</span>
-                      </Button>
-                    </Can>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+      <CardContent>
+        <DataTable
+          label="Team access grants"
+          controller={table}
+          columns={columns}
+          getRowId={(a) => a.id}
+          searchPlaceholder="Search teams by name or slug…"
+          empty={{
+            icon: <UsersIcon className="size-5" />,
+            title: "No team access grants",
+            description:
+              "Add a team to give it visibility and operational rights on this app.",
+          }}
+          emptyFiltered={{
+            title: "No matching teams",
+            description: "No team with a grant on this app matches that search.",
+          }}
+        />
       </CardContent>
 
       <AddTeamSheet

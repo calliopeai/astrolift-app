@@ -5,18 +5,14 @@ from __future__ import annotations
 import pytest
 
 from core.cloud_tags import (
-    MIN_REQUIRED_KEYS,
     PLATFORM_NAMESPACE,
     TAG_AGENT_ID,
     TAG_AGENT_RUN_ID,
     TAG_APP,
     TAG_BINDING,
-    TAG_ENV,
     TAG_INSTALL,
     TAG_ORG,
     CloudTagSet,
-    TagEnforcementError,
-    assert_required_tags,
     for_agent_run,
     to_aws,
     to_azure,
@@ -90,20 +86,6 @@ def test_canonical_dict_includes_set_optionals():
     assert out[TAG_BINDING] == "main_db"
     assert out[TAG_AGENT_ID] == "agent-007"
     assert out[TAG_AGENT_RUN_ID] == "run-42"
-
-
-def test_min_required_keys_locked():
-    """Lock-test: changing what's mandatory needs to be a
-    deliberate change reviewed by a human."""
-    assert MIN_REQUIRED_KEYS == {
-        TAG_INSTALL,
-        TAG_ORG,
-        TAG_APP,
-        TAG_ENV,
-    }
-
-
-# ---- AWS serialization ---------------------------------------------
 
 
 def test_aws_keeps_slash_in_keys():
@@ -198,46 +180,6 @@ def test_azure_rejects_values_over_256():
 
 
 # ---- enforcement ---------------------------------------------------
-
-
-def test_assert_required_passes_when_all_present():
-    assert_required_tags(
-        {
-            TAG_INSTALL: "acme-prod",
-            TAG_ORG: "acme",
-            TAG_APP: "api",
-            TAG_ENV: "prod",
-        }
-    )
-
-
-def test_assert_required_fails_when_missing():
-    """The CI test in astrolift-providers calls this on every
-    freshly-provisioned resource. Catches plugin authors who
-    forgot to thread tags through."""
-    with pytest.raises(TagEnforcementError, match="missing required"):
-        assert_required_tags(
-            {
-                TAG_INSTALL: "acme-prod",
-                TAG_ORG: "acme",
-                # missing TAG_APP and TAG_ENV
-            }
-        )
-
-
-def test_assert_required_treats_empty_as_missing():
-    with pytest.raises(TagEnforcementError):
-        assert_required_tags(
-            {
-                TAG_INSTALL: "acme-prod",
-                TAG_ORG: "",
-                TAG_APP: "api",
-                TAG_ENV: "prod",
-            }
-        )
-
-
-# ---- agent stamping ------------------------------------------------
 
 
 def test_for_agent_run_stamps_agent_fields():

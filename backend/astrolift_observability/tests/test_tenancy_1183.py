@@ -71,7 +71,7 @@ def _scaffold(suffix: str, *, prometheus_endpoint: str | None = None, log_driver
     plugin_obj = ProviderPlugin(
         name="K8s",
         slug=f"k8s-{suffix}",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

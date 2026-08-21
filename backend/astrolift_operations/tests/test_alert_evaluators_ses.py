@@ -118,7 +118,7 @@ def _scaffold(*, plugin_slug: str = "aws", region: str = "us-east-1"):
             ProviderPlugin(
                 name=plugin_slug.upper(),
                 slug=plugin_slug,
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

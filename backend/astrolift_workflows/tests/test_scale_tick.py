@@ -256,7 +256,7 @@ def service_agent_stack(db):
         provisioning_status="ready",
     )
     plugin = ProviderPlugin(
-        name="K8s", slug="k8s-scaletick", version="0.0.1", capabilities_manifest={}, config_schema={}
+        name="K8s", slug="k8s-scaletick", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
     )
     ProviderPlugin.objects.bulk_create([plugin])
     plugin = ProviderPlugin.objects.get(slug="k8s-scaletick")

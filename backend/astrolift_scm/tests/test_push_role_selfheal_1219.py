@@ -56,13 +56,11 @@ def org():
 
 @pytest.fixture
 def cluster(org):
-    # bulk_create bypasses BaseCoreModel.save(), which fights with
-    # ProviderPlugin's CharField('version') override — same workaround as
-    # the lifecycle conftest.
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="Test Provider",
         slug="test-provider-pr",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

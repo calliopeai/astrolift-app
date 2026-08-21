@@ -58,14 +58,11 @@ def _tenant(org, actor_user_id=None):
 
 
 def _provider_plugin(slug: str) -> ProviderPlugin:
-    # bulk_create bypasses BaseCoreModel.save(), which would try to
-    # increment the model's ``version`` field — but ProviderPlugin shadows
-    # that with a semver *string* field, so save() raises TypeError. This
-    # mirrors the workaround in astrolift_observability/tests/test_log_queries.
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="K8s",
         slug=slug,
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

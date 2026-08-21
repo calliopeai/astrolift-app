@@ -63,7 +63,7 @@ def _provider_plugin(slug: str):
     plugin = ProviderPlugin(
         name=f"Plugin {slug}",
         slug=slug,
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

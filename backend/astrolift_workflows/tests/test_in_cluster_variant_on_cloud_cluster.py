@@ -52,14 +52,13 @@ def _make_service(*, kind: str, variant: str, plugin_slug: str, backend_ref: str
     org = Organization.objects.create(name="Acme", slug=f"acme-{suffix}")
     team = Team.objects.create(organization=org, name="Eng", slug=f"eng-{suffix}")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug=f"demo-{suffix}")
-    # bulk_create bypasses BaseCoreModel.save(), whose integer optimistic-version
-    # bump collides with ProviderPlugin's CharField ``version``.
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name=plugin_slug.upper(),
                 slug=plugin_slug,
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),

@@ -47,7 +47,7 @@ def aws_plugin():
     plugin = ProviderPlugin(
         name="AWS",
         slug="aws",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )
@@ -60,7 +60,7 @@ def gcp_plugin():
     plugin = ProviderPlugin(
         name="GCP",
         slug="gcp",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

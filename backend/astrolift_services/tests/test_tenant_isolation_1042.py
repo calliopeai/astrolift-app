@@ -126,7 +126,7 @@ def _make_org_graph(
             ProviderPlugin(
                 name=plugin_slug.upper(),
                 slug=plugin_slug,
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

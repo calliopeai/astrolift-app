@@ -107,7 +107,7 @@ def test_deploy_count_reflects_real_deployments_in_window(permission_resolver):
 
     org, app = _scaffold()
     plugin = ProviderPlugin(
-        name="Test", slug="t-metrics", version="0.0.1", capabilities_manifest={}, config_schema={}
+        name="Test", slug="t-metrics", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
     )
     ProviderPlugin.objects.bulk_create([plugin])
     plugin = ProviderPlugin.objects.get(slug="t-metrics")

@@ -83,7 +83,7 @@ def _graph(suffix: str = "a"):
             ProviderPlugin(
                 name=f"Kubernetes {suffix}",
                 slug=f"kubernetes-{suffix}",
-                version="1.0.0",
+                plugin_version="1.0.0",
             )
         ]
     )

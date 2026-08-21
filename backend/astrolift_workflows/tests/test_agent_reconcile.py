@@ -120,7 +120,7 @@ def _make_cluster(org, *, slug, is_active=True, agent_key_hash="abc123"):
                 ProviderPlugin(
                     name="K8s",
                     slug="k8s-reconcile",
-                    version="0.0.1",
+                    plugin_version="0.0.1",
                     capabilities_manifest={},
                     config_schema={},
                 )

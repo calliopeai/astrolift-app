@@ -42,7 +42,7 @@ def _scaffold(slug_suffix="bulk"):
     plugin = ProviderPlugin(
         name="Test",
         slug=f"bulk-plugin-{slug_suffix}",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

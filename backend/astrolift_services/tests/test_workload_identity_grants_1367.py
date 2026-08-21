@@ -69,7 +69,7 @@ def _make_org_graph(suffix: str) -> _Graph:
             ProviderPlugin(
                 name="Azure",
                 slug="azure",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),

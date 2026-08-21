@@ -303,7 +303,9 @@ def plugin_to_type(plugin) -> ProviderPluginType:
         id=GUID(str(plugin.guid)),
         slug=plugin.slug,
         name=plugin.name,
-        version=plugin.version,
+        # The GraphQL field keeps the name `version`; the column behind it
+        # is `plugin_version` since #1517.
+        version=plugin.plugin_version,
         capabilities_manifest=plugin.capabilities_manifest or {},
         is_enabled=plugin.is_enabled,
     )

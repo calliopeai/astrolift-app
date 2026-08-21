@@ -94,7 +94,7 @@ def _environment() -> tuple[RegisteredApp, AppEnvironment]:
             ProviderPlugin(
                 name="Azure",
                 slug="azure",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),
@@ -300,7 +300,7 @@ def test_a_non_azure_cluster_records_no_grants() -> None:
             ProviderPlugin(
                 name="AWS",
                 slug="aws",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),
