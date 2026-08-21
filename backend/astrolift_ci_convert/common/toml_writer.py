@@ -35,13 +35,19 @@ def _write_step(step: StepDef, job_id: str, step_idx: int) -> list[str]:
     for todo in step.todos:
         lines.append(f"# TODO: unsupported — {todo}")
 
-    lines.append("[[jobs.steps]]")
+    # The job id belongs in the table path. Without it every job's steps
+    # land in one shared `jobs.steps` array and no job has any of its own,
+    # so the job-to-step association is lost entirely on the way out.
+    # `job_id` was already a parameter here and was simply never used.
+    lines.append(f"[[jobs.{job_id}.steps]]")
     lines.append(f"name = {_toml_string(step.name)}")
 
     if step.uses:
         lines.append(f"uses = {_toml_string(step.uses)}")
         if step.with_params:
-            lines.append("[jobs.steps.with]")
+            # Sub-tables attach to the most recent element of the array
+            # above, so these have to follow the same path.
+            lines.append(f"[jobs.{job_id}.steps.with]")
             for k, v in step.with_params.items():
                 lines.append(f"  {k} = {_toml_string(str(v))}")
 
@@ -50,7 +56,7 @@ def _write_step(step: StepDef, job_id: str, step_idx: int) -> list[str]:
         lines.append(f"run = {run_val}")
 
     if step.env:
-        lines.append("[jobs.steps.env]")
+        lines.append(f"[jobs.{job_id}.steps.env]")
         for k, v in step.env.items():
             lines.append(f"  {k} = {_toml_string(str(v))}")
 
