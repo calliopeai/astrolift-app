@@ -102,8 +102,15 @@ def box_namespace(box) -> str:
 
 
 def box_attach_command(box) -> list[str]:
-    """What ``astro exec --app <box>`` should run to join the session."""
-    return attach_argv(box.session_name or SESSION_NAME)
+    """What ``astro exec --app <box>`` should run to join the session.
+
+    ``SESSION_NAME`` rather than a per-box value: this string has to match
+    the ``has-session`` target the in-pod keep-alive loop polls and the
+    session ``container_spec`` creates. A box that could name its own
+    would let those three disagree, and the way that fails is an attach
+    command that connects to nothing (#1470).
+    """
+    return attach_argv(SESSION_NAME)
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +122,7 @@ def _identity_env(box) -> dict[str, str]:
     return {
         BOX_ENV_MARKER: "1",
         BOX_ENV_GUID: str(box.guid),
-        BOX_ENV_SESSION: box.session_name,
+        BOX_ENV_SESSION: SESSION_NAME,
     }
 
 
@@ -163,7 +170,7 @@ def render_agent_box_job(
 
     session = SessionSpec(
         image=image,
-        session_name=box.session_name,
+        session_name=SESSION_NAME,
         idle_timeout_seconds=int(box.idle_timeout_seconds),
         env=_identity_env(box),
     )
