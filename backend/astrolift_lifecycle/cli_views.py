@@ -361,6 +361,13 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     # ── create Deployment + start workflow ──────────────────────────
     actor = Actor(kind="deploy_token", user_id=None)
 
+    # #1536: a new CI deploy supersedes any in-flight one for this
+    # (app, env) — abort the live workflow, fail out dead-workflow rows.
+    # Before the new row exists so it can't self-match.
+    from astrolift_lifecycle.supersede import supersede_in_flight_deploys
+
+    supersede_in_flight_deploys(app, env)
+
     with transaction.atomic():
         deployment = Deployment.objects.create(
             registered_app=app,

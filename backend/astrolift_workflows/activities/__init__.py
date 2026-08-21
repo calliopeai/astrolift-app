@@ -36,6 +36,7 @@ from astrolift_workflows.activities.app_lifecycle import (
     provision_preview_namespace,
     provision_registry_repo,
     render_manifests,
+    resync_manifest_for_deploy,
     update_secrets,
     wait_dns,
 )
@@ -282,6 +283,7 @@ __all__ = [
     "provision_namespace",
     "provision_preview_namespace",
     "provision_registry_repo",
+    "resync_manifest_for_deploy",
     "provision_secrets_backend",
     "prune_audit_log",
     "prune_stale_sessions",

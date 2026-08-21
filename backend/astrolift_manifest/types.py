@@ -34,6 +34,14 @@ class WorkloadManifest:
     hpa_target_cpu_pct: int = 80
     storage_class: str | None = None
     storage_size: str | None = None
+    # Prometheus scrape opt-in (#1226). Off unless the manifest says
+    # otherwise, so an app that never asked is never scraped and no
+    # existing manifest changes behaviour. `metrics_port` is required
+    # when enabled — there is no safe default, because guessing a port
+    # scrapes whatever happens to be listening on it.
+    metrics_enabled: bool = False
+    metrics_port: int | None = None
+    metrics_path: str = "/metrics"
     containers: tuple[ContainerManifest, ...] = ()
     # Volume declarations from ``[[workloads.<name>.volumes]]`` (#739).
     # Each dict carries the raw parsed shape (name, kind, mount_path,

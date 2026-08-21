@@ -354,6 +354,49 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
             path=f"{path}.concurrency_policy",
         )
 
+    # Prometheus scrape opt-in (#1226): `[workloads.<name>.metrics]` with
+    # `port`, and optionally `path`. Absent means not scraped, which is
+    # what every existing manifest means.
+    metrics_enabled = False
+    metrics_port: int | None = None
+    metrics_path = "/metrics"
+    raw_metrics = d.get("metrics")
+    if raw_metrics is not None:
+        if not isinstance(raw_metrics, dict):
+            raise ManifestError(
+                "metrics must be a table, e.g. metrics = { port = 9090 }",
+                path=f"{path}.metrics",
+            )
+        # `enabled` defaults true: writing the table at all is the opt-in.
+        # `enabled = false` is how you keep the config while turning it off.
+        metrics_enabled = bool(raw_metrics.get("enabled", True))
+        raw_port = raw_metrics.get("port")
+        if metrics_enabled and raw_port is None:
+            raise ManifestError(
+                "metrics requires a 'port' — a scrape target with no port would "
+                "have to be guessed, and guessing scrapes whatever is listening",
+                path=f"{path}.metrics.port",
+            )
+        if raw_port is not None:
+            try:
+                metrics_port = int(raw_port)
+            except (TypeError, ValueError):
+                raise ManifestError(
+                    f"metrics.port must be an integer, got {raw_port!r}",
+                    path=f"{path}.metrics.port",
+                ) from None
+            if not (1 <= metrics_port <= 65535):
+                raise ManifestError(
+                    f"metrics.port must be between 1 and 65535, got {metrics_port}",
+                    path=f"{path}.metrics.port",
+                )
+        metrics_path = str(raw_metrics.get("path", "/metrics"))
+        if not metrics_path.startswith("/"):
+            raise ManifestError(
+                f"metrics.path must start with '/', got {metrics_path!r}",
+                path=f"{path}.metrics.path",
+            )
+
     # Workflow-worker fields (#796). ``workflow_type`` + ``task_queue``
     # are required when ``kind == "workflow"`` — a worker that doesn't
     # know which workflow type to register or which task queue to poll
@@ -449,6 +492,9 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         is_public=bool(d.get("is_public", False)),
         schedule=schedule,
         concurrency_policy=concurrency_policy,
+        metrics_enabled=metrics_enabled,
+        metrics_port=metrics_port,
+        metrics_path=metrics_path,
         replicas=int(d.get("replicas", 1)),
         cpu_request=d.get("cpu_request"),
         cpu_limit=d.get("cpu_limit"),

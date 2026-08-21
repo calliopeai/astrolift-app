@@ -156,6 +156,13 @@ class DeploymentMutations:
             initial_status = (
                 Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
             )
+            # #1536: a new deploy supersedes any in-flight one for this
+            # (app, env) — abort the live workflow, fail out dead-workflow
+            # rows. Before the new row exists so it can't self-match.
+            if initial_status is Deployment.Status.PENDING:
+                from astrolift_lifecycle.supersede import supersede_in_flight_deploys
+
+                supersede_in_flight_deploys(app, env)
 
             # Mint an emailed-approval magic link when the deploy gates
             # on human approvals. Plaintext is returned in the
