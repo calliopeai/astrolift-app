@@ -633,11 +633,17 @@ class AWSBillingActualsConfig:
 
 
 class AWSBillingActuals:
-    """Reads actual AWS spend grouped by the ``astrolift.io/binding``
-    tag via Cost Explorer's ``GetCostAndUsage`` API.
+    """Reads actual AWS spend grouped by ``AWS_MANAGED_SERVICE_TAG_KEY``
+    via Cost Explorer's ``GetCostAndUsage`` API.
 
-    Cost Explorer accepts ``GroupBy=[{Type:'TAG', Key:'astrolift.io/binding'}]``
-    which returns one ``Group`` per distinct tag value plus a
+    That is ``astrolift.io/managed_service_id``. This text used to say
+    ``astrolift.io/binding``, which the code has not grouped on since
+    #1419 moved attribution onto the managed-service id — and which no
+    resource carries anyway, because ``ProvisionSpec.binding_id`` is set
+    by nothing (#1470). Anyone debugging an attribution gap against the
+    old sentence would have activated the wrong cost-allocation tag.
+
+    Cost Explorer returns one ``Group`` per distinct tag value plus a
     ``$untagged`` group for resources missing the tag. The client
     converts each group's amortized cost into integer cents and emits
     one :class:`BillingActualLineItem` per (tag value, currency) pair.

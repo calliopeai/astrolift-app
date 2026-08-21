@@ -12,13 +12,23 @@ from typing import Any, Protocol
 class ProvisionSpec:
     """Normalized request to provision a managed service.
 
-    ``binding_id`` and ``managed_service_id`` carry the platform GUIDs
-    the cost collector joins on. Drivers stamp them onto the cloud-
-    side resource as ``astrolift.io/binding`` /
-    ``astrolift.io/managed_service_id`` (per-cloud serialization
-    handled in each driver's tag helper). Both default to empty so
-    older call sites continue to compile; populated specs flow through
-    from the workflow layer once #432 wiring lands.
+    ``managed_service_id`` is the platform GUID cost attribution joins
+    on. ``build_provision_spec`` populates it, drivers stamp it onto the
+    cloud resource, and all three billing collectors group by it.
+
+    ``binding_id`` does not work that way and has never been populated.
+    The sentence here used to promise it would "flow through from the
+    workflow layer once #432 wiring lands"; #432 is closed, and #1419
+    moved attribution onto the managed-service id instead. Sixty-eight
+    driver sites still stamp ``astrolift.io/binding`` when it is
+    non-empty, and it never is, so no live resource carries that tag
+    (#1470).
+
+    It is left in place rather than removed because the ownership
+    verifier and the adoption path both branch on it, and both branches
+    wake together the day something populates it — but nothing does
+    today, and a reader should not take its presence for a working
+    join key.
     """
 
     organization_id: str
