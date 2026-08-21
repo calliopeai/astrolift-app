@@ -37,6 +37,7 @@ log = logging.getLogger("astrolift_workflows.activities.cluster_management")
 def _verify_reachability_sync(cluster_id: int) -> None:
     """Sync core — exposed so unit tests can call it directly."""
     from astrolift_clusters.models import TenantCluster
+    from core.cluster_credentials import assert_declared_account
     from core.cluster_management import probe_cluster_capabilities_dispatch
 
     cluster = TenantCluster.all_objects.get(pk=cluster_id)
@@ -49,6 +50,12 @@ def _verify_reachability_sync(cluster_id: int) -> None:
         raise RuntimeError(
             f"cluster {cluster.slug} is inactive — re-activate before bringing into management"
         )
+    # Before the probe: an AWS cluster naming an account its credential is
+    # not in would otherwise pass every check here and every check after,
+    # then provision into the wrong account while handing back ARNs naming
+    # the declared one (#1422). One GetCallerIdentity, at the moment the
+    # cluster is first trusted, where the answer is still actionable.
+    assert_declared_account(cluster)
     # A cheap read-only call: the probe lists CRDs. Auth / DNS / TLS
     # failure surfaces here as an exception with the cluster slug in
     # the message, which the workflow records in last_management_error.
