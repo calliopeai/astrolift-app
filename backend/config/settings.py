@@ -396,6 +396,10 @@ INSTALLED_APPS = [
     "astrolift_pipelines",
     "astrolift_agents",
     "astrolift_dispatch",
+    # Retired (#1528): its four models are dropped by
+    # astrolift_ci/0002_delete_ci_models. The app stays listed until that
+    # migration has run everywhere — unlisting it first would strand the
+    # tables. The shell goes in a follow-up.
     "astrolift_ci",
     # End of Astrolift
     "constance",
