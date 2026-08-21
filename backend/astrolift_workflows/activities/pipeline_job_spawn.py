@@ -118,18 +118,32 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     """Create a JobRun row, render the K8s Job manifest, and apply it."""
     from django.utils import timezone
 
-    from astrolift_pipelines.models import Job, JobRun, PipelineRun
+    from astrolift_pipelines.models import Job, JobRun, PipelineRun, Step, StepRun
+    from astrolift_pipelines.step_script import render_step_script
 
     run = PipelineRun.objects.select_related(
         "pipeline__organization",
     ).get(pk=pipeline_run_id)
     job = Job.objects.get(pipeline=run.pipeline, job_id=job_id_str, deleted_at__isnull=True)
 
+    steps = list(Step.objects.filter(job=job, deleted_at__isnull=True).order_by("position"))
+    script = render_step_script(steps)
+
     job_run = JobRun.objects.create(
         pipeline_run=run,
         job=job,
         status=JobRun.Status.RUNNING,
         started_at=timezone.now(),
+    )
+
+    # One StepRun per Step, up front. Nothing created these before, so
+    # `AstroliftJobRun.stepRuns` was an empty list on every run and the
+    # per-step columns held their defaults forever (#1501). Created at
+    # spawn rather than as each step starts, because the control plane
+    # does not watch the pod step by step — it settles them from the
+    # termination message once the Job is terminal.
+    StepRun.objects.bulk_create(
+        [StepRun(job_run=job_run, step=step, status=StepRun.Status.PENDING) for step in steps]
     )
 
     org_slug = run.pipeline.organization.slug
@@ -139,7 +153,7 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     try:
         client = _get_cluster_client(run)
         _ensure_pipeline_namespace(client, namespace, org_slug)
-        manifest = _build_job_manifest(k8s_job_name, namespace, job, run)
+        manifest = _build_job_manifest(k8s_job_name, namespace, job, run, script)
         client.server_side_apply(manifest, field_manager="astrolift-pipelines")
     except Exception as exc:
         job_run.status = JobRun.Status.FAILURE
@@ -202,6 +216,15 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
     job_failed = any(c.get("type") == "Failed" and c.get("status") == "True" for c in conditions)
 
     if complete or succeeded > 0:
+        # Before the delete: the per-step records live on the pod's
+        # terminated container state, and the pod goes with the Job.
+        _settle_step_runs(
+            job_run=job_run,
+            client=client,
+            namespace=namespace,
+            k8s_job_name=k8s_job_name,
+            job_failed=False,
+        )
         job_run.status = JobRun.Status.SUCCESS
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
@@ -210,7 +233,18 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         return {"completed": True, "failed": False, "exit_code": 0}
 
     if job_failed or (failed_count > 0 and active == 0):
-        exit_code = _extract_exit_code(conditions)
+        settled = _settle_step_runs(
+            job_run=job_run,
+            client=client,
+            namespace=namespace,
+            k8s_job_name=k8s_job_name,
+            job_failed=True,
+        )
+        # The pod's own exit code beats parsing it out of a Job condition
+        # message, which is what `_extract_exit_code` has to do and which
+        # had never run against a real failure while the container was a
+        # stub that always exited 0.
+        exit_code = settled if settled is not None else _extract_exit_code(conditions)
         job_run.status = JobRun.Status.FAILURE
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
@@ -219,6 +253,102 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
 
     # Still running.
     return {"completed": False, "failed": False, "exit_code": None}
+
+
+def _settle_step_runs(
+    *,
+    job_run: Any,
+    client: Any,
+    namespace: str,
+    k8s_job_name: str,
+    job_failed: bool,
+) -> int | None:
+    """Settle this job run's StepRun rows from the pod's exit records.
+
+    Returns the failing step's exit code when there is one, so the caller
+    can report the container's own code rather than parsing it out of a
+    Job condition message.
+
+    Never raises. Step-level detail is diagnostics; failing to read it
+    must not change the job's own verdict, which the Job status already
+    decided. A run whose records cannot be read keeps whatever it can
+    infer from that verdict.
+    """
+    from django.utils import timezone
+
+    from astrolift_pipelines.models import StepRun
+    from astrolift_pipelines.step_script import STATUS_SKIPPED, parse_step_records
+
+    step_runs = list(
+        StepRun.objects.filter(job_run=job_run).select_related("step").order_by("step__position")
+    )
+    if not step_runs:
+        return None
+
+    records: dict[int, tuple[str, int]] = {}
+    try:
+        message = _terminated_message(client, namespace, k8s_job_name)
+        records = parse_step_records(message)
+    except Exception:  # noqa: BLE001 — many k8s subtypes; see docstring
+        log.warning(
+            "settle_step_runs: could not read the pod's records for %s",
+            k8s_job_name,
+            exc_info=True,
+        )
+
+    now = timezone.now()
+    failing_exit: int | None = None
+    seen_failure = False
+
+    for step_run in step_runs:
+        position = int(getattr(step_run.step, "position", 0) or 0)
+        record = records.get(position)
+
+        if record is None:
+            # No record. Either the step never ran because an earlier one
+            # failed, or the records were unreadable — in which case the
+            # Job's own verdict is all there is.
+            if seen_failure or job_failed:
+                step_run.status = StepRun.Status.SKIPPED if seen_failure else StepRun.Status.FAILURE
+            else:
+                step_run.status = StepRun.Status.SUCCESS
+        elif record[0] == STATUS_SKIPPED:
+            # A `uses:` step. Recorded rather than passed over silently,
+            # so the run says plainly that a declared step did nothing.
+            step_run.status = StepRun.Status.SKIPPED
+        elif record[1] == 0:
+            step_run.status = StepRun.Status.SUCCESS
+            step_run.exit_code = 0
+        else:
+            step_run.status = StepRun.Status.FAILURE
+            step_run.exit_code = record[1]
+            if not seen_failure:
+                failing_exit = record[1]
+            seen_failure = True
+
+        step_run.finished_at = now
+        step_run.save(update_fields=["status", "exit_code", "finished_at", "updated_at", "version"])
+
+    return failing_exit
+
+
+def _terminated_message(client: Any, namespace: str, k8s_job_name: str) -> str:
+    """The `main` container's termination message for this Job's pod.
+
+    `backoffLimit: 0` and `restartPolicy: Never`, so there is one pod per
+    Job. It is found by the label the pod template already carries rather
+    than by name, which the Job generates.
+    """
+    for pod in client.list(kind="Pod", namespace=namespace) or []:
+        labels = ((pod.get("metadata") or {}).get("labels")) or {}
+        if labels.get("job-name") != k8s_job_name:
+            continue
+        for status in ((pod.get("status") or {}).get("containerStatuses")) or []:
+            if status.get("name") != "main":
+                continue
+            terminated = (status.get("state") or {}).get("terminated") or {}
+            return str(terminated.get("message") or "")
+    return ""
 
 
 def _cancel_pipeline_job_sync(job_run_id: int) -> None:
@@ -379,6 +509,7 @@ def _build_job_manifest(
     namespace: str,
     job: Any,
     run: Any,
+    script: str,
 ) -> dict:
     """Render a batch/v1 Job manifest for a pipeline Job row.
 
@@ -389,12 +520,24 @@ def _build_job_manifest(
       - allowPrivilegeEscalation=false.
       - runAsNonRoot=true.
     """
+    from astrolift_pipelines.step_script import TERMINATION_LOG
+
     image = (job.container_image or "").strip() or "ubuntu:22.04"
 
     container: dict = {
         "name": "main",
         "image": image,
-        "command": ["/bin/sh", "-c", "echo 'pipeline job started'; exit 0"],
+        # The job's own steps (#1501). This was
+        # `echo 'pipeline job started'; exit 0` — unconditional — so every
+        # pipeline reported SUCCESS without running any of the operator's
+        # steps.
+        "command": ["/bin/sh", "-c", script],
+        # File, so the kubelet reads the per-step records the script
+        # appends. Pod logs are not an option: poll_pipeline_job deletes
+        # the Job on both terminal branches and the pod goes with it
+        # (#1218).
+        "terminationMessagePath": TERMINATION_LOG,
+        "terminationMessagePolicy": "File",
         "securityContext": {
             "privileged": False,
             "allowPrivilegeEscalation": False,
