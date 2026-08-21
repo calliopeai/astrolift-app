@@ -18,29 +18,31 @@ Three layers:
   symbols; GCP requires lowercase + hyphen + 63-char limit; Azure
   is case-insensitive but forbids several characters, including ``/``).
   Caller doesn't worry about it.
-* **Required-tag enforcement** (``MIN_REQUIRED_KEYS``) — the set a
-  freshly-provisioned resource is meant to carry.
 
 .. warning::
 
-   Nothing in this module has a production caller. The only callers
-   of ``assert_required_tags`` are this package's own tests, and no
-   driver builds a ``CloudTagSet`` (#1500).
-
-   The header above describes an intended design, not shipped
-   behaviour, and the previous version of this text claimed a
-   providers-repo CI test enforced ``MIN_REQUIRED_KEYS``. No such
-   test exists here. That claim is the reason the gap read as
-   covered for as long as it did.
-
-   What actually happens: platform tags *are* applied on provision,
-   by per-cloud builders that read ``ProvisionSpec`` scalar fields
-   and hand-roll their own dicts — ``aws/managed/_base.tags_for``,
+   This module is **not** what stamps tags on a provisioned resource,
+   and it never was. Platform tags are applied by per-cloud builders
+   that read ``ProvisionSpec`` scalar fields and hand-roll their own
+   dicts — ``aws/managed/_base.tags_for``,
    ``azure/managed/tags.arm_tags_for``, and per-driver GCP labels.
-   Their spellings differ from each other and from this module's, so
-   ``assert_required_tags`` would reject every resource the platform
-   has ever created; ``astrolift.io/install`` in particular is
-   written by no builder on any cloud.
+   Their spellings differ from each other and from this module's.
+
+   What this module is for now is being the canonical spelling that
+   ``providers/tests/test_managed_service_tag_keys.py`` holds the
+   three billing clients and ``_sdk/managed_service_tags`` against.
+   That cross-check is its one real consumer, and it is why
+   ``CloudTagSet`` and the ``to_*`` serializers are still here.
+
+   The required-tag *enforcement* that used to live here is gone
+   (#1500). ``MIN_REQUIRED_KEYS`` and ``assert_required_tags`` had no
+   production caller, and three separate docstrings claimed a
+   providers-repo CI test ran them, which was never true. They also
+   could not have been switched on as written: they demanded
+   ``astrolift.io/install``, which no builder on any cloud writes, so
+   they would have rejected every resource the platform has ever
+   created. A guard that cannot be enabled is not a guard, and one
+   that reads as coverage is worse than none.
 
    ``providers/_sdk/managed_service_tags.py`` is the narrow fix that
    did ship (#1419), scoped to the one key cost attribution groups
@@ -73,7 +75,7 @@ from _sdk.azure_tags import serialize_azure_arm_tags
 PLATFORM_NAMESPACE = "astrolift.io"
 
 
-# Canonical key set. Adding a key requires updating MIN_REQUIRED_KEYS
+# Canonical key set.
 # below if it's mandatory.
 TAG_INSTALL = f"{PLATFORM_NAMESPACE}/install"
 TAG_ORG = f"{PLATFORM_NAMESPACE}/org"
@@ -87,20 +89,6 @@ TAG_AGENT_ID = f"{PLATFORM_NAMESPACE}/agent_id"
 TAG_AGENT_RUN_ID = f"{PLATFORM_NAMESPACE}/agent_run_id"
 TAG_COST_CENTER = f"{PLATFORM_NAMESPACE}/cost_center"
 TAG_DEPLOYMENT_ID = f"{PLATFORM_NAMESPACE}/deployment_id"
-
-
-# These MUST be present on every resource the platform provisions.
-# CI test in astrolift-providers asserts this on smoke-deployed
-# fixtures — catches plugin authors who forgot to thread tags
-# through.
-MIN_REQUIRED_KEYS: frozenset[str] = frozenset(
-    {
-        TAG_INSTALL,
-        TAG_ORG,
-        TAG_APP,
-        TAG_ENV,
-    }
-)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -256,22 +244,6 @@ def to_azure(tags: CloudTagSet) -> dict[str, str]:
 
 
 # ---- enforcement helpers -------------------------------------------
-
-
-class TagEnforcementError(ValueError):
-    """A resource is missing required platform tags."""
-
-
-def assert_required_tags(tags: Mapping[str, str]) -> None:
-    """Used by the providers-repo CI test and by post-provision
-    smoke checks: every resource freshly provisioned must carry
-    at minimum the MIN_REQUIRED_KEYS set with non-empty values."""
-    missing = [k for k in MIN_REQUIRED_KEYS if not tags.get(k)]
-    if missing:
-        raise TagEnforcementError(
-            f"resource missing required platform tags: {sorted(missing)}; "
-            "every plugin must apply CloudTagSet at provision time"
-        )
 
 
 # ---- agent extension --------------------------------------------------
