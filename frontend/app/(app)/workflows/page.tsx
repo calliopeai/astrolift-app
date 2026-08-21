@@ -20,6 +20,12 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -38,14 +44,6 @@ import type {
   WorkflowDefinitionRun,
   WorkflowDefinitionSummary,
 } from "@/graphql/workflows/tiered.types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatTriggerKind } from "./[slug]/components/workflow-detail-shell";
 import { latestRun, RunStateBadge } from "./[slug]/components/run-content";
 import { LIST_WORKFLOW_RUNS } from "@/graphql/operations/operations.queries";
@@ -75,38 +73,54 @@ const TAB_LABELS: Record<WorkflowTab, string> = {
 // list doc (LIST_CONFIGURED_WORKFLOWS) doesn't fetch runs, so this
 // surface-local doc extends it. Fields verified against schema.graphql
 // (`workflows(orgId)` → ConfiguredWorkflow → runs: [WorkflowRun!]!).
-const LIST_WORKFLOWS_WITH_RUNS = gql`
-  query WorkflowsModuleList($orgId: ID) {
-    workflows(orgId: $orgId) {
+const CONFIGURED_WORKFLOW_FIELDS = gql`
+  fragment ConfiguredWorkflowFields on ConfiguredWorkflow {
+    guid
+    name
+    slug
+    description
+    triggerKind
+    scheduleCron
+    isEnabled
+    inputs
+    stageBindings
+    organizationGuid
+    definitionSlug
+    definitionName
+    patternKind
+    runCount
+    createdAt
+    runs {
       guid
-      name
-      slug
-      description
-      triggerKind
-      scheduleCron
-      isEnabled
-      inputs
-      stageBindings
-      organizationGuid
-      definitionSlug
-      definitionName
-      patternKind
-      runCount
-      createdAt
-      runs {
-        guid
-        currentState
-        temporalWorkflowId
-        startedAt
-        completedAt
-        isCompleted
-      }
+      currentState
+      temporalWorkflowId
+      startedAt
+      completedAt
+      isCompleted
     }
   }
 `;
 
-interface WorkflowsModuleListData {
-  workflows: ConfiguredWorkflowWithRuns[];
+/**
+ * Cursor-paginated configured workflows (#1243). `workflows` is deprecated
+ * for returning every one the org owns in one response; `workflowsPage`
+ * shipped alongside it and had no document at all until this one.
+ */
+const LIST_WORKFLOWS_PAGE = gql`
+  ${CONFIGURED_WORKFLOW_FIELDS}
+  query WorkflowsModuleListPage($orgId: ID, $search: String, $limit: Int, $after: String) {
+    workflowsPage(orgId: $orgId, search: $search, limit: $limit, after: $after) {
+      items {
+        ...ConfiguredWorkflowFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+interface WorkflowsModulePageData {
+  workflowsPage: CursorPage<ConfiguredWorkflowWithRuns>;
 }
 
 const TERMINAL_DEFINITION_RUN_STATES = new Set([
@@ -204,17 +218,21 @@ export default function WorkflowsPage() {
   const entitlement = useWorkflowsEntitlement();
   const permissions = useMyPermissions();
   const canViewPlatformRuns = permissions.can("audit_log.read");
-  const {
-    data: wfData,
-    loading: wfLoading,
-    error: wfError,
-    refetch: wfRefetch,
-  } = useQuery<WorkflowsModuleListData>(LIST_WORKFLOWS_WITH_RUNS, {
+  // `workflowsPage` searches the workflow's own name / slug / description
+  // and the name / slug of the definition behind it. No sort argument, so
+  // no column declares a `sortKey`. Skipped off-tab, as the flat query was.
+  const table = useCursorTable<ConfiguredWorkflowWithRuns>({
+    query: LIST_WORKFLOWS_PAGE,
     variables: { orgId: null },
+    extract: (d) => (d as WorkflowsModulePageData | undefined)?.workflowsPage,
+    searchVariable: "search",
+    urlKey: "wf",
     skip: tab !== "workflows",
     fetchPolicy: "cache-and-network",
   });
-  const configuredWorkflows = wfData?.workflows ?? [];
+  const wfLoading = table.state === "loading";
+  const wfError = table.error;
+  const wfRefetch = table.refetch;
   const repositoryWorkflows = definitions.filter(
     (definition) =>
       !definition.isGlobal && Boolean(definition.sourceRepo) && Boolean(definition.projectGuid)
@@ -235,6 +253,118 @@ export default function WorkflowsPage() {
   const historicalDefinitionRuns = definitionRuns.runs.filter((run) =>
     TERMINAL_DEFINITION_RUN_STATES.has(run.status)
   );
+
+  const workflowColumns: Column<ConfiguredWorkflowWithRuns>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cell: (wf) => (
+        <>
+          <Link
+            href={`/workflows/${encodeURIComponent(wf.slug)}`}
+            className="font-medium hover:underline"
+          >
+            {wf.name}
+          </Link>
+          {wf.description && (
+            <div className="text-muted-foreground max-w-md truncate text-xs">{wf.description}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "definition",
+      header: "Definition",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (wf) => wf.definitionName,
+    },
+    {
+      id: "trigger",
+      header: "Trigger",
+      cell: (wf) => (
+        <>
+          <Badge variant="outline">{formatTriggerKind(wf.triggerKind)}</Badge>
+          {wf.scheduleCron && (
+            <div className="text-muted-foreground mt-1 font-mono text-xs">{wf.scheduleCron}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (wf) => (
+        <Badge variant={wf.isEnabled ? "default" : "secondary"}>
+          {wf.isEnabled ? "Enabled" : "Disabled"}
+        </Badge>
+      ),
+    },
+    {
+      id: "lastRun",
+      header: "Last run",
+      cell: (wf) => {
+        const last = latestRun(wf.runs);
+        return last ? (
+          <div className="flex flex-col gap-1">
+            <RunStateBadge state={last.currentState} />
+            <span className="text-muted-foreground text-xs">
+              {new Date(last.startedAt).toLocaleString()}
+            </span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-sm">Never run</span>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (wf) => {
+        const busy = busySlug === wf.slug;
+        return (
+          <div className="flex items-center justify-end gap-2">
+            {entitlement.canRun && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRunConfigured(wf)}
+                disabled={busy || !wf.isEnabled}
+              >
+                <PlayIcon className="mr-1 h-3 w-3" /> Run
+              </Button>
+            )}
+            {entitlement.canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleToggleConfigured(wf)}
+                disabled={busy}
+              >
+                {wf.isEnabled ? (
+                  <PowerOffIcon className="mr-1 h-3 w-3" />
+                ) : (
+                  <PowerIcon className="mr-1 h-3 w-3" />
+                )}
+                {wf.isEnabled ? "Disable" : "Enable"}
+              </Button>
+            )}
+            {entitlement.canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteConfigured(wf)}
+                disabled={busy}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <TrashIcon className="mr-1 h-3 w-3" /> Delete
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   const handleRunConfigured = async (wf: ConfiguredWorkflowWithRuns) => {
     setBusySlug(wf.slug);
@@ -400,7 +530,7 @@ export default function WorkflowsPage() {
       {tab === "workflows" && (
         <div className="flex flex-col gap-4">
           {(wfLoading || defsLoading) &&
-            configuredWorkflows.length === 0 &&
+            (table.totalCount ?? 0) === 0 &&
             repositoryWorkflows.length === 0 && (
               <div className="flex items-center justify-center p-12">
                 <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
@@ -415,7 +545,8 @@ export default function WorkflowsPage() {
             !defsLoading &&
             !wfError &&
             !defsError &&
-            configuredWorkflows.length === 0 &&
+            (table.totalCount ?? 0) === 0 &&
+            !table.isFiltered &&
             repositoryWorkflows.length === 0 && (
               <EmptyState
                 icon={<WorkflowIcon className="size-5" />}
@@ -487,7 +618,7 @@ export default function WorkflowsPage() {
               </div>
             </section>
           )}
-          {configuredWorkflows.length > 0 && (
+          {((table.totalCount ?? 0) > 0 || table.isFiltered) && (
             <section className="space-y-3">
               <div>
                 <h2 className="font-semibold">Configured workflows</h2>
@@ -495,109 +626,26 @@ export default function WorkflowsPage() {
                   Template-based workflows with custom inputs or triggers.
                 </p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Definition</TableHead>
-                    <TableHead>Trigger</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last run</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {configuredWorkflows.map((wf) => {
-                    const last = latestRun(wf.runs);
-                    const busy = busySlug === wf.slug;
-                    return (
-                      <TableRow key={wf.slug}>
-                        <TableCell>
-                          <Link
-                            href={`/workflows/${encodeURIComponent(wf.slug)}`}
-                            className="font-medium hover:underline"
-                          >
-                            {wf.name}
-                          </Link>
-                          {wf.description && (
-                            <div className="text-muted-foreground max-w-md truncate text-xs">
-                              {wf.description}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {wf.definitionName}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{formatTriggerKind(wf.triggerKind)}</Badge>
-                          {wf.scheduleCron && (
-                            <div className="text-muted-foreground mt-1 font-mono text-xs">
-                              {wf.scheduleCron}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={wf.isEnabled ? "default" : "secondary"}>
-                            {wf.isEnabled ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {last ? (
-                            <div className="flex flex-col gap-1">
-                              <RunStateBadge state={last.currentState} />
-                              <span className="text-muted-foreground text-xs">
-                                {new Date(last.startedAt).toLocaleString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">Never run</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {entitlement.canRun && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRunConfigured(wf)}
-                                disabled={busy || !wf.isEnabled}
-                              >
-                                <PlayIcon className="mr-1 h-3 w-3" /> Run
-                              </Button>
-                            )}
-                            {entitlement.canManage && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleToggleConfigured(wf)}
-                                disabled={busy}
-                              >
-                                {wf.isEnabled ? (
-                                  <PowerOffIcon className="mr-1 h-3 w-3" />
-                                ) : (
-                                  <PowerIcon className="mr-1 h-3 w-3" />
-                                )}
-                                {wf.isEnabled ? "Disable" : "Enable"}
-                              </Button>
-                            )}
-                            {entitlement.canManage && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteConfigured(wf)}
-                                disabled={busy}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <TrashIcon className="mr-1 h-3 w-3" /> Delete
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <DataTable
+                label="Configured workflows"
+                controller={table}
+                columns={workflowColumns}
+                getRowId={(wf) => wf.slug}
+                searchPlaceholder="Search by workflow or definition…"
+                empty={{
+                  icon: <WorkflowIcon className="size-5" />,
+                  title: "No configured workflows",
+                  description:
+                    "Configure a reusable template to give it custom inputs or a trigger.",
+                  actionHref: entitlement.canCreate ? "/workflows/new" : undefined,
+                  actionLabel: entitlement.canCreate ? "New Workflow" : undefined,
+                }}
+                emptyFiltered={{
+                  title: "No matching workflows",
+                  description:
+                    "No configured workflow matches that search. The server matches the workflow's name, slug and description, and the definition behind it.",
+                }}
+              />
             </section>
           )}
         </div>
