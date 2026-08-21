@@ -826,15 +826,27 @@ def _get_or_create_box(
     # An existing settled box is re-pointed at what the caller asked for
     # before it is restarted, so re-ensuring after editing an env spec picks
     # up the edit instead of silently restarting the old shape.
+    #
+    # ``name`` only when the caller supplied one: it is blank on most presses
+    # and an unconditional assignment would overwrite the operator's label
+    # with the empty string, or with a default derived from a spec they never
+    # asked to be named after.
+    #
+    # ``owner`` is deliberately not re-pointed. It is part of the ensure key
+    # through ``box_slug_for``, so re-pointing it would let one person's press
+    # take over another person's box (#1470).
     if not box.is_live:
         box.environment_spec = spec
         box.agent_definition = agent
+        if name:
+            box.name = name
         if idle_timeout_seconds is not None:
             box.idle_timeout_seconds = idle_timeout_seconds
         box.save(
             update_fields=[
                 "environment_spec",
                 "agent_definition",
+                "name",
                 "idle_timeout_seconds",
                 "updated_at",
                 "version",

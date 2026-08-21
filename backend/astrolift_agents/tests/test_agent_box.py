@@ -1004,6 +1004,47 @@ def test_re_ensuring_a_reaped_box_restarts_it_under_the_same_address(
     assert len(cluster.driver.applied) == 2
 
 
+def test_re_ensuring_with_a_name_renames_the_box_it_returns(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """``--name`` on a settled box used to be accepted and dropped.
+
+    Every other field the caller can influence is re-pointed before the
+    restart; ``name`` was left out of the same block, so the box came back
+    under its old label and nothing said why.
+    """
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="Old label")
+    box = AgentBox.objects.get(slug=first.data.slug)
+    box.status = AgentBox.Status.EXPIRED
+    box.save()
+
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="New label")
+
+    assert second.ok is True, second.errors
+    assert second.data.slug == first.data.slug
+    assert second.data.name == "New label"
+
+
+def test_re_ensuring_without_a_name_keeps_the_one_the_box_has(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """``name`` is blank on most presses, so re-pointing it unconditionally
+    would wipe the operator's label on the next restart."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="Keep me")
+    box = AgentBox.objects.get(slug=first.data.slug)
+    box.status = AgentBox.Status.EXPIRED
+    box.save()
+
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert second.ok is True, second.errors
+    assert second.data.name == "Keep me"
+
+
 def test_ensure_is_denied_without_the_dispatch_grant(
     permission_resolver, info, org, with_tenant_org, cluster
 ):
