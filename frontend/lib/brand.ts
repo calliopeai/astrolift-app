@@ -14,17 +14,17 @@
 
 export const brand = {
   name: "Astrolift",
-  primary: "#08d4b8",
-  primaryDark: "#08d4b8",
-  onPrimary: "#0b0b19",
-  navy: {
-    900: "#010409",
-    800: "#090c10",
-    700: "#0d1117",
-    50: "#1a2035",
+  primary: "#17805c",
+  primaryDark: "#1ea97b",
+  onPrimary: "#04241b",
+  emerald: {
+    bg: "#04231a",
+    codeBg: "#052b25",
+    surfaceDeep: "#053438",
+    card: "#0a5a46",
   },
-  fg: "#e0e5f2",
-  fgMuted: "#a3aed0",
+  fg: "#eaf6ef",
+  fgMuted: "#8ba199",
 } as const;
 
 export type Brand = typeof brand;

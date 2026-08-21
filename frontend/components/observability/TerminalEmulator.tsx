@@ -208,9 +208,9 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       disableStdin: false,
       allowProposedApi: true,
       theme: {
-        background: "#0b0f17",
-        foreground: "#e2e8f0",
-        cursor: "#7dd3fc",
+        background: "#052b25",
+        foreground: "#eaf6ef",
+        cursor: "#8fd82a",
       },
     });
     const fit = new FitAddon();
@@ -510,7 +510,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
           // exact terminal-canvas background — must match the xterm
           // theme.background literal set above; not tokenizable.
           // eslint-disable-next-line astrolift/no-raw-design-values
-          className="h-full w-full rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
+          className="h-full w-full rounded-md border bg-[#052b25] p-2 [&_.xterm-viewport]:!overflow-y-auto"
         />
         {!standalone && (
           <div className="absolute top-2 right-3 flex items-center gap-1 opacity-40 transition-opacity focus-within:opacity-100 hover:opacity-100">

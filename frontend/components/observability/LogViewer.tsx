@@ -202,10 +202,10 @@ function segmentLine(
 const POD_BADGE_PALETTE = [
   "border-info-border bg-info/10 text-info-fg",
   "border-success-border bg-success/10 text-success-fg",
-  "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  "border-lime-600/40 bg-lime-500/10 text-lime-700 dark:text-lime-300",
   "border-warning-border bg-warning/10 text-warning-fg",
   "border-danger-border bg-danger/10 text-danger-fg",
-  "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+  "border-border bg-muted text-muted-foreground",
 ] as const;
 
 function podBadgeClass(podName: string): string {
