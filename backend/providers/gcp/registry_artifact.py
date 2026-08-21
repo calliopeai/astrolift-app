@@ -196,10 +196,16 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         repo: str,
         scm_provider: str,
         scm_repo_full_name: str,
+        scm_repo_numeric_ids: tuple[int, int] | None = None,
     ) -> CiPushRole:
         """Provision (or refresh) GCP Workload Identity Federation so
         GitHub Actions can push to this Artifact Registry repo path
         without long-lived service-account keys.
+
+        ``scm_repo_numeric_ids`` is accepted for protocol parity and
+        unused: the WIF binding matches ``attribute.repository`` (the
+        ``repository`` claim), which GitHub does NOT ID-stamp, so this
+        driver is unaffected by #1532.
 
         Resources:
         * Workload Identity Pool ``astrolift-github-actions`` (one per

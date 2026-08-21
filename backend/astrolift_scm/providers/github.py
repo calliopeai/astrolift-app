@@ -320,6 +320,49 @@ def github_installation_includes_repo(connection, *, repo_full_name: str) -> boo
             return False
 
 
+def fetch_github_repo_numeric_ids(connection, *, repo_full_name: str) -> tuple[int, int]:
+    """Return ``(owner_id, repo_id)`` — GitHub's immutable numeric ids.
+
+    Newly created repos present Actions OIDC tokens whose ``sub`` claim is
+    ID-stamped (``repo:org@OWNER_ID/name@REPO_ID:...``), so cloud-side
+    trust policies that match on ``sub`` need these ids alongside the
+    login-based pattern (#1532). One ``GET /repos/{full_name}``.
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    req = urllib.request.Request(
+        f"{base}/repos/{repo_full_name}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403) and not _is_rate_limited(exc):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                github_auth_error_message(exc.code, connection.kind),
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+    owner_id = (payload.get("owner") or {}).get("id") if isinstance(payload, dict) else None
+    repo_id = payload.get("id") if isinstance(payload, dict) else None
+    if not isinstance(owner_id, int) or not isinstance(repo_id, int):
+        raise GithubProviderError(
+            "UNEXPECTED_SHAPE",
+            f"GitHub returned no numeric ids for {repo_full_name!r}",
+        )
+    return owner_id, repo_id
+
+
 def fetch_github_file(
     connection,
     *,

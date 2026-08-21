@@ -63,10 +63,19 @@ class ImageRegistryDriver(Protocol):
         repo: str,
         scm_provider: str,
         scm_repo_full_name: str,
+        scm_repo_numeric_ids: tuple[int, int] | None = None,
     ) -> CiPushRole:
         """Provision (or refresh) a cloud-side identity assumable by the
         SCM provider's CI runner via OIDC, scoped to push images into
         ``repo`` only.
+
+        ``scm_repo_numeric_ids`` is ``(owner_id, repo_id)`` — GitHub's
+        immutable numeric ids. Newly created repos present OIDC tokens
+        whose ``sub`` claim is ID-stamped (``repo:org@OWNER_ID/name@REPO_ID:...``),
+        so drivers that match on ``sub`` must trust that shape alongside
+        the login-based one or new repos can never assume (#1532). None
+        means the lookup wasn't possible; drivers fall back to the
+        login-based pattern only.
 
         Drivers that don't (yet) implement OIDC-based CI push must raise
         :class:`_sdk.UnsupportedOperationError` so the lifecycle layer

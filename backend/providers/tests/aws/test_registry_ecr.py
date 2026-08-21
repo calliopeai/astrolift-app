@@ -265,3 +265,54 @@ def test_ensure_ci_push_role_description_is_ascii() -> None:
     desc = iam.created.get("Description", "")
     assert desc, "create_role was not called with a Description"
     assert desc.isascii(), f"IAM role Description must be ASCII (#1026): {desc!r}"
+
+
+# ---- ensure_ci_push_role: ID-stamped OIDC subjects (#1532) -------
+
+
+def _trust_sub_patterns(iam: _RecordingIam) -> list[str]:
+    import json
+
+    doc = json.loads(iam.created["AssumeRolePolicyDocument"])
+    return doc["Statement"][0]["Condition"]["StringLike"]["token.actions.githubusercontent.com:sub"]
+
+
+def test_ensure_ci_push_role_trusts_id_stamped_subject() -> None:
+    """Newly created GitHub repos present ID-stamped OIDC subjects
+    (``repo:org@OWNER_ID/name@REPO_ID:...``); the trust policy must list
+    that pattern alongside the login-based one or the assume fails with
+    a bare "Not authorized" (#1532)."""
+    iam = _RecordingIam()
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+        scm_repo_numeric_ids=(19630436, 1342155079),
+    )
+    assert _trust_sub_patterns(iam) == [
+        "repo:steadymd/hello-astro-demo:*",
+        "repo:steadymd@19630436/hello-astro-demo@1342155079:*",
+    ]
+
+
+def test_ensure_ci_push_role_without_ids_trusts_login_subject_only() -> None:
+    """No numeric ids (lookup failed / unavailable) degrades to the
+    login-based pattern — never a wildcard that another repo could
+    satisfy."""
+    iam = _RecordingIam()
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+    )
+    assert _trust_sub_patterns(iam) == ["repo:steadymd/hello-astro-demo:*"]

@@ -227,6 +227,7 @@ class ECRDriver(ImageRegistryDriver):
         repo: str,
         scm_provider: str,
         scm_repo_full_name: str,
+        scm_repo_numeric_ids: tuple[int, int] | None = None,
     ) -> CiPushRole:
         """Provision (or refresh) an IAM role assumable by GitHub Actions
         via OIDC, scoped to pushing into ``repo`` only.
@@ -235,7 +236,11 @@ class ECRDriver(ImageRegistryDriver):
         64-char role-name limit).  Trust policy enforces both the
         repo scope (``sub`` claim) AND the GitHub ``aud`` claim so
         another tenant's CI in the same GitHub org can't assume this
-        role.  Inline policy grants only the five ECR push actions
+        role.  The ``sub`` match lists the login-based pattern plus,
+        when ``scm_repo_numeric_ids`` is given, the ID-stamped pattern
+        (``repo:org@OWNER_ID/name@REPO_ID:*``) that newly created
+        GitHub repos present — without it their tokens never match and
+        the assume fails with a bare "Not authorized" (#1532).  Inline policy grants only the five ECR push actions
         scoped to this repo's ARN.  Idempotent — re-running refreshes
         the trust + inline policies in place.
 
@@ -270,6 +275,13 @@ class ECRDriver(ImageRegistryDriver):
         oidc_arn = f"arn:aws:iam::{account_id}:oidc-provider/{_GITHUB_OIDC_PROVIDER_HOST}"
         repo_arn = f"arn:aws:ecr:{self._config.region}:{account_id}:repository/{repo}"
 
+        sub_patterns = [f"repo:{scm_repo_full_name}:*"]
+        if scm_repo_numeric_ids is not None:
+            owner_login, repo_name_only = scm_repo_full_name.split("/", 1)
+            owner_id, repo_numeric_id = scm_repo_numeric_ids
+            sub_patterns.append(
+                f"repo:{owner_login}@{owner_id}/{repo_name_only}@{repo_numeric_id}:*",
+            )
         trust_policy = {
             "Version": "2012-10-17",
             "Statement": [
@@ -282,7 +294,7 @@ class ECRDriver(ImageRegistryDriver):
                             f"{_GITHUB_OIDC_PROVIDER_HOST}:aud": "sts.amazonaws.com",
                         },
                         "StringLike": {
-                            f"{_GITHUB_OIDC_PROVIDER_HOST}:sub": f"repo:{scm_repo_full_name}:*",
+                            f"{_GITHUB_OIDC_PROVIDER_HOST}:sub": sub_patterns,
                         },
                     },
                 },

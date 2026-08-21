@@ -104,9 +104,14 @@ class _RoleDriver:
         self.raises = raises
         self.calls: list[dict] = []
 
-    def ensure_ci_push_role(self, *, repo, scm_provider, scm_repo_full_name):
+    def ensure_ci_push_role(self, *, repo, scm_provider, scm_repo_full_name, scm_repo_numeric_ids=None):
         self.calls.append(
-            {"repo": repo, "scm_provider": scm_provider, "scm_repo_full_name": scm_repo_full_name}
+            {
+                "repo": repo,
+                "scm_provider": scm_provider,
+                "scm_repo_full_name": scm_repo_full_name,
+                "scm_repo_numeric_ids": scm_repo_numeric_ids,
+            }
         )
         if self.raises is not None:
             raise self.raises
@@ -135,6 +140,9 @@ def test_ensure_provisions_and_persists_blank_ref(app, monkeypatch):
             "repo": "acme-pr/app-pr",
             "scm_provider": "github",
             "scm_repo_full_name": "acme/api",
+            # No SourceConnection in this fixture — the numeric-id lookup
+            # degrades to None and the trust stays login-pattern-only (#1532).
+            "scm_repo_numeric_ids": None,
         }
     ]
 

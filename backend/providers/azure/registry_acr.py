@@ -208,9 +208,17 @@ class ACRDriver(ImageRegistryDriver):
         repo: str,
         scm_provider: str,
         scm_repo_full_name: str,
+        scm_repo_numeric_ids: tuple[int, int] | None = None,
     ) -> CiPushRole:
         """Provision (or refresh) a User-Assigned Managed Identity that
         GitHub Actions can assume via OIDC + push to this ACR registry.
+
+        ``scm_repo_numeric_ids`` is accepted for protocol parity and
+        unused for now: Federated Identity Credentials match the
+        ``subject`` exactly (no wildcards), so trusting GitHub's
+        ID-stamped subjects (#1532) needs a second FIC per stamped
+        subject variant — tracked separately, not silently mismatched
+        here.
 
         Three Azure resources land idempotently:
 

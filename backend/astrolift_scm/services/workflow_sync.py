@@ -1084,6 +1084,28 @@ def _persist_ci_workflow_stamp(app: RegisteredApp, result: WorkflowSyncResult) -
 # ---------------------------------------------------------------------------
 
 
+def github_repo_numeric_ids(app: RegisteredApp) -> tuple[int, int] | None:
+    """Best-effort ``(owner_id, repo_id)`` for the app's source repo.
+
+    Feeds the ID-stamped OIDC ``sub`` pattern that newly created GitHub
+    repos present (#1532). None when the lookup can't run (non-github
+    source, no connection, host error) — the push role then trusts the
+    login-based subject only, which keeps pre-stamping repos working.
+    """
+    if app.source_kind != "github" or not (app.source_repo or "").strip():
+        return None
+    conn = _pick_source_connection(app)
+    if conn is None:
+        return None
+    from astrolift_scm.providers.github import fetch_github_repo_numeric_ids
+
+    try:
+        return fetch_github_repo_numeric_ids(conn, repo_full_name=app.source_repo)
+    except Exception:  # noqa: BLE001 — degrade to the classic pattern, never block provisioning
+        logger.warning("push-role ensure: numeric-id lookup failed for %s", app.slug, exc_info=True)
+        return None
+
+
 def ensure_ci_push_role(app: RegisteredApp) -> str:
     """Provision (or reuse) the OIDC CI push role and persist its ARN to
     ``app.push_role_ref`` so the rendered GitHub workflow's
@@ -1118,6 +1140,7 @@ def ensure_ci_push_role(app: RegisteredApp) -> str:
             repo=f"{app.organization.slug}/{app.slug}",
             scm_provider=app.source_kind,
             scm_repo_full_name=app.source_repo,
+            scm_repo_numeric_ids=github_repo_numeric_ids(app),
         )
     except Exception as exc:  # noqa: BLE001 — surface, don't swallow (the whole point)
         logger.exception("push-role ensure: ensure_ci_push_role failed for %s", app.slug)
