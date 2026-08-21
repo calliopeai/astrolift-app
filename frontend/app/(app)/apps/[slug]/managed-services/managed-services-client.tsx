@@ -9,7 +9,12 @@ import { EmailDetailSheet } from "./email-detail-sheet";
 import { ServiceDetailSheet } from "./service-detail-sheet";
 
 import { Can } from "@/components/Can";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,15 +48,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -59,7 +55,10 @@ import {
   DEPROVISION_MANAGED_SERVICE,
   PROVISION_MANAGED_SERVICE,
 } from "@/graphql/services/services.mutations";
-import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
+import {
+  LIST_MANAGED_SERVICES,
+  LIST_MANAGED_SERVICES_PAGE,
+} from "@/graphql/services/services.queries";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -79,8 +78,8 @@ interface ManagedService {
   lastActionKind: string;
 }
 
-interface Resp {
-  astroliftManagedServices: ManagedService[];
+interface PageResp {
+  astroliftManagedServicesPage: CursorPage<ManagedService>;
 }
 
 interface EnvsResp {
@@ -213,13 +212,25 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
   });
-  const services = useQuery<Resp>(LIST_MANAGED_SERVICES, {
+  // `astroliftManagedServicesPage` searches the service name, kind,
+  // variant and environment, and takes no sort argument, so no column
+  // declares a `sortKey`. The flat field it replaces is deprecated for
+  // applying no ordering at all — row order was whatever Postgres
+  // returned — so paging also makes the list stable between polls. The
+  // 15s poll stays: a provisioning service settles while an operator
+  // watches this page.
+  const table = useCursorTable<ManagedService>({
+    query: LIST_MANAGED_SERVICES_PAGE,
     variables: { appSlug: slug, environmentName: null },
+    extract: (d) => (d as PageResp | undefined)?.astroliftManagedServicesPage,
+    searchVariable: "search",
+    urlKey: "svc",
     fetchPolicy: "cache-and-network",
     pollInterval: 15000,
   });
 
   const refetch = [
+    "ListManagedServicesPage",
     {
       query: LIST_MANAGED_SERVICES,
       variables: { appSlug: slug, environmentName: null },
@@ -240,7 +251,114 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   });
 
   const busy = provisionState.loading || deprovisionState.loading;
-  const list = services.data?.astroliftManagedServices ?? [];
+  // A deleted service is inert: no sheet, no actions. `onRowActivate` is
+  // per-table rather than per-row, so the guard lives in the handler.
+  const openDetail = (svc: ManagedService) => {
+    if (svc.status === "deleted") return;
+    if (svc.kind === "email") setEmailDetailTarget(svc);
+    else setServiceDetailTarget(svc);
+  };
+
+  const columns: Column<ManagedService>[] = [
+    {
+      id: "health",
+      header: <span className="sr-only">Status</span>,
+      width: "w-8",
+      cell: (svc) => <StatusDot status={STATUS_DOT[svc.status] ?? "muted"} />,
+    },
+    {
+      id: "name",
+      header: "Name",
+      cellClassName: "font-mono text-xs",
+      cell: (svc) => svc.name,
+    },
+    {
+      id: "kind",
+      header: "Kind",
+      cell: (svc) => <Badge variant="secondary">{svc.kind}</Badge>,
+    },
+    {
+      id: "variant",
+      header: "Variant",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (svc) => svc.variant || "—",
+    },
+    {
+      id: "env",
+      header: "Env",
+      cell: (svc) => (
+        <Badge variant="outline" className="font-mono text-2xs">
+          {svc.environmentName}
+        </Badge>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (svc) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="capitalize">{svc.status}</span>
+          <ValidationBadges service={svc} />
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      width: "w-24",
+      // Above the row's stretched activator, so these stay clickable and
+      // do not double-fire it.
+      cellClassName: "relative z-10",
+      cell: (svc) => {
+        const isEmail = svc.kind === "email";
+        const isActive = svc.status !== "deleted";
+        return (
+          <div className="flex justify-end gap-1">
+            {isEmail && isActive ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setEmailDetailTarget(svc)}
+                title="Email deliverability details"
+              >
+                <MailIcon className="size-4" />
+                <span className="sr-only">Email details</span>
+              </Button>
+            ) : null}
+            {!isEmail && isActive ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setServiceDetailTarget(svc)}
+                title="Service details"
+              >
+                <InfoIcon className="size-4" />
+                <span className="sr-only">Details</span>
+              </Button>
+            ) : null}
+            {isActive && (
+              <Can permission="app.deploy">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={() => setDeprovisionTarget(svc)}
+                  disabled={busy}
+                >
+                  <Trash2Icon className="size-4" />
+                  <span className="sr-only">Deprovision</span>
+                </Button>
+              </Can>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   const envList = envs.data?.astroliftEnvironments ?? [];
 
   async function handleDeprovision(s: ManagedService) {
@@ -290,123 +408,30 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
       <AppTabs slug={slug} active="settings" />
       <Card>
         <CardContent className="p-0">
-          {services.loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<DatabaseIcon className="size-5" />}
-                title="No managed services yet"
-                description="Provision a database, cache, or queue to attach it to one of this app's environments."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Variant</TableHead>
-                  <TableHead>Env</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-12 text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((s) => {
-                  // #709 — every kind except email opens the generic detail
-                  // sheet on row-click. Email keeps its kind-specific sheet
-                  // (deliverability + suppression + DKIM, much richer than
-                  // metrics alone).
-                  const isEmail = s.kind === "email";
-                  const isActive = s.status !== "deleted";
-                  const onRowOpen = () => {
-                    if (!isActive) return;
-                    if (isEmail) setEmailDetailTarget(s);
-                    else setServiceDetailTarget(s);
-                  };
-                  return (
-                    <TableRow
-                      key={s.id}
-                      onClick={isActive ? onRowOpen : undefined}
-                      className={isActive ? "cursor-pointer" : undefined}
-                    >
-                      <TableCell className="w-8">
-                        <StatusDot status={STATUS_DOT[s.status] ?? "muted"} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{s.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{s.kind}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {s.variant || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-2xs">
-                          {s.environmentName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1">
-                          <span className="capitalize">{s.status}</span>
-                          <ValidationBadges service={s} />
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="flex justify-end gap-1 text-right"
-                        // Stop propagation so action-buttons in this cell
-                        // don't double-trigger the row's onClick.
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {isEmail && isActive ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => setEmailDetailTarget(s)}
-                            title="Email deliverability details"
-                          >
-                            <MailIcon className="size-4" />
-                            <span className="sr-only">Email details</span>
-                          </Button>
-                        ) : null}
-                        {!isEmail && isActive ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => setServiceDetailTarget(s)}
-                            title="Service details"
-                          >
-                            <InfoIcon className="size-4" />
-                            <span className="sr-only">Details</span>
-                          </Button>
-                        ) : null}
-                        {isActive && (
-                          <Can permission="app.deploy">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-8"
-                              onClick={() => setDeprovisionTarget(s)}
-                              disabled={busy}
-                            >
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Deprovision</span>
-                            </Button>
-                          </Can>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            label="Managed services"
+            controller={table}
+            columns={columns}
+            getRowId={(svc) => svc.id}
+            onRowActivate={openDetail}
+            rowLabel={(svc) =>
+              svc.status === "deleted"
+                ? `${svc.name} (deleted)`
+                : `Open ${svc.name} (${svc.kind})`
+            }
+            searchPlaceholder="Search by name, kind, variant, or environment…"
+            empty={{
+              icon: <DatabaseIcon className="size-5" />,
+              title: "No managed services",
+              description:
+                "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
+            }}
+            emptyFiltered={{
+              title: "No matching services",
+              description:
+                "No service on this app matches that search. The server matches the name, kind, variant and environment.",
+            }}
+          />
         </CardContent>
       </Card>
 

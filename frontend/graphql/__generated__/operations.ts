@@ -11719,6 +11719,8 @@ export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
 
 export type ListProjectManagedServiceCatalogQuery = { astroliftProjectManagedServiceCatalog: Array<{ id: string, providerPluginSlug: string, kind: string, variant: string, displayName: string, description: string, status: string, available: boolean, unavailableReason: string, isDefaultForKind: boolean, sizeOptions: Array<string>, configSchema: Record<string, unknown>, bindingEnvs: Array<string>, issueUrl: string }> };
 
+export type ManagedServiceFieldsFragment = { id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> };
+
 export type ListManagedServicesQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -11726,6 +11728,17 @@ export type ListManagedServicesQueryVariables = Exact<{
 
 
 export type ListManagedServicesQuery = { astroliftManagedServices: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> };
+
+export type ListManagedServicesPageQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListManagedServicesPageQuery = { astroliftManagedServicesPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> } };
 
 export type ListManagedServiceObjectsQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
