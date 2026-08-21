@@ -208,10 +208,6 @@ const PENDING_MIGRATION = [
     reason: "No blocker: astroliftPreviewEnvironmentsPage exists.",
   },
   {
-    file: "app/(app)/webhooks/[id]/webhook-detail-client.tsx",
-    reason: "No blocker: astroliftWebhookDeliveriesPage exists.",
-  },
-  {
     file: "app/(app)/workflows/page.tsx",
     reason:
       "No blocker: the configured-workflows table reads `workflows`, and workflowsPage exists.",
