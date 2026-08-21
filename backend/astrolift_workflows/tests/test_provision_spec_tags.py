@@ -37,7 +37,7 @@ def _scaffold(suffix: str, *, tags: dict | None = None):
     # CharField that shadows BaseCoreModel.version, the optimistic-lock
     # integer, so save() evaluates `"0.0.1" + 1` and raises. bulk_create
     # skips save(). The rest of the suite routes around it the same way
-    # (#1516).
+    # (#1517).
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
