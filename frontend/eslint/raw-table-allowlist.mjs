@@ -174,20 +174,21 @@ const UNSUPPORTED_ROW_SHAPE = [
 ];
 
 /**
- * Group 4 — no blocker. These are owed a migration.
+ * Group 4 — no blocker. These were owed a migration, and are done.
  *
- * The field is Page-capable and the row shape is ordinary; nothing stands
- * in the way except that the work has not been done. Recorded honestly
- * instead of given a reason it does not have, because the only thing that
- * makes this list shrink is being able to see which entries have no
- * excuse.
+ * Empty, and worth keeping rather than deleting: it is where a surface
+ * goes when someone adds a raw table with no reason not to use DataTable,
+ * and an empty array makes that entry obvious in review. Naming the group
+ * "nobody got to it" rather than inventing a blocker is what let it be
+ * emptied — every other group here is still populated because its entries
+ * have real ones.
+ *
+ * Two of the eight turned out to have blockers after all once read:
+ * cronjob-home moved to group 1 (its field filters on the app, not the
+ * workload — #1512), and roles-tab's stated reason was wrong. That is the
+ * argument for the reasons being specific enough to check.
  */
-const PENDING_MIGRATION = [
-  {
-    file: "app/(app)/apps/[slug]/managed-services/managed-services-client.tsx",
-    reason: "No blocker: astroliftManagedServicesPage exists.",
-  },
-];
+const PENDING_MIGRATION = [];
 
 export const RAW_TABLE_ALLOWLIST = [
   ...NO_PAGE_FIELD,

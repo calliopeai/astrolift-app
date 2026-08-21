@@ -176,47 +176,85 @@ export const LIST_PROJECT_MANAGED_SERVICE_CATALOG = gql`
   }
 `;
 
+const MANAGED_SERVICE_FIELDS = gql`
+  fragment ManagedServiceFields on AstroliftManagedService {
+    id
+    kind
+    name
+    variant
+    environmentName
+    registeredAppSlug
+    status
+    statusError
+    config
+    appliedConfig
+    operationKind
+    operationWorkflowId
+    operationRunId
+    operationStartedAt
+    operationCompletedAt
+    createdAt
+    updatedAt
+    lastActionAt
+    lastActionKind
+    editableFields
+    volumeBindings {
+      id
+      name
+      mountPath
+      subPath
+      sourceKind
+      protocol
+      claimName
+      claimNamespace
+      storageClassName
+      csiDriver
+      readOnly
+      capacity
+      accessModes
+      workloadNames
+      containerNames
+      credentialReferenceCount
+    }
+  }
+`;
+
 export const LIST_MANAGED_SERVICES = gql`
+  ${MANAGED_SERVICE_FIELDS}
   query ListManagedServices($appSlug: String!, $environmentName: String) {
     astroliftManagedServices(appSlug: $appSlug, environmentName: $environmentName) {
-      id
-      kind
-      name
-      variant
-      environmentName
-      registeredAppSlug
-      status
-      statusError
-      config
-      appliedConfig
-      operationKind
-      operationWorkflowId
-      operationRunId
-      operationStartedAt
-      operationCompletedAt
-      createdAt
-      updatedAt
-      lastActionAt
-      lastActionKind
-      editableFields
-      volumeBindings {
-        id
-        name
-        mountPath
-        subPath
-        sourceKind
-        protocol
-        claimName
-        claimNamespace
-        storageClassName
-        csiDriver
-        readOnly
-        capacity
-        accessModes
-        workloadNames
-        containerNames
-        credentialReferenceCount
+      ...ManagedServiceFields
+    }
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_MANAGED_SERVICES`` (#1230). The flat
+ * field is deprecated for applying no ordering at all — row order was
+ * whatever Postgres returned — so this is also what makes the list stable
+ * between renders.
+ */
+export const LIST_MANAGED_SERVICES_PAGE = gql`
+  ${MANAGED_SERVICE_FIELDS}
+  query ListManagedServicesPage(
+    $appSlug: String!
+    $environmentName: String
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftManagedServicesPage(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...ManagedServiceFields
       }
+      nextCursor
+      totalCount
     }
   }
 `;
