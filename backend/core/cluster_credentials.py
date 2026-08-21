@@ -114,6 +114,73 @@ def assert_credential_supported(cluster: TenantCluster, *, capability: str) -> N
     )
 
 
+def record_verified_account(cluster: TenantCluster) -> str:
+    """Prove which account this cluster is in, and save the answer (#1422).
+
+    Called when a cluster is brought into management. Returns the verified
+    account id, or ``""`` for a cloud where the question does not arise.
+
+    Two invariants, both from the same fact — a cluster cannot move between
+    accounts:
+
+    * A cluster whose declared `account_id` disagrees with the credential
+      in use is refused, because every ARN the drivers build would name an
+      account the resources are not in.
+    * A cluster already carrying a verified account that now resolves to a
+      different one is refused rather than re-stamped. That is not a
+      cluster being corrected, it is a different cluster wearing this
+      row's name, and silently re-pointing it would move every app on it.
+
+    The verified value is what ARNs should be built from afterwards: it is
+    the one that was checked.
+    """
+    from django.utils import timezone
+
+    if _cloud_for(cluster) != "aws":
+        return ""
+
+    credential = credential_for_cluster(cluster)
+
+    from _sdk.cloud_credentials import CloudCredentialError
+    from aws.session import caller_account
+
+    region = str(_as_dict(getattr(cluster, "provider_config", None)).get("region") or "") or "us-east-1"
+    try:
+        actual = caller_account(credential, region=region)
+    except CloudCredentialError as exc:
+        raise ClusterCredentialInvalid(f"cluster {_slug_for(cluster)}: {exc}") from exc
+
+    declared = credential.declared_account
+    if declared and actual != declared:
+        raise ClusterAccountMismatch(
+            f"cluster {_slug_for(cluster)}: declares AWS account {declared} but the credential "
+            f"in use resolves to {actual}. Resources would be created in {actual} while every "
+            f"ARN the drivers build would name {declared}.",
+        )
+
+    previous = str(getattr(cluster, "cloud_account_id", "") or "")
+    if previous and previous != actual:
+        raise ClusterAccountMismatch(
+            f"cluster {_slug_for(cluster)}: was verified in AWS account {previous} and now "
+            f"resolves to {actual}. A cluster cannot move between accounts — if this is a "
+            f"different cluster, register it as one rather than re-pointing this row, which "
+            f"every app already bound to it would follow.",
+        )
+
+    if previous != actual:
+        cluster.cloud_account_id = actual
+        cluster.cloud_account_verified_at = timezone.now()
+        cluster.save(
+            update_fields=[
+                "cloud_account_id",
+                "cloud_account_verified_at",
+                "updated_at",
+                "version",
+            ]
+        )
+    return actual
+
+
 def assert_declared_account(cluster: TenantCluster) -> None:
     """Refuse when the cluster names an AWS account its credential is not in.
 

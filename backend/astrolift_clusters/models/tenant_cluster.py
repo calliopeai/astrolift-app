@@ -91,6 +91,19 @@ class TenantCluster(NamedBaseCoreModel):
     )
     provider_config = models.JSONField(default=dict, blank=True)
 
+    # The cloud account this cluster is actually in, proved rather than
+    # declared (#1422). Written once, when the cluster is brought into
+    # management and the credential in use is asked who it is; immutable
+    # after, because a cluster cannot move between accounts — the control
+    # plane would be building ARNs for one account against resources in
+    # another, which is precisely the failure this closes.
+    #
+    # Distinct from `provider_config["account_id"]`, which is what the
+    # operator *said*. That stays as the declaration; this is the answer.
+    # Every ARN should be built from this one.
+    cloud_account_id = models.CharField(max_length=64, blank=True, default="")
+    cloud_account_verified_at = models.DateTimeField(null=True, blank=True)
+
     region = models.CharField(max_length=64, blank=True, default="")
     endpoint = models.URLField(blank=True, default="")
     ca_cert = models.TextField(blank=True, default="")
