@@ -24,7 +24,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
-from _sdk.agent_session import keepalive_script
+from _sdk.agent_session import SESSION_NAME, keepalive_script
 from _sdk.k8s_naming import agent_namespace
 
 from astrolift_agents.models import AgentBox, AgentEnvironmentSpec
@@ -275,7 +275,7 @@ def test_the_rendered_container_comes_from_the_session_sdk(org):
     container = _container_of(job)
 
     expected = keepalive_script(
-        SessionSpec(image="agent-claude:1", session_name=box.session_name, idle_timeout_seconds=120)
+        SessionSpec(image="agent-claude:1", session_name=SESSION_NAME, idle_timeout_seconds=120)
     )
     assert container["command"] == ["/bin/sh", "-lc"]
     assert container["args"] == [expected]
@@ -368,7 +368,7 @@ def test_the_rendered_pod_reaps_itself_when_idle(org):
         # inside 30s; anything longer means the loop never fired.
         assert proc.wait(timeout=30) is not None
         still_there = subprocess.run(
-            ["tmux", "-L", socket, "has-session", "-t", box.session_name],
+            ["tmux", "-L", socket, "has-session", "-t", SESSION_NAME],
             capture_output=True,
             check=False,
         )
@@ -1002,6 +1002,47 @@ def test_re_ensuring_a_reaped_box_restarts_it_under_the_same_address(
     assert second.data.status == AgentBox.Status.PROVISIONING.value
     assert AgentBox.objects.filter(organization=org).count() == 1
     assert len(cluster.driver.applied) == 2
+
+
+def test_re_ensuring_with_a_name_renames_the_box_it_returns(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """``--name`` on a settled box used to be accepted and dropped.
+
+    Every other field the caller can influence is re-pointed before the
+    restart; ``name`` was left out of the same block, so the box came back
+    under its old label and nothing said why.
+    """
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="Old label")
+    box = AgentBox.objects.get(slug=first.data.slug)
+    box.status = AgentBox.Status.EXPIRED
+    box.save()
+
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="New label")
+
+    assert second.ok is True, second.errors
+    assert second.data.slug == first.data.slug
+    assert second.data.name == "New label"
+
+
+def test_re_ensuring_without_a_name_keeps_the_one_the_box_has(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """``name`` is blank on most presses, so re-pointing it unconditionally
+    would wipe the operator's label on the next restart."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", name="Keep me")
+    box = AgentBox.objects.get(slug=first.data.slug)
+    box.status = AgentBox.Status.EXPIRED
+    box.save()
+
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert second.ok is True, second.errors
+    assert second.data.name == "Keep me"
 
 
 def test_ensure_is_denied_without_the_dispatch_grant(

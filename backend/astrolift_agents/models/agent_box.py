@@ -18,7 +18,7 @@ box already running rather than starting a rival one on another node.
 
 from __future__ import annotations
 
-from _sdk.agent_session import DEFAULT_IDLE_TIMEOUT_SECONDS, SESSION_NAME
+from _sdk.agent_session import DEFAULT_IDLE_TIMEOUT_SECONDS
 from django.conf import settings
 from django.db import models
 
@@ -92,7 +92,6 @@ class AgentBox(NamedBaseCoreModel):
     # keep-alive loop kills the session and the pod exits. ``0`` is the
     # explicit "never reap" sentinel from ``_sdk.agent_session.NEVER``.
     idle_timeout_seconds = models.PositiveIntegerField(default=DEFAULT_IDLE_TIMEOUT_SECONDS)
-    session_name = models.CharField(max_length=64, default=SESSION_NAME)
     # Frozen at spawn so the box stays self-describing after the spec that
     # produced it is edited or deleted.
     image = models.CharField(max_length=512, blank=True, default="")
