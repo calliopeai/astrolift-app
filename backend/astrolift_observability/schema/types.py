@@ -380,6 +380,28 @@ class PromqlSeries:
     """Ordered list of (timestamp, value) samples."""
 
 
+@strawberry.type(name="AstroliftAppMetricNames")
+class AppMetricNamesResult:
+    """The metric names an app's own workloads expose (#1226).
+
+    ``ok`` is ``False`` when the cluster has no Prometheus endpoint or the
+    lookup failed; ``names`` is empty in that case and ``error`` carries
+    the operator-facing reason, matching ``ExecutePromqlResult``.
+
+    ``truncated`` says the app emits more distinct metric names than
+    ``limit``. It is surfaced rather than silently capped because a
+    mis-instrumented app — one minting a metric name per request id — looks
+    identical to a rich one from a truncated list, and the operator needs
+    to know which they are looking at.
+    """
+
+    ok: bool
+    names: list[str]
+    truncated: bool
+    limit: int
+    error: str | None = None
+
+
 @strawberry.type(name="AstroliftExecutePromqlResult")
 class ExecutePromqlResult:
     """Envelope returned by ``astroliftExecutePromql`` (#750).

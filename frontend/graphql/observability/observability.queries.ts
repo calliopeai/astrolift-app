@@ -305,6 +305,36 @@ export const GET_TRACE_SPANS = gql`
 `;
 
 /**
+ * The metric names this app's own workloads expose (#1226).
+ *
+ * Feeds the Query panel's picker: an operator cannot write PromQL against
+ * a metric they do not know the name of, and the platform families that
+ * share the namespace (cAdvisor, kube-state-metrics, the ingress
+ * controller) are filtered out server-side because those already have
+ * their own panels.
+ *
+ * ``truncated`` means the app emits more distinct names than ``limit``.
+ * Worth rendering rather than swallowing: an app minting a metric name
+ * per request id looks exactly like a richly instrumented one from a
+ * capped list.
+ */
+export const APP_METRIC_NAMES = gql`
+  query AppMetricNames($appSlug: String!, $environmentName: String, $limit: Int) {
+    astroliftAppMetricNames(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      limit: $limit
+    ) {
+      ok
+      error
+      names
+      truncated
+      limit
+    }
+  }
+`;
+
+/**
  * Ad-hoc PromQL executor (#647).
  *
  * Returns an envelope with ok / error so the panel can surface

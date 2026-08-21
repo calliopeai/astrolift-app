@@ -914,6 +914,14 @@ export type AstroliftAppLogQueryLine = {
   timestamp: Scalars['String']['output'];
 };
 
+export type AstroliftAppMetricNames = {
+  error?: Maybe<Scalars['String']['output']>;
+  limit: Scalars['Int']['output'];
+  names: Array<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAppMetrics = {
   appSlug: Scalars['String']['output'];
   deployCount: Scalars['Int']['output'];
@@ -7446,6 +7454,7 @@ export type Query = {
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
+  astroliftAppMetricNames: AstroliftAppMetricNames;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
@@ -7961,6 +7970,14 @@ export type QueryAstroliftAppLogsArgs = {
 export type QueryAstroliftAppManagedServiceMetricsArgs = {
   managedServiceId: Scalars['ID']['input'];
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryAstroliftAppMetricNamesArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  lookbackSeconds?: Scalars['Int']['input'];
 };
 
 
