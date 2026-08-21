@@ -621,3 +621,7 @@ jobs:
         run: |
           npm run codegen
           git diff --exit-code -- graphql/__generated__
+      - name: Verify the route dictionary
+        run: |
+          npm run routes:dict
+          git diff --exit-code -- ROUTES.md
