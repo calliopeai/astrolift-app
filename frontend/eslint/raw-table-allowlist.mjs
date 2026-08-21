@@ -187,11 +187,6 @@ const PENDING_MIGRATION = [
     file: "app/(app)/apps/[slug]/managed-services/managed-services-client.tsx",
     reason: "No blocker: astroliftManagedServicesPage exists.",
   },
-  {
-    file: "app/(app)/workflows/page.tsx",
-    reason:
-      "No blocker: the configured-workflows table reads `workflows`, and workflowsPage exists.",
-  },
 ];
 
 export const RAW_TABLE_ALLOWLIST = [
