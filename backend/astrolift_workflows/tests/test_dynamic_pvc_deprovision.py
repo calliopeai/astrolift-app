@@ -67,7 +67,7 @@ def _scaffold():
             ProviderPlugin(
                 name="Kubernetes",
                 slug="k8s-pvc",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),

@@ -254,12 +254,11 @@ def test_enqueued_task_reaches_terminal_via_dispatch_activity(
     PROVISIONING -> RUNNING -> COMPLETED via the reused spawn/poll path."""
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
 
-    # bulk_create bypasses BaseCoreModel.save() — ProviderPlugin shadows the
-    # base int version field with a CharField (a separately-tracked bug).
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="K8s Dispatch",
         slug="k8s-dispatch",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

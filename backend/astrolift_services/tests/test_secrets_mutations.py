@@ -78,15 +78,13 @@ def _scaffold():
         name="Demo",
         slug="demo",
     )
-    # bulk_create bypasses Tracking.save() — needed because ProviderPlugin
-    # overrides Tracking's int `version` with a string version column, and
-    # the increment-on-save path can't add 1 to "0.0.1".
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name="K8s Native",
                 slug="k8s-native",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

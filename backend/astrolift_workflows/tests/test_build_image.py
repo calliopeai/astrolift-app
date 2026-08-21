@@ -90,8 +90,7 @@ def _make_deployment(build_strategy="dockerfile", image_tag="sha-abc"):
     suffix = uuid.uuid4().hex[:6]
     org = Organization.objects.create(name="BuildOrg", slug=f"bo-{suffix}")
     team = Team.objects.create(organization=org, name="T", slug=f"t-{suffix}")
-    # bulk_create bypasses BaseCoreModel.save() (ProviderPlugin.version is a
-    # CharField shadowing the base int version) — same trick the cluster suites use.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [plugin] = ProviderPlugin.objects.bulk_create(
         [ProviderPlugin(name="aws", slug=f"aws-{suffix}", capabilities_manifest={}, config_schema={})]
     )

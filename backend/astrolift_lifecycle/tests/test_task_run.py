@@ -77,9 +77,7 @@ def app(org):
 def cluster(org):
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
 
-    # bulk_create to bypass the model's save() — ProviderPlugin shadows the
-    # base integer ``version`` with a CharField, so the concurrency-counter
-    # increment in save() raises (pre-existing). Mirrors test_provider_pickers.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [plugin] = ProviderPlugin.objects.bulk_create([ProviderPlugin(name="test-k8s", slug="test-k8s")])
     return TenantCluster.objects.create(
         organization=org,

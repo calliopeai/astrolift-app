@@ -55,15 +55,13 @@ def _make_service(*, variant: str = "bedrock") -> ManagedService:
         name="Demo",
         slug="demo-msr",
     )
-    # bulk_create bypasses BaseCoreModel.save(), whose integer
-    # optimistic-version bump collides with ProviderPlugin's CharField
-    # ``version`` (same pattern the reprovision-mutation test uses).
+    # Seeded directly; the plugin row is scaffolding for this test.
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
                 name="AWS",
                 slug="aws-msr",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             ),

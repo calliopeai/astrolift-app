@@ -71,7 +71,7 @@ def provider_plugin():
             ProviderPlugin(
                 name="K8s",
                 slug="k8s-builder",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

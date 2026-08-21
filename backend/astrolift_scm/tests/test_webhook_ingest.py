@@ -57,7 +57,7 @@ def stack():
     plugin = ProviderPlugin(
         name="P",
         slug="p-wh",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

@@ -160,7 +160,7 @@ def push_stack():
     plugin = ProviderPlugin(
         name="P3c",
         slug="p-3c",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

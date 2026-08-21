@@ -495,7 +495,7 @@ def test_manual_scale_works_on_service_agent(agent_stack, settings, monkeypatch)
     workload.save(update_fields=["run_family", "updated_at", "version"])
 
     plugin = ProviderPlugin(
-        name="K8s", slug="k8s-scale", version="0.0.1", capabilities_manifest={}, config_schema={}
+        name="K8s", slug="k8s-scale", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
     )
     ProviderPlugin.objects.bulk_create([plugin])
     plugin = ProviderPlugin.objects.get(slug="k8s-scale")

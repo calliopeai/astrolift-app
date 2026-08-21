@@ -49,7 +49,7 @@ def _scaffold():
             ProviderPlugin(
                 name="K8s Native",
                 slug="k8s-native-reprv",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )
@@ -381,7 +381,7 @@ def _real_plugin_scaffold(plugin_slug: str):
             ProviderPlugin(
                 name=plugin_slug,
                 slug=plugin_slug,
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

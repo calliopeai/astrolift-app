@@ -94,9 +94,7 @@ def other_org():
         slug="other-app",
         manifest_raw="name = 'other-app'\n",
     )
-    # bulk_create bypasses BaseCoreModel.save() — ProviderPlugin shadows the
-    # base int ``version`` with a CharField (known data-model bug), so the
-    # concurrency increment in save() raises. Mirrors the shared fixtures.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [plugin2] = ProviderPlugin.objects.bulk_create([ProviderPlugin(name="other-k8s", slug="other-k8s-1118")])
     cluster2 = TenantCluster.objects.create(
         organization=org2,

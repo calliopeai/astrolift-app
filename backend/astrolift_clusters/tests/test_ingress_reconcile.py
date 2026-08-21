@@ -87,9 +87,7 @@ def team(org):
 
 @pytest.fixture
 def plugin():
-    # bulk_create bypasses BaseCoreModel.save(); ProviderPlugin.version
-    # is a CharField (chart version) that shadows the base int version,
-    # so a plain .create() trips the base save's `version + 1`.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [p] = ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(

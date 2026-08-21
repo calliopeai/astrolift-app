@@ -83,9 +83,7 @@ def team(org):
 
 @pytest.fixture
 def plugin():
-    # bulk_create bypasses BaseCoreModel.save() (ProviderPlugin.version
-    # is a CharField that shadows the base int version) — same trick the
-    # ingress_reconcile suite uses.
+    # Seeded directly; the plugin row is scaffolding for this test.
     [p] = ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(

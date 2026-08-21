@@ -49,14 +49,11 @@ def _tenant(org):
 
 
 def _provider_plugin(slug: str) -> ProviderPlugin:
-    # bulk_create bypasses BaseCoreModel.save() (which would try to bump the
-    # model's integer ``version`` — ProviderPlugin shadows it with a semver
-    # *string*, so save() raises). Mirrors the workaround in the sibling
-    # agent-task-logs / observability tests.
+    # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="K8s",
         slug=slug,
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

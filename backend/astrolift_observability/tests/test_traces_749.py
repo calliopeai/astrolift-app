@@ -41,7 +41,7 @@ def _scaffold(*, trace_driver: str | None = "tempo", trace_endpoint: str | None 
     plugin_obj = ProviderPlugin(
         name="K8s",
         slug="k8s-trace",
-        version="0.0.1",
+        plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )

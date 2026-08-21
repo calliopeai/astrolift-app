@@ -132,7 +132,7 @@ def per_install():
     installation ids and distinct repos. Org A is canonical (owns the
     webhook URL guid)."""
     plugin = ProviderPlugin(
-        name="P", slug="plugin-pi", version="0.0.1", capabilities_manifest={}, config_schema={}
+        name="P", slug="plugin-pi", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
     )
     ProviderPlugin.objects.bulk_create([plugin])
     plugin = ProviderPlugin.objects.get(slug="plugin-pi")

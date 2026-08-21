@@ -36,7 +36,7 @@ def _service() -> ManagedService:
             ProviderPlugin(
                 name="Update Provider",
                 slug="update-provider",
-                version="1.0.0",
+                plugin_version="1.0.0",
                 capabilities_manifest={},
                 config_schema={},
             )

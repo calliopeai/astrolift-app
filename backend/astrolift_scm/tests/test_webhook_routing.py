@@ -150,7 +150,7 @@ def push_stack(org):
             ProviderPlugin(
                 name="P",
                 slug="p-wr",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )
@@ -212,7 +212,7 @@ def pr_stack(org):
             ProviderPlugin(
                 name="P2",
                 slug="p2-wr",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )

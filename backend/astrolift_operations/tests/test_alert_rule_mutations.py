@@ -317,7 +317,7 @@ def _make_email_service_for(org):
             ProviderPlugin(
                 name="AWS",
                 slug="aws",
-                version="0.0.1",
+                plugin_version="0.0.1",
                 capabilities_manifest={},
                 config_schema={},
             )
