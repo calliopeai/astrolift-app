@@ -29,6 +29,7 @@ with workflow.unsafe.imports_passed_through():
         pre_flight,
         provision_namespace,
         render_manifests,
+        resync_manifest_for_deploy,
         update_secrets,
         wait_dns,
     )
@@ -108,6 +109,20 @@ class DeployAppWorkflow:
         deployment_id = input.deployment_id
 
         try:
+            # Refresh the manifest from the source repo BEFORE validation and
+            # render (#1535): the deploy path renders from the DB registration,
+            # and without this nothing ever picked up a repo-side manifest fix
+            # after registration. Best-effort — the activity reports the
+            # outcome and never raises; a fetch failure deploys with the
+            # last-known-good registration. Patched for replay compatibility
+            # with in-flight pre-#1535 runs.
+            if workflow.patched("deploy-manifest-resync"):
+                await workflow.execute_activity(
+                    resync_manifest_for_deploy,
+                    deployment_id,
+                    start_to_close_timeout=_MARK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
             await workflow.execute_activity(
                 pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )
@@ -133,11 +148,13 @@ class DeployAppWorkflow:
                 _image_tag = next(iter(_image_tags.values()), "")
                 await workflow.execute_activity(
                     build_image,
-                    args=[BuildImageInput(
-                        deployment_id=input.deployment_id,
-                        image_tag=_image_tag,
-                        commit_sha=input.commit_sha,
-                    )],
+                    args=[
+                        BuildImageInput(
+                            deployment_id=input.deployment_id,
+                            image_tag=_image_tag,
+                            commit_sha=input.commit_sha,
+                        )
+                    ],
                     # Builds are the longest step — a cold dockerfile build
                     # can run 10+ minutes. Give it a wide window and a
                     # heartbeat timeout (the kaniko driver heartbeats per
@@ -239,6 +256,18 @@ class DeployAppWorkflow:
             )
 
             if self._abort_requested:
+                # #1536: an aborted deploy must not strand its row at
+                # DEPLOYING — before this, the abort path exited without any
+                # bookkeeping and every superseded/cancelled deploy sat
+                # in-flight forever. mark_failed is idempotent and keeps an
+                # operator-written reason. Patched for replay compatibility.
+                if workflow.patched("abort-marks-failed"):
+                    await workflow.execute_activity(
+                        mark_failed,
+                        args=[deployment_id, "aborted: superseded by a newer deploy or cancelled"],
+                        start_to_close_timeout=_MARK_TIMEOUT,
+                        retry_policy=_STANDARD_RETRY,
+                    )
                 return WorkflowResult(ok=False, message="aborted by signal")
 
             # Rollout poll + health check are terminal on failure: the driver

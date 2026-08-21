@@ -129,6 +129,9 @@ def render_manifests(
             hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
             if hpa is not None:
                 out.append(hpa)
+            monitor = _render_pod_monitor(w, namespace=namespace, labels=wl_labels)
+            if monitor is not None:
+                out.append(monitor)
         elif w.kind == "cronjob":
             out.append(
                 _render_cronjob(
@@ -264,7 +267,10 @@ def _render_deployment(
             "replicas": int(w.replicas),
             "selector": {"matchLabels": selector},
             "template": {
-                "metadata": {"labels": {**labels, **selector}},
+                "metadata": {
+                    "labels": {**labels, **selector},
+                    **_metrics_annotations(w),
+                },
                 "spec": _pod_spec(
                     w,
                     image_tag=image_tag,
@@ -480,6 +486,79 @@ def _render_workflow_worker(
     if target is not None:
         target["env"] = injected + target.get("env", [])
     return dep
+
+
+def _metrics_annotations(w: Any) -> dict[str, Any]:
+    """Prometheus discovery annotations for a scrape-enabled workload (#1226).
+
+    Returned as a mapping to splat, so a workload that opted out adds no
+    ``annotations`` key at all rather than an empty one — an empty
+    annotations block is a diff against every existing rendered pod.
+
+    These are for annotation-based scrapers. The ``PodMonitor`` below is
+    what the platform's own kube-prometheus-stack actually reads; both are
+    emitted because an operator's cluster may run either.
+    """
+    if not w.metrics_enabled or not w.metrics_port:
+        return {}
+    return {
+        "annotations": {
+            "prometheus.io/scrape": "true",
+            "prometheus.io/port": str(w.metrics_port),
+            "prometheus.io/path": w.metrics_path or "/metrics",
+        }
+    }
+
+
+def _render_pod_monitor(w: Any, *, namespace: str, labels: dict[str, str]) -> dict[str, Any] | None:
+    """A PodMonitor for a scrape-enabled workload, or ``None``.
+
+    A PodMonitor rather than a ServiceMonitor: a ServiceMonitor needs a
+    Service, and only ``is_public`` workloads get one — a private worker
+    exposing ``/metrics`` is exactly the case this is for.
+
+    The cluster's Prometheus watches both kinds across all namespaces
+    (``podMonitorSelectorNilUsesHelmValues: false``), so no label on this
+    object has to match a selector the cluster sets; it is picked up by
+    existing.
+    """
+    if not w.metrics_enabled or not w.metrics_port:
+        return None
+    return {
+        "apiVersion": "monitoring.coreos.com/v1",
+        "kind": "PodMonitor",
+        "metadata": {
+            "name": w.name,
+            "namespace": namespace,
+            "labels": labels,
+        },
+        "spec": {
+            "selector": {
+                "matchLabels": {
+                    "astrolift.dev/workload": w.name,
+                    "astrolift.dev/app": labels["astrolift.dev/app"],
+                }
+            },
+            # Scoped to this namespace. Omitting it lets a PodMonitor
+            # select pods in other namespaces, which on a shared cluster
+            # is one app scraping another.
+            "namespaceSelector": {"matchNames": [namespace]},
+            "podMetricsEndpoints": [
+                {
+                    # Addressed by number, not name. A container declares
+                    # one named port, "http", for the port it serves on;
+                    # a metrics port is frequently a different one and has
+                    # no name to reference. prometheus-operator marks
+                    # `targetPort` deprecated in favour of a named `port`,
+                    # so naming the metrics container port is the tidier
+                    # follow-up — it just costs a change to the container
+                    # renderer's signature that this does not need.
+                    "targetPort": int(w.metrics_port),
+                    "path": w.metrics_path or "/metrics",
+                }
+            ],
+        },
+    }
 
 
 def _render_service(

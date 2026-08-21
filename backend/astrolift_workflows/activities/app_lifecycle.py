@@ -224,6 +224,57 @@ async def provision_registry_repo(registered_app_id: int) -> str:
     return uri
 
 
+def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_registry.services.manifest_sync import resync_app_manifest_from_repo
+
+    deployment = Deployment.objects.select_related("registered_app").get(pk=deployment_id)
+    app = deployment.registered_app
+    result = resync_app_manifest_from_repo(app)
+    return {
+        "status": result.status,
+        "error": result.error or "",
+        "app_slug": app.slug,
+    }
+
+
+@activity.defn(name="astrolift.app.resync_manifest_for_deploy")
+async def resync_manifest_for_deploy(deployment_id: int) -> dict:
+    """Refresh the app's manifest from its source repo before render (#1535).
+
+    The deploy path renders from the DB registration, which nothing
+    refreshed automatically — a repo manifest fixed after registration was
+    never picked up until an operator clicked the Settings resync button,
+    so 'fix the TOML and push' deploys silently kept the stale config.
+
+    Best-effort by contract: ``resync_app_manifest_from_repo`` never
+    raises. ``applied``/``in_sync`` proceed with fresh state; ``diverged``
+    keeps the operator's staged draft (clobbering it is the destructive
+    sync's job, not a deploy's); ``fetch_failed`` logs loudly and the
+    deploy proceeds with the last-known-good registration.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    outcome = await sync_to_async(_resync_manifest_for_deploy_sync)(deployment_id)
+    if outcome["status"] in ("applied", "in_sync"):
+        log.info(
+            "resync_manifest_for_deploy app=%s status=%s",
+            outcome["app_slug"],
+            outcome["status"],
+            extra={"deployment_id": deployment_id},
+        )
+    else:
+        log.warning(
+            "resync_manifest_for_deploy app=%s status=%s error=%s — deploying with the stored manifest",
+            outcome["app_slug"],
+            outcome["status"],
+            outcome["error"],
+            extra={"deployment_id": deployment_id},
+        )
+    return outcome
+
+
 def _provision_managed_services_initial_sync(
     registered_app_id: int,
     app_environment_id: int,
