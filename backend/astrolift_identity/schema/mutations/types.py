@@ -29,6 +29,10 @@ class UpdateOrganizationInput:
     website: str | None = None
     audit_log_retention_days: int | None = None
     allow_user_profile_edit: bool | None = None
+    # Operator tags stamped on every resource this org provisions (#1505).
+    # A whole-map replace rather than a merge: there has to be a way to
+    # remove a tag, and `{}` is the obvious one.
+    default_resource_tags: strawberry.scalars.JSON | None = None
 
 
 @strawberry.input

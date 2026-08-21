@@ -2684,6 +2684,7 @@ export type AstroliftOrganization = {
   allowUserProfileEdit: Scalars['Boolean']['output'];
   auditLogRetentionDays: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
+  defaultResourceTags: Scalars['JSON']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
@@ -9754,6 +9755,7 @@ export type UpdateOrgSkillRepoInput = {
 export type UpdateOrganizationInput = {
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
+  defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
