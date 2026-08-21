@@ -6,7 +6,12 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,18 +32,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { CREATE_ROLE, UPDATE_ROLE } from "@/graphql/identity/identity.mutations";
-import { LIST_ROLES } from "@/graphql/identity/identity.queries";
+import { LIST_ROLES, LIST_ROLES_PAGE } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftRole,
   MutationResult,
@@ -49,6 +45,17 @@ import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
 }
+interface RolesPageResp {
+  astroliftRolesPage: CursorPage<AstroliftRole>;
+}
+
+/**
+ * Both editor paths refresh two documents: this table's paginated one by
+ * operation name, so it re-runs with the cursor and search currently in
+ * effect, and the flat list the permission catalogue below is derived
+ * from and that the assignments tab reads for its grant dialog.
+ */
+const ROLE_REFETCH = ["ListRolesPage", { query: LIST_ROLES }];
 
 const SCOPE_TONE: Record<string, string> = {
   ORG: "bg-info/15 text-info-fg",
@@ -71,21 +78,72 @@ export function RolesTab() {
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
 
-  const { data, loading } = useQuery<RolesResp>(LIST_ROLES, {
+  // `astroliftRolesPage` searches slug, name and description. It takes no
+  // sort argument, so no column declares a `sortKey`.
+  const table = useCursorTable<AstroliftRole>({
+    query: LIST_ROLES_PAGE,
+    extract: (d) => (d as RolesPageResp | undefined)?.astroliftRolesPage,
+    searchVariable: "search",
+    urlKey: "role",
     fetchPolicy: "cache-and-network",
   });
-  const roleList = React.useMemo(() => data?.astroliftRoles ?? [], [data]);
 
-  // The available-permissions catalog for the checklist is the union of
-  // every role's permission set. The `org_owner` system role carries the
-  // full `Permission` enum (backend `system_roles.py`), so this union is
-  // the complete catalog — derived client-side with no dedicated catalog
-  // query, and it can never drift ahead of what the backend will accept.
+  // The flat list stays, and it is not the table's data source: the
+  // permission checklist below is the union of *every* role's permission
+  // set, so deriving it from whichever page is on screen would silently
+  // shrink the editor's catalogue as an operator paged or searched. The
+  // `org_owner` system role carries the full `Permission` enum (backend
+  // `system_roles.py`), so the union over the whole list is the complete
+  // catalogue, with no dedicated catalogue query to drift ahead of what
+  // the backend will accept.
+  const { data } = useQuery<RolesResp>(LIST_ROLES, { fetchPolicy: "cache-and-network" });
   const allPermissions = React.useMemo(() => {
     const set = new Set<string>();
-    for (const r of roleList) for (const p of r.permissions) set.add(p);
+    for (const r of data?.astroliftRoles ?? []) for (const p of r.permissions) set.add(p);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [roleList]);
+  }, [data]);
+
+  const columns: Column<AstroliftRole>[] = [
+    {
+      id: "role",
+      header: "Role",
+      cell: (role) => (
+        <>
+          <div className="font-medium">{role.name}</div>
+          <div className="text-muted-foreground font-mono text-xs">{role.slug}</div>
+        </>
+      ),
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      cell: (role) => (
+        <Badge className={SCOPE_TONE[role.scopeLevel]} variant="secondary">
+          {role.scopeLevel}
+        </Badge>
+      ),
+    },
+    {
+      id: "type",
+      header: "Type",
+      cell: (role) =>
+        role.isSystem ? (
+          <Badge variant="outline" className="gap-1">
+            <LockIcon className="size-3" />
+            System
+          </Badge>
+        ) : (
+          <Badge variant="secondary">Custom</Badge>
+        ),
+    },
+    {
+      id: "permissions",
+      header: "Permissions",
+      align: "right",
+      cellClassName: "font-mono tabular-nums",
+      cell: (role) => role.permissions.length,
+    },
+  ];
 
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [sheetMode, setSheetMode] = React.useState<EditorMode>("create");
@@ -125,70 +183,29 @@ export function RolesTab() {
           </Can>
         }
       >
-        {loading && roleList.length === 0 ? (
-          <div className="space-y-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : roleList.length === 0 ? (
-          <EmptyState
-            icon={<ShieldIcon className="size-5" />}
-            title="No roles"
-            description="System roles are seeded on deploy; if none appear, the org context may not be resolved yet."
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Role</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Permissions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roleList.map((role) => (
-                <TableRow
-                  key={role.id}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${role.isSystem || !canManage ? "View" : "Edit"} role ${role.name}`}
-                  onClick={() => openRole(role)}
-                  onKeyDown={(ev) => {
-                    if (ev.key === "Enter" || ev.key === " ") {
-                      ev.preventDefault();
-                      openRole(role);
-                    }
-                  }}
-                  className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                >
-                  <TableCell>
-                    <div className="font-medium">{role.name}</div>
-                    <div className="text-muted-foreground font-mono text-xs">{role.slug}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={SCOPE_TONE[role.scopeLevel]} variant="secondary">
-                      {role.scopeLevel}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {role.isSystem ? (
-                      <Badge variant="outline" className="gap-1">
-                        <LockIcon className="size-3" />
-                        System
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">Custom</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">
-                    {role.permissions.length}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          label="Roles"
+          controller={table}
+          columns={columns}
+          getRowId={(role) => role.id}
+          // A role has no page of its own; activating one opens the editor
+          // sheet, read-only for a system role or a viewer without manage.
+          onRowActivate={openRole}
+          rowLabel={(role) =>
+            `${role.isSystem || !canManage ? "View" : "Edit"} role ${role.name}`
+          }
+          searchPlaceholder="Search roles by name or slug…"
+          empty={{
+            icon: <ShieldIcon className="size-5" />,
+            title: "No roles",
+            description:
+              "System roles are seeded on deploy; if none appear, the org context may not be resolved yet.",
+          }}
+          emptyFiltered={{
+            title: "No matching roles",
+            description: "No role matches this search. Try another name or slug.",
+          }}
+        />
       </Section>
 
       <RoleEditorSheet
@@ -261,13 +278,13 @@ function RoleEditorSheet({
   const [createRole, { loading: creating }] = useMutation<{
     createRole: MutationResult<AstroliftRole>;
   }>(CREATE_ROLE, {
-    refetchQueries: [{ query: LIST_ROLES }],
+    refetchQueries: ROLE_REFETCH,
     awaitRefetchQueries: true,
   });
   const [updateRole, { loading: updating }] = useMutation<{
     updateRole: MutationResult<AstroliftRole>;
   }>(UPDATE_ROLE, {
-    refetchQueries: [{ query: LIST_ROLES }],
+    refetchQueries: ROLE_REFETCH,
     awaitRefetchQueries: true,
   });
   const saving = creating || updating;
