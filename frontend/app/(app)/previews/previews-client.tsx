@@ -1,35 +1,24 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import {
   ExternalLinkIcon,
   GitPullRequestIcon,
   TrashIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import { DataTable, useCursorTable, type Column, type CursorPage } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { TEAR_DOWN_PREVIEW } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_PREVIEW_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftPreviewEnvironment,
   PreviewStatus,
@@ -42,8 +31,8 @@ interface MutationResultLite {
   errors: { code: string; message: string }[];
 }
 
-interface Resp {
-  astroliftPreviewEnvironments: AstroliftPreviewEnvironment[];
+interface PreviewsPageResp {
+  astroliftPreviewEnvironmentsPage: CursorPage<AstroliftPreviewEnvironment>;
 }
 
 const statusToDot: Record<
@@ -59,144 +48,150 @@ const statusToDot: Record<
 export function PreviewsClient() {
   const t = useTranslations("lists.previews");
   const fmt = useFormatters();
-  const router = useRouter();
   const { can } = useMyPermissions();
   const formatTime = (iso: string | null | undefined): string =>
     iso ? fmt.formatDateTime(iso) : "—";
-  const { data, loading } = useQuery<Resp>(LIST_PREVIEW_ENVIRONMENTS, {
+
+  // `appSlug: null` is every app, which is what this page is. The field
+  // searches app, branch, hostname, commit and status, and takes no sort
+  // argument, so no column declares a `sortKey`. The 30s poll is kept:
+  // a building preview settles while an operator watches this page.
+  const table = useCursorTable<AstroliftPreviewEnvironment>({
+    query: LIST_PREVIEW_ENVIRONMENTS_PAGE,
     variables: { appSlug: null },
+    extract: (d) => (d as PreviewsPageResp | undefined)?.astroliftPreviewEnvironmentsPage,
+    searchVariable: "search",
+    urlKey: "pv",
     pollInterval: 30000,
   });
-  const list = data?.astroliftPreviewEnvironments ?? [];
 
-  const refetch = [
-    { query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: null } },
-  ];
   const [tearDown, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
-  }>(TEAR_DOWN_PREVIEW, { refetchQueries: refetch });
+  }>(TEAR_DOWN_PREVIEW, { refetchQueries: ["ListPreviewEnvironmentsPage"] });
 
   const [tearTarget, setTearTarget] = React.useState<AstroliftPreviewEnvironment | null>(null);
+
+  const columns: Column<AstroliftPreviewEnvironment>[] = [
+    {
+      id: "app",
+      header: t("columns.app"),
+      // The status dot lives in this cell rather than in a column of its
+      // own. `rowHref` builds the row's link out of the first column, so
+      // a lead column holding only a dot would give every row a link with
+      // no accessible name.
+      cell: (p) => (
+        <>
+          <span className="flex items-center gap-2 font-medium">
+            <StatusDot status={statusToDot[p.status]} />
+            {p.registeredAppSlug}
+          </span>
+          <span className="text-muted-foreground block font-mono text-xs">ns {p.namespace}</span>
+        </>
+      ),
+    },
+    {
+      id: "pr",
+      header: t("columns.pr"),
+      cellClassName: "font-mono text-xs",
+      cell: (p) => `#${p.prNumber}`,
+    },
+    {
+      id: "branch",
+      header: t("columns.branch"),
+      cell: (p) => (
+        <>
+          <div className="text-sm">{p.branch}</div>
+          {p.commitSha && (
+            <div className="text-muted-foreground font-mono text-xs">{p.commitSha.slice(0, 7)}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "hostname",
+      header: t("columns.hostname"),
+      // Above the row link, so the running preview stays reachable.
+      cellClassName: "relative z-10",
+      cell: (p) =>
+        p.status === "running" ? (
+          <a
+            href={`https://${p.hostname}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-sm hover:underline"
+          >
+            {p.hostname}
+            <ExternalLinkIcon className="size-3" />
+          </a>
+        ) : (
+          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
+        ),
+    },
+    {
+      id: "lastDeploy",
+      header: t("columns.lastDeploy"),
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (p) => formatTime(p.lastDeployedAt),
+    },
+    {
+      id: "status",
+      header: t("columns.status"),
+      cell: (p) => (
+        <Badge variant="secondary" className="capitalize">
+          {p.status.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: t("columns.actions"),
+      align: "right",
+      cellClassName: "relative z-10",
+      cell: (p) =>
+        p.status !== "torn_down" && can("app.deploy") ? (
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={tearState.loading}
+              onClick={() => setTearTarget(p)}
+            >
+              <TrashIcon className="size-3" /> {t("tearDown")}
+            </Button>
+          </Can>
+        ) : null,
+    },
+  ];
+
 
   return (
     <PageShell
       title={t("title")}
       description={t("description")}
     >
-      <Card>
-        <CardContent className="p-0">
-          {loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<GitPullRequestIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-                actionHref="/apps"
-                actionLabel={t("openApps")}
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>{t("columns.app")}</TableHead>
-                  <TableHead>{t("columns.pr")}</TableHead>
-                  <TableHead>{t("columns.branch")}</TableHead>
-                  <TableHead>{t("columns.hostname")}</TableHead>
-                  <TableHead>{t("columns.lastDeploy")}</TableHead>
-                  <TableHead>{t("columns.status")}</TableHead>
-                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((p) => (
-                  <TableRow
-                    key={p.id}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open preview PR #${p.prNumber}`}
-                    onClick={() => router.push(`/previews/${p.id}`)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "Enter" || ev.key === " ") {
-                        ev.preventDefault();
-                        router.push(`/previews/${p.id}`);
-                      }
-                    }}
-                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                  >
-                    <TableCell className="w-8">
-                      <StatusDot status={statusToDot[p.status]} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{p.registeredAppSlug}</div>
-                      <div className="text-muted-foreground text-xs font-mono">
-                        ns {p.namespace}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      #{p.prNumber}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{p.branch}</div>
-                      {p.commitSha && (
-                        <div className="text-muted-foreground text-xs font-mono">
-                          {p.commitSha.slice(0, 7)}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {p.status === "running" ? (
-                        <a
-                          href={`https://${p.hostname}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(ev) => ev.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-sm hover:underline"
-                        >
-                          {p.hostname}
-                          <ExternalLinkIcon className="size-3" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground font-mono text-xs">
-                          {p.hostname}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatTime(p.lastDeployedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {p.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                      {p.status !== "torn_down" && can("app.deploy") && (
-                        <Can permission="app.deploy">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={tearState.loading}
-                            onClick={() => setTearTarget(p)}
-                          >
-                            <TrashIcon className="size-3" /> {t("tearDown")}
-                          </Button>
-                        </Can>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        label="Preview environments"
+        controller={table}
+        columns={columns}
+        getRowId={(p) => p.id}
+        // A real link, so a preview can be opened in a new tab. The
+        // hand-rolled row was `role="link"` on a <tr> driving
+        // `router.push`, which middle-click and copy-link could not reach.
+        rowHref={(p) => `/previews/${p.id}`}
+        searchPlaceholder="Search by app, branch, host, commit, or status…"
+        empty={{
+          icon: <GitPullRequestIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          actionHref: "/apps",
+          actionLabel: t("openApps"),
+        }}
+        emptyFiltered={{
+          title: "No matching previews",
+          description:
+            "No preview matches that search. The server matches the app, branch, hostname, commit and status.",
+        }}
+      />
 
       <ConfirmDialog
         open={tearTarget !== null}

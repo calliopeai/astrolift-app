@@ -204,10 +204,6 @@ const PENDING_MIGRATION = [
     reason: "No blocker: astroliftRoleBindingsPage exists. Still on the legacy useListControls.",
   },
   {
-    file: "app/(app)/previews/previews-client.tsx",
-    reason: "No blocker: astroliftPreviewEnvironmentsPage exists.",
-  },
-  {
     file: "app/(app)/workflows/page.tsx",
     reason:
       "No blocker: the configured-workflows table reads `workflows`, and workflowsPage exists.",
