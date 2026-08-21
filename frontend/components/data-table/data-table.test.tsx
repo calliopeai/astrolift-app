@@ -161,6 +161,25 @@ describe("DataTable", () => {
       expect(screen.getByRole("link", { name: "api" })).toHaveAttribute("href", "/apps/1");
     });
 
+    it("positions a rowHref row so its stretched link cannot escape it", () => {
+      // `after:inset-0` resolves against the nearest positioned ancestor.
+      // `table-container` is positioned and the row is not, so dropping
+      // this class puts every row's overlay across the entire table and
+      // the last row answers every click (#1502).
+      //
+      // jsdom computes no layout, so the class is the only thing a test
+      // in this repo can hold. It was verified as the fix in a browser:
+      // `position: relative` on the row gives each row its own extent,
+      // full width; on the cell it confines the link to the first cell
+      // and deadens the rest of the row.
+      renderTable(controller({ rows, state: "ready" }), {
+        rowHref: (r: Row) => `/apps/${r.id}`,
+      });
+      for (const row of screen.getAllByRole("row").slice(1)) {
+        expect(row).toHaveClass("relative");
+      }
+    });
+
     it("does not render links when onRowActivate is given", () => {
       const onRowActivate = vi.fn();
       renderTable(controller({ rows, state: "ready" }), { onRowActivate });

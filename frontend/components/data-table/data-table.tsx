@@ -183,7 +183,14 @@ export function DataTable<TRow>({
             <TableRow
               key={id}
               data-state={selected ? "selected" : undefined}
+              // `relative`: the row link below is stretched with
+              // `after:inset-0`, which reaches exactly as far as the nearest
+              // positioned ancestor. Without it the row is not one and
+              // `table-container` is, so every row's overlay covers the whole
+              // table and the last row in the DOM swallows every click
+              // (#1502).
               className={cn(
+                rowHref && "relative",
                 (rowHref || onRowActivate) && "cursor-pointer",
                 rowClassName?.(row)
               )}
