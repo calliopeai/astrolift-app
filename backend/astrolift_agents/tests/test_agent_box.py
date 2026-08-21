@@ -24,7 +24,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
-from _sdk.agent_session import keepalive_script
+from _sdk.agent_session import SESSION_NAME, keepalive_script
 from _sdk.k8s_naming import agent_namespace
 
 from astrolift_agents.models import AgentBox, AgentEnvironmentSpec
@@ -275,7 +275,7 @@ def test_the_rendered_container_comes_from_the_session_sdk(org):
     container = _container_of(job)
 
     expected = keepalive_script(
-        SessionSpec(image="agent-claude:1", session_name=box.session_name, idle_timeout_seconds=120)
+        SessionSpec(image="agent-claude:1", session_name=SESSION_NAME, idle_timeout_seconds=120)
     )
     assert container["command"] == ["/bin/sh", "-lc"]
     assert container["args"] == [expected]
@@ -368,7 +368,7 @@ def test_the_rendered_pod_reaps_itself_when_idle(org):
         # inside 30s; anything longer means the loop never fired.
         assert proc.wait(timeout=30) is not None
         still_there = subprocess.run(
-            ["tmux", "-L", socket, "has-session", "-t", box.session_name],
+            ["tmux", "-L", socket, "has-session", "-t", SESSION_NAME],
             capture_output=True,
             check=False,
         )

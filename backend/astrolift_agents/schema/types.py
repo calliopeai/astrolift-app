@@ -269,6 +269,9 @@ class AgentBoxType:
     # Seconds of no attached client *and* no pane output before the in-pod
     # loop ends the session. ``0`` means never reap.
     idle_timeout_seconds: int
+    # The tmux session inside the pod. Constant across every box, and kept
+    # on the type because the CLI reads it; see ``box_attach_command`` for
+    # why it is not per-box (#1470).
     session_name: str
     # What to run under ``astro exec --app <slug> --`` to join the session.
     attach_command: list[str]
@@ -288,6 +291,8 @@ class AgentBoxType:
 
 
 def agent_box_to_type(box) -> AgentBoxType:
+    from _sdk.agent_session import SESSION_NAME
+
     from astrolift_agents.services.agent_box import box_attach_command
 
     return AgentBoxType(
@@ -299,7 +304,7 @@ def agent_box_to_type(box) -> AgentBoxType:
         environment_spec_slug=(box.environment_spec.slug if box.environment_spec_id is not None else ""),
         image=box.image or "",
         idle_timeout_seconds=int(box.idle_timeout_seconds),
-        session_name=box.session_name,
+        session_name=SESSION_NAME,
         attach_command=box_attach_command(box),
         namespace=box.namespace or "",
         pod_name=box.pod_name or "",
