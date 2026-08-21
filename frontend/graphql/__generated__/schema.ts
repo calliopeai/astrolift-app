@@ -2832,6 +2832,8 @@ export type AstroliftPreviewEnvironment = {
   aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  estimatedCostApproximate: Scalars['Boolean']['output'];
+  estimatedCostNotes: Array<Scalars['String']['output']>;
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];

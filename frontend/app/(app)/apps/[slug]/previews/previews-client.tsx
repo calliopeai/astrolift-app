@@ -291,10 +291,16 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     let dailySum = 0;
     let priced = 0;
     let unpriced = 0;
+    // A roll-up inherits the weakest estimate in it. Some GCP variants
+    // total by summing every SKU in a service, an over-count by
+    // construction, so a projection built partly from those is one too
+    // and has to say so (#1509).
+    let approximate = 0;
     for (const p of live) {
       if (typeof p.estimatedDailyCostUsd === "number") {
         dailySum += p.estimatedDailyCostUsd;
         priced += 1;
+        if (p.estimatedCostApproximate) approximate += 1;
       } else {
         unpriced += 1;
       }
@@ -306,6 +312,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       monthlyProjection: dailySum * daysInMonth,
       priced,
       unpriced,
+      approximate,
       liveCount: live.length,
     };
   }, [list]);
@@ -505,6 +512,12 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
               {dailyCost != null
                 ? t("costTooltip", { pods: aggregate.podCount, cost: dailyCost.toFixed(2) })
                 : t("costTooltipUnavailable", { pods: aggregate.podCount })}
+              {/* The driver's own qualifications on its own number. */}
+              {p.estimatedCostNotes.map((note) => (
+                <span key={note} className="mt-1 block max-w-xs text-xs opacity-80">
+                  {note}
+                </span>
+              ))}
             </TooltipContent>
           </Tooltip>
         );
@@ -611,11 +624,21 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
             </div>
             <div>
               <span className="text-muted-foreground text-xs">This month (projected)</span>
-              <div className="font-mono text-lg">${spend.monthlyProjection.toFixed(2)}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-lg">${spend.monthlyProjection.toFixed(2)}</span>
+                {spend.approximate > 0 && (
+                  <Badge variant="outline" className="gap-1 text-2xs uppercase">
+                    <AlertTriangleIcon className="size-3" />
+                    approximate
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="text-muted-foreground ml-auto text-xs">
               {spend.priced} of {spend.liveCount} previews priced
               {spend.unpriced > 0 && ` · ${spend.unpriced} not priced by this cluster's driver`}
+              {spend.approximate > 0 &&
+                ` · ${spend.approximate} priced by summing every SKU in the service, so the total is an over-count`}
             </div>
           </CardContent>
         </Card>

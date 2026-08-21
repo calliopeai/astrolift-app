@@ -618,6 +618,10 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
         podCount
       }
       estimatedDailyCostUsd
+    estimatedCostNotes
+    estimatedCostApproximate
+      estimatedCostNotes
+      estimatedCostApproximate
     }
   }
 `;
@@ -644,6 +648,8 @@ const PREVIEW_ENVIRONMENT_FIELDS = gql`
       podCount
     }
     estimatedDailyCostUsd
+    estimatedCostNotes
+    estimatedCostApproximate
   }
 `;
 

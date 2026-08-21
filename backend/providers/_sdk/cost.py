@@ -106,6 +106,22 @@ class CostEstimate:
     """ISO-8601 UTC timestamp of the live API call."""
 
     notes: list[str] = field(default_factory=list)
+    """Qualifications on the number, for the operator reading it.
+
+    Every driver populates this — list-price caveats on all three clouds,
+    and on GCP the ``APPROXIMATE`` label on variants with no SKU plan. A
+    caller that renders ``monthly_total`` and drops these is showing a
+    figure without the sentence that says how much to trust it (#1509)."""
+
+    approximate: bool = False
+    """True when the total is known to be wrong in a stated direction.
+
+    Structural rather than left for a caller to sniff out of ``notes``:
+    the GCP estimator sums every region-matching SKU in a service for
+    variants that have no SKU plan yet, which over-counts by
+    construction. A surface that renders an approximate figure the same
+    way it renders a considered one is the thing this flag exists to
+    stop."""
 
 
 @dataclass(frozen=True)

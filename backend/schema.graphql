@@ -2862,6 +2862,8 @@ type AstroliftPreviewEnvironment {
   prUrl: String!
   aggregateResources: AstroliftPreviewAggregateResources!
   estimatedDailyCostUsd: Float
+  estimatedCostNotes: [String!]!
+  estimatedCostApproximate: Boolean!
 }
 
 type AstroliftPreviewEnvironmentMutationResult {

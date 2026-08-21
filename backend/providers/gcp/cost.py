@@ -531,6 +531,9 @@ class GCPCostEstimator(CostEstimator):
                     f"({request.kind}, {request.variant}) has no SKU plan yet (#1318)."
                 ),
             ],
+            # The note above says so in prose; this is the same fact in a
+            # form a surface can branch on without parsing it (#1509).
+            approximate=True,
         )
 
     def _legacy_line_items(

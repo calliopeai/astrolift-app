@@ -2832,6 +2832,8 @@ export type AstroliftPreviewEnvironment = {
   aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  estimatedCostApproximate: Scalars['Boolean']['output'];
+  estimatedCostNotes: Array<Scalars['String']['output']>;
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -11080,9 +11082,9 @@ export type ListPreviewEnvironmentsQueryVariables = Exact<{
 }>;
 
 
-export type ListPreviewEnvironmentsQuery = { astroliftPreviewEnvironments: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> };
+export type ListPreviewEnvironmentsQuery = { astroliftPreviewEnvironments: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> };
 
-export type PreviewEnvironmentFieldsFragment = { id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
+export type PreviewEnvironmentFieldsFragment = { id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
 
 export type ListPreviewEnvironmentsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -11092,7 +11094,7 @@ export type ListPreviewEnvironmentsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
+export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
 
 export type ListAppPodsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];

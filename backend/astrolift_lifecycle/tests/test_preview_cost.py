@@ -1,7 +1,7 @@
 """Tests for the preview cost / resource aggregator (#431).
 
 Covers the pure helpers (parse / format / aggregate) and the
-``estimate_daily_cost_usd`` integration with a fake driver — including
+``estimate_daily_cost`` integration with a fake driver — including
 the absolute prohibition on fabricating a cost when the driver can't
 return a live number.
 """
@@ -16,7 +16,7 @@ import pytest
 from astrolift_lifecycle.preview_cost import (
     PreviewAggregateResources,
     aggregate_pod_resources,
-    estimate_daily_cost_usd,
+    estimate_daily_cost,
     format_cpu_cores,
     format_memory_bytes,
     parse_cpu_cores,
@@ -193,6 +193,8 @@ class _FakeCostDriver:
 
     mode: str = "estimate"
     monthly_total: float = 30.0
+    notes: list = field(default_factory=list)
+    approximate: bool = False
     requests: list = field(default_factory=list)
 
     def estimate(self, request):
@@ -217,6 +219,8 @@ class _FakeCostDriver:
             monthly_total=self.monthly_total,
             pricing_source_url="https://example.invalid/pricing",
             pricing_fetched_at="2026-05-16T00:00:00Z",
+            notes=list(self.notes),
+            approximate=self.approximate,
         )
 
 
@@ -246,18 +250,67 @@ def test_estimate_daily_cost_returns_rounded_daily(patch_driver):
     driver = _FakeCostDriver(mode="estimate", monthly_total=30.0)
     patch_driver(driver)
     agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
-    daily = estimate_daily_cost_usd(
+    daily = estimate_daily_cost(
         cluster=SimpleNamespace(region="us-east-1"),
         aggregate=agg,
     )
-    assert daily == pytest.approx(1.0)
+    assert daily is not None
+    assert daily.daily_usd == pytest.approx(1.0)
+
+
+def test_the_drivers_caveats_travel_with_the_number(patch_driver):
+    """#1509: every note a driver attached used to be dropped here.
+
+    The list-price caveat is on all three clouds, so an operator reading
+    any figure at all was reading one without it.
+    """
+    driver = _FakeCostDriver(
+        mode="estimate",
+        monthly_total=30.0,
+        notes=[
+            "AWS Pricing API returns on-demand list price; savings plans are not applied.",
+            "",
+        ],
+    )
+    patch_driver(driver)
+    agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
+
+    estimate = estimate_daily_cost(cluster=SimpleNamespace(region="us-east-1"), aggregate=agg)
+
+    assert estimate is not None
+    assert estimate.notes == ("AWS Pricing API returns on-demand list price; savings plans are not applied.",)
+    assert estimate.approximate is False
+
+
+def test_an_approximate_total_says_so(patch_driver):
+    """The GCP estimator sums every region-matching SKU in a service for
+    the fourteen variants with no SKU plan, which over-counts by
+    construction. It labels the result; that label reached nobody."""
+    driver = _FakeCostDriver(
+        mode="estimate",
+        monthly_total=30.0,
+        notes=["APPROXIMATE: sums all 41 region-matching SKUs in service ABCD."],
+        approximate=True,
+    )
+    patch_driver(driver)
+    agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
+
+    estimate = estimate_daily_cost(cluster=SimpleNamespace(region="us-east-1"), aggregate=agg)
+
+    assert estimate is not None
+    assert estimate.approximate is True
+    assert estimate.notes[0].startswith("APPROXIMATE:")
+    # The flag is structural, not sniffed out of the prose: a surface
+    # branching on the string would break the first time the wording
+    # changed.
+    assert estimate.daily_usd == pytest.approx(1.0)
 
 
 def test_estimate_daily_cost_returns_none_when_driver_unavailable(patch_driver):
     driver = _FakeCostDriver(mode="unavailable")
     patch_driver(driver)
     agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
-    daily = estimate_daily_cost_usd(
+    daily = estimate_daily_cost(
         cluster=SimpleNamespace(region="us-east-1"),
         aggregate=agg,
     )
@@ -270,7 +323,7 @@ def test_estimate_daily_cost_returns_none_on_api_error(patch_driver):
     driver = _FakeCostDriver(mode="raise")
     patch_driver(driver)
     agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
-    daily = estimate_daily_cost_usd(
+    daily = estimate_daily_cost(
         cluster=SimpleNamespace(region="us-east-1"),
         aggregate=agg,
     )
@@ -281,7 +334,7 @@ def test_estimate_daily_cost_returns_none_on_not_implemented(patch_driver):
     driver = _FakeCostDriver(mode="not_implemented")
     patch_driver(driver)
     agg = PreviewAggregateResources(cpu_cores=0.5, memory_bytes=1024**3, pod_count=2)
-    daily = estimate_daily_cost_usd(
+    daily = estimate_daily_cost(
         cluster=SimpleNamespace(region="us-east-1"),
         aggregate=agg,
     )
@@ -292,7 +345,7 @@ def test_estimate_daily_cost_short_circuits_on_zero_usage():
     """No pods → no point asking the pricing API. The driver should
     not be invoked at all."""
     agg = PreviewAggregateResources(cpu_cores=0.0, memory_bytes=0.0, pod_count=0)
-    daily = estimate_daily_cost_usd(
+    daily = estimate_daily_cost(
         cluster=SimpleNamespace(region="us-east-1"),
         aggregate=agg,
     )
@@ -390,5 +443,5 @@ def test_estimate_daily_cost_threads_subscription_id_for_azure(patch_driver):
         memory_bytes=1024**3,
         pod_count=2,
     )
-    estimate_daily_cost_usd(cluster=cluster, aggregate=agg)
+    estimate_daily_cost(cluster=cluster, aggregate=agg)
     assert driver.requests[0].config["subscription_id"] == "abc-123"

@@ -372,6 +372,14 @@ class PreviewEnvironmentType:
     failed (which the FE renders as "—" rather than "0")."""
 
     estimated_daily_cost_usd: float | None
+    # What the driver said about its own number. Every caveat it attaches
+    # used to be dropped before it reached anyone (#1509): the list-price
+    # note on all three clouds, and on GCP the APPROXIMATE label on the
+    # variants that sum every SKU in a service.
+    estimated_cost_notes: list[str]
+    # True when the figure is known to be wrong in a stated direction, so
+    # a surface can render it differently rather than as a considered one.
+    estimated_cost_approximate: bool
     """Daily $ estimate from the cluster driver's live cost API.
     ``None`` (not zero) when the driver doesn't implement the cost
     capability, doesn't recognise compute pricing, or the pricing API
@@ -967,6 +975,8 @@ def preview_to_type(
     *,
     aggregate_resources: PreviewAggregateResourcesType | None = None,
     estimated_daily_cost_usd: float | None = None,
+    estimated_cost_notes: list[str] | None = None,
+    estimated_cost_approximate: bool = False,
 ) -> PreviewEnvironmentType:
     """Serialize a ``PreviewEnvironment`` row into the GraphQL type.
 
@@ -1016,6 +1026,8 @@ def preview_to_type(
         pr_url=pr_url,
         aggregate_resources=aggregate_resources,
         estimated_daily_cost_usd=estimated_daily_cost_usd,
+        estimated_cost_notes=list(estimated_cost_notes or []),
+        estimated_cost_approximate=estimated_cost_approximate,
     )
 
 

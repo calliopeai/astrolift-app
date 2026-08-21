@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { ExternalLinkIcon } from "lucide-react";
+import { AlertTriangleIcon, ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -11,6 +11,7 @@ import {
   EntityDetailShell,
   type Dot,
 } from "@/components/detail/EntityDetailShell";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
@@ -159,10 +160,35 @@ export function PreviewDetailClient({ id }: { id: string }) {
                 { term: "Pods", description: String(p.aggregateResources.podCount) },
                 {
                   term: "Est. daily cost",
+                  // The figure and what the driver said about it. Every
+                  // caveat used to be dropped before it reached here
+                  // (#1509), including the label on GCP variants whose
+                  // total is an over-count by construction — so an
+                  // operator read a confident number that could be out by
+                  // an order of magnitude with nothing saying so.
                   description:
-                    p.estimatedDailyCostUsd == null
-                      ? "—"
-                      : `$${p.estimatedDailyCostUsd.toFixed(2)}`,
+                    p.estimatedDailyCostUsd == null ? (
+                      "—"
+                    ) : (
+                      <span className="flex flex-col gap-1">
+                        <span className="flex items-center gap-1.5">
+                          {`$${p.estimatedDailyCostUsd.toFixed(2)}`}
+                          {p.estimatedCostApproximate && (
+                            <Badge variant="outline" className="gap-1 text-2xs uppercase">
+                              <AlertTriangleIcon className="size-3" />
+                              approximate
+                            </Badge>
+                          )}
+                        </span>
+                        {p.estimatedCostNotes.length > 0 && (
+                          <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+                            {p.estimatedCostNotes.map((note) => (
+                              <span key={note}>{note}</span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    ),
                 },
               ]}
             />
