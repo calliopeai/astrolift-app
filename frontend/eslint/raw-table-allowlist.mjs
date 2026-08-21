@@ -184,10 +184,6 @@ const UNSUPPORTED_ROW_SHAPE = [
  */
 const PENDING_MIGRATION = [
   {
-    file: "app/(app)/apps/[slug]/components/teams-card.tsx",
-    reason: "No blocker: astroliftAppTeamAccessesPage exists.",
-  },
-  {
     file: "app/(app)/apps/[slug]/managed-services/managed-services-client.tsx",
     reason: "No blocker: astroliftManagedServicesPage exists.",
   },
