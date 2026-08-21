@@ -200,10 +200,6 @@ const PENDING_MIGRATION = [
     reason: "No blocker: astroliftManagedServicesPage exists.",
   },
   {
-    file: "app/(app)/apps/[slug]/members/app-members-client.tsx",
-    reason: "No blocker: astroliftRoleBindingsPage exists. Still on the legacy useListControls.",
-  },
-  {
     file: "app/(app)/previews/previews-client.tsx",
     reason: "No blocker: astroliftPreviewEnvironmentsPage exists.",
   },

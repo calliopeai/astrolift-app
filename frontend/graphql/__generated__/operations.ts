@@ -10805,6 +10805,7 @@ export type RoleBindingFieldsFragment = { id: string, groupExternalId: string, s
 
 export type ListRoleBindingsPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
 }>;
