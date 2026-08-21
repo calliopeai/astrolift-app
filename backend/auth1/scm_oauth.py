@@ -63,7 +63,12 @@ GITHUB_TOKEN_EXCHANGE = "https://github.com/login/oauth/access_token"
 GITHUB_API_DEFAULT = "https://api.github.com"
 GITLAB_DEFAULT_BASE = "https://gitlab.com"
 GITLAB_DEFAULT_SCOPE = "read_api read_repository read_user"
-GITHUB_DEFAULT_SCOPE = "read:user repo"
+# ``workflow`` is required alongside ``repo``: GitHub refuses any write
+# touching .github/workflows/* from an OAuth token without it, so a
+# personal-repo connection minted without this scope can never complete
+# ci setup (#1542). Scopes freeze at authorization — pre-existing
+# connections must reconnect to re-issue their token with it.
+GITHUB_DEFAULT_SCOPE = "read:user repo workflow"
 
 
 # ---------------------------------------------------------------------------

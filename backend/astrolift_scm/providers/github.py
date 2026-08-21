@@ -915,6 +915,23 @@ def put_github_file(
             body_text = exc.read().decode("utf-8", "replace")[:300]
         except Exception:
             pass
+        # GitHub categorically refuses .github/workflows/* writes from a
+        # token missing the ``workflow`` scope; the refusal body names the
+        # scope but rides varying status codes, so detect by body (#1542).
+        # Only token-kind connections — App installs express this as a
+        # missing ``workflows: write`` permission, handled by the 403 path.
+        if (
+            connection.kind in {"github_oauth_user", "github_pat"}
+            and "workflow" in body_text
+            and "scope" in body_text
+        ):
+            raise GithubProviderError(
+                "MISSING_WORKFLOW_SCOPE",
+                "GitHub refused the workflow-file write: the connected token "
+                "lacks the 'workflow' scope. Reconnect GitHub to re-issue the "
+                "token with workflow access, then re-run CI setup.",
+                recoverable=True,
+            ) from exc
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",

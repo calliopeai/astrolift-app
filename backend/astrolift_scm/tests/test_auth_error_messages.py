@@ -408,3 +408,88 @@ def test_sync_github_threads_ci_workflow_permission_hint(monkeypatch):
     assert captured["operation"] == ws.CI_WORKFLOW_WRITE_OPERATION
     assert captured["permission"] == ws.CI_WORKFLOW_WRITE_PERMISSION
     assert captured["permission"] == "Contents: write and Workflows: write"
+
+
+# ---------------------------------------------------------------------------
+# Missing ``workflow`` scope refusal (#1542)
+# ---------------------------------------------------------------------------
+
+
+def _http_error_sequence_with_body(*steps):
+    """Like ``_http_error_sequence`` but each step is ``(code, body)`` so a
+    test can present GitHub's actual refusal text, which the provider
+    detects by body rather than status code."""
+    state = {"i": 0}
+
+    def _boom(req, timeout=10):
+        i = state["i"]
+        state["i"] += 1
+        code, body = steps[i] if i < len(steps) else steps[-1]
+        raise urllib.error.HTTPError(req.full_url, code, "err", {}, io.BytesIO(body))
+
+    return _boom
+
+
+_WORKFLOW_REFUSAL = (
+    b'{"message":"refusing to allow an OAuth App to create or update workflow '
+    b'`.github/workflows/astrolift-ci.yml` without `workflow` scope"}'
+)
+
+
+@pytest.mark.parametrize("kind", ["github_oauth_user", "github_pat"])
+def test_put_file_workflow_scope_refusal_says_reconnect_to_reissue(monkeypatch, kind):
+    """GitHub's categorical workflow-scope refusal must surface as its own
+    code with re-issue guidance — scopes freeze at authorization, so the
+    only remedy is reconnecting, never retrying (#1542)."""
+    from astrolift_scm.providers import ProviderError, put_file
+
+    conn = _PatConn()
+    conn.kind = kind
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        _http_error_sequence_with_body((404, b"denied"), (422, _WORKFLOW_REFUSAL)),
+    )
+
+    with pytest.raises(ProviderError) as exc:
+        put_file(
+            conn,
+            repo_full_name="acme/personal-api",
+            path=".github/workflows/astrolift-ci.yml",
+            branch="main",
+            content="name: ci\n",
+            commit_message="chore: ci",
+        )
+
+    assert exc.value.code == "MISSING_WORKFLOW_SCOPE"
+    assert "Reconnect" in exc.value.message
+    assert "workflow" in exc.value.message
+
+
+def test_put_file_app_install_never_maps_to_workflow_scope(monkeypatch):
+    """App installs have permissions, not scopes — a body that happens to
+    mention scopes must still ride the 403 permission path."""
+    from astrolift_scm.providers import ProviderError, put_file
+    from astrolift_scm.providers.github_app import installation_token as _real  # noqa: F401
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_test_token",
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        _http_error_sequence_with_body((404, b"denied"), (403, _WORKFLOW_REFUSAL)),
+    )
+
+    with pytest.raises(ProviderError) as exc:
+        put_file(
+            _AppConn(),
+            repo_full_name="acme/api",
+            path=".github/workflows/astrolift-ci.yml",
+            branch="main",
+            content="name: ci\n",
+            commit_message="chore: ci",
+            operation="write the CI workflow file",
+            permission="Contents: write and Workflows: write",
+        )
+
+    assert exc.value.code == "AUTH_FAILED"

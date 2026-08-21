@@ -141,7 +141,9 @@ def test_github_start_redirects_to_authorize_with_state(org_user_member):
     assert parsed.netloc == "github.com"
     qs = parse_qs(parsed.query)
     assert qs["client_id"] == ["gh-client-id"]
-    assert qs["scope"] == ["read:user repo"]
+    # ``workflow`` must ride along or the token can never push
+    # .github/workflows/* and personal-repo ci setup dies (#1542).
+    assert qs["scope"] == ["read:user repo workflow"]
     assert "state" in qs and qs["state"][0]
     # State persisted to the session for callback verification
     session = client.session
