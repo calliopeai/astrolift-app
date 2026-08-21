@@ -184,10 +184,6 @@ const UNSUPPORTED_ROW_SHAPE = [
  */
 const PENDING_MIGRATION = [
   {
-    file: "app/(app)/administration/permissions/roles-tab.tsx",
-    reason: "No blocker: astroliftRolesPage exists. Still on the legacy useListControls.",
-  },
-  {
     file: "app/(app)/apps/[slug]/components/homes/cronjob-home.tsx",
     reason: "No blocker: astroliftScheduledJobRunsPage exists.",
   },
