@@ -28,6 +28,13 @@ class PipelineRun(BaseCoreModel):
     run_number = models.PositiveIntegerField()
     trigger_kind = models.CharField(max_length=32, choices=TriggerKind.choices)
     trigger_ref = models.CharField(max_length=255, blank=True, default="")
+    # The commit this run is *of*. `trigger_ref` is a branch or tag name,
+    # which moves — two runs of "main" a week apart are different code, and
+    # a pipeline definition cannot be pinned to a name that will not hold
+    # still. Both webhook receivers already have this in the payload and
+    # were discarding it (#1531). Blank for a manual trigger that named
+    # only a ref, which is why it is not required.
+    commit_sha = models.CharField(max_length=64, blank=True, default="")
     trigger_actor = models.CharField(max_length=255, blank=True, default="")
     temporal_workflow_id = models.CharField(max_length=512, blank=True, default="")
     status = models.CharField(

@@ -104,23 +104,28 @@ def _repo_url_matches(pipeline_url: str, payload_clone_url: str, payload_html_ur
     return norm in {normalize(payload_clone_url), normalize(payload_html_url)}
 
 
-def _extract_repo_info(event: str, payload: dict) -> tuple[str, str, str, str]:
-    """Extract (repo_clone_url, repo_html_url, ref, actor) from a webhook payload."""
+def _extract_repo_info(event: str, payload: dict) -> tuple[str, str, str, str, str]:
+    """Extract (repo_clone_url, repo_html_url, ref, actor, commit_sha)."""
     repo = payload.get("repository") or {}
     clone_url = repo.get("clone_url", "")
     html_url = repo.get("html_url", "")
     actor = (payload.get("sender") or {}).get("login", "")
 
+    commit_sha = ""
     if event == "push":
         ref = payload.get("ref", "")  # e.g. "refs/heads/main" or "refs/tags/v1.0"
+        # The commit the push landed on. A ref moves; this does not, and it
+        # is what a run is actually of (#1531).
+        commit_sha = str(payload.get("after") or "")
     elif event == "pull_request":
         pr = payload.get("pull_request") or {}
         head = pr.get("head") or {}
         ref = head.get("ref", "")  # branch name
+        commit_sha = str(head.get("sha") or "")
     else:
         ref = ""
 
-    return clone_url, html_url, ref, actor
+    return clone_url, html_url, ref, actor, commit_sha
 
 
 def _trigger_matches(trigger: Trigger, event: str, ref: str) -> bool:
@@ -183,7 +188,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     if event not in _HANDLED_EVENTS:
         return JsonResponse({"status": "not handled", "event": event})
 
-    clone_url, html_url, ref, actor = _extract_repo_info(event, payload)
+    clone_url, html_url, ref, actor, commit_sha = _extract_repo_info(event, payload)
 
     # Find pipelines for this org whose repo URL matches the webhook
     pipelines = Pipeline.objects.filter(
@@ -209,6 +214,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                     run_number=_next_run_number(pipeline),
                     trigger_kind=event,
                     trigger_ref=ref,
+                    commit_sha=commit_sha,
                     trigger_actor=actor,
                     status="pending",
                     temporal_workflow_id="",  # set by dispatcher on workflow start
