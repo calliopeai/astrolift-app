@@ -739,6 +739,18 @@ export type AstroliftAppDnsRecordsResult = {
   records: Array<AstroliftAppDnsRecord>;
 };
 
+export type AstroliftAppDoctorCheck = {
+  detail: Scalars['String']['output'];
+  fix: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftAppDoctorReport = {
+  checks: Array<AstroliftAppDoctorCheck>;
+  healthy: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAppDomain = {
   byoCertificateUploadedAt?: Maybe<Scalars['DateTime']['output']>;
   certExpiresAt?: Maybe<Scalars['DateTime']['output']>;
@@ -7485,6 +7497,7 @@ export type Query = {
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDeployTokensPage: AstroliftDeployTokenPage;
   astroliftAppDnsRecords: AstroliftAppDnsRecordsResult;
+  astroliftAppDoctor: AstroliftAppDoctorReport;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
@@ -7962,6 +7975,11 @@ export type QueryAstroliftAppDeployTokensPageArgs = {
 export type QueryAstroliftAppDnsRecordsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppDoctorArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 

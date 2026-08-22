@@ -45,6 +45,7 @@ import { BundleHome } from "./components/homes/bundle-home";
 import { CronjobHome } from "./components/homes/cronjob-home";
 import { FunctionHome } from "./components/homes/function-home";
 import { TaskHome } from "./components/homes/task-home";
+import { AppDoctorPanel } from "./components/app-doctor-panel";
 import { AutowireStatusBanner } from "./components/autowire-status-banner";
 import { StaleManifestNotice } from "@/components/StaleManifestNotice";
 
@@ -363,6 +364,11 @@ export function AppDetailClient({ slug }: { slug: string }) {
         sourceRepo={a.sourceRepo}
         autowire={a.autowire}
       />
+
+      {/* The cloud half of the same question (#1550). Autowire above covers
+          the repo wiring; this verifies the manifest, registry, push role,
+          DNS and deployment state. On demand: each run does live probes. */}
+      <AppDoctorPanel appSlug={a.slug} />
 
       {/* Primary object: the app's public URL / access surface. */}
       <UrlCard
