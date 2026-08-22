@@ -162,6 +162,39 @@ export const PUSH_CI_WORKFLOW = gql`
 // interpolated) so this file stays parseable by graphql-codegen's
 // document loader.
 
+// The inbound direction, which had no mutation at all. Selects repoText +
+// renderedText so the caller can render the comparison without a follow-up
+// query: the drift badge is only actionable if you can see what drifted.
+// The outbound direction stays RESYNC_CI_WORKFLOW below -- the destructive
+// behaviour was fixed in the service every push path shares, not by adding
+// a second, safer push field beside it.
+
+export const PULL_CI_WORKFLOW_FROM_REPO = gql`
+  mutation PullCiWorkflowFromRepo($input: CiWorkflowSyncActionInput!) {
+    pullCiWorkflowFromRepo(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+        repoText
+        renderedText
+        repoTextPulledAt
+      }
+    }
+  }
+`;
+
 export const RESYNC_CI_WORKFLOW = gql`
   mutation ResyncAstroliftCiWorkflow($input: CiWorkflowSyncActionInput!) {
     resyncAstroliftCiWorkflow(input: $input) {

@@ -1301,6 +1301,9 @@ type AstroliftCiWorkflowSyncStatus {
   path: String!
   prUrl: String!
   detail: String!
+  repoText: String!
+  renderedText: String!
+  repoTextPulledAt: DateTime
 }
 
 type AstroliftCiWorkflowSyncStatusMutationResult {
@@ -5404,6 +5407,7 @@ type Mutation {
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
   pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
   resyncAstroliftCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  pullCiWorkflowFromRepo(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   adoptRepoCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult!

@@ -1155,15 +1155,15 @@
       "loadingTitle": "Config",
       "loading": "Loading…",
       "updated": "updated {at}",
-      "syncFromRepo": "Sync from repo",
+      "syncFromRepo": "Pull from repo",
       "saveDraft": "Save draft",
       "saving": "Saving…",
       "pushToRepo": "Push to repo",
       "syncStates": {
-        "inSync": "In sync",
-        "dbAhead": "Unsaved drafts in DB",
+        "inSync": "Matches repo",
+        "dbAhead": "Unsaved drafts here",
         "repoAhead": "Repo ahead",
-        "diverged": "Diverged"
+        "diverged": "Both changed"
       },
       "conflict": {
         "title": "The manifest changed under your edit",
@@ -1199,9 +1199,9 @@
       "onBranch": "on branch",
       "openRepo": "Open repo",
       "confirmSync": {
-        "title": "Sync from repo?",
+        "title": "Pull from repo?",
         "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge.",
-        "confirm": "Sync from repo"
+        "confirm": "Pull from repo"
       },
       "view": {
         "form": "Form",

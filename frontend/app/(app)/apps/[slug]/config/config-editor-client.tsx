@@ -319,9 +319,9 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       const text = next?.rawManifestStaged || next?.rawManifest || "";
       setDraft(text);
       baselineRef.current = text;
-      toast.success("Synced from repo");
+      toast.success("Pulled from repo");
     } else {
-      throw new Error(data?.syncManifestFromRepo.errors?.[0]?.message ?? "Sync failed");
+      throw new Error(data?.syncManifestFromRepo.errors?.[0]?.message ?? "Couldn't pull from the repo");
     }
   }
 

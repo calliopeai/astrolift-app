@@ -207,6 +207,9 @@ export const GET_APP = gql`
         path
         prUrl
         detail
+        repoText
+        renderedText
+        repoTextPulledAt
       }
       settingsLastModified {
         deployStrategy

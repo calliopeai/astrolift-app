@@ -370,33 +370,81 @@ class AdoptResult:
     template_version: int
 
 
-def adopt_repo_ci_workflow(app) -> AdoptResult:
-    """Declare the repo's CURRENT workflow file the authoritative baseline.
+# The stored repo copy is a CI workflow file: GitHub caps a workflow at
+# well under this, and the platform's own render is ~4 KiB. A file past the
+# cap is refused rather than truncated, because a half-file shown as "what
+# your repo has" is worse than an error saying it was too big to keep.
+MAX_STORED_REPO_TEXT_BYTES: int = 64 * 1024
 
-    Fetches the repo file and re-points the app's sync record
-    (``synced_hash`` / ``synced_blob_sha`` / ``ci_workflow_template_version``)
-    at it, then flags ``state = in_sync``. Clears a ``repo_drift`` /
-    ``conflict`` by accepting the repo copy — WITHOUT pushing anything.
 
-    Per the epic's caveat, adopt does NOT import the repo file's config; it
-    only re-baselines the stamp tracking so the platform stops flagging a
-    file it now considers authoritative. Raises
-    :class:`CiWorkflowAdoptError` when there is no file to adopt.
+def pull_repo_ci_workflow(app) -> AdoptResult:
+    """Bring the repo's workflow file INTO the platform and make it the baseline.
+
+    The one direction that was missing. Every other action on this file
+    writes outward: :func:`~astrolift_scm.services.workflow_sync.sync_workflow_file_to_repo`
+    renders the template and puts it, and the sweep does the same. The
+    inbound half existed only as a digest re-baseline -- it stopped the
+    drift badge and threw the file away, so an operator's own workflow was
+    never anywhere the platform could show it.
+
+    This stores the text under ``ci_workflow_state["repo_text"]`` (with the
+    ref and byte length it was read at) alongside the re-baselined digests,
+    so ``astroliftApp.ciWorkflowSyncStatus`` can hand the UI the repo copy
+    to diff against the current render. Nothing is pushed.
+
+    Raises :class:`CiWorkflowAdoptError` when there is no file to pull, or
+    when the file is larger than :data:`MAX_STORED_REPO_TEXT_BYTES`.
     """
     repo_text = fetch_repo_ci_workflow(app)
     if repo_text is None:
         raise CiWorkflowAdoptError(
             "ABSENT",
-            "no managed CI workflow file exists in the repo to adopt; sync one first",
+            "no managed CI workflow file exists in the repo to pull; push one first",
         )
 
+    size = len(repo_text.encode("utf-8"))
+    if size > MAX_STORED_REPO_TEXT_BYTES:
+        raise CiWorkflowAdoptError(
+            "TOO_LARGE",
+            f"the repo's workflow file is {size} bytes, over the "
+            f"{MAX_STORED_REPO_TEXT_BYTES}-byte limit the platform keeps; "
+            "trim it or manage it outside Astrolift",
+        )
+
+    result = _rebaseline_on_repo_copy(app, repo_text, store_text=True)
+    return result
+
+
+def adopt_repo_ci_workflow(app) -> AdoptResult:
+    """Re-baseline onto the repo's file WITHOUT keeping a copy of it.
+
+    Retained for the deprecated ``adoptRepoCiWorkflow`` mutation. Identical
+    to :func:`pull_repo_ci_workflow` except that the file's text is not
+    stored, which is the whole reason a pull was added: adopting told the
+    platform to stop flagging a file it then could not show anyone.
+    """
+    repo_text = fetch_repo_ci_workflow(app)
+    if repo_text is None:
+        raise CiWorkflowAdoptError(
+            "ABSENT",
+            "no managed CI workflow file exists in the repo to adopt; push one first",
+        )
+    return _rebaseline_on_repo_copy(app, repo_text, store_text=False)
+
+
+def _rebaseline_on_repo_copy(app, repo_text: str, *, store_text: bool) -> AdoptResult:
+    """Point the sync record at ``repo_text`` and flag ``in_sync``.
+
+    Shared by the pull and the deprecated adopt so there is one place that
+    decides what "the repo copy is now the baseline" means on the record.
+    """
     from astrolift_scm.services.workflow_sync import _render_and_path
 
     _body, path = _render_and_path(app)
     parsed = parse_stamp(repo_text)
     # Honor the repo file's own stamp version when present; an unstamped file
-    # we adopt is declared current (so it reads IN_SYNC, not perpetually
-    # stale) — the column stays non-null to preserve "null == never synced".
+    # we take is declared current (so it reads IN_SYNC, not perpetually
+    # stale) -- the column stays non-null to preserve "null == never pushed".
     version = parsed.version if parsed.version is not None else TEMPLATE_VERSION
 
     now = timezone.now().isoformat()
@@ -408,8 +456,19 @@ def adopt_repo_ci_workflow(app) -> AdoptResult:
     blob["synced_at"] = now
     blob["checked_at"] = now
     blob["detail"] = ""
-    # Adopting the repo copy supersedes any pending platform sync PR.
+    # Taking the repo copy supersedes any pending platform push PR.
     blob.pop("pr_url", None)
+
+    if store_text:
+        blob["repo_text"] = repo_text
+        blob["repo_text_bytes"] = len(repo_text.encode("utf-8"))
+        blob["repo_text_ref"] = (app.deploy_branch or "main").strip() or "main"
+        blob["repo_text_pulled_at"] = now
+    else:
+        # An adopt that keeps no text must not leave a stale one behind
+        # claiming to be what the repo has.
+        for key in ("repo_text", "repo_text_bytes", "repo_text_ref", "repo_text_pulled_at"):
+            blob.pop(key, None)
 
     app.ci_workflow_template_version = version
     app.ci_workflow_state = blob
