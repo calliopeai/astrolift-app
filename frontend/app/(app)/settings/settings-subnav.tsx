@@ -2,6 +2,7 @@
 
 import {
   BellIcon,
+  PaletteIcon,
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const LINKS: SubnavLink[] = [
   { href: "/settings/profile", label: "Profile", icon: <UserIcon className="size-4" /> },
   { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon className="size-4" /> },
   { href: "/settings/notifications", label: "Notifications", icon: <BellIcon className="size-4" /> },
+  { href: "/settings/appearance", label: "Appearance", icon: <PaletteIcon className="size-4" /> },
 ];
 
 export function SettingsSubnav() {
