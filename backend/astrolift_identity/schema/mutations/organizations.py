@@ -31,6 +31,7 @@ from astrolift_identity.schema.types import (
     OrganizationType,
     organization_to_type,
 )
+from astrolift_operations.observability_profile import RETENTION_LOGS
 from core.appearance import AppearanceError, validate_appearance
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -89,6 +90,19 @@ class OrganizationMutations:
                     field="auditLogRetentionDays",
                 )
             org.audit_log_retention_days = days
+        if input.log_retention_days_default is not None:
+            log_days = int(input.log_retention_days_default)
+            # Bounded by the platform log-retention window rather than a
+            # literal, so this and the Logs surface that reads the column
+            # cannot drift apart. Above the ceiling the aggregator would
+            # be asked for lines the platform never promised to keep.
+            if log_days < 1 or log_days > RETENTION_LOGS.max_days:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"logRetentionDaysDefault must be between 1 and {RETENTION_LOGS.max_days}",
+                    field="logRetentionDaysDefault",
+                )
+            org.log_retention_days_default = log_days
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
         if input.default_resource_tags is not None:

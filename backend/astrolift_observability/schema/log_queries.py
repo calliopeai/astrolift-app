@@ -23,6 +23,7 @@ from strawberry.types import Info
 
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_observability.schema.types import AppLogLine, AppLogPage
+from astrolift_operations import observability_retention
 from astrolift_registry.models import RegisteredApp
 from core import cluster_log_query
 from core.cluster_observability import namespace_for_app
@@ -242,6 +243,19 @@ class LogHistoryQuery:
 
         since, until = _normalize_window(since, until)
         bounded_limit = _clamp_limit(limit)
+        # The 31-day ceiling above is a scan guard, not a policy. The
+        # platform's own log retention for this org is what decides
+        # whether lines that old still exist, and only the platform
+        # knows it — Loki reports nothing and the CloudWatch driver
+        # hardcodes reached_retention=False. Without this the operator
+        # reads "no lines in window" for a window that expired.
+        past_retention = since < observability_retention.cutoff_at(
+            observability_retention.effective_for(
+                stream="log",
+                org_override_days=app.organization.log_retention_days_default,
+            ),
+            now=dt.datetime.now(dt.UTC),
+        )
 
         namespace = namespace_for_app(app)
         try:
@@ -302,7 +316,7 @@ class LogHistoryQuery:
         return AppLogPage(
             items=items,
             next_cursor=page.next_cursor,
-            reached_retention=page.reached_retention,
+            reached_retention=page.reached_retention or past_retention,
             historical_available=True,
             total_count=len(items),
             reason=reason,
