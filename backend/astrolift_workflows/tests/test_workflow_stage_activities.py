@@ -1004,3 +1004,102 @@ def test_gate_capture_failure_does_not_break_decision(run, definition, monkeypat
 
     execution = WorkflowStageExecution.objects.get(pk=int(gate_exec))
     assert execution.status == "completed"  # decision still recorded
+
+
+# ---------------------------------------------------------------------------
+# Gate reviewer notification (#59)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_gate_open_emails_the_approver_named_on_the_stage(run, definition):
+    """Opening a gate notifies its reviewer: the stage's address-shaped
+    approver receives the review-request email."""
+    from django.core import mail
+
+    gate = _stage(definition, 1)
+    gate.approvers = ["team:reviewers", "reviewer@example.test"]
+    gate.save()
+
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    assert len(mail.outbox) == 1
+    message = mail.outbox[0]
+    assert message.to == ["reviewer@example.test"]
+    assert "stage-pipeline-s1" in message.subject
+
+
+@pytest.mark.django_db
+def test_gate_open_emits_notified_event_with_delivery_outcome(run, definition):
+    """The gate notification rides the platform event bus, so the activity
+    feed / outbound webhooks see the gate open and which channels delivered."""
+    from astrolift_operations.models import Event
+
+    gate = _stage(definition, 1)
+    gate.approvers = ["reviewer@example.test"]
+    gate.save()
+
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    event = Event.objects.get(event_type="workflow.human_gate.notified")
+    assert event.organization_id == run.organization_id
+    assert event.resource_kind == "workflow_run"
+    assert event.resource_id == str(run.guid)
+    assert event.payload["stage_name"] == gate.slug
+    assert event.payload["delivery"] == {"email": True}
+
+
+@pytest.mark.django_db
+def test_gate_open_falls_back_to_org_admin_when_no_approver_address(run, definition):
+    """Team / role approver slugs are not addresses, so a gate declaring only
+    those falls through to the service's org-admin recipient."""
+    from django.core import mail
+
+    gate = _stage(definition, 1)
+    gate.approvers = ["team:reviewers"]
+    gate.save()
+
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    admin_emails = set(
+        get_user_model().objects.filter(is_superuser=True, is_active=True).values_list("email", flat=True)
+    )
+    assert admin_emails  # the platform ships a superuser to fall back to
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to[0] in admin_emails
+
+
+@pytest.mark.django_db
+def test_non_gate_stage_open_does_not_notify(run, definition):
+    """Only human gates notify — an agent stage opening RUNNING must not mail
+    anyone, even when a recipient is resolvable."""
+    from django.core import mail
+
+    from astrolift_operations.models import Event
+
+    # A fallback recipient exists, so silence here can only come from the
+    # kind check and not from an unresolvable reviewer.
+    assert get_user_model().objects.filter(is_superuser=True, is_active=True).exists()
+
+    _create_stage_execution_sync(str(run.pk), str(_stage(definition, 0).pk), 1)
+
+    assert mail.outbox == []
+    assert not Event.objects.filter(event_type="workflow.human_gate.notified").exists()
+
+
+@pytest.mark.django_db
+def test_gate_notification_failure_does_not_break_stage_creation(run, definition, monkeypatch):
+    """Notification is side-effect-only: a broken mail / Slack path must not
+    fail the activity and stall the run at the gate."""
+    from astrolift_agents.services import human_gate as human_gate_service
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("notification exploded")
+
+    monkeypatch.setattr(human_gate_service, "notify_human_gate", _boom)
+
+    gate = _stage(definition, 1)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
+    assert execution.status == "running"
