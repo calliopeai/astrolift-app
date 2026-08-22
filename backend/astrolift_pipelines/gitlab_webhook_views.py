@@ -157,7 +157,8 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         triggers = Trigger.objects.filter(pipeline=pipeline, deleted_at__isnull=True)
         for trigger in triggers:
             # Remap trigger kind for gitlab MR → pull_request matching
-            if not _trigger_matches(trigger, canonical_kind, ref):
+            decision = _trigger_matches(trigger, canonical_kind, ref, payload)
+            if decision is None or not decision.should_trigger:
                 continue
             try:
                 run = PipelineRun.objects.create(

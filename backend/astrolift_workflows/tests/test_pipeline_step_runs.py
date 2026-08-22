@@ -187,7 +187,7 @@ def test_the_pods_output_is_kept_on_the_job_run(monkeypatch):
     from astrolift_workflows.activities import pipeline_job_spawn as mod
 
     job_run = _scaffold("g", [{"position": 0, "run": "echo hi"}])
-    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: object())
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run, job=None: object())
 
     async def _fake_tail(*, cluster, namespace, pod_name, tail):  # noqa: ARG001
         return ["building…", "", "   ", "done"]
@@ -205,7 +205,9 @@ def test_a_log_read_that_fails_does_not_cost_the_run(monkeypatch):
     from astrolift_workflows.activities import pipeline_job_spawn as mod
 
     job_run = _scaffold("h", [{"position": 0, "run": "true"}])
-    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: (_ for _ in ()).throw(RuntimeError("gone")))
+    monkeypatch.setattr(
+        mod, "_resolve_cluster", lambda run, job=None: (_ for _ in ()).throw(RuntimeError("gone"))
+    )
 
     mod._capture_job_logs(job_run=job_run, run=job_run.pipeline_run, pod=_pod("0 ran 0\n"))
 
@@ -218,7 +220,7 @@ def test_a_long_build_is_truncated_from_the_front(monkeypatch):
     from astrolift_workflows.activities import pipeline_job_spawn as mod
 
     job_run = _scaffold("i", [{"position": 0, "run": "true"}])
-    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: object())
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run, job=None: object())
 
     async def _fake_tail(*, cluster, namespace, pod_name, tail):  # noqa: ARG001
         return ["x" * 100 for _ in range(2000)] + ["THE-LAST-LINE"]
