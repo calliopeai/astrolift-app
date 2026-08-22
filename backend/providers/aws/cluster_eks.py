@@ -1327,13 +1327,15 @@ class EKSClusterDriver(ClusterDriver):
                     # delete them. txt registry is on by chart default.
                     "txtOwnerId": eks_cluster_name,
                     "sources": ["service", "ingress"],
-                    # external-dns defaults --aws-evaluate-target-health=true.
+                    # external-dns defaults aws-evaluate-target-health to true.
                     # On an ALB alias that makes Route53 answer NODATA whenever
                     # it can't positively see target health — a freshly deployed
                     # app reads as NXDOMAIN even with a healthy target group,
                     # and resolvers then negative-cache the miss. The ALB is
                     # already the health boundary; DNS must always answer.
-                    "extraArgs": ["--aws-evaluate-target-health=false"],
+                    # Kingpin negation form: "--flag=false" is a fatal parse
+                    # error ("unexpected false") that crashloops the pod.
+                    "extraArgs": ["--no-aws-evaluate-target-health"],
                     # Pin the SA name (chart default) so the IRSA trust subject
                     # the platform mints (astrolift-system:external-dns) is
                     # deterministic, not coupled to the Flux release name (#1044).
