@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from astrolift_clusters.ingress_modes import IngressMode
 from core.models.base import NamedBaseCoreModel
 
 
@@ -110,6 +111,28 @@ class TenantCluster(NamedBaseCoreModel):
     auth_method = models.CharField(max_length=32, choices=AuthMethod.choices)
     auth_config = models.JSONField(default=dict, blank=True)
     ingress_class = models.CharField(max_length=64, default="nginx")
+    # Ingress mode (#64). Decides how many cloud load balancers the
+    # cluster ends up provisioning: ``shared_ingress`` puts every app in
+    # an org into one ALB group, ``per_app_ingress`` leaves each Ingress
+    # with its own load balancer.
+    #
+    # Defaults to per_app_ingress even though
+    # ``astrolift_clusters.ingress_modes`` documents shared as the
+    # cheaper default: nothing emitted a grouping annotation before this
+    # field existed, so defaulting to shared would re-group load
+    # balancers that are already serving traffic on the next deploy.
+    # That has to be an operator's decision, not a migration's.
+    ingress_mode = models.CharField(
+        max_length=32,
+        choices=[(m.value, m.value) for m in IngressMode],
+        default=IngressMode.PER_APP_INGRESS.value,
+        help_text=(
+            "shared_ingress: one load balancer fronts every app in the org "
+            "(ALB group annotation). per_app_ingress: one load balancer per "
+            "app Ingress. Only honoured on ALB clusters -- an nginx-family "
+            "controller already shares one load balancer per cluster."
+        ),
+    )
     alb_auth_config = models.JSONField(
         null=True,
         blank=True,

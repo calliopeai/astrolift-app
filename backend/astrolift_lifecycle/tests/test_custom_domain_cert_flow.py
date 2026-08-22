@@ -795,3 +795,39 @@ def test_render_no_managed_domain_unchanged(deployment):
     ingresses = [r for r in out if r["kind"] == "Ingress"]
     assert len(ingresses) == 1
     assert ingresses[0]["metadata"]["labels"].get("astrolift.dev/managed-subdomain") != "true"
+
+
+# ---- ingress mode (#64) --------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_managed_subdomain_alb_carries_the_shared_group_when_the_cluster_asks(
+    deployment_alb,
+    cluster_alb,
+):
+    """This render path duplicates ``core.app_deploy``'s managed-subdomain
+    ALB block, so it has to stamp the shared-ingress group too, or the same
+    app lands in two different ALB groups depending on which path ran."""
+    from astrolift_clusters.ingress_modes import IngressMode
+
+    cluster_alb.ingress_mode = IngressMode.SHARED_INGRESS.value
+    cluster_alb.save(update_fields=["ingress_mode", "updated_at", "version"])
+
+    out = _render_app_ingresses_and_tls(deployment_alb.pk, "test-ns", _make_manifest())
+    ing = next(r for r in out if r["kind"] == "Ingress")
+    annotations = ing["metadata"]["annotations"]
+    assert annotations["alb.ingress.kubernetes.io/group.name"] == "astrolift-acme-test"
+    assert annotations["alb.ingress.kubernetes.io/group.order"] == "100"
+
+
+@pytest.mark.django_db
+def test_managed_subdomain_alb_has_no_group_by_default(deployment_alb, cluster_alb):
+    """Default cluster mode is per-app, so nothing about the rendered
+    Ingress changes for an install that never opts in."""
+    from astrolift_clusters.ingress_modes import IngressMode
+
+    assert cluster_alb.ingress_mode == IngressMode.PER_APP_INGRESS.value
+
+    out = _render_app_ingresses_and_tls(deployment_alb.pk, "test-ns", _make_manifest())
+    ing = next(r for r in out if r["kind"] == "Ingress")
+    assert "alb.ingress.kubernetes.io/group.name" not in ing["metadata"]["annotations"]

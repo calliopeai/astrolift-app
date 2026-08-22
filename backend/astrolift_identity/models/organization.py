@@ -126,6 +126,24 @@ class Organization(NamedBaseCoreModel):
     # covering the replacement.
     residency_allowed_regions = models.JSONField(default=list, blank=True)
 
+    # House theme for the operator UI (#135). The appearance axes — ground,
+    # accent, density, corners — are per-person by default; this is the org's
+    # answer for anyone who has not chosen, and `appearance_locked` makes it
+    # the answer for everyone.
+    #
+    # Stored as one JSON blob rather than four columns because the axis set is
+    # the frontend's to define (frontend/lib/appearance.ts) and will grow; a
+    # column per axis would put a migration in the way of every addition.
+    # Unknown or malformed keys are ignored by the client's `normalize`, so a
+    # stale value degrades to the shipped default instead of breaking the UI.
+    # Empty dict means "no house theme".
+    appearance_default = models.JSONField(default=dict, blank=True)
+
+    # When true the house theme wins outright and the personal picker renders
+    # read-only. Deliberately separate from `appearance_default` being set:
+    # an org can publish a default it wants people to be able to override.
+    appearance_locked = models.BooleanField(default=False)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

@@ -357,13 +357,19 @@ class Route53Driver(DnsDriver):
         return {"zone_id": zone_id, "nameservers": nameservers}
 
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.request_wildcard_cert")
-    def request_wildcard_cert(self, zone: str, zone_id: str) -> dict[str, Any]:
+    def request_wildcard_cert(
+        self,
+        zone: str,
+        zone_id: str,
+        sans: list[str] | None = None,
+    ) -> dict[str, Any]:
         acm = self._acm_client()
+        san_list = list(sans) if sans else [zone, f"*.{zone}"]
         try:
             cert_response = acm.request_certificate(
                 DomainName=f"*.{zone}",
                 ValidationMethod="DNS",
-                SubjectAlternativeNames=[zone, f"*.{zone}"],
+                SubjectAlternativeNames=san_list,
             )
         except Exception as exc:
             raise map_client_error(exc) from exc

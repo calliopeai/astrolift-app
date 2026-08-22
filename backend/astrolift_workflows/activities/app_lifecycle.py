@@ -775,6 +775,7 @@ def _render_app_ingresses_and_tls(
             )
             if computed:
                 if cluster.ingress_class == "alb":
+                    from core.app_deploy import shared_ingress_annotations
                     from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
 
                     alb_cfg = ALBConfig(
@@ -783,6 +784,15 @@ def _render_app_ingresses_and_tls(
                     )
                     driver = ALBIngressDriver(config=alb_cfg)
                     tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
+                    # Same grouping the other managed-subdomain renderer
+                    # applies. Both have to stamp it or a shared-mode
+                    # cluster ends up with the app in two ALB groups
+                    # depending on which render path ran.
+                    group_annotations = shared_ingress_annotations(
+                        cluster,
+                        org_slug=org_slug,
+                        app_slug=d.registered_app.slug,
+                    )
                     # One Ingress per workload; all hostnames for that
                     # workload go into its rules list (ALB LBC handles
                     # multi-host Ingress natively with one listener).
@@ -803,6 +813,10 @@ def _render_app_ingresses_and_tls(
                             rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = (
                                 ingress_state_label
                             )
+                            if group_annotations:
+                                rendered["metadata"].setdefault("annotations", {}).update(
+                                    group_annotations,
+                                )
                             out.append(rendered)
                 else:
                     # Generic Ingress for nginx, traefik, etc. All
@@ -1588,6 +1602,72 @@ async def delete_preview_namespace(preview_environment_id: int) -> str:
         extra={"preview_environment_id": preview_environment_id},
     )
     return namespace
+
+
+def _load_preview_teardown_state_sync(preview_environment_id: int) -> dict:
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    p = PreviewEnvironment.all_objects.get(pk=preview_environment_id)
+    return {
+        "preview_id": p.pk,
+        "status": p.status,
+        "torn_down_at_unix": (int(p.torn_down_at.timestamp()) if p.torn_down_at else None),
+    }
+
+
+@activity.defn(name="astrolift.preview.teardown_state")
+async def load_preview_teardown_state(preview_environment_id: int) -> dict:
+    """Project the row into ``preview_teardown.PreviewTeardownState``.
+
+    The teardown policy is Django-free (the workflow sandbox imports
+    it), so it can't read a row itself — this is the join that lets
+    ``teardown_steps_to_run`` decide what still needs doing. Reads
+    through ``all_objects`` because a closed PR's preview may already
+    be soft-deleted, and a soft-deleted preview still owns cluster
+    resources until this workflow finishes.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_load_preview_teardown_state_sync)(preview_environment_id)
+
+
+def _emit_preview_torn_down_event_sync(preview_environment_id: int) -> None:
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from core.events import Event
+
+    p = PreviewEnvironment.all_objects.select_related("registered_app").get(
+        pk=preview_environment_id,
+    )
+    Event.emit(
+        "preview_env.torn_down",
+        payload={
+            "preview_environment_guid": str(p.guid),
+            "pr_number": p.pr_number,
+            "branch": p.branch,
+            "hostname": p.hostname,
+            "namespace": p.namespace,
+        },
+        resource_kind="preview_environment",
+        resource_id=str(p.guid),
+        organization_id=p.registered_app.organization_id,
+        registered_app_id=p.registered_app_id,
+    )
+
+
+@activity.defn(name="astrolift.preview.emit_torn_down_event")
+async def emit_preview_torn_down_event(preview_environment_id: int) -> None:
+    """Emit the ``preview_env.torn_down`` event (teardown step 5).
+
+    Separate from ``mark_preview_torn_down`` so a re-fired teardown
+    can re-emit the event without touching the timestamp the first
+    run stamped -- which is exactly the convergence branch the policy's
+    ``teardown_steps_to_run`` returns for an inconsistent row.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_emit_preview_torn_down_event_sync)(preview_environment_id)
 
 
 def _create_rollback_deployment_sync(deployment_id: int) -> int:

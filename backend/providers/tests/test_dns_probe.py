@@ -93,7 +93,7 @@ def test_query_txt_round_trip(monkeypatch) -> None:
 
     monkeypatch.setattr(_dns_probe.socket, "socket", _factory)
 
-    answers = _dns_probe._query_txt(
+    answers = _dns_probe._query_records(
         server="127.0.0.1",
         qname="example.com",
     )
@@ -130,8 +130,49 @@ def test_query_txt_nxdomain_returns_empty(monkeypatch) -> None:
         "socket",
         lambda *a, **k: fake,
     )
-    answers = _dns_probe._query_txt(
+    answers = _dns_probe._query_records(
         server="127.0.0.1",
         qname="missing.example.com",
     )
     assert answers == []
+
+
+def test_query_ns_round_trip(monkeypatch) -> None:
+    """NS rdata is a domain name that may point back into the message, so it
+    has to be decoded against the whole buffer rather than the rdata slice."""
+    from _sdk import _dns_probe
+
+    class _FakeSock:
+        def __init__(self) -> None:
+            self.last_packet: bytes = b""
+
+        def settimeout(self, _t: float) -> None:
+            pass
+
+        def sendto(self, packet: bytes, _addr) -> None:
+            self.last_packet = packet
+
+        def recvfrom(self, _bufsize: int):
+            txid = struct.unpack(">H", self.last_packet[0:2])[0]
+            header = struct.pack(">HHHHHH", txid, 0x8180, 1, 1, 0, 0)
+            qname = _encode_name("apps.example.com")
+            question = qname + struct.pack(">HH", 2, 1)
+            # NS target 'ns-1.awsdns-01.com' with its final label replaced by a
+            # pointer to the question's 'com' label.
+            com_offset = 12 + len(_encode_name("apps.example")) - 1
+            rdata = b"\x04ns-1\x09awsdns-01" + bytes([0xC0, com_offset])
+            answer = bytes([0xC0, 0x0C]) + struct.pack(">HHIH", 2, 1, 300, len(rdata)) + rdata
+            return header + question + answer, ("127.0.0.1", 53)
+
+        def close(self) -> None:
+            pass
+
+    fake = _FakeSock()
+    monkeypatch.setattr(_dns_probe.socket, "socket", lambda *a, **k: fake)
+
+    answers = _dns_probe._query_records(
+        server="127.0.0.1",
+        qname="apps.example.com",
+        qtype=2,
+    )
+    assert answers == ["ns-1.awsdns-01.com"]

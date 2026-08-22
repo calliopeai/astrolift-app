@@ -269,8 +269,13 @@ class K8sIngressDriver(IngressDriver):
         if self._config.oidc_auth is not None:
             auth = self._config.oidc_auth
             annotations["nginx.ingress.kubernetes.io/auth-url"] = f"https://{auth.auth_proxy_host}/oauth2/auth"
+            # rd must be the FULL app URL: the auth host lives on its own
+            # hostname, so a path-only rd lands the user on the auth host
+            # after login instead of back on the app. oauth2-proxy's
+            # whitelist-domain gates which hosts the full-URL redirect
+            # may target.
             annotations["nginx.ingress.kubernetes.io/auth-signin"] = (
-                f"https://{auth.auth_proxy_host}/oauth2/start?rd=$escaped_request_uri"
+                f"https://{auth.auth_proxy_host}/oauth2/start?rd=https://$host$escaped_request_uri"
             )
             annotations["nginx.ingress.kubernetes.io/auth-response-headers"] = ",".join(auth.response_headers)
 

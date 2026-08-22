@@ -80,6 +80,18 @@ class WebhookSubscription(BaseCoreModel):
     # flows can show what tripped.
     disabled_reason = models.CharField(max_length=255, blank=True, default="")
 
+    # Reheal bookkeeping. The daily reheal sweep
+    # (``astrolift_workflows.periodic_maintenance``) re-tests disabled
+    # subscriptions and re-enables the ones whose endpoint came back.
+    # ``last_reheal_attempt_at`` is what the policy's 6-hour backoff is
+    # measured from -- without it the sweep would re-probe a dead
+    # endpoint on every tick; ``consecutive_failed_reheals`` is what
+    # decides the notify-exactly-once threshold. Both are distinct from
+    # ``last_delivery_at`` / ``failure_count``, which track real traffic
+    # and must not be moved by a probe.
+    last_reheal_attempt_at = models.DateTimeField(null=True, blank=True)
+    consecutive_failed_reheals = models.PositiveIntegerField(default=0)
+
     class Meta:
         indexes = [
             models.Index(fields=["organization", "is_active"], name="webhook_org_active_idx"),

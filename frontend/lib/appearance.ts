@@ -134,21 +134,63 @@ export function normalize(raw: unknown): Appearance {
   };
 }
 
-export function readAppearance(): Appearance {
+/**
+ * Keep only the axes present and valid, without filling in the rest.
+ *
+ * Distinct from `normalize`, which always returns a complete preference.
+ * A partial has to stay partial: an org that pins only the accent must not
+ * thereby also pin ground, density and corners to the shipped defaults, and
+ * a stored personal preference of `{accent}` must leave the org free to
+ * decide the other three.
+ */
+export function normalizePartial(raw: unknown): Partial<Appearance> {
+  const v = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const out: Partial<Appearance> = {};
+  if (isGround(v.ground)) out.ground = v.ground;
+  if (isAccent(v.accent)) out.accent = v.accent;
+  if (v.density === "cards" || v.density === "compact") out.density = v.density;
+  const corners = ([0, 2, 4, 10] as const).find((c) => c === v.corners);
+  if (corners !== undefined) out.corners = corners;
+  return out;
+}
+
+/**
+ * The stored personal preference, or `null` when this person has never
+ * chosen.
+ *
+ * Returning `null` rather than a filled-in default is load-bearing: an org
+ * default only applies to people who haven't chosen, and if "never chose"
+ * were indistinguishable from "chose the defaults" the org default would
+ * never apply to anyone — a policy that reads as coverage while covering
+ * nothing.
+ */
+export function readAppearance(): Partial<Appearance> | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return normalize(raw ? JSON.parse(raw) : null);
+    if (!raw) return null;
+    const parsed = normalizePartial(JSON.parse(raw));
+    return Object.keys(parsed).length > 0 ? parsed : null;
   } catch {
-    // private mode, disabled storage, or malformed JSON — fall back cleanly
-    return DEFAULT_APPEARANCE;
+    // private mode, disabled storage, or malformed JSON — treat as unset
+    return null;
   }
 }
 
-export function writeAppearance(next: Appearance): void {
+export function writeAppearance(next: Partial<Appearance>): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // preference just won't persist; the applied theme is still correct
+  }
+}
+
+/** Forget the personal preference entirely, handing the decision back to
+ * the org default (or the shipped one). */
+export function clearAppearance(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // nothing to do — the applied theme is still corrected by the caller
   }
 }
 
