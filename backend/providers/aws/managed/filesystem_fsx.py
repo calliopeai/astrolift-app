@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -33,6 +34,7 @@ from _sdk.managed_service import (
     VolumeSourceKind,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "filesystem"
 _MANAGED_BY = "platform"
@@ -57,7 +59,7 @@ _SIZE_CAPACITY = {
 
 
 @dataclass(frozen=True)
-class FSxConfig:
+class FSxConfig(CredentialedConfig):
     region: str
     account_id: str
     subnet_ids: tuple[str, ...] = ()
@@ -84,9 +86,7 @@ class FSxDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("fsx", region_name=config.region)
+            client = aws_client("fsx", region=config.region, credential=config.credential)
         self._fsx = client
         self._secrets = secrets_client
         self._sleep = sleep
@@ -603,9 +603,7 @@ class FSxDriver(ManagedServiceDriver):
 
     def _read_secret_scalar(self, secret_ref: str) -> str:
         if self._secrets is None:
-            import boto3
-
-            self._secrets = boto3.client("secretsmanager", region_name=self._config.region)
+            self._secrets = aws_client("secretsmanager", region=self._config.region, credential=self._config.credential)
         secret_id, _, field = secret_ref.partition("#")
         response = self._secrets.get_secret_value(SecretId=secret_id)
         value = str(response.get("SecretString") or "")

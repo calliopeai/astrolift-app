@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -56,6 +57,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 log = logging.getLogger("aws.managed.api_gateway_http")
 
@@ -74,7 +76,7 @@ _INVOKE_STATEMENT_ID = "AstroliftApiGatewayInvoke"
 
 
 @dataclass(frozen=True)
-class ApiGatewayHttpConfig:
+class ApiGatewayHttpConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str = "us-east-1"
@@ -96,15 +98,11 @@ class ApiGatewayHttpDriver:
         if client is not None:
             self._api = client
         else:
-            import boto3
-
-            self._api = boto3.client("apigatewayv2", region_name=config.region)
+            self._api = aws_client("apigatewayv2", region=config.region, credential=config.credential)
         if lambda_client is not None:
             self._lambda = lambda_client
         else:
-            import boto3
-
-            self._lambda = boto3.client("lambda", region_name=config.region)
+            self._lambda = aws_client("lambda", region=config.region, credential=config.credential)
 
     # ---- lifecycle ------------------------------------------------
 

@@ -46,6 +46,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -70,6 +71,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 log = logging.getLogger("aws.managed.faas_lambda")
 
@@ -96,7 +98,7 @@ _ROLE_PROPAGATION_SLEEP = 5
 
 
 @dataclass(frozen=True)
-class LambdaConfig:
+class LambdaConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str = "us-east-1"
@@ -125,15 +127,11 @@ class LambdaDriver(ManagedServiceDriver):
         if client is not None:
             self._lambda = client
         else:
-            import boto3
-
-            self._lambda = boto3.client("lambda", region_name=config.region)
+            self._lambda = aws_client("lambda", region=config.region, credential=config.credential)
         if iam_client is not None:
             self._iam = iam_client
         else:
-            import boto3
-
-            self._iam = boto3.client("iam", region_name=config.region)
+            self._iam = aws_client("iam", region=config.region, credential=config.credential)
 
     # ---- lifecycle ------------------------------------------------
 

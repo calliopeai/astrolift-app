@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "database_proxy"
 _PORTS = {"POSTGRESQL": 5432, "MYSQL": 3306, "SQLSERVER": 1433}
@@ -41,7 +43,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class RDSProxyConfig:
+class RDSProxyConfig(CredentialedConfig):
     region: str
     vpc_subnet_ids: list[str] = field(default_factory=list)
     vpc_security_group_ids: list[str] = field(default_factory=list)
@@ -63,15 +65,11 @@ class RDSProxyDriver(ManagedServiceDriver):
         if rds_client is not None:
             self._rds = rds_client
         else:
-            import boto3
-
-            self._rds = boto3.client("rds", region_name=config.region)
+            self._rds = aws_client("rds", region=config.region, credential=config.credential)
         if iam_client is not None:
             self._iam = iam_client
         else:
-            import boto3
-
-            self._iam = boto3.client("iam", region_name=config.region)
+            self._iam = aws_client("iam", region=config.region, credential=config.credential)
 
     @driver_op(
         cloud="aws",

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -33,12 +34,13 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "queue"
 
 
 @dataclass(frozen=True)
-class SQSConfig:
+class SQSConfig(CredentialedConfig):
     region: str
     account_id: str = ""
     queue_name_prefix: str = "astrolift"
@@ -98,9 +100,7 @@ class SQSDriver(ManagedServiceDriver):
         if client is not None:
             self._sqs = client
         else:
-            import boto3
-
-            self._sqs = boto3.client("sqs", region_name=config.region)
+            self._sqs = aws_client("sqs", region=config.region, credential=config.credential)
 
     # ---- lifecycle ------------------------------------------------
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -22,6 +23,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "cache"
 _SIZE_TO_NODE_TYPE = {
@@ -42,7 +44,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class ElastiCacheMemcachedConfig:
+class ElastiCacheMemcachedConfig(CredentialedConfig):
     region: str
     cache_subnet_group: str
     security_group_ids: list[str] = field(default_factory=list)
@@ -60,9 +62,7 @@ class ElastiCacheMemcachedDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if elasticache_client is None:
-            import boto3
-
-            elasticache_client = boto3.client("elasticache", region_name=config.region)
+            elasticache_client = aws_client("elasticache", region=config.region, credential=config.credential)
         self._ec = elasticache_client
 
     @driver_op(

@@ -53,6 +53,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -74,6 +75,7 @@ from aws.managed._base import (
     handle_for,
     parse_handle,
 )
+from aws.session import aws_client
 
 KIND = "email"
 
@@ -86,7 +88,7 @@ def _smtp_endpoint_for(region: str) -> str:
 
 
 @dataclass(frozen=True)
-class SESEmailConfig:
+class SESEmailConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -151,17 +153,14 @@ class AmazonSESDriver(ManagedServiceDriver):
         if ses_client is not None:
             self._ses = ses_client
         else:
-            import boto3
-
-            self._ses = boto3.client("ses", region_name=config.region)
+            self._ses = aws_client("ses", region=config.region, credential=config.credential)
         if secrets_client is not None:
             self._sm = secrets_client
         else:
-            import boto3
-
-            self._sm = boto3.client(
+            self._sm = aws_client(
                 "secretsmanager",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         # Lazily constructed Route53 driver used to publish the SES
         # domain-verification + Easy-DKIM records so a domain identity

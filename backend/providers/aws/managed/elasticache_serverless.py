@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -26,6 +27,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 _ENGINES = {"valkey", "redis", "memcached"}
 _STATE = {
@@ -44,7 +46,7 @@ _SIZE_LIMITS = {
 
 
 @dataclass(frozen=True)
-class ElastiCacheServerlessConfig:
+class ElastiCacheServerlessConfig(CredentialedConfig):
     region: str
     subnet_ids: list[str] = field(default_factory=list)
     security_group_ids: list[str] = field(default_factory=list)
@@ -67,13 +69,9 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if elasticache_client is None:
-            import boto3
-
-            elasticache_client = boto3.client("elasticache", region_name=config.region)
+            elasticache_client = aws_client("elasticache", region=config.region, credential=config.credential)
         if secrets_client is None:
-            import boto3
-
-            secrets_client = boto3.client("secretsmanager", region_name=config.region)
+            secrets_client = aws_client("secretsmanager", region=config.region, credential=config.credential)
         self._ec = elasticache_client
         self._sm = secrets_client
 

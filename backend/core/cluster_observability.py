@@ -25,12 +25,17 @@ contract stays narrow.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from astrolift_drivers.registry import DriverNotFound, plugins
-from core.cluster_credentials import CREDENTIAL_REFUSALS, assert_credential_supported
+from core.cluster_credentials import (
+    CREDENTIAL_REFUSALS,
+    assert_credential_supported,
+    credential_for_cluster,
+)
 
 if TYPE_CHECKING:
     from astrolift_clusters.models import TenantCluster
@@ -2309,6 +2314,32 @@ def managed_config_for(
     kind: str,
     variant: str = "",
 ) -> Any:
+    """Build a managed-service driver config, carrying the cluster's identity.
+
+    Thin wrapper over :func:`_managed_config_uncredentialed`, which builds the
+    config itself. The credential is stamped on afterwards rather than passed
+    into each of the forty-odd constructors, so a newly added kind cannot be
+    the one that forgets it.
+
+    ``dataclasses.replace`` rather than assignment because every driver config
+    is frozen. A config without the field is returned untouched: those are the
+    clouds where the credential does not apply.
+    """
+    cfg = _managed_config_uncredentialed(plugin_slug, cluster, kind=kind, variant=variant)
+    if not dataclasses.is_dataclass(cfg):
+        return cfg
+    if not any(f.name == "credential" for f in dataclasses.fields(cfg)):
+        return cfg
+    return dataclasses.replace(cfg, credential=credential_for_cluster(cluster))
+
+
+def _managed_config_uncredentialed(
+    plugin_slug: str,
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str = "",
+) -> Any:
     """Build a managed-service DRIVER config from the cluster's install
     settings (#1002).
 
@@ -2339,6 +2370,12 @@ def managed_config_for(
     pc = cluster.provider_config or {}
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
+
+    # The identity the VPC discovery below must run as. The networking
+    # helpers build their own ec2/eks/rds clients, so leaving them ambient
+    # would put the subnet group and security group in the control plane's
+    # account while the database itself went to the cluster's (#1422).
+    _cred = credential_for_cluster(cluster)
 
     # Every AWS driver builds ARNs by interpolating `account_id`. Prefer the
     # account the cluster was *proved* to be in when it was brought into
@@ -2487,13 +2524,13 @@ def managed_config_for(
         vpc_id = str(pc.get("vpc_endpoint_vpc_id") or pc.get("vpc_id") or "")
         subnet_ids = list(pc.get("vpc_endpoint_subnet_ids") or [])
         if not vpc_id:
-            import boto3
+            from aws.session import aws_client
 
             vpc_id, discovered_subnets, _ = discover_vpc(
                 cluster,
                 region=region,
-                ec2=boto3.client("ec2", region_name=region),
-                eks=boto3.client("eks", region_name=region),
+                ec2=aws_client("ec2", region=region, credential=_cred),
+                eks=aws_client("eks", region=region, credential=_cred),
             )
             if not subnet_ids:
                 subnet_ids = discovered_subnets
@@ -2517,6 +2554,7 @@ def managed_config_for(
 
         subnet_ids, security_group_ids = ensure_db_proxy_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return RDSProxyConfig(
@@ -2535,6 +2573,7 @@ def managed_config_for(
         port = {"postgres": 5432, "mysql": 3306, "mssql": 1433}[kind]
         subnet_group, sg_ids = ensure_db_networking(
             cluster,
+            credential=_cred,
             region=region,
             port=port,
             service="rds",
@@ -2639,6 +2678,7 @@ def managed_config_for(
             ) from exc
         subnet_ids, sg_ids = ensure_serverless_cache_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return ElastiCacheServerlessConfig(
@@ -2662,6 +2702,7 @@ def managed_config_for(
 
         subnet_group, sg_ids = ensure_db_networking(
             cluster,
+            credential=_cred,
             region=region,
             port=11211,
             service="elasticache",
@@ -2681,6 +2722,7 @@ def managed_config_for(
 
         subnet_group, sg_ids = ensure_memorydb_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return MemoryDBConfig(
@@ -2705,6 +2747,7 @@ def managed_config_for(
 
         subnet_group, sg_ids = ensure_db_networking(
             cluster,
+            credential=_cred,
             region=region,
             port=6379,
             service="elasticache",
@@ -2815,6 +2858,7 @@ def managed_config_for(
 
         subnet_ids, security_group_ids = ensure_msk_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return MSKConfig(
@@ -2838,6 +2882,7 @@ def managed_config_for(
 
         subnet_ids, security_group_ids = ensure_mq_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         engine_key = "rabbitmq" if variant == "amazon_mq_rabbitmq" else "activemq"
@@ -2868,6 +2913,7 @@ def managed_config_for(
 
         subnet_ids, security_group_ids = ensure_efs_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return EFSConfig(
@@ -2888,6 +2934,7 @@ def managed_config_for(
 
         subnet_ids, security_group_ids = ensure_fsx_networking(
             cluster,
+            credential=_cred,
             region=region,
             variant=variant,
         )
@@ -2916,6 +2963,7 @@ def managed_config_for(
             if public_access
             else ensure_opensearch_serverless_networking(
                 cluster,
+                credential=_cred,
                 region=region,
             )
         )
@@ -2947,6 +2995,7 @@ def managed_config_for(
 
         subnet_group, security_group_ids = ensure_documentdb_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return DocumentDBConfig(
@@ -2972,6 +3021,7 @@ def managed_config_for(
 
         subnet_group, security_group_ids = ensure_neptune_networking(
             cluster,
+            credential=_cred,
             region=region,
         )
         return NeptuneConfig(
@@ -2995,6 +3045,7 @@ def managed_config_for(
         serverless = variant == "redshift_serverless"
         subnet_group, subnet_ids, security_group_ids = ensure_redshift_networking(
             cluster,
+            credential=_cred,
             region=region,
             serverless=serverless,
         )
@@ -3058,6 +3109,7 @@ def managed_config_for(
                 if public_endpoint
                 else ensure_keyspaces_networking(
                     cluster,
+                    credential=_cred,
                     region=region,
                 )
             ),

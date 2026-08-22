@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -64,6 +65,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "kv_store"
 
@@ -82,7 +84,7 @@ _SIZE_TO_PROVISIONED_CAPACITY = {
 
 
 @dataclass(frozen=True)
-class DynamoDBConfig:
+class DynamoDBConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -115,9 +117,7 @@ class DynamoDBDriver(ManagedServiceDriver):
         if ddb_client is not None:
             self._ddb = ddb_client
         else:
-            import boto3
-
-            self._ddb = boto3.client("dynamodb", region_name=config.region)
+            self._ddb = aws_client("dynamodb", region=config.region, credential=config.credential)
 
     # ---- lifecycle ----------------------------------------------------
 

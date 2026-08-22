@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -59,6 +60,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "mysql"
 
@@ -85,7 +87,7 @@ _SIZE_TO_STORAGE_GB = {
 
 
 @dataclass(frozen=True)
-class RDSMySQLConfig:
+class RDSMySQLConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -137,17 +139,14 @@ class RDSMySQLDriver(ManagedServiceDriver):
         if rds_client is not None:
             self._rds = rds_client
         else:
-            import boto3
-
-            self._rds = boto3.client("rds", region_name=config.region)
+            self._rds = aws_client("rds", region=config.region, credential=config.credential)
         if secrets_client is not None:
             self._sm = secrets_client
         else:
-            import boto3
-
-            self._sm = boto3.client(
+            self._sm = aws_client(
                 "secretsmanager",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
 
     # ---- lifecycle ----------------------------------------------------

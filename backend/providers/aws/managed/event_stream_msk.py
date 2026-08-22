@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -33,6 +34,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "event_stream"
 _SIZE_INSTANCE = {
@@ -75,7 +77,7 @@ _UPDATE_PLAN_TAG = "astrolift.io/update-plan-sha256"
 
 
 @dataclass(frozen=True)
-class MSKConfig:
+class MSKConfig(CredentialedConfig):
     region: str
     account_id: str
     cluster_name_prefix: str = "astrolift"
@@ -100,9 +102,7 @@ class MSKDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("kafka", region_name=config.region)
+            client = aws_client("kafka", region=config.region, credential=config.credential)
         self._msk = client
         self._sleep = sleep
 

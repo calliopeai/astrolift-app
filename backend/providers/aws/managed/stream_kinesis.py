@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "stream"
 _MODES = {"ON_DEMAND", "PROVISIONED"}
@@ -41,7 +43,7 @@ _SIZE_SHARDS = {"small": 1, "medium": 2, "large": 4, "xlarge": 8}
 
 
 @dataclass(frozen=True)
-class KinesisConfig:
+class KinesisConfig(CredentialedConfig):
     region: str
     account_id: str
     stream_name_prefix: str = "astrolift"
@@ -55,9 +57,7 @@ class KinesisDriver(ManagedServiceDriver):
     def __init__(self, *, config: KinesisConfig, client: Any | None = None) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("kinesis", region_name=config.region)
+            client = aws_client("kinesis", region=config.region, credential=config.credential)
         self._kinesis = client
 
     @driver_op(

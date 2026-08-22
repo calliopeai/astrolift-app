@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -34,6 +35,7 @@ from _sdk.managed_service import (
     VolumeSourceKind,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "filesystem"
 _MANAGED_BY = "platform"
@@ -48,7 +50,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class EFSConfig:
+class EFSConfig(CredentialedConfig):
     region: str
     account_id: str
     subnet_ids: tuple[str, ...] = ()
@@ -70,9 +72,7 @@ class EFSDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("efs", region_name=config.region)
+            client = aws_client("efs", region=config.region, credential=config.credential)
         self._efs = client
         self._sleep = sleep
 

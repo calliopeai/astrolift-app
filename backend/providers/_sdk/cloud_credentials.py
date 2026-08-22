@@ -41,7 +41,7 @@ why they are absent rather than half-supported.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -232,3 +232,27 @@ def _reject_inline_secrets(cloud: str, block: dict[str, Any]) -> None:
         f"({', '.join(offenders)}). It is a plaintext JSON column; a literal there "
         f"cannot be unwritten. Declare a role to assume instead.",
     )
+
+
+@dataclass(frozen=True)
+class CredentialedConfig:
+    """Base for a driver config that carries the identity to act as (#1422).
+
+    Every managed-service driver takes its own frozen ``*Config`` dataclass
+    and builds clients from it, so the credential has to reach them the same
+    way the region already does. Declared once here rather than repeated on
+    forty configs, so a driver cannot be migrated onto ``aws_client`` while
+    quietly lacking the field.
+
+    ``kw_only`` because the subclasses declare required fields of their own
+    (``region: str`` and friends) and an inherited field with a default would
+    otherwise have to come first, which is exactly the ordering error
+    dataclasses refuse. ``kw_only`` fields are excluded from that rule.
+
+    Defaults to None, which ``aws_client`` treats as ambient. A config built
+    before this existed therefore behaves byte-identically, which is the
+    property that makes the migration reviewable: nothing changes until a
+    cluster declares a credential.
+    """
+
+    credential: CloudCredential | None = field(default=None, kw_only=True)

@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from aws.session import aws_client
+
 log = logging.getLogger("astrolift.providers.aws.managed.networking")
 
 _MANAGED_TAGS = [
@@ -26,14 +28,13 @@ _MANAGED_TAGS = [
 ]
 
 
-def _clients(region: str, *, ec2=None, rds=None, elasticache=None, eks=None):
-    import boto3
+def _clients(region: str, *, ec2=None, rds=None, elasticache=None, eks=None, credential=None):
 
     return (
-        ec2 or boto3.client("ec2", region_name=region),
-        rds or boto3.client("rds", region_name=region),
-        elasticache or boto3.client("elasticache", region_name=region),
-        eks or boto3.client("eks", region_name=region),
+        ec2 or aws_client("ec2", region=region, credential=credential),
+        rds or aws_client("rds", region=region, credential=credential),
+        elasticache or aws_client("elasticache", region=region, credential=credential),
+        eks or aws_client("eks", region=region, credential=credential),
     )
 
 
@@ -217,6 +218,7 @@ def ensure_db_networking(
     port: int,
     service: str,  # "rds" | "elasticache"
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[str, list[str]]:
     """Resolve ``(subnet_group_name, [security_group_id])`` for a VPC-bound
     managed service, creating the shared per-cluster infra if absent.
@@ -230,7 +232,7 @@ def ensure_db_networking(
     if pc.get(group_key) and pc.get("db_security_group_ids"):
         return str(pc[group_key]), list(pc["db_security_group_ids"])
 
-    ec2, rds, elasticache, eks = clients or _clients(region)
+    ec2, rds, elasticache, eks = clients or _clients(region, credential=credential)
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
         cluster,
         region=region,
@@ -273,6 +275,7 @@ def ensure_db_proxy_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve private subnet and security-group IDs for RDS Proxy.
 
@@ -286,7 +289,7 @@ def ensure_db_proxy_networking(
     if pc.get("db_proxy_subnet_ids") and pc.get("db_proxy_security_group_ids"):
         return list(pc["db_proxy_subnet_ids"]), list(pc["db_proxy_security_group_ids"])
 
-    ec2, _rds, _elasticache, eks = clients or _clients(region)
+    ec2, _rds, _elasticache, eks = clients or _clients(region, credential=credential)
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
         cluster,
         region=region,
@@ -315,6 +318,7 @@ def ensure_serverless_cache_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve raw private network IDs for ElastiCache Serverless.
 
@@ -331,7 +335,7 @@ def ensure_serverless_cache_networking(
             pc["serverless_cache_security_group_ids"],
         )
 
-    ec2, _rds, _elasticache, eks = clients or _clients(region)
+    ec2, _rds, _elasticache, eks = clients or _clients(region, credential=credential)
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
         cluster,
         region=region,
@@ -359,6 +363,7 @@ def ensure_memorydb_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[str, list[str]]:
     """Find or create the private subnet group and access group for MemoryDB."""
 
@@ -367,11 +372,9 @@ def ensure_memorydb_networking(
         return str(pc["memorydb_subnet_group"]), list(pc["memorydb_security_group_ids"])
 
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        memorydb = boto3.client("memorydb", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        memorydb = aws_client("memorydb", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, memorydb, eks = clients
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
@@ -417,6 +420,7 @@ def ensure_opensearch_serverless_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> list[str]:
     """Find or create the cluster-scoped OpenSearch Serverless VPC endpoint."""
 
@@ -425,11 +429,9 @@ def ensure_opensearch_serverless_networking(
         return list(pc["opensearch_serverless_vpc_endpoint_ids"])
 
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        aoss = boto3.client("opensearchserverless", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        aoss = aws_client("opensearchserverless", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, aoss, eks = clients
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
@@ -480,6 +482,7 @@ def ensure_documentdb_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[str, list[str]]:
     """Find or create a DocumentDB-specific subnet group and access SG."""
 
@@ -487,11 +490,9 @@ def ensure_documentdb_networking(
     if pc.get("documentdb_subnet_group") and pc.get("documentdb_security_group_ids"):
         return str(pc["documentdb_subnet_group"]), list(pc["documentdb_security_group_ids"])
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        docdb = boto3.client("docdb", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        docdb = aws_client("docdb", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, docdb, eks = clients
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
@@ -537,6 +538,7 @@ def ensure_neptune_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[str, list[str]]:
     """Find or create a Neptune-specific subnet group and access SG."""
 
@@ -544,11 +546,9 @@ def ensure_neptune_networking(
     if pc.get("neptune_subnet_group") and pc.get("neptune_security_group_ids"):
         return str(pc["neptune_subnet_group"]), list(pc["neptune_security_group_ids"])
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        neptune = boto3.client("neptune", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        neptune = aws_client("neptune", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, neptune, eks = clients
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
@@ -589,6 +589,7 @@ def ensure_redshift_networking(
     region: str,
     serverless: bool,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[str, list[str], list[str]]:
     """Resolve private Redshift subnet and security-group resources."""
 
@@ -601,11 +602,9 @@ def ensure_redshift_networking(
             raise RuntimeError("Redshift Serverless requires at least three distinct subnets")
         return pinned_subnet_group, pinned_subnets, pinned_groups
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        redshift = boto3.client("redshift", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        redshift = aws_client("redshift", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, redshift, eks = clients
     vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
@@ -652,6 +651,7 @@ def ensure_msk_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve private subnets and a Kafka access SG for Amazon MSK.
 
@@ -666,10 +666,8 @@ def ensure_msk_networking(
     if pinned_subnets and pinned_groups:
         return pinned_subnets, pinned_groups
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, eks = clients
     vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
@@ -720,6 +718,7 @@ def ensure_mq_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve private multi-AZ subnets and TLS broker ingress for Amazon MQ."""
 
@@ -729,10 +728,8 @@ def ensure_mq_networking(
     if pinned_subnets and pinned_groups:
         return pinned_subnets, pinned_groups
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, eks = clients
     vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
@@ -781,6 +778,7 @@ def ensure_efs_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve private multi-AZ subnets and NFS ingress for Amazon EFS."""
 
@@ -790,10 +788,8 @@ def ensure_efs_networking(
     if pinned_subnets and pinned_groups:
         return pinned_subnets, pinned_groups
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, eks = clients
     vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
@@ -825,6 +821,7 @@ def ensure_fsx_networking(
     region: str,
     variant: str,
     clients: Any | None = None,
+    credential=None,
 ) -> tuple[list[str], list[str]]:
     """Resolve private subnets and protocol ingress for an FSx variant."""
 
@@ -843,10 +840,8 @@ def ensure_fsx_networking(
     if pinned_subnets and pinned_groups:
         return pinned_subnets, pinned_groups
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, eks = clients
     vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
@@ -896,6 +891,7 @@ def ensure_keyspaces_networking(
     *,
     region: str,
     clients: Any | None = None,
+    credential=None,
 ) -> str:
     """Find or create a private Amazon Keyspaces interface VPC endpoint."""
 
@@ -903,10 +899,8 @@ def ensure_keyspaces_networking(
     if pc.get("keyspaces_vpc_endpoint_id"):
         return str(pc["keyspaces_vpc_endpoint_id"])
     if clients is None:
-        import boto3
-
-        ec2 = boto3.client("ec2", region_name=region)
-        eks = boto3.client("eks", region_name=region)
+        ec2 = aws_client("ec2", region=region, credential=credential)
+        eks = aws_client("eks", region=region, credential=credential)
     else:
         ec2, eks = clients
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(

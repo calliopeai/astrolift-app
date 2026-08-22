@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -26,6 +27,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "sms"
 _OWNERSHIP_TAG = "astrolift.io/sms-binding"
@@ -53,7 +55,7 @@ _ALLOWED_CONFIG = {
 
 
 @dataclass(frozen=True)
-class SNSSmsConfig:
+class SNSSmsConfig(CredentialedConfig):
     region: str
     account_id: str
     topic_name_prefix: str = "astrolift-sms"
@@ -70,9 +72,7 @@ class SNSSmsDriver(ManagedServiceDriver):
     def __init__(self, *, config: SNSSmsConfig, client: Any | None = None) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("sns", region_name=config.region)
+            client = aws_client("sns", region=config.region, credential=config.credential)
         self._sns = client
 
     @driver_op(
