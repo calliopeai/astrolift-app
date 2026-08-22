@@ -9786,6 +9786,7 @@ export type UpdateOrganizationInput = {
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
+  logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
