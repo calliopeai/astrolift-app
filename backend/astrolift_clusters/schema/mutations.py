@@ -16,6 +16,7 @@ import datetime as dt
 import hashlib
 import logging
 import secrets
+from collections.abc import Callable, Mapping
 
 import strawberry
 from django.db import transaction
@@ -35,10 +36,11 @@ from astrolift_clusters.schema.types import (
     cluster_to_type,
     domain_to_type,
 )
-from astrolift_graphql import GUID, MutationResultType
+from astrolift_graphql import GUID, MutationErrorType, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_operations import observability_profile
 from astrolift_workflows.client import signal_workflow, start_workflow
 from astrolift_workflows.inputs import (
     Actor,
@@ -56,6 +58,67 @@ from core.tenancy import get_current_tenant
 logger = logging.getLogger(__name__)
 
 JSON = strawberry.scalars.JSON
+
+
+# The per-cluster observability driver bundle rides in ``provider_config``
+# under these key pairs; the read paths that consume it
+# (``core.cluster_log_query``, ``astrolift_observability.trace_client``)
+# log-and-skip anything malformed. So a typo'd key persists fine and only
+# surfaces weeks later as an empty Logs tab with nothing pointing at the
+# cause. Refuse it at the write boundary instead.
+_OBSERVABILITY_DRIVER_KEYS: tuple[tuple[str, str, Callable[..., object]], ...] = (
+    ("log_driver", "log_config", observability_profile.validate_log_driver_config),
+    (
+        "metrics_driver",
+        "metrics_config",
+        observability_profile.validate_metrics_driver_config,
+    ),
+    ("trace_driver", "trace_config", observability_profile.validate_trace_driver_config),
+)
+
+
+def _observability_config_issues(provider_config: object) -> list[str]:
+    """Every observability misconfiguration in ``provider_config``.
+
+    An absent driver key is not an issue — a cluster with no aggregator
+    wired is the normal case and the read paths already render the "live
+    tail only" empty state for it. All issues are collected rather than
+    raising on the first so the operator fixes one round-trip's worth at
+    a time instead of playing whack-a-mole.
+    """
+    if not isinstance(provider_config, Mapping):
+        return []
+    issues: list[str] = []
+    for driver_key, config_key, validate in _OBSERVABILITY_DRIVER_KEYS:
+        driver = provider_config.get(driver_key)
+        if driver is None or (isinstance(driver, str) and not driver.strip()):
+            continue
+        try:
+            # Lowercased to match how the read paths normalize the kind,
+            # so validation can't pass a driver they will later skip.
+            validate(
+                driver=str(driver).strip().lower(),
+                config=provider_config.get(config_key) or {},
+            )
+        except observability_profile.ObservabilityProfileError as exc:
+            issues.append(f"providerConfig.{driver_key}: {exc}")
+    return issues
+
+
+def _observability_failure(issues: list[str]) -> MutationResultType[None]:
+    """Multi-error envelope — one ``errors`` entry per misconfiguration."""
+    return MutationResultType(
+        ok=False,
+        data=None,
+        errors=[
+            MutationErrorType(
+                code=ErrorCode.VALIDATION.value,
+                message=issue,
+                field="providerConfig",
+            )
+            for issue in issues
+        ],
+    )
 
 
 def _decommission_workflow_id(cluster_guid: str) -> str:
@@ -433,6 +496,9 @@ class ClustersMutation:
                 f"cluster slug {input.slug!r} already registered",
                 field="slug",
             )
+        issues = _observability_config_issues(input.provider_config)
+        if issues:
+            return _observability_failure(issues)
 
         org = None
         if input.organization_scoped:

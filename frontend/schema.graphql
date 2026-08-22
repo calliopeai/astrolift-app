@@ -2671,6 +2671,19 @@ type AstroliftNotificationPreferenceMutationResult {
   data: AstroliftNotificationPreference
 }
 
+type AstroliftNotificationProfile {
+  id: GUID!
+  driver: String!
+  retentionDeliveryDays: Int!
+  isActive: Boolean!
+}
+
+type AstroliftNotificationProfileMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftNotificationProfile
+}
+
 enum AstroliftObservabilityPanelReason {
   OK
   NOT_CONFIGURED
@@ -5297,6 +5310,7 @@ type Mutation {
   registerMobileDevice(input: RegisterMobileDeviceInput!): AstroliftDeviceRegistrationMutationResult!
   revokeMobileDevice(input: RevokeMobileDeviceInput!): RevokemobiledevicepayloadMutationResult!
   setNotificationPreference(input: SetNotificationPreferenceInput!): AstroliftNotificationPreferenceMutationResult!
+  setNotificationProfile(input: SetNotificationProfileInput!): AstroliftNotificationProfileMutationResult!
   createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
@@ -6557,6 +6571,12 @@ input SetNotificationPreferenceInput {
   enabled: Boolean!
 }
 
+input SetNotificationProfileInput {
+  driver: String!
+  config: JSON!
+  retentionDeliveryDays: Int = null
+}
+
 input SetPreviewPinnedInput {
   id: GUID!
   pinned: Boolean!
@@ -6816,6 +6836,7 @@ input UpdateOrganizationInput {
   name: String = null
   website: String = null
   auditLogRetentionDays: Int = null
+  logRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
