@@ -185,6 +185,11 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # attachable and left its Secret behind (read-only cluster reads,
         # per-box try/except, an unobservable box is left untouched).
         ScheduleKind.AGENT_BOX_REAP,
+        # Cert-expiry monitor ships active (#155) — the failure it catches
+        # (a cert that quietly stopped renewing) only shows up otherwise as
+        # a production TLS outage. Read-only provider reads, per-domain
+        # try/except, watermarked so a threshold pages once.
+        ScheduleKind.CERT_EXPIRY,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)

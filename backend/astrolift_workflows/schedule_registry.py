@@ -199,6 +199,17 @@ class ScheduleKind(StrEnum):
     unreachable cluster resolves to "leave as-is" rather than to a death
     certificate."""
 
+    CERT_EXPIRY = "cert_expiry"
+    """Daily — refresh each live custom domain's cached TLS-cert snapshot
+    from its provider and evaluate it against the 30 / 14 / 7-day reminder
+    thresholds (spec 13 §5.3, #155), emitting domain.cert_expiring on a
+    threshold crossing and domain.cert_renewal_failed while a cert inside
+    the 7-day window keeps failing to renew. Kept distinct from ALERT_EVAL
+    (AlertRule predicates) and UPTIME_PROBE (edge reachability): a cert
+    that stops renewing is invisible to both until the day TLS breaks.
+    Crossings are watermarked per domain (``cert_expiry_checked_at``) so
+    each reminder pages exactly once, not daily."""
+
     CI_WORKFLOW_RESYNC = "ci_workflow_resync"
     """Every 1 hr (HELD — opt-in) — recompute drift for every app with a
     managed CI workflow file and auto-push ONLY the SAFE states
@@ -437,6 +448,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.AGENT_BOX_REAP,
         ),
         description="Settle live AgentBox rows against their k8s Job (#128)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.CERT_EXPIRY,
+        workflow_name="CertExpiryTickWorkflow",
+        interval_seconds=24 * 60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.CERT_EXPIRY,
+        ),
+        description="Daily TLS cert expiry check: 30/14/7-day reminders + renewal-failure escalation (#155)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CI_WORKFLOW_RESYNC,

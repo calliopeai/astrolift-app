@@ -37,8 +37,8 @@ import {
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 import {
-  ADOPT_REPO_CI_WORKFLOW,
   OPEN_CI_WORKFLOW_RECONCILE_PR,
+  PULL_CI_WORKFLOW_FROM_REPO,
   REFRESH_CI_WORKFLOW_SYNC_STATUS,
   RESYNC_CI_WORKFLOW,
 } from "@/graphql/scm/scm.mutations";
@@ -445,19 +445,23 @@ export function CiSetupSection({
 }
 
 // ---------------------------------------------------------------------
-// Managed CI-workflow drift status + actions (#1210, Phase 2)
+// Managed CI-workflow status + actions (#1210)
 //
-// Reads the app's ``ciWorkflowSyncStatus`` rollup and renders a drift
-// badge (in_sync / template_stale / repo_drift / conflict / absent /
-// unknown) plus three operator actions, gated behind `app.update`:
+// Two directions, named after what they do, plus a re-check:
 //
-//   * Refresh     — recompute drift now by reading the repo.
-//   * Resync      — re-render + push the current template (fixes
-//                   template_stale / absent).
-//   * Adopt repo  — accept the repo's current file as the new baseline
-//                   WITHOUT pushing (clears repo_drift / conflict). It
-//                   only re-baselines the stamp tracking; it does NOT
-//                   import the repo file's config, hence the confirm.
+//   * Check      — read the repo and reclassify.
+//   * Pull       — bring the repo's file INTO the platform and baseline
+//                  on it. Stores its text, so the comparison below has
+//                  something to show. Pushes nothing.
+//   * Push       — send the platform's current template to the repo. A
+//                  hand-edited file goes through a reviewable PR rather
+//                  than being overwritten in place.
+//
+// "Resync" used to be the only outbound action and it direct-wrote onto
+// an unprotected deploy branch, so pressing it on an edited file lost
+// the edit. "Adopt repo copy" was the only inbound one and it kept no
+// copy, so a drift badge pointed at a file nobody could read. Both are
+// still reachable through the deprecated mutations for API clients.
 //
 // Each mutation returns the refreshed status; we refetch `GetApp` so
 // the badge (sourced from the app query) converges after the action.
@@ -468,11 +472,11 @@ interface CiSyncMutationResult {
   errors: Array<{ code: string; message: string; field?: string | null }>;
   data: AstroliftCiWorkflowSyncStatus | null;
 }
-interface ResyncResp {
+interface PushResp {
   resyncAstroliftCiWorkflow: CiSyncMutationResult;
 }
-interface AdoptResp {
-  adoptRepoCiWorkflow: CiSyncMutationResult;
+interface PullResp {
+  pullCiWorkflowFromRepo: CiSyncMutationResult;
 }
 interface RefreshResp {
   refreshCiWorkflowSyncStatus: CiSyncMutationResult;
@@ -484,26 +488,26 @@ interface ReconcileResp {
 /** Badge presentation per drift state. Unknown states fall back to the
  *  neutral muted chip rather than blanking out. */
 const DRIFT_BADGE: Record<string, { label: string; className: string }> = {
-  in_sync: { label: "in sync", className: "bg-success/10 text-success-fg" },
-  template_stale: { label: "template stale", className: "bg-warning/10 text-warning-fg" },
-  repo_drift: { label: "repo drift", className: "bg-warning/10 text-warning-fg" },
-  conflict: { label: "conflict", className: "bg-danger/10 text-danger-fg" },
-  absent: { label: "not synced", className: "bg-muted text-muted-foreground" },
+  in_sync: { label: "matches", className: "bg-success/10 text-success-fg" },
+  template_stale: { label: "template behind", className: "bg-warning/10 text-warning-fg" },
+  repo_drift: { label: "edited in repo", className: "bg-warning/10 text-warning-fg" },
+  conflict: { label: "both changed", className: "bg-danger/10 text-danger-fg" },
+  absent: { label: "not in repo", className: "bg-muted text-muted-foreground" },
   unknown: { label: "unknown", className: "bg-muted text-muted-foreground" },
 };
 
 /** One-line, human plain-English gloss under the badge so an operator
  *  knows what the state means and which action resolves it. */
 const DRIFT_HINT: Record<string, string> = {
-  in_sync: "The managed workflow file matches the current template. Nothing to do.",
+  in_sync: "The repo's workflow file matches what the platform renders. Nothing to do.",
   template_stale:
-    "The repo file is unchanged but the platform renders a newer template. Resync to update it.",
+    "The repo file is untouched, but the platform renders a newer template. Push to update it.",
   repo_drift:
-    "The repo file was edited away from what the platform synced. Resync to overwrite, or adopt the repo copy.",
+    "Someone edited the repo's file. Pull to keep their version, or push to replace it through a PR.",
   conflict:
-    "Both the repo file and the template changed. Resync to overwrite the repo, or adopt the repo copy as the baseline.",
-  absent: "No managed workflow file on the deploy branch. Resync to create one.",
-  unknown: "Drift couldn't be determined on the last check. Refresh to try again.",
+    "The repo file and the template both changed. Pull to keep the repo's version, or push to replace it through a PR.",
+  absent: "No workflow file on the deploy branch. Push to create one.",
+  unknown: "The repo couldn't be read on the last check. Check again to retry.",
 };
 
 function WorkflowSyncStatusControl({
@@ -513,11 +517,11 @@ function WorkflowSyncStatusControl({
   appId: string;
   status: AstroliftCiWorkflowSyncStatus;
 }) {
-  const [resync, { loading: resyncing }] = useMutation<ResyncResp>(RESYNC_CI_WORKFLOW, {
+  const [push, { loading: pushing }] = useMutation<PushResp>(RESYNC_CI_WORKFLOW, {
     refetchQueries: ["GetApp"],
     awaitRefetchQueries: true,
   });
-  const [adopt, { loading: adopting }] = useMutation<AdoptResp>(ADOPT_REPO_CI_WORKFLOW, {
+  const [pull, { loading: pulling }] = useMutation<PullResp>(PULL_CI_WORKFLOW_FROM_REPO, {
     refetchQueries: ["GetApp"],
     awaitRefetchQueries: true,
   });
@@ -529,11 +533,12 @@ function WorkflowSyncStatusControl({
     OPEN_CI_WORKFLOW_RECONCILE_PR,
     { refetchQueries: ["GetApp"], awaitRefetchQueries: true }
   );
-  const [confirmAdoptOpen, setConfirmAdoptOpen] = React.useState(false);
+  const [confirmPullOpen, setConfirmPullOpen] = React.useState(false);
+  const [comparing, setComparing] = React.useState(false);
 
   const badge = DRIFT_BADGE[status.state] ?? DRIFT_BADGE.unknown;
   const hint = DRIFT_HINT[status.state] ?? DRIFT_HINT.unknown;
-  const busy = resyncing || adopting || refreshing || reconciling;
+  const busy = pushing || pulling || refreshing || reconciling;
   // A reconcile PR only makes sense for a drifted (hand-edited) file.
   const canReconcile = status.state === "repo_drift" || status.state === "conflict";
 
@@ -552,18 +557,18 @@ function WorkflowSyncStatusControl({
     }
   }
 
-  async function handleResync() {
+  async function handlePush() {
     try {
-      const { data } = await resync({ variables: { input: { appId } } });
+      const { data } = await push({ variables: { input: { appId } } });
       const payload = data?.resyncAstroliftCiWorkflow;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't resync the workflow file.");
+        toast.error(payload?.errors?.[0]?.message ?? "Couldn't push the workflow file.");
         return;
       }
       if (payload.data.prUrl) {
         toast.success(
           <span>
-            Branch is protected — opened a PR.{" "}
+            Opened a PR rather than overwriting the repo&apos;s file.{" "}
             <Link href={payload.data.prUrl} target="_blank" rel="noreferrer" className="underline">
               View PR
             </Link>
@@ -571,9 +576,9 @@ function WorkflowSyncStatusControl({
         );
         return;
       }
-      toast.success("Resynced the managed workflow file to the current template.");
+      toast.success("Pushed the current template to the repo.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't resync the workflow file.");
+      toast.error(err instanceof Error ? err.message : "Couldn't push the workflow file.");
     }
   }
 
@@ -602,13 +607,14 @@ function WorkflowSyncStatusControl({
     }
   }
 
-  async function handleAdopt() {
-    const { data } = await adopt({ variables: { input: { appId } } });
-    const payload = data?.adoptRepoCiWorkflow;
+  async function handlePull() {
+    const { data } = await pull({ variables: { input: { appId } } });
+    const payload = data?.pullCiWorkflowFromRepo;
     if (!payload?.ok || !payload.data) {
-      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't adopt the repo copy.");
+      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't pull the repo's file.");
     }
-    toast.success("Adopted the repo's file as the new baseline.");
+    toast.success("Pulled the repo's workflow file. It's now the baseline.");
+    setComparing(true);
   }
 
   return (
@@ -655,35 +661,35 @@ function WorkflowSyncStatusControl({
             ) : (
               <RefreshCwIcon className="size-3.5" />
             )}
-            Refresh
+            Check
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={handleResync}
+            onClick={() => setConfirmPullOpen(true)}
             disabled={busy}
             className="gap-1.5"
           >
-            {resyncing ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <UploadCloudIcon className="size-3.5" />
-            )}
-            Resync
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setConfirmAdoptOpen(true)}
-            disabled={busy}
-            className="gap-1.5"
-          >
-            {adopting ? (
+            {pulling ? (
               <Loader2Icon className="size-3.5 animate-spin" />
             ) : (
               <DownloadIcon className="size-3.5" />
             )}
-            Adopt repo copy
+            Pull from repo
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePush}
+            disabled={busy}
+            className="gap-1.5"
+          >
+            {pushing ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <UploadCloudIcon className="size-3.5" />
+            )}
+            Push to repo
           </Button>
           {canReconcile ? (
             <Button
@@ -704,13 +710,51 @@ function WorkflowSyncStatusControl({
         </div>
       </Can>
 
+      {status.repoText && status.renderedText && status.repoText !== status.renderedText ? (
+        <div className="border-border rounded-md border">
+          <button
+            type="button"
+            onClick={() => setComparing((v) => !v)}
+            className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
+          >
+            <span>
+              Compare the repo&apos;s file with what a push would send
+              {status.repoTextPulledAt
+                ? ` (pulled ${formatRelativeWebhookInstall(status.repoTextPulledAt)})`
+                : ""}
+            </span>
+            <span aria-hidden>{comparing ? "\u2212" : "+"}</span>
+          </button>
+          {comparing ? (
+            <div className="grid gap-3 border-t p-3 md:grid-cols-2">
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
+                  In the repo
+                </p>
+                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
+                  {status.repoText}
+                </pre>
+              </div>
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
+                  What a push would send
+                </p>
+                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
+                  {status.renderedText}
+                </pre>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <ConfirmDialog
-        open={confirmAdoptOpen}
-        onOpenChange={setConfirmAdoptOpen}
-        title="Adopt the repo's workflow file as the baseline?"
-        description="The platform will treat the repo's current file as authoritative and stop flagging it as drift. This only re-baselines sync tracking — it does not import the file's config, and nothing is pushed."
-        confirmLabel="Adopt repo copy"
-        onConfirm={handleAdopt}
+        open={confirmPullOpen}
+        onOpenChange={setConfirmPullOpen}
+        title="Pull the repo's workflow file?"
+        description="Astrolift reads the file from the deploy branch, stores it, and treats it as the baseline, so it stops being reported as changed. Nothing is written to the repo."
+        confirmLabel="Pull from repo"
+        onConfirm={handlePull}
       />
     </div>
   );

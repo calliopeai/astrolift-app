@@ -63,11 +63,6 @@ const NO_PAGE_FIELD = [
       "astroliftAppSecrets and astroliftAppSecretBundleAttachments are unpaginated list fields.",
   },
   {
-    file: "app/(app)/cost/cost-client.tsx",
-    reason:
-      "astroliftBudgets is unpaginated; the second table is a client-side rollup of the cost-by-binding response.",
-  },
-  {
     file: "app/(app)/domains/domains-client.tsx",
     reason: "astroliftManagedDomains is an unpaginated list field.",
   },
@@ -82,10 +77,6 @@ const NO_PAGE_FIELD = [
   {
     file: "app/(app)/pipelines/[id]/secrets-tab.tsx",
     reason: "astroliftPipelineSecrets is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/quotas/quotas-client.tsx",
-    reason: "astroliftQuotas is an unpaginated list field.",
   },
   {
     file: "app/(app)/settings/identity-provider/identity-provider-client.tsx",

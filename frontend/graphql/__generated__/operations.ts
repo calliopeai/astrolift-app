@@ -1305,6 +1305,9 @@ export type AstroliftCiWorkflowSyncStatus = {
   detail: Scalars['String']['output'];
   path: Scalars['String']['output'];
   prUrl: Scalars['String']['output'];
+  renderedText: Scalars['String']['output'];
+  repoText: Scalars['String']['output'];
+  repoTextPulledAt?: Maybe<Scalars['DateTime']['output']>;
   state: Scalars['String']['output'];
   syncedAt?: Maybe<Scalars['DateTime']['output']>;
   syncedTemplateVersion?: Maybe<Scalars['Int']['output']>;
@@ -2363,6 +2366,7 @@ export type AstroliftManagedService = {
   environmentName: Scalars['String']['output'];
   grantState: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  isolation: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
@@ -2664,6 +2668,19 @@ export type AstroliftNotificationPreferenceMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftNotificationProfile = {
+  driver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  retentionDeliveryDays: Scalars['Int']['output'];
+};
+
+export type AstroliftNotificationProfileMutationResult = {
+  data?: Maybe<AstroliftNotificationProfile>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftObservabilityPanelReason =
   | 'ERROR'
   | 'NOT_CONFIGURED'
@@ -2701,6 +2718,7 @@ export type AstroliftOrganization = {
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
+  managedServiceIsolationPolicy: Scalars['JSON']['output'];
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
@@ -5239,6 +5257,7 @@ export type Mutation = {
   provisionManagedService: AstroliftManagedServiceMutationResult;
   provisionProjectManagedService: AstroliftManagedServiceMutationResult;
   publishForm: AstroliftFormDefinitionMutationResult;
+  pullCiWorkflowFromRepo: AstroliftCiWorkflowSyncStatusMutationResult;
   pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
   pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
@@ -5325,6 +5344,7 @@ export type Mutation = {
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
+  setNotificationProfile: AstroliftNotificationProfileMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -6318,6 +6338,11 @@ export type MutationPublishFormArgs = {
 };
 
 
+export type MutationPullCiWorkflowFromRepoArgs = {
+  input: CiWorkflowSyncActionInput;
+};
+
+
 export type MutationPushAstroliftCiSecretsToRepoArgs = {
   input: PushCiSecretsToRepoInput;
 };
@@ -6739,6 +6764,11 @@ export type MutationSetFeatureFlagArgs = {
 
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
+};
+
+
+export type MutationSetNotificationProfileArgs = {
+  input: SetNotificationProfileInput;
 };
 
 
@@ -7366,6 +7396,7 @@ export type ProvisionManagedServiceInput = {
   appSlug: Scalars['String']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   variant: InputMaybe<Scalars['String']['input']>;
@@ -7377,6 +7408,7 @@ export type ProvisionProjectManagedServiceInput = {
   clusterId: Scalars['GUID']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['GUID']['input'];
@@ -9497,6 +9529,12 @@ export type SetNotificationPreferenceInput = {
   eventKind: Scalars['String']['input'];
 };
 
+export type SetNotificationProfileInput = {
+  config: Scalars['JSON']['input'];
+  driver: Scalars['String']['input'];
+  retentionDeliveryDays: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type SetPreviewPinnedInput = {
   id: Scalars['GUID']['input'];
   pinned: Scalars['Boolean']['input'];
@@ -9786,6 +9824,8 @@ export type UpdateOrganizationInput = {
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
+  logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  managedServiceIsolationPolicy: InputMaybe<Scalars['JSON']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
@@ -11506,7 +11546,7 @@ export type GetAppQueryVariables = Exact<{
 }>;
 
 
-export type GetAppQuery = { astroliftApp?: { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
+export type GetAppQuery = { astroliftApp?: { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
 
 export type ListWorkloadsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -11654,6 +11694,13 @@ export type PushCiWorkflowMutationVariables = Exact<{
 
 
 export type PushCiWorkflowMutation = { pushCiWorkflow: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { commitSha: string, filePath: string, repoUrl: string } | null } };
+
+export type PullCiWorkflowFromRepoMutationVariables = Exact<{
+  input: CiWorkflowSyncActionInput;
+}>;
+
+
+export type PullCiWorkflowFromRepoMutation = { pullCiWorkflowFromRepo: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null } };
 
 export type ResyncAstroliftCiWorkflowMutationVariables = Exact<{
   input: CiWorkflowSyncActionInput;

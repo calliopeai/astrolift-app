@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from strawberry.types import Info
 
@@ -31,6 +33,7 @@ from astrolift_identity.schema.types import (
     OrganizationType,
     organization_to_type,
 )
+from astrolift_operations.observability_profile import RETENTION_LOGS
 from core.appearance import AppearanceError, validate_appearance
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -57,6 +60,22 @@ class OrganizationMutations:
             slug=input.slug,
             website=input.website or "",
         )
+        # Seed the org-wide security burst rules (#151) so a new tenant
+        # detects a credential-stuffing run out of the box instead of only
+        # recording the failures in the audit log. There is no
+        # ``org.created`` platform Event to subscribe to, so this is the
+        # hook, mirroring the per-app seeding at app registration:
+        # idempotent, and best-effort because an alert-config failure must
+        # never fail the org create.
+        try:
+            from astrolift_operations.alert_seed import seed_security_alert_rules
+
+            seed_security_alert_rules(org)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "create_organization: security alert-rule seeding failed for %s",
+                org.slug,
+            )
         return gql_success(organization_to_type(org))
 
     @strawberry.field
@@ -89,6 +108,19 @@ class OrganizationMutations:
                     field="auditLogRetentionDays",
                 )
             org.audit_log_retention_days = days
+        if input.log_retention_days_default is not None:
+            log_days = int(input.log_retention_days_default)
+            # Bounded by the platform log-retention window rather than a
+            # literal, so this and the Logs surface that reads the column
+            # cannot drift apart. Above the ceiling the aggregator would
+            # be asked for lines the platform never promised to keep.
+            if log_days < 1 or log_days > RETENTION_LOGS.max_days:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"logRetentionDaysDefault must be between 1 and {RETENTION_LOGS.max_days}",
+                    field="logRetentionDaysDefault",
+                )
+            org.log_retention_days_default = log_days
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
         if input.default_resource_tags is not None:
@@ -104,6 +136,35 @@ class OrganizationMutations:
                     str(exc),
                     field="defaultResourceTags",
                 )
+        if input.managed_service_isolation_policy is not None:
+            from astrolift_drivers.isolation import IsolationError, parse_policy
+            from astrolift_services.models import ManagedService
+
+            raw = input.managed_service_isolation_policy
+            if not isinstance(raw, dict):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "managedServiceIsolationPolicy must be an object mapping kind to mode",
+                    field="managedServiceIsolationPolicy",
+                )
+            known_kinds = {kind for kind, _label in ManagedService.Kind.choices}
+            unknown = sorted(str(kind) for kind in raw if str(kind) not in known_kinds)
+            if unknown:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"managedServiceIsolationPolicy names unknown kinds {unknown}",
+                    field="managedServiceIsolationPolicy",
+                )
+            try:
+                policy = parse_policy(raw)
+            except IsolationError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="managedServiceIsolationPolicy",
+                )
+            org.managed_service_isolation_policy = {kind: mode.value for kind, mode in policy.items()}
+
         if input.appearance_default is not None:
             # Validated here for the same reason the tags above are: the
             # client's normalize() protects the client, not the column, and an

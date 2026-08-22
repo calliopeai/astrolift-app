@@ -293,3 +293,7 @@ class RevocationReason:
     QUOTA_EVICTION = "quota_eviction"
     AUTO_STALE = "auto_stale"
     LOGOUT = "logout"
+    # An IdP deprovisioned the person over SCIM (#78). Distinct from
+    # ``admin_revoke`` so the audit trail says the removal came from
+    # the directory, not from an operator inside the product.
+    SCIM_DEPROVISION = "scim_deprovision"

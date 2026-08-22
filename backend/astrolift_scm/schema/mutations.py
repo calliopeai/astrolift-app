@@ -1155,6 +1155,48 @@ class ScmMutation:
         return gql_success(build_ci_workflow_sync_status(app))
 
     @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.pull")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def pull_ci_workflow_from_repo(
+        self, info: Info, input: CiWorkflowSyncActionInput
+    ) -> MutationResultType[AppCiWorkflowSyncStatusType]:
+        """Read the repo's workflow file into the platform and baseline on it.
+
+        The inbound half of the pair. Until this existed every action on
+        this file wrote outward: the manual push renders the template and
+        puts it, and the fleet sweep does the same. The only "from repo"
+        action re-pointed the digests at the repo file and discarded its
+        text, so an operator's own workflow was never anywhere the platform
+        could show it -- and "repo drift" was a badge you could act on only
+        by overwriting what you could not read.
+
+        Stores the file's text on the app (bounded, see
+        ``MAX_STORED_REPO_TEXT_BYTES``), flags ``in_sync``, and pushes
+        nothing. Pair it with ``pushCiWorkflowToRepo`` for the outbound
+        direction.
+        """
+        from astrolift_scm.services.ci_workflow_drift import (
+            CiWorkflowAdoptError,
+            CiWorkflowFetchError,
+            pull_repo_ci_workflow,
+        )
+
+        app = _ci_drift_app(input.app_id)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        try:
+            pull_repo_ci_workflow(app)
+        except CiWorkflowAdoptError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message, field="appId")
+        except CiWorkflowFetchError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}")
+
+        app.refresh_from_db()
+        return gql_success(build_ci_workflow_sync_status(app))
+
+    @strawberry.field
     @mutation_audit(action="scm.ci_workflow.adopt")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()

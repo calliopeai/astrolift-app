@@ -19,6 +19,7 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
 from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
+from astrolift_workflows.workflows.cert_expiry_tick import CertExpiryTickWorkflow
 from astrolift_workflows.workflows.ci_workflow_resync_tick import (
     CiWorkflowResyncTickWorkflow,
 )
@@ -71,6 +72,7 @@ from astrolift_workflows.workflows.secret_rotation import (
     RotateSecretBundleWorkflow,
     SecretBundleScheduledRefreshWorkflow,
 )
+from astrolift_workflows.workflows.sync_app_domain import SyncAppDomainWorkflow
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 from astrolift_workflows.workflows.update_managed_service import UpdateManagedServiceWorkflow
@@ -94,6 +96,7 @@ __all__ = [
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
     "CaptureQuotaUsageSnapshotWorkflow",
+    "CertExpiryTickWorkflow",
     "CiWorkflowResyncTickWorkflow",
     "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",
@@ -124,6 +127,7 @@ __all__ = [
     "RotateSecretBundleWorkflow",
     "RunStatusReconcileTickWorkflow",
     "SecretBundleScheduledRefreshWorkflow",
+    "SyncAppDomainWorkflow",
     "SyncDevEnvironmentFilesWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",

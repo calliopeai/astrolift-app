@@ -1,10 +1,11 @@
 """URL routes owned by ``astrolift_identity``.
 
-Currently exposes the CLI / mobile device-flow surface (#475) and the
-SSO step-up re-auth flow (#526). The REST endpoints
-(``/api/cli/v1/auth/{start,complete,refresh}``) are mounted at the
-project root by ``config.urls``; the in-browser approval page and the
-SSO step-up endpoints live under the auth1-protected ``/app/`` prefix.
+Currently exposes the CLI / mobile device-flow surface (#475), the SCIM
+2.0 provisioning surface (#78, #91) and the SSO step-up re-auth flow
+(#526). The REST endpoints (``/api/cli/v1/auth/{start,complete,refresh}``
+and ``/api/scim/v2/*``) are mounted at the project root by
+``config.urls``; the in-browser approval page and the SSO step-up
+endpoints live under the auth1-protected ``/app/`` prefix.
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from __future__ import annotations
 from django.urls import path
 from django_ratelimit.decorators import ratelimit
 
-from astrolift_identity import device_flow_views, step_up_sso
+from astrolift_identity import device_flow_views, scim_views, step_up_sso
+from astrolift_identity.scim import SCIM_RATE_LIMIT_PER_MIN
 
 app_name = "astrolift_identity"
 
@@ -37,6 +39,36 @@ api_urlpatterns = [
         "api/cli/v1/auth/refresh",
         ratelimit(key="ip", rate="60/m", block=True)(device_flow_views.device_flow_refresh),
         name="device-flow-refresh",
+    ),
+]
+
+
+# SCIM 2.0 provisioning surface (#78, #91). Mounted at the project root
+# by config.urls because ``/api/scim/v2/`` is the base URL an operator
+# pastes into Okta / Entra, and RFC 7644 fixes the resource paths
+# (no trailing slash). Auth is the org-scoped ``alft_st_`` bearer,
+# checked inside the view — no session, no CSRF.
+#
+# The ceiling is spec 27 §8's 240/min, keyed on the credential rather
+# than the IP so one tenant's IdP (or a NAT they share) cannot starve
+# another's, and so the constant that documents the limit is the
+# constant that enforces it.
+_scim_ratelimit = ratelimit(
+    key="header:authorization",
+    rate=f"{SCIM_RATE_LIMIT_PER_MIN}/m",
+    block=True,
+)
+
+scim_api_urlpatterns = [
+    path(
+        "api/scim/v2/Users",
+        _scim_ratelimit(scim_views.scim_users),
+        name="scim-users",
+    ),
+    path(
+        "api/scim/v2/Users/<str:member_guid>",
+        _scim_ratelimit(scim_views.scim_user_detail),
+        name="scim-user-detail",
     ),
 ]
 

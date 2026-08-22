@@ -31,6 +31,11 @@ class OrganizationType:
     # (#1505). Portable by construction: refused on write unless all three
     # clouds would accept them.
     default_resource_tags: strawberry.scalars.JSON
+    # Per-kind managed-service isolation floor, e.g. {"postgres":
+    # "dedicated"}. Read back so an operator can see which kinds their
+    # compliance posture pins before they provision one.
+    managed_service_isolation_policy: strawberry.scalars.JSON
+
     appearance_default: strawberry.scalars.JSON
     appearance_locked: bool
     # Non-null once the first-run wizard has been completed or
@@ -102,6 +107,7 @@ def organization_to_type(org) -> OrganizationType:
         log_retention_days_default=org.log_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
         default_resource_tags=dict(org.default_resource_tags or {}),
+        managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
         appearance_default=dict(org.appearance_default or {}),
         appearance_locked=bool(org.appearance_locked),
         onboarding_completed_at=org.onboarding_completed_at,

@@ -398,7 +398,8 @@ export function DashboardClient() {
         icon={CoinsIcon}
         value={mtdValue}
         loading={costForecast.loading && forecast == null}
-        href="/administration/cost"
+        // No href: the Cost console it linked to is gone. The number itself
+        // is live, so the tile stays and simply stops being a link.
         emptyCta={t("tiles.costMtd.emptyCta")}
         trend={
           forecast && forecast.mtdCents > 0 ? <CostMtdDelta forecast={forecast} t={t} /> : null

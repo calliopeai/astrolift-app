@@ -28,6 +28,8 @@ from astrolift_workflows.activities.build_image import (
 
 build_image_mod = importlib.import_module("astrolift_workflows.activities.build_image")
 
+_GOOD_DIGEST = "sha256:" + "9c" * 32
+
 
 # ---------------------------------------------------------------------------
 # BuildImageInput contract
@@ -168,6 +170,48 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
 
     class FakeRegistry:
         def list_tags(self, repo_name):
+            return [FakeTag("sha-abc", _GOOD_DIGEST)]
+
+    prepared = _PreparedBuild(
+        driver=FakeDriver(),
+        registry_driver=FakeRegistry(),
+        repo_name="bo/app",
+        repo_uri="123.dkr.ecr.us-west-2.amazonaws.com/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+
+    result = _build_image_sync(
+        BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha="cafebabe")
+    )
+
+    assert result["stub"] is False
+    assert result["digest"] == _GOOD_DIGEST
+    assert result["image_ref"] == "123.dkr.ecr.us-west-2.amazonaws.com/bo/app:sha-abc"
+    deployment.refresh_from_db()
+    assert deployment.image_digest == _GOOD_DIGEST
+
+
+def test_build_image_sync_ignores_a_malformed_registry_digest(monkeypatch):
+    """The render pins containers to whatever lands in ``image_digest``, so a
+    registry that answers with something other than ``sha256:<64 hex>`` must
+    leave the column empty (deploy on the tag) rather than store a value that
+    would render an unpullable image ref."""
+    from providers._sdk.build import BuildResult
+
+    deployment = _make_deployment(image_tag="sha-abc")
+
+    class FakeDriver:
+        def build(self, spec, repo, tag):
+            return BuildResult(success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0)
+
+    class FakeTag:
+        def __init__(self, name, digest):
+            self.name = name
+            self.digest = digest
+
+    class FakeRegistry:
+        def list_tags(self, repo_name):
             return [FakeTag("sha-abc", "sha256:feedface")]
 
     prepared = _PreparedBuild(
@@ -184,10 +228,9 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
     )
 
     assert result["stub"] is False
-    assert result["digest"] == "sha256:feedface"
-    assert result["image_ref"] == "123.dkr.ecr.us-west-2.amazonaws.com/bo/app:sha-abc"
+    assert result["digest"] == ""
     deployment.refresh_from_db()
-    assert deployment.image_digest == "sha256:feedface"
+    assert deployment.image_digest == ""
 
 
 def test_build_image_sync_raises_on_build_failure(monkeypatch):

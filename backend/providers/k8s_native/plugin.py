@@ -147,6 +147,18 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "description": ("Generic OCI registry URL (Harbor/Zot/GHCR)."),
             },
+            "registry_variant": {
+                "type": "string",
+                "enum": ["generic_oci", "quay", "dockerhub", "ghcr", "harbor"],
+                "default": "generic_oci",
+            },
+            "registry_namespace": {
+                "type": "string",
+                "description": (
+                    "Org / project / user segment image repositories live under. "
+                    "Required for the quay, dockerhub, ghcr and harbor variants."
+                ),
+            },
             "cnpg_storage_class": {"type": "string"},
             "cnpg_backup_url": {"type": "string"},
             "cnpg_operator_namespace": {"type": "string", "default": "cnpg-system"},

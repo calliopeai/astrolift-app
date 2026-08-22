@@ -14,6 +14,11 @@ from astrolift_workflows.activities.app_deregister import (
     list_app_secret_targets,
     revoke_app_secret_bundle_refs,
 )
+from astrolift_workflows.activities.app_domain_sync import (
+    plan_app_domain_sync,
+    revert_app_subdomain,
+    verify_app_hostnames,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     create_promotion_deployment,
@@ -62,6 +67,7 @@ from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_ingress,
     deprovision_app_registry_repo,
 )
+from astrolift_workflows.activities.cert_expiry import check_cert_expiry_tick
 from astrolift_workflows.activities.ci_workflow_resync import resync_ci_workflows_tick
 from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_acm_certs,
@@ -110,6 +116,7 @@ from astrolift_workflows.activities.install_prereqs import (
     record_cluster_bootstrap_run,
 )
 from astrolift_workflows.activities.managed_service_lifecycle import (
+    bounce_workloads_bound_to_managed_service,
     check_managed_service_ready,
     deprovision_managed_service,
     finalize_managed_service_deletion,
@@ -174,6 +181,7 @@ from astrolift_workflows.activities.static_site import (
     ensure_static_site_services,
     sync_static_assets,
 )
+from astrolift_workflows.activities.supply_chain_gate import evaluate_supply_chain_gate
 from astrolift_workflows.activities.uptime import probe_uptime_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
@@ -199,11 +207,13 @@ __all__ = [
     "apply_manifests",
     "apply_platform_rbac",
     "apply_to_target_cluster",
+    "bounce_workloads_bound_to_managed_service",
     "bounce_workloads_consuming_bundle",
     "build_image",
     "cancel_pipeline_job",
     "capture_platform_cost_snapshot",
     "capture_quota_usage_snapshot",
+    "check_cert_expiry_tick",
     "check_managed_service_ready",
     "cleanup_cluster_acm_certs",
     "cleanup_cluster_dns_records",
@@ -240,6 +250,7 @@ __all__ = [
     "ensure_static_site_services",
     "ensure_workload_identity",
     "evaluate_alerts_tick",
+    "evaluate_supply_chain_gate",
     "expire_pending_approval_deployments",
     "fetch_app_build_strategy",
     "finalize_managed_service_deletion",
@@ -283,6 +294,7 @@ __all__ = [
     "mark_preview_torn_down",
     "mark_running",
     "mark_workflow_run",
+    "plan_app_domain_sync",
     "poll_agent_run_status",
     "poll_cert_issuance",
     "poll_pipeline_job",
@@ -319,6 +331,7 @@ __all__ = [
     "request_wildcard_cert_for_zone",
     "resync_ci_workflows_tick",
     "resync_manifest_for_deploy",
+    "revert_app_subdomain",
     "revoke_app_deploy_tokens",
     "revoke_app_secret_bundle_refs",
     "run_preflight_job",
@@ -335,6 +348,7 @@ __all__ = [
     "update_stage_execution",
     "validate_migration_target",
     "validate_ns_delegation",
+    "verify_app_hostnames",
     "verify_reachability",
     "wait_dns",
 ]

@@ -62,6 +62,7 @@ from astrolift_lifecycle.schema.types import (
     deployment_to_type,
 )
 from astrolift_registry.models import RegisteredApp
+from astrolift_services.capability_projection import check_promotion
 from astrolift_workflows.client import (
     signal_workflow,
     terminate_workflow,
@@ -922,7 +923,11 @@ class DeploymentMutations:
                     name=name,
                     deleted_at__isnull=True,
                 )
-                .select_related("registered_app", "tenant_cluster", "managed_domain")
+                .select_related(
+                    "registered_app",
+                    "tenant_cluster__provider_plugin",
+                    "managed_domain",
+                )
                 .first()
             )
 
@@ -963,6 +968,21 @@ class DeploymentMutations:
                 ErrorCode.PRECONDITION.value,
                 f"no running deployment in environment {source_env.name!r} to promote",
                 field="sourceEnvironmentName",
+            )
+
+        # A promotion moves an image between environments that may sit on
+        # different clusters, and the source's managed services resolved
+        # against the *source* cluster's plugin catalogue. Verify the
+        # target can expose every one of those variants before we accept
+        # the promotion: without this the operator gets a green mutation
+        # and an audit entry, and the mismatch only surfaces mid-apply in
+        # DeployAppWorkflow (#59).
+        capability = check_promotion(source_env=source_env, target_env=target_env)
+        if not capability.ok:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "; ".join(issue.detail for issue in capability.issues),
+                field="targetEnvironmentName",
             )
 
         approvals_required = _required_approvals_for(app, target_env)

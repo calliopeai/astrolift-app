@@ -266,6 +266,18 @@ class AppCiWorkflowSyncStatusType:
     path: str
     pr_url: str
     detail: str
+    # The repo's own copy of the file, as of the last pull, and the text the
+    # platform renders today. Both empty-string when unavailable rather than
+    # null, so the UI never has to distinguish "no pull yet" from "pull
+    # returned nothing" to decide whether it can show a diff.
+    #
+    # Before the pull existed, the only inbound action re-pointed the digests
+    # at the repo file and discarded it, so "repo drift" was a badge with
+    # nothing behind it: no way to see what drifted before choosing whether
+    # to overwrite it.
+    repo_text: str
+    rendered_text: str
+    repo_text_pulled_at: dt.datetime | None
 
 
 @strawberry.type(name="AstroliftSecurityPolicy")
@@ -1309,6 +1321,23 @@ def build_autowire_status(app) -> AppAutowireStatusType:
 _CI_WORKFLOW_STATE_ABSENT = "absent"
 
 
+def _rendered_ci_workflow_or_empty(app) -> str:
+    """The workflow text the platform would push for ``app`` right now.
+
+    Pure render (string substitution over a template), no network. Returns
+    "" for an app the renderer cannot serve -- an unsupported source host,
+    or a missing field the template needs -- because this feeds a diff view
+    that must not fail the whole app query.
+    """
+    try:
+        from astrolift_scm.services.workflow_sync import _render_and_path
+
+        body, _path = _render_and_path(app)
+    except Exception:  # noqa: BLE001 - a render failure is "no preview", not an error
+        return ""
+    return body or ""
+
+
 def build_ci_workflow_sync_status(app) -> AppCiWorkflowSyncStatusType:
     """Roll up the managed CI-workflow versioned-sync status (#1209).
 
@@ -1337,6 +1366,9 @@ def build_ci_workflow_sync_status(app) -> AppCiWorkflowSyncStatusType:
         path=state.get("path") or "",
         pr_url=state.get("pr_url") or "",
         detail=state.get("detail") or "",
+        repo_text=state.get("repo_text") or "",
+        rendered_text=_rendered_ci_workflow_or_empty(app),
+        repo_text_pulled_at=_iso_or_none(state.get("repo_text_pulled_at")),
     )
 
 
