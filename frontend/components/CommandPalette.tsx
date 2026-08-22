@@ -99,8 +99,6 @@ const PAGES: PaletteEntry[] = [
   { label: "Teams", href: "/administration/teams", group: "Pages", module: "admin", permission: "team.read" },
   { label: "Projects", href: "/administration/projects", group: "Pages", module: "admin", permission: "project.read" },
   { label: "API Keys", href: "/tokens", group: "Pages", module: "admin", permission: "api_token.create" },
-  { label: "Cost", href: "/administration/cost", group: "Pages", module: "admin", permission: "billing.read" },
-  { label: "Quotas", href: "/administration/quotas", group: "Pages", module: "admin", permission: "org.manage_members" },
   { label: "Metrics", href: "/administration/metrics", group: "Pages", module: "admin", permission: "app.read" },
   { label: "Audit log", href: "/administration/audit", group: "Pages", module: "admin", permission: "audit_log.read" },
   { label: "Policies", href: "/administration/policies", group: "Pages", module: "admin" },

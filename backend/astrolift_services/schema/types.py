@@ -190,6 +190,11 @@ class ManagedServiceType:
     name: str
     kind: str
     variant: str
+    isolation: str
+    """The requested mode (``shared`` | ``dedicated``), or ``""`` for
+    unspecified. The mode actually provisioned at can be firmer than this:
+    the org's compliance floor outranks the request."""
+
     status: str
     status_error: str
     config: JSON
@@ -984,6 +989,7 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
         name=svc.name,
         kind=svc.kind,
         variant=svc.variant or "",
+        isolation=svc.isolation or "",
         status=svc.status,
         status_error=svc.status_error or "",
         config=svc.config or {},

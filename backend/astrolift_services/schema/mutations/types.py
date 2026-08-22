@@ -226,6 +226,11 @@ class ProvisionManagedServiceInput:
     name: str | None = None
     variant: str | None = None
     config: strawberry.scalars.JSON | None = None
+    isolation: str | None = None
+    """``shared`` | ``dedicated``, or null to take the org's compliance
+    floor and then the variant default. Not part of ``config``: driver
+    config schemas are per-variant and several close themselves to extra
+    keys, so a portable request cannot travel inside one."""
 
 
 @strawberry.input
@@ -237,6 +242,7 @@ class ProvisionProjectManagedServiceInput:
     name: str | None = None
     variant: str | None = None
     config: strawberry.scalars.JSON | None = None
+    isolation: str | None = None
     agent_environment_spec_slugs: list[str] = strawberry.field(default_factory=list)
     app_environment_ids: list[GUID] = strawberry.field(default_factory=list)
 

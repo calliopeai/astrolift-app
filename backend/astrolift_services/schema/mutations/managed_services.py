@@ -10,6 +10,7 @@ from strawberry.types import Info
 
 from astrolift_agents.models import AgentEnvironmentSpec
 from astrolift_clusters.models import TenantCluster
+from astrolift_drivers.isolation import IsolationError, parse_mode
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -69,6 +70,17 @@ _UPDATE_DESIRED_STATE_FIELDS = (
     "operation_started_at",
     "operation_completed_at",
 )
+
+
+def _requested_isolation(value: str | None) -> str:
+    """The isolation mode to store on the row, or ``""`` for unspecified.
+
+    Refused here rather than at provision time: the resolver is reached from
+    a Temporal activity, where an unparseable mode surfaces as a retrying
+    provision failure instead of a message to whoever typed it.
+    """
+    mode = parse_mode(value)
+    return mode.value if mode is not None else ""
 
 
 def _project_service_rows_for_caller(service_id):
@@ -272,6 +284,10 @@ class ManagedServiceMutations:
                     field="kind",
                 )
         resolved_variant = catalog_item.variant if catalog_item is not None else (input.variant or "")
+        try:
+            isolation = _requested_isolation(input.isolation)
+        except IsolationError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="isolation")
         name = (input.name or input.kind).strip()
         if ManagedService.objects.filter(
             project=project,
@@ -355,6 +371,7 @@ class ManagedServiceMutations:
             kind=input.kind,
             name=name,
             variant=resolved_variant,
+            isolation=isolation,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
         )
@@ -653,6 +670,10 @@ class ManagedServiceMutations:
                     field="kind",
                 )
         resolved_variant = catalog_item.variant if catalog_item is not None else (input.variant or "")
+        try:
+            isolation = _requested_isolation(input.isolation)
+        except IsolationError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="isolation")
         name = (input.name or input.kind).strip()
         if ManagedService.objects.filter(
             registered_app=app,
@@ -671,6 +692,7 @@ class ManagedServiceMutations:
             kind=input.kind,
             name=name,
             variant=resolved_variant,
+            isolation=isolation,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
         )
