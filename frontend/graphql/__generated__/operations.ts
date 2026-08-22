@@ -2363,6 +2363,7 @@ export type AstroliftManagedService = {
   environmentName: Scalars['String']['output'];
   grantState: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  isolation: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
@@ -2693,12 +2694,15 @@ export type AstroliftOrgSkillRepoMutationResult = {
 
 export type AstroliftOrganization = {
   allowUserProfileEdit: Scalars['Boolean']['output'];
+  appearanceDefault: Scalars['JSON']['output'];
+  appearanceLocked: Scalars['Boolean']['output'];
   auditLogRetentionDays: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
   defaultResourceTags: Scalars['JSON']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
+  managedServiceIsolationPolicy: Scalars['JSON']['output'];
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
@@ -7364,6 +7368,7 @@ export type ProvisionManagedServiceInput = {
   appSlug: Scalars['String']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   variant: InputMaybe<Scalars['String']['input']>;
@@ -7375,6 +7380,7 @@ export type ProvisionProjectManagedServiceInput = {
   clusterId: Scalars['GUID']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['GUID']['input'];
@@ -9779,9 +9785,12 @@ export type UpdateOrgSkillRepoInput = {
 
 export type UpdateOrganizationInput = {
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
+  appearanceDefault: InputMaybe<Scalars['JSON']['input']>;
+  appearanceLocked: InputMaybe<Scalars['Boolean']['input']>;
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
+  managedServiceIsolationPolicy: InputMaybe<Scalars['JSON']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
@@ -10714,7 +10723,7 @@ export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string,
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
+export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: Record<string, unknown>, appearanceLocked: boolean, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
 
 export type ListTeamsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -10775,7 +10784,7 @@ export type GetOrganizationQueryVariables = Exact<{
 }>;
 
 
-export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
+export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: Record<string, unknown>, appearanceLocked: boolean, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
 
 export type GetOnboardingStateQueryVariables = Exact<{ [key: string]: never; }>;
 

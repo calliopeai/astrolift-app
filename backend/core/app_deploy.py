@@ -836,6 +836,39 @@ def render_resources_for_deployment(
     return resources
 
 
+def shared_ingress_annotations(cluster: Any, *, org_slug: str, app_slug: str) -> dict[str, str]:
+    """ALB group annotations for a cluster in shared-ingress mode (#64).
+
+    Empty dict for a per-app cluster and for every non-ALB ingress
+    class, which is what keeps the rendering identical for clusters
+    that never opt in.
+
+    Restricted to ALB on purpose. It is the one controller where
+    "shared" means a real cloud load balancer is shared and where the
+    policy's annotation is an actual grouping key; an nginx-family
+    controller already fronts the whole cluster with one load balancer,
+    and the policy's nginx entry is the ingress-class annotation, which
+    would take the Ingress away from its controller rather than group
+    it.
+    """
+    from astrolift_clusters.ingress_modes import IngressMode, shared_annotations_for
+    from astrolift_clusters.status_routing import IngressDriver
+
+    if getattr(cluster, "ingress_mode", "") != IngressMode.SHARED_INGRESS:
+        return {}
+    if getattr(cluster, "ingress_class", "") != "alb":
+        return {}
+    ann = shared_annotations_for(
+        driver=IngressDriver.AWS_ALB,
+        org_slug=org_slug,
+        app_slug=app_slug,
+    )
+    out = {ann.group_name_key: ann.group_name_value}
+    if ann.group_order_key:
+        out[ann.group_order_key] = ann.group_order_value
+    return out
+
+
 def _render_managed_subdomain_ingress(
     deployment: Deployment,
     manifest: Any,
@@ -953,6 +986,7 @@ def _render_managed_subdomain_ingress(
             )
         )
         tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
+        group_annotations = shared_ingress_annotations(cluster, org_slug=org_slug, app_slug=app.slug)
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
             if wh.workload_slug in serviceless_workloads:
@@ -969,6 +1003,8 @@ def _render_managed_subdomain_ingress(
                 rendered.setdefault("metadata", {})["namespace"] = namespace
                 rendered["metadata"].setdefault("labels", {})["astrolift.dev/managed-subdomain"] = "true"
                 rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
+                if group_annotations:
+                    rendered["metadata"].setdefault("annotations", {}).update(group_annotations)
                 out.append(rendered)
     else:
         from providers.k8s_native.ingress import (
@@ -1070,5 +1106,6 @@ __all__ = [
     "namespace_for_app",
     "workload_identity_role_name",
     "render_resources_for_deployment",
+    "shared_ingress_annotations",
     "workloads_from_resources",
 ]

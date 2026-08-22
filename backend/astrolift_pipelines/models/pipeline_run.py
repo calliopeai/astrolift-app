@@ -35,6 +35,12 @@ class PipelineRun(BaseCoreModel):
     # were discarding it (#1531). Blank for a manual trigger that named
     # only a ref, which is why it is not required.
     commit_sha = models.CharField(max_length=64, blank=True, default="")
+    # Set when the run was triggered by a pull request from a fork, under
+    # the trigger's `fork_secrets_policy`. Decided at the receiver, where
+    # the payload is, and recorded rather than recomputed: by the time a
+    # job spawns the payload is gone, and a security decision must not be
+    # able to come out differently the second time it is asked.
+    skip_secrets = models.BooleanField(default=False)
     trigger_actor = models.CharField(max_length=255, blank=True, default="")
     temporal_workflow_id = models.CharField(max_length=512, blank=True, default="")
     status = models.CharField(

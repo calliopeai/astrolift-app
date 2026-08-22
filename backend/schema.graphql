@@ -2711,6 +2711,8 @@ type AstroliftOrganization {
   allowUserProfileEdit: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
+  appearanceDefault: JSON!
+  appearanceLocked: Boolean!
   onboardingCompletedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -6817,6 +6819,8 @@ input UpdateOrganizationInput {
   allowUserProfileEdit: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
+  appearanceDefault: JSON = null
+  appearanceLocked: Boolean = null
 }
 
 input UpdatePipelineInput {

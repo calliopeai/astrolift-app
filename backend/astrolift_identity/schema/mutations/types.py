@@ -38,6 +38,11 @@ class UpdateOrganizationInput:
     # above: lifting a floor has to be expressible, and `{}` is how.
     managed_service_isolation_policy: strawberry.scalars.JSON | None = None
 
+    # House theme for the operator UI (#135). Whole-map replace, same reason
+    # as the tags above: `{}` has to mean "no house theme".
+    appearance_default: strawberry.scalars.JSON | None = None
+    appearance_locked: bool | None = None
+
 
 @strawberry.input
 class CreateTeamInput:

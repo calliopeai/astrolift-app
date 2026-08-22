@@ -265,39 +265,45 @@ export function AppTabs({ slug, active }: AppTabsProps) {
 
   return (
     <div className="-mx-6">
-      {/* Primary: BROCS pillar bar. */}
+      {/* Primary: BROCS pillars as a segmented mode-switcher. Contained
+          chips read as "which layer am I in", categorically distinct from
+          the page-level underline tabs below — two stacked underline rows
+          were indistinguishable at a glance. Mono uppercase because BROCS
+          is the brand vocabulary, not a page name. */}
       <nav
         aria-label={t("pillarAriaLabel")}
-        className="border-border scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
+        className="scrollbar-none flex gap-1 overflow-x-auto px-6 pt-1 pb-2 [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
       >
-        {PILLARS.map((pillar) => {
-          const isActive = pillar.key === activePillar;
-          // Land on the pillar's first sub-tab; Run leads with Overview.
-          const href = pillar.subs[0].href(basePath, slug);
-          return (
-            <Link
-              key={pillar.key}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t(`pillars.${pillar.label}`)}
-              {isActive && (
-                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
-              )}
-            </Link>
-          );
-        })}
+        <div className="bg-muted/40 border-border flex shrink-0 gap-0.5 rounded-sm border p-0.5">
+          {PILLARS.map((pillar) => {
+            const isActive = pillar.key === activePillar;
+            // Land on the pillar's first sub-tab; Run leads with Overview.
+            const href = pillar.subs[0].href(basePath, slug);
+            return (
+              <Link
+                key={pillar.key}
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "shrink-0 rounded-sm px-3 py-1 font-mono text-xs font-medium tracking-wider uppercase transition-colors",
+                  isActive
+                    ? "text-foreground bg-[var(--brand-primary)]/12 shadow-[inset_0_0_0_1px_var(--brand-primary)]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                )}
+              >
+                {t(`pillars.${pillar.label}`)}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Secondary: sub-tabs for the active pillar. Always rendered, even
-          when a pillar has a single sub-route. */}
+      {/* Secondary: pages of the active pillar as quiet underline tabs.
+          Always rendered, even when a pillar has a single sub-route, so
+          the two-level rhythm stays stable across pillars. */}
       <nav
         aria-label={t("ariaLabel")}
-        className="border-border bg-muted/30 scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
+        className="border-border scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
       >
         {current.subs.map((sub) => {
           const isActive = sub.label === activeSub;
@@ -307,8 +313,10 @@ export function AppTabs({ slug, active }: AppTabsProps) {
               href={sub.href(basePath, slug)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative shrink-0 px-3 py-2 text-xs font-medium transition-colors",
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                "relative shrink-0 px-3 py-2 text-sm transition-colors",
+                isActive
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               {t(sub.label)}

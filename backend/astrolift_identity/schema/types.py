@@ -35,6 +35,9 @@ class OrganizationType:
     # "dedicated"}. Read back so an operator can see which kinds their
     # compliance posture pins before they provision one.
     managed_service_isolation_policy: strawberry.scalars.JSON
+
+    appearance_default: strawberry.scalars.JSON
+    appearance_locked: bool
     # Non-null once the first-run wizard has been completed or
     # explicitly skipped. The FE opens the onboarding wizard when
     # this is null AND the operator has zero team memberships.
@@ -105,6 +108,8 @@ def organization_to_type(org) -> OrganizationType:
         allow_user_profile_edit=org.allow_user_profile_edit,
         default_resource_tags=dict(org.default_resource_tags or {}),
         managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
+        appearance_default=dict(org.appearance_default or {}),
+        appearance_locked=bool(org.appearance_locked),
         onboarding_completed_at=org.onboarding_completed_at,
         created_at=org.created_at,
         updated_at=org.updated_at,
