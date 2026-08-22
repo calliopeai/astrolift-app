@@ -390,7 +390,12 @@ def _ensure_static_site_services_sync(deployment_id: int) -> dict[str, Any]:
 
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(app_slug=app.slug, org_slug=org_slug, base_zone=managed_domain.zone),
+            HostnameInputs(
+                app_slug=app.slug,
+                org_slug=org_slug,
+                base_zone=managed_domain.zone,
+                subdomain_override=app.subdomain or "",
+            ),
         ):
             aliases_by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
 
@@ -737,7 +742,15 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
         wh.workload_slug: wh.hostname
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(app_slug=app.slug, org_slug=org_slug, base_zone=managed_domain.zone),
+            # Same override the Ingress render uses (#143). A cdn-backed
+            # workload has no Ingress, so this CNAME is the only thing that
+            # can follow an operator's ``setAppSubdomain``.
+            HostnameInputs(
+                app_slug=app.slug,
+                org_slug=org_slug,
+                base_zone=managed_domain.zone,
+                subdomain_override=app.subdomain or "",
+            ),
         )
     }
     dns_driver = driver_for_capability(cluster, "dns")
@@ -812,7 +825,12 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
             wh.workload_slug: wh.hostname
             for wh in compute_hostnames(
                 manifest,
-                HostnameInputs(app_slug=app.slug, org_slug=org_slug, base_zone=managed_domain.zone),
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=org_slug,
+                    base_zone=managed_domain.zone,
+                    subdomain_override=app.subdomain or "",
+                ),
             )
         }
         for w in targets:

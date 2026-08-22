@@ -899,6 +899,34 @@ def notification_preference_to_type(p) -> NotificationPreferenceType:
     )
 
 
+# ---- Notification profile (#490) ------------------------------------
+
+
+@strawberry.type(name="AstroliftNotificationProfile")
+class NotificationProfileType:
+    """The install's active notification driver + retention window.
+
+    ``config`` is deliberately not exposed: the dispatcher's
+    ``_resolve_secret`` fallback reads a plain-text value stashed
+    alongside a ``*_secret_ref``, so the blob can carry live
+    credentials. Operators write it; nothing reads it back out
+    over the API."""
+
+    id: GUID
+    driver: str
+    retention_delivery_days: int
+    is_active: bool
+
+
+def notification_profile_to_type(p) -> NotificationProfileType:
+    return NotificationProfileType(
+        id=GUID(str(p.guid)),
+        driver=p.driver,
+        retention_delivery_days=p.retention_delivery_days,
+        is_active=bool(p.is_active),
+    )
+
+
 def synthetic_preference_type(*, channel: str, event_kind: str, enabled: bool) -> NotificationPreferenceType:
     """Construct a preference type for a defaulted row (no DB entry)."""
     return NotificationPreferenceType(

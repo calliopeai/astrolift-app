@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from astrolift_drivers.isolation import Isolation
 from core.models.base import BaseCoreModel
 
 
@@ -95,6 +96,18 @@ class ManagedService(BaseCoreModel):
     kind = models.CharField(max_length=32, choices=Kind.choices)
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")
+    # The isolation mode the requester asked for, not the one that will be
+    # used. Blank means "unspecified", which lets the org's compliance floor
+    # or the variant default decide at provision time; storing the resolved
+    # mode here instead would freeze a later policy change out of a
+    # reprovision. Choices are read off the resolver's own enum so the two
+    # cannot drift.
+    isolation = models.CharField(
+        max_length=16,
+        choices=[(mode.value, mode.value) for mode in Isolation],
+        blank=True,
+        default="",
+    )
     config = models.JSONField(default=dict, blank=True)
     # Desired config can move ahead of the real resource while an asynchronous
     # update runs. Keep the last provider-confirmed config separately so the UI,

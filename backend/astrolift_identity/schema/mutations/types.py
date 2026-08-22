@@ -28,11 +28,20 @@ class UpdateOrganizationInput:
     name: str | None = None
     website: str | None = None
     audit_log_retention_days: int | None = None
+    # Per-org override for how far back the historical Logs surface will
+    # serve lines. Bounded by the platform's log retention window rather
+    # than left to the PositiveIntegerField.
+    log_retention_days_default: int | None = None
     allow_user_profile_edit: bool | None = None
     # Operator tags stamped on every resource this org provisions (#1505).
     # A whole-map replace rather than a merge: there has to be a way to
     # remove a tag, and `{}` is the obvious one.
     default_resource_tags: strawberry.scalars.JSON | None = None
+    # Per-kind managed-service isolation floor, e.g. {"postgres":
+    # "dedicated"}. A whole-map replace for the same reason as the tags
+    # above: lifting a floor has to be expressible, and `{}` is how.
+    managed_service_isolation_policy: strawberry.scalars.JSON | None = None
+
     # House theme for the operator UI (#135). Whole-map replace, same reason
     # as the tags above: `{}` has to mean "no house theme".
     appearance_default: strawberry.scalars.JSON | None = None
