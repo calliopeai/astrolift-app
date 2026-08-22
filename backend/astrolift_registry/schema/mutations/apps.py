@@ -195,11 +195,11 @@ class AppMutations:
     ) -> MutationResultType[RegisteredAppType]:
         """Edit a registered app's subdomain without redeploy.
 
-        The platform's hostname computation re-derives from
-        ``app.subdomain`` on the next render — for live ingress
-        traffic this needs an Ingress patch (handled by the
-        SyncAppDomainWorkflow, separately tracked). This mutation is
-        the source-of-truth update + collision check.
+        This mutation is the source-of-truth update + collision
+        check; ``SyncAppDomainWorkflow`` (#143) is what makes live
+        traffic follow it, re-applying DNS + the Ingress host rule
+        for the new hostname and rolling back to the old subdomain if
+        a step fails part-way.
 
         Validation:
         - DNS label rules (lowercase letters, digits, hyphens)
@@ -244,8 +244,27 @@ class AppMutations:
             )
 
         if app.subdomain != new_subdomain:
+            from astrolift_workflows.client import start_workflow
+            from astrolift_workflows.inputs import Actor, SyncAppDomainInput
+
+            previous_subdomain = app.subdomain
             app.subdomain = new_subdomain
             app.save(update_fields=["subdomain", "updated_at", "version"])
+            # Deterministic id: re-firing for the same app supersedes the
+            # in-flight sync rather than racing a second one onto the same
+            # Ingress. The workflow needs the pre-write value to diff the
+            # hostnames and to restore routing if a step fails.
+            start_workflow(
+                "SyncAppDomainWorkflow",
+                args=[
+                    SyncAppDomainInput(
+                        registered_app_id=app.pk,
+                        previous_subdomain=previous_subdomain,
+                        actor=Actor(kind="system", display="app-subdomain-sync"),
+                    ),
+                ],
+                workflow_id=f"SyncAppDomainWorkflow-{app.guid}",
+            )
         return gql_success(app_to_type(app))
 
     @strawberry.field

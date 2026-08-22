@@ -76,6 +76,7 @@ def _scenario(manifest_toml: str):
         pk=1,
         registered_app=SimpleNamespace(
             slug="shop",
+            subdomain="shop",
             organization=SimpleNamespace(slug="acme"),
             organization_id=1,
         ),

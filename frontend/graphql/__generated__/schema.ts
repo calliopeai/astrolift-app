@@ -2363,6 +2363,7 @@ export type AstroliftManagedService = {
   environmentName: Scalars['String']['output'];
   grantState: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  isolation: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
@@ -2664,6 +2665,19 @@ export type AstroliftNotificationPreferenceMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftNotificationProfile = {
+  driver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  retentionDeliveryDays: Scalars['Int']['output'];
+};
+
+export type AstroliftNotificationProfileMutationResult = {
+  data?: Maybe<AstroliftNotificationProfile>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftObservabilityPanelReason =
   | 'ERROR'
   | 'NOT_CONFIGURED'
@@ -2701,6 +2715,7 @@ export type AstroliftOrganization = {
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
+  managedServiceIsolationPolicy: Scalars['JSON']['output'];
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
@@ -5325,6 +5340,7 @@ export type Mutation = {
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
+  setNotificationProfile: AstroliftNotificationProfileMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -6742,6 +6758,11 @@ export type MutationSetNotificationPreferenceArgs = {
 };
 
 
+export type MutationSetNotificationProfileArgs = {
+  input: SetNotificationProfileInput;
+};
+
+
 export type MutationSetPreviewPinnedArgs = {
   input: SetPreviewPinnedInput;
 };
@@ -7366,6 +7387,7 @@ export type ProvisionManagedServiceInput = {
   appSlug: Scalars['String']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   variant: InputMaybe<Scalars['String']['input']>;
@@ -7377,6 +7399,7 @@ export type ProvisionProjectManagedServiceInput = {
   clusterId: Scalars['GUID']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['GUID']['input'];
@@ -9497,6 +9520,12 @@ export type SetNotificationPreferenceInput = {
   eventKind: Scalars['String']['input'];
 };
 
+export type SetNotificationProfileInput = {
+  config: Scalars['JSON']['input'];
+  driver: Scalars['String']['input'];
+  retentionDeliveryDays: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type SetPreviewPinnedInput = {
   id: Scalars['GUID']['input'];
   pinned: Scalars['Boolean']['input'];
@@ -9786,6 +9815,8 @@ export type UpdateOrganizationInput = {
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
+  logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  managedServiceIsolationPolicy: InputMaybe<Scalars['JSON']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
