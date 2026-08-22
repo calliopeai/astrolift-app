@@ -28,17 +28,16 @@ from core.tenancy import TenantContext, tenant_context
 pytestmark = pytest.mark.django_db
 
 
-# Shape mirrors astrolift_manifest's own fixtures: astrolift_version + an
-# [app] table + at least one [[workloads]] entry.
+# Verified against astrolift_manifest.parser + normalize directly: `name` is
+# top-level (not under [app]), and `kind` must be one of the enum members —
+# "service" is not one of them, "deployment" is.
 GOOD_MANIFEST = """\
 astrolift_version = 1
-[app]
-name = "Checkout"
-slug = "checkout"
+name = "checkout"
 
 [[workloads]]
 name = "api"
-kind = "service"
+kind = "deployment"
 """
 
 
