@@ -6810,6 +6810,7 @@ input UpdateOrganizationInput {
   name: String = null
   website: String = null
   auditLogRetentionDays: Int = null
+  logRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   defaultResourceTags: JSON = null
 }

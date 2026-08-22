@@ -28,6 +28,10 @@ class UpdateOrganizationInput:
     name: str | None = None
     website: str | None = None
     audit_log_retention_days: int | None = None
+    # Per-org override for how far back the historical Logs surface will
+    # serve lines. Bounded by the platform's log retention window rather
+    # than left to the PositiveIntegerField.
+    log_retention_days_default: int | None = None
     allow_user_profile_edit: bool | None = None
     # Operator tags stamped on every resource this org provisions (#1505).
     # A whole-map replace rather than a merge: there has to be a way to
