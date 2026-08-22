@@ -82,15 +82,14 @@ from astrolift_workflows.workflows.workflow_definition_run import (
     WorkflowDefinitionRunWorkflow,
 )
 
+from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
 __all__ = [
-    "UptimeProbeTickWorkflow",
-    "UpdateManagedServiceWorkflow",
     "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",
-    "AlertEvalTickWorkflow",
     "AgentLoopTickWorkflow",
     "AgentReconcileTickWorkflow",
     "AgentScaleTickWorkflow",
+    "AlertEvalTickWorkflow",
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
@@ -110,6 +109,7 @@ __all__ = [
     "MigrateAppWorkflow",
     "NamespaceProvisionWorkflow",
     "OnboardAppWorkflow",
+    "PipelineRunWorkflow",
     "PollScheduledJobRunsWorkflow",
     "PreviewGarbageCollectWorkflow",
     "PromoteDeploymentWorkflow",
@@ -127,6 +127,8 @@ __all__ = [
     "SyncDevEnvironmentFilesWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
+    "UpdateManagedServiceWorkflow",
+    "UptimeProbeTickWorkflow",
     "ValidateCustomDomainWorkflow",
     "WorkflowDefinitionRunWorkflow",
 ]
