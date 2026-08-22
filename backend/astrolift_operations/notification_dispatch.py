@@ -724,6 +724,54 @@ def _template_app_uptime_event(envelope: EventEnvelope, action_label: str) -> No
     )
 
 
+def _template_cert_event(envelope: EventEnvelope, *, renewal_failed: bool) -> NotificationTemplate | None:
+    """TLS cert expiry / renewal-failure alert -> the app's org admins (#155).
+
+    Same recipient rule as the uptime alerts: a cert about to lapse is a
+    whoever-owns-this-must-know event, and the operator who has to fix the
+    renewal is an admin. Payload keys come from
+    ``cert_expiry_monitor._payload_for``.
+    """
+    if envelope.organization_id is None:
+        return None
+    admin_ids = _org_admin_user_ids(organization_id=envelope.organization_id)
+    if not admin_ids:
+        return None
+    payload = envelope.payload or {}
+    hostname = str(payload.get("hostname", "") or "")
+    app_slug = str(payload.get("app_slug", "") or "")
+    days = payload.get("days_until_expiry")
+    try:
+        days_int = int(days) if days is not None else None
+    except (TypeError, ValueError):
+        days_int = None
+    if renewal_failed:
+        title = f"Cert renewal failing: {hostname}" if hostname else "Cert renewal failing"
+        when = f"expires in {days_int}d" if days_int is not None and days_int >= 0 else "already expired"
+        body = f"{hostname or app_slug}: renewal is failing and the cert {when}."
+    else:
+        title = f"Cert expiring: {hostname}" if hostname else "Cert expiring"
+        body = (
+            f"{hostname or app_slug} expires in {days_int} days"
+            if days_int is not None and days_int >= 0
+            else f"{hostname or app_slug} has expired"
+        )
+    action_url = f"astrolift://apps/{app_slug}/domains" if app_slug else "astrolift://apps"
+    return NotificationTemplate(
+        title=_truncate(title, PUSH_TITLE_MAX),
+        body=_truncate(body, PUSH_BODY_MAX),
+        action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
+        recipient_user_ids=tuple(sorted(admin_ids)),
+        extra_data={
+            "hostname": _truncate(hostname, PUSH_DATA_VALUE_MAX),
+            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
+            "days_until_expiry": _truncate(
+                str(days_int if days_int is not None else ""), PUSH_DATA_VALUE_MAX
+            ),
+        },
+    )
+
+
 NOTIFICATION_TEMPLATES = {
     "deploy.approved": lambda env: _template_deploy_event(env, "approved"),
     "deploy.rejected": lambda env: _template_deploy_event(env, "rejected"),
@@ -734,6 +782,8 @@ NOTIFICATION_TEMPLATES = {
     "cluster.bootstrap_failed": _template_cluster_bootstrap_failed,
     "app.deregister_pending": _template_app_deregister_pending,
     "app.down": lambda env: _template_app_uptime_event(env, "down"),
+    "domain.cert_expiring": lambda env: _template_cert_event(env, renewal_failed=False),
+    "domain.cert_renewal_failed": lambda env: _template_cert_event(env, renewal_failed=True),
     "app.recovered": lambda env: _template_app_uptime_event(env, "recovered"),
     "auth.session.created": _template_session_created,
 }

@@ -19,6 +19,7 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
 from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
+from astrolift_workflows.workflows.cert_expiry_tick import CertExpiryTickWorkflow
 from astrolift_workflows.workflows.ci_workflow_resync_tick import (
     CiWorkflowResyncTickWorkflow,
 )
@@ -95,6 +96,7 @@ __all__ = [
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
     "CaptureQuotaUsageSnapshotWorkflow",
+    "CertExpiryTickWorkflow",
     "CiWorkflowResyncTickWorkflow",
     "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",

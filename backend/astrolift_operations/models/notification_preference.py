@@ -50,6 +50,9 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     # ---- uptime: an app going unreachable is a page-me event ----------
     ("push", "app.down"): True,
     ("push", "app.recovered"): True,
+    # ---- certs (#155): a lapsing cert breaks TLS for everyone ------
+    ("push", "domain.cert_expiring"): True,
+    ("push", "domain.cert_renewal_failed"): True,
     # ---- #499 new-session ------------------------------------------
     # Mobile/web new sessions are security-critical → ON.
     # CLI sessions are a noisy bootstrap signal → OFF by default so
@@ -70,6 +73,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     # are intentionally push-only.
     ("email", "app.down"): True,
     ("email", "app.recovered"): True,
+    ("email", "domain.cert_expiring"): True,
+    ("email", "domain.cert_renewal_failed"): True,
     ("email", "deploy.failed"): True,
     ("email", "cluster.bootstrap_failed"): True,
     ("email", "secret.revealed"): True,

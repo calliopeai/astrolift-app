@@ -67,6 +67,7 @@ from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_ingress,
     deprovision_app_registry_repo,
 )
+from astrolift_workflows.activities.cert_expiry import check_cert_expiry_tick
 from astrolift_workflows.activities.ci_workflow_resync import resync_ci_workflows_tick
 from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_acm_certs,
@@ -211,6 +212,7 @@ __all__ = [
     "cancel_pipeline_job",
     "capture_platform_cost_snapshot",
     "capture_quota_usage_snapshot",
+    "check_cert_expiry_tick",
     "check_managed_service_ready",
     "cleanup_cluster_acm_certs",
     "cleanup_cluster_dns_records",
