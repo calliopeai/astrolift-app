@@ -106,6 +106,40 @@ def _mark_pipeline_run_running_sync(pipeline_run_id: int) -> dict:
     return {"jobs": jobs}
 
 
+# Prometheus series for the pipeline subsystem (#98).
+#
+# astrolift_pipelines/metrics.py registered the counters and histograms on
+# prometheus_client's default registry -- the one config.views.metrics_view
+# serves via generate_latest() -- and then nothing ever called the helpers,
+# so /metrics carried zero pipeline series. Every terminal transition in this
+# module now records, which is why these wrappers exist rather than a call
+# inlined once: there are six job-run terminal paths and two run-level ones,
+# and the failure mode of adding a seventh without a metric is exactly what
+# left this module dark in the first place. test_pipeline_metrics_wired.py
+# pins that as a ratchet.
+#
+# Metrics must never fail a pipeline: a labelling bug or a registry problem
+# would otherwise turn a green deploy red, so both wrappers swallow.
+
+
+def _record_job_metric(job_run, *, backend: str = "k8s_job") -> None:
+    from astrolift_pipelines.metrics import record_job_completed
+
+    try:
+        record_job_completed(job_run, backend=backend)
+    except Exception:  # noqa: BLE001 - observability must not break the run
+        log.warning("pipeline metrics: job_run=%s not recorded", job_run.pk, exc_info=True)
+
+
+def _record_run_metric(run) -> None:
+    from astrolift_pipelines.metrics import record_run_completed
+
+    try:
+        record_run_completed(run)
+    except Exception:  # noqa: BLE001
+        log.warning("pipeline metrics: pipeline_run=%s not recorded", run.pk, exc_info=True)
+
+
 def _mark_pipeline_run_success_sync(pipeline_run_id: int) -> None:
     from django.utils import timezone
 
@@ -115,6 +149,7 @@ def _mark_pipeline_run_success_sync(pipeline_run_id: int) -> None:
     run.status = PipelineRun.Status.SUCCESS
     run.finished_at = timezone.now()
     run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    _record_run_metric(run)
 
 
 def _mark_pipeline_run_failed_sync(pipeline_run_id: int, reason: str) -> None:
@@ -126,6 +161,7 @@ def _mark_pipeline_run_failed_sync(pipeline_run_id: int, reason: str) -> None:
     run.status = PipelineRun.Status.FAILURE
     run.finished_at = timezone.now()
     run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    _record_run_metric(run)
     log.info(
         "pipeline_run_failed id=%s reason=%s",
         pipeline_run_id,
@@ -216,6 +252,7 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
         job_run.status = JobRun.Status.FAILURE
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+        _record_job_metric(job_run)
         # A spawn that dies after materializing leaves a plaintext
         # credential in the namespace with no pod that needs it and no
         # poll that will ever clean up, since poll only runs for a job
@@ -288,6 +325,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.status = JobRun.Status.SUCCESS
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+        _record_job_metric(job_run)
         # Delete the K8s Job after success — keeps the pipeline namespace tidy.
         _delete_k8s_job(client, namespace, k8s_job_name)
         _cleanup_secrets_quietly(job_run, namespace, run, client=client)
@@ -307,6 +345,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.status = JobRun.Status.FAILURE
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+        _record_job_metric(job_run)
         _delete_k8s_job(client, namespace, k8s_job_name)
         # Beside the Job delete on this branch too: a per-run Secret that
         # outlives the pod is a plaintext credential sitting in a
@@ -577,6 +616,7 @@ def _cancel_pipeline_job_sync(job_run_id: int) -> None:
     job_run.status = JobRun.Status.CANCELLED
     job_run.finished_at = timezone.now()
     job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    _record_job_metric(job_run)
 
 
 def _mark_job_run_cancelled_sync(job_run_id: int) -> None:
@@ -594,6 +634,7 @@ def _mark_job_run_cancelled_sync(job_run_id: int) -> None:
     job_run.status = JobRun.Status.CANCELLED
     job_run.finished_at = timezone.now()
     job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    _record_job_metric(job_run)
 
 
 def _mark_job_run_failed_sync(job_run_id: int, exit_code: int | None) -> None:
@@ -607,6 +648,7 @@ def _mark_job_run_failed_sync(job_run_id: int, exit_code: int | None) -> None:
     job_run.status = JobRun.Status.FAILURE
     job_run.finished_at = timezone.now()
     job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    _record_job_metric(job_run)
 
 
 # ---------------------------------------------------------------------------

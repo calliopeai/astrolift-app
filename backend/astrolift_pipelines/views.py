@@ -335,6 +335,17 @@ def runner_job_complete(request, runner_guid: str, job_run_guid: str):
     job_run.steps_result = body.get("steps", [])
     job_run.save(update_fields=["status", "finished_at", "steps_result", "updated_at", "version"])
 
+    # The `backend` label on this histogram exists because a job can execute
+    # two ways; this is the self-hosted half. Swallowing on purpose: a
+    # metrics problem must not turn a runner's completion callback into a
+    # 500, which would make the runner retry a job that already finished.
+    try:
+        from astrolift_pipelines.metrics import record_job_completed
+
+        record_job_completed(job_run, backend="self_hosted")
+    except Exception:  # noqa: BLE001
+        log.warning("pipeline metrics: job_run=%s not recorded", job_run.pk, exc_info=True)
+
     # Clear runner's current job pointer and return to idle.
     runner.current_job_run = None
     runner.status = Runner.Status.IDLE
