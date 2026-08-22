@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1033" height="213" viewBox="0 0 1033 213" role="img" aria-label="Astrolift">
-  <rect width="1033" height="213" fill="#2B2D2C"/>
+  <rect width="1033" height="213" fill="#000000"/>
 
   <!-- Astrolift mark: paper-plane shape with a single bright pinpoint -->
-  <g transform="translate(40,30)" fill="none" stroke="#DC394C" stroke-width="9" stroke-linejoin="round">
+  <g transform="translate(40,30)" fill="none" stroke="#2F9E52" stroke-width="9" stroke-linejoin="round">
     <path d="M77 8 L143 152 L77 122 L11 152 Z"/>
   </g>
-  <circle cx="117" cy="77" r="11" fill="#DC394C"/>
+  <circle cx="117" cy="77" r="11" fill="#2F9E52"/>
 
   <!-- Wordmark: ASTROLIFT in a clean condensed sans -->
-  <g transform="translate(200,140)" fill="#FAFAFA"
+  <g transform="translate(200,140)" fill="#F0F2F1"
      font-family="Inter, 'Helvetica Neue', Arial, sans-serif"
      font-weight="700" font-size="120" letter-spacing="6">
     <text x="0" y="0">ASTROLIFT</text>
   </g>
 
   <!-- Subtle baseline accent in brand red -->
-  <rect x="200" y="160" width="720" height="6" fill="#DC394C"/>
+  <rect x="200" y="160" width="720" height="6" fill="#2F9E52"/>
 </svg>

@@ -1,69 +1,70 @@
 /*
  * Astrolift Admin Theme — supports dark, light, and system-auto modes.
  *
- * Brand palette (aligned with astrolift-site):
- *   #010409  navy/charcoal (background, dark)
- *   #5B3A8E  deep purple   (primary brand accent)
- *   #3E2563  darker purple (secondary / hover)
- *   #08d4b8  brand teal    (links, accent highlights)
- *   #37efed  bright teal   (link hover in dark, accent-2)
- *   #FAFAFA  near-white    (foreground on dark)
+ * Brand palette (the operator-UI amendment, §11 of the brand kit):
+ *   #000000  true black    (ground, dark)
+ *   #2F9E52  action green  (primary brand accent)
+ *   #1F6B38  deep green    (secondary / hover)
+ *   #8FD82A  lime          (links, accent highlights)
+ *   #CBF39D  pale lime     (link hover in dark, accent-2)
+ *   #F0F2F1  near-white    (foreground on dark)
  *
- * Errors stay red (semantic), but every "brand red" use of #DC394C
- * has been replaced with the purple/teal pair so destructive intent
- * isn't conflated with normal navigation.
+ * Errors stay red and use the #FF6B6B err token. The former purple/teal
+ * pair is gone: the brand permits no purple at all, and the teals read as
+ * cyan against dark chrome. This is a static theme — it does not follow a
+ * user's Appearance preference, which lives only in the operator UI.
  */
 
 /* ── Shared brand accents + dark defaults ───────────────────────────────── */
 
 :root {
     /* Brand accents — unchanged across all themes */
-    --primary:                #5B3A8E;
-    --secondary:              #3E2563;
-    --accent:                 #08d4b8;
-    --primary-fg:             #FAFAFA;
+    --primary:                #2F9E52;
+    --secondary:              #1F6B38;
+    --accent:                 #8FD82A;
+    --primary-fg:             #F0F2F1;
 
-    --button-fg:              #FAFAFA;
-    --button-bg:              #5B3A8E;
-    --button-hover-bg:        #4A2E73;
-    --default-button-bg:      #3E2563;
-    --default-button-hover-bg:#2D1A47;
+    --button-fg:              #F0F2F1;
+    --button-bg:              #2F9E52;
+    --button-hover-bg:        #278845;
+    --default-button-bg:      #1F6B38;
+    --default-button-hover-bg:#17512A;
     --close-button-bg:        #4a4c4b;
     --close-button-hover-bg:  #5a5c5b;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
-    --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #3E2563;
-    --object-tools-hover-bg:  #2D1A47;
+    --object-tools-fg:        #F0F2F1;
+    --object-tools-bg:        #1F6B38;
+    --object-tools-hover-bg:  #17512A;
 
-    --breadcrumbs-bg:         #5B3A8E;
-    --breadcrumbs-fg:         #FAFAFA;
-    --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #08d4b8;
+    --breadcrumbs-bg:         #2F9E52;
+    --breadcrumbs-fg:         #F0F2F1;
+    --breadcrumbs-link-fg:    #F0F2F1;
+    --link-selected-fg:       #8FD82A;
 
     /* Header stays dark in both themes for brand consistency */
-    --header-color:           #FAFAFA;
-    --header-branding-color:  #FAFAFA;
-    --header-bg:              #010409;
-    --header-link-color:      #FAFAFA;
+    --header-color:           #F0F2F1;
+    --header-branding-color:  #F0F2F1;
+    --header-bg:              #000000;
+    --header-link-color:      #F0F2F1;
 
     /* Dark theme defaults (applied when no explicit data-theme is set) */
-    --body-fg:                #FAFAFA;
-    --body-bg:                #0D1117;
-    --body-quiet-color:       #a3aed0;
+    --body-fg:                #F0F2F1;
+    --body-bg:                #141414;
+    --body-quiet-color:       #8B9188;
     --body-loud-color:        #ffffff;
 
-    --link-fg:                #37efed;
-    --link-hover-color:       #5ff7f5;
+    --link-fg:                #CBF39D;
+    --link-hover-color:       #DEF7BE;
 
-    --hairline-color:         #1A2035;
-    --border-color:           #1A2035;
+    --hairline-color:         #1B1B1B;
+    --border-color:           #1B1B1B;
 
     --error-fg:               #ff7a7a;
-    --message-success-bg:     #0f1f17;
-    --message-success-color:  #6ee5c9;
-    --message-success-border: #1a3d2f;
+    --message-success-bg:     #0B1207;
+    --message-success-color:  #A6E34D;
+    --message-success-border: #14351F;
     --message-warning-bg:     #332e17;
     --message-warning-color:  #e6c87a;
     --message-warning-border: #5a4d2d;
@@ -71,59 +72,59 @@
     --message-error-color:    #ff7a7a;
     --message-error-border:   #5a2d2d;
 
-    --darkened-bg:            #090C10;
-    --selected-bg:            #2A1F4A;
-    --selected-row:           #2A1F4A;
-    --input-bg:               #0D1117;
+    --darkened-bg:            #0A0A0A;
+    --selected-bg:            #14351F;
+    --selected-row:           #14351F;
+    --input-bg:               #141414;
 }
 
 /* ── Explicit dark theme (beats Django's html[data-theme="dark"] specificity) */
 
 :root[data-theme="dark"] {
-    --primary:                #5B3A8E;
-    --secondary:              #3E2563;
-    --accent:                 #08d4b8;
-    --primary-fg:             #FAFAFA;
+    --primary:                #2F9E52;
+    --secondary:              #1F6B38;
+    --accent:                 #8FD82A;
+    --primary-fg:             #F0F2F1;
 
-    --button-fg:              #FAFAFA;
-    --button-bg:              #5B3A8E;
-    --button-hover-bg:        #4A2E73;
-    --default-button-bg:      #3E2563;
-    --default-button-hover-bg:#2D1A47;
+    --button-fg:              #F0F2F1;
+    --button-bg:              #2F9E52;
+    --button-hover-bg:        #278845;
+    --default-button-bg:      #1F6B38;
+    --default-button-hover-bg:#17512A;
     --close-button-bg:        #4a4c4b;
     --close-button-hover-bg:  #5a5c5b;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
-    --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #3E2563;
-    --object-tools-hover-bg:  #2D1A47;
+    --object-tools-fg:        #F0F2F1;
+    --object-tools-bg:        #1F6B38;
+    --object-tools-hover-bg:  #17512A;
 
-    --breadcrumbs-bg:         #5B3A8E;
-    --breadcrumbs-fg:         #FAFAFA;
-    --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #08d4b8;
+    --breadcrumbs-bg:         #2F9E52;
+    --breadcrumbs-fg:         #F0F2F1;
+    --breadcrumbs-link-fg:    #F0F2F1;
+    --link-selected-fg:       #8FD82A;
 
-    --header-bg:              #010409;
-    --header-color:           #FAFAFA;
-    --header-branding-color:  #FAFAFA;
-    --header-link-color:      #FAFAFA;
+    --header-bg:              #000000;
+    --header-color:           #F0F2F1;
+    --header-branding-color:  #F0F2F1;
+    --header-link-color:      #F0F2F1;
 
-    --body-fg:                #FAFAFA;
-    --body-bg:                #0D1117;
-    --body-quiet-color:       #a3aed0;
+    --body-fg:                #F0F2F1;
+    --body-bg:                #141414;
+    --body-quiet-color:       #8B9188;
     --body-loud-color:        #ffffff;
 
-    --link-fg:                #37efed;
-    --link-hover-color:       #5ff7f5;
+    --link-fg:                #CBF39D;
+    --link-hover-color:       #DEF7BE;
 
-    --hairline-color:         #1A2035;
-    --border-color:           #1A2035;
+    --hairline-color:         #1B1B1B;
+    --border-color:           #1B1B1B;
 
     --error-fg:               #ff7a7a;
-    --message-success-bg:     #0f1f17;
-    --message-success-color:  #6ee5c9;
-    --message-success-border: #1a3d2f;
+    --message-success-bg:     #0B1207;
+    --message-success-color:  #A6E34D;
+    --message-success-border: #14351F;
     --message-warning-bg:     #1f1c0f;
     --message-warning-color:  #e6c87a;
     --message-warning-border: #3d3519;
@@ -131,9 +132,9 @@
     --message-error-color:    #ff7a7a;
     --message-error-border:   #3d1a1a;
 
-    --darkened-bg:            #090C10;
-    --selected-bg:            #2A1F4A;
-    --selected-row:           #2A1F4A;
+    --darkened-bg:            #0A0A0A;
+    --selected-bg:            #14351F;
+    --selected-row:           #14351F;
     --input-bg:               #111211;
 }
 
@@ -142,48 +143,48 @@
 :root[data-theme="light"] {
     /* Header — dark gray in light mode */
     --header-bg:              #3a3a3a;
-    --header-color:           #FAFAFA;
-    --header-branding-color:  #FAFAFA;
-    --header-link-color:      #FAFAFA;
+    --header-color:           #F0F2F1;
+    --header-branding-color:  #F0F2F1;
+    --header-link-color:      #F0F2F1;
 
     /* Brand accents — must repeat here to beat base.css html[data-theme="light"] specificity */
-    --primary:                #5B3A8E;
-    --secondary:              #3E2563;
-    --accent:                 #08d4b8;
-    --primary-fg:             #FAFAFA;
+    --primary:                #2F9E52;
+    --secondary:              #1F6B38;
+    --accent:                 #8FD82A;
+    --primary-fg:             #F0F2F1;
 
-    --button-fg:              #FAFAFA;
-    --button-bg:              #5B3A8E;
-    --button-hover-bg:        #4A2E73;
-    --default-button-bg:      #3E2563;
-    --default-button-hover-bg:#2D1A47;
+    --button-fg:              #F0F2F1;
+    --button-bg:              #2F9E52;
+    --button-hover-bg:        #278845;
+    --default-button-bg:      #1F6B38;
+    --default-button-hover-bg:#17512A;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
-    --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #3E2563;
-    --object-tools-hover-bg:  #2D1A47;
+    --object-tools-fg:        #F0F2F1;
+    --object-tools-bg:        #1F6B38;
+    --object-tools-hover-bg:  #17512A;
 
-    --breadcrumbs-bg:         #5B3A8E;
-    --breadcrumbs-fg:         #FAFAFA;
-    --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #06b8a0;
+    --breadcrumbs-bg:         #2F9E52;
+    --breadcrumbs-fg:         #F0F2F1;
+    --breadcrumbs-link-fg:    #F0F2F1;
+    --link-selected-fg:       #7AC022;
 
     --body-fg:                #1a1a1a;
     --body-bg:                #f8f8f8;
     --body-quiet-color:       #666666;
     --body-loud-color:        #000000;
 
-    --link-fg:                #06b8a0;
-    --link-hover-color:       #5B3A8E;
+    --link-fg:                #7AC022;
+    --link-hover-color:       #2F9E52;
 
     --hairline-color:         #e0e0e0;
     --border-color:           #e0e0e0;
 
     --error-fg:               #c0392b;
-    --message-success-bg:     #d4f1e4;
-    --message-success-color:  #0f6147;
-    --message-success-border: #a0dcbf;
+    --message-success-bg:     #E8F5D6;
+    --message-success-color:  #1F6B38;
+    --message-success-border: #BFE38F;
     --message-warning-bg:     #fff3cd;
     --message-warning-color:  #856404;
     --message-warning-border: #ffeeba;
@@ -192,8 +193,8 @@
     --message-error-border:   #f5c6cb;
 
     --darkened-bg:            #eeeeee;
-    --selected-bg:            #ece5fa;
-    --selected-row:           #ece5fa;
+    --selected-bg:            #E6F3E4;
+    --selected-row:           #E6F3E4;
     --input-bg:               #ffffff;
 }
 
@@ -203,48 +204,48 @@
     :root:not([data-theme="dark"]) {
         /* Header — dark gray in light mode */
         --header-bg:              #3a3a3a;
-        --header-color:           #FAFAFA;
-        --header-branding-color:  #FAFAFA;
-        --header-link-color:      #FAFAFA;
+        --header-color:           #F0F2F1;
+        --header-branding-color:  #F0F2F1;
+        --header-link-color:      #F0F2F1;
 
         /* Brand accents */
-        --primary:                #5B3A8E;
-        --secondary:              #3E2563;
-        --accent:                 #08d4b8;
-        --primary-fg:             #FAFAFA;
+        --primary:                #2F9E52;
+        --secondary:              #1F6B38;
+        --accent:                 #8FD82A;
+        --primary-fg:             #F0F2F1;
 
-        --button-fg:              #FAFAFA;
-        --button-bg:              #5B3A8E;
-        --button-hover-bg:        #4A2E73;
-        --default-button-bg:      #3E2563;
-        --default-button-hover-bg:#2D1A47;
+        --button-fg:              #F0F2F1;
+        --button-bg:              #2F9E52;
+        --button-hover-bg:        #278845;
+        --default-button-bg:      #1F6B38;
+        --default-button-hover-bg:#17512A;
         --delete-button-bg:       #8B3138;
         --delete-button-hover-bg: #6a1921;
 
-        --object-tools-fg:        #FAFAFA;
-        --object-tools-bg:        #3E2563;
-        --object-tools-hover-bg:  #2D1A47;
+        --object-tools-fg:        #F0F2F1;
+        --object-tools-bg:        #1F6B38;
+        --object-tools-hover-bg:  #17512A;
 
-        --breadcrumbs-bg:         #5B3A8E;
-        --breadcrumbs-fg:         #FAFAFA;
-        --breadcrumbs-link-fg:    #FAFAFA;
-        --link-selected-fg:       #06b8a0;
+        --breadcrumbs-bg:         #2F9E52;
+        --breadcrumbs-fg:         #F0F2F1;
+        --breadcrumbs-link-fg:    #F0F2F1;
+        --link-selected-fg:       #7AC022;
 
         --body-fg:                #1a1a1a;
         --body-bg:                #f8f8f8;
         --body-quiet-color:       #666666;
         --body-loud-color:        #000000;
 
-        --link-fg:                #06b8a0;
-        --link-hover-color:       #5B3A8E;
+        --link-fg:                #7AC022;
+        --link-hover-color:       #2F9E52;
 
         --hairline-color:         #e0e0e0;
         --border-color:           #e0e0e0;
 
         --error-fg:               #c0392b;
-        --message-success-bg:     #d4f1e4;
-        --message-success-color:  #0f6147;
-        --message-success-border: #a0dcbf;
+        --message-success-bg:     #E8F5D6;
+        --message-success-color:  #1F6B38;
+        --message-success-border: #BFE38F;
         --message-warning-bg:     #fff3cd;
         --message-warning-color:  #856404;
         --message-warning-border: #ffeeba;
@@ -253,8 +254,8 @@
         --message-error-border:   #f5c6cb;
 
         --darkened-bg:            #eeeeee;
-        --selected-bg:            #ece5fa;
-        --selected-row:           #ece5fa;
+        --selected-bg:            #E6F3E4;
+        --selected-row:           #E6F3E4;
         --input-bg:               #ffffff;
     }
 }
@@ -306,15 +307,15 @@
 }
 
 #header #user-tools {
-    color: #a3aed0;
+    color: #8B9188;
 }
 
 #header #user-tools a {
-    color: #a3aed0;
+    color: #8B9188;
 }
 
 #header #user-tools a:hover {
-    color: #FAFAFA;
+    color: #F0F2F1;
 }
 
 /* Quick-links group in header */
@@ -322,7 +323,7 @@
     display: inline-flex;
     gap: 2px;
     margin-right: 8px;
-    border-right: 1px solid #1A2035;
+    border-right: 1px solid #1B1B1B;
     padding-right: 10px;
 }
 
@@ -330,8 +331,8 @@
     display: inline-block;
     padding: 2px 7px;
     border-radius: 3px;
-    background: #1A2035;
-    color: #a3aed0 !important;
+    background: #1B1B1B;
+    color: #8B9188 !important;
     font-size: 0.75em;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -341,7 +342,7 @@
 
 .bw-links a:hover {
     background: var(--primary);
-    color: #FAFAFA !important;
+    color: #F0F2F1 !important;
 }
 
 /* ── Light mode header text overrides ───────────────────────────────────── */
@@ -761,19 +762,19 @@ ul.errorlist {
 :root[data-theme="dark"] #nav-sidebar .module caption,
 :root[data-theme="dark"] #nav-sidebar .module h2 {
     background: #3a3a3a !important;
-    color: #FAFAFA !important;
+    color: #F0F2F1 !important;
 }
 
 :root[data-theme="light"] #nav-sidebar .module caption,
 :root[data-theme="light"] #nav-sidebar .module h2 {
     background: #3a3a3a !important;
-    color: #FAFAFA !important;
+    color: #F0F2F1 !important;
 }
 
 @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) #nav-sidebar .module caption,
     :root:not([data-theme="dark"]) #nav-sidebar .module h2 {
         background: #3a3a3a !important;
-        color: #FAFAFA !important;
+        color: #F0F2F1 !important;
     }
 }
