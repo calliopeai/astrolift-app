@@ -18,6 +18,15 @@ from core.tenancy import TenantContext, tenant_context
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def _temporal_disabled(settings):
+    """The mutation enqueues SyncAppDomainWorkflow now (#143). There is no
+    Temporal server in the unit-test env, so run the client facade in its
+    no-op mode; the two tests that assert on the enqueue replace
+    ``start_workflow`` outright."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+
+
 def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
 
@@ -161,3 +170,65 @@ def test_set_subdomain_requires_permission():
         )
     assert not result.ok
     assert result.errors[0].code == "PERMISSION_DENIED"
+
+
+def _record_starts(monkeypatch):
+    """Capture what the mutation enqueues on the Temporal client facade.
+
+    The resolver imports ``start_workflow`` from the client module inside
+    the function body, so patching the module attribute is enough.
+    """
+    import astrolift_workflows.client as wf_client
+
+    starts: list[tuple[str, list, str]] = []
+
+    def _start(name, args, *, workflow_id, task_queue=None):
+        starts.append((name, list(args), workflow_id))
+        return wf_client.WorkflowHandle(
+            workflow_id=workflow_id,
+            run_id="run-1",
+            enqueued=True,
+        )
+
+    monkeypatch.setattr(wf_client, "start_workflow", _start)
+    return starts
+
+
+def test_set_subdomain_starts_the_domain_sync_workflow(permission_resolver, monkeypatch):
+    """#143: the row write alone left DNS + the Ingress host rule on the
+    old hostname. The rename must enqueue SyncAppDomainWorkflow, carrying
+    the pre-write subdomain so the workflow can diff and roll back."""
+    org, _, _, app = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    starts = _record_starts(monkeypatch)
+
+    with _ctx(org):
+        result = RegistryMutation().set_app_subdomain(
+            _info(),
+            input=SetAppSubdomainInput(id=str(app.guid), subdomain="hello-v2"),
+        )
+
+    assert result.ok, result.errors
+    assert len(starts) == 1, "the rename must fire the sync, not just write the row"
+    name, args, workflow_id = starts[0]
+    assert name == "SyncAppDomainWorkflow"
+    assert workflow_id == f"SyncAppDomainWorkflow-{app.guid}"
+    assert args[0].registered_app_id == app.pk
+    assert args[0].previous_subdomain == "hello"
+
+
+def test_unchanged_subdomain_starts_nothing(permission_resolver, monkeypatch):
+    """No hostname moved, so there is nothing to reconcile - firing here
+    would re-apply an app's manifests on every no-op save."""
+    org, _, _, app = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    starts = _record_starts(monkeypatch)
+
+    with _ctx(org):
+        result = RegistryMutation().set_app_subdomain(
+            _info(),
+            input=SetAppSubdomainInput(id=str(app.guid), subdomain="hello"),
+        )
+
+    assert result.ok
+    assert starts == []

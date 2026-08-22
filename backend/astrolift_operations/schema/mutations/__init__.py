@@ -48,6 +48,7 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     RotateOutboundWebhookSecretInput,
     SetAlertSubscriptionInput,
     SetNotificationPreferenceInput,
+    SetNotificationProfileInput,
     TestNotificationInput,
     TestWebhookInput,
     UnmuteAlertRuleInput,
