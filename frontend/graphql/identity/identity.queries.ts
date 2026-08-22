@@ -17,6 +17,8 @@ export const LIST_ORGANIZATIONS = gql`
       website
       scimEnabled
       auditLogRetentionDays
+      appearanceDefault
+      appearanceLocked
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
@@ -251,6 +253,8 @@ export const GET_ORGANIZATION = gql`
       website
       scimEnabled
       auditLogRetentionDays
+      appearanceDefault
+      appearanceLocked
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit

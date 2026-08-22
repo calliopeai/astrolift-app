@@ -18,6 +18,13 @@ interface AppearanceContextValue {
   locked: boolean;
   setAppearance: (patch: Partial<Appearance>) => void;
   reset: () => void;
+  /**
+   * Supply the org policy once it is known. Called by
+   * `AppearancePolicyBridge` from inside the authenticated layout — this
+   * provider sits in the root layout, which also wraps the login pages where
+   * no org query can run.
+   */
+  setPolicy: (policy: OrgAppearancePolicy | null) => void;
 }
 
 const AppearanceContext = React.createContext<AppearanceContextValue | null>(null);
@@ -27,7 +34,7 @@ export function AppearanceProvider({
   policy = null,
 }: {
   children: React.ReactNode;
-  /** Org-level default / lock. Null until #135 serves it. */
+  /** Initial org policy, when a caller already has it. */
   policy?: OrgAppearancePolicy | null;
 }) {
   // Start from the shipped default so server and first client render agree;
@@ -35,6 +42,7 @@ export function AppearanceProvider({
   // layout has already stamped <html>, so the user never sees the default.
   const [personal, setPersonal] = React.useState<Appearance>(DEFAULT_APPEARANCE);
   const [hydrated, setHydrated] = React.useState(false);
+  const [orgPolicy, setOrgPolicy] = React.useState<OrgAppearancePolicy | null>(policy);
 
   React.useEffect(() => {
     setPersonal(readAppearance());
@@ -42,8 +50,8 @@ export function AppearanceProvider({
   }, []);
 
   const { value, locked } = React.useMemo(
-    () => resolveAppearance(hydrated ? personal : null, policy),
-    [hydrated, personal, policy],
+    () => resolveAppearance(hydrated ? personal : null, orgPolicy),
+    [hydrated, personal, orgPolicy],
   );
 
   React.useEffect(() => {
@@ -68,9 +76,13 @@ export function AppearanceProvider({
     writeAppearance(DEFAULT_APPEARANCE);
   }, [locked]);
 
+  const setPolicy = React.useCallback((next: OrgAppearancePolicy | null) => {
+    setOrgPolicy(next);
+  }, []);
+
   const ctx = React.useMemo(
-    () => ({ appearance: value, locked, setAppearance, reset }),
-    [value, locked, setAppearance, reset],
+    () => ({ appearance: value, locked, setAppearance, reset, setPolicy }),
+    [value, locked, setAppearance, reset, setPolicy],
   );
 
   return <AppearanceContext.Provider value={ctx}>{children}</AppearanceContext.Provider>;
