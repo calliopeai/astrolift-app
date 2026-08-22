@@ -30,6 +30,16 @@ from aws._errors import NotFoundError, map_client_error
 # the CI runner presents at AssumeRoleWithWebIdentity time.
 _GITHUB_OIDC_PROVIDER_HOST = "token.actions.githubusercontent.com"
 
+# ECR severity labels -> the platform's four policy severities. ECR also
+# emits INFORMATIONAL and UNDEFINED, which carry no policy meaning and
+# are dropped rather than folded into LOW.
+_SCAN_SEVERITIES = {
+    "CRITICAL": "critical",
+    "HIGH": "high",
+    "MEDIUM": "medium",
+    "LOW": "low",
+}
+
 
 @dataclass(frozen=True)
 class ECRConfig:
@@ -219,6 +229,105 @@ class ECRDriver(ImageRegistryDriver):
             raise NotFoundError(f"repository {repo} not found") from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
+
+    @driver_op(cloud="aws", driver="registry")
+    def get_scan_findings(self, *, repo: str, digest: str) -> dict[str, Any]:
+        """Read back the vulnerability findings ECR produced for one image.
+
+        ``ensure_repo`` turns basic scanning on (``image_scanning_enabled``,
+        default True), so ECR has been scanning every pushed image while
+        nothing in the platform ever read a finding. This is that read,
+        mapped onto a provider-neutral shape the deploy gate consumes:
+
+            {"status": "COMPLETE" | "IN_PROGRESS" | "NOT_FOUND" | "FAILED",
+             "description": "<ECR's own status text>",
+             "completed_at": "<iso-8601>" | "",
+             "severity_counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+             "findings": [{"cve_id", "severity", "package_name",
+                           "package_version", "fixed_in_version",
+                           "description"}]}
+
+        ``status`` is reported rather than swallowed: an image that has
+        never been scanned yields ``NOT_FOUND`` with an empty finding set,
+        and the caller must not read that as "clean". Findings are paged to
+        exhaustion because a policy that walks the finding list would
+        under-count a truncated page.
+
+        Enhanced (Inspector) scanning reports through ``enhancedFindings``
+        instead; this driver only enables basic scanning, so only
+        ``findings`` is mapped.
+        """
+        image_id = {"imageDigest": digest}
+        severity_counts = dict.fromkeys(_SCAN_SEVERITIES.values(), 0)
+        findings: list[dict[str, Any]] = []
+        status = ""
+        description = ""
+        completed_at = ""
+        next_token: str | None = None
+        try:
+            while True:
+                kwargs: dict[str, Any] = {"repositoryName": repo, "imageId": image_id}
+                if next_token:
+                    kwargs["nextToken"] = next_token
+                response = self._client.describe_image_scan_findings(**kwargs)
+                scan_status = response.get("imageScanStatus") or {}
+                status = scan_status.get("status") or status
+                description = scan_status.get("description") or description
+                block = response.get("imageScanFindings") or {}
+                if not next_token:
+                    # Counts are whole-image totals, identical on every
+                    # page - take them from the first response only.
+                    raw_counts = block.get("findingSeverityCounts") or {}
+                    for ecr_severity, key in _SCAN_SEVERITIES.items():
+                        severity_counts[key] = int(raw_counts.get(ecr_severity, 0) or 0)
+                    completed_raw = block.get("imageScanCompletedAt")
+                    completed_at = completed_raw.isoformat() if completed_raw else ""
+                for finding in block.get("findings") or []:
+                    severity = _SCAN_SEVERITIES.get((finding.get("severity") or "").upper())
+                    if severity is None:
+                        # INFORMATIONAL / UNDEFINED carry no policy meaning.
+                        continue
+                    attributes = {
+                        attribute.get("key", ""): attribute.get("value", "")
+                        for attribute in finding.get("attributes") or []
+                    }
+                    findings.append(
+                        {
+                            "cve_id": finding.get("name", ""),
+                            "severity": severity,
+                            "package_name": attributes.get("package_name", ""),
+                            "package_version": attributes.get("package_version", ""),
+                            "fixed_in_version": attributes.get("fixed_in_version", ""),
+                            "description": finding.get("description", ""),
+                        }
+                    )
+                next_token = response.get("nextToken")
+                if not next_token:
+                    break
+        except self._client.exceptions.ScanNotFoundException as exc:
+            # The image exists but carries no scan - a real answer, not an
+            # error: scanning may have been off when it was pushed.
+            return {
+                "status": "NOT_FOUND",
+                "description": str(exc),
+                "completed_at": "",
+                "severity_counts": dict.fromkeys(_SCAN_SEVERITIES.values(), 0),
+                "findings": [],
+            }
+        except self._client.exceptions.ImageNotFoundException as exc:
+            raise NotFoundError(f"image {repo}@{digest} not found") from exc
+        except self._client.exceptions.RepositoryNotFoundException as exc:
+            raise NotFoundError(f"repository {repo} not found") from exc
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+        return {
+            "status": status or "UNKNOWN",
+            "description": description,
+            "completed_at": completed_at,
+            "severity_counts": severity_counts,
+            "findings": findings,
+        }
 
     @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.create_ci_push_role")
     def ensure_ci_push_role(
