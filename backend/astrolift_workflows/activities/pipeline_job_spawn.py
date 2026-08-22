@@ -745,9 +745,10 @@ def _build_job_manifest(
       - allowPrivilegeEscalation=false.
       - runAsNonRoot=true.
     """
+    from astrolift_pipelines.build_image import resolve_job_image
     from astrolift_pipelines.step_script import TERMINATION_LOG
 
-    image = (job.container_image or "").strip() or "ubuntu:22.04"
+    image = resolve_job_image(job, run)
 
     container: dict = {
         "name": "main",

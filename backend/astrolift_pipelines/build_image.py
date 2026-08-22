@@ -13,39 +13,41 @@ Resolution precedence (highest wins):
 
 from __future__ import annotations
 
+from django.conf import settings
+
 _PLATFORM_DEFAULT_IMAGE = "ghcr.io/calliopeai/astrolift-builder:latest"
 
 
 def resolve_job_image(job, pipeline_run) -> str:
-    """Return the container image to use for a pipeline job.
+    """The container image a pipeline job runs on.
 
-    Applies the resolution precedence defined in #65 (DSL spec):
-    job.container_image > pipeline defaults > org config > platform default.
+    Precedence: what the job declared, then the install's
+    `PIPELINE_DEFAULT_IMAGE`, then the platform default (#65).
+
+    `pipeline_run` is unused now that the org-level levels are gone. It is
+    kept because the signature is the seam an org-level default would come
+    back through, and changing it would churn the call site for nothing.
     """
-    # 1. Job-level container
+    # 1. What the job asked for.
     if job.container_image:
-        return job.container_image
+        return str(job.container_image).strip()
 
-    # 2. Pipeline TOML defaults — not stored separately at v1; check org extra_data
-    org = pipeline_run.pipeline.organization
-    extra = getattr(org, "extra_data", None) or {}
+    # 2. The install's override.
+    #
+    # Two levels used to sit between these, both reading
+    # `Organization.extra_data`. That field does not exist on the model, so
+    # `getattr` returned None, the dict was always empty, and neither level
+    # could ever produce a value. They are removed rather than left as
+    # branches that read like configuration an operator could use.
+    settings_default = str(getattr(settings, "PIPELINE_DEFAULT_IMAGE", "") or "").strip()
+    if settings_default:
+        return settings_default
 
-    # 3. Org install config
-    org_default = extra.get("pipeline_default_image")
-    if org_default:
-        return org_default
-
-    # 4. Django settings override
-    try:
-        from django.conf import settings
-
-        settings_default = getattr(settings, "PIPELINE_DEFAULT_IMAGE", None)
-        if settings_default:
-            return settings_default
-    except Exception:  # noqa: BLE001
-        pass
-
-    # 5. Hardcoded platform default
+    # 3. The platform default, which is what the runner path already uses
+    #    (`runner_views` line 186). Before this, the K8s path fell back to
+    #    bare `ubuntu:22.04` instead — no git, no shell tooling, no astro
+    #    CLI — so the same job got a working image on a self-hosted runner
+    #    and an unusable one in-cluster.
     return _PLATFORM_DEFAULT_IMAGE
 
 
