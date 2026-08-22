@@ -19,6 +19,7 @@ steps in the pipeline. Per-job scoping is explicitly a v2 concern.
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -227,3 +228,51 @@ def build_redactor_for_job(secret_bundle: dict[str, str]) -> SecretRedactor:
     are known) and passed to the log streaming layer.
     """
     return SecretRedactor(list(secret_bundle.values()))
+
+
+# ---------------------------------------------------------------------------
+# Which secrets a job needs (#1529)
+# ---------------------------------------------------------------------------
+
+# The reference syntax was already decided and already shipping: the GHA
+# converter rewrites `${{ secrets.X }}` to `${secrets.X}` and passes it
+# through into step `run` and `env` values. What was missing was anything
+# that read those references back out, so `resolve_pipeline_secrets` took a
+# name list no caller could construct.
+#
+# The names are derived from the references rather than declared separately.
+# Requiring a declaration would mean every pipeline converted from GitHub
+# Actions arrives referencing secrets it does not declare — broken on
+# arrival and needing a hand edit — because the converter emits references
+# and no declaration. Deriving them makes a converted pipeline run as
+# converted.
+#
+# An explicit block is a superset and can be added later without changing
+# this: the union of declared and referenced names is still a name list.
+_SECRET_REF = re.compile(r"\$\{secrets\.([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def secret_names_in(*texts: str | None) -> list[str]:
+    """Every distinct ``${secrets.NAME}`` in the given strings, sorted."""
+    found: set[str] = set()
+    for text in texts:
+        if text:
+            found.update(_SECRET_REF.findall(text))
+    return sorted(found)
+
+
+def secret_names_for_job(job, steps) -> list[str]:
+    """Every secret name this job's definition refers to.
+
+    Covers the step's script, and both of its string-valued maps: a
+    registry credential is as likely to arrive through `with` as through
+    `run`, and missing one would fail the job with an unresolved
+    reference rather than anything that names the cause.
+    """
+    texts: list[str | None] = []
+    for step in steps:
+        texts.append(step.run)
+        texts.append(step.uses)
+        texts.extend(str(v) for v in (step.env or {}).values())
+        texts.extend(str(v) for v in (step.with_params or {}).values())
+    return secret_names_in(*texts)
