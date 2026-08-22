@@ -28,12 +28,17 @@ from core.tenancy import TenantContext, tenant_context
 pytestmark = pytest.mark.django_db
 
 
-GOOD_MANIFEST = """
-name = "checkout"
+# Shape mirrors astrolift_manifest's own fixtures: astrolift_version + an
+# [app] table + at least one [[workloads]] entry.
+GOOD_MANIFEST = """\
+astrolift_version = 1
+[app]
+name = "Checkout"
+slug = "checkout"
 
 [[workloads]]
 name = "api"
-image = "nginx:1.27"
+kind = "service"
 """
 
 
