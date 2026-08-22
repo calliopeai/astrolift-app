@@ -39,9 +39,7 @@ class _Result:
 def in_sync_manifest(monkeypatch):
     import astrolift_registry.services.manifest_sync as manifest_sync
 
-    monkeypatch.setattr(
-        manifest_sync, "resync_app_manifest_from_repo", lambda a, **k: _Result("in_sync")
-    )
+    monkeypatch.setattr(manifest_sync, "resync_app_manifest_from_repo", lambda a, **k: _Result("in_sync"))
 
 
 def test_healthy_app_passes(app, env, in_sync_manifest):
