@@ -280,6 +280,42 @@ class AppCiWorkflowSyncStatusType:
     repo_text_pulled_at: dt.datetime | None
 
 
+@strawberry.type(name="AstroliftAppDoctorCheck")
+class AppDoctorCheckType:
+    """One dependency the app needs, and whether it is actually usable.
+
+    Mirrors ``astrolift_registry.services.app_doctor.DoctorCheck``.
+
+    ``status`` distinguishes four things the UI must not conflate:
+    ``pass`` / ``fail`` are verified states, ``skip`` means the check does
+    not apply to this app, and ``unknown`` means the probe itself errored --
+    the dependency is *unverified*, which is not the same as broken.
+
+    ``fix`` is the action handle the UI maps to a button
+    (``resync_manifest`` / ``retry_autowire`` / ``rerun_onboarding`` /
+    ``redeploy``), empty when there is nothing one click can do.
+    """
+
+    key: str
+    status: str
+    detail: str
+    fix: str
+
+
+@strawberry.type(name="AstroliftAppDoctorReport")
+class AppDoctorReportType:
+    """The whole verdict for an app.
+
+    ``healthy`` is the service's own rollup rather than something the client
+    recomputes, so "is this app fully wired?" has one answer. It counts
+    ``skip`` as fine and ``unknown`` as not fine: an unverified dependency
+    is not a green light.
+    """
+
+    healthy: bool
+    checks: list[AppDoctorCheckType]
+
+
 @strawberry.type(name="AstroliftSecurityPolicy")
 class SecurityPolicyType:
     """Resolved supply-chain policy for an app (#313).
@@ -1369,6 +1405,24 @@ def build_ci_workflow_sync_status(app) -> AppCiWorkflowSyncStatusType:
         repo_text=state.get("repo_text") or "",
         rendered_text=_rendered_ci_workflow_or_empty(app),
         repo_text_pulled_at=_iso_or_none(state.get("repo_text_pulled_at")),
+    )
+
+
+def build_app_doctor_report(app, *, resolve=None) -> AppDoctorReportType:
+    """Run the doctor and shape it for GraphQL.
+
+    Thin on purpose: every judgement lives in the service, which promises
+    never to raise, so this resolver has nothing to catch and no policy of
+    its own.
+    """
+    from astrolift_registry.services.app_doctor import run_app_doctor
+
+    report = run_app_doctor(app, resolve=resolve)
+    return AppDoctorReportType(
+        healthy=report.healthy,
+        checks=[
+            AppDoctorCheckType(key=c.key, status=c.status, detail=c.detail, fix=c.fix) for c in report.checks
+        ],
     )
 
 

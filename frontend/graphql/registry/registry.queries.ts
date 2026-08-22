@@ -525,3 +525,21 @@ export const GET_WORKLOAD_MANIFEST = gql`
     }
   }
 `;
+
+// The doctor is a separate, on-demand query rather than a field on GET_APP:
+// its checks resolve hostnames, read a push-role trust policy, and run the
+// idempotent manifest resync, so folding it into the page query would make
+// every app page load do live network probes.
+export const GET_APP_DOCTOR = gql`
+  query GetAppDoctor($appSlug: String!) {
+    astroliftAppDoctor(appSlug: $appSlug) {
+      healthy
+      checks {
+        key
+        status
+        detail
+        fix
+      }
+    }
+  }
+`;

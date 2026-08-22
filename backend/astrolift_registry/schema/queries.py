@@ -21,6 +21,7 @@ from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
+    AppDoctorReportType,
     AppFreshness,
     AppHealthPulseType,
     AppsListSortKey,
@@ -37,6 +38,7 @@ from astrolift_registry.schema.types import (
     WorkloadType,
     app_team_access_to_type,
     app_to_type,
+    build_app_doctor_report,
     build_app_freshness,
     build_autowire_status,
     build_ci_workflow_sync_status,
@@ -1854,6 +1856,43 @@ class RegistryQuery:
 
         qs = base_qs.filter(scope_filter).order_by("team__name", "name")[:500]
         return [project_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_doctor(self, info: Info, app_slug: str) -> AppDoctorReportType:
+        """Verify every dependency this app needs is actually usable (#1550).
+
+        The service behind this has existed and been tested since #1550 was
+        filed; nothing exposed it, so the checks were written, green, and
+        unreachable -- an operator asking "is this app fully wired?" had no
+        way to run them. This is that exposure.
+
+        Org-scoped before any probing: slugs are unique only within an org,
+        and the checks read a push-role trust policy and resolve hostnames,
+        so a caller must not be able to aim them at another tenant's app.
+        Fails closed (an empty report, not a crash) when there is no tenant.
+
+        Read-mostly rather than read-only, deliberately: the manifest check
+        runs the same idempotent resync the Settings button does, which heals
+        drift in place and never clobbers a staged draft. Everything else
+        only reads.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+            if org_id is not None
+            else None
+        )
+        if app is None:
+            # An empty report rather than an error: the field is non-null and
+            # this is a diagnostic surface, so "nothing to report" is the
+            # honest answer for an app this caller cannot see.
+            return AppDoctorReportType(healthy=False, checks=[])
+        return build_app_doctor_report(app)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

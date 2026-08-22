@@ -4,9 +4,12 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+
 from config.permissions import AbstractPermissions
 from core.serializers.permissions import UserGroupSerializer
-from core.schema.common import GlobalIDUtils, MutationResult
+from core.schema.common import GlobalIDUtils, MutationResult, ValidationError
 from core.systems import Action
 
 
@@ -28,17 +31,64 @@ class PermissionMutations:
         AbstractPermissions.check_django_auth_permission(user, 'user', Action.CHANGE, True)
         AbstractPermissions.check_django_auth_permission(user, 'group', Action.CHANGE, True)
 
-        # Resolve global IDs to PKs
-        from core.schema import GroupType, UserType
+        # Global IDs -> PKs.
+        #
+        # This was `from core.schema import GroupType, UserType` followed by
+        # `Type.get_object(...)`, which was wrong twice over and raised on
+        # every single call: neither name is exported from `core.schema`
+        # (they live in `core.schema.types.permissions` and
+        # `core.schema.types.user`), and neither type has a `get_object`
+        # classmethod to call -- both are plain `strawberry_django.type`
+        # wrappers. `GlobalIDUtils` was already imported in this module and
+        # unused; it is what the other mutations resolve ids with.
         user_pks = []
+        bad_user_ids = []
         for user_id in input.user_ids:
-            user_pks.append(UserType.get_object(global_id=user_id, info=info, raise_not_found=True).id)
+            pk = GlobalIDUtils.get_pk_flexible(user_id, expected_type='UserType')
+            if pk is None:
+                bad_user_ids.append(str(user_id))
+            else:
+                user_pks.append(pk)
+        group_pk = GlobalIDUtils.get_pk_flexible(input.group_id, expected_type='GroupType')
 
-        group_id = GroupType.get_object(global_id=input.group_id, info=info, raise_not_found=True).id
+        errors = []
+        if bad_user_ids:
+            errors.append(ValidationError(
+                field='userIds',
+                messages=[f'not a user id: {", ".join(bad_user_ids)}'],
+            ))
+        if group_pk is None:
+            errors.append(ValidationError(
+                field='groupId',
+                messages=[f'not a group id: {input.group_id}'],
+            ))
+        if errors:
+            return MutationResult(ok=False, errors=errors)
+
+        # Existence is checked here rather than left to the serializer, whose
+        # fields are plain CharFields, because the save path is
+        # `Group.objects.get(pk=...)` + `user_set.add(*pks)`: a missing group
+        # raises DoesNotExist and a missing user raises IntegrityError, both
+        # of which would escape this resolver as a 500. Mutations return the
+        # envelope, they do not raise.
+        if not Group.objects.filter(pk=group_pk).exists():
+            return MutationResult(ok=False, errors=[ValidationError(
+                field='groupId', messages=[f'group {input.group_id} not found'],
+            )])
+        found = set(
+            str(pk) for pk in
+            get_user_model().objects.filter(pk__in=user_pks).values_list('pk', flat=True)
+        )
+        missing = [pk for pk in user_pks if str(pk) not in found]
+        if missing:
+            return MutationResult(ok=False, errors=[ValidationError(
+                field='userIds',
+                messages=[f'user(s) not found: {", ".join(str(m) for m in missing)}'],
+            )])
 
         data = {
             'user_ids': user_pks,
-            'group_id': group_id,
+            'group_id': group_pk,
             'operation': input.operation,
         }
 

@@ -727,6 +727,18 @@ type AstroliftAppDnsRecordsResult {
   records: [AstroliftAppDnsRecord!]!
 }
 
+type AstroliftAppDoctorCheck {
+  key: String!
+  status: String!
+  detail: String!
+  fix: String!
+}
+
+type AstroliftAppDoctorReport {
+  healthy: Boolean!
+  checks: [AstroliftAppDoctorCheck!]!
+}
+
 type AstroliftAppDomain {
   id: GUID!
   hostname: String!
@@ -5955,6 +5967,7 @@ type Query {
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
   astroliftWorkloadManifest(appSlug: String!, workloadSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftWorkloadManifest
   assignableAstroliftProjects: [AstroliftProject!]!
+  astroliftAppDoctor(appSlug: String!): AstroliftAppDoctorReport!
   scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
   scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
