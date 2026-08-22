@@ -272,26 +272,31 @@ export function AppTabs({ slug, active }: AppTabsProps) {
           is the brand vocabulary, not a page name. */}
       <nav
         aria-label={t("pillarAriaLabel")}
-        className="scrollbar-none flex gap-1 overflow-x-auto px-6 pt-1 pb-2 [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+        className="scrollbar-none flex gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6 pt-1 pb-2"
       >
         <div className="bg-muted/40 border-border flex shrink-0 gap-0.5 rounded-sm border p-0.5">
           {PILLARS.map((pillar) => {
             const isActive = pillar.key === activePillar;
             // Land on the pillar's first sub-tab; Run leads with Overview.
             const href = pillar.subs[0].href(basePath, slug);
+            const label = t(`pillars.${pillar.label}`);
             return (
               <Link
                 key={pillar.key}
                 href={href}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "shrink-0 rounded-sm px-3 py-1 font-mono text-xs font-medium tracking-wider uppercase transition-colors",
+                  "shrink-0 rounded-sm px-3.5 py-1.5 font-mono text-sm font-medium tracking-wider uppercase transition-colors",
                   isActive
                     ? "text-foreground bg-[var(--brand-primary)]/12 shadow-[inset_0_0_0_1px_var(--brand-primary)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
-                {t(`pillars.${pillar.label}`)}
+                {/* The initial carries the brand: the five of them spell
+                    BROCS. Split inside one element so the accessible name is
+                    still the whole word. */}
+                <span className="text-[var(--brand-primary)]">{label.charAt(0)}</span>
+                {label.slice(1)}
               </Link>
             );
           })}

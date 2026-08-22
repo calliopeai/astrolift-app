@@ -354,13 +354,15 @@ def _create_stage_execution_sync(
     run.current_stage_execution = execution
     run.save(update_fields=["current_stage_execution", "updated_at", "version"])
 
-    # A human gate opening RUNNING is the moment reviewers are notified — the
-    # live executor has no separate notify step (the legacy notify_human_gate
-    # service is a different, unused tier). Capture a pending GATE interaction
-    # so the P3 map shows the gate the instant it blocks (#1217). Defensive:
-    # never lets capture break stage creation.
+    # A human gate opening RUNNING is the moment reviewers are notified, and
+    # this activity is the only durable hook at that moment. Capture a pending
+    # GATE interaction so the P3 map shows the gate the instant it blocks
+    # (#1217), then notify the reviewers so the gate does not sit until its
+    # timeout waiting for someone to notice it in the UI (#59). Both are
+    # defensive: neither may break stage creation.
     if stage.kind == WorkflowStage.StageKind.HUMAN_GATE:
         _capture_gate_interaction(execution, status="pending")
+        _notify_gate_reviewers(run, stage)
     return str(execution.pk)
 
 
@@ -859,6 +861,39 @@ def _capture_gate_interaction(
         log.exception(
             "failed to capture gate interaction for execution %s",
             getattr(execution, "pk", None),
+        )
+
+
+def _notify_gate_reviewers(run, stage) -> None:
+    """Notify the reviewers of a just-opened human gate (#59).
+
+    Translates the ``WorkflowStage`` row into the stage descriptor the
+    notification service takes, then hands off. ``approvers`` holds opaque
+    approver references (team / role slugs); an entry that is already an
+    address is the stage-level assignee, and anything else falls through to
+    the service's definition / org-admin resolution.
+
+    Fully defensive, like gate capture: notification is side-effect-only, so
+    a failure here must never fail the activity and stall the run.
+    """
+    try:
+        from astrolift_agents.services.human_gate import notify_human_gate
+
+        approvers = stage.approvers or []
+        assignee = next((a for a in approvers if isinstance(a, str) and "@" in a), None)
+        notify_human_gate(
+            run,
+            {
+                "name": stage.slug or f"stage-{stage.order}",
+                "label": stage.name or stage.role,
+                "assignee_email": assignee,
+            },
+        )
+    except Exception:  # noqa: BLE001 — notification must never break the gate flow
+        log.exception(
+            "failed to notify reviewers of gate stage %s on workflow_run %s",
+            getattr(stage, "pk", None),
+            getattr(run, "pk", None),
         )
 
 

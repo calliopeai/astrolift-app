@@ -114,6 +114,17 @@ class Organization(NamedBaseCoreModel):
     # refused in front of the person who typed it.
     default_resource_tags = models.JSONField(default=dict, blank=True)
 
+    # Per-kind managed-service isolation floor this org's compliance posture
+    # requires, e.g. {"postgres": "dedicated"}. A floor, not a default: it
+    # outranks the per-service request at provision time, so an app cannot
+    # put a regulated kind back onto a shared backing instance. Empty means
+    # no floor and the request or the variant default decides.
+    #
+    # Validated on the way in by the mutation. A mode this control plane
+    # cannot parse would otherwise sit here until the next provision and
+    # then fail it, away from whoever typed it.
+    managed_service_isolation_policy = models.JSONField(default=dict, blank=True)
+
     # House theme for the operator UI (#135). The appearance axes — ground,
     # accent, density, corners — are per-person by default; this is the org's
     # answer for anyone who has not chosen, and `appearance_locked` makes it
