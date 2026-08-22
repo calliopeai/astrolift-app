@@ -277,20 +277,119 @@ async def detect_drift() -> int:
 # ---- Webhook reheal ----------------------------------------------
 
 
-def _reheal_webhook_subscriptions_sync() -> int:
-    """Surface unhealthy webhook subscriptions for re-creation.
+# Reheal probe payload marker. Distinct from the operator-triggered
+# ``webhook.test`` so a subscriber can tell an automated recovery probe
+# from a human pressing Test.
+_REHEAL_EVENT_TYPE = "webhook.reheal"
 
-    Pings-not-acked detection lives on ``WebhookSubscription`` rows; the
-    platform marks rows whose last delivery failed N times in a row as
-    ``unhealthy`` and this activity walks those and bumps the retry
-    counter. Returns the count of subscriptions touched.
+
+def _reheal_webhook_subscriptions_sync() -> int:
+    """Re-test auto-disabled webhook subscriptions and re-enable the
+    ones whose endpoint came back (#144, spec 06 §5).
+
+    The policy lives in ``astrolift_workflows.periodic_maintenance``:
+    ``reheal_due`` holds the 6-hour backoff so a dead endpoint isn't
+    probed on every tick, and ``classify_test_delivery`` turns the
+    probe's status code into re-enable / still-failing plus the
+    notify-exactly-once-at-threshold decision.
+
+    Re-enabling here does not contradict ``record_delivery_outcome``'s
+    refusal to auto-re-enable on a live-traffic success: that guard
+    exists so a lucky 200 in a stream of failures doesn't silently
+    resurrect an integration. This is the audited recovery path, a
+    deliberate probe, backed off, counted, and reported.
+
+    Returns the number of subscriptions re-enabled.
     """
+    from django.utils import timezone
+
     from astrolift_operations.models import WebhookSubscription
 
-    qs = WebhookSubscription.objects.filter(deleted_at__isnull=True)
-    # Conservative: count subscriptions that *exist*. Real reheal logic
-    # lands when delivery-failure tracking is added to the model.
-    return qs.count()
+    # The signed POST has exactly one implementation in the platform;
+    # a second one here would let the signature scheme drift.
+    from astrolift_operations.schema.mutations.helpers import _deliver_test_webhook
+    from astrolift_workflows.periodic_maintenance import (
+        RehealOutcome,
+        classify_test_delivery,
+        reheal_due,
+    )
+
+    now = timezone.now()
+    reenabled = 0
+    candidates = WebhookSubscription.objects.filter(
+        is_active=False,
+        disabled_at__isnull=False,
+        deleted_at__isnull=True,
+    )
+    for sub in candidates:
+        if not sub.url:
+            continue
+        if not reheal_due(
+            disabled_at=sub.disabled_at,
+            last_reheal_attempt_at=sub.last_reheal_attempt_at,
+            now=now,
+        ):
+            continue
+
+        try:
+            probe = _deliver_test_webhook(
+                url=sub.url,
+                secret=(sub.secret_hash or "").encode("utf-8"),
+                payload={
+                    "kind": _REHEAL_EVENT_TYPE,
+                    "subscription_id": str(sub.guid),
+                    "organization_id": sub.organization_id,
+                    "message": "automated reheal probe from the Astrolift control plane",
+                },
+                event_type=_REHEAL_EVENT_TYPE,
+                format=sub.format or "generic",
+            )
+            status_code = probe["status_code"]
+        except Exception:  # noqa: BLE001 - a probe that can't be sent is a failed probe
+            log.exception(
+                "reheal probe raised",
+                extra={"subscription_id": str(sub.guid)},
+            )
+            status_code = None
+
+        result = classify_test_delivery(
+            subscription_id=sub.pk,
+            test_status_code=status_code,
+            prior_consecutive_failed_reheals=sub.consecutive_failed_reheals or 0,
+        )
+
+        fields = ["last_reheal_attempt_at", "consecutive_failed_reheals"]
+        sub.last_reheal_attempt_at = now
+        sub.consecutive_failed_reheals = result.consecutive_failed_reheals
+        if result.outcome == RehealOutcome.REENABLED:
+            sub.is_active = True
+            sub.disabled_at = None
+            sub.disabled_reason = ""
+            # The live-traffic failure count is what auto-disabled the
+            # row; leaving it at the threshold would re-disable on the
+            # next single failure rather than after another full run.
+            sub.failure_count = 0
+            fields += ["is_active", "disabled_at", "disabled_reason", "failure_count"]
+            reenabled += 1
+        sub.save(update_fields=fields + ["updated_at", "version"])
+
+        if result.notify_operator:
+            from core.events import Event
+
+            Event.emit(
+                "webhook_subscription.reheal_exhausted",
+                payload={
+                    "subscription_guid": str(sub.guid),
+                    "url": sub.url,
+                    "consecutive_failed_reheals": result.consecutive_failed_reheals,
+                    "last_status_code": status_code,
+                },
+                resource_kind="webhook_subscription",
+                resource_id=str(sub.guid),
+                organization_id=sub.organization_id,
+            )
+
+    return reenabled
 
 
 @activity.defn(name="astrolift.scheduled.reheal_webhook_subscriptions")

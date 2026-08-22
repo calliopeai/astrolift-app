@@ -17,6 +17,7 @@ from astrolift_operations.schema.mutations.types import (
     RegisterMobileDeviceInput,
     RevokeMobileDeviceInput,
     SetNotificationPreferenceInput,
+    SetNotificationProfileInput,
     TestNotificationInput,
     _MarkAllReadPayload,
     _RevokeMobileDevicePayload,
@@ -24,6 +25,7 @@ from astrolift_operations.schema.mutations.types import (
 from astrolift_operations.schema.types import (
     DeviceRegistrationType,
     NotificationPreferenceType,
+    NotificationProfileType,
     NotificationType,
     notification_to_type,
 )
@@ -329,3 +331,107 @@ class NotificationMutations:
             row.enabled = bool(input.enabled)
             row.save(update_fields=["enabled", "updated_at", "version"])
         return gql_success(notification_preference_to_type(row))
+
+    # ---- Notification profile (#490) ------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="notification_profile.set")
+    @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
+    def set_notification_profile(
+        self, info: Info, input: SetNotificationProfileInput
+    ) -> MutationResultType[NotificationProfileType]:
+        """Install (or replace) the active notification profile for the
+        caller's org, shape-checked by the policy module first.
+
+        Validation belongs here because the send path cannot report
+        it: ``resolve_driver_for_recipient`` swallows a driver build
+        failure and the dispatcher audits ``status=no_driver``, so a
+        misspelled driver or a config missing a required key persists
+        fine and then silently stops every alert with nothing telling
+        the operator why.
+
+        Upsert, not append: one active profile per org is a DB
+        constraint, so a re-submit rewrites the live row rather than
+        inserting a second one. Rewriting in place also keeps the
+        config blob, which can carry plaintext credentials, out of
+        dead rows; the trail of who changed what comes from
+        ``mutation_audit``.
+        """
+        from astrolift_operations.models import NotificationProfile
+        from astrolift_operations.notification_profile import (
+            NotificationProfileError,
+            NotificationProfileSpec,
+            RetentionConfig,
+            validate_profile,
+        )
+        from astrolift_operations.schema.types import notification_profile_to_type
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        config = input.config
+        if not isinstance(config, dict):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "config must be an object",
+                field="config",
+            )
+
+        # Retention and driver shape fail on different inputs, so they
+        # get separate try blocks to attribute the error to the field
+        # the operator actually has to fix.
+        try:
+            retention = (
+                RetentionConfig(delivery_days=input.retention_delivery_days)
+                if input.retention_delivery_days is not None
+                else RetentionConfig()
+            )
+        except NotificationProfileError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                str(exc),
+                field="retentionDeliveryDays",
+            )
+
+        driver = (input.driver or "").strip()
+        try:
+            validate_profile(
+                profile=NotificationProfileSpec(
+                    driver=driver,
+                    config=config,
+                    retention=retention,
+                ),
+            )
+        except NotificationProfileError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="config")
+
+        existing = (
+            NotificationProfile.objects.filter(organization_id=org_id, is_active=True)
+            .order_by("-updated_at")
+            .first()
+        )
+        if existing is not None:
+            existing.driver = driver
+            existing.config = config
+            existing.retention_delivery_days = retention.delivery_days
+            existing.save(
+                update_fields=[
+                    "driver",
+                    "config",
+                    "retention_delivery_days",
+                    "updated_at",
+                    "version",
+                ]
+            )
+            return gql_success(notification_profile_to_type(existing))
+
+        row = NotificationProfile.objects.create(
+            organization_id=org_id,
+            driver=driver,
+            config=config,
+            retention_delivery_days=retention.delivery_days,
+        )
+        return gql_success(notification_profile_to_type(row))

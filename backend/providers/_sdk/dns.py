@@ -110,9 +110,21 @@ class DnsDriver(Protocol):
             f"dns.provision_zone({zone=}) not supported on this driver",
         )
 
-    def request_wildcard_cert(self, zone: str, zone_id: str) -> dict[str, Any]:
+    def request_wildcard_cert(
+        self,
+        zone: str,
+        zone_id: str,
+        sans: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Request a wildcard cert for *.<zone> via the cloud cert service. Returns
-        cert metadata and DNS validation records to write into the zone."""
+        cert metadata and DNS validation records to write into the zone.
+
+        ``sans`` is the full SubjectAltName list to request. ``*.<zone>`` matches
+        exactly one label deeper (RFC 6125), so a caller that issues hostnames
+        two labels deep (preview envs live at ``<name>.pr.<zone>``) has to name
+        that wildcard explicitly. ``None`` keeps the driver default of
+        ``[<zone>, *.<zone>]`` for callers that only serve one label down.
+        """
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(

@@ -5,7 +5,7 @@ import * as React from "react";
 import {
   type Appearance,
   type OrgAppearancePolicy,
-  DEFAULT_APPEARANCE,
+  clearAppearance,
   applyAppearance,
   readAppearance,
   resolveAppearance,
@@ -18,6 +18,13 @@ interface AppearanceContextValue {
   locked: boolean;
   setAppearance: (patch: Partial<Appearance>) => void;
   reset: () => void;
+  /**
+   * Supply the org policy once it is known. Called by
+   * `AppearancePolicyBridge` from inside the authenticated layout — this
+   * provider sits in the root layout, which also wraps the login pages where
+   * no org query can run.
+   */
+  setPolicy: (policy: OrgAppearancePolicy | null) => void;
 }
 
 const AppearanceContext = React.createContext<AppearanceContextValue | null>(null);
@@ -27,14 +34,16 @@ export function AppearanceProvider({
   policy = null,
 }: {
   children: React.ReactNode;
-  /** Org-level default / lock. Null until #135 serves it. */
+  /** Initial org policy, when a caller already has it. */
   policy?: OrgAppearancePolicy | null;
 }) {
-  // Start from the shipped default so server and first client render agree;
-  // the real preference is read in an effect. The inline script in the root
-  // layout has already stamped <html>, so the user never sees the default.
-  const [personal, setPersonal] = React.useState<Appearance>(DEFAULT_APPEARANCE);
+  // null until read, and null again when this person has never chosen — the
+  // org default only applies to people with no preference of their own, so
+  // "unset" has to be representable. The inline script in the root layout has
+  // already stamped <html>, so nobody sees the pre-hydration state.
+  const [personal, setPersonal] = React.useState<Partial<Appearance> | null>(null);
   const [hydrated, setHydrated] = React.useState(false);
+  const [orgPolicy, setOrgPolicy] = React.useState<OrgAppearancePolicy | null>(policy);
 
   React.useEffect(() => {
     setPersonal(readAppearance());
@@ -42,8 +51,8 @@ export function AppearanceProvider({
   }, []);
 
   const { value, locked } = React.useMemo(
-    () => resolveAppearance(hydrated ? personal : null, policy),
-    [hydrated, personal, policy],
+    () => resolveAppearance(hydrated ? personal : null, orgPolicy),
+    [hydrated, personal, orgPolicy],
   );
 
   React.useEffect(() => {
@@ -54,7 +63,7 @@ export function AppearanceProvider({
     (patch: Partial<Appearance>) => {
       if (locked) return;
       setPersonal((prev) => {
-        const next = { ...prev, ...patch };
+        const next = { ...(prev ?? {}), ...patch };
         writeAppearance(next);
         return next;
       });
@@ -62,15 +71,21 @@ export function AppearanceProvider({
     [locked],
   );
 
+  // Reset means "I have no preference", not "my preference is the shipped
+  // default" — so it clears storage and hands the decision back to the org.
   const reset = React.useCallback(() => {
     if (locked) return;
-    setPersonal(DEFAULT_APPEARANCE);
-    writeAppearance(DEFAULT_APPEARANCE);
+    setPersonal(null);
+    clearAppearance();
   }, [locked]);
 
+  const setPolicy = React.useCallback((next: OrgAppearancePolicy | null) => {
+    setOrgPolicy(next);
+  }, []);
+
   const ctx = React.useMemo(
-    () => ({ appearance: value, locked, setAppearance, reset }),
-    [value, locked, setAppearance, reset],
+    () => ({ appearance: value, locked, setAppearance, reset, setPolicy }),
+    [value, locked, setAppearance, reset, setPolicy],
   );
 
   return <AppearanceContext.Provider value={ctx}>{children}</AppearanceContext.Provider>;

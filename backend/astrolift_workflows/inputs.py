@@ -152,6 +152,22 @@ class ValidateCustomDomainInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class SyncAppDomainInput:
+    """Input for ``SyncAppDomainWorkflow`` (#143, spec 06 §4.17).
+
+    Reconciles DNS + ingress + cert state after ``setAppSubdomain``
+    changed the app's platform hostname, without a full redeploy.
+    ``previous_subdomain`` is what the row held before the write --
+    the workflow needs it to compute the hostname diff, and to put
+    the routing back if a step fails part-way through.
+    """
+
+    registered_app_id: int
+    previous_subdomain: str
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class InstallClusterPrereqsInput:
     """Input for ``InstallClusterPrereqsWorkflow`` (#66).
 
@@ -345,9 +361,9 @@ class SyncDevEnvironmentFilesInput:
 class ProvisionManagedDomainInput:
     """Input for ``ProvisionManagedDomainWorkflow`` (#781).
 
-    Drives the five-step DNS zone provisioning flow: hosted-zone
+    Drives the six-step DNS zone provisioning flow: hosted-zone
     creation, wildcard cert request, cert issuance poll, ManagedDomain
-    row registration, and activation.
+    row registration, the NS-delegation gate, and activation.
 
     ``cluster_id`` is the TenantCluster PK whose provider plugin's
     ``DnsDriver`` is used for all cloud operations. ``zone`` is the

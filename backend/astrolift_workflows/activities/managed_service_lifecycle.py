@@ -72,6 +72,44 @@ def _service_identity(svc: Any) -> str:
     return guid
 
 
+def _resolve_isolation(svc: Any, *, org: Any, cluster: Any) -> str:
+    """The isolation mode this row provisions at.
+
+    Nineteen drivers read ``ProvisionSpec.isolation``. Four size the backing
+    resource off it (DocumentDB and Neptune instance counts, MemoryDB replicas
+    per shard, Memcached nodes) and the rest stamp it as a cloud tag or label.
+    The spec field defaults to ``"shared"`` and nothing ever set it, so a
+    request for dedicated isolation produced a single-node topology tagged as
+    shared, and no compliance floor was enforceable at all.
+
+    No plugin declares per-variant isolation support, so every variant is
+    passed as accepting both modes with ``shared`` as its default -- the value
+    the spec has always carried. That leaves the resolver's variant gate inert
+    rather than guessing a capability the catalogue does not state.
+    """
+
+    from astrolift_drivers.isolation import (
+        Isolation,
+        VariantSupport,
+        parse_mode,
+        parse_policy,
+        resolve,
+    )
+
+    decision = resolve(
+        manifest_choice=parse_mode(str(getattr(svc, "isolation", "") or "") or None),
+        org_policy=parse_policy(getattr(org, "managed_service_isolation_policy", None)),
+        org_policy_kind_key=str(svc.kind),
+        variant=VariantSupport(
+            plugin_slug=getattr(cluster.provider_plugin, "slug", "") or "",
+            variant=str(getattr(svc, "variant", "") or ""),
+            allowed_modes=frozenset(Isolation),
+            default=Isolation.SHARED,
+        ),
+    )
+    return decision.mode.value
+
+
 def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
     """The ``ProvisionSpec`` this managed-service row provisions through.
 
@@ -104,6 +142,7 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         service_handle_hint=svc.name or svc.kind,
         size=str(svc_config.get("size", "small")),
         config=svc_config,
+        isolation=_resolve_isolation(svc, org=org, cluster=cluster),
         managed_service_id=_service_identity(svc),
         # The operator's tag channel, distinct from the platform envelope
         # each cloud's own builder stamps. Twenty-one drivers read this and
@@ -705,6 +744,31 @@ async def check_managed_service_ready(
     return await sync_to_async(_check_ready_sync)(managed_service_id, handle)
 
 
+def _connection_secret_path(svc: Any) -> str:
+    """Where this binding's connection material lives in the secrets backend.
+
+    ``ManagedService.connection_secret_ref`` had no writer, so
+    ``revealManagedServiceConnection`` answered ``placeholder:pending`` for
+    every service in every org, and the audit row it emits alongside recorded
+    an empty ref, leaving the trail unable to say which secret was disclosed.
+
+    Composed from stable identifiers rather than taken from the driver so a
+    reprovision of the same binding resolves to the same path.
+    """
+
+    from astrolift_drivers.connection_secret import secret_storage_path
+
+    app = svc.registered_app
+    owner = app or svc.project
+    org = app.organization if app is not None else svc.project.organization
+    return secret_storage_path(
+        env_slug=svc.effective_environment_name,
+        org_slug=org.slug,
+        app_slug=owner.slug,
+        service_name=svc.name or svc.kind,
+    )
+
+
 def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
     from astrolift_services.models import ManagedService
 
@@ -712,12 +776,14 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
     if handle:
         svc.backend_ref = handle
     svc.applied_config = dict(svc.config or {})
+    svc.connection_secret_ref = _connection_secret_path(svc)
     svc.status = ManagedService.Status.ACTIVE
     svc.status_error = ""
     svc.save(
         update_fields=[
             "backend_ref",
             "applied_config",
+            "connection_secret_ref",
             "status",
             "status_error",
             "updated_at",

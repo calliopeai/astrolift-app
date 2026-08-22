@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('astrolift_identity', '0025_organization_pipeline_definition_mode'),
+        ('astrolift_identity', '0027_organization_managed_service_isolation_policy'),
     ]
 
     operations = [

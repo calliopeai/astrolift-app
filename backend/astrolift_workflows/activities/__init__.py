@@ -14,12 +14,19 @@ from astrolift_workflows.activities.app_deregister import (
     list_app_secret_targets,
     revoke_app_secret_bundle_refs,
 )
+from astrolift_workflows.activities.app_domain_sync import (
+    plan_app_domain_sync,
+    revert_app_subdomain,
+    verify_app_hostnames,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     create_promotion_deployment,
     create_rollback_deployment,
     delete_preview_namespace,
+    emit_preview_torn_down_event,
     health_check,
+    load_preview_teardown_state,
     mark_app_provisioning,
     mark_app_ready,
     mark_deploying,
@@ -144,6 +151,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
     register_managed_domain_row,
     reissue_cert,
     request_wildcard_cert_for_zone,
+    validate_ns_delegation,
 )
 from astrolift_workflows.activities.run_status_reconcile import reconcile_runs_tick
 from astrolift_workflows.activities.scheduled import (
@@ -217,6 +225,7 @@ __all__ = [
     "delete_preview_namespace",
     "delete_secret_from_cluster",
     "delete_static_dns_records",
+    "emit_preview_torn_down_event",
     "deprovision_app_certificate",
     "deprovision_app_dns_record",
     "deprovision_app_identity_role",
@@ -252,6 +261,7 @@ __all__ = [
     "list_app_managed_service_ids",
     "list_app_secret_targets",
     "list_bundles_due_for_refresh",
+    "load_preview_teardown_state",
     "load_agent_run_outcome",
     "mark_app_deregistered",
     "mark_app_provisioning",
@@ -280,6 +290,7 @@ __all__ = [
     "mark_preview_torn_down",
     "mark_running",
     "mark_workflow_run",
+    "plan_app_domain_sync",
     "poll_agent_run_status",
     "poll_cert_issuance",
     "poll_pipeline_job",
@@ -316,6 +327,7 @@ __all__ = [
     "request_wildcard_cert_for_zone",
     "resync_ci_workflows_tick",
     "resync_manifest_for_deploy",
+    "revert_app_subdomain",
     "revoke_app_deploy_tokens",
     "revoke_app_secret_bundle_refs",
     "run_preflight_job",
@@ -331,6 +343,8 @@ __all__ = [
     "update_secrets",
     "update_stage_execution",
     "validate_migration_target",
+    "validate_ns_delegation",
+    "verify_app_hostnames",
     "verify_reachability",
     "wait_dns",
 ]

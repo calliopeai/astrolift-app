@@ -28,6 +28,7 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
+import { HouseThemeCard } from "./house-theme-card";
 import { TrustedDomainsCard } from "./trusted-domains-card";
 
 export function OrganizationSettingsClient() {
@@ -230,6 +231,8 @@ export function OrganizationSettingsClient() {
           </div>
         </form>
       )}
+
+      {org && <HouseThemeCard org={org} />}
 
       <TrustedDomainsCard />
 
