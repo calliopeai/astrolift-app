@@ -37,6 +37,11 @@ class UpdateOrganizationInput:
     # A whole-map replace rather than a merge: there has to be a way to
     # remove a tag, and `{}` is the obvious one.
     default_resource_tags: strawberry.scalars.JSON | None = None
+    # Per-kind managed-service isolation floor, e.g. {"postgres":
+    # "dedicated"}. A whole-map replace for the same reason as the tags
+    # above: lifting a floor has to be expressible, and `{}` is how.
+    managed_service_isolation_policy: strawberry.scalars.JSON | None = None
+
     # House theme for the operator UI (#135). Whole-map replace, same reason
     # as the tags above: `{}` has to mean "no house theme".
     appearance_default: strawberry.scalars.JSON | None = None

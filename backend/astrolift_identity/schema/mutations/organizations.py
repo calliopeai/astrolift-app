@@ -118,6 +118,35 @@ class OrganizationMutations:
                     str(exc),
                     field="defaultResourceTags",
                 )
+        if input.managed_service_isolation_policy is not None:
+            from astrolift_drivers.isolation import IsolationError, parse_policy
+            from astrolift_services.models import ManagedService
+
+            raw = input.managed_service_isolation_policy
+            if not isinstance(raw, dict):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "managedServiceIsolationPolicy must be an object mapping kind to mode",
+                    field="managedServiceIsolationPolicy",
+                )
+            known_kinds = {kind for kind, _label in ManagedService.Kind.choices}
+            unknown = sorted(str(kind) for kind in raw if str(kind) not in known_kinds)
+            if unknown:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"managedServiceIsolationPolicy names unknown kinds {unknown}",
+                    field="managedServiceIsolationPolicy",
+                )
+            try:
+                policy = parse_policy(raw)
+            except IsolationError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="managedServiceIsolationPolicy",
+                )
+            org.managed_service_isolation_policy = {kind: mode.value for kind, mode in policy.items()}
+
         if input.appearance_default is not None:
             # Validated here for the same reason the tags above are: the
             # client's normalize() protects the client, not the column, and an

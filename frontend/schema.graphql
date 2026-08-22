@@ -2359,6 +2359,7 @@ type AstroliftManagedService {
   name: String!
   kind: String!
   variant: String!
+  isolation: String!
   status: String!
   statusError: String!
   config: JSON!
@@ -2722,6 +2723,7 @@ type AstroliftOrganization {
   logRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
   defaultResourceTags: JSON!
+  managedServiceIsolationPolicy: JSON!
   appearanceDefault: JSON!
   appearanceLocked: Boolean!
   onboardingCompletedAt: DateTime
@@ -5806,6 +5808,7 @@ input ProvisionManagedServiceInput {
   name: String = null
   variant: String = null
   config: JSON = null
+  isolation: String = null
 }
 
 input ProvisionProjectManagedServiceInput {
@@ -5816,6 +5819,7 @@ input ProvisionProjectManagedServiceInput {
   name: String = null
   variant: String = null
   config: JSON = null
+  isolation: String = null
   agentEnvironmentSpecSlugs: [String!]! = []
   appEnvironmentIds: [GUID!]! = []
 }
@@ -6835,6 +6839,7 @@ input UpdateOrganizationInput {
   logRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   defaultResourceTags: JSON = null
+  managedServiceIsolationPolicy: JSON = null
   appearanceDefault: JSON = null
   appearanceLocked: Boolean = null
 }

@@ -2363,6 +2363,7 @@ export type AstroliftManagedService = {
   environmentName: Scalars['String']['output'];
   grantState: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  isolation: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
@@ -2714,6 +2715,7 @@ export type AstroliftOrganization = {
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
+  managedServiceIsolationPolicy: Scalars['JSON']['output'];
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
@@ -7385,6 +7387,7 @@ export type ProvisionManagedServiceInput = {
   appSlug: Scalars['String']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   variant: InputMaybe<Scalars['String']['input']>;
@@ -7396,6 +7399,7 @@ export type ProvisionProjectManagedServiceInput = {
   clusterId: Scalars['GUID']['input'];
   config: InputMaybe<Scalars['JSON']['input']>;
   environmentName: Scalars['String']['input'];
+  isolation: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['GUID']['input'];
@@ -9812,6 +9816,7 @@ export type UpdateOrganizationInput = {
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
   logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  managedServiceIsolationPolicy: InputMaybe<Scalars['JSON']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
