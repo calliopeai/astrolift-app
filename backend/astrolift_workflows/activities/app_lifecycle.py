@@ -893,6 +893,7 @@ def _bindings_secret_name(app_slug: str) -> str:
 
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     from astrolift_lifecycle.models import Deployment
+    from astrolift_workflows.activities.direct_apply import DryRunFailed, apply_with_dry_run
     from core.app_deploy import (
         AppDeployError,
         driver_for_deployment,
@@ -911,14 +912,22 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
             f"manifest for app {d.registered_app.slug!r} rendered to zero resources — "
             "check the workloads/services block in astrolift.toml",
         )
-    result = driver.apply_manifests(ctx.slug, namespace, resources)
-    if not result.ok:
-        # ``result.errors`` is now ``list[ApplyError]`` (#603). Use the
-        # legacy string shape via ``.summary()`` so the message keeps the
-        # historical ``Kind/name: exc`` format the workflow log + UI
+    try:
+        result = apply_with_dry_run(driver, ctx.slug, namespace, resources)
+    except DryRunFailed as exc:
+        # Gate, not a retry: the apiserver rejected the set on a server-side
+        # dry-run, so nothing was mutated. Without it the driver's per-object
+        # loop applies everything it can and reports the rejection only
+        # afterwards, leaving the namespace half-updated.
+        raise AppDeployError(
+            f"dry-run rejected the manifest set for deployment {deployment_id}: " + "; ".join(exc.errors),
+        ) from exc
+    if result.errors:
+        # ``ApplyResult.errors`` carries the driver's legacy ``Kind/name: exc``
+        # strings (#603) so the message keeps the format the workflow log + UI
         # already render.
         raise AppDeployError(
-            f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.summary()),
+            f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.errors),
         )
     return {
         "created": list(result.created),
@@ -931,9 +940,11 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
 async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     """Apply the rendered manifest set to the deployment's cluster.
 
-    Uses server-side apply (idempotent) via the cluster driver. Returns
-    the ``ApplyResult`` shape ({created/updated/unchanged}) so the
-    workflow event log carries which resources actually changed for an
+    Uses server-side apply (idempotent) via the cluster driver, gated on a
+    server-side dry-run of the whole set (spec 07 §4) so a rejected object
+    fails the deploy before any object is mutated. Returns the
+    ``ApplyResult`` shape ({created/updated/unchanged}) so the workflow
+    event log carries which resources actually changed for an
     operator-facing diff view.
     """
     from asgiref.sync import sync_to_async

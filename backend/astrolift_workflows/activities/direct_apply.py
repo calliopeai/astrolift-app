@@ -8,14 +8,19 @@ Pure-Python helpers for the ``direct_api`` delivery mode:
   conflict with other controllers (cert-manager, ESO, mesh
   injectors, …).
 * **Manifest set hashing** — SHA-256 of the canonicalised
-  rendered manifest set. Stored on
-  ``Deployment.config_snapshot`` so two deploys producing the same
-  manifest set are recognisable, and rollback can verify
-  byte-identity.
+  rendered manifest set, returned on :class:`ApplyResult` so two
+  deploys producing the same manifest set are recognisable in the
+  apply log. It is deliberately *not* written to
+  ``Deployment.config_snapshot['manifest_hash']``: that key is
+  compared against ``RegisteredApp.manifest_hash``, which hashes the
+  normalised astrolift.toml (``astrolift_manifest.normalize``), not
+  the rendered k8s objects. Storing this hash there would make the
+  config-drift banner fire on every app forever.
 * **Dry-run wrapper** — ``apply_with_dry_run(driver, cluster,
-  objects)`` runs dry-run first, aborts with a typed exception on
-  schema/RBAC violations, then runs the real apply. Idempotent
-  re-apply is the explicit non-failure case (zero diff is success).
+  namespace, objects)`` runs dry-run first, aborts with a typed
+  exception on schema/RBAC violations, then runs the real apply.
+  Idempotent re-apply is the explicit non-failure case (zero diff is
+  success).
 
 The actual ``apply_manifests`` k8s call lives on the
 ``ClusterDriver`` protocol (#11).
@@ -31,6 +36,10 @@ from collections.abc import Iterable, Mapping
 # Spec 07 §4 — fieldManager string. Must be stable across re-applies
 # because k8s tracks ownership by this string. Renaming would re-own
 # every field every release — silent flapping with other controllers.
+# The value is stamped on the wire by the shared k8s client
+# (providers/_sdk/k8s_dynamic_client.py, which hardcodes it because the
+# providers tree can't import backend apps); the two are kept in step by
+# test_direct_apply.test_driver_stamps_this_field_manager.
 FIELD_MANAGER = "astrolift"
 
 
@@ -79,7 +88,7 @@ class DryRunFailed(Exception):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ApplyResult:
-    """Output of a successful apply."""
+    """Outcome of the real apply that followed a clean dry-run."""
 
     objects_applied: int
     snapshot_hash: str
@@ -88,86 +97,54 @@ class ApplyResult:
     re-apply path. The deploy workflow records this so the UI can
     show 'no changes' instead of 'redeployed'."""
 
+    created: tuple[str, ...] = ()
+    updated: tuple[str, ...] = ()
+    unchanged: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    """Per-object failures from the *real* apply, in the driver's
+    ``Kind/name: exc`` form. The dry-run gate can't catch everything
+    (a conflict raced in between, a quota consumed since), so the
+    caller still has to check this."""
+
 
 def apply_with_dry_run(
     driver,
     cluster,
+    namespace: str,
     objects: Iterable[Mapping[str, object]],
-    *,
-    field_manager: str = FIELD_MANAGER,
 ) -> ApplyResult:
-    """Run dry-run then real apply.
+    """Dry-run the manifest set, then apply it for real.
 
-    The driver protocol is structural; tests pass a stub with the
-    same shape as ``ClusterDriver.apply``. This wrapper:
+    ``driver`` is a ``ClusterDriver`` (providers ``_sdk.cluster``):
+    every implementation takes ``apply_manifests(cluster, namespace,
+    manifests, dry_run=...)`` and returns an ``ApplyResult`` that
+    *collects* per-object errors instead of raising. That collecting
+    loop is exactly why the gate matters — a set with one schema- or
+    RBAC-rejected object still applies every other object before the
+    caller sees the failure, leaving the namespace half-updated. The
+    dry-run pass moves that verdict ahead of the first mutation.
 
-      1. Runs ``driver.apply(cluster, objects, dry_run=True,
-         field_manager=...)``.
-      2. On failure, raises :class:`DryRunFailed` carrying the
-         driver's reported errors.
-      3. On success, runs the real apply and returns the snapshot
-         hash + diff-emptiness signal for the audit log.
-
-    Drivers that don't accept ``dry_run`` / ``field_manager``
-    kwargs (older test stubs) fall back to a positional call with
-    the kwargs ignored — this lets us land the policy module ahead
-    of the driver expansion.
+    Raises :class:`DryRunFailed` when the dry-run reports any error;
+    nothing has been mutated at that point.
     """
     objs = list(objects)
     snapshot = manifest_set_sha256(objs)
 
-    dry_run_errors = _try_dry_run(
-        driver,
-        cluster,
-        objs,
-        field_manager=field_manager,
-    )
-    if dry_run_errors:
-        raise DryRunFailed(errors=dry_run_errors)
+    dry = driver.apply_manifests(cluster, namespace, objs, dry_run=True)
+    if not dry.ok:
+        raise DryRunFailed(errors=list(dry.summary()))
 
-    diff_was_empty = _apply(
-        driver,
-        cluster,
-        objs,
-        field_manager=field_manager,
-    )
-
+    applied = driver.apply_manifests(cluster, namespace, objs, dry_run=False)
+    created = tuple(applied.created)
+    updated = tuple(applied.updated)
     return ApplyResult(
         objects_applied=len(objs),
         snapshot_hash=snapshot,
-        diff_was_empty=bool(diff_was_empty),
+        # Nothing created and nothing updated is the idempotent
+        # re-apply case: every object was already at the desired state.
+        diff_was_empty=not created and not updated,
+        created=created,
+        updated=updated,
+        unchanged=tuple(applied.unchanged),
+        errors=tuple(applied.summary()),
     )
-
-
-def _try_dry_run(driver, cluster, objs, *, field_manager: str) -> list[str]:
-    """Driver call with kwargs that older stubs may not have. We
-    catch TypeError once for the kwargs fallback, then propagate
-    anything else."""
-    try:
-        result = driver.apply(
-            cluster,
-            objs,
-            dry_run=True,
-            field_manager=field_manager,
-        )
-    except TypeError:
-        # Older driver shape — call without kwargs.
-        result = driver.apply(cluster, objs)
-    if isinstance(result, dict) and result.get("dry_run_errors"):
-        return list(result["dry_run_errors"])
-    return []
-
-
-def _apply(driver, cluster, objs, *, field_manager: str) -> bool:
-    try:
-        result = driver.apply(
-            cluster,
-            objs,
-            dry_run=False,
-            field_manager=field_manager,
-        )
-    except TypeError:
-        result = driver.apply(cluster, objs)
-    if isinstance(result, dict):
-        return bool(result.get("diff_was_empty", False))
-    return False
