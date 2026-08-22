@@ -1225,6 +1225,46 @@ def sync_workflow_file_to_repo(
     return result
 
 
+def _has_operator_edits(app: RegisteredApp, existing: str | None) -> bool:
+    """Would writing the rendered template over ``existing`` lose someone's edits?
+
+    The destructive default this exists to close: every push entry point --
+    ``pushAstroliftCiWorkflowToRepo``, ``pushCiWorkflow``,
+    ``resyncAstroliftCiWorkflow`` and the fleet sweep -- lands here, and on an
+    unprotected deploy branch this function used to PUT straight over whatever
+    the repo had. An operator who edited the managed file lost the edit with no
+    warning and no diff, which is exactly the drift the platform can already
+    detect.
+
+    So classify first, from the text the caller has ALREADY fetched for its
+    equality check (pure function, no second round trip), and let a
+    hand-edited file take the side-branch PR route instead. ``absent`` and
+    ``template_stale`` are the two states with nothing to lose -- no file, or
+    a file the platform itself last wrote -- and they still write directly;
+    they are the same two the fleet sweep treats as safe to auto-push.
+
+    Returns False when the state cannot be determined from the persisted
+    record. An unknown state routes via PR at the call site, not here.
+    """
+    # No file on the branch means nothing to lose. Checked before the record
+    # is read so a create never depends on the sync record existing at all.
+    if existing is None:
+        return False
+
+    from astrolift_scm.services.ci_workflow_drift import (
+        SyncState,
+        _persisted_state_with_version,
+        compute_sync_state,
+    )
+
+    state = compute_sync_state(
+        repo_file_text=existing,
+        persisted_state=_persisted_state_with_version(app),
+        current_template_version=TEMPLATE_VERSION,
+    )
+    return state not in (SyncState.ABSENT, SyncState.TEMPLATE_STALE, SyncState.IN_SYNC)
+
+
 def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
     connection = _pick_source_connection(app)
     if connection is None:
@@ -1258,11 +1298,16 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
 
     # ``force_pr`` (reconcile) short-circuits the protection probe: the change
     # always goes through a reviewable side-branch PR so the operator's edits
-    # aren't clobbered in place.
-    route_via_pr = force_pr or _is_github_branch_protected(
-        connection,
-        repo_full_name=app.source_repo,
-        branch=deploy_branch,
+    # aren't clobbered in place. A file carrying operator edits takes the same
+    # route without being asked -- see _has_operator_edits.
+    route_via_pr = (
+        force_pr
+        or _has_operator_edits(app, existing)
+        or _is_github_branch_protected(
+            connection,
+            repo_full_name=app.source_repo,
+            branch=deploy_branch,
+        )
     )
 
     commit_message = (
@@ -1384,11 +1429,15 @@ def _sync_gitlab(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
     # ``force_pr`` (reconcile) short-circuits the protection probe — see
-    # ``_sync_github``.
-    route_via_pr = force_pr or _is_gitlab_branch_protected(
-        connection,
-        repo_full_name=app.source_repo,
-        branch=deploy_branch,
+    # ``_sync_github``. Operator edits route via MR/PR the same way.
+    route_via_pr = (
+        force_pr
+        or _has_operator_edits(app, existing)
+        or _is_gitlab_branch_protected(
+            connection,
+            repo_full_name=app.source_repo,
+            branch=deploy_branch,
+        )
     )
 
     commit_message = (
@@ -1518,6 +1567,19 @@ def _sync_bitbucket(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSy
     if existing is not None and existing == rendered:
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
+    # No side-branch PR flow here, so there is no safe route for a file
+    # carrying operator edits: refuse instead of overwriting it. The operator
+    # pulls the repo copy (making it the baseline) or edits the file, then
+    # pushes.
+    if _has_operator_edits(app, existing):
+        raise WorkflowSyncError(
+            "WOULD_OVERWRITE_EDITS",
+            "the workflow file in this Bitbucket repo has been edited away "
+            "from what Astrolift last wrote, and Bitbucket has no side-branch "
+            "PR flow wired to review a replacement. Pull the repo's copy to "
+            "keep it, or edit the file in the repo, then push.",
+        )
+
     commit_message = (
         f"chore(astrolift): sync CI workflow for {app.slug}"
         if existing is None
@@ -1584,11 +1646,15 @@ def _sync_gitea(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncRe
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
     # ``force_pr`` (reconcile) short-circuits the protection probe — see
-    # ``_sync_github``.
-    route_via_pr = force_pr or _is_gitea_branch_protected(
-        connection,
-        repo_full_name=app.source_repo,
-        branch=deploy_branch,
+    # ``_sync_github``. Operator edits route via MR/PR the same way.
+    route_via_pr = (
+        force_pr
+        or _has_operator_edits(app, existing)
+        or _is_gitea_branch_protected(
+            connection,
+            repo_full_name=app.source_repo,
+            branch=deploy_branch,
+        )
     )
 
     commit_message = (

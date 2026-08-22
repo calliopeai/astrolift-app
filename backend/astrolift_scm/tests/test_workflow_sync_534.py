@@ -8,6 +8,7 @@ boundary so no real HTTP is issued.
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -267,13 +268,41 @@ def test_sync_bitbucket_in_sync(monkeypatch):
     assert not put_called
 
 
+def _stale_stamped_baseline(app, rendered: str) -> str:
+    """Record ``rendered`` as the platform's own last write, then hand back the
+    same body stamped one template version back.
+
+    This is what a template bump looks like on a file nobody has touched:
+    the body hash still matches the baseline (``content_hash`` strips the
+    stamp), so the state is ``template_stale`` and a direct write loses
+    nothing. A repo file with NO baseline behind it is a different case --
+    it is somebody else's file, and overwriting it is the bug the
+    ``_has_operator_edits`` guard exists to stop.
+    """
+    app.ci_workflow_template_version = max(ci_templates.TEMPLATE_VERSION - 1, 0)
+    app.ci_workflow_state = {
+        "synced_hash": ci_templates.content_hash(rendered),
+        "synced_blob_sha": ci_templates.git_blob_sha(rendered.encode("utf-8")),
+        "state": "in_sync",
+    }
+    app.save(update_fields=["ci_workflow_template_version", "ci_workflow_state", "updated_at", "version"])
+    return re.sub(
+        r"template-version=\d+",
+        f"template-version={max(ci_templates.TEMPLATE_VERSION - 1, 0)}",
+        rendered,
+        count=1,
+    )
+
+
 def test_sync_bitbucket_updated(monkeypatch):
+    """A file the platform itself last wrote, one template behind, is updated
+    in place. Nothing is lost, so there is nothing to review."""
     org, app = _scaffold(source_kind="bitbucket")
     _bb_conn(org)
+    rendered = render_astrolift_bitbucket_pipeline(app)
+    repo_text = _stale_stamped_baseline(app, rendered)
 
-    monkeypatch.setattr(
-        "astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: "# old pipeline\n"
-    )
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: repo_text)
     monkeypatch.setattr(
         "astrolift_scm.services.workflow_sync.put_file",
         lambda *a, **kw: _put_result("updated-sha"),
@@ -284,6 +313,32 @@ def test_sync_bitbucket_updated(monkeypatch):
 
     assert result.status == "updated"
     assert result.commit_sha == "updated-sha"
+
+
+def test_sync_bitbucket_refuses_to_overwrite_a_pipeline_it_did_not_write(monkeypatch):
+    """``bitbucket-pipelines.yml`` is the HOST's conventional CI path, not an
+    Astrolift-specific one, so a repo that already does CI has a real file
+    there. This used to be overwritten on the first push, destroying the
+    tenant's own pipeline definition, and Bitbucket has no side-branch PR
+    flow wired to review a replacement -- so refuse.
+    """
+    org, app = _scaffold(source_kind="bitbucket")
+    _bb_conn(org)
+
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: "# their own pipeline\n"
+    )
+
+    def _boom(*a, **kw):
+        raise AssertionError("must not overwrite a pipeline Astrolift did not write")
+
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.put_file", _boom)
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        with pytest.raises(WorkflowSyncError) as exc:
+            _sync_bitbucket(app)
+
+    assert exc.value.code == "WOULD_OVERWRITE_EDITS"
 
 
 def test_sync_bitbucket_fetch_failed(monkeypatch):
@@ -370,12 +425,14 @@ def test_sync_gitea_in_sync(monkeypatch):
 
 
 def test_sync_gitea_updated_unprotected(monkeypatch):
+    """Same as Bitbucket's case: the platform's own file, one version behind,
+    is updated in place on an unprotected branch."""
     org, app = _scaffold(source_kind="gitea")
     _gitea_conn(org)
+    rendered = render_astrolift_gitea_ci_workflow(app)
+    repo_text = _stale_stamped_baseline(app, rendered)
 
-    monkeypatch.setattr(
-        "astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: "# old workflow\n"
-    )
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: repo_text)
     monkeypatch.setattr(
         "astrolift_scm.services.workflow_sync._is_gitea_branch_protected",
         lambda *a, **kw: False,
@@ -390,6 +447,37 @@ def test_sync_gitea_updated_unprotected(monkeypatch):
 
     assert result.status == "updated"
     assert result.commit_sha == "updated-gitea-sha"
+
+
+def test_sync_gitea_hand_edited_file_goes_through_a_pr_not_over_it(monkeypatch):
+    """An unprotected branch was the hazard: the write was available, so the
+    edit was taken. Now the edit routes through a review PR instead."""
+    org, app = _scaffold(source_kind="gitea")
+    _gitea_conn(org)
+
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: "# hand-edited\n")
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync._is_gitea_branch_protected",
+        lambda *a, **kw: False,
+    )
+    branches: list[str] = []
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync.put_file",
+        lambda *a, **kw: branches.append(kw.get("branch", "")) or _put_result("pr-sha"),
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync._gitea_create_branch_direct", lambda *a, **kw: None
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync.open_pull_request",
+        lambda *a, **kw: SimpleNamespace(url="https://gitea.example/acme/api/pulls/3"),
+    )
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = _sync_gitea(app)
+
+    assert result.status == "pr_opened"
+    assert branches and branches[0] != "main", "the write must land on a side branch"
 
 
 def test_sync_gitea_protected_opens_pr(monkeypatch):

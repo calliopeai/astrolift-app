@@ -1305,6 +1305,9 @@ export type AstroliftCiWorkflowSyncStatus = {
   detail: Scalars['String']['output'];
   path: Scalars['String']['output'];
   prUrl: Scalars['String']['output'];
+  renderedText: Scalars['String']['output'];
+  repoText: Scalars['String']['output'];
+  repoTextPulledAt?: Maybe<Scalars['DateTime']['output']>;
   state: Scalars['String']['output'];
   syncedAt?: Maybe<Scalars['DateTime']['output']>;
   syncedTemplateVersion?: Maybe<Scalars['Int']['output']>;
@@ -5254,6 +5257,7 @@ export type Mutation = {
   provisionManagedService: AstroliftManagedServiceMutationResult;
   provisionProjectManagedService: AstroliftManagedServiceMutationResult;
   publishForm: AstroliftFormDefinitionMutationResult;
+  pullCiWorkflowFromRepo: AstroliftCiWorkflowSyncStatusMutationResult;
   pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
   pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
@@ -6331,6 +6335,11 @@ export type MutationProvisionProjectManagedServiceArgs = {
 
 export type MutationPublishFormArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationPullCiWorkflowFromRepoArgs = {
+  input: CiWorkflowSyncActionInput;
 };
 
 

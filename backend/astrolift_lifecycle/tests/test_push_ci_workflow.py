@@ -8,7 +8,8 @@ permission gate, error mapping) runs against real Postgres rows.
 
 Matrix:
   * GitHub: file-missing → ``created`` with commit_sha
-  * GitHub: file diverged → ``updated`` with commit_sha
+  * GitHub: file Astrolift did not write → ``pr_opened``, never an
+    in-place overwrite of the deploy branch
   * GitHub: file matches → ``in_sync`` (no PUT issued)
   * GitHub: protected branch → ``pr_opened`` with pr_url
   * GitLab: file-missing → ``created`` with commit_sha
@@ -262,16 +263,24 @@ def test_creates_workflow_file_when_missing(
 # ---------------------------------------------------------------------------
 
 
-def test_updates_workflow_file_when_diverged(
+def test_a_file_astrolift_did_not_write_is_not_overwritten(
     monkeypatch,
     permission_resolver,
     org,
     app_with_repo,
     github_connection,
 ):
+    """This used to PUT straight onto the deploy branch and assert "updated".
+
+    The repo holds a file Astrolift has no baseline for -- somebody else's
+    workflow, or one an operator hand-edited. Writing the template over it on
+    an unprotected branch destroyed it silently. Now the change lands on a
+    side branch and opens a PR, so the diff is reviewable.
+    """
     permission_resolver.grant(Permission.APP_UPDATE)
     router = _Router()
-    drift_body = b"# stale workflow that doesn't match the template\nname: old\n"
+    drift_body = b"# a workflow Astrolift never wrote\nname: old\n"
+    put_branches: list[str] = []
 
     def handler(req):
         method = req.get_method()
@@ -280,11 +289,17 @@ def test_updates_workflow_file_when_diverged(
         if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
             if accept == "application/vnd.github.raw":
                 return "response", drift_body  # fetch_file path
-            # _github_existing_sha path on PUT — needs blob sha.
             return "response", json.dumps({"sha": "oldblob"}).encode()
         if method == "GET" and "/branches/main/protection" in url:
             return "error", _http_error(404, b"", url)
+        # Side-branch creation: read the deploy branch tip, then create the ref.
+        if method == "GET" and "/branches/main" in url:
+            return "response", json.dumps({"commit": {"sha": "headsha"}}).encode()
+        if method == "POST" and "/git/refs" in url:
+            return "response", json.dumps({"ref": "refs/heads/astrolift/ci-workflow"}).encode()
         if method == "PUT" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+            body = json.loads(req.data.decode()) if req.data else {}
+            put_branches.append(body.get("branch", ""))
             return "response", json.dumps(
                 {
                     "commit": {
@@ -294,6 +309,8 @@ def test_updates_workflow_file_when_diverged(
                     "content": {"path": ".github/workflows/astrolift-ci.yml"},
                 }
             ).encode()
+        if method == "POST" and "/pulls" in url:
+            return "response", json.dumps({"html_url": "https://github.com/acme/api/pull/9"}).encode()
         raise AssertionError(f"unexpected request {method} {url}")
 
     router.install(monkeypatch, handler)
@@ -305,8 +322,9 @@ def test_updates_workflow_file_when_diverged(
         )
 
     assert result.ok, result.errors
-    assert result.data.status == "updated"
-    assert result.data.commit_sha == "newcafe1234"
+    assert result.data.status == "pr_opened"
+    assert put_branches, "the template still has to be written somewhere"
+    assert put_branches[0] != "main", "it must not land on the deploy branch"
 
 
 # ---------------------------------------------------------------------------
