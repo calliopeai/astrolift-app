@@ -14,6 +14,11 @@ from astrolift_workflows.activities.app_deregister import (
     list_app_secret_targets,
     revoke_app_secret_bundle_refs,
 )
+from astrolift_workflows.activities.app_domain_sync import (
+    plan_app_domain_sync,
+    revert_app_subdomain,
+    verify_app_hostnames,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     create_promotion_deployment,
@@ -283,6 +288,7 @@ __all__ = [
     "mark_preview_torn_down",
     "mark_running",
     "mark_workflow_run",
+    "plan_app_domain_sync",
     "poll_agent_run_status",
     "poll_cert_issuance",
     "poll_pipeline_job",
@@ -319,6 +325,7 @@ __all__ = [
     "request_wildcard_cert_for_zone",
     "resync_ci_workflows_tick",
     "resync_manifest_for_deploy",
+    "revert_app_subdomain",
     "revoke_app_deploy_tokens",
     "revoke_app_secret_bundle_refs",
     "run_preflight_job",
@@ -335,6 +342,7 @@ __all__ = [
     "update_stage_execution",
     "validate_migration_target",
     "validate_ns_delegation",
+    "verify_app_hostnames",
     "verify_reachability",
     "wait_dns",
 ]
