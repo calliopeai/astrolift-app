@@ -40,6 +40,7 @@ def _scenario():
         pk=1,
         registered_app=SimpleNamespace(
             slug="hello-web",
+            subdomain="hello-web",
             organization=SimpleNamespace(slug="acme"),
             organization_id=1,
         ),
@@ -74,3 +75,18 @@ def test_managed_subdomain_ingress_returns_ingress_for_alb():
     # the EvaluateTargetHealth DNS alias returns nothing.
     hc = ing["metadata"]["annotations"]["alb.ingress.kubernetes.io/healthcheck-path"]
     assert hc == "/health", f"ALB healthcheck-path must follow the manifest probe, got {hc}"
+
+
+def test_managed_subdomain_ingress_follows_the_app_subdomain():
+    """#143: the render read only ``app.slug``, so ``setAppSubdomain``
+    changed the URL the API reported and nothing else — the live host rule
+    stayed on the old name until somebody re-registered the app."""
+    deployment, manifest, md, cluster = _scenario()
+    deployment.registered_app.subdomain = "hello-v2"
+    out = _render_managed_subdomain_ingress(
+        deployment, manifest, namespace="acme-hello-web", managed_domain=md, cluster=cluster
+    )
+    hosts = [r["host"] for r in out[0]["spec"]["rules"]]
+    assert hosts == [
+        "hello-v2.apps.example.net"
+    ], f"the operator-set subdomain must be the rendered host, got {hosts}"
