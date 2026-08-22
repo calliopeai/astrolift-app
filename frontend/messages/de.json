@@ -955,6 +955,13 @@
         "controls": "Controls & access",
         "insights": "Observability & activity",
         "links": "Quick links"
+      },
+      "headerDeploy": {
+        "title": "{tag} nach {env} deployen?",
+        "description": "Stellt das zuletzt verwendete Image-Tag erneut bereit. Anderes Tag oder Environment: Environments-Seite.",
+        "confirm": "Deployen",
+        "started": "Deploy gestartet: {tag} nach {env}",
+        "failed": "Deploy fehlgeschlagen"
       }
     },
     "deployStrategy": {

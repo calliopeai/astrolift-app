@@ -955,6 +955,13 @@
         "controls": "Controls & access",
         "insights": "Observability & activity",
         "links": "Quick links"
+      },
+      "headerDeploy": {
+        "title": "将 {tag} 部署到 {env}?",
+        "description": "重新部署最近的镜像标签。要选择其他标签或环境，请前往环境页面。",
+        "confirm": "部署",
+        "started": "部署已开始:{tag} → {env}",
+        "failed": "部署失败"
       }
     },
     "deployStrategy": {

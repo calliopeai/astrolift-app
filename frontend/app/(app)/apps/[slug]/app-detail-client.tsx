@@ -25,6 +25,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { START_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
+import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { SOFT_DELETE_APP } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_APPS, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type {
@@ -95,6 +98,49 @@ export function AppDetailClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const tDetail = useTranslations("apps.detail");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmDeploy, setConfirmDeploy] = React.useState(false);
+
+  // The header Deploy action redeploys the LATEST deployment (same tag,
+  // same env) behind a confirm. It used to be a bare link to the
+  // environments page — a rocket-labeled button that deployed nothing
+  // and read as broken. With no history there is nothing to redeploy,
+  // so the button falls back to navigating there.
+  const latestDeploys = useQuery<{ astroliftDeployments: AstroliftDeployment[] }>(LIST_DEPLOYMENTS, {
+    variables: { appSlug: slug, limit: 1 },
+  });
+  const latestDeploy = latestDeploys.data?.astroliftDeployments?.[0];
+  const [headerDeploy, { loading: headerDeploying }] = useMutation<{
+    startDeployment: MutationResult<AstroliftDeployment>;
+  }>(START_DEPLOYMENT, {
+    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { appSlug: slug, limit: 1 } }],
+  });
+
+  async function handleHeaderDeploy() {
+    if (!latestDeploy) return;
+    let data;
+    try {
+      ({ data } = await headerDeploy({
+        variables: {
+          input: {
+            appSlug: slug,
+            environmentName: latestDeploy.environmentName,
+            imageTag: latestDeploy.imageTag,
+            triggerKind: "manual",
+          },
+        },
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tDetail("headerDeploy.failed"));
+      return;
+    }
+    if (data?.startDeployment.ok) {
+      toast.success(
+        tDetail("headerDeploy.started", { env: latestDeploy.environmentName, tag: latestDeploy.imageTag }),
+      );
+    } else {
+      toast.error(data?.startDeployment.errors?.[0]?.message ?? tDetail("headerDeploy.failed"));
+    }
+  }
   // includeDrift opts the resolver into the config-drift rollup
   // (#407 C). The overview is the only caller that needs it; sibling
   // queries that hit GET_APP without the flag keep the cheap shape.
@@ -233,12 +279,21 @@ export function AppDetailClient({ slug }: { slug: string }) {
               </a>
             </Button>
           )}
-          <Button asChild>
-            <a href={appPath(chrome, a.slug, "environments")}>
-              <RocketIcon className="size-4" />
-              {tDetail("actions.deploy")}
-            </a>
-          </Button>
+          {latestDeploy ? (
+            <Can permission="app.deploy">
+              <Button onClick={() => setConfirmDeploy(true)} disabled={headerDeploying}>
+                <RocketIcon className="size-4" />
+                {tDetail("actions.deploy")}
+              </Button>
+            </Can>
+          ) : (
+            <Button asChild>
+              <a href={appPath(chrome, a.slug, "environments")}>
+                <RocketIcon className="size-4" />
+                {tDetail("actions.deploy")}
+              </a>
+            </Button>
+          )}
           <Button asChild variant="outline">
             <a href={appPath(chrome, a.slug, "config")}>
               <FileCodeIcon className="size-4" />
@@ -341,6 +396,20 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <Section title={tDetail("groups.links")}>
         <QuickLinksGrid appSlug={a.slug} />
       </Section>
+
+      {latestDeploy && (
+        <ConfirmDialog
+          open={confirmDeploy}
+          onOpenChange={setConfirmDeploy}
+          title={tDetail("headerDeploy.title", {
+            tag: latestDeploy.imageTag,
+            env: latestDeploy.environmentName,
+          })}
+          description={tDetail("headerDeploy.description")}
+          confirmLabel={tDetail("headerDeploy.confirm")}
+          onConfirm={handleHeaderDeploy}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmOpen}

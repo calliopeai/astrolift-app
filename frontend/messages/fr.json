@@ -955,6 +955,13 @@
         "controls": "Controls & access",
         "insights": "Observability & activity",
         "links": "Quick links"
+      },
+      "headerDeploy": {
+        "title": "Déployer {tag} vers {env} ?",
+        "description": "Redéploie le tag d'image le plus récent. Utilisez la page environnements pour choisir un autre tag ou environnement.",
+        "confirm": "Déployer",
+        "started": "Déploiement lancé : {tag} vers {env}",
+        "failed": "Échec du déploiement"
       }
     },
     "deployStrategy": {
