@@ -769,7 +769,7 @@ def _connection_secret_path(svc: Any) -> str:
     )
 
 
-def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
+def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
     from astrolift_services.models import ManagedService
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
@@ -795,10 +795,10 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
     # these rows (resolving secret refs via the cluster secrets backend) and
     # mounts it via envFrom — without them a provisioned service injects no
     # env and the app can't consume it.
-    _sync_binding_rows(svc)
+    return _sync_binding_rows(svc)
 
 
-def _finalize_update_sync(managed_service_id: int, handle: str) -> None:
+def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
     from django.utils import timezone
 
     from astrolift_services.models import ManagedService
@@ -821,14 +821,16 @@ def _finalize_update_sync(managed_service_id: int, handle: str) -> None:
             "version",
         ],
     )
-    _sync_binding_rows(svc)
+    return _sync_binding_rows(svc)
 
 
 @activity.defn(name="astrolift.managed_service.finalize_update")
-async def finalize_managed_service_update(managed_service_id: int, handle: str) -> None:
+async def finalize_managed_service_update(managed_service_id: int, handle: str) -> list[int]:
+    """Persist the applied config, flip to ACTIVE, and report which binding
+    rows carry a value the workload has not seen yet (spec 06 §4.8 step 6)."""
     from asgiref.sync import sync_to_async
 
-    await sync_to_async(_finalize_update_sync)(managed_service_id, handle)
+    return await sync_to_async(_finalize_update_sync)(managed_service_id, handle)
 
 
 def _managed_binding_for(svc: Any) -> Any:
@@ -888,8 +890,15 @@ def _managed_binding_for(svc: Any) -> Any:
     return binding_method(handle)
 
 
-def _sync_binding_rows(svc: Any) -> None:
-    """Atomically replace the driver's environment and volume envelopes."""
+def _sync_binding_rows(svc: Any) -> list[int]:
+    """Atomically replace the driver's environment and volume envelopes.
+
+    Returns the ids of the env binding rows whose value differs from what the
+    previous envelope carried (a brand-new key counts as a difference). Those
+    are the rows a running pod has stale copies of, so they are what the
+    dependent-workload bounce keys off — an update that rewrites the same
+    endpoint and password must not restart anybody's pods.
+    """
     from _sdk.managed_service import VolumeMount
     from django.db import transaction
 
@@ -900,7 +909,7 @@ def _sync_binding_rows(svc: Any) -> None:
 
     binding = _managed_binding_for(svc)
     if binding is None:
-        return
+        return []
     env_vars = getattr(binding, "env_vars", {}) or {}
     volume_mounts = list(getattr(binding, "pod_volume_mounts", ()) or ())
 
@@ -915,18 +924,28 @@ def _sync_binding_rows(svc: Any) -> None:
             raise ValueError(f"managed-service binding emitted duplicate volume name {volume.name!r}")
         names.add(volume.name)
 
+    rebound: list[int] = []
     with transaction.atomic():
+        prior = dict(
+            ManagedServiceBinding.objects.filter(managed_service=svc).values_list(
+                "env_key",
+                "env_value_ref",
+            ),
+        )
         ManagedServiceBinding.objects.filter(managed_service=svc).delete()
         ManagedServiceVolumeBinding.objects.filter(managed_service=svc).delete()
         for env_key, value_ref in env_vars.items():
             secret_ref = getattr(value_ref, "secret_ref", None)
             literal = getattr(value_ref, "literal", None)
-            ManagedServiceBinding.objects.create(
+            env_value_ref = secret_ref if secret_ref else (literal or "")
+            row = ManagedServiceBinding.objects.create(
                 managed_service=svc,
                 env_key=env_key,
-                env_value_ref=secret_ref if secret_ref else (literal or ""),
+                env_value_ref=env_value_ref,
                 is_secret=bool(secret_ref),
             )
+            if prior.get(env_key) != env_value_ref:
+                rebound.append(row.pk)
         for volume in volume_mounts:
             ManagedServiceVolumeBinding.objects.create(
                 managed_service=svc,
@@ -950,22 +969,27 @@ def _sync_binding_rows(svc: Any) -> None:
                 workload_names=list(volume.workload_names),
                 container_names=list(volume.container_names),
             )
+    return rebound
 
 
 @activity.defn(name="astrolift.managed_service.finalize_provision")
 async def finalize_managed_service_provision(
     managed_service_id: int,
     handle: str,
-) -> None:
+) -> list[int]:
     """Persist the driver's backend handle and flip the row to ACTIVE.
 
     Decoupled from the provision call so a DB hiccup persisting the
     handle can be retried without re-issuing the (idempotent) cloud
     provision.
+
+    Returns the binding row ids whose value the dependent workloads have not
+    seen yet, which the bounce activity turns into the set of app
+    environments to restart (spec 06 §4.7 step 5).
     """
     from asgiref.sync import sync_to_async
 
-    await sync_to_async(_finalize_provision_sync)(managed_service_id, handle)
+    return await sync_to_async(_finalize_provision_sync)(managed_service_id, handle)
 
 
 def _mark_failed_sync(managed_service_id: int, error: str) -> None:
@@ -993,3 +1017,162 @@ async def mark_managed_service_failed(
     from asgiref.sync import sync_to_async
 
     await sync_to_async(_mark_failed_sync)(managed_service_id, error)
+
+
+def _dependent_app_environment_ids(svc: Any, rebound_binding_ids: list[int]) -> tuple[int, ...]:
+    """App environments whose running pods hold a stale copy of a rebound
+    binding (spec 06 §4.7 step 5).
+
+    A service reaches an environment two ways: app-private rows carry the env
+    directly, project-owned rows reach it through an attachment. The pairing
+    goes to ``managed_service_states.workloads_to_redeploy`` rather than being
+    computed here so the "which workloads does a rebind touch" rule stays in
+    the phase contract these workflows are specified against.
+    """
+    from astrolift_services.models import ManagedServiceAttachment, ManagedServiceBinding
+    from astrolift_workflows.managed_service_states import (
+        WorkloadBinding,
+        workloads_to_redeploy,
+    )
+
+    env_ids: set[int] = set()
+    if svc.app_environment_id:
+        env_ids.add(int(svc.app_environment_id))
+    env_ids.update(
+        int(pk)
+        for pk in ManagedServiceAttachment.objects.filter(
+            managed_service=svc,
+            app_environment__isnull=False,
+            deleted_at__isnull=True,
+        ).values_list("app_environment_id", flat=True)
+    )
+    binding_ids = list(
+        ManagedServiceBinding.objects.filter(
+            managed_service=svc,
+            deleted_at__isnull=True,
+        ).values_list("pk", flat=True),
+    )
+    all_bindings = [
+        WorkloadBinding(workload_id=env_id, binding_id=int(binding_id))
+        for env_id in sorted(env_ids)
+        for binding_id in binding_ids
+    ]
+    return workloads_to_redeploy(
+        rebound_binding_ids=[int(pk) for pk in rebound_binding_ids],
+        all_bindings=all_bindings,
+    )
+
+
+def _bounce_dependent_workloads_sync(
+    managed_service_id: int,
+    rebound_binding_ids: list[int],
+) -> int:
+    """Roll every workload that consumes a rebound binding, returning the count.
+
+    The connection envelope lands in the per-app ``astrolift-bindings-<slug>``
+    Secret, and a Secret change restarts nothing on its own: pods keep the
+    values they read at start, so a rotated password or a moved endpoint leaves
+    the app failing at connect time with nothing tying the failure to the
+    service operation. Same restart-annotation patch the bundle-rotation
+    bounce (#365) uses.
+
+    Best-effort per workload — a driver that cannot list or patch is logged and
+    skipped, because the new values still land on the environment's next deploy
+    and a failed bounce must not fail the service operation.
+    """
+    from datetime import UTC, datetime
+
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models import ManagedService
+    from core.app_deploy import namespace_for_app
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    if not rebound_binding_ids:
+        return 0
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    env_ids = _dependent_app_environment_ids(svc, rebound_binding_ids)
+    if not env_ids:
+        return 0
+
+    now_iso = datetime.now(UTC).isoformat()
+    patch = {
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": now_iso,
+                        "astrolift.io/managed-service-rebound-at": now_iso,
+                        "astrolift.io/managed-service": str(svc.guid),
+                    },
+                },
+            },
+        },
+    }
+
+    bounced = 0
+    environments = (
+        AppEnvironment.all_objects.filter(pk__in=env_ids, tenant_cluster__isnull=False)
+        .select_related("registered_app__organization", "tenant_cluster__provider_plugin")
+        .order_by("pk")
+    )
+    for env in environments:
+        namespace = namespace_for_app(env.registered_app)
+        driver = _driver_for_cluster(env.tenant_cluster)
+        cluster_slug = _context_for_cluster(env.tenant_cluster).slug
+        patch_workload = getattr(driver, "patch_workload", None)
+        if not callable(patch_workload):
+            log.warning(
+                "cluster driver for %s has no patch_workload — workloads keep "
+                "the stale managed-service envelope until their next deploy",
+                env.tenant_cluster.slug,
+            )
+            continue
+        targets: list[tuple[str, str]] = []
+        list_workloads = getattr(driver, "list_workloads", None)
+        if callable(list_workloads):
+            try:
+                targets = [
+                    (kind, name)
+                    for kind, name in list_workloads(cluster_slug, namespace)
+                    if kind == "Deployment"
+                ]
+            except Exception as exc:  # noqa: BLE001 — best-effort discovery
+                log.warning(
+                    "list_workloads on cluster=%s ns=%s failed: %s",
+                    cluster_slug,
+                    namespace,
+                    exc,
+                )
+                targets = []
+        if not targets:
+            # Same fallback the rotation bounce uses: the renderer names a
+            # single-workload app's Deployment after the app slug.
+            targets = [("Deployment", str(env.registered_app.slug))]
+        for kind, name in targets:
+            try:
+                patch_workload(cluster_slug, namespace, kind, name, patch)
+                bounced += 1
+            except Exception as exc:  # noqa: BLE001 — a stale pod set is not a failed provision
+                log.warning(
+                    "patch_workload(%s/%s) on cluster=%s failed: %s",
+                    kind,
+                    name,
+                    cluster_slug,
+                    exc,
+                )
+    return bounced
+
+
+@activity.defn(name="astrolift.managed_service.bounce_dependent_workloads")
+async def bounce_workloads_bound_to_managed_service(
+    managed_service_id: int,
+    rebound_binding_ids: list[int],
+) -> int:
+    """Restart the workloads consuming the bindings finalize just rewrote."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_bounce_dependent_workloads_sync)(
+        managed_service_id,
+        rebound_binding_ids,
+    )

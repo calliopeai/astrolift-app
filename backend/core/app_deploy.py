@@ -246,6 +246,39 @@ def cluster_for_deployment(deployment: Deployment) -> TenantCluster:
     return env.tenant_cluster
 
 
+def assert_residency_allows(app: RegisteredApp, cluster: TenantCluster) -> None:
+    """Refuse a deploy that would land outside the org's residency allow-list
+    (#152, spec 12 §14).
+
+    Enforced here rather than at env-binding time because the bound cluster's
+    region can be relabeled, and because the migration path picks a target
+    cluster the environment was never bound to. Every apply resolves its driver
+    through one of the two callers below, so this is the choke point a deploy
+    cannot reach the cluster without passing.
+    """
+    from astrolift_clusters.residency import (
+        ResidencyPolicy,
+        ResidencyViolation,
+        check_target,
+    )
+
+    org = getattr(app, "organization", None)
+    if org is None:
+        return
+    policy = ResidencyPolicy(
+        org_slug=str(org.slug),
+        allowed_regions=tuple(str(region) for region in (org.residency_allowed_regions or ())),
+    )
+    try:
+        check_target(
+            policy,
+            cluster_id=cluster.pk,
+            cluster_region=str(cluster.region or ""),
+        )
+    except ResidencyViolation as exc:
+        raise AppDeployError(str(exc)) from exc
+
+
 def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     """Return ``(driver, cluster_context, namespace)`` for a deployment.
 
@@ -255,6 +288,7 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     The namespace is the app's per-app namespace string.
     """
     cluster = cluster_for_deployment(deployment)
+    assert_residency_allows(deployment.registered_app, cluster)
     try:
         driver = _driver_for_cluster(cluster)
     except ClusterManagementError as exc:
@@ -523,6 +557,87 @@ def _require_azure_config(cluster: TenantCluster, capability: str, **values: str
         )
 
 
+def _k8s_native_registry_driver(cluster: TenantCluster) -> Any:
+    """Build the k8s_native image-registry driver for the cluster's named
+    registry variant (#60).
+
+    The plugin registers one generic ``OCIRegistryDriver`` for the whole
+    ``registry`` role, but the availability matrix advertises five variants
+    (generic_oci, quay, dockerhub, ghcr, harbor) and each pins a different
+    host + credential shape. ``k8s_native.registry_variants`` holds those
+    factories; ``provider_config['registry_variant']`` selects between them,
+    mirroring how ``ingress_variant`` selects an ingress shape.
+
+    Without this branch the capability resolver fell through to the
+    cluster-level ``K8sNativeConfig``, which carries a kubeconfig path and no
+    registry URL, so every registry call on a vanilla-Kubernetes cluster died
+    inside the driver constructor.
+    """
+    from k8s_native.registry_variants import (
+        dockerhub_driver,
+        ghcr_driver,
+        harbor_driver,
+        quay_driver,
+    )
+
+    pc = cluster.provider_config or {}
+    ac = cluster.auth_config or {}
+    variant = str(pc.get("registry_variant") or "generic_oci")
+    url = str(pc.get("oci_registry_url") or "")
+    # Credentials are operator-managed and out of band for every OCI
+    # registry (robot account, PAT, hub password), so they ride
+    # auth_config alongside the other per-cluster secrets.
+    username = str(ac.get("registry_username") or "")
+    password = str(ac.get("registry_password") or "")
+
+    def _namespace() -> str:
+        value = str(pc.get("registry_namespace") or "")
+        if not value:
+            raise AppDeployError(
+                f"cluster {cluster.slug}: registry_variant {variant!r} requires "
+                "provider_config.registry_namespace (the org / project / user "
+                "segment the image repositories live under)",
+            )
+        return value
+
+    if variant == "generic_oci":
+        from k8s_native.registry_oci import OCIRegistryConfig, OCIRegistryDriver
+
+        if not url:
+            raise AppDeployError(
+                f"cluster {cluster.slug}: registry capability requires provider_config.oci_registry_url",
+            )
+        return OCIRegistryDriver(
+            config=OCIRegistryConfig(
+                registry_url=url,
+                username=username,
+                password=password,
+            ),
+        )
+    if variant == "quay":
+        return quay_driver(organization=_namespace(), username=username, password=password)
+    if variant == "dockerhub":
+        return dockerhub_driver(namespace=_namespace(), username=username, password=password)
+    if variant == "ghcr":
+        return ghcr_driver(organization=_namespace(), username=username, pat=password)
+    if variant == "harbor":
+        if not url:
+            raise AppDeployError(
+                f"cluster {cluster.slug}: registry_variant 'harbor' requires "
+                "provider_config.oci_registry_url (the Harbor base URL)",
+            )
+        return harbor_driver(
+            base_url=url,
+            project=_namespace(),
+            robot_username=username,
+            robot_password=password,
+        )
+    raise AppDeployError(
+        f"cluster {cluster.slug}: unknown registry_variant {variant!r} — "
+        "expected one of generic_oci, quay, dockerhub, ghcr, harbor",
+    )
+
+
 def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
     """Resolve a non-cluster driver (``secrets``, ``dns``, ``registry``,
     ``tls``, ``identity``) for the cluster's provider plugin.
@@ -545,6 +660,12 @@ def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
         raise AppDeployError(
             f"cluster {cluster.slug}: provider plugin {plugin_slug!r} does not register a {capability!r} driver",
         ) from exc
+    # Registry on k8s_native is variant-dispatched, and the variant factories
+    # build the config and the driver together, so this one returns the driver
+    # rather than feeding ``driver_cls`` below. The lookup above still runs, so
+    # a plugin that stops registering a registry driver still refuses here.
+    if plugin_slug == "k8s_native" and capability == "registry":
+        return _k8s_native_registry_driver(cluster)
     cfg = _config_for_capability(plugin_slug, cluster, capability)
     try:
         return driver_cls(config=cfg)
@@ -578,6 +699,7 @@ def driver_for_target_cluster(
             f"target cluster {cluster.slug!r} lifecycle is {cluster.lifecycle!r}, not managed — "
             "bring it into management before migrating apps to it",
         )
+    assert_residency_allows(deployment.registered_app, cluster)
     try:
         driver = _driver_for_cluster(cluster)
     except ClusterManagementError as exc:
@@ -1104,6 +1226,7 @@ def workloads_from_resources(
 
 __all__ = [
     "AppDeployError",
+    "assert_residency_allows",
     "cluster_for_deployment",
     "driver_for_capability",
     "driver_for_deployment",
