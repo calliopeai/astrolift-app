@@ -33,6 +33,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useAppearance } from "@/components/AppearanceProvider";
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -242,6 +243,8 @@ export function SettingsClient({
   const isAgent = resourceKind === "agent";
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.settings");
+  const { appearance } = useAppearance();
+  const compactLinks = appearance.density === "compact";
   const app = useQuery<AppResp>(GET_APP, {
     variables: { slug },
     fetchPolicy: "cache-and-network",
@@ -340,7 +343,17 @@ export function SettingsClient({
           the LINK_SECTIONS list below for advanced edits. */}
       {!isAgent && <DeployStrategyCard app={a} />}
 
-      <div className="flex flex-col gap-3">
+      {/* Density decides the shape of this list, not just its padding.
+        * Compact merges the rows into one panel (hairline borders collapsed
+        * with -mt-px); cards keeps boxes and flows them into columns, where
+        * the interleaved CI block spans the full width. */}
+      <div
+        className={
+          compactLinks
+            ? "flex flex-col"
+            : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [&>*:not(a)]:sm:col-span-2 [&>*:not(a)]:xl:col-span-3"
+        }
+      >
         {LINK_SECTIONS.filter(
           (section) =>
             !isAgent || !["deploy-tokens", "managed-services", "domains"].includes(section.key)
@@ -359,6 +372,7 @@ export function SettingsClient({
               section={s}
               slug={a.slug}
               lastModifiedAt={sectionLastModified}
+              compact={compactLinks}
             />
           );
           // CI-setup section slots between the manifest-editor link
@@ -887,33 +901,60 @@ function SettingsLinkCard({
   section,
   slug,
   lastModifiedAt,
+  compact = false,
 }: {
   section: LinkSection;
   slug: string;
   lastModifiedAt?: string | null;
+  /** Compact renders a table-style row; cards renders a boxed tile. */
+  compact?: boolean;
 }) {
   const chrome = useAppChrome();
   const t = useTranslations("apps.settings.links");
   const Icon = section.icon;
+  const title = t(`${section.i18nKey}.title`);
+  const description = t(`${section.i18nKey}.description`);
+  const modified = lastModifiedAt ? `Modified ${formatRelativeAge(lastModifiedAt)}` : null;
+
+  // These are destinations, not peer objects to compare, so the compact
+  // default is a row: name and description on the left, freshness right-
+  // aligned where it can be scanned down the column.
+  if (compact) {
+    return (
+      <Link
+        href={section.href(chrome, slug)}
+        className="group border-border bg-card hover:bg-accent/40 -mt-px flex items-center gap-3 border px-3 py-2.5 transition-colors first:mt-0"
+      >
+        <Icon className="text-primary size-4 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{title}</span>
+          <span className="text-muted-foreground block truncate text-xs">{description}</span>
+        </span>
+        {modified && (
+          <span className="text-muted-foreground hidden font-mono text-2xs whitespace-nowrap sm:block">
+            {modified}
+          </span>
+        )}
+        <ChevronRightIcon className="text-muted-foreground group-hover:text-foreground size-4 shrink-0 transition-colors" />
+      </Link>
+    );
+  }
+
   return (
     <Link href={section.href(chrome, slug)} className="group block">
-      <Card className="hover:bg-accent/40 transition-colors">
-        <CardContent className="flex items-center gap-4 p-5">
-          <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
-            <Icon className="size-5" />
+      <Card className="hover:bg-accent/40 h-full transition-colors">
+        <CardContent className="flex items-start gap-3 p-4">
+          <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2">
+            <Icon className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{t(`${section.i18nKey}.title`)}</p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {t(`${section.i18nKey}.description`)}
-            </p>
-            {lastModifiedAt && (
-              <p className="text-muted-foreground mt-1 text-xs">
-                Modified {formatRelativeAge(lastModifiedAt)}
-              </p>
+            <p className="text-sm font-semibold">{title}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
+            {modified && (
+              <p className="text-muted-foreground mt-1 font-mono text-2xs">{modified}</p>
             )}
           </div>
-          <ChevronRightIcon className="text-muted-foreground group-hover:text-foreground size-5 shrink-0 transition-colors" />
+          <ChevronRightIcon className="text-muted-foreground group-hover:text-foreground size-4 shrink-0 transition-colors" />
         </CardContent>
       </Card>
     </Link>
