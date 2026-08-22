@@ -89,6 +89,15 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # Same shape as the reconcile above: read-only cluster reads, per-box
         # try/except, and an unobservable box is left alone.
         ScheduleKind.AGENT_BOX_REAP,
+        # Cert-expiry monitoring ships active (#155) — the third detector
+        # alongside uptime and alert-eval, and the only one that sees a cert
+        # that quietly stopped renewing. Held it would be worthless: the
+        # failure it exists to catch surfaces as a production TLS outage.
+        # Safe: read-only (provider cert reads through the existing
+        # TTL-guarded refresher), per-domain try/except, and a domain with
+        # no known expiry is skipped. Reminders are watermarked per domain,
+        # so it pages once per threshold rather than every day.
+        ScheduleKind.CERT_EXPIRY,
         # NB: ScheduleKind.CI_WORKFLOW_RESYNC is INTENTIONALLY absent here
         # (#1211, Phase 3). Unlike the read-mostly / idempotent-SSA kinds
         # above, it does OUTBOUND writes to tenant source repos (pushes the
