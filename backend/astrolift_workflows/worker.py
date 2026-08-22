@@ -143,6 +143,7 @@ from astrolift_workflows.activities import (
     update_secrets,
     update_stage_execution,
     validate_migration_target,
+    validate_ns_delegation,
     verify_reachability,
     wait_dns,
 )
@@ -391,6 +392,7 @@ ACTIVITIES = (
     update_secrets,
     update_stage_execution,
     validate_migration_target,
+    validate_ns_delegation,
     verify_reachability,
     wait_dns,
 )
