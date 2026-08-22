@@ -75,6 +75,7 @@ def render_manifests(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str = "",
     environment_name: str,
     labels: dict[str, str] | None = None,
     env_from_secret_refs: list[str] | None = None,
@@ -86,6 +87,12 @@ def render_manifests(
     sets every container's image. Per-container image overrides
     (``image_ref`` on the container) take precedence so a sidecar can
     pin its own image.
+
+    ``image_digest`` is the ``sha256:...`` the build recorded for that
+    tag. When present the platform-built containers are emitted as
+    ``<repo>@<digest>`` instead of ``<repo>:<tag>`` (spec 12 §9), so a
+    re-pushed tag cannot change the bytes a rollback restores. Empty
+    (dry-run previews, pre-build renders) keeps the tag form.
 
     ``env_from_secret_refs`` is the list of k8s Secret names every
     primary container should pull ``envFrom: secretRef:`` from. The
@@ -119,6 +126,7 @@ def render_manifests(
                     namespace=namespace,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     labels=wl_labels,
                     env_from_secret_refs=env_from,
                 )
@@ -139,6 +147,7 @@ def render_manifests(
                     namespace=namespace,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     labels=wl_labels,
                     env_from_secret_refs=env_from,
                 )
@@ -150,6 +159,7 @@ def render_manifests(
                     namespace=namespace,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     labels=wl_labels,
                     env_from_secret_refs=env_from,
                 )
@@ -168,6 +178,7 @@ def render_manifests(
                         namespace=namespace,
                         image_tag=image_tag,
                         image_repository=image_repository,
+                        image_digest=image_digest,
                         labels=wl_labels,
                         env_from_secret_refs=env_from,
                     )
@@ -187,6 +198,7 @@ def render_manifests(
                     namespace=namespace,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     labels=wl_labels,
                     env_from_secret_refs=env_from,
                 )
@@ -204,6 +216,7 @@ def render_manifests(
                     namespace=namespace,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     labels=wl_labels,
                     env_from_secret_refs=env_from,
                 )
@@ -216,6 +229,7 @@ def render_manifests(
                 namespace=namespace,
                 image_tag=image_tag,
                 image_repository=image_repository,
+                image_digest=image_digest,
                 labels=wl_labels,
                 env_from_secret_refs=env_from,
             )
@@ -251,6 +265,7 @@ def _render_deployment(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -275,6 +290,7 @@ def _render_deployment(
                     w,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    image_digest=image_digest,
                     env_from_secret_refs=env_from_secret_refs,
                 ),
             },
@@ -288,6 +304,7 @@ def _render_cronjob(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -315,6 +332,7 @@ def _render_cronjob(
                                 w,
                                 image_tag=image_tag,
                                 image_repository=image_repository,
+                                image_digest=image_digest,
                                 env_from_secret_refs=env_from_secret_refs,
                             ),
                             "restartPolicy": "OnFailure",
@@ -332,6 +350,7 @@ def _render_task(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -362,6 +381,7 @@ def _render_task(
                         w,
                         image_tag=image_tag,
                         image_repository=image_repository,
+                        image_digest=image_digest,
                         env_from_secret_refs=env_from_secret_refs,
                     ),
                     "restartPolicy": "Never",
@@ -377,6 +397,7 @@ def _render_agent(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -404,6 +425,7 @@ def _render_agent(
         namespace=namespace,
         image_tag=image_tag,
         image_repository=image_repository,
+        image_digest=image_digest,
         labels=labels,
         env_from_secret_refs=env_from_secret_refs,
     )
@@ -431,6 +453,7 @@ def _render_workflow_worker(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -467,6 +490,7 @@ def _render_workflow_worker(
         namespace=namespace,
         image_tag=image_tag,
         image_repository=image_repository,
+        image_digest=image_digest,
         labels=labels,
         env_from_secret_refs=env_from_secret_refs,
     )
@@ -645,6 +669,7 @@ def _pod_spec(
     *,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
@@ -654,11 +679,29 @@ def _pod_spec(
                 workload=w,
                 image_tag=image_tag,
                 image_repository=image_repository,
+                image_digest=image_digest,
                 env_from_secret_refs=env_from_secret_refs,
             )
             for c in w.containers
         ],
     }
+
+
+def _platform_image(*, image_repository: str, image_tag: str, image_digest: str) -> str:
+    """The image string for a container the platform builds.
+
+    Prefers the digest: a tag is mutable, so re-pushing it changes the
+    bytes a "rollback to that release" actually ships. ``build_image``
+    records the digest best-effort (a registry read can fail on an
+    otherwise-good build), so fall back to the tag when it is absent
+    rather than blocking the deploy.
+    """
+    ref = f"{image_repository}:{image_tag}"
+    if not image_digest:
+        return ref
+    from astrolift_workflows.activities.image_digest import pin_to_digest  # noqa: PLC0415
+
+    return str(pin_to_digest(ref=ref, digest=image_digest))
 
 
 def _render_container(
@@ -667,11 +710,13 @@ def _render_container(
     workload: WorkloadManifest,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     spec: dict[str, Any] = {
         "name": c.name,
-        "image": c.image_ref or f"{image_repository}:{image_tag}",
+        "image": c.image_ref
+        or _platform_image(image_repository=image_repository, image_tag=image_tag, image_digest=image_digest),
     }
     if c.port > 0:
         spec["ports"] = [{"containerPort": int(c.port), "protocol": "TCP", "name": "http"}]
@@ -784,6 +829,7 @@ def _render_function(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -797,7 +843,9 @@ def _render_function(
     if primary is None:
         raise ValueError(f"function workload {w.name!r} has no containers")
 
-    image = primary.image_ref if primary.image_ref else f"{image_repository}:{image_tag}"
+    image = primary.image_ref or _platform_image(
+        image_repository=image_repository, image_tag=image_tag, image_digest=image_digest
+    )
     container_spec: dict[str, Any] = {
         "image": image,
         "resources": _render_resources(w),
@@ -855,6 +903,7 @@ def _render_statefulset(
     namespace: str,
     image_tag: str,
     image_repository: str,
+    image_digest: str,
     labels: dict[str, str],
     env_from_secret_refs: list[str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -877,6 +926,7 @@ def _render_statefulset(
         w,
         image_tag=image_tag,
         image_repository=image_repository,
+        image_digest=image_digest,
         env_from_secret_refs=env_from_secret_refs,
     )
 

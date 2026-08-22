@@ -36,6 +36,8 @@ import logging
 
 from temporalio import activity
 
+from astrolift_workflows.activities.image_digest import is_digest
+
 log = logging.getLogger("astrolift_workflows.activities.build_image")
 
 # Where the kaniko build Job runs — the platform namespace present on every
@@ -305,6 +307,17 @@ def _read_pushed_digest(registry_driver, repo_name: str, image_tag: str) -> str:
     try:
         for tag in registry_driver.list_tags(repo_name):
             if getattr(tag, "name", "") == image_tag and getattr(tag, "digest", ""):
+                if not is_digest(tag.digest):
+                    # The render pins containers to whatever lands here, so a
+                    # malformed digest would produce an unpullable image ref.
+                    # Better to fall back to the tag than to ship garbage.
+                    log.warning(
+                        "registry returned malformed digest %r for %s:%s — ignoring",
+                        tag.digest,
+                        repo_name,
+                        image_tag,
+                    )
+                    return ""
                 return tag.digest
     except Exception as exc:  # noqa: BLE001
         log.warning("could not read pushed digest for %s:%s — %s", repo_name, image_tag, exc)

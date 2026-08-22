@@ -548,6 +548,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         namespace=namespace,
         image_tag=d.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
+        image_digest=d.image_digest,
         environment_name=env.name,
         env_from_secret_refs=env_from,
     )

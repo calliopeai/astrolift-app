@@ -760,6 +760,11 @@ def render_resources_for_deployment(
         namespace=namespace,
         image_tag=deployment.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
+        # Pin to the digest the build recorded. This is the render that
+        # apply_manifests actually ships (#1003), so without it every
+        # workload runs a mutable tag and a rollback can silently land
+        # different bytes than the release it names.
+        image_digest=deployment.image_digest,
         environment_name=env.name,
         env_from_secret_refs=env_from,
     )
