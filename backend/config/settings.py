@@ -462,6 +462,12 @@ CONSTANCE_CONFIG = {
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
     "GET_PRESIGNED_URL_EXPIRATION": (3600, "Time to live in seconds of presigned urls for downloading."),
     "AUTH0_REGISTER_NEW_USER": (False, "Register new users in Auth0"),
+    "RESTRICT_SOURCE_REPOS_TO_ORG": (
+        False,
+        "Only accept app source repos owned by a connected organization. Personal "
+        "repos are refused at registration and hidden from the repo picker. Default "
+        "off, which is the existing behavior.",
+    ),
     "EMAIL_NOTIFICATIONS": (False, "Enables the platform to send Email Notifications"),
     "ZENTINELLE_ENABLED": (
         False,
@@ -686,6 +692,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
+    "Source repositories": {"fields": ("RESTRICT_SOURCE_REPOS_TO_ORG",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
     "Admin screens": {
