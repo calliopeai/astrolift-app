@@ -329,12 +329,6 @@ const modules: ModuleEntry[] = [
       {
         label: "Usage & Governance",
         items: [
-          { label: "Cost", href: "/administration/cost", icon: <CreditCardIcon /> },
-          {
-            label: "Quotas",
-            href: "/administration/quotas",
-            icon: <SlidersHorizontalIcon />,
-          },
           { label: "Metrics", href: "/administration/metrics", icon: <GaugeIcon /> },
           // /tokens stays top-level canonical (#893) — this entry points AT it.
           { label: "API Keys", href: "/tokens", icon: <KeyRoundIcon /> },
