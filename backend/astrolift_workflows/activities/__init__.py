@@ -143,6 +143,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
     register_managed_domain_row,
     reissue_cert,
     request_wildcard_cert_for_zone,
+    validate_ns_delegation,
 )
 from astrolift_workflows.activities.run_status_reconcile import reconcile_runs_tick
 from astrolift_workflows.activities.scheduled import (
@@ -329,6 +330,7 @@ __all__ = [
     "update_secrets",
     "update_stage_execution",
     "validate_migration_target",
+    "validate_ns_delegation",
     "verify_reachability",
     "wait_dns",
 ]

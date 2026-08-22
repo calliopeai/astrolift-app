@@ -1,4 +1,4 @@
-"""Minimal pure-Python DNS TXT resolver for the email auth probe (#632).
+"""Minimal pure-Python DNS resolver for the email auth probe (#632).
 
 Why not `dnspython`: the providers tree intentionally avoids transitive
 runtime dependencies beyond what the cloud SDKs already pull in. Adding
@@ -12,15 +12,17 @@ The implementation:
 * UDP query against the system resolver (read from
   ``/etc/resolv.conf``); fall back to Google Public DNS (``8.8.8.8``)
   when no nameserver line is present (e.g. plain-pid namespaces).
-* Builds a standard DNS query (one question, class IN, type TXT) and
-  parses the answer section. TXT records are RFC 1035 character
-  strings; multi-string TXT answers are concatenated per RFC 4408.
+* Builds a standard DNS query (one question, class IN) and parses the
+  answer section. TXT records are RFC 1035 character strings;
+  multi-string TXT answers are concatenated per RFC 4408. NS records
+  are a single (possibly compression-pointer) domain name.
 * Times out after 3 seconds per attempt; up to two retries with a
   fresh transaction id. On total failure, surfaces an exception the
   caller renders as ``UNKNOWN`` rather than guessing the auth state.
 
-Scope: TXT records only. Other types aren't needed for the DKIM /
-SPF / DMARC probe (DKIM presence is read from SES itself, not DNS).
+Scope: TXT (the DKIM / SPF / DMARC probe; DKIM presence is read from
+SES itself, not DNS) and NS (the managed-zone delegation gate, which
+has to know what the public internet is told to ask for a zone).
 """
 
 from __future__ import annotations
@@ -121,11 +123,21 @@ def _decode_name(buf: bytes, offset: int) -> tuple[str, int]:
     return ".".join(labels), next_offset
 
 
-def _query_txt(*, server: str, qname: str, timeout: float = 3.0) -> list[str]:
-    """One round-trip TXT query against ``server`` (UDP/53)."""
+_TYPE_NS = 2
+_TYPE_TXT = 16
+
+
+def _query_records(
+    *,
+    server: str,
+    qname: str,
+    qtype: int = _TYPE_TXT,
+    timeout: float = 3.0,
+) -> list[str]:
+    """One round-trip query of ``qtype`` against ``server`` (UDP/53)."""
     txid = random.randint(0, 0xFFFF)
     header = struct.pack(">HHHHHH", txid, 0x0100, 1, 0, 0, 0)
-    question = _encode_name(qname) + struct.pack(">HH", 16, 1)
+    question = _encode_name(qname) + struct.pack(">HH", qtype, 1)
     packet = header + question
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -159,8 +171,16 @@ def _query_txt(*, server: str, qname: str, timeout: float = 3.0) -> list[str]:
         rtype, _rclass, _ttl, rdlength = struct.unpack(">HHIH", data[offset : offset + 10])
         offset += 10
         rdata = data[offset : offset + rdlength]
+        rdata_start = offset
         offset += rdlength
-        if rtype != 16:  # TXT only
+        if rtype != qtype:
+            continue
+        if qtype == _TYPE_NS:
+            # NS rdata is one domain name, which may use compression
+            # pointers back into the message — decode against the whole
+            # buffer, not the rdata slice.
+            name, _ = _decode_name(data, rdata_start)
+            answers.append(name.lower())
             continue
         # TXT rdata is one or more length-prefixed strings (RFC 1035
         # §3.3.14). Concatenate per RFC 4408 (SPF).
@@ -177,6 +197,18 @@ def _query_txt(*, server: str, qname: str, timeout: float = 3.0) -> list[str]:
     return answers
 
 
+def _lookup(qname: str, *, qtype: int, timeout: float) -> list[str]:
+    servers = _system_resolvers() + list(_FALLBACK_RESOLVERS)
+    last_exc: Exception | None = None
+    for server in servers:
+        try:
+            return _query_records(server=server, qname=qname, qtype=qtype, timeout=timeout)
+        except (OSError, DnsResolveError) as exc:
+            last_exc = exc
+            continue
+    raise DnsResolveError(f"all resolvers failed for {qname!r}: {last_exc}") from last_exc
+
+
 def lookup_txt(qname: str, *, timeout: float = 3.0) -> list[str]:
     """Resolve TXT records for ``qname`` via the system resolvers.
 
@@ -186,12 +218,16 @@ def lookup_txt(qname: str, *, timeout: float = 3.0) -> list[str]:
     callers render this as ``UNKNOWN`` so operators can retry without
     us blaming the auth setup.
     """
-    servers = _system_resolvers() + list(_FALLBACK_RESOLVERS)
-    last_exc: Exception | None = None
-    for server in servers:
-        try:
-            return _query_txt(server=server, qname=qname, timeout=timeout)
-        except (OSError, DnsResolveError) as exc:
-            last_exc = exc
-            continue
-    raise DnsResolveError(f"all resolvers failed for {qname!r}: {last_exc}") from last_exc
+    return _lookup(qname, qtype=_TYPE_TXT, timeout=timeout)
+
+
+def lookup_ns(qname: str, *, timeout: float = 3.0) -> list[str]:
+    """Resolve NS records for ``qname`` via the system resolvers.
+
+    Returns the delegated nameserver hostnames, lowercased and without the
+    trailing dot. Empty list means the resolver answered but the name has no
+    delegation (NXDOMAIN / no answer) — a real finding, not a failure to
+    look. :class:`DnsResolveError` means the lookup itself could not be
+    performed, which callers must not read as "not delegated".
+    """
+    return _lookup(qname, qtype=_TYPE_NS, timeout=timeout)

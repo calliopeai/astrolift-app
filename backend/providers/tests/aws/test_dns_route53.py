@@ -261,3 +261,41 @@ def test_list_certificates_empty_when_none(acm_client) -> None:
     driver = Route53Driver(client=None)
     driver._acm = acm_client
     assert driver.list_certificates() == []
+
+
+# ---- wildcard cert SANs (#70) ----------------------------------------
+
+
+def test_request_wildcard_cert_requests_the_caller_sans(driver_with_zone, acm_client) -> None:
+    """The caller's SAN list is what ACM is asked for. ``*.<zone>`` matches one
+    label only, so a preview wildcard two labels deep has to be named."""
+    driver, zone_id = driver_with_zone
+    driver._acm = acm_client
+
+    result = driver.request_wildcard_cert(
+        "acme.platform.example",
+        zone_id,
+        sans=[
+            "acme.platform.example",
+            "*.acme.platform.example",
+            "*.pr.acme.platform.example",
+        ],
+    )
+
+    desc = acm_client.describe_certificate(CertificateArn=result["cert_id"])
+    sans = desc["Certificate"]["SubjectAlternativeNames"]
+    assert "*.pr.acme.platform.example" in sans
+
+
+def test_request_wildcard_cert_defaults_without_sans(driver_with_zone, acm_client) -> None:
+    """No SAN list → the driver's own zone + one-label wildcard."""
+    driver, zone_id = driver_with_zone
+    driver._acm = acm_client
+
+    result = driver.request_wildcard_cert("acme.platform.example", zone_id)
+
+    desc = acm_client.describe_certificate(CertificateArn=result["cert_id"])
+    sans = desc["Certificate"]["SubjectAlternativeNames"]
+    assert "acme.platform.example" in sans
+    assert "*.acme.platform.example" in sans
+    assert "*.pr.acme.platform.example" not in sans
