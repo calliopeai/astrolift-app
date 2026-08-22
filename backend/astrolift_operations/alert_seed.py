@@ -32,6 +32,7 @@ import logging
 from astrolift_operations.alert_rules import Severity as TemplateSeverity
 from astrolift_operations.alert_rules import render_for_app
 from astrolift_operations.models import AlertRule
+from astrolift_operations.security_events import DetectorKind
 
 log = logging.getLogger(__name__)
 
@@ -100,4 +101,56 @@ def seed_default_alert_rules(app) -> int:
     return created
 
 
-__all__ = ["seed_default_alert_rules"]
+# The security burst detectors (#151) are org-wide, not per-app: the burst
+# they count is "one actor against this tenant", so they seed once per
+# organization with target=global instead of once per app.
+#
+# The seeded severity is the *base* severity the policy assigns to a
+# threshold crossing (WARNING). ``security_events`` escalates to CRITICAL
+# at 5x the threshold, but the AlertEvent takes its severity from the rule
+# row, so the escalation shows up in the evaluator's log line rather than
+# on the event.
+_SECURITY_RULES: tuple[tuple[DetectorKind, str], ...] = (
+    (DetectorKind.FAILED_LOGIN_BURST, "Failed authentication burst"),
+    (DetectorKind.PERMISSION_DENIED_BURST, "Permission denial burst"),
+)
+
+
+def seed_security_alert_rules(organization) -> int:
+    """Seed the org-wide security burst rules. Returns the count created.
+
+    Same contract as the per-app seeder: idempotent (the rule name is
+    org-unique, so a re-run creates nothing) and best-effort per row.
+
+    No thresholds in the predicate — ``security_events.DEFAULTS`` carries
+    the spec values, and an operator editing the rule then overrides only
+    the knob they mean to change.
+    """
+    created = 0
+    for kind, title in _SECURITY_RULES:
+        name = title[:_MAX_NAME_LEN]
+        if AlertRule.objects.filter(organization=organization, name=name).exists():
+            continue
+        try:
+            AlertRule.objects.create(
+                organization=organization,
+                name=name,
+                target=AlertRule.Target.GLOBAL.value,
+                target_id="",
+                predicate={"kind": kind.value},
+                severity=AlertRule.Severity.WARN.value,
+                notify_channels=[],
+                is_active=True,
+            )
+            created += 1
+        except Exception:  # noqa: BLE001 — one bad row must not skip the rest
+            log.warning(
+                "alert seed: failed to create security rule %r for org %s",
+                name,
+                getattr(organization, "slug", organization),
+                exc_info=True,
+            )
+    return created
+
+
+__all__ = ["seed_default_alert_rules", "seed_security_alert_rules"]

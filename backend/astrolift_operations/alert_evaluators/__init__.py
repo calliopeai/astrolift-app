@@ -39,6 +39,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from astrolift_operations.models import AlertRule
 
+from astrolift_operations.alert_evaluators.security import (
+    evaluate_failed_login_burst,
+    evaluate_permission_denied_burst,
+)
 from astrolift_operations.alert_evaluators.ses import (
     evaluate_ses_bounce_rate,
     evaluate_ses_complaint_rate,
@@ -54,6 +58,10 @@ log = logging.getLogger(__name__)
 KIND_HANDLERS: dict[str, Callable[[AlertRule, dict], bool]] = {
     "ses_bounce_rate": evaluate_ses_bounce_rate,
     "ses_complaint_rate": evaluate_ses_complaint_rate,
+    # Kind names match ``security_events.DetectorKind`` values so a rule's
+    # predicate names the detector it configures.
+    "failed_login_burst": evaluate_failed_login_burst,
+    "permission_denied_burst": evaluate_permission_denied_burst,
 }
 
 
@@ -92,6 +100,8 @@ def evaluate(rule: AlertRule) -> bool:
 __all__ = [
     "KIND_HANDLERS",
     "evaluate",
+    "evaluate_failed_login_burst",
+    "evaluate_permission_denied_burst",
     "evaluate_ses_bounce_rate",
     "evaluate_ses_complaint_rate",
 ]
