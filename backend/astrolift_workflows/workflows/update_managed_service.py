@@ -11,6 +11,7 @@ from astrolift_workflows.inputs import UpdateManagedServiceInput, WorkflowResult
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        bounce_workloads_bound_to_managed_service,
         check_managed_service_ready,
         finalize_managed_service_update,
         mark_managed_service_failed,
@@ -89,9 +90,19 @@ class UpdateManagedServiceWorkflow:
                 )
                 return WorkflowResult(ok=False, message=message)
 
-        await workflow.execute_activity(
+        rebound = await workflow.execute_activity(
             finalize_managed_service_update,
             args=[svc_id, handle],
+            start_to_close_timeout=_QUICK_TIMEOUT,
+            retry_policy=_STATUS_RETRY,
+        )
+
+        # Spec §4.8 step 7: only the bindings whose value actually moved get a
+        # bounce. An update that rewrites the same endpoint and password
+        # returns an empty list and restarts nobody.
+        await workflow.execute_activity(
+            bounce_workloads_bound_to_managed_service,
+            args=[svc_id, rebound or []],
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )

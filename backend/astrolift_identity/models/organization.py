@@ -114,6 +114,18 @@ class Organization(NamedBaseCoreModel):
     # refused in front of the person who typed it.
     default_resource_tags = models.JSONField(default=dict, blank=True)
 
+    # Data-residency pinning (#152, spec 12 §14). The deploy path reads this
+    # into astrolift_clusters.residency.ResidencyPolicy and refuses any target
+    # cluster whose region is outside the list. Empty is the unconfigured
+    # state ("deploy anywhere"); once an admin sets it the list is an
+    # allow-list and the check fails closed, including for a cluster whose
+    # region column is blank.
+    #
+    # Regions, not cluster ids: a cluster can be replaced or re-provisioned
+    # inside a region, and an allow-list of surrogate keys would silently stop
+    # covering the replacement.
+    residency_allowed_regions = models.JSONField(default=list, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

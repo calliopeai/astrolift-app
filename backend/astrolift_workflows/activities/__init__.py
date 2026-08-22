@@ -108,6 +108,7 @@ from astrolift_workflows.activities.install_prereqs import (
     record_cluster_bootstrap_run,
 )
 from astrolift_workflows.activities.managed_service_lifecycle import (
+    bounce_workloads_bound_to_managed_service,
     check_managed_service_ready,
     deprovision_managed_service,
     finalize_managed_service_deletion,
@@ -196,6 +197,7 @@ __all__ = [
     "apply_manifests",
     "apply_platform_rbac",
     "apply_to_target_cluster",
+    "bounce_workloads_bound_to_managed_service",
     "bounce_workloads_consuming_bundle",
     "build_image",
     "cancel_pipeline_job",

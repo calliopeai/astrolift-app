@@ -39,6 +39,7 @@ from astrolift_workflows.inputs import ProvisionManagedServiceInput, WorkflowRes
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        bounce_workloads_bound_to_managed_service,
         check_managed_service_ready,
         finalize_managed_service_provision,
         mark_managed_service_failed,
@@ -149,9 +150,21 @@ class ProvisionManagedServiceWorkflow:
                 )
                 return WorkflowResult(ok=False, message=msg)
 
-        await workflow.execute_activity(
+        rebound = await workflow.execute_activity(
             finalize_managed_service_provision,
             args=[svc_id, handle],
+            start_to_close_timeout=_QUICK_TIMEOUT,
+            retry_policy=_STATUS_RETRY,
+        )
+
+        # Spec §4.7 step 5: workloads already running in the environments this
+        # service is bound to mount the connection envelope as a Secret and
+        # read it once at start, so a brand-new binding never reaches them
+        # without a restart. Best-effort inside the activity, so a cluster that
+        # cannot be patched does not fail an otherwise-good provision.
+        await workflow.execute_activity(
+            bounce_workloads_bound_to_managed_service,
+            args=[svc_id, rebound or []],
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
