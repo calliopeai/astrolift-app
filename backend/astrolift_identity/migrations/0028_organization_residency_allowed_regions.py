@@ -6,11 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-<<<<<<<< HEAD:backend/astrolift_identity/migrations/0028_organization_residency_allowed_regions.py
         ('astrolift_identity', '0027_organization_managed_service_isolation_policy'),
-========
-        ('astrolift_identity', '0026_organization_appearance_policy'),
->>>>>>>> origin/wire/residency-and-managed-service-states:backend/astrolift_identity/migrations/0027_organization_residency_allowed_regions.py
     ]
 
     operations = [
