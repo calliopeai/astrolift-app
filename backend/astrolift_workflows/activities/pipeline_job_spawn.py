@@ -185,6 +185,18 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     # deploy key could not express it at all.
     secret_names = secret_names_for_job(job, steps)
 
+    # A pull request from a fork runs code nobody in the org has reviewed,
+    # in a job that would otherwise be handed the org's registry
+    # credentials and deploy keys. The decision was made at the receiver,
+    # where the payload was, and is only read here (#1529, #95).
+    if secret_names and getattr(run, "skip_secrets", False):
+        log.info(
+            "spawn_pipeline_job: withholding %d secret(s) from fork run %s",
+            len(secret_names),
+            run.pk,
+        )
+        secret_names = []
+
     try:
         client = _get_cluster_client(run)
         _ensure_pipeline_namespace(client, namespace, org_slug)

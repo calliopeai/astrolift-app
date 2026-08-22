@@ -128,32 +128,34 @@ def _extract_repo_info(event: str, payload: dict) -> tuple[str, str, str, str, s
     return clone_url, html_url, ref, actor, commit_sha
 
 
-def _trigger_matches(trigger: Trigger, event: str, ref: str) -> bool:
-    """Return True when a Trigger config matches the incoming event + ref."""
+def _trigger_matches(trigger: Trigger, event: str, ref: str, payload: dict | None = None):
+    """Apply a Trigger's filters to an incoming event.
+
+    Returns a `TriggerFilterResult`, or None when the trigger is not for
+    this event kind at all.
+
+    The matching itself lives in `astrolift_pipelines.trigger_filters`,
+    which had no caller. What used to be here did exact-string membership
+    on branch names, so `branches = ["release/*"]` matched nothing and the
+    pipeline looked broken for no visible reason; it ignored `paths`
+    entirely, so a docs-only push triggered every pipeline in the org; and
+    it never looked at whether a pull request came from a fork, which is
+    the half that decides whether org secrets are handed to code from
+    outside the org.
+
+    The kind gate stays here because it is a property of the Trigger row
+    rather than of its config, and the filter module only sees the config.
+    """
+    from astrolift_pipelines.trigger_filters import apply_trigger_filters
+
     kind_map = {
         "push": ("push",),
         "pull_request": ("pull_request",),
     }
     if trigger.kind not in kind_map.get(event, ()):
-        return False
+        return None
 
-    config = trigger.config or {}
-
-    if event == "push":
-        # Branch filter
-        branches = config.get("branches", [])
-        if branches:
-            branch = ref.removeprefix("refs/heads/")
-            if branch not in branches:
-                return False
-        # Tag filter
-        tags = config.get("tags", [])
-        if tags and ref.startswith("refs/tags/"):
-            tag = ref.removeprefix("refs/tags/")
-            if tag not in tags:
-                return False
-
-    return True
+    return apply_trigger_filters(trigger.config or {}, event, ref, payload or {})
 
 
 @require_http_methods(["POST"])
@@ -204,7 +206,8 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         # Check triggers
         triggers = Trigger.objects.filter(pipeline=pipeline, deleted_at__isnull=True)
         for trigger in triggers:
-            if not _trigger_matches(trigger, event, ref):
+            decision = _trigger_matches(trigger, event, ref, payload)
+            if decision is None or not decision.should_trigger:
                 continue
 
             # Create PipelineRun and dispatch workflow
@@ -216,6 +219,11 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                     trigger_ref=ref,
                     commit_sha=commit_sha,
                     trigger_actor=actor,
+                    # A fork's pull request runs code the org has not
+                    # reviewed. Recorded on the run rather than recomputed
+                    # at spawn time, because the payload is gone by then
+                    # and the answer must not be able to differ.
+                    skip_secrets=decision.skip_secrets,
                     status="pending",
                     temporal_workflow_id="",  # set by dispatcher on workflow start
                 )
