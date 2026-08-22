@@ -30,15 +30,15 @@ interface MeResp {
 
 const RESOURCE_TONE: Record<string, string> = {
   app: "bg-info/15 text-info-fg",
-  cluster: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  cluster: "bg-chart-3/15 text-chart-3",
   org: "bg-success/15 text-success-fg",
   team: "bg-success/15 text-success-fg",
   project: "bg-success/15 text-success-fg",
   api_token: "bg-warning/15 text-warning-fg",
   deploy_token: "bg-warning/15 text-warning-fg",
   policy: "bg-danger/15 text-danger-fg",
-  audit_log: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-  billing: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  audit_log: "bg-foreground/5 text-muted-foreground",
+  billing: "bg-foreground/5 text-muted-foreground",
 };
 
 /**

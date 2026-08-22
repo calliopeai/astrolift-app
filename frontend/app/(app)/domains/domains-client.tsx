@@ -53,9 +53,9 @@ interface Resp {
 
 const defaultForBadge: Record<string, string> = {
   tenant_apps: "bg-info/15 text-info-fg",
-  preview_envs: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  preview_envs: "bg-chart-3/15 text-chart-3",
   both: "bg-success/15 text-success-fg",
-  none: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
+  none: "bg-foreground/5 text-muted-foreground",
 };
 
 export function DomainsClient() {

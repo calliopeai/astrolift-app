@@ -168,7 +168,7 @@ export function UrlHealthBadge({ appSlug, url, compact, className }: Props) {
 // ─── view helpers ─────────────────────────────────────────────────────────────
 
 function statusContainerClass(status: UrlHealthStatus | string, loading: boolean): string {
-  if (loading) return "border-zinc-300 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300";
+  if (loading) return "border-border bg-muted text-muted-foreground";
   switch (status) {
     case "ok":
       return "border-success-border bg-success/10 text-success-fg hover:bg-success/20";
@@ -178,7 +178,7 @@ function statusContainerClass(status: UrlHealthStatus | string, loading: boolean
       return "border-danger-border bg-danger/10 text-danger-fg hover:bg-danger/20";
     case "unknown":
     default:
-      return "border-zinc-300 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300";
+      return "border-border bg-muted text-muted-foreground";
   }
 }
 
@@ -191,7 +191,7 @@ function statusDotClass(status: UrlHealthStatus | string): string {
     case "down":
       return "bg-danger";
     default:
-      return "bg-zinc-400";
+      return "bg-muted-foreground";
   }
 }
 

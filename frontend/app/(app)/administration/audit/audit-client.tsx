@@ -109,7 +109,7 @@ const decisionStyles: Record<string, { icon: React.ReactNode; cls: string }> = {
   },
   UNKNOWN: {
     icon: null,
-    cls: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
+    cls: "bg-foreground/5 text-muted-foreground",
   },
 };
 

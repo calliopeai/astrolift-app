@@ -104,10 +104,10 @@ interface ScanPayload {
 }
 
 const SEVERITY_TONE: Record<ScanFinding["severity"], string> = {
-  critical: "bg-danger/15 text-danger-fg",
-  high: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  critical: "bg-danger/25 text-danger-fg",
+  high: "bg-danger/10 text-danger-fg",
   medium: "bg-warning/15 text-warning-fg",
-  low: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  low: "bg-foreground/5 text-muted-foreground",
 };
 
 function formatTime(iso: string | null | undefined): string {

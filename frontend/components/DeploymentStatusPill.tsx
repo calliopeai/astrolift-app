@@ -15,11 +15,11 @@ import { cn } from "@/lib/utils";
  * animated pulse on in-flight states, and the same a11y label.
  *
  * Colour tokens deliberately match the ``StatusDot`` rules:
- *   running  → brand teal (success)
+ *   running  → brand green (success)
  *   failed   → red
  *   pending* → amber (operator attention required)
- *   deploying / redeploying → blue + pulse (in-flight)
- *   superseded / rolled_back → zinc (terminal, no-op)
+ *   deploying / redeploying → info green + pulse (in-flight)
+ *   superseded / rolled_back → muted (terminal, no-op)
  */
 
 interface PillStyle {
@@ -54,11 +54,11 @@ const STATUS_STYLES: Record<DeploymentStatus, PillStyle> = {
     label: "Failed",
   },
   rolled_back: {
-    className: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/30",
+    className: "bg-foreground/5 text-muted-foreground border-border",
     label: "Rolled back",
   },
   superseded: {
-    className: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/30 line-through",
+    className: "bg-foreground/5 text-muted-foreground border-border line-through",
     label: "Superseded",
   },
 };
@@ -75,9 +75,13 @@ export function DeploymentStatusPill({ status, label, className }: DeploymentSta
   return (
     <Badge
       variant="outline"
-      className={cn("font-medium", style.className, className)}
+      className={cn("font-mono font-semibold", style.className, className)}
       aria-label={`Status: ${label ?? style.label}`}
     >
+      <span
+        aria-hidden
+        className="size-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]"
+      />
       {label ?? style.label}
     </Badge>
   );

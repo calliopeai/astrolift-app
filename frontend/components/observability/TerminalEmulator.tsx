@@ -567,7 +567,7 @@ function TerminalToolbarButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="rounded-md border border-slate-700 bg-slate-900/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+      className="border-border bg-card/80 text-muted-foreground hover:bg-accent hover:text-foreground rounded-md border p-1.5 transition-colors"
     >
       {children}
     </button>

@@ -71,7 +71,7 @@ const STATUS_TONE: Record<
   },
   pending_approval: {
     label: "Awaiting approval",
-    className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
+    className: "bg-info/10 text-info-fg border-info-border",
     icon: ClockIcon,
   },
   redeploying: {

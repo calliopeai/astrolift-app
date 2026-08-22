@@ -47,7 +47,7 @@ const STATUS_TONE: Record<DeploymentStatus, string> = {
   pending:
     "border-warning-border bg-warning/10 text-warning-fg",
   pending_approval:
-    "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700/50 dark:bg-purple-950/30 dark:text-purple-300",
+    "bg-info/10 text-info-fg border-info-border",
   redeploying:
     "border-warning-border bg-warning/10 text-warning-fg",
 };

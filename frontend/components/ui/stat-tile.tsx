@@ -77,7 +77,7 @@ export function StatTile({
           <Skeleton className="h-8 w-16" />
         ) : (
           <div className="flex items-end justify-between gap-3">
-            <p className="text-2xl font-bold tabular-nums">{displayValue}</p>
+            <p className="font-mono text-2xl font-bold tabular-nums">{displayValue}</p>
             {sparkline && <div className="min-w-0 shrink">{sparkline}</div>}
           </div>
         )}

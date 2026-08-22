@@ -59,7 +59,7 @@ const ROLE_REFETCH = ["ListRolesPage", { query: LIST_ROLES }];
 
 const SCOPE_TONE: Record<string, string> = {
   ORG: "bg-info/15 text-info-fg",
-  TEAM: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  TEAM: "bg-chart-3/15 text-chart-3",
   PROJECT: "bg-success/15 text-success-fg",
   APP: "bg-warning/15 text-warning-fg",
 };

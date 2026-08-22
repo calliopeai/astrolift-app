@@ -56,9 +56,9 @@ export function PendingDeployments({ appSlug }: Props) {
   if (pending.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
+    <section className="flex flex-col gap-3 rounded-lg border border-info-border bg-info/5 p-4">
       <div className="flex items-center gap-2">
-        <ShieldCheckIcon className="size-4 text-purple-600 dark:text-purple-400" />
+        <ShieldCheckIcon className="size-4 text-info-fg" />
         <h2 className="text-sm font-semibold">Pending approval</h2>
         <span className="text-muted-foreground text-xs">({pending.length})</span>
         {canApprove ? (

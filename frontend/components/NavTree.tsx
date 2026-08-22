@@ -58,7 +58,7 @@ const OPEN_KEY = "astrolift.nav.tree.open.v1";
 const STATUS_DOT_CLASS: Record<AstroliftAppStatus, string> = {
   ready: "bg-success",
   provisioning: "bg-warning",
-  pending: "bg-slate-400",
+  pending: "bg-muted-foreground",
   failed: "bg-danger",
 };
 
@@ -74,7 +74,7 @@ function statusIcon(status: AstroliftAppStatus) {
       aria-hidden
       className={cn(
         "inline-block size-1.5 shrink-0 rounded-full",
-        STATUS_DOT_CLASS[status] ?? "bg-slate-400"
+        STATUS_DOT_CLASS[status] ?? "bg-muted-foreground"
       )}
     />
   );
@@ -732,7 +732,7 @@ function WorkflowNode({
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
-                  workflow.isEnabled ? "bg-success" : "bg-slate-400"
+                  workflow.isEnabled ? "bg-success" : "bg-muted-foreground"
                 )}
               />
               <span className="truncate">{workflow.name}</span>

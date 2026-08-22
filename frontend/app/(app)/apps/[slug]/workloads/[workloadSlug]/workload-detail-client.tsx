@@ -99,8 +99,8 @@ const STATUS_VARIANT: Record<string, string> = {
   Succeeded: "bg-success/10 text-success-fg",
   Pending: "bg-warning/10 text-warning-fg",
   ContainerCreating: "bg-warning/10 text-warning-fg",
-  Terminating: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
-  Unknown: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  Terminating: "bg-foreground/5 text-muted-foreground",
+  Unknown: "bg-foreground/5 text-muted-foreground",
   CrashLoopBackOff: "bg-danger/10 text-danger-fg",
   ImagePullBackOff: "bg-danger/10 text-danger-fg",
   ErrImagePull: "bg-danger/10 text-danger-fg",
@@ -1205,7 +1205,7 @@ const VOLUME_KIND_LABEL: Record<string, string> = {
 
 const VOLUME_KIND_VARIANT: Record<string, string> = {
   pvc: "bg-info/10 text-info-fg",
-  empty_dir: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  empty_dir: "bg-foreground/5 text-muted-foreground",
   config_map: "bg-warning/10 text-warning-fg",
   secret: "bg-danger/10 text-danger-fg",
 };

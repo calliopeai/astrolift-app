@@ -27,7 +27,7 @@ const TILE_TONE: Record<DeploymentStatus, string> = {
   superseded: "bg-muted-foreground/30 hover:bg-muted-foreground/50 border-muted-foreground/20",
   deploying: "bg-warning/85 hover:bg-warning border-warning-border animate-pulse",
   pending: "bg-warning/70 hover:bg-warning border-warning-border animate-pulse",
-  pending_approval: "bg-purple-500/85 hover:bg-purple-500 border-purple-500/50 animate-pulse",
+  pending_approval: "bg-info/85 hover:bg-info border-info-border animate-pulse",
   redeploying: "bg-warning/85 hover:bg-warning border-warning-border animate-pulse",
 };
 

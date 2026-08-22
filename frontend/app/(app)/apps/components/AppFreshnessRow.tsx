@@ -41,7 +41,7 @@ const PULSE_BG: Record<AppHealthPulseStatus, string> = {
   OK: "bg-[var(--brand-primary)]",
   DEGRADED: "bg-danger animate-pulse",
   STALE: "bg-warning",
-  NEVER: "bg-zinc-400",
+  NEVER: "bg-muted-foreground",
 };
 
 export function AppFreshnessRow({ pulse, latestDeployment, lastDeployedAt }: Props) {
