@@ -162,6 +162,10 @@ export const UPDATE_ORGANIZATION = gql`
         website
         scimEnabled
         auditLogRetentionDays
+        appearanceDefault
+        appearanceLocked
+      appearanceDefault
+      appearanceLocked
         previewMaxActiveDefault
         logRetentionDaysDefault
         allowUserProfileEdit
