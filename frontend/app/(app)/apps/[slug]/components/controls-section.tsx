@@ -230,17 +230,27 @@ function EnvironmentRow({
 
   async function handleDeploy() {
     const tag = imageTag.trim() || lastTag || "latest";
-    const { data } = await deploy({
-      variables: {
-        input: {
-          appSlug,
-          environmentName: env.name,
-          imageTag: tag,
-          triggerKind: "manual",
-          branch: deployBranch || null,
+    // A thrown mutation (network failure, GraphQL-level error outside the
+    // envelope) previously escaped as an unhandled rejection — the click
+    // produced no toast, no row, nothing. Silent failure is the one
+    // outcome a deploy button must never have.
+    let data: StartResp | null | undefined;
+    try {
+      ({ data } = await deploy({
+        variables: {
+          input: {
+            appSlug,
+            environmentName: env.name,
+            imageTag: tag,
+            triggerKind: "manual",
+            branch: deployBranch || null,
+          },
         },
-      },
-    });
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastDeployFailed"));
+      return;
+    }
     if (data?.startDeployment.ok) {
       toast.success(t("toastDeployStarted", { env: env.name, tag }));
       setImageTag("");
@@ -250,14 +260,21 @@ function EnvironmentRow({
   }
 
   async function handleRebuildAndDeploy() {
-    const { data } = await rebuildAndDeploy({
-      variables: {
-        input: {
-          appSlug,
-          branch: deployBranch || null,
+    // Same silent-failure guard as handleDeploy.
+    let data: TriggerDeployResp | null | undefined;
+    try {
+      ({ data } = await rebuildAndDeploy({
+        variables: {
+          input: {
+            appSlug,
+            branch: deployBranch || null,
+          },
         },
-      },
-    });
+      }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastRebuildFailed"));
+      return;
+    }
     const payload = data?.triggerAstroliftDeployWorkflow;
     if (payload?.ok && payload.data?.runUrl) {
       const runUrl = payload.data.runUrl;
