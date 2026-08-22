@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Mapping
 from enum import StrEnum
+from typing import Any
 
 
 class Isolation(StrEnum):
@@ -79,6 +80,26 @@ def parse_mode(value: str | None) -> Isolation | None:
         return Isolation(value)
     except ValueError as exc:
         raise IsolationError(f"isolation {value!r} not one of {[m.value for m in Isolation]}") from exc
+
+
+def parse_policy(raw: Mapping[str, Any] | None) -> dict[str, Isolation]:
+    """Parse an org's stored ``kind -> mode`` compliance floor into the
+    shape :func:`resolve` takes.
+
+    The stored form is JSON (plain strings), so it has to be re-parsed on
+    the way out; a value that no longer names a mode is an error rather
+    than a silent drop, because dropping it would quietly downgrade a
+    regulated kind back to whatever the manifest asked for.
+    """
+    if not raw:
+        return {}
+    out: dict[str, Isolation] = {}
+    for kind, value in raw.items():
+        mode = parse_mode(value if isinstance(value, str) else None)
+        if mode is None:
+            raise IsolationError(f"isolation policy for kind {kind!r} must name a mode, got {value!r}")
+        out[str(kind)] = mode
+    return out
 
 
 def resolve(
