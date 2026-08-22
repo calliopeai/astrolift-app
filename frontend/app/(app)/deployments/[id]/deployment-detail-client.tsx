@@ -26,6 +26,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
+import { StaleManifestNotice } from "@/components/StaleManifestNotice";
 import { StatusDot } from "@/components/StatusDot";
 import { Can } from "@/components/Can";
 import { Badge } from "@/components/ui/badge";
@@ -671,6 +672,14 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         </div>
       }
     >
+      {/* #1553: say so when this rollout rendered the stored manifest
+        * instead of the repo's. Above the status card because it changes
+        * what a green deploy means. */}
+      <StaleManifestNotice
+        status={d.manifestResyncStatus}
+        error={d.manifestResyncError}
+        appSlug={d.registeredAppSlug}
+      />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">

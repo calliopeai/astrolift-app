@@ -471,6 +471,16 @@ class RegisteredAppType:
     # time; surfaces on the Settings page as relative time.
     last_resync_at: dt.datetime | None
 
+    manifest_bootstrap_status: str
+    """Outcome of the manifest bootstrap at registration (#1553). ``applied``
+    means workloads were materialised; ``parse_failed`` / ``fetch_failed`` /
+    ``diverged`` mean the app registered without them and needs attention;
+    ``no_source`` means there was nothing to bootstrap from. Empty on apps
+    registered before the field landed."""
+
+    manifest_bootstrap_error: str
+    """Why the bootstrap did not apply. Empty when it succeeded."""
+
     # Source-host webhook state (#385). ``installed_at`` is null
     # until the operator clicks "Install webhook" on the Settings
     # page; FE renders it as a green "installed · 5m ago" chip vs
@@ -969,6 +979,8 @@ def app_to_type(
         deleted_at=app.deleted_at,
         version=int(app.version or 0),
         last_resync_at=app.last_resync_at,
+        manifest_bootstrap_status=app.manifest_bootstrap_status,
+        manifest_bootstrap_error=app.manifest_bootstrap_error,
         source_webhook_installed_at=app.source_webhook_installed_at,
         security_policy=_security_policy_to_type(app),
         latest_deployment=(freshness.latest_deployment if freshness else None),

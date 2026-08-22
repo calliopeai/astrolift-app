@@ -1673,6 +1673,8 @@ type AstroliftDeployment {
   requiredApproverCount: Int!
   approvedBy: [AstroliftDeploymentApprover!]!
   awaitingApprovers: [AstroliftDeploymentApprover!]!
+  manifestResyncStatus: String!
+  manifestResyncError: String!
   startedAt: DateTime
   succeededAt: DateTime
   failedAt: DateTime
@@ -3099,6 +3101,8 @@ type AstroliftRegisteredApp {
   deletedAt: DateTime
   version: Int!
   lastResyncAt: DateTime
+  manifestBootstrapStatus: String!
+  manifestBootstrapError: String!
   sourceWebhookInstalledAt: DateTime
   securityPolicy: AstroliftSecurityPolicy!
   latestDeployment: AstroliftAppDeploymentSummary

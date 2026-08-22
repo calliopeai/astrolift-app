@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ApplicationError
 
 from astrolift_workflows.inputs import DeployAppInput, WorkflowResult
 
@@ -117,12 +117,26 @@ class DeployAppWorkflow:
             # last-known-good registration. Patched for replay compatibility
             # with in-flight pre-#1535 runs.
             if workflow.patched("deploy-manifest-resync"):
-                await workflow.execute_activity(
+                resync = await workflow.execute_activity(
                     resync_manifest_for_deploy,
                     deployment_id,
                     start_to_close_timeout=_MARK_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
+                # #1553: a refused resync (``diverged`` / ``fetch_failed``)
+                # renders the stored manifest. That is the right call when
+                # there is something to deploy, but with zero workloads it
+                # produces a green deploy that ships nothing — and the
+                # operator's push appears to have been silently ignored.
+                # Fail here instead, naming the reason, so the deploy says
+                # what the log used to only whisper.
+                if resync.get("status") in ("diverged", "fetch_failed") and not resync.get("workload_count"):
+                    raise ApplicationError(
+                        "manifest resync "
+                        f"{resync.get('status')} and this app has no workloads to deploy: "
+                        f"{resync.get('error') or 'no detail'}",
+                        non_retryable=True,
+                    )
             await workflow.execute_activity(
                 pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )

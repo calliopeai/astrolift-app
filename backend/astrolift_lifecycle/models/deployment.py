@@ -185,6 +185,18 @@ class Deployment(BaseCoreModel):
     # best-effort and never required for a deploy to succeed.
     github_deployment_id = models.BigIntegerField(null=True, blank=True, default=None)
 
+    # Outcome of the deploy-time manifest resync (#1553). #1535 made every
+    # deploy re-fetch astrolift.toml first, but the resync is best-effort:
+    # ``diverged`` (an unpushed staged draft would be clobbered) and
+    # ``fetch_failed`` both leave the deploy rendering the *stored*
+    # manifest. That was only ever a worker log line, so an operator whose
+    # push never took effect had no way to see why — and since workloads
+    # are only reconciled on ``applied``, the visible result was an app
+    # that deploys green with zero workloads. Persisted here so the API and
+    # the UI can say which manifest a deploy actually used.
+    manifest_resync_status = models.CharField(max_length=32, blank=True, default="")
+    manifest_resync_error = models.TextField(blank=True, default="")
+
     started_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)
