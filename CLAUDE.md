@@ -32,6 +32,13 @@ sees them:
 ## Pre-commit checklist
 
 - `cd backend && ruff format --check . && ruff check . && mypy core config`
+- `cd backend/providers && ruff format --check . && ruff check .` — a separate
+  run on purpose. `providers/` is its own package and pins `ruff>=0.15` while the
+  backend pins `>=0.6`, so the line above does not cover it and the ambient ruff
+  cannot even parse `providers/pyproject.toml` (`Unknown rule selector: TC`).
+  CI lints it in the `test (providers)` job; skipping it locally means finding
+  out there. Install the pinned version with
+  `pip install --target <dir> "ruff>=0.15,<0.16"` and run that binary.
 - `docker compose -f docker/docker-compose.yaml exec ui npm run lint`
 - `docker compose -f docker/docker-compose.yaml exec ui npx tsc --noEmit`
 - `./run.sh test` (or `make test`)
