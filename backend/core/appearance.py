@@ -51,9 +51,7 @@ def validate_appearance(raw: Any) -> dict[str, Any]:
     for key, value in raw.items():
         allowed = _ALLOWED.get(key)
         if allowed is None:
-            raise AppearanceError(
-                f"unknown appearance key {key!r}; allowed: {', '.join(sorted(_ALLOWED))}"
-            )
+            raise AppearanceError(f"unknown appearance key {key!r}; allowed: {', '.join(sorted(_ALLOWED))}")
         # bool is an int subclass, and True would otherwise sneak past the
         # corners check as 1 — reject it explicitly.
         if key == "corners" and isinstance(value, bool):

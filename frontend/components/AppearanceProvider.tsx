@@ -5,7 +5,7 @@ import * as React from "react";
 import {
   type Appearance,
   type OrgAppearancePolicy,
-  DEFAULT_APPEARANCE,
+  clearAppearance,
   applyAppearance,
   readAppearance,
   resolveAppearance,
@@ -37,10 +37,11 @@ export function AppearanceProvider({
   /** Initial org policy, when a caller already has it. */
   policy?: OrgAppearancePolicy | null;
 }) {
-  // Start from the shipped default so server and first client render agree;
-  // the real preference is read in an effect. The inline script in the root
-  // layout has already stamped <html>, so the user never sees the default.
-  const [personal, setPersonal] = React.useState<Appearance>(DEFAULT_APPEARANCE);
+  // null until read, and null again when this person has never chosen — the
+  // org default only applies to people with no preference of their own, so
+  // "unset" has to be representable. The inline script in the root layout has
+  // already stamped <html>, so nobody sees the pre-hydration state.
+  const [personal, setPersonal] = React.useState<Partial<Appearance> | null>(null);
   const [hydrated, setHydrated] = React.useState(false);
   const [orgPolicy, setOrgPolicy] = React.useState<OrgAppearancePolicy | null>(policy);
 
@@ -62,7 +63,7 @@ export function AppearanceProvider({
     (patch: Partial<Appearance>) => {
       if (locked) return;
       setPersonal((prev) => {
-        const next = { ...prev, ...patch };
+        const next = { ...(prev ?? {}), ...patch };
         writeAppearance(next);
         return next;
       });
@@ -70,10 +71,12 @@ export function AppearanceProvider({
     [locked],
   );
 
+  // Reset means "I have no preference", not "my preference is the shipped
+  // default" — so it clears storage and hands the decision back to the org.
   const reset = React.useCallback(() => {
     if (locked) return;
-    setPersonal(DEFAULT_APPEARANCE);
-    writeAppearance(DEFAULT_APPEARANCE);
+    setPersonal(null);
+    clearAppearance();
   }, [locked]);
 
   const setPolicy = React.useCallback((next: OrgAppearancePolicy | null) => {

@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { useAppearance } from "@/components/AppearanceProvider";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import { normalize, type Appearance } from "@/lib/appearance";
+import { normalizePartial, type Appearance } from "@/lib/appearance";
 
 /**
  * Feeds the org's house theme into the appearance provider (#135).
@@ -32,13 +32,14 @@ export function AppearancePolicyBridge() {
   React.useEffect(() => {
     if (!org) return;
     const parsed = key ? (JSON.parse(key) as unknown) : null;
-    // Trust nothing: an org default written before an axis was renamed would
-    // otherwise pin every user to a value the client no longer understands.
-    // `normalize` maps anything unknown back onto the shipped default.
+    // Trust nothing, and keep a partial partial: an org that pins only the
+    // accent must not thereby pin ground, density and corners too.
+    // `normalizePartial` drops unknown keys and values without filling the
+    // rest, so an axis renamed since the policy was written degrades to
+    // "not set" instead of to the shipped default.
+    const filtered = normalizePartial(parsed);
     const orgDefault: Partial<Appearance> | null =
-      parsed && typeof parsed === "object" && Object.keys(parsed).length > 0
-        ? normalize(parsed)
-        : null;
+      Object.keys(filtered).length > 0 ? filtered : null;
     setPolicy({ orgDefault, locked });
   }, [org, key, locked, setPolicy]);
 

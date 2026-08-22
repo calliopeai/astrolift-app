@@ -31,9 +31,9 @@ from astrolift_identity.schema.types import (
     OrganizationType,
     organization_to_type,
 )
+from core.appearance import AppearanceError, validate_appearance
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
-from core.appearance import AppearanceError, validate_appearance
 from core.resource_tags import ResourceTagError, validate_resource_tags
 from core.tenancy import get_current_tenant
 
