@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useTheme } from "next-themes";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -48,32 +47,10 @@ const TIMEZONES: string[] = (() => {
 })();
 
 export function AppearanceClient() {
-  const { theme, setTheme } = useTheme();
-
+  // Theme moved to Settings → Appearance (the full style page); this
+  // page keeps the profile-scoped cards only.
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Appearance</CardTitle>
-          <CardDescription>
-            Choose how the dashboard looks. Defaults to your system preference.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 max-w-sm">
-          <Label htmlFor="theme">Theme</Label>
-          <Select value={theme ?? "system"} onValueChange={setTheme}>
-            <SelectTrigger id="theme">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Language</CardTitle>

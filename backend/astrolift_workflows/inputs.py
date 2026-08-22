@@ -361,9 +361,9 @@ class SyncDevEnvironmentFilesInput:
 class ProvisionManagedDomainInput:
     """Input for ``ProvisionManagedDomainWorkflow`` (#781).
 
-    Drives the five-step DNS zone provisioning flow: hosted-zone
+    Drives the six-step DNS zone provisioning flow: hosted-zone
     creation, wildcard cert request, cert issuance poll, ManagedDomain
-    row registration, and activation.
+    row registration, the NS-delegation gate, and activation.
 
     ``cluster_id`` is the TenantCluster PK whose provider plugin's
     ``DnsDriver`` is used for all cloud operations. ``zone`` is the

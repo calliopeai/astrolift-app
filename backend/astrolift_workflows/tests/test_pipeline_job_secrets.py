@@ -98,7 +98,7 @@ def _capture(monkeypatch, job_run, *, lines, resolved=None, raises=False):
         return resolved or {}
 
     monkeypatch.setattr("astrolift_pipelines.secret_plumbing.resolve_pipeline_secrets", fake_resolve)
-    monkeypatch.setattr(mod, "_resolve_cluster", lambda run: object())
+    monkeypatch.setattr(mod, "_resolve_cluster", lambda run, job=None: object())
     monkeypatch.setattr(
         "core.cluster_observability.fetch_pod_log_tail",
         _async_returning(lines),

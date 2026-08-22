@@ -24,7 +24,9 @@ from astrolift_workflows.activities.app_lifecycle import (
     create_promotion_deployment,
     create_rollback_deployment,
     delete_preview_namespace,
+    emit_preview_torn_down_event,
     health_check,
+    load_preview_teardown_state,
     mark_app_provisioning,
     mark_app_ready,
     mark_deploying,
@@ -148,6 +150,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
     register_managed_domain_row,
     reissue_cert,
     request_wildcard_cert_for_zone,
+    validate_ns_delegation,
 )
 from astrolift_workflows.activities.run_status_reconcile import reconcile_runs_tick
 from astrolift_workflows.activities.scheduled import (
@@ -220,6 +223,7 @@ __all__ = [
     "delete_preview_namespace",
     "delete_secret_from_cluster",
     "delete_static_dns_records",
+    "emit_preview_torn_down_event",
     "deprovision_app_certificate",
     "deprovision_app_dns_record",
     "deprovision_app_identity_role",
@@ -255,6 +259,7 @@ __all__ = [
     "list_app_managed_service_ids",
     "list_app_secret_targets",
     "list_bundles_due_for_refresh",
+    "load_preview_teardown_state",
     "load_agent_run_outcome",
     "mark_app_deregistered",
     "mark_app_provisioning",
@@ -336,6 +341,7 @@ __all__ = [
     "update_secrets",
     "update_stage_execution",
     "validate_migration_target",
+    "validate_ns_delegation",
     "verify_app_hostnames",
     "verify_reachability",
     "wait_dns",
