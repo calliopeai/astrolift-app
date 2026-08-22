@@ -21,6 +21,7 @@ from django.views.generic import RedirectView
 from astrolift_identity.urls import (
     api_urlpatterns as identity_api_urls,
     app_urlpatterns as identity_app_urls,
+    scim_api_urlpatterns as identity_scim_urls,
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
 from astrolift_agents.urls import urlpatterns as agents_api_urls
@@ -121,6 +122,12 @@ urlpatterns = [
     # against — POST /api/cli/v1/auth/{start,complete,refresh} —
     # work without rewriting the consumer.
     *identity_api_urls,
+    # SCIM 2.0 provisioning surface (#78, #91). Mounted at the project
+    # root because ``/api/scim/v2/`` is the base URL the operator hands
+    # to Okta / Entra; the IdP arrives with an org-scoped ``alft_st_``
+    # bearer and no session, so the ``/app/`` prefix (and its auth1
+    # login gate) would turn every provisioning call into a redirect.
+    *identity_scim_urls,
     # Calliope App Builder REST surface (#767, #768). Mounted at the
     # project root for the same reason as the CLI flow — the App
     # Builder ships against ``/api/builder/v1/dev-environments/...``
