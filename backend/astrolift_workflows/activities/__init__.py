@@ -181,6 +181,7 @@ from astrolift_workflows.activities.static_site import (
     ensure_static_site_services,
     sync_static_assets,
 )
+from astrolift_workflows.activities.supply_chain_gate import evaluate_supply_chain_gate
 from astrolift_workflows.activities.uptime import probe_uptime_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
@@ -249,6 +250,7 @@ __all__ = [
     "ensure_static_site_services",
     "ensure_workload_identity",
     "evaluate_alerts_tick",
+    "evaluate_supply_chain_gate",
     "expire_pending_approval_deployments",
     "fetch_app_build_strategy",
     "finalize_managed_service_deletion",

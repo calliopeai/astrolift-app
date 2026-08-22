@@ -4,8 +4,8 @@ PromoteDeploymentWorkflow — copy a running deployment to a different env.
 Picks up a ``source_deployment_id`` (typically staging) and a
 ``target_app_environment_id`` (typically prod), creates a new
 ``trigger_kind=promotion`` deployment row pointing back at the
-source via ``promoted_from``, and runs the standard apply path
-against it.
+source via ``promoted_from``, then runs the app's supply-chain gate
+(#313) and, if it passes, the standard apply path against it.
 
 If the target env requires approvals, the new row lands in
 ``pending_approval`` and the workflow exits — the operator approves
@@ -28,8 +28,10 @@ with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         apply_manifests,
         create_promotion_deployment,
+        evaluate_supply_chain_gate,
         health_check,
         mark_deploying,
+        mark_failed,
         mark_running,
         poll_rollout,
         pre_flight,
@@ -51,6 +53,28 @@ class PromoteDeploymentWorkflow:
             args=[input.source_deployment_id, input.target_app_environment_id],
             start_to_close_timeout=_TIMEOUT,
         )
+
+        # Supply-chain gate (#313). Runs before anything touches the
+        # cluster — and before the approval hand-off below — so an image
+        # the app's own policy refuses never reaches an operator's
+        # approval queue, let alone the apply path.
+        gate: dict = await workflow.execute_activity(
+            evaluate_supply_chain_gate,
+            new_id,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        if gate.get("decision") == "block":
+            reason = gate.get("reason") or "blocked by the app's supply-chain policy"
+            await workflow.execute_activity(
+                mark_failed,
+                args=[new_id, reason],
+                start_to_close_timeout=_TIMEOUT,
+            )
+            return WorkflowResult(
+                ok=False,
+                message=reason,
+                data={"new_deployment_id": new_id, "supply_chain": gate},
+            )
 
         # Resolve the new row's status. If approvals are required,
         # the row landed pending_approval and we hand off to the
