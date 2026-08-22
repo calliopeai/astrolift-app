@@ -43,6 +43,8 @@ import { CronjobHome } from "./components/homes/cronjob-home";
 import { FunctionHome } from "./components/homes/function-home";
 import { TaskHome } from "./components/homes/task-home";
 import { AutowireStatusBanner } from "./components/autowire-status-banner";
+import { StaleManifestNotice } from "@/components/StaleManifestNotice";
+
 import { ConfigDriftBanner } from "./components/config-drift-banner";
 import { ControlsSection } from "./components/controls-section";
 import { DeployActivityStrip } from "./components/deploy-activity-strip";
@@ -280,6 +282,16 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <ProvisioningProgressPanel app={a} />
 
       <ReprovisionCallout appSlug={a.slug} reprovision={a.reprovision} />
+
+      {/* #1553: an app that registered without workloads says so here,
+        * rather than letting the operator discover it at deploy time. Sits
+        * outside the drift conditional — the two are unrelated. */}
+      <StaleManifestNotice
+        status={a.manifestBootstrapStatus}
+        error={a.manifestBootstrapError}
+        appSlug={a.slug}
+        context="registration"
+      />
 
       {a.configDrift?.hasDrift ? (
         <ConfigDriftBanner appSlug={a.slug} drift={a.configDrift} />

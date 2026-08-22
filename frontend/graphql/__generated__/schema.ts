@@ -3057,6 +3057,8 @@ export type AstroliftRegisteredApp = {
   latestDeployment?: Maybe<AstroliftAppDeploymentSummary>;
   logRetentionDays: Scalars['Int']['output'];
   managedHostname: Scalars['String']['output'];
+  manifestBootstrapError: Scalars['String']['output'];
+  manifestBootstrapStatus: Scalars['String']['output'];
   manifestHash: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
   manifestSyncState: Scalars['String']['output'];

@@ -63,6 +63,8 @@ const APP_FIELDS = gql`
     lastSyncedHash
     manifestSyncState
     lastResyncAt
+    manifestBootstrapStatus
+    manifestBootstrapError
     sourceWebhookInstalledAt
     isArchived
     archivedAt

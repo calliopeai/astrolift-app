@@ -258,6 +258,21 @@ class RegisteredApp(NamedBaseCoreModel):
     # "Last resynced 5 minutes ago" without grepping audit logs.
     last_resync_at = models.DateTimeField(null=True, blank=True)
 
+    # Outcome of the manifest bootstrap at registration (#1553). Registration
+    # is deliberately forgiving — a manifest it cannot parse or fetch must not
+    # cost the operator the whole registration — but "forgiving" had meant
+    # "silent": the app landed with zero workloads and nothing said why, so
+    # the first signal was a deploy that shipped nothing much later. Recorded
+    # here for the same reason ``autowire_state`` is recorded: the app detail
+    # page can then say which step still needs attention.
+    #
+    # ``applied`` the manifest parsed and its workloads were materialised;
+    # ``parse_failed`` an inline manifest was unusable; ``fetch_failed`` /
+    # ``diverged`` came back from the repo fetch; ``no_source`` there was
+    # nothing to bootstrap from. Empty means the app predates the field.
+    manifest_bootstrap_status = models.CharField(max_length=32, blank=True, default="")
+    manifest_bootstrap_error = models.TextField(blank=True, default="")
+
     # Source-host webhook state (#385). Populated by
     # ``installAstroliftSourceWebhook`` so the Settings page can show
     # whether the push-event hook is wired up. ``source_webhook_id``

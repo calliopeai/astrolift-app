@@ -254,6 +254,15 @@ class RegistrationMutations:
         # registerAgentRepo flow already uses, so direct-upload apps reach
         # parity. Best-effort + idempotent: a malformed manifest does not fail
         # registration (the raw is stored and validated again at deploy time).
+        # #1553: record the outcome, and cover the case where there is no
+        # inline manifest at all. Previously this whole block was skipped when
+        # ``manifest_raw`` was empty, so an app registered straight from a repo
+        # got no manifest fetch, no workloads, and no signal — the operator
+        # then spent the next hour convinced the platform was caching a
+        # manifest it had in fact never read. Still best-effort: registration
+        # must survive a bad manifest. The difference is that it now says so.
+        _bootstrap_status = "no_source"
+        _bootstrap_error = ""
         if (input.manifest_raw or "").strip():
             try:
                 from astrolift_manifest.normalize import (
@@ -268,11 +277,45 @@ class RegistrationMutations:
                     defaults=NormalizationDefaults(),
                 )
                 persist_manifest(app, _manifest, raw_text=input.manifest_raw)
-            except Exception:
+                _bootstrap_status = "applied"
+            except Exception as exc:  # noqa: BLE001 — registration must survive
+                _bootstrap_status = "parse_failed"
+                _bootstrap_error = str(exc) or exc.__class__.__name__
                 logging.getLogger(__name__).exception(
                     "register_app: manifest workload persist failed for %s",
                     app.slug,
                 )
+        elif app.source_repo:
+            # Fetch it from the repo instead of leaving the app manifest-less.
+            # ``resync_app_manifest_from_repo`` is the one blessed path: it
+            # fetches, parses, and materialises workloads via persist_manifest,
+            # and never raises.
+            try:
+                from astrolift_registry.services.manifest_sync import (
+                    resync_app_manifest_from_repo,
+                )
+
+                _resync = resync_app_manifest_from_repo(app)
+                _bootstrap_status = _resync.status
+                _bootstrap_error = _resync.error or ""
+            except Exception as exc:  # noqa: BLE001 — registration must survive
+                _bootstrap_status = "fetch_failed"
+                _bootstrap_error = str(exc) or exc.__class__.__name__
+                logging.getLogger(__name__).exception(
+                    "register_app: manifest bootstrap fetch failed for %s",
+                    app.slug,
+                )
+
+        app.manifest_bootstrap_status = _bootstrap_status
+        app.manifest_bootstrap_error = _bootstrap_error
+        app.save(
+            update_fields=[
+                "manifest_bootstrap_status",
+                "manifest_bootstrap_error",
+                "updated_at",
+                "version",
+            ]
+        )
 
         _bootstrap_app_environments(app, [])
 
