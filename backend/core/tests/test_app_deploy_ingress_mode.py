@@ -47,6 +47,9 @@ def _render(*, ingress_class: str, ingress_mode: str | None):
             slug="hello-web",
             organization=SimpleNamespace(slug="acme"),
             organization_id=1,
+            # No per-app subdomain override — these cases are about ALB
+            # grouping, so the hostname should come from the slug.
+            subdomain="",
         ),
         app_environment=SimpleNamespace(ingress_paused=False),
     )

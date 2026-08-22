@@ -3,10 +3,8 @@
 import {
   BarChart3Icon,
   BuildingIcon,
-  CreditCardIcon,
   FileBoxIcon,
   FlagIcon,
-  GaugeIcon,
   KeyIcon,
   ScaleIcon,
   ScrollTextIcon,
@@ -19,9 +17,7 @@ import { usePathname } from "next/navigation";
 import * as React from "react";
 
 import {
-  FEATURE_FLAG_ADMIN_COST,
   FEATURE_FLAG_ADMIN_PERMISSIONS,
-  FEATURE_FLAG_ADMIN_QUOTAS,
   useFeatureFlag,
 } from "@/graphql/server/server.hooks";
 import { cn } from "@/lib/utils";
@@ -32,12 +28,6 @@ interface SubnavLink {
   icon: React.ReactNode;
 }
 
-// Cost ships behind the `admin.cost_enabled` runtime flag (#1205), and Quotas
-// behind `admin.quotas_enabled` (#1204). Both live in GROUPS but are filtered
-// out below unless the install has enabled the flag, so the hrefs are named
-// here for those gates.
-const COST_HREF = "/administration/cost";
-const QUOTAS_HREF = "/administration/quotas";
 // Permissions ships behind the `admin.permissions_enabled` runtime flag
 // (#1206) — the actionable Roles / Assignments / Diagnostics screen. Lives
 // in the Organization group but filtered out below unless the install
@@ -64,11 +54,6 @@ const GROUPS: SubnavLink[][] = [
   ],
   // Usage & Governance — spend, limits, usage, and the audit trail.
   [
-    // Cost and Quotas are both implemented but gated behind runtime flags
-    // (`admin.cost_enabled` #1205 / `admin.quotas_enabled` #1204) — filtered
-    // out below unless the install turns them on in /administration/features.
-    { href: COST_HREF, label: "Cost", icon: <CreditCardIcon className="size-4" /> },
-    { href: QUOTAS_HREF, label: "Quotas", icon: <GaugeIcon className="size-4" /> },
     { href: "/administration/metrics", label: "Metrics", icon: <BarChart3Icon className="size-4" /> },
     { href: "/tokens", label: "API Keys", icon: <KeyIcon className="size-4" /> },
     { href: "/administration/audit", label: "Audit", icon: <ScrollTextIcon className="size-4" /> },
@@ -79,25 +64,17 @@ const GROUPS: SubnavLink[][] = [
 export function AdministrationSubnav() {
   const pathname = usePathname();
 
-  // Cost and Quotas each stay hidden until the install enables their runtime
-  // flag (`admin.cost_enabled` #1205 / `admin.quotas_enabled` #1204),
-  // mirroring the zentinelle.enabled surface gate. Until the server-info
-  // handshake resolves each flag reads false, so the entry never flickers in
-  // before the answer arrives.
-  const costEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_COST);
-  const quotasEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_QUOTAS);
+  // Permissions stays hidden until the install enables
+  // `admin.permissions_enabled` (#1206), mirroring the zentinelle.enabled
+  // surface gate. Until the server-info handshake resolves the flag reads
+  // false, so the entry never flickers in before the answer arrives.
   const permissionsEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_PERMISSIONS);
   const groups = React.useMemo(
     () =>
       GROUPS.map((group) =>
-        group.filter(
-          (link) =>
-            (link.href !== COST_HREF || costEnabled) &&
-            (link.href !== QUOTAS_HREF || quotasEnabled) &&
-            (link.href !== PERMISSIONS_HREF || permissionsEnabled),
-        ),
+        group.filter((link) => link.href !== PERMISSIONS_HREF || permissionsEnabled),
       ),
-    [costEnabled, quotasEnabled, permissionsEnabled],
+    [permissionsEnabled],
   );
 
   return (
