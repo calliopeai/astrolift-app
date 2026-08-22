@@ -17,7 +17,10 @@ import pytest
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_operations.alert_rules import DEFAULT_RULES
-from astrolift_operations.alert_seed import seed_default_alert_rules
+from astrolift_operations.alert_seed import (
+    seed_default_alert_rules,
+    seed_security_alert_rules,
+)
 from astrolift_operations.models import AlertRule
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations import RegisterAppInput, RegistryMutation
@@ -162,3 +165,31 @@ def test_two_apps_same_org_do_not_collide(permission_resolver):
     assert AlertRule.objects.filter(organization=org).count() == 2 * len(DEFAULT_RULES)
     assert AlertRule.objects.filter(target_id="app-a").count() == len(DEFAULT_RULES)
     assert AlertRule.objects.filter(target_id="app-b").count() == len(DEFAULT_RULES)
+
+
+# ---- org-wide security burst rules (#151) ---------------------------
+
+
+def test_security_seed_creates_the_two_burst_rules():
+    org = Organization.objects.create(name="Sec", slug="sec-burst-seed")
+
+    created = seed_security_alert_rules(org)
+
+    rules = list(AlertRule.objects.filter(organization=org))
+    assert created == 2
+    assert {r.predicate["kind"] for r in rules} == {
+        "failed_login_burst",
+        "permission_denied_burst",
+    }
+    # Global target: the burst is a whole-tenant signal, so a per-app
+    # target_id would be a lie the alert page would then display.
+    assert {r.target for r in rules} == {AlertRule.Target.GLOBAL.value}
+    assert all(r.is_active for r in rules)
+
+
+def test_security_seed_is_idempotent():
+    org = Organization.objects.create(name="Sec", slug="sec-burst-seed-idem")
+
+    assert seed_security_alert_rules(org) == 2
+    assert seed_security_alert_rules(org) == 0
+    assert AlertRule.objects.filter(organization=org).count() == 2

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from strawberry.types import Info
 
@@ -58,6 +60,22 @@ class OrganizationMutations:
             slug=input.slug,
             website=input.website or "",
         )
+        # Seed the org-wide security burst rules (#151) so a new tenant
+        # detects a credential-stuffing run out of the box instead of only
+        # recording the failures in the audit log. There is no
+        # ``org.created`` platform Event to subscribe to, so this is the
+        # hook, mirroring the per-app seeding at app registration:
+        # idempotent, and best-effort because an alert-config failure must
+        # never fail the org create.
+        try:
+            from astrolift_operations.alert_seed import seed_security_alert_rules
+
+            seed_security_alert_rules(org)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "create_organization: security alert-rule seeding failed for %s",
+                org.slug,
+            )
         return gql_success(organization_to_type(org))
 
     @strawberry.field
