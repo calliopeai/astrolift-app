@@ -12,6 +12,9 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from _sdk.cloud_credentials import CredentialedConfig
+from aws.session import aws_client
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -66,7 +69,7 @@ _DESTINATION_DESCRIPTIONS = {
 
 
 @dataclass(frozen=True)
-class FirehoseConfig:
+class FirehoseConfig(CredentialedConfig):
     region: str
     account_id: str
     delivery_stream_name_prefix: str = "astrolift"
@@ -87,9 +90,7 @@ class FirehoseDriver(ManagedServiceDriver):
         self._config = config
         self._sleep = sleep
         if client is None:
-            import boto3
-
-            client = boto3.client("firehose", region_name=config.region)
+            client = aws_client("firehose", region=config.region, credential=config.credential)
         self._firehose = client
 
     @driver_op(

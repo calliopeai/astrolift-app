@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import quote
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -27,6 +28,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "observability"
 _BUNDLE_TAG = "astrolift.io/observability-bundle"
@@ -76,7 +78,7 @@ _REQUIRED_NAMED_REQUESTS = {
 
 
 @dataclass(frozen=True)
-class CloudWatchConfig:
+class CloudWatchConfig(CredentialedConfig):
     region: str
     account_id: str = ""
     log_group_prefix: str = "/astrolift"
@@ -98,13 +100,9 @@ class CloudWatchDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if logs_client is None:
-            import boto3
-
-            logs_client = boto3.client("logs", region_name=config.region)
+            logs_client = aws_client("logs", region=config.region, credential=config.credential)
         if cloudwatch_client is None:
-            import boto3
-
-            cloudwatch_client = boto3.client("cloudwatch", region_name=config.region)
+            cloudwatch_client = aws_client("cloudwatch", region=config.region, credential=config.credential)
         self._logs = logs_client
         self._cw = cloudwatch_client
 

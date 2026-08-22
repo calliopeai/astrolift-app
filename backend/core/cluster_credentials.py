@@ -74,7 +74,57 @@ CREDENTIAL_REFUSALS: tuple[type[Exception], ...] = (
 #: to the cloud client. Everything absent from this set still authenticates
 #: ambiently and therefore refuses to run against a cluster that declares a
 #: credential. Grow it one migrated driver at a time.
-CREDENTIAL_AWARE_CAPABILITIES: frozenset[str] = frozenset({"log_query"})
+#:
+#: ``managed:*`` (PR 3 of #1422) covers every AWS managed-service kind: each
+#: driver config now carries the credential, every ``boto3.client`` in
+#: ``aws/managed/`` goes through ``aws_client``, and the VPC discovery in
+#: ``_networking`` takes it too — that last one matters, because leaving it
+#: ambient would put a subnet group in the control plane's account while the
+#: database it is for went to the cluster's.
+#:
+#: Still absent, and therefore still refusing: the capability drivers
+#: (``secrets``, ``dns``, ``registry``, ``tls``, ``identity`` — PR 4) and the
+#: EKS cluster driver with its presigned token minter (PR 5).
+_MANAGED_KINDS: frozenset[str] = frozenset(
+    {
+        "api_gateway",
+        "cache",
+        "cdn",
+        "database_proxy",
+        "document_db",
+        "email",
+        "encryption_key",
+        "event_bus",
+        "event_stream",
+        "faas",
+        "filesystem",
+        "graph_db",
+        "kv_store",
+        "model_endpoint",
+        "mq",
+        "mssql",
+        "mysql",
+        "object_store",
+        "observability",
+        "postgres",
+        "private_endpoint",
+        "queue",
+        "redis",
+        "search",
+        "sms",
+        "stream",
+        "time_series",
+        "topic",
+        "vector_index",
+        "warehouse",
+        "wide_column",
+        "workflow_engine",
+    }
+)
+
+CREDENTIAL_AWARE_CAPABILITIES: frozenset[str] = frozenset(
+    {"log_query", *(f"managed:{kind}" for kind in _MANAGED_KINDS)}
+)
 
 
 def credential_for_cluster(cluster: TenantCluster) -> CloudCredential:

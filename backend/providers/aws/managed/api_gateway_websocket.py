@@ -25,6 +25,7 @@ from _sdk.managed_service import (
 )
 from aws._naming import iam_role_name
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 if TYPE_CHECKING:
     from aws.managed.api_gateway_http import ApiGatewayHttpConfig
@@ -48,13 +49,9 @@ class ApiGatewayWebSocketDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("apigatewayv2", region_name=config.region)
+            client = aws_client("apigatewayv2", region=config.region, credential=config.credential)
         if lambda_client is None:
-            import boto3
-
-            lambda_client = boto3.client("lambda", region_name=config.region)
+            lambda_client = aws_client("lambda", region=config.region, credential=config.credential)
         self._api = client
         self._lambda = lambda_client
 

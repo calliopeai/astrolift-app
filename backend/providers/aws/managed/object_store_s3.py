@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -39,12 +40,13 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "object_store"
 
 
 @dataclass(frozen=True)
-class S3Config:
+class S3Config(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -73,9 +75,7 @@ class S3Driver(ManagedServiceDriver):
         if client is not None:
             self._s3 = client
         else:
-            import boto3
-
-            self._s3 = boto3.client("s3", region_name=config.region)
+            self._s3 = aws_client("s3", region=config.region, credential=config.credential)
 
     # ---- lifecycle ------------------------------------------------
 

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -25,6 +26,7 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
 from aws.managed.redshift import _data_api_grants
+from aws.session import aws_client
 
 KIND = "warehouse"
 _SIZE_TO_RPU = {"small": 8, "medium": 32, "large": 128, "xlarge": 256}
@@ -37,7 +39,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class RedshiftServerlessConfig:
+class RedshiftServerlessConfig(CredentialedConfig):
     region: str
     account_id: str
     subnet_ids: list[str] = field(default_factory=list)
@@ -59,9 +61,7 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if serverless_client is None:
-            import boto3
-
-            serverless_client = boto3.client("redshift-serverless", region_name=config.region)
+            serverless_client = aws_client("redshift-serverless", region=config.region, credential=config.credential)
         self._serverless = serverless_client
 
     @driver_op(

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 _COLLECTION_TYPES = {"SEARCH", "VECTORSEARCH"}
 _STATE = {
@@ -36,7 +38,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class OpenSearchServerlessConfig:
+class OpenSearchServerlessConfig(CredentialedConfig):
     region: str
     account_id: str
     collection_type: str = "SEARCH"
@@ -59,11 +61,10 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if opensearch_serverless_client is None:
-            import boto3
-
-            opensearch_serverless_client = boto3.client(
+            opensearch_serverless_client = aws_client(
                 "opensearchserverless",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         self._aoss = opensearch_serverless_client
 

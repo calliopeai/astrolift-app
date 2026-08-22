@@ -51,6 +51,7 @@ from _sdk import (
 )
 from _sdk._dns_probe import DnsResolveError, lookup_txt
 from aws.managed._base import ManagedServiceError
+from aws.session import aws_client
 
 if TYPE_CHECKING:
     from aws.managed.email_ses import SESEmailConfig
@@ -114,15 +115,11 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
         if ses_client is not None:
             self._ses = ses_client
         else:
-            import boto3
-
-            self._ses = boto3.client("ses", region_name=config.region)
+            self._ses = aws_client("ses", region=config.region, credential=config.credential)
         if sesv2_client is not None:
             self._sesv2 = sesv2_client
         else:
-            import boto3
-
-            self._sesv2 = boto3.client("sesv2", region_name=config.region)
+            self._sesv2 = aws_client("sesv2", region=config.region, credential=config.credential)
         # CloudWatch client is lazy — only required by the per-template
         # send-statistics path (#628). Tests inject a fake; production
         # paths share boto3's client cache by re-creating it when None.
@@ -579,11 +576,10 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
         if self._cloudwatch is not None:
             return self._cloudwatch
         try:
-            import boto3
-
-            self._cloudwatch = boto3.client(
+            self._cloudwatch = aws_client(
                 "cloudwatch",
-                region_name=self._config.region,
+                region=self._config.region,
+                credential=self._config.credential,
             )
         except Exception as exc:  # pragma: no cover — boto3 import path
             log.debug("cloudwatch client init failed: %s", exc)

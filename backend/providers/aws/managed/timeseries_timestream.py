@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -73,6 +74,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "time_series"
 
@@ -90,7 +92,7 @@ _SIZE_TO_RETENTION = {
 
 
 @dataclass(frozen=True)
-class TimestreamConfig:
+class TimestreamConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -139,20 +141,18 @@ class TimestreamDriver(ManagedServiceDriver):
         if ts_write_client is not None:
             self._tsw = ts_write_client
         else:
-            import boto3
-
-            self._tsw = boto3.client(
+            self._tsw = aws_client(
                 "timestream-write",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         if ts_query_client is not None:
             self._tsq = ts_query_client
         else:
-            import boto3
-
-            self._tsq = boto3.client(
+            self._tsq = aws_client(
                 "timestream-query",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
 
     # ---- lifecycle ----------------------------------------------------

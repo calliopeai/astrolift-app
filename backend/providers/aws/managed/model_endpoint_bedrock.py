@@ -40,6 +40,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -62,6 +63,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "model_endpoint"
 
@@ -79,7 +81,7 @@ _SIZE_TO_MODEL_ID = {
 
 
 @dataclass(frozen=True)
-class AmazonBedrockConfig:
+class AmazonBedrockConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -119,20 +121,18 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         if bedrock_client is not None:
             self._bedrock = bedrock_client
         else:
-            import boto3
-
-            self._bedrock = boto3.client(
+            self._bedrock = aws_client(
                 "bedrock",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         if logs_client is not None:
             self._logs = logs_client
         else:
-            import boto3
-
-            self._logs = boto3.client(
+            self._logs = aws_client(
                 "logs",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         # Bedrock has no first-party "model record" resource for
         # on-demand models. The driver owns this dict as the

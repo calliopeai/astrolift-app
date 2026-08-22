@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -35,6 +36,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "mq"
 _UPDATE_PLAN_TAG = "astrolift.io/update-plan-sha256"
@@ -60,7 +62,7 @@ _PROTOCOL_SCHEMES = {
 
 
 @dataclass(frozen=True)
-class AmazonMQConfig:
+class AmazonMQConfig(CredentialedConfig):
     region: str
     account_id: str
     broker_name_prefix: str = "astrolift"
@@ -88,10 +90,10 @@ class AmazonMQDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None or secrets_client is None:
-            import boto3
-
-            client = client or boto3.client("mq", region_name=config.region)
-            secrets_client = secrets_client or boto3.client("secretsmanager", region_name=config.region)
+            client = client or aws_client("mq", region=config.region, credential=config.credential)
+            secrets_client = secrets_client or aws_client(
+                "secretsmanager", region=config.region, credential=config.credential
+            )
         self._mq = client
         self._secrets = secrets_client
         self._sleep = sleep

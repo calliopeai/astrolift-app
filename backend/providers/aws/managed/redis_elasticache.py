@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -58,6 +59,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "redis"
 
@@ -71,7 +73,7 @@ _SIZE_TO_NODE_TYPE = {
 
 
 @dataclass(frozen=True)
-class ElastiCacheConfig:
+class ElastiCacheConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -115,20 +117,18 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         if elasticache_client is not None:
             self._ec = elasticache_client
         else:
-            import boto3
-
-            self._ec = boto3.client(
+            self._ec = aws_client(
                 "elasticache",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         if secrets_client is not None:
             self._sm = secrets_client
         else:
-            import boto3
-
-            self._sm = boto3.client(
+            self._sm = aws_client(
                 "secretsmanager",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
 
     # ---- lifecycle ----------------------------------------------------

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -25,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "private_endpoint"
 _ENDPOINT_TYPES = {
@@ -71,7 +73,7 @@ _RESERVED_MODIFY = {
 
 
 @dataclass(frozen=True)
-class VpcEndpointConfig:
+class VpcEndpointConfig(CredentialedConfig):
     region: str
     vpc_id: str = ""
     subnet_ids: list[str] = field(default_factory=list)
@@ -87,9 +89,7 @@ class VpcEndpointDriver(ManagedServiceDriver):
     def __init__(self, *, config: VpcEndpointConfig, client: Any | None = None) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("ec2", region_name=config.region)
+            client = aws_client("ec2", region=config.region, credential=config.credential)
         self._ec2 = client
 
     @driver_op(

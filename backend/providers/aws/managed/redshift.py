@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "warehouse"
 _SIZE_TO_NODE = {
@@ -57,7 +59,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class RedshiftConfig:
+class RedshiftConfig(CredentialedConfig):
     region: str
     account_id: str
     cluster_subnet_group: str
@@ -75,9 +77,7 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
     def __init__(self, *, config: RedshiftConfig, redshift_client: Any | None = None) -> None:
         self._config = config
         if redshift_client is None:
-            import boto3
-
-            redshift_client = boto3.client("redshift", region_name=config.region)
+            redshift_client = aws_client("redshift", region=config.region, credential=config.credential)
         self._redshift = redshift_client
 
     @driver_op(

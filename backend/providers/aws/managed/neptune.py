@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "graph_db"
 _PORT = 8182
@@ -51,7 +53,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class NeptuneConfig:
+class NeptuneConfig(CredentialedConfig):
     region: str
     account_id: str
     db_subnet_group: str
@@ -68,9 +70,7 @@ class NeptuneDriver(ManagedServiceDriver):
     def __init__(self, *, config: NeptuneConfig, neptune_client: Any | None = None) -> None:
         self._config = config
         if neptune_client is None:
-            import boto3
-
-            neptune_client = boto3.client("neptune", region_name=config.region)
+            neptune_client = aws_client("neptune", region=config.region, credential=config.credential)
         self._neptune = neptune_client
 
     @driver_op(

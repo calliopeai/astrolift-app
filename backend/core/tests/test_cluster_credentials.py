@@ -46,6 +46,13 @@ def test_a_cluster_without_a_declaration_is_ambient_everywhere():
 
 
 def test_an_unmigrated_capability_refuses_a_declared_credential():
+    """`secrets` rather than `managed:postgres`, which used to stand here.
+
+    PR 3 of #1422 threaded the credential through every AWS managed-service
+    driver, so `managed:*` is now migrated and no longer refuses. The
+    capability drivers (PR 4) and the EKS driver (PR 5) are not, and this
+    test has to name one of those to still be testing anything.
+    """
     cluster = _cluster(
         provider_config={
             "region": "us-west-2",
@@ -54,9 +61,9 @@ def test_an_unmigrated_capability_refuses_a_declared_credential():
     )
 
     with pytest.raises(ClusterCredentialUnsupported) as exc:
-        assert_credential_supported(cluster, capability="managed:postgres")
+        assert_credential_supported(cluster, capability="secrets")
 
-    assert "managed:postgres" in str(exc.value)
+    assert "secrets" in str(exc.value)
     assert cluster.slug in str(exc.value)
 
 

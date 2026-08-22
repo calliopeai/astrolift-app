@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -27,6 +28,7 @@ from _sdk.managed_service import (
 )
 from aws._naming import iam_role_name
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "encryption_key"
 _MANAGED_GRANT_PREFIX = "astrolift-"
@@ -35,7 +37,7 @@ _ROTATABLE_USAGE = "ENCRYPT_DECRYPT"
 
 
 @dataclass(frozen=True)
-class KMSConfig:
+class KMSConfig(CredentialedConfig):
     region: str
     alias_name_prefix: str = "alias/astrolift"
     deletion_protection_default: bool = True
@@ -52,9 +54,7 @@ class KMSDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("kms", region_name=config.region)
+            client = aws_client("kms", region=config.region, credential=config.credential)
         self._kms = client
         self._regional_clients = dict(regional_clients or {})
         self._regional_clients.setdefault(config.region, client)
@@ -638,9 +638,9 @@ class KMSDriver(ManagedServiceDriver):
 
     def _client(self, region: str) -> Any:
         if region not in self._regional_clients:
-            import boto3
-
-            self._regional_clients[region] = boto3.client("kms", region_name=region)
+            # A per-region client cache. The region varies; the identity
+            # does not, so it comes off the config rather than the argument.
+            self._regional_clients[region] = aws_client("kms", region=region, credential=self._config.credential)
         return self._regional_clients[region]
 
     def _primary_alias(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,6 +25,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "wide_column"
 _SIZE_TO_CAPACITY = {
@@ -44,7 +46,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class KeyspacesConfig:
+class KeyspacesConfig(CredentialedConfig):
     region: str
     account_id: str
     name_prefix: str = "astrolift"
@@ -62,9 +64,7 @@ class KeyspacesDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if keyspaces_client is None:
-            import boto3
-
-            keyspaces_client = boto3.client("keyspaces", region_name=config.region)
+            keyspaces_client = aws_client("keyspaces", region=config.region, credential=config.credential)
         self._keyspaces = keyspaces_client
 
     @driver_op(

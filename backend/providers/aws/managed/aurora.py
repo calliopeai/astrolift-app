@@ -25,6 +25,7 @@ from typing import Any
 from urllib.parse import quote
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -42,6 +43,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 _ENGINE_PORT = {"aurora-postgresql": 5432, "aurora-mysql": 3306}
 _SIZE_TO_CLASS = {
@@ -76,7 +78,7 @@ _PASSWORD_ALPHABET = string.ascii_letters + string.digits + "-_."
 
 
 @dataclass(frozen=True)
-class AuroraConfig:
+class AuroraConfig(CredentialedConfig):
     region: str
     db_subnet_group: str
     security_group_ids: list[str] = field(default_factory=list)
@@ -107,15 +109,11 @@ class AuroraDriver(ManagedServiceDriver):
         if rds_client is not None:
             self._rds = rds_client
         else:
-            import boto3
-
-            self._rds = boto3.client("rds", region_name=config.region)
+            self._rds = aws_client("rds", region=config.region, credential=config.credential)
         if secrets_client is not None:
             self._sm = secrets_client
         else:
-            import boto3
-
-            self._sm = boto3.client("secretsmanager", region_name=config.region)
+            self._sm = aws_client("secretsmanager", region=config.region, credential=config.credential)
 
     @driver_op(
         cloud="aws",

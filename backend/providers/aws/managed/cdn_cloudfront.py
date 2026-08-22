@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -53,6 +54,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 log = logging.getLogger("aws.managed.cdn_cloudfront")
 
@@ -76,7 +78,7 @@ _DISABLE_POLL_SECONDS = 10
 
 
 @dataclass(frozen=True)
-class CloudFrontConfig:
+class CloudFrontConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str = "us-east-1"  # CloudFront + its ACM certs are us-east-1
@@ -98,10 +100,11 @@ class CloudFrontDriver(ManagedServiceDriver):
         if client is not None:
             self._cf = client
         else:
-            import boto3
-
             # CloudFront is global but boto3 wants us-east-1.
-            self._cf = boto3.client("cloudfront", region_name="us-east-1")
+            # CloudFront is global, but the identity still has to be the
+            # cluster's: a distribution created by the control plane's own
+            # credential lands in the wrong account (#1422).
+            self._cf = aws_client("cloudfront", region="us-east-1", credential=config.credential)
 
     # ---- lifecycle ------------------------------------------------
 
@@ -886,6 +889,9 @@ class CloudFrontDriver(ManagedServiceDriver):
     def _s3(self, region: str | None = None) -> Any:
         if self._injected_s3 is not None:
             return self._injected_s3
-        import boto3
 
-        return boto3.client("s3", region_name=region or self._config.region)
+        return aws_client(
+            "s3",
+            region=region or self._config.region,
+            credential=self._config.credential,
+        )

@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -55,6 +56,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.session import aws_client
 
 KIND = "search"
 
@@ -80,7 +82,7 @@ _SIZE_TO_VOLUME_GB = {
 
 
 @dataclass(frozen=True)
-class OpenSearchSearchConfig:
+class OpenSearchSearchConfig(CredentialedConfig):
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str
@@ -138,20 +140,18 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         if opensearch_client is not None:
             self._os = opensearch_client
         else:
-            import boto3
-
-            self._os = boto3.client(
+            self._os = aws_client(
                 "opensearch",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         if secrets_client is not None:
             self._sm = secrets_client
         else:
-            import boto3
-
-            self._sm = boto3.client(
+            self._sm = aws_client(
                 "secretsmanager",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
 
     # ---- lifecycle ----------------------------------------------------

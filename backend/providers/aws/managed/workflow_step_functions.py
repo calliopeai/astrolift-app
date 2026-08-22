@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -26,13 +27,14 @@ from _sdk.managed_service import (
 )
 from aws._naming import iam_role_name
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "workflow_engine"
 _ALIAS_MARKER = "Astrolift managed alias"
 
 
 @dataclass(frozen=True)
-class StepFunctionsConfig:
+class StepFunctionsConfig(CredentialedConfig):
     region: str
     state_machine_name_prefix: str = "astrolift"
     deletion_protection_default: bool = True
@@ -45,9 +47,7 @@ class _StepFunctionsDriver(ManagedServiceDriver):
     def __init__(self, *, config: StepFunctionsConfig, client: Any | None = None) -> None:
         self._config = config
         if client is None:
-            import boto3
-
-            client = boto3.client("stepfunctions", region_name=config.region)
+            client = aws_client("stepfunctions", region=config.region, credential=config.credential)
         self._sfn = client
 
     @driver_op(

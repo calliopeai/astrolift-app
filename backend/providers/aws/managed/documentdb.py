@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -26,6 +27,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.session import aws_client
 
 KIND = "document_db"
 _SIZE_TO_INSTANCE_CLASS = {
@@ -46,7 +48,7 @@ _STATE = {
 
 
 @dataclass(frozen=True)
-class DocumentDBConfig:
+class DocumentDBConfig(CredentialedConfig):
     region: str
     db_subnet_group: str
     security_group_ids: list[str] = field(default_factory=list)
@@ -69,13 +71,9 @@ class DocumentDBDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config
         if docdb_client is None:
-            import boto3
-
-            docdb_client = boto3.client("docdb", region_name=config.region)
+            docdb_client = aws_client("docdb", region=config.region, credential=config.credential)
         if secrets_client is None:
-            import boto3
-
-            secrets_client = boto3.client("secretsmanager", region_name=config.region)
+            secrets_client = aws_client("secretsmanager", region=config.region, credential=config.credential)
         self._docdb = docdb_client
         self._secrets = secrets_client
 
