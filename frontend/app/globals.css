@@ -346,14 +346,6 @@
   --brand-on-primary: #04241b;
 }
 
-/* Sidebar — the one surface allowed to hold the deep planet green. */
-.dark[data-sidebar-tint="ground"] {
-  --sidebar: var(--card);
-}
-.dark[data-sidebar-tint="accent"] {
-  --sidebar: color-mix(in oklab, var(--primary) 13%, var(--background));
-}
-
 /* Light mode follows the accent too, at the deeper end of each hue. */
 [data-accent="copper"]:not(.dark) {
   --brand-primary: #9c5730;
