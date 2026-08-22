@@ -139,6 +139,12 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
 
     from astrolift_pipelines.job_sync import job_for_run
     from astrolift_pipelines.models import JobRun, PipelineRun, Step, StepRun
+    from astrolift_pipelines.secret_plumbing import (
+        make_env_from_refs,
+        materialize_job_secrets,
+        resolve_pipeline_secrets,
+        secret_names_for_job,
+    )
     from astrolift_pipelines.step_script import render_step_script
 
     run = PipelineRun.objects.select_related(
@@ -173,15 +179,37 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     namespace = _pipeline_namespace(org_slug)
     k8s_job_name = _k8s_job_name(run, job)
 
+    # The secrets this job's definition refers to. Until #1529 the whole
+    # module had no caller: `resolve_pipeline_secrets` took a name list
+    # nothing could construct, so a job needing a registry credential or a
+    # deploy key could not express it at all.
+    secret_names = secret_names_for_job(job, steps)
+
     try:
         client = _get_cluster_client(run)
         _ensure_pipeline_namespace(client, namespace, org_slug)
-        manifest = _build_job_manifest(k8s_job_name, namespace, job, run, script)
+
+        secret_env: list[dict] = []
+        if secret_names:
+            # Resolution raises on a name the org store does not hold, so a
+            # typo fails the job here with the name in the message rather
+            # than inside the container as an unresolved reference.
+            bundle = resolve_pipeline_secrets(run, secret_names)
+            k8s_secret = materialize_job_secrets(job_run, bundle, namespace=namespace, cluster=client)
+            secret_env = make_env_from_refs(k8s_secret, sorted(bundle))
+
+        manifest = _build_job_manifest(k8s_job_name, namespace, job, run, script, secret_env)
         client.server_side_apply(manifest, field_manager="astrolift-pipelines")
     except Exception as exc:
         job_run.status = JobRun.Status.FAILURE
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+        # A spawn that dies after materializing leaves a plaintext
+        # credential in the namespace with no pod that needs it and no
+        # poll that will ever clean up, since poll only runs for a job
+        # that started.
+        if secret_names:
+            _cleanup_secrets_quietly(job_run, namespace, run)
         raise RuntimeError(f"spawn_pipeline_job failed for {job_id_str!r}: {exc}") from exc
 
     job_run.temporal_activity_id = k8s_job_name
@@ -250,6 +278,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
         # Delete the K8s Job after success — keeps the pipeline namespace tidy.
         _delete_k8s_job(client, namespace, k8s_job_name)
+        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
         return {"completed": True, "failed": False, "exit_code": 0}
 
     if job_failed or (failed_count > 0 and active == 0):
@@ -267,6 +296,10 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
         _delete_k8s_job(client, namespace, k8s_job_name)
+        # Beside the Job delete on this branch too: a per-run Secret that
+        # outlives the pod is a plaintext credential sitting in a
+        # namespace, and the failure path is the one that gets forgotten.
+        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
         return {"completed": False, "failed": True, "exit_code": exit_code}
 
     # Still running.
@@ -413,11 +446,86 @@ def _capture_job_logs(*, job_run: Any, run: Any, pod: dict | None) -> None:
     body = "\n".join(line for line in lines if line and line.strip())
     if not body:
         return
+
+    # Redact before truncating and before storing. #1218 built this capture
+    # deliberately ahead of #1529's secrets, because capture without
+    # secrets is safe and secrets without redaction are not: the first
+    # mounted credential would otherwise land in a stored excerpt.
+    redacted = _redact_secrets(job_run=job_run, run=run, body=body)
+    if redacted is None:
+        # The job uses secrets and we could not resolve them to mask them.
+        # Storing the raw output would be the leak this exists to prevent,
+        # so the excerpt is dropped instead. Diagnostics lose; the run does
+        # not change.
+        log.warning(
+            "capture_job_logs: skipping excerpt for job_run=%s — secrets unresolvable to redact",
+            job_run.pk,
+        )
+        return
+    body = redacted
+
     if len(body) > PIPELINE_LOG_CHARS:
         body = "…" + body[-PIPELINE_LOG_CHARS:]
 
     job_run.log_excerpt = body
     job_run.save(update_fields=["log_excerpt", "updated_at", "version"])
+
+
+def _redact_secrets(*, job_run: Any, run: Any, body: str) -> str | None:
+    """Mask this job's secret values in `body`.
+
+    Returns the masked text, or None when the job uses secrets that could
+    not be resolved — the caller drops the excerpt rather than store it
+    unmasked.
+
+    The values are re-resolved rather than carried from spawn: the bundle
+    is plaintext, and persisting it anywhere so a later activity could read
+    it back would be a worse leak than the one being prevented. A secret
+    rotated between spawn and this call would be masked by its new value
+    and not its old one, which is the one gap in this and is inherent to
+    matching on values.
+    """
+    from astrolift_pipelines.models import Step
+    from astrolift_pipelines.secret_plumbing import (
+        build_redactor_for_job,
+        resolve_pipeline_secrets,
+        secret_names_for_job,
+    )
+
+    steps = list(Step.objects.filter(job=job_run.job, deleted_at__isnull=True).order_by("position"))
+    names = secret_names_for_job(job_run.job, steps)
+    if not names:
+        return body
+    try:
+        bundle = resolve_pipeline_secrets(run, names)
+    except Exception:  # noqa: BLE001 — fail closed, see the docstring
+        return None
+    return build_redactor_for_job(bundle).redact_lines(body)
+
+
+def _cleanup_secrets_quietly(job_run: Any, namespace: str, run: Any, *, client: Any = None) -> None:
+    """Delete this job run's K8s Secret. Never raises.
+
+    Secret cleanup must not change a run's verdict, which is already
+    decided by the time this is called — but it must also not be skipped,
+    because what is left behind is a plaintext credential in a namespace
+    the pod that needed it has already left.
+    """
+    from astrolift_pipelines.secret_plumbing import cleanup_job_secrets
+
+    try:
+        cleanup_job_secrets(
+            job_run,
+            namespace=namespace,
+            cluster=client if client is not None else _get_cluster_client(run),
+        )
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "cleanup_job_secrets: left behind for job_run=%s in %s",
+            job_run.pk,
+            namespace,
+            exc_info=True,
+        )
 
 
 def _cancel_pipeline_job_sync(job_run_id: int) -> None:
@@ -444,6 +552,10 @@ def _cancel_pipeline_job_sync(job_run_id: int) -> None:
     try:
         client = _get_cluster_client(run)
         _delete_k8s_job(client, namespace, k8s_job_name)
+        # The third terminal path. A cancelled job leaves exactly the same
+        # plaintext credential behind as a failed one, and poll never runs
+        # again to notice.
+        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
     except Exception:  # noqa: BLE001 — best-effort
         pass
 
@@ -590,6 +702,7 @@ def _build_job_manifest(
     job: Any,
     run: Any,
     script: str,
+    secret_env: list[dict] | None = None,
 ) -> dict:
     """Render a batch/v1 Job manifest for a pipeline Job row.
 
@@ -626,6 +739,10 @@ def _build_job_manifest(
         "env": [
             {"name": "ASTROLIFT_PIPELINE_RUN_ID", "value": str(run.pk)},
             {"name": "ASTROLIFT_JOB_ID", "value": str(job.job_id)},
+            # secretKeyRef entries, never literal values: a value inlined
+            # here would be readable from the Job spec by anyone who can
+            # get the object, and would appear in K8s audit events (#1529).
+            *(secret_env or []),
         ],
     }
 
