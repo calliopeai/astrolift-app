@@ -319,7 +319,7 @@ def test_nginx_oidc_auth_injects_auth_signin_annotation() -> None:
     )
     annotations = ing["metadata"]["annotations"]
     assert annotations["nginx.ingress.kubernetes.io/auth-signin"] == (
-        "https://auth.cluster.example.com/oauth2/start?rd=$escaped_request_uri"
+        "https://auth.cluster.example.com/oauth2/start?rd=https://$host$escaped_request_uri"
     )
 
 

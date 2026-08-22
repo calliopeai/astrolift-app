@@ -198,7 +198,7 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
         secret_names = []
 
     try:
-        client = _get_cluster_client(run)
+        client = _get_cluster_client(run, job)
         _ensure_pipeline_namespace(client, namespace, org_slug)
 
         secret_env: list[dict] = []
@@ -444,7 +444,10 @@ def _capture_job_logs(*, job_run: Any, run: Any, pod: dict | None) -> None:
     from core.cluster_observability import fetch_pod_log_tail
 
     try:
-        cluster = _resolve_cluster(run)
+        # Routed by the job, not the org default: the pod ran on whichever
+        # cluster its `runs_on` selected, and reading logs from a different
+        # one would come back empty rather than wrong-looking.
+        cluster = _resolve_cluster(run, job_run.job)
         lines = async_to_sync(fetch_pod_log_tail)(
             cluster=cluster,
             namespace=_pipeline_namespace(run.pipeline.organization.slug),
@@ -621,43 +624,60 @@ def _k8s_job_name(run: Any, job: Any) -> str:
     return raw[:63].rstrip("-")
 
 
-def _resolve_cluster(run: Any) -> Any:
-    """The org cluster a pipeline run's jobs land on.
+def _resolve_cluster(run: Any, job: Any = None) -> Any:
+    """The cluster a pipeline job lands on, from its own ``runs_on``.
 
-    Pipeline jobs run on the org's default cluster (the first active cluster
-    bound to the organization). The spawner does NOT require a specific
-    AppEnvironment cluster binding — pipelines are org-scoped, not app-scoped.
+    Routing lives in :mod:`astrolift_pipelines.dispatch_router`, which had
+    no caller. What used to be here took the org's oldest managed cluster
+    and ignored ``runs_on`` entirely, so ``cluster:prod-eu``,
+    ``["linux","arm64"]``, ``windows`` and ``self-hosted`` all landed on the
+    same place — an arm64 job onto amd64 nodes, and a self-hosted job as a
+    K8s Job on the platform's own cluster.
+
+    It also could not run at all: it filtered on ``lifecycle_state``, which
+    is not a field on ``TenantCluster`` (the column is ``lifecycle``), so
+    every call raised ``FieldError``. Nothing caught it because every test
+    of this path patches this function out.
+
+    ``job`` is optional because the log capture calls this with only the
+    run, after the job has already been placed; without it this resolves
+    the org default, which is what that path needs.
 
     Split out from :func:`_get_cluster_client` because the log capture needs
     the ``TenantCluster`` itself, not the dynamic client:
     ``fetch_pod_log_tail`` speaks the observability layer's driver lookup.
     """
-    from astrolift_clusters.models import TenantCluster
+    from astrolift_pipelines.dispatch_router import route
 
     org = run.pipeline.organization
-    cluster = (
-        TenantCluster.objects.filter(
-            organization=org,
-            deleted_at__isnull=True,
-            lifecycle_state="managed",
-        )
-        .order_by("created_at")
-        .first()
-    )
-    if cluster is None:
+    runs_on = str(getattr(job, "runs_on", "") or "") if job is not None else ""
+
+    decision = route(runs_on or "astrolift/default", org)
+
+    if decision.runner_only:
+        # A self-hosted or macOS job belongs to a registered runner agent,
+        # which claims work over the runner API. Spawning it as a K8s Job
+        # here would run it on the platform's cluster instead — the wrong
+        # machine, quietly.
         raise RuntimeError(
-            f"organization {org.slug!r} has no managed cluster — pipeline jobs cannot be scheduled"
+            f"job requires a self-hosted runner ({runs_on!r}); "
+            f"K8s spawn does not apply. {decision.reason}"
         )
-    return cluster
+    if decision.cluster is None:
+        raise RuntimeError(
+            f"organization {org.slug!r} has no cluster matching {runs_on or 'astrolift/default'!r} "
+            f"— pipeline job cannot be scheduled. {decision.reason}"
+        )
+    return decision.cluster
 
 
-def _get_cluster_client(run: Any) -> Any:
+def _get_cluster_client(run: Any, job: Any = None) -> Any:
     """Resolve the KubernetesDynamicClient for the pipeline run's org cluster."""
 
     from astrolift_drivers.registry import plugins
     from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
-    cluster = _resolve_cluster(run)
+    cluster = _resolve_cluster(run, job)
 
     plugin = plugins.get(cluster.provider_plugin_id)
     if plugin is None:
