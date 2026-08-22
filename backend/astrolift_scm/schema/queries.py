@@ -8,6 +8,7 @@ from strawberry.types import Info
 
 from astrolift_graphql import PageType, keyset_page, search_q
 from astrolift_scm.models import SourceConnection, SshDeployKey
+from astrolift_scm.org_repo_policy import filter_repos
 from astrolift_scm.providers import ProviderError, fetch_file, list_repos
 from astrolift_scm.schema.types import (
     RemoteRepoListType,
@@ -241,6 +242,10 @@ class ScmQuery:
 
         try:
             rows = list_repos(conn, search=search, limit=limit)
+            # Never offer a repo registration would refuse (#1543). Getting
+            # as far as choosing one before being told no is worse than not
+            # seeing it. A no-op when the policy is off.
+            rows = filter_repos(rows, conn.organization)
         except ProviderError as exc:
             _flag_reauth_on_user_token(conn, exc)
             return RemoteRepoListType(

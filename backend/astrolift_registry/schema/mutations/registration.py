@@ -39,6 +39,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppType,
     app_to_type,
 )
+from astrolift_scm.org_repo_policy import rejection_reason
 from core.decorators import tenant_scoped
 from core.friendly_name import friendly_name_from_slug
 from core.mutations import ErrorCode, mutation_audit
@@ -107,6 +108,15 @@ class RegistrationMutations:
                 f"app with slug {eff_slug!r} already exists in this organization",
                 field="slug",
             )
+
+        # The org-only source policy, when the install has it on (#1543).
+        # Checked before the conflict lookups because a repo this install
+        # will not accept should be refused for that reason, not for
+        # colliding with something.
+        if input.source_repo:
+            refusal = rejection_reason(input.source_repo, project.organization)
+            if refusal:
+                return gql_failure(ErrorCode.VALIDATION.value, refusal, field="sourceRepo")
 
         if input.source_repo and input.manifest_path:
             if RegisteredApp.objects.filter(
@@ -472,6 +482,13 @@ class RegistrationMutations:
 
         if not (input.source_repo or "").strip():
             return gql_failure(ErrorCode.VALIDATION.value, "sourceRepo is required", field="sourceRepo")
+
+        # Same policy as register_app (#1543). This path registers every
+        # manifest in a repo at once, so letting it through would onboard a
+        # personal repo as many apps in one call.
+        refusal = rejection_reason(input.source_repo, project.organization)
+        if refusal:
+            return gql_failure(ErrorCode.VALIDATION.value, refusal, field="sourceRepo")
 
         # Apps are deploy targets — require a managed cluster up front (mirror
         # register_app). organization is nullable on TenantCluster: null =
