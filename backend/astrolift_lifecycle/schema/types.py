@@ -190,6 +190,19 @@ class DeploymentType:
     out when self-approval is disabled (Constance flag
     ``ALLOW_SELF_APPROVE_DEPLOYS``)."""
 
+    manifest_resync_status: str
+    """Outcome of the deploy-time manifest resync (#1553). ``applied`` /
+    ``in_sync`` mean this deploy rendered the repo's current manifest;
+    ``diverged`` (an unpushed staged draft blocked the refresh) and
+    ``fetch_failed`` mean it rendered the *stored* one, so a repo-side fix
+    may not be in this rollout. Empty on deploys predating the field and on
+    apps with no source repo."""
+
+    manifest_resync_error: str
+    """Why the resync did not apply, verbatim from the sync service — the
+    branch and path it looked at, or the reason a staged draft blocked it.
+    Empty when the resync succeeded."""
+
     started_at: dt.datetime | None
     succeeded_at: dt.datetime | None
     failed_at: dt.datetime | None

@@ -231,10 +231,33 @@ def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
     deployment = Deployment.objects.select_related("registered_app").get(pk=deployment_id)
     app = deployment.registered_app
     result = resync_app_manifest_from_repo(app)
+
+    # Record the outcome on the deployment (#1553). Without this the only
+    # trace of a refused resync is a worker log line, so a deploy that
+    # rendered a stale manifest looks identical to one that rendered a
+    # fresh one. Written here rather than in the workflow because the
+    # workflow sandbox cannot touch the ORM.
+    deployment.manifest_resync_status = result.status
+    deployment.manifest_resync_error = result.error or ""
+    # "version" belongs in update_fields: BaseCoreModel.save() increments it
+    # on every save, and leaving it out computes the bump then discards it.
+    deployment.save(
+        update_fields=[
+            "manifest_resync_status",
+            "manifest_resync_error",
+            "updated_at",
+            "version",
+        ]
+    )
+
     return {
         "status": result.status,
         "error": result.error or "",
         "app_slug": app.slug,
+        # Zero workloads after a refused resync is the shape of the bug in
+        # #1553: the deploy would go green having deployed nothing. The
+        # workflow uses this to fail pre-flight loudly instead.
+        "workload_count": app.workloads.filter(deleted_at__isnull=True).count(),
     }
 
 

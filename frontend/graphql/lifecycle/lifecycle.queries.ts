@@ -58,6 +58,8 @@ export const LIST_DEPLOYMENTS = gql`
       ciRunUrl
       repoUrl
       abortedReason
+      manifestResyncStatus
+      manifestResyncError
       triggeredByUserId
       triggeredByMe
       approvedBy {
@@ -213,6 +215,8 @@ export const GET_DEPLOYMENT = gql`
       ciProvider
       repoUrl
       abortedReason
+      manifestResyncStatus
+      manifestResyncError
       triggeredByUserId
       triggeredByMe
       approvedBy {

@@ -1683,6 +1683,8 @@ export type AstroliftDeployment = {
   id: Scalars['GUID']['output'];
   imageDigest: Scalars['String']['output'];
   imageTag: Scalars['String']['output'];
+  manifestResyncError: Scalars['String']['output'];
+  manifestResyncStatus: Scalars['String']['output'];
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];

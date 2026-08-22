@@ -62,6 +62,7 @@ from astrolift_manifest.types import (
 )
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
+from core.events import Event
 
 log = logging.getLogger(__name__)
 
@@ -392,6 +393,45 @@ def _compute_changes(
 
 
 def resync_app_manifest_from_repo(
+    app: RegisteredApp,
+    *,
+    fetch: _FetchFn | None = None,
+) -> ResyncResult:
+    """Re-fetch + reconcile ``app``'s manifest, and leave an audit trail.
+
+    Thin wrapper over :func:`_resync_app_manifest_from_repo` that emits an
+    event for every outcome the operator would want to know about (#1553).
+    A refused resync used to exist only as a worker log line, so a deploy
+    that silently rendered the stored manifest was indistinguishable from
+    one that rendered a fresh one. ``in_sync`` is deliberately not emitted
+    — every deploy resyncs, and "nothing changed" is not news.
+
+    Emission never affects the result: an events-backend failure must not
+    turn a successful resync into a failed one.
+    """
+    result = _resync_app_manifest_from_repo(app, fetch=fetch)
+    if result.status != "in_sync":
+        try:
+            Event.emit(
+                f"app.manifest_resync.{result.status}",
+                {
+                    "app_slug": app.slug,
+                    "source_repo": app.source_repo,
+                    "manifest_path": app.manifest_path,
+                    "branch": app.deploy_branch or app.default_branch or "main",
+                    "error": result.error or "",
+                },
+                resource_kind="registered_app",
+                resource_id=app.pk,
+                registered_app_id=app.pk,
+                organization_id=app.organization_id,
+            )
+        except Exception:  # noqa: BLE001 — audit is best-effort
+            log.exception("failed to emit manifest resync event for app %s", app.pk)
+    return result
+
+
+def _resync_app_manifest_from_repo(
     app: RegisteredApp,
     *,
     fetch: _FetchFn | None = None,

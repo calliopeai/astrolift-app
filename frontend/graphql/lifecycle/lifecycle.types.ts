@@ -97,6 +97,9 @@ export interface DeploymentApprovalContextFields {
   commitAuthor: string;
   repoUrl: string;
   abortedReason: string;
+  /** #1553 — which manifest this deploy actually rendered. */
+  manifestResyncStatus: string;
+  manifestResyncError: string;
   triggeredByUserId: string | null;
   triggeredByMe: boolean;
 }
