@@ -34,6 +34,7 @@ class FakeStep:
     uses: str | None = None
     step_id: str = ""
     env: dict = field(default_factory=dict)
+    with_params: dict = field(default_factory=dict)
 
 
 def _execute(script: str, tmp_path: Path) -> tuple[int, str, dict]:
@@ -100,25 +101,81 @@ def test_a_failing_step_fails_the_job_and_stops_the_rest(tmp_path):
     assert 2 not in records
 
 
-def test_a_uses_step_is_recorded_as_skipped_and_the_job_continues(tmp_path):
-    """Scoped decision, not an oversight: `uses:` is not resolved.
-
-    It records `skipped` and execution continues, so a job whose only step
-    is a `uses:` still reports success while doing nothing. The record is
-    what stops that being silent.
-    """
+def test_a_uses_step_runs_the_action_it_names(tmp_path):
+    """This used to record `skipped` and continue, so a job whose steps were
+    all `uses:` reported success while doing nothing at all."""
     steps = [
         FakeStep(position=0, run="echo one"),
-        FakeStep(position=1, uses="astrolift/deploy@v1", step_id="deploy"),
-        FakeStep(position=2, run="echo three"),
+        FakeStep(
+            position=1,
+            uses="astrolift/git-checkout@v1",
+            step_id="checkout",
+            with_params={"repository": "https://example.invalid/r.git", "ref": "main"},
+        ),
     ]
+
+    script = render_step_script(steps)
+
+    # The action's own commands are in the script, under the step's label.
+    assert "git clone" in script
+    assert "::: checkout /" in script
+    # And it settles as a real step, not a skip.
+    assert f"{STATUS_SKIPPED} 0" not in script.split("# --- checkout ---")[1]
+
+
+def test_a_multi_command_action_stops_at_the_first_failure(tmp_path, monkeypatch):
+    """The failure has to be a command that is NOT last.
+
+    A real action's commands tend to fail together — git clone failing means
+    git checkout fails too — so the last command's exit code masks whether
+    the middle of the action was actually guarded. This uses an action whose
+    failing command is followed by a succeeding one, which is the only shape
+    that tells the two apart.
+    """
+
+    class _Stub:
+        def render_steps(self, with_params, env, context):
+            return [
+                {"name": "first", "run": "echo starting"},
+                # `sh -c` rather than a bare `exit`: a bare `exit` ends the
+                # subshell the caller wraps this in, which would make the
+                # test pass whether or not the guard is there.
+                {"name": "boom", "run": "sh -c 'exit 7'"},
+                {"name": "after", "run": "echo should-not-run"},
+            ]
+
+    monkeypatch.setattr("astrolift_pipelines.actions.registry.resolve_action", lambda uses: _Stub())
+    steps = [FakeStep(position=0, uses="astrolift/whatever@v1", step_id="act")]
 
     code, out, records = _execute(render_step_script(steps), tmp_path)
 
-    assert code == 0
-    assert "one" in out and "three" in out
-    assert records[1] == (STATUS_SKIPPED, 0)
-    assert "astrolift/deploy@v1" in out
+    assert code == 7
+    assert "starting" in out
+    assert "should-not-run" not in out
+    assert records[0] == (STATUS_RAN, 7)
+
+
+def test_an_unknown_action_fails_before_the_pod_is_created():
+    """`render_step_script` runs before the K8s Job exists, so a pipeline
+    naming an action that does not exist fails with the name in the message
+    rather than starting a container that cannot do its job."""
+    steps = [FakeStep(position=0, uses="astrolift/deploy@v1", step_id="deploy")]
+
+    with pytest.raises(StepScriptError) as exc:
+        render_step_script(steps)
+
+    assert "astrolift/deploy@v1" in str(exc.value)
+    # The message lists what does exist, because the fix is a one-word edit.
+    assert "astrolift/astrolift-deploy@v1" in str(exc.value)
+
+
+def test_an_action_missing_a_required_input_fails_at_render():
+    steps = [FakeStep(position=0, uses="astrolift/git-checkout@v1", step_id="checkout", with_params={})]
+
+    with pytest.raises(StepScriptError) as exc:
+        render_step_script(steps)
+
+    assert "checkout" in str(exc.value)
 
 
 def test_a_step_with_neither_run_nor_uses_is_skipped_not_silent(tmp_path):

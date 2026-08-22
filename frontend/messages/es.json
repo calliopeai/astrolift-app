@@ -955,6 +955,13 @@
         "controls": "Controls & access",
         "insights": "Observability & activity",
         "links": "Quick links"
+      },
+      "headerDeploy": {
+        "title": "¿Desplegar {tag} en {env}?",
+        "description": "Vuelve a desplegar la etiqueta de imagen más reciente. Usa la página de entornos para elegir otra etiqueta o entorno.",
+        "confirm": "Desplegar",
+        "started": "Despliegue iniciado: {tag} en {env}",
+        "failed": "El despliegue falló"
       }
     },
     "deployStrategy": {

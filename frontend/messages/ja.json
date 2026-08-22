@@ -955,6 +955,13 @@
         "controls": "Controls & access",
         "insights": "Observability & activity",
         "links": "Quick links"
+      },
+      "headerDeploy": {
+        "title": "{tag} を {env} にデプロイしますか?",
+        "description": "直近のイメージタグを再デプロイします。別のタグや環境は環境ページから選択してください。",
+        "confirm": "デプロイ",
+        "started": "デプロイ開始: {tag} → {env}",
+        "failed": "デプロイに失敗しました"
       }
     },
     "deployStrategy": {

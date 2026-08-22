@@ -24,11 +24,13 @@ Two properties the script has to hold, and one it deliberately does not:
   (#1218). Each step appends a record to the termination-log file, and
   Kubernetes surfaces that file's contents on the pod's terminated
   container state. It is a 4096-byte channel intended for exactly this.
-* **It does not resolve `uses:`.** A `uses:` step is recorded as skipped
-  and execution continues, so a job whose steps are all `uses:` still
-  reports success while doing nothing. That is a deliberate scoping
-  decision, not an oversight; `astrolift_pipelines/actions/registry.py`
-  is where the resolution would live.
+* **It resolves `uses:`** through `astrolift_pipelines.actions.registry`.
+  Before this, a `uses:` step was recorded as skipped and execution
+  continued, so a job whose steps were all `uses:` reported success while
+  doing nothing at all. An unknown action or a missing required input now
+  fails the job at render time, before the pod is created, because the
+  alternative is a container that starts and cannot do the thing it was
+  asked to do.
 """
 
 from __future__ import annotations
@@ -62,12 +64,16 @@ class StepScriptError(ValueError):
     """A job whose steps cannot be rendered into a runnable script."""
 
 
-def render_step_script(steps: list[Any]) -> str:
+def render_step_script(steps: list[Any], *, context: dict | None = None) -> str:
     """The `/bin/sh` script for *steps*, in order.
 
     `steps` are `Step` rows (anything with `position`, `step_id`, `run`,
     `uses` and `env` works, which is what keeps this testable without a
     database).
+
+    `context` is handed to a built-in action's `render_steps`. Optional
+    because most callers have nothing to add, and no built-in reads it yet;
+    it exists because the action contract already takes it.
     """
     if not steps:
         # A job with no steps is a job that does nothing, and it should
@@ -93,13 +99,18 @@ def render_step_script(steps: list[Any]) -> str:
         lines.append(f"# --- {label} ---")
         lines.append(f"echo {shlex.quote(f'::: {label}')}")
 
+        if not run and uses:
+            # A built-in action renders to ordinary shell, so from here down
+            # it is treated exactly like a `run` step: one subshell, one
+            # record, one position. Keeping the mapping 1:1 with the Step row
+            # is what lets `parse_step_records` settle the StepRun.
+            run = _render_uses(step, uses=str(uses), label=label, context=context)
+
         if not run:
-            # Includes the `uses:` case and a step carrying neither. Both
-            # are recorded rather than passed over in silence, so the
-            # StepRun says `skipped` and an operator reading the pod's
-            # output sees why.
-            reason = f"uses: {uses}" if uses else "no run command"
-            lines.append(f"echo {shlex.quote(f'::: skipped ({reason})')}")
+            # A step carrying neither `run` nor `uses`. Recorded rather than
+            # passed over in silence, so the StepRun says `skipped` and an
+            # operator reading the pod's output sees why.
+            lines.append(f"echo {shlex.quote('::: skipped (no run command)')}")
             lines.append(f"echo '{position} {STATUS_SKIPPED} 0' >> {TERMINATION_LOG}")
             lines.append("")
             continue
@@ -126,6 +137,52 @@ def render_step_script(steps: list[Any]) -> str:
 
     lines.append("exit 0")
     return "\n".join(lines) + "\n"
+
+
+def _render_uses(step: Any, *, uses: str, label: str, context: dict | None) -> str:
+    """Turn a `uses:` step into the shell it stands for.
+
+    Raises `StepScriptError` on an unknown action or a missing required
+    input. That is deliberate and it happens here rather than in the
+    container: `render_step_script` runs before the K8s Job is created, so
+    a pipeline naming an action that does not exist fails with the name in
+    the message instead of starting a pod that cannot do its job.
+    """
+    from astrolift_pipelines.actions import ActionInputError
+    from astrolift_pipelines.actions.registry import UnknownActionError, resolve_action
+
+    try:
+        action = resolve_action(uses)
+        rendered = action.render_steps(
+            with_params=dict(getattr(step, "with_params", None) or {}),
+            env=dict(getattr(step, "env", None) or {}),
+            context=dict(context or {}),
+        )
+    except UnknownActionError as exc:
+        raise StepScriptError(f"{label}: {exc}") from exc
+    except ActionInputError as exc:
+        raise StepScriptError(f"{label}: {uses}: {exc}") from exc
+
+    out: list[str] = []
+    for sub in rendered:
+        command = str(sub.get("run") or "").strip()
+        if not command:
+            continue
+        name = str(sub.get("name") or "")
+        if name:
+            out.append(f"echo {shlex.quote(f'::: {label} / {name}')}")
+        for key, value in sorted((sub.get("env") or {}).items()):
+            if not _ENV_NAME.match(str(key)):
+                raise StepScriptError(f"{label}: {key!r} is not a legal environment variable name")
+            out.append(f"export {key}={shlex.quote(str(value))}")
+        # `set -e` is not in force inside the subshell the caller wraps this
+        # in, so a failing command in the middle of a multi-command action
+        # would otherwise be stepped over and the action reported as passing.
+        out.append(f"{command} || exit $?")
+
+    if not out:
+        raise StepScriptError(f"{label}: {uses} rendered no commands")
+    return "\n".join(out)
 
 
 def parse_step_records(message: str) -> dict[int, tuple[str, int]]:

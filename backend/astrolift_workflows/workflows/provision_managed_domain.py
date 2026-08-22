@@ -26,8 +26,9 @@ maximum) calling ``poll_cert_issuance``. Two signals interrupt the loop:
                polling the replacement.
 
 Once the cert reaches "issued": ``register_managed_domain_row`` upserts
-the ManagedDomain row, then ``mark_managed_domain_active`` flips the zone
-active.
+the ManagedDomain row, ``validate_ns_delegation`` confirms the registrar
+actually delegates the zone to the nameservers Step 1 returned, and only
+then does ``mark_managed_domain_active`` flip the zone active.
 
 Workflow id pattern: ``ProvisionManagedDomainWorkflow-<cluster_id>-<zone>``.
 """
@@ -52,6 +53,7 @@ with workflow.unsafe.imports_passed_through():
         register_managed_domain_row,
         reissue_cert,
         request_wildcard_cert_for_zone,
+        validate_ns_delegation,
     )
 
 
@@ -233,7 +235,33 @@ class ProvisionManagedDomainWorkflow:
                 message=_truncate(f"register_managed_domain_row failed: {exc}"),
             )
 
-        # Step 5: activate the zone.
+        # Step 5: NS delegation gate. The registrar has to point the zone at
+        # the nameservers Step 1 handed back before the zone is fit to serve —
+        # activating one that still resolves to the operator's previous DNS
+        # provider provisions apps at hostnames nobody can reach.
+        try:
+            delegation = await workflow.execute_activity(
+                validate_ns_delegation,
+                args=[input.cluster_id, zone],
+                start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                retry_policy=_ACTIVITY_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return WorkflowResult(
+                ok=False,
+                message=_truncate(f"validate_ns_delegation failed: {exc}"),
+            )
+        if not (isinstance(delegation, dict) and delegation.get("passed")):
+            reason = delegation.get("reason", "") if isinstance(delegation, dict) else ""
+            return WorkflowResult(
+                ok=False,
+                message=_truncate(
+                    f"NS delegation not in place for zone {zone!r}; zone left "
+                    f"inactive: {reason}"
+                ),
+            )
+
+        # Step 6: activate the zone.
         try:
             await workflow.execute_activity(
                 mark_managed_domain_active,

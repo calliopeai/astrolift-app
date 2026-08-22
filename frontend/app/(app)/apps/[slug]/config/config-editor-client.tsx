@@ -476,7 +476,12 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
           <Button
             variant="outline"
             onClick={handlePush}
-            disabled={busy || a.manifestSyncState === "in_sync"}
+            disabled={busy}
+            title={
+              a.manifestSyncState === "in_sync"
+                ? "In sync with the repo — edit and Save draft first"
+                : undefined
+            }
           >
             <GitPullRequestIcon className="size-4" />
             {t("pushToRepo")}

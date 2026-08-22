@@ -32,6 +32,7 @@ from astrolift_identity.schema.types import (
     organization_to_type,
 )
 from astrolift_operations.observability_profile import RETENTION_LOGS
+from core.appearance import AppearanceError, validate_appearance
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.resource_tags import ResourceTagError, validate_resource_tags
@@ -117,6 +118,21 @@ class OrganizationMutations:
                     str(exc),
                     field="defaultResourceTags",
                 )
+        if input.appearance_default is not None:
+            # Validated here for the same reason the tags above are: the
+            # client's normalize() protects the client, not the column, and an
+            # org admin can post this mutation without a browser. A rejected
+            # axis says what was allowed rather than being dropped silently.
+            try:
+                org.appearance_default = validate_appearance(input.appearance_default)
+            except AppearanceError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="appearanceDefault",
+                )
+        if input.appearance_locked is not None:
+            org.appearance_locked = bool(input.appearance_locked)
         org.save()
         return gql_success(organization_to_type(org))
 

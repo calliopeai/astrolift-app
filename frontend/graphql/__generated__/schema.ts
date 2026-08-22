@@ -2693,6 +2693,8 @@ export type AstroliftOrgSkillRepoMutationResult = {
 
 export type AstroliftOrganization = {
   allowUserProfileEdit: Scalars['Boolean']['output'];
+  appearanceDefault: Scalars['JSON']['output'];
+  appearanceLocked: Scalars['Boolean']['output'];
   auditLogRetentionDays: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
   defaultResourceTags: Scalars['JSON']['output'];
@@ -9779,9 +9781,12 @@ export type UpdateOrgSkillRepoInput = {
 
 export type UpdateOrganizationInput = {
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
+  appearanceDefault: InputMaybe<Scalars['JSON']['input']>;
+  appearanceLocked: InputMaybe<Scalars['Boolean']['input']>;
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
   defaultResourceTags: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
+  logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
