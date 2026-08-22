@@ -122,6 +122,28 @@ class SetNotificationPreferenceInput:
 
 
 @strawberry.input
+class SetNotificationProfileInput:
+    """Install the notification driver for the caller's org (#490).
+
+    Upsert, not append: the DB allows one active profile per org, so
+    re-submitting rewrites the live row's driver/config in place.
+    ``config`` is the per-driver blob whose required keys the policy
+    module enforces (region + platform_applications for ``aws_sns``,
+    project_id for ``gcp_fcm``, primary + secondaries for
+    ``multiplexer``, and so on)."""
+
+    driver: str
+    """``aws_sns`` | ``gcp_fcm`` | ``azure_anh`` | ``otlp_webhook``
+    | ``multiplexer``."""
+
+    config: strawberry.scalars.JSON
+
+    retention_delivery_days: int | None = None
+    """Days of NotificationDelivery audit rows to keep. Omit for the
+    30-day default; 365 is the ceiling."""
+
+
+@strawberry.input
 class CreateAlertRuleInput:
     name: str
     target: str

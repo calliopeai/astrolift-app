@@ -1,13 +1,11 @@
 "use client";
 
 import { ActivityIcon, ShieldCheckIcon, UsersIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
-import {
-  FEATURE_FLAG_ADMIN_PERMISSIONS,
-  useFeatureFlag,
-} from "@/graphql/server/server.hooks";
+import { FEATURE_FLAG_ADMIN_PERMISSIONS, useFeatureFlag } from "@/graphql/server/server.hooks";
 
 import { AssignmentsTab } from "./assignments-tab";
 import { PermissionsDiagnosticsContent } from "./permissions-diagnostics-client";
@@ -26,13 +24,35 @@ export function PermissionsClient() {
   const [tab, setTab] = React.useState<TabKey>("roles");
 
   // Screen gate: Permissions ships behind `admin.permissions_enabled`
-  // (#1206), mirroring the cost/quotas surface gates. With the flag off the
-  // nav entry is filtered out and a direct hit renders nothing. The flag
-  // reads false until the server-info handshake resolves; only the active
-  // tab mounts, so no roles/bindings queries fire while gated (the tab
-  // components are never mounted when this returns null).
+  // (#1206). The nav entry is filtered out while the flag is off, but the
+  // route stays reachable, so this used to `return null` and a direct hit
+  // rendered a blank page — indistinguishable from the screen being broken.
+  // It says so instead, and points at the flipper that turns it on.
+  //
+  // The flag reads false until the server-info handshake resolves, and the
+  // tab components never mount from here, so no roles or bindings queries
+  // fire while gated.
   if (!enabled) {
-    return null;
+    return (
+      <PageShell
+        title="Permissions"
+        description="Define roles and their permission sets, assign roles to users, and inspect effective access."
+      >
+        <div className="text-muted-foreground max-w-prose rounded-md border border-dashed p-6 text-sm">
+          <p className="text-foreground font-medium">
+            This console is turned off for this install.
+          </p>
+          <p className="mt-2">
+            Permissions ships behind the{" "}
+            <code className="font-mono">admin.permissions_enabled</code> flag. Turn it on under{" "}
+            <Link className="underline underline-offset-2" href="/administration/features">
+              Administration &rsaquo; Features
+            </Link>
+            .
+          </p>
+        </div>
+      </PageShell>
+    );
   }
 
   return (

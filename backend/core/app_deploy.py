@@ -896,6 +896,11 @@ def _render_managed_subdomain_ingress(
             app_slug=app.slug,
             org_slug=org_slug,
             base_zone=managed_domain.zone,
+            # ``setAppSubdomain`` writes this field and SyncAppDomainWorkflow
+            # re-applies from here (#143). Without the override the rendered
+            # host stayed ``<slug>.<zone>`` forever, so a rename only ever
+            # changed the URL the API reported -- never the live Ingress.
+            subdomain_override=app.subdomain or "",
         ),
     )
     log.info("render_managed_subdomain_ingress: computed hostnames=%s", [h.hostname for h in computed])

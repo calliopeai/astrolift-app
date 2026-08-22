@@ -71,6 +71,7 @@ from astrolift_workflows.workflows.secret_rotation import (
     RotateSecretBundleWorkflow,
     SecretBundleScheduledRefreshWorkflow,
 )
+from astrolift_workflows.workflows.sync_app_domain import SyncAppDomainWorkflow
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 from astrolift_workflows.workflows.update_managed_service import UpdateManagedServiceWorkflow
@@ -124,6 +125,7 @@ __all__ = [
     "RotateSecretBundleWorkflow",
     "RunStatusReconcileTickWorkflow",
     "SecretBundleScheduledRefreshWorkflow",
+    "SyncAppDomainWorkflow",
     "SyncDevEnvironmentFilesWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
