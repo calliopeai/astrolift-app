@@ -72,31 +72,16 @@ def verify_signature(secret: bytes, body: bytes, signature_header: str) -> bool:
 
 
 def _get_org_pipeline_secret(org: Organization) -> bytes | None:
-    """Return the pipeline webhook secret for an org, or None if unset.
+    """Return the org's GitHub webhook HMAC secret, or None if unset.
 
-    The secret is stored in Astrolift's secret store under the key
-    ``astrolift/pipeline/webhook_secret``. This falls back to
-    ``PIPELINE_WEBHOOK_SECRET`` on the org's ``settings`` dict when
-    the secret store isn't wired (dev installs, tests).
+    Reads the encrypted secret off the org's `SourceConnection`, the same
+    column `astrolift_scm/webhook_views.py` and `auth1/scm_webhook.py` read.
+    See `webhook_security.org_webhook_secret` for why this replaced a lookup
+    through a module that does not exist.
     """
-    # Dev/test fallback — check org.extra_data for a plaintext secret.
-    extra = getattr(org, "extra_data", None) or {}
-    dev_secret = extra.get("pipeline_webhook_secret")
-    if dev_secret:
-        return dev_secret.encode() if isinstance(dev_secret, str) else dev_secret
+    from astrolift_pipelines.webhook_security import org_webhook_secret
 
-    # Production path: read from the installed secrets backend.
-    # The secret is written by installPipelineWebhook at setup time.
-    try:
-        from astrolift_lifecycle.services.secrets import read_org_secret
-
-        value = read_org_secret(org, "astrolift/pipeline/webhook_secret")
-        if value:
-            return value.encode() if isinstance(value, str) else value
-    except Exception:  # noqa: BLE001 — degraded path, don't blow up the receiver
-        pass
-
-    return None
+    return org_webhook_secret(org, source_kind="github")
 
 
 def _repo_url_matches(pipeline_url: str, payload_clone_url: str, payload_html_url: str) -> bool:

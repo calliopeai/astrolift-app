@@ -44,22 +44,18 @@ _HANDLED_GITLAB_EVENTS = {"Push Hook", "Tag Push Hook", "Merge Request Hook"}
 
 
 def _get_org_pipeline_secret(org: Organization) -> str | None:
-    """Return the pipeline webhook secret for an org, or None if unset."""
-    extra = getattr(org, "extra_data", None) or {}
-    dev_secret = extra.get("pipeline_webhook_secret")
-    if dev_secret:
-        return dev_secret if isinstance(dev_secret, str) else dev_secret.decode()
+    """Return the org's GitLab webhook token, or None if unset.
 
-    try:
-        from astrolift_lifecycle.services.secrets import read_org_secret
+    GitLab presents the secret verbatim in `X-Gitlab-Token` rather than
+    signing the body, so this is compared in constant time as a string --
+    hence the decode. Scoped to gitlab connections: verifying a GitLab
+    delivery against a GitHub connection's secret would be a cross-host
+    confusion.
+    """
+    from astrolift_pipelines.webhook_security import org_webhook_secret
 
-        value = read_org_secret(org, "astrolift/pipeline/webhook_secret")
-        if value:
-            return value if isinstance(value, str) else value.decode()
-    except Exception:  # noqa: BLE001
-        pass
-
-    return None
+    secret = org_webhook_secret(org, source_kind="gitlab")
+    return secret.decode("utf-8") if secret else None
 
 
 def verify_signature(secret: str, provided: str) -> bool:
