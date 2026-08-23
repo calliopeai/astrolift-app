@@ -21,12 +21,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.secrets import SecretsBackend
 from aws._errors import NotFoundError, map_client_error
+from aws.session import aws_client
 
 
 @dataclass(frozen=True)
-class SecretsConfig:
+class SecretsConfig(CredentialedConfig):
     region: str
     kms_key_id: str | None = None
     """Customer-managed KMS key. None = AWS-managed default key."""
@@ -79,18 +81,15 @@ class AWSSecretsBackend(SecretsBackend):
         if sm_client is not None:
             self._sm = sm_client
         else:
-            import boto3
-
-            self._sm = boto3.client(
+            self._sm = aws_client(
                 "secretsmanager",
-                region_name=config.region,
+                region=config.region,
+                credential=config.credential,
             )
         if ssm_client is not None:
             self._ssm = ssm_client
         else:
-            import boto3
-
-            self._ssm = boto3.client("ssm", region_name=config.region)
+            self._ssm = aws_client("ssm", region=config.region, credential=config.credential)
 
     @driver_op(cloud="aws", driver="secrets")
     def ensure_initialized(self) -> dict | None:

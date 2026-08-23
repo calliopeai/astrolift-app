@@ -22,8 +22,10 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
 from aws._errors import NotFoundError, map_client_error
+from aws.session import aws_client
 
 # GitHub's OIDC issuer — present in the trust policy of the per-app
 # push role, and the `aud` claim our IAM trust enforces on the JWT
@@ -42,7 +44,7 @@ _SCAN_SEVERITIES = {
 
 
 @dataclass(frozen=True)
-class ECRConfig:
+class ECRConfig(CredentialedConfig):
     """AWS-specific ECR config. Bound from the cluster's plugin config."""
 
     region: str
@@ -78,9 +80,7 @@ class ECRDriver(ImageRegistryDriver):
         if client is not None:
             self._client = client
         else:
-            import boto3
-
-            self._client = boto3.client("ecr", region_name=config.region)
+            self._client = aws_client("ecr", region=config.region, credential=config.credential)
 
     @driver_op(cloud="aws", driver="registry")
     def ensure_repo(self, name: str) -> Repo:
@@ -369,9 +369,7 @@ class ECRDriver(ImageRegistryDriver):
         import json
 
         if self._iam is None:
-            import boto3
-
-            self._iam = boto3.client("iam", region_name=self._config.region)
+            self._iam = aws_client("iam", region=self._config.region, credential=self._config.credential)
 
         account_id = self._config.account_id
         # ``repo`` is the ECR repo name ``<org>/<app>`` — the literal '/' is

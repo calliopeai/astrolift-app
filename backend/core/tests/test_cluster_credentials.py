@@ -46,13 +46,26 @@ def test_a_cluster_without_a_declaration_is_ambient_everywhere():
 
 
 def test_an_unmigrated_capability_refuses_a_declared_credential():
-    """`secrets` rather than `managed:postgres`, which used to stand here.
+    """Named by exclusion rather than by hand.
 
-    PR 3 of #1422 threaded the credential through every AWS managed-service
-    driver, so `managed:*` is now migrated and no longer refuses. The
-    capability drivers (PR 4) and the EKS driver (PR 5) are not, and this
-    test has to name one of those to still be testing anything.
+    This test has had to be rewritten at every step of the migration: it
+    stood on `managed:postgres` until PR 3 threaded the managed drivers, then
+    on `secrets` until PR 4/5 threaded the capability and EKS drivers. Each
+    time it was a green test that had silently stopped testing anything,
+    found only because it went red.
+
+    So the subject is now derived from `CREDENTIAL_AWARE_CAPABILITIES`
+    instead of written down beside it. Migrating the next driver moves this
+    test by itself, and the day nothing is left unmigrated it skips rather
+    than passes vacuously.
     """
+    from core.cluster_credentials import CREDENTIAL_AWARE_CAPABILITIES
+
+    unmigrated = sorted({"dns", "tls", "ingress", "notification"} - CREDENTIAL_AWARE_CAPABILITIES)
+    if not unmigrated:
+        pytest.skip("every capability is migrated; this test has nothing left to guard")
+    capability = unmigrated[0]
+
     cluster = _cluster(
         provider_config={
             "region": "us-west-2",
@@ -61,15 +74,16 @@ def test_an_unmigrated_capability_refuses_a_declared_credential():
     )
 
     with pytest.raises(ClusterCredentialUnsupported) as exc:
-        assert_credential_supported(cluster, capability="secrets")
+        assert_credential_supported(cluster, capability=capability)
 
-    assert "secrets" in str(exc.value)
+    assert capability in str(exc.value)
     assert cluster.slug in str(exc.value)
 
 
 def test_a_migrated_capability_accepts_a_declared_credential():
-    """log_query is the one path that threads the credential to the client
-    today; the set it is drawn from is what a migration PR grows."""
+    """log_query was the first path to thread the credential to the client;
+    the set it is drawn from is what a migration PR grows. It now also holds
+    the managed drivers, the cluster driver, and registry/identity/secrets."""
     cluster = _cluster(
         provider_config={
             "region": "us-west-2",
