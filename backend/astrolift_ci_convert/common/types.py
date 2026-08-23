@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from astrolift_ci_convert.common import schema_version as schema_version_module
+
 
 @dataclass
 class StepDef:
@@ -46,6 +48,11 @@ class ScheduleDef:
 @dataclass
 class PipelineDef:
     name: str
+    # The document dialect this definition was read from, or will be written
+    # as. Defaults to the current version so code constructing a PipelineDef
+    # directly (the GHA/GitLab converters) produces a document that declares
+    # its dialect without every call site having to remember.
+    schema_version: int = field(default=schema_version_module.CURRENT)
     jobs: list[JobDef] = field(default_factory=list)
     env: dict = field(default_factory=dict)
     on_push_branches: list[str] = field(default_factory=list)

@@ -43,6 +43,21 @@ class PipelineRun(BaseCoreModel):
     skip_secrets = models.BooleanField(default=False)
     trigger_actor = models.CharField(max_length=255, blank=True, default="")
     temporal_workflow_id = models.CharField(max_length=512, blank=True, default="")
+    # What definition this run actually executed (#65, spec requirement 5).
+    #
+    # `trigger_ref` records the ref that fired the run, which is not the same
+    # question: a branch moves, and a definition fetched from it is a
+    # different document a minute later. Without a digest, "why did this run
+    # behave differently" is unanswerable after the fact -- and it becomes
+    # unanswerable across N files the moment the DSL grows includes.
+    #
+    # SHA-256 over the fetched document text, hex, no prefix. Empty when the
+    # run had no TOML behind it (an API/dashboard-defined pipeline), which is
+    # a real state and distinct from "we did not record it".
+    definition_digest = models.CharField(max_length=64, blank=True, default="")
+    # The dialect that document declared, so a run stays interpretable after
+    # the schema moves on. 0 = no document (see above).
+    definition_schema_version = models.PositiveSmallIntegerField(default=0)
     status = models.CharField(
         max_length=32,
         choices=Status.choices,

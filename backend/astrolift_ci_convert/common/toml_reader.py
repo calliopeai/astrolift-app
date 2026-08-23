@@ -22,6 +22,7 @@ from __future__ import annotations
 import tomllib
 from typing import Any
 
+from astrolift_ci_convert.common import schema_version as schema_version_module
 from astrolift_ci_convert.common.types import JobDef, PipelineDef, ScheduleDef, StepDef
 
 
@@ -40,6 +41,14 @@ def read_toml(text: str) -> PipelineDef:
     except tomllib.TOMLDecodeError as exc:
         raise TomlReadError(f"not valid TOML: {exc}") from exc
 
+    # Dialect first: a document we cannot read should say so before any
+    # other complaint, because every later error is only meaningful under a
+    # known schema.
+    try:
+        version = schema_version_module.coerce(raw.get(schema_version_module.FIELD))
+    except schema_version_module.UnsupportedSchemaVersion as exc:
+        raise TomlReadError(str(exc), path=schema_version_module.FIELD) from exc
+
     name = raw.get("name")
     if not isinstance(name, str) or not name.strip():
         raise TomlReadError("a pipeline needs a 'name'", path="name")
@@ -50,6 +59,7 @@ def read_toml(text: str) -> PipelineDef:
 
     return PipelineDef(
         name=name,
+        schema_version=version,
         jobs=_read_jobs(raw.get("jobs")),
         env=_str_map(raw.get("env"), "env"),
         on_push_branches=_str_list(push.get("branches"), "on.push.branches"),
@@ -88,6 +98,32 @@ def _read_jobs(raw: Any) -> list[JobDef]:
     return jobs
 
 
+def _unwrap_run(raw: object) -> str | None:
+    """A step's shell command, with the writer's formatting undone.
+
+    ``toml_writer`` emits a command as a TOML multi-line literal, opening
+    ``'''`` then a newline then the body then a newline then the closing
+    delimiter. TOML trims the newline that follows the opening delimiter but
+    keeps the one before the closing one, so ``make`` round-trips as
+    ``"make\n"``.
+
+    That made write -> read -> write non-idempotent, which stopped being
+    cosmetic the moment a run started recording a digest of its definition
+    (``PipelineRun.definition_digest``): the same pipeline converted twice
+    would hash differently. Exactly one trailing newline is removed, which is
+    the precise inverse of what the writer adds -- a basic-string ``run =
+    "make"`` has none and is untouched.
+
+    A script whose last line is deliberately blank loses that blank line.
+    That is meaningless to a shell, and idempotent round-tripping is worth
+    more than preserving it.
+    """
+    if raw is None:
+        return None
+    text = str(raw)
+    return text[:-1] if text.endswith("\n") else text
+
+
 def _read_steps(raw: Any, job_path: str) -> list[StepDef]:
     if raw is None:
         return []
@@ -113,7 +149,7 @@ def _read_steps(raw: Any, job_path: str) -> list[StepDef]:
             StepDef(
                 name=str(body.get("name") or f"step {index + 1}"),
                 uses=str(uses) if uses is not None else None,
-                run=str(run) if run is not None else None,
+                run=_unwrap_run(run),
                 env=_str_map(body.get("env"), f"{step_path}.env"),
                 with_params=_str_map(body.get("with"), f"{step_path}.with"),
             )
