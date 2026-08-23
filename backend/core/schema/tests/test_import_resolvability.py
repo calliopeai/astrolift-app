@@ -33,22 +33,6 @@ GUARDED = ("core/schema", "core/serializers")
 
 FIRST_PARTY_PREFIXES = ("core", "config", "astrolift", "providers")
 
-# Sites known broken and deliberately NOT fixed, so this gate can be
-# enforced without pretending the tree is clean. Each raises ImportError
-# when its path runs, exactly like the ones #1590 fixed.
-#
-# Why they are still here: the fix is not the import. These helpers resolve
-# a caller-supplied global id to a row, and `core/tests/test_tenancy_guardrail_byid.py`
-# flagged the obvious repair (`Model.objects.filter(pk=...)`) as an unscoped
-# by-id fetch -- correctly, because it is one. Unlike Upload, none of
-# `SharedDirectory` / `User` / `SignRequest` carries an organization column
-# and none of their types has a `get_queryset`, so there is no scoping
-# mechanism to route through and no org clause to add. Choosing one is a
-# security decision, and that guard's own docstring says adding an exemption
-# is a code-review decision rather than an author's.
-#
-# Making them *run* without settling that would turn "always fails" into
-# "works, across tenants", which is strictly worse.
 # Empty, and the anti-rot test below keeps it that way: an entry may only be
 # added with a reason, and must be removed the moment the site resolves.
 # The six that lived here (core.schema.library, core.schema.upload,
