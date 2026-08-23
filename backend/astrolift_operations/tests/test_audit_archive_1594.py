@@ -181,3 +181,43 @@ def test_the_append_only_trigger_still_refuses_delete(org, uploads):
 
     with pytest.raises(InternalError), transaction.atomic():
         AuditEvent.objects.filter(pk=event.pk).delete()
+
+
+def test_the_exporter_reads_only_fields_the_model_has():
+    """The guard for the class of bug that produced this whole change.
+
+    `_row_to_record`'s audit branch read `resource_kind`, `resource_id` and
+    `payload`. `AuditEvent` has `target_kind`, `target_id` and `data`. So the
+    exporter raised AttributeError on the first real row it was ever handed,
+    and `test_retention.py` stayed green throughout because its `_FakeAudit`
+    was shaped like the exporter rather than like the model.
+
+    Two things could drift again -- the exporter, or the fake -- so this
+    checks the exporter against the real model. A fake cannot satisfy it.
+    """
+    from astrolift_operations.retention import _row_to_record
+
+    class _Probe:
+        """Answers only for concrete AuditEvent fields; raises otherwise,
+        exactly as a real instance would."""
+
+        def __init__(self):
+            self._names = {f.name for f in AuditEvent._meta.get_fields() if hasattr(f, "attname")}
+            self._names |= {f.attname for f in AuditEvent._meta.concrete_fields}
+            self.read: set[str] = set()
+
+        def __getattr__(self, name):
+            names = object.__getattribute__(self, "_names")
+            if name not in names:
+                raise AttributeError(f"AuditEvent has no field {name!r}")
+            object.__getattribute__(self, "read").add(name)
+            return {} if name in {"data", "reasoning"} else "x"
+
+    probe = _Probe()
+    probe.occurred_at = timezone.now()
+
+    record = _row_to_record(probe, stream="audit")
+
+    assert record["stream"] == "audit"
+    assert "target_kind" in record
+    assert "resource_kind" not in record
