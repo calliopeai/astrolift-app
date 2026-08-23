@@ -1,5 +1,4 @@
-from django.contrib import admin, messages
-from django.contrib.contenttypes.models import ContentType
+from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from import_export.admin import ImportExportMixin
@@ -27,22 +26,6 @@ class BaseCoreMixing:
                 ('global_id', 'version', 'created_at', 'created_by', 'updated_by', 'updated_at', 'deleted_at',
                  'deleted_by'))
         # return super().get_readonly_fields(request, obj)
-
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if hasattr(self.model, 'to_mermaid'):  # Example condition
-            actions['diagram'] = (self.diagram, 'diagram', 'Generate Mermaid diagram')
-        return actions
-
-    def diagram(self, admin, request, queryset, *args, **kwargs):
-        content_type = ContentType.objects.get_for_model(queryset[0])
-        for rule in queryset:
-            url = reverse('diagram_view', kwargs=dict(
-                content_type_id=content_type.id,
-                object_id=rule.id
-            ))
-            messages.info(request, mark_safe(f'<a target="_blank" href="{url}">Diagram {rule}</a>'))
-
 
 class BaseCoreAdmin(admin.ModelAdmin, AdminGrapheneUtils, BaseCoreMixing, ImportExportMixin):
 
