@@ -204,33 +204,28 @@ class NotificationReadMutationTest(TestCase):
     def _make_context(self, user=None):
         return StrawberryContext(FakeRequest(user or self.user))
 
-    def _patch_get_object(self, notification):
-        """Patch the broken import path so get_object resolves directly."""
-        import sys
-        import types
-
-        # The mutation does `from core.schema import NotificationType` at call time.
-        # core.schema.__init__ doesn't export NotificationType, so we inject it.
-        fake_type = types.SimpleNamespace()
-        fake_type.get_object = staticmethod(
-            lambda info, gid, raise_not_found=True: notification
-        )
-        return patch.dict(
-            sys.modules['core.schema'].__dict__,
-            {'NotificationType': fake_type},
-        )
+    # `_patch_get_object` used to live here. It injected a fake
+    # `NotificationType` into `sys.modules['core.schema'].__dict__` because,
+    # as its own comment said, "core.schema.__init__ doesn't export
+    # NotificationType". That is true, and it meant the mutation raised
+    # ImportError on its first line for every real caller -- so these tests
+    # passed against a resolver that only existed inside them, and the
+    # mutation had never once succeeded in production.
+    #
+    # The import is fixed (#1590), so the tests now exercise the real id
+    # resolution. Any future need to patch this seam again is a signal that
+    # the seam is broken, not that it needs patching.
 
     def test_notification_read_marks_as_read(self):
         """Marking a notification as read updates its status in the database."""
         gid = self.notification.global_id
         context = self._make_context()
 
-        with self._patch_get_object(self.notification):
-            result = schema.execute_sync(
-                'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
-                variable_values={'gid': gid},
-                context_value=context,
-            )
+        result = schema.execute_sync(
+            'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
+            variable_values={'gid': gid},
+            context_value=context,
+        )
 
         self.assertIsNone(result.errors)
         self.assertTrue(result.data['notificationRead'])
@@ -245,12 +240,11 @@ class NotificationReadMutationTest(TestCase):
         gid = self.notification.global_id
         context = self._make_context()
 
-        with self._patch_get_object(self.notification):
-            schema.execute_sync(
-                'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
-                variable_values={'gid': gid},
-                context_value=context,
-            )
+        schema.execute_sync(
+            'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
+            variable_values={'gid': gid},
+            context_value=context,
+        )
 
         self.notification.refresh_from_db()
         self.assertGreaterEqual(self.notification.status_date, original_date)
@@ -268,12 +262,11 @@ class NotificationReadMutationTest(TestCase):
         gid = other_notif.global_id
         context = self._make_context(self.user)
 
-        with self._patch_get_object(other_notif):
-            result = schema.execute_sync(
-                'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
-                variable_values={'gid': gid},
-                context_value=context,
-            )
+        result = schema.execute_sync(
+            'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
+            variable_values={'gid': gid},
+            context_value=context,
+        )
 
         self.assertIsNotNone(result.errors)
         self.assertIn('does not belong to user', str(result.errors[0]))
@@ -290,12 +283,11 @@ class NotificationReadMutationTest(TestCase):
         gid = self.notification.global_id
         context = self._make_context()
 
-        with self._patch_get_object(self.notification):
-            result = schema.execute_sync(
-                'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
-                variable_values={'gid': gid},
-                context_value=context,
-            )
+        result = schema.execute_sync(
+            'mutation NotifRead($gid: ID!) { notificationRead(gid: $gid) }',
+            variable_values={'gid': gid},
+            context_value=context,
+        )
 
         self.assertIsNone(result.errors)
         self.assertTrue(result.data['notificationRead'])
