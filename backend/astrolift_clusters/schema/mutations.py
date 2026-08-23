@@ -23,6 +23,7 @@ from django.db import transaction
 from django.db.models import Q
 from strawberry.types import Info
 
+from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import (
     ClusterBootstrapRun,
     ManagedDomain,
@@ -250,6 +251,10 @@ class UpdateTenantClusterInput:
     region: str | None = None
     endpoint: str | None = None
     ingress_class: str | None = None
+    # None means "leave it": flipping a cluster to shared_ingress re-groups
+    # load balancers that are already serving traffic, so it has to be an
+    # explicit act rather than a side effect of any other update (#1537).
+    ingress_mode: str | None = None
     alb_auth_config: JSON | None = strawberry.UNSET
     # Write-only: the read side comes back redacted on TenantClusterType
     # because this carries the oauth2-proxy cookie secret (#1616).
@@ -717,6 +722,15 @@ class ClustersMutation:
         had_gate = _has_auth_gate(cluster.ingress_class, cluster)
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
+        if input.ingress_mode is not None:
+            if input.ingress_mode not in {m.value for m in IngressMode}:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"ingressMode must be one of "
+                    f"{sorted(m.value for m in IngressMode)}, got {input.ingress_mode!r}",
+                    field="ingressMode",
+                )
+            cluster.ingress_mode = input.ingress_mode
         if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         if oidc_changed:
