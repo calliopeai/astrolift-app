@@ -288,7 +288,12 @@ def test_create_trigger_unknown_kind(user, org, pipeline, permission_resolver):
 # ---------------------------------------------------------------------------
 
 
-def test_trigger_pipeline_run_creates_pending_run(user, org, pipeline, permission_resolver):
+def test_trigger_pipeline_run_creates_pending_run(user, org, pipeline, permission_resolver, settings):
+    # The mutation dispatches to Temporal now that the dispatch works at all
+    # (#1614) -- it used to raise ImportError on its first line and be
+    # swallowed, so no test needed this. Same stub the other suites use.
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+
     mutation = PipelinesMutation()
     info = _admin_info(user)
     permission_resolver.grant(Permission.APP_UPDATE)
