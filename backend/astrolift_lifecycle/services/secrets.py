@@ -77,6 +77,25 @@ def write_org_secret(org, key: str, value: str) -> None:
     row.save(update_fields=["backend_kind", "ciphertext", "updated_at", "version"])
 
 
+def list_org_secrets(org, *, prefix: str = "") -> list[str]:
+    """Keys the org holds, optionally narrowed to those under ``prefix``.
+
+    ``astrolift_pipelines.pipeline_secrets.get_pipeline_secret_names`` has
+    imported this since #100 and it was never written, so the name list a
+    pipeline shows for its secrets has always been empty (#1614).
+
+    Names only. A caller that wanted values would call ``read_org_secret``
+    per key, which is one decrypt per secret and therefore one place to
+    audit rather than a bulk read that hands out everything at once.
+    """
+    from astrolift_lifecycle.models import OrgSecret
+
+    rows = OrgSecret.objects.filter(organization_id=_org_pk(org))
+    if prefix:
+        rows = rows.filter(key__startswith=prefix)
+    return sorted(rows.values_list("key", flat=True))
+
+
 def delete_org_secret(org, key: str) -> None:
     """Soft-delete the secret at ``key``. Absent keys are a no-op.
 
