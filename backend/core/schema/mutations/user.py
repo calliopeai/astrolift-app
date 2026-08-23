@@ -38,9 +38,20 @@ def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User
     ``core.schema.user`` does not exist; these helpers have raised ImportError
     on every call since the Graphene migration (#1590). Resolution is a plain
     pk lookup because ``UserType`` carries no ``get_queryset`` hook to scope
-    through - callers that accept an arbitrary user id own their own
-    authorization check, and ``switch_user`` below is the one that needed it.
+    through, so every caller owns its own gate. All five were audited in #1593:
+
+    * ``switch_user`` - ``_may_switch_to`` (superuser or shared switch group)
+    * ``profile_request_pwd_change`` - ``P.PROFILE_CHANGE_RESET_PASSWORD_USERS``
+    * ``profile_request_delete_user`` - ``P.PROFILE_DELETE_USERS``
+    * ``pin_transaction`` - ``Profile.authenticate`` checks the PIN against the
+      *proxy* user's own hash, so acting as them requires their credential
+    * ``sign_request_user`` - ``P.SIGNREQUEST_CHANGE_SIGN``, checked against the
+      target. That grants "may be asked to sign", not access to the asker's
+      data, and is pre-existing semantics rather than a gate added here.
     """
+    # tenancy: User is a core global model with no organization column, so
+    # there is no org clause to add here. Authorization lives at each call
+    # site, enumerated in the docstring above, not in this fetch.
     pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='UserType')
     user = User.objects.filter(pk=pk).first() if pk else None
     if user is None and raise_not_found:
@@ -49,7 +60,25 @@ def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User
 
 
 def _get_sign_request_object(info, global_id: str, raise_not_found: bool = True) -> SignRequest:
-    """Resolve a SignRequest from a relay global ID."""
+    """Resolve a SignRequest from a relay global ID.
+
+    The Graphene ``SignRequestType.get_object`` this replaced carried its own
+    security (``sign_request_user`` says so in a comment, and deliberately
+    avoided it). That module does not exist, so both callers have raised
+    ImportError rather than enforcing anything. The enforcement they get back
+    is the model's, which is stricter than a queryset filter would be:
+
+    * ``sign_request_sign`` - ``SignRequest.sign`` checks
+      ``P.SIGNREQUEST_CHANGE_SIGN``, that the caller is in
+      ``users_allowed_to_sign()``, that they were actually requested, and that
+      an active PinTransaction exists.
+    * ``sign_request_cancel`` - ``SignRequest.cancel`` checks
+      ``P.SIGNREQUEST_CHANGE_CANCEL``.
+    """
+    # tenancy: SignRequest is a core global model with no organization column;
+    # affiliation, not org membership, is what bounds visibility (see the model
+    # docstring). Every consumer permission-checks on its first line, so there
+    # is no org clause to add to this fetch.
     pk = _get_sign_request_pk(global_id)
     sign_request = SignRequest.objects.filter(pk=pk).first() if pk else None
     if sign_request is None and raise_not_found:
