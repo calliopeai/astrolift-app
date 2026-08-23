@@ -65,6 +65,43 @@ class OIDCAuthConfig:
     the authenticated identity."""
 
 
+# The three annotation keys that route an nginx-family Ingress through
+# the central auth host. ``core.ingress_reconcile`` patches exactly
+# these keys, so this tuple is the canonical set for the render path
+# and the in-place patch path alike -- they must not drift.
+NGINX_AUTH_ANNOTATION_KEYS = (
+    "nginx.ingress.kubernetes.io/auth-url",
+    "nginx.ingress.kubernetes.io/auth-signin",
+    "nginx.ingress.kubernetes.io/auth-response-headers",
+)
+
+
+def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
+    """Annotations pointing an nginx-family Ingress at the central auth
+    host.
+
+    Split out of ``_render_nginx_style`` so every producer of a gated
+    Ingress emits byte-identical values: this driver, the workflow's
+    own managed-subdomain renderer
+    (``astrolift_workflows.activities.app_lifecycle``), and the live
+    patcher (``core.ingress_reconcile``). Three call sites hand-rolling
+    the gate is how an app ends up authenticated on one render path and
+    public on another.
+    """
+    return {
+        "nginx.ingress.kubernetes.io/auth-url": f"https://{auth.auth_proxy_host}/oauth2/auth",
+        # rd must be the FULL app URL: the auth host lives on its own
+        # hostname, so a path-only rd lands the user on the auth host
+        # after login instead of back on the app. oauth2-proxy's
+        # whitelist-domain gates which hosts the full-URL redirect
+        # may target.
+        "nginx.ingress.kubernetes.io/auth-signin": (
+            f"https://{auth.auth_proxy_host}/oauth2/start?rd=https://$host$escaped_request_uri"
+        ),
+        "nginx.ingress.kubernetes.io/auth-response-headers": ",".join(auth.response_headers),
+    }
+
+
 @dataclass(frozen=True)
 class K8sIngressConfig:
     variant: str = "nginx_ingress"
@@ -267,17 +304,7 @@ class K8sIngressDriver(IngressDriver):
         if tls_strategy == "letsencrypt":
             annotations["cert-manager.io/cluster-issuer"] = self._config.cert_manager_issuer
         if self._config.oidc_auth is not None:
-            auth = self._config.oidc_auth
-            annotations["nginx.ingress.kubernetes.io/auth-url"] = f"https://{auth.auth_proxy_host}/oauth2/auth"
-            # rd must be the FULL app URL: the auth host lives on its own
-            # hostname, so a path-only rd lands the user on the auth host
-            # after login instead of back on the app. oauth2-proxy's
-            # whitelist-domain gates which hosts the full-URL redirect
-            # may target.
-            annotations["nginx.ingress.kubernetes.io/auth-signin"] = (
-                f"https://{auth.auth_proxy_host}/oauth2/start?rd=https://$host$escaped_request_uri"
-            )
-            annotations["nginx.ingress.kubernetes.io/auth-response-headers"] = ",".join(auth.response_headers)
+            annotations.update(nginx_auth_annotations(self._config.oidc_auth))
 
         rules = [
             {

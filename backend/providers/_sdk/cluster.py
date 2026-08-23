@@ -482,6 +482,20 @@ class ClusterContext:
     provider_plugin_slug: str = ""
     """Surfaces the provider plugin in error messages; not used for auth."""
 
+    oidc_auth_config: dict[str, Any] = field(default_factory=dict)
+    """Central edge-auth config from the row: ``discovery_url``,
+    ``client_id``, ``cookie_secret``, ``upstream_connector``,
+    ``auth_proxy_host``.
+
+    Carried so ``bootstrap_components`` can render the auth host from
+    what the operator actually declared. Without it the recipe has no
+    way to know the hostname, the upstream issuer, or the cookie scope,
+    and the oauth2-proxy component can only ship placeholders that every
+    install then has to hand-correct.
+
+    Not part of ``to_auth()`` -- this configures what the cluster runs,
+    not how the platform authenticates to it."""
+
     def to_auth(self) -> ClusterAuth:
         """Project this context onto the ``ClusterAuth`` shape used by
         ``build_api_client``. Workflow + driver share the conversion

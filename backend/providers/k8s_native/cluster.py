@@ -100,6 +100,48 @@ class K8sNativeConfig:
     rollout_timeout_default_seconds: int = 600
 
 
+# Name of the Secret the oauth2-proxy release reads its credentials
+# from. The bootstrap recipe references it rather than carrying the
+# values: ``helm_values`` is returned to operators over GraphQL, and
+# ``oidc_auth_config`` holds ``cookie_secret``, the key that signs the
+# session cookie. A recipe that inlined it would hand a session-minting
+# credential to every caller who can read the cluster.
+CENTRAL_AUTH_SECRET_NAME = "astrolift-central-auth"
+
+
+def cookie_scope_for(auth_proxy_host: str) -> str:
+    """The parent zone of the auth host, dot-prefixed.
+
+    ``auth.astro.example.com`` -> ``.astro.example.com``. This is the
+    whole point of the central auth host: a cookie scoped to the parent
+    zone is presented on every app subdomain under it, so one login and
+    one registered callback cover every app without per-app
+    registration. Returns ``""`` for a host with no parent to scope to,
+    which leaves the flag off rather than emitting a bare ``.com``.
+    """
+    labels = [label for label in (auth_proxy_host or "").split(".") if label]
+    if len(labels) < 3:
+        return ""
+    return "." + ".".join(labels[1:])
+
+
+def issuer_from_discovery_url(discovery_url: str) -> str:
+    """Issuer URL for oauth2-proxy's ``--oidc-issuer-url``.
+
+    The row stores a discovery URL because that is what an operator
+    copies out of a provider console, but oauth2-proxy wants the issuer
+    and appends the well-known path itself. Passing the discovery URL
+    straight through yields a doubled
+    ``/.well-known/openid-configuration`` and a proxy that cannot
+    start.
+    """
+    url = (discovery_url or "").rstrip("/")
+    suffix = "/.well-known/openid-configuration"
+    if url.endswith(suffix):
+        url = url[: -len(suffix)]
+    return url
+
+
 class K8sNativeClusterDriver(ClusterDriver):
     def __init__(
         self,
@@ -632,6 +674,45 @@ class K8sNativeClusterDriver(ClusterDriver):
         Longhorn; MetalLB provides LoadBalancer Service IPs since
         bare-metal clusters don't get cloud LBs for free.
         """
+        # The auth host is rendered from the cluster row, not from
+        # placeholders: an oauth2-proxy that doesn't know its own
+        # hostname, its upstream issuer, or its cookie scope is the one
+        # piece an operator cannot supply after the fact without
+        # hand-editing the release (#1539).
+        oidc_config = getattr(cluster, "oidc_auth_config", None) or {}
+        auth_proxy_host = str(oidc_config.get("auth_proxy_host") or "")
+        oidc_client_id = str(oidc_config.get("client_id") or "")
+        oidc_issuer_url = issuer_from_discovery_url(str(oidc_config.get("discovery_url") or ""))
+        cookie_scope = cookie_scope_for(auth_proxy_host)
+        auth_host_configured = bool(auth_proxy_host and oidc_client_id and oidc_issuer_url)
+
+        oauth2_proxy_args: dict[str, Any] = {
+            "provider": "oidc",
+            "email-domain": "*",
+            # nginx's auth_request calls the proxy over the cluster
+            # network with the original Host preserved; without this the
+            # proxy builds its redirects from the internal address.
+            "reverse-proxy": "true",
+            "set-xauthrequest": "true",
+            "skip-provider-button": "true",
+        }
+        if oidc_issuer_url:
+            oauth2_proxy_args["oidc-issuer-url"] = oidc_issuer_url
+        if auth_proxy_host:
+            # The SINGLE callback. Every app redirects through this one
+            # URL, so the upstream IdP needs exactly one registration no
+            # matter how many apps the cluster ends up serving -- which
+            # is the defect this closes, since Cognito matches callbacks
+            # exactly and caps them at 100 per client.
+            oauth2_proxy_args["redirect-url"] = f"https://{auth_proxy_host}/oauth2/callback"
+        if cookie_scope:
+            oauth2_proxy_args["cookie-domain"] = cookie_scope
+            # Bounds which hosts the full-URL ``rd`` may send a user back
+            # to after login. The Ingress annotations pass the app's own
+            # URL, so without this the proxy refuses the redirect and
+            # strands the user on the auth host.
+            oauth2_proxy_args["whitelist-domain"] = cookie_scope
+
         return [
             BootstrapComponent(
                 key="cert-manager",
@@ -939,18 +1020,24 @@ class K8sNativeClusterDriver(ClusterDriver):
             ),
             BootstrapComponent(
                 key="oauth2-proxy",
-                title="oauth2-proxy (OIDC edge auth gate)",
-                default_enabled=False,
+                title="oauth2-proxy (central auth host)",
+                default_enabled=auth_host_configured,
                 rationale=(
-                    "oauth2-proxy sits in front of every nginx-class Ingress and "
-                    "enforces OIDC authentication via the nginx "
-                    "auth_request sub-request mechanism. Works with Dex "
-                    "(in-cluster) or any external OIDC provider. Enable "
-                    "alongside Dex when oidc_auth_config is set."
+                    "The central auth host. It owns the single OIDC callback "
+                    "for the whole cluster and issues a session cookie scoped "
+                    "to the parent zone, so every nginx-class Ingress gates on "
+                    "it via an auth_request sub-request and a new public app "
+                    "needs no callback registration of its own. Rendered from "
+                    "the cluster's oidc_auth_config; enabled once that config "
+                    "is complete. Works against Dex in-cluster or any external "
+                    "OIDC provider."
                 ),
                 helm_values={
                     "config": {
-                        "clientID": "astrolift-proxy",
+                        "clientID": oidc_client_id,
+                        # Client secret + cookie secret come from the
+                        # Secret, never from the recipe.
+                        "existingSecret": CENTRAL_AUTH_SECRET_NAME,
                         "cookieSecure": True,
                         "cookieName": "_astrolift_oauth2",
                         "emailDomains": ["*"],
@@ -959,16 +1046,32 @@ class K8sNativeClusterDriver(ClusterDriver):
                         "setXauthrequest": True,
                         "upstreamInsecureSkipVerify": False,
                     },
+                    "extraArgs": oauth2_proxy_args,
                     "ingress": {
                         "enabled": True,
                         "className": "nginx",
                         "annotations": {
                             "cert-manager.io/cluster-issuer": "letsencrypt-prod",
                         },
+                        "hosts": [auth_proxy_host] if auth_proxy_host else [],
+                        "tls": (
+                            [
+                                {
+                                    "secretName": "astrolift-central-auth-tls",
+                                    "hosts": [auth_proxy_host],
+                                }
+                            ]
+                            if auth_proxy_host
+                            else []
+                        ),
                     },
                     "replicaCount": 2,
                 },
-                requires=["dex or external OIDC provider", "oidc_auth_config set on cluster"],
+                requires=[
+                    "dex or external OIDC provider",
+                    "oidc_auth_config set on cluster (discovery_url, client_id, auth_proxy_host)",
+                    f"Secret {CENTRAL_AUTH_SECRET_NAME} (client-secret, cookie-secret) in the release namespace",
+                ],
                 options=[],
                 chart_name="oauth2-proxy",
                 chart_repo_url="https://oauth2-proxy.github.io/manifests",
