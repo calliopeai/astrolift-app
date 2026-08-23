@@ -11,13 +11,12 @@ carries what the operator declared.
 from __future__ import annotations
 
 from _sdk.cluster import ClusterContext
-from k8s_native.cluster import (
+from k8s_native.central_auth import (
     CENTRAL_AUTH_SECRET_NAME,
-    K8sNativeClusterDriver,
-    K8sNativeConfig,
     cookie_scope_for,
     issuer_from_discovery_url,
 )
+from k8s_native.cluster import K8sNativeClusterDriver, K8sNativeConfig
 
 OIDC_CONFIG = {
     "discovery_url": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_abc",
@@ -140,3 +139,67 @@ def test_component_omits_host_flags_without_a_config():
     assert values["ingress"]["hosts"] == []
     assert "redirect-url" not in values["extraArgs"]
     assert "cookie-domain" not in values["extraArgs"]
+
+
+# ---- every cloud driver offers the same auth host --------------------
+
+
+def test_eks_recipe_offers_the_central_auth_host():
+    """Astrolift's tenant runtime is EKS. A recipe only the vanilla-k8s
+    driver carried would leave the auth host unbuildable on the clusters
+    that actually serve tenant apps -- which is how the first install
+    ended up hand-assembling it with Flux."""
+    from unittest.mock import MagicMock
+
+    from _sdk.cluster import ClusterContext as Ctx
+    from aws.cluster_eks import EKSClusterDriver, EKSConfig
+
+    eks = MagicMock()
+    eks.describe_cluster.return_value = {"cluster": {"resourcesVpcConfig": {"vpcId": "vpc-1"}}}
+    sts = MagicMock()
+    sts.get_caller_identity.return_value = {"Account": "123456789012"}
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    driver = EKSClusterDriver(
+        config=EKSConfig(region="us-west-2", cluster_name="prod"),
+        eks_client=eks,
+        sts_client=sts,
+        ec2_client=ec2,
+        k8s_client_factory=lambda **kw: MagicMock(),
+    )
+
+    components = driver.bootstrap_components(
+        Ctx(slug="aws-prod", auth_method="exec_plugin", oidc_auth_config=OIDC_CONFIG)
+    )
+    component = next(c for c in components if c.key == "oauth2-proxy")
+
+    assert component.default_enabled is True
+    assert component.helm_values["extraArgs"]["redirect-url"] == ("https://auth.astrolift.smdinfra.net/oauth2/callback")
+    assert component.helm_values["extraArgs"]["cookie-domain"] == ".astrolift.smdinfra.net"
+
+
+def test_eks_recipe_leaves_the_auth_host_off_without_a_config():
+    """An ALB-only cluster has no nginx controller to gate against, so
+    the component must be inert rather than installed-and-broken."""
+    from unittest.mock import MagicMock
+
+    from _sdk.cluster import ClusterContext as Ctx
+    from aws.cluster_eks import EKSClusterDriver, EKSConfig
+
+    eks = MagicMock()
+    eks.describe_cluster.return_value = {"cluster": {"resourcesVpcConfig": {"vpcId": "vpc-1"}}}
+    sts = MagicMock()
+    sts.get_caller_identity.return_value = {"Account": "123456789012"}
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    driver = EKSClusterDriver(
+        config=EKSConfig(region="us-west-2", cluster_name="prod"),
+        eks_client=eks,
+        sts_client=sts,
+        ec2_client=ec2,
+        k8s_client_factory=lambda **kw: MagicMock(),
+    )
+
+    components = driver.bootstrap_components(Ctx(slug="aws-prod", auth_method="exec_plugin"))
+    component = next(c for c in components if c.key == "oauth2-proxy")
+    assert component.default_enabled is False
