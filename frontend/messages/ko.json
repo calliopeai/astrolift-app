@@ -800,6 +800,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "로그인 불필요",
+        "edgeAuthUngatedHelp": "이 앱의 플랫폼 서브도메인은 클러스터 로그인으로 보호되지만 이 사용자 지정 도메인은 보호되지 않으므로 URL을 아는 사람은 누구나 앱에 접근할 수 있습니다. 세션 쿠키는 플랫폼 영역에만 적용되며 외부 도메인은 포함할 수 없습니다.",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",

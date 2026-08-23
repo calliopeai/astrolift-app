@@ -158,6 +158,38 @@ Value:  ingress.<cluster>.astrolift.app`}</code>
 
       <Separator />
 
+      {/* #1621 — the documented answer to "is my custom domain behind the
+          login gate". It is not, it cannot be made to be by configuration,
+          and an operator should read that here rather than discover it by
+          opening the URL. */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-medium">Authentication on a custom domain</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          If your cluster has an edge login gate, it covers the app&apos;s
+          platform subdomain — not your custom domain. The gate&apos;s session
+          cookie is issued by the cluster&apos;s auth host and scoped to the
+          platform&apos;s own zone, and a response from one domain cannot set a
+          cookie for an unrelated one. A custom domain is therefore outside the
+          gate by construction, and no setting changes that.
+        </p>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          The Domains tab marks any such row{" "}
+          <Badge
+            className="border-warning-border bg-warning/10 text-warning-fg"
+            variant="outline"
+          >
+            No login required
+          </Badge>
+          , and the Ingress carries{" "}
+          <code>astrolift.dev/edge-auth=ungated</code> so it is visible from{" "}
+          <code>kubectl</code> too. Treat a custom domain as a public entrance:
+          if the app behind it needs authentication, it has to enforce that
+          itself.
+        </p>
+      </section>
+
+      <Separator />
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Troubleshooting</h2>
         <ul className="text-muted-foreground flex flex-col gap-3 text-sm">

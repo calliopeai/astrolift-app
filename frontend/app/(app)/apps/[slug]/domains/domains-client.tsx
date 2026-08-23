@@ -149,6 +149,10 @@ interface AppDomain {
   // platform-managed cert".
   isWildcard?: boolean;
   sniCertRef?: string;
+  // #1621 — "no_gate" | "gated" | "ungated". Optional so a stale Apollo
+  // cache entry written before the field landed doesn't crash the row;
+  // undefined is treated as "nothing to say", same as no_gate.
+  edgeAuthState?: string;
 }
 
 interface WorkloadOption {
@@ -236,6 +240,31 @@ function CertExpiryBadge({
   return (
     <Badge variant="outline" className="text-muted-foreground text-2xs">
       Expires in {days}d
+    </Badge>
+  );
+}
+
+/**
+ * #1621 — the app's managed subdomain is behind the cluster's login gate
+ * and this custom domain is not, so the same backend is reachable here
+ * without authenticating.
+ *
+ * Rendered only for ``ungated``. It is not a misconfiguration the
+ * operator can toggle away: the gate's session cookie is scoped to the
+ * platform's own zone and cannot be set for an external domain, so a
+ * custom domain is outside it by construction. The badge exists because
+ * the alternative was finding out by opening the URL.
+ */
+function EdgeAuthBadge({ state }: { state?: string }) {
+  const t = useTranslations("apps.domains.cert");
+  if (state !== "ungated") return null;
+  return (
+    <Badge
+      variant="outline"
+      className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
+      title={t("edgeAuthUngatedHelp")}
+    >
+      {t("edgeAuthUngated")}
     </Badge>
   );
 }
@@ -984,6 +1013,8 @@ function DomainHandshakeCard({
               read the cert yet (certExpiresAt null). Warning tone when
               within 14d of expiry; danger tone when within 7d. */}
           <CertExpiryBadge expiresAt={domain.certExpiresAt ?? null} status={domain.certObservabilityStatus ?? ""} />
+          {/* #1621 — gated on the managed subdomain, not here. */}
+          <EdgeAuthBadge state={domain.edgeAuthState} />
           <span className="text-muted-foreground ml-auto text-xs">
             {domain.lastCheckedAt
               ? t("lastChecked", { at: new Date(domain.lastCheckedAt).toLocaleString() })
