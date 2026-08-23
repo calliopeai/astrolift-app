@@ -187,8 +187,7 @@ def _connection_token(connection, *, source_kind: str) -> str:
         token = accessor(connection)
     except Exception as exc:  # noqa: BLE001 - provider errors differ per host
         raise TomlFetchError(
-            f"The {label} connection for this organization cannot produce a "
-            f"credential: {exc}"
+            f"The {label} connection for this organization cannot produce a " f"credential: {exc}"
         ) from exc
     if not token:
         raise TomlFetchError(f"The {label} connection for this organization has no usable credential.")
@@ -216,4 +215,3 @@ def _extract_project_path_gitlab(url: str) -> str:
             break
     parts = url.split("/", 1)
     return parts[1] if len(parts) > 1 else url
-

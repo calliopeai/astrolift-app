@@ -53,9 +53,7 @@ def test_a_pat_connection_resolves_to_its_decrypted_token(org):
     _connection(org, "github_pat")
 
     connection = _org_connection(org, source_kind="github")
-    with mock.patch(
-        "astrolift_scm.providers.github._token", return_value="ghp_live"
-    ) as accessor:
+    with mock.patch("astrolift_scm.providers.github._token", return_value="ghp_live") as accessor:
         assert _connection_token(connection, source_kind="github") == "ghp_live"
 
     # The provider driver is the only code that knows how each connection
@@ -95,9 +93,7 @@ def test_an_unusable_credential_is_reported_not_swallowed(org):
     _connection(org, "github_pat")
     connection = _org_connection(org, source_kind="github")
 
-    with mock.patch(
-        "astrolift_scm.providers.github._token", side_effect=RuntimeError("key rotated out")
-    ):
+    with mock.patch("astrolift_scm.providers.github._token", side_effect=RuntimeError("key rotated out")):
         with pytest.raises(TomlFetchError, match="key rotated out"):
             _connection_token(connection, source_kind="github")
 
@@ -115,9 +111,7 @@ def test_gitlab_resolves_through_its_own_provider(org):
     _connection(org, "gitlab_pat")
 
     connection = _org_connection(org, source_kind="gitlab")
-    with mock.patch(
-        "astrolift_scm.providers.gitlab._token", return_value="glpat_live"
-    ) as accessor:
+    with mock.patch("astrolift_scm.providers.gitlab._token", return_value="glpat_live") as accessor:
         assert _connection_token(connection, source_kind="gitlab") == "glpat_live"
 
     accessor.assert_called_once_with(connection)
@@ -129,9 +123,7 @@ def test_gitlab_fetch_uses_the_connections_api_base_not_the_repo_host(org):
     repo URL and could only ever reach the guess."""
     from astrolift_scm.providers.gitlab import _api_base
 
-    connection = _connection(
-        org, "gitlab_pat", api_base_url="https://git.internal.example/api-gateway"
-    )
+    connection = _connection(org, "gitlab_pat", api_base_url="https://git.internal.example/api-gateway")
 
     assert _api_base(connection) == "https://git.internal.example/api-gateway"
 
@@ -155,11 +147,7 @@ def test_the_dead_field_and_module_are_gone():
         "secret_ciphertext behind the provider driver"
     )
 
-    modules = {
-        n.module
-        for n in ast.walk(tree)
-        if isinstance(n, ast.ImportFrom) and n.module
-    } | {
+    modules = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module} | {
         alias.name for n in ast.walk(tree) if isinstance(n, ast.Import) for alias in n.names
     }
     assert "core.encryption" not in modules, "the envelope module is core.secrets"
