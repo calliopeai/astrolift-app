@@ -47,6 +47,7 @@ from _sdk.cluster import (
 from _sdk.k8s_dynamic_client import KubernetesDynamicClient
 from _sdk.k8s_dynamic_client import NotFoundError as _NotFound
 from _sdk.k8s_dynamic_client import PreconditionFailedError as _PreconditionFailed
+from k8s_native.central_auth import central_auth_component
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -937,45 +938,7 @@ class K8sNativeClusterDriver(ClusterDriver):
                 chart_repo_type="default",
                 chart_version="0.19.1",
             ),
-            BootstrapComponent(
-                key="oauth2-proxy",
-                title="oauth2-proxy (OIDC edge auth gate)",
-                default_enabled=False,
-                rationale=(
-                    "oauth2-proxy sits in front of every nginx-class Ingress and "
-                    "enforces OIDC authentication via the nginx "
-                    "auth_request sub-request mechanism. Works with Dex "
-                    "(in-cluster) or any external OIDC provider. Enable "
-                    "alongside Dex when oidc_auth_config is set."
-                ),
-                helm_values={
-                    "config": {
-                        "clientID": "astrolift-proxy",
-                        "cookieSecure": True,
-                        "cookieName": "_astrolift_oauth2",
-                        "emailDomains": ["*"],
-                        "scope": "openid email profile groups",
-                        "passAccessToken": True,
-                        "setXauthrequest": True,
-                        "upstreamInsecureSkipVerify": False,
-                    },
-                    "ingress": {
-                        "enabled": True,
-                        "className": "nginx",
-                        "annotations": {
-                            "cert-manager.io/cluster-issuer": "letsencrypt-prod",
-                        },
-                    },
-                    "replicaCount": 2,
-                },
-                requires=["dex or external OIDC provider", "oidc_auth_config set on cluster"],
-                options=[],
-                chart_name="oauth2-proxy",
-                chart_repo_url="https://oauth2-proxy.github.io/manifests",
-                chart_repo_type="default",
-                chart_version="7.7.14",
-                depends_on=["dex"],
-            ),
+            central_auth_component(getattr(cluster, "oidc_auth_config", None)),
         ]
 
     # ---- Cluster health (#68 slice 1) -----------------------------
