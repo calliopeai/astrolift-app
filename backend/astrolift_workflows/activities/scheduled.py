@@ -444,10 +444,9 @@ def _prune_audit_log_sync(retention_days: int) -> int:
         "pk", "audit_log_retention_days"
     )
     for org_id, days in org_windows:
-        total += _count(
-            AuditEvent.objects.filter(organization_id=org_id),
-            days=max(1, int(days or fallback_days)),
-        )
+        window = max(1, int(days or fallback_days))
+        total += _count(AuditEvent.objects.filter(organization_id=org_id), days=window)
+        _archive_org(org_id, now=now, retention_days=window)
     total += _count(AuditEvent.objects.filter(organization__isnull=True), days=fallback_days)
 
     if total:
@@ -457,6 +456,29 @@ def _prune_audit_log_sync(retention_days: int) -> int:
             total,
         )
     return total
+
+
+def _archive_org(org_id: int, *, now, retention_days: int) -> None:
+    """Archive one org's expired audit events, if it has opted in (#1594).
+
+    Best-effort per org, deliberately: one org's blob-store misconfiguration
+    must not stop the sweep reporting for the rest, and this activity's
+    contract is the count it returns. The archive logs its own failures.
+
+    Still does not delete. The append-only trigger stands and #1594 carries
+    that decision; this only means an org that has opted in now has the
+    events off-platform before whichever way that decision goes.
+    """
+    from astrolift_identity.models import Organization
+    from astrolift_operations.audit_archive import archive_expired_audit_events
+
+    try:
+        org = Organization.objects.get(pk=org_id)
+        if not org.audit_export_enabled:
+            return
+        archive_expired_audit_events(org, now=now, retention_days=retention_days)
+    except Exception:  # noqa: BLE001
+        log.exception("audit archive: failed for organization %s", org_id)
 
 
 @activity.defn(name="astrolift.scheduled.prune_audit_log")

@@ -56,6 +56,21 @@ class Organization(NamedBaseCoreModel):
     # column is the per-org override (NULL = inherit). See spec 08 §12
     # for the observability stream defaults (logs/metrics/traces).
     audit_log_retention_days = models.PositiveIntegerField(default=365)
+    # Off by default, deliberately (#1594). Turning it on starts writing an
+    # org's audit events to the install's blob store, which is a data-export
+    # decision an operator has to make rather than inherit: the archive
+    # leaves the platform's own storage and lands wherever the install
+    # points AWS_STORAGE_BUCKET_NAME. It also does not change what is
+    # retained -- the append-only trigger still refuses DELETE, so this
+    # archives and never prunes.
+    audit_export_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Write audit events past this org's retention window to the install's "
+            "blob store as hash-chained JSONL. Does not delete anything: the "
+            "append-only trigger still refuses DELETE (see #1594)."
+        ),
+    )
     preview_max_active_default = models.PositiveIntegerField(default=5)
     log_retention_days_default = models.PositiveIntegerField(default=30)
     # Observability streams. Metrics carry two horizons because raw
