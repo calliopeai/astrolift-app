@@ -62,15 +62,16 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
     ``org`` is the Django Organization instance; it is not imported here so
     the resolution stays usable from the providers-isolated layers.
     """
-    # Step 1 — provider plugin registry (production path).
-    try:
-        from astrolift_drivers.registry import get_driver_for_org  # type: ignore[import-not-found]
+    # Step 1 — the install's platform-owned S3 bucket. This is the production
+    # path, and it is new (#1610): what stood here was a lookup of
+    # `astrolift_drivers.registry.get_driver_for_org`, which does not exist,
+    # so snapshots fell straight through to a dev-only local path and then
+    # raised. There was no way to store a snapshot on a production install.
+    from core.blob_store_resolution import install_s3_driver
 
-        driver = get_driver_for_org(org, role="blob_store")
-        if driver is not None:
-            return driver  # type: ignore[return-value]
-    except ImportError:
-        pass
+    driver = install_s3_driver(purpose="snapshot store")
+    if driver is not None:
+        return driver
 
     # Step 2 — local filesystem fallback. Snapshots share the artifact local
     # path by default so they work wherever artifacts do, but can be split
@@ -85,9 +86,9 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
     # Step 3 — nothing configured.
     raise BlobStoreNotConfiguredError(
         "No blob store is configured for VNC snapshots. Set "
+        "AWS_STORAGE_BUCKET_NAME for a normal install, or "
         "ASTROLIFT_SNAPSHOT_LOCAL_PATH (or PIPELINE_ARTIFACT_LOCAL_PATH) for "
-        "local dev, or configure a blob_store driver in the install's "
-        "provider plugin registry."
+        "local dev."
     )
 
 
