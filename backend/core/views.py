@@ -1,24 +1,10 @@
 from core.utils.file_processor.file_export_util import Echo, FileExport
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-
-
-@login_required
-def diagram_view(request, content_type_id, object_id):
-    # Get the content type and the object
-    content_type = get_object_or_404(ContentType, id=content_type_id)
-    model_class = content_type.model_class()
-    obj = get_object_or_404(model_class, id=object_id)
-
-    # Generate Mermaid diagram code based on the object (customize this as needed)
-    mermaid_code = obj.to_mermaid().to_graph()
-    # Render the template with the generated code
-    return render(request, "core/diagram.html", {"mermaid_code": mermaid_code})
 
 
 @login_required

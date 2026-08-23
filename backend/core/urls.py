@@ -4,7 +4,6 @@ from django.urls import path
 from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('core/diagram/<int:content_type_id>/<int:object_id>/', views.diagram_view, name='diagram_view'),
     path('core/user-permissions-report/', views.user_permissions_tree, name='user_permissions_report'),
     path('core/user-permissions-tree-view/',
          TemplateView.as_view(
