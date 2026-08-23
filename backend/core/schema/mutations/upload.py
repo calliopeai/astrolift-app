@@ -18,9 +18,10 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.models import Profile, SharedDirectory, SharedFile
-from core.models.process import DataProcessEntity, EntityType, FileType, ProcessStatus
+from core.models.process import DataProcess, DataProcessEntity, EntityType, FileType, ProcessStatus
 from core.models.upload import FileUpload, Upload
 from core.schema.common import GlobalIDUtils
+from core.schema.types.upload import FileUploadType as StrawberryFileUploadType
 from core.schema.types.upload import UploadType as StrawberryUploadType
 from core.systems import AwsProcessSystem
 from strawberry.relay import from_base64
@@ -35,6 +36,58 @@ except ImportError:
     HAS_DOMAIN_APP = False
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_upload(info: Info, global_id: strawberry.ID) -> Upload:
+    """Resolve an Upload global id through the type's scoped queryset.
+
+    The scoping is the point. `UploadType.get_queryset` applies
+    `with_view_permission_info(info)`, which is the mechanism the rest of
+    the upload surface uses; resolving straight off `Upload.objects` would
+    return any tenant's row, since the id is globally unique. That is the
+    leak `core/tests/test_tenancy_guardrail_byid.py` exists to stop, and it
+    flagged exactly that on the first draft of this fix.
+    """
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='UploadType')
+    if pk is None:
+        raise GraphQLError("Not an upload id.")
+    scoped = StrawberryUploadType.get_queryset(Upload.objects.all(), info)
+    upload = scoped.filter(pk=pk).first()
+    if upload is None:
+        # Indistinguishable from "not visible to you", deliberately: telling
+        # a caller a row exists in another tenant is the same leak in words.
+        raise GraphQLError("Upload not found.")
+    return upload
+
+
+def _resolve_file_upload(info: Info, global_id: strawberry.ID) -> FileUpload:
+    """Resolve a FileUpload global id through its own scoped queryset."""
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='FileUploadType')
+    if pk is None:
+        raise GraphQLError("Not a file upload id.")
+    scoped = StrawberryFileUploadType.get_queryset(FileUpload.objects.all(), info)
+    file_upload = scoped.filter(pk=pk).first()
+    if file_upload is None:
+        raise GraphQLError("File upload not found.")
+    return file_upload
+
+
+def _resolve_process(info: Info, global_id: strawberry.ID) -> DataProcess:
+    """Resolve a DataProcess global id, scoped to the caller's uploads.
+
+    `DataProcess` carries no organization column, so there is no org clause
+    to add; it is reached through the upload it belongs to. Narrowing by
+    `created_by` keeps a caller-supplied id from addressing someone else's
+    process, which is the same protection an org clause would give here.
+    """
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='DataProcessType')
+    if pk is None:
+        raise GraphQLError("Not a process id.")
+    mine = DataProcess.objects.filter(created_by=info.context.user)
+    process = mine.filter(pk=pk).first()
+    if process is None:
+        raise GraphQLError("Process not found.")
+    return process
 
 
 # ---------------------------------------------------------------------------
@@ -293,14 +346,17 @@ class UploadMutations:
         upload_id: Optional[strawberry.ID] = None,
         expiration_date: Optional[date] = None,
     ) -> ConfirmUploadResult:
-        from core.schema import UploadType
-
         if not upload_id and not public_url:
             raise GraphQLError(
                 "Requires either an upload id or a public URL to complete the update/confirmation."
             )
         if upload_id:
-            upload = UploadType.get_object(info, global_id=upload_id, raise_not_found=True)
+            # `from core.schema import UploadType` raised ImportError here:
+            # the package root exports no type names. The real type is
+            # already imported at module scope as `StrawberryUploadType`,
+            # and it has no `get_object` -- a Graphene-era classmethod the
+            # Strawberry migration dropped. See #1567 for the same fix.
+            upload = _resolve_upload(info, upload_id)
         else:
             upload = Upload.objects.filter(public_url=public_url).get()
 
@@ -363,14 +419,16 @@ class UploadMutations:
         uploaded_file_id: strawberry.ID,
         process_id: Optional[strawberry.ID] = None,
     ) -> ProcessFileResult:
-        from core.schema import UploadType
-        from core.schema.process import DataProcessType
-
-        upload: Upload = UploadType.get_object(info, uploaded_file_id, raise_not_found=True)
+        # Two broken imports on these two lines, not one: the package root
+        # exports no `UploadType`, and `core.schema.process` does not exist
+        # as a module at all. This mutation could never run.
+        upload = _resolve_upload(info, uploaded_file_id)
         obj = upload.get_as_object()
 
         if process_id:
-            process = DataProcessType.get_object(info, process_id, raise_not_found=True)
+            # `DataProcessType` has no module to come from. Resolve the id
+            # to the model directly, the same way the upload above does.
+            process = _resolve_process(info, process_id)
         else:
             process = AwsProcessSystem.load_file_data(obj, upload.id, entity_type=entity_type)
 
@@ -404,10 +462,10 @@ class UploadMutations:
         description: Optional[str] = None,
         is_public: Optional[bool] = False,
     ) -> FileUploadResult:
-        from core.schema.upload import FileUploadType
-
+        # `core.schema.upload` does not exist; the module is
+        # `core.schema.types.upload`, whose types carry no `get_object`.
         if file_upload_gid:
-            file_upload = FileUploadType.get_object(info, file_upload_gid, raise_not_found=True)
+            file_upload = _resolve_file_upload(info, file_upload_gid)
         else:
             file_upload = FileUpload.objects.create(
                 created_by=info.context.user,

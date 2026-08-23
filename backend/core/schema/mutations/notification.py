@@ -51,9 +51,23 @@ class NotificationMutations:
     @strawberry.mutation(description="Mark a notification as read.")
     def notification_read(self, info: Info, gid: strawberry.ID) -> bool:
         from core.models import Notification, NotificationStatus
-        from core.schema import NotificationType
 
-        notification = NotificationType.get_object(info, gid, raise_not_found=True)
+        # `from core.schema import NotificationType` raised ImportError on
+        # this line: the package root exports no type names (the real type
+        # is `core.schema.types.notification.NotificationType`, and it has
+        # no `get_object` -- that was a Graphene-era classmethod that did
+        # not survive the Strawberry migration). So this mutation had never
+        # succeeded. Same defect and same remedy as #1567.
+        #
+        # `expected_type` is load-bearing rather than decorative: resolving
+        # the id without it would accept any model's global id and then
+        # write `status` onto whatever came back.
+        pk = GlobalIDUtils.get_pk_flexible(gid, expected_type='NotificationType')
+        if pk is None:
+            raise GraphQLError('Not a notification id')
+        notification = Notification.objects.filter(pk=pk).first()
+        if notification is None:
+            raise GraphQLError('Notification not found')
         if notification.user != info.context.user:
             raise ValueError('Notification does not belong to user')
 
