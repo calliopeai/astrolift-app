@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
+from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.cluster import (
     ApplyError,
     ApplyResult,
@@ -91,6 +92,7 @@ from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
+from aws.session import aws_client
 from k8s_native.central_auth import central_auth_component
 from k8s_native.management import (
     ManagementBackend,
@@ -235,7 +237,7 @@ def _region_info(slug: str) -> RegionInfo:
 
 
 @dataclass(frozen=True)
-class EKSConfig:
+class EKSConfig(CredentialedConfig):
     """AWS-specific EKS auth + connection config."""
 
     region: str
@@ -307,21 +309,15 @@ class EKSClusterDriver(ClusterDriver):
         if eks_client is not None:
             self._eks = eks_client
         else:
-            import boto3
-
-            self._eks = boto3.client("eks", region_name=config.region)
+            self._eks = aws_client("eks", region=config.region, credential=config.credential)
         if sts_client is not None:
             self._sts = sts_client
         else:
-            import boto3
-
-            self._sts = boto3.client("sts", region_name=config.region)
+            self._sts = aws_client("sts", region=config.region, credential=config.credential)
         if ec2_client is not None:
             self._ec2 = ec2_client
         else:
-            import boto3
-
-            self._ec2 = boto3.client("ec2", region_name=config.region)
+            self._ec2 = aws_client("ec2", region=config.region, credential=config.credential)
         # Cognito IDP client is built lazily on first use (the auth-gate
         # picker path, #859) so the common apply/probe paths don't pay
         # to construct a client they never touch. Tests inject a stub
@@ -1924,8 +1920,6 @@ class EKSClusterDriver(ClusterDriver):
         via elbv2 DescribeLoadBalancers. CloudWatch is then queried for
         RequestCount, HTTPCode_Target_5XX_Count, and TargetResponseTime.
         """
-        import boto3
-
         from aws.timeseries_cloudwatch import (
             alb_arn_for_app_namespace,
             error_rate,
@@ -1948,8 +1942,9 @@ class EKSClusterDriver(ClusterDriver):
             return empty
 
         region = self._config.region
-        elbv2 = boto3.client("elbv2", region_name=region)
-        cw = boto3.client("cloudwatch", region_name=region)
+        _cred = self._config.credential
+        elbv2 = aws_client("elbv2", region=region, credential=_cred)
+        cw = aws_client("cloudwatch", region=region, credential=_cred)
 
         alb_arn = alb_arn_for_app_namespace(
             k8s_client=k8s,
@@ -2118,9 +2113,9 @@ class EKSClusterDriver(ClusterDriver):
         production builds it here on first use via the ambient
         credential chain (same as the eks/sts/ec2 clients)."""
         if self._cognito_idp is None:
-            import boto3
-
-            self._cognito_idp = boto3.client("cognito-idp", region_name=self._config.region)
+            self._cognito_idp = aws_client(
+                "cognito-idp", region=self._config.region, credential=self._config.credential
+            )
         return self._cognito_idp
 
     # ---- certificate discovery (#858) ------------------------------
@@ -2350,9 +2345,7 @@ class EKSClusterDriver(ClusterDriver):
         region. Mirrors the eks/sts/ec2 client construction; injectable
         via the ``acm_client`` ctor kwarg for moto tests."""
         if self._acm is None:
-            import boto3
-
-            self._acm = boto3.client("acm", region_name=self._config.region)
+            self._acm = aws_client("acm", region=self._config.region, credential=self._config.credential)
         return self._acm
 
     def _iam_client(self) -> Any:
@@ -2361,9 +2354,7 @@ class EKSClusterDriver(ClusterDriver):
         cluster's other clients. Injectable via the ``iam_client`` ctor
         kwarg for moto tests (mirrors ``_acm_client``)."""
         if self._iam is None:
-            import boto3
-
-            self._iam = boto3.client("iam", region_name=self._config.region)
+            self._iam = aws_client("iam", region=self._config.region, credential=self._config.credential)
         return self._iam
 
     def _oidc_issuer(self) -> str:

@@ -287,7 +287,9 @@ def _ensure_cluster_oidc_issuer(cluster) -> None:
     pc = cluster.provider_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
     cluster_name = str(pc.get("cluster_name", ac.get("cluster_name", cluster.slug)))
-    issuer = discover_oidc_issuer(region, cluster_name)
+    from core.cluster_credentials import credential_for_cluster
+
+    issuer = discover_oidc_issuer(region, cluster_name, credential=credential_for_cluster(cluster))
     if not issuer:
         return
     new_ac = dict(ac)

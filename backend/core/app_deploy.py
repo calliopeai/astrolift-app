@@ -21,7 +21,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from core.cluster_credentials import CREDENTIAL_REFUSALS, assert_credential_supported
+from core.cluster_credentials import (
+    CREDENTIAL_REFUSALS,
+    assert_credential_supported,
+    stamp_credential,
+)
 from core.cluster_management import (
     ClusterManagementError,
     _context_for_cluster,
@@ -299,6 +303,27 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
 
 
 def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability: str) -> Any:
+    """The capability driver's config, carrying the cluster's identity.
+
+    Stamped on the way out, exactly as ``managed_config_for`` and
+    ``_config_for`` do. Before #1422 this funnel was the one that did not:
+    the ECR, IRSA and Secrets drivers built their clients ambiently, so a
+    cluster declaring a role got its images and secrets in the control
+    plane's account. ``assert_credential_supported`` refused that path
+    rather than letting it run, which is why it surfaced as a refusal and
+    not as a misplaced repository.
+    """
+    return stamp_credential(
+        _config_for_capability_uncredentialed(plugin_slug, cluster, capability),
+        cluster,
+    )
+
+
+def _config_for_capability_uncredentialed(
+    plugin_slug: str,
+    cluster: TenantCluster,
+    capability: str,
+) -> Any:
     """Build the driver-specific config dataclass for (plugin, capability).
 
     Non-cluster capabilities (registry, identity, secrets, dns, tls) need

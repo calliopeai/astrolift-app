@@ -25,7 +25,6 @@ contract stays narrow.
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
@@ -35,6 +34,7 @@ from core.cluster_credentials import (
     CREDENTIAL_REFUSALS,
     assert_credential_supported,
     credential_for_cluster,
+    stamp_credential,
 )
 
 if TYPE_CHECKING:
@@ -268,6 +268,17 @@ def _driver_for_cluster(cluster: TenantCluster) -> Any:
 
 
 def _config_for(plugin_slug: str, cluster: TenantCluster) -> Any:
+    """The cluster driver's config, carrying the cluster's identity.
+
+    Stamped on the way out for the same reason ``managed_config_for``
+    does it: the EKS driver builds eks/sts/ec2 clients from this config,
+    so leaving it ambient would reach the control plane's own account
+    while every ARN in the row named the tenant's (#1422).
+    """
+    return stamp_credential(_config_for_uncredentialed(plugin_slug, cluster), cluster)
+
+
+def _config_for_uncredentialed(plugin_slug: str, cluster: TenantCluster) -> Any:
     """Per-plugin config dataclass instantiation.
 
     Each driver has a tiny ``*Config`` dataclass keyed by cloud
@@ -2321,16 +2332,12 @@ def managed_config_for(
     into each of the forty-odd constructors, so a newly added kind cannot be
     the one that forgets it.
 
-    ``dataclasses.replace`` rather than assignment because every driver config
-    is frozen. A config without the field is returned untouched: those are the
-    clouds where the credential does not apply.
+    The stamping rule itself is :func:`~core.cluster_credentials.stamp_credential`,
+    shared with the other two config funnels so they cannot come to disagree
+    about which configs get one.
     """
     cfg = _managed_config_uncredentialed(plugin_slug, cluster, kind=kind, variant=variant)
-    if not dataclasses.is_dataclass(cfg):
-        return cfg
-    if not any(f.name == "credential" for f in dataclasses.fields(cfg)):
-        return cfg
-    return dataclasses.replace(cfg, credential=credential_for_cluster(cluster))
+    return stamp_credential(cfg, cluster)
 
 
 def _managed_config_uncredentialed(

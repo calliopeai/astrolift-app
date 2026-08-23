@@ -22,6 +22,7 @@ and at no point is there a path that quietly uses the wrong identity.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -122,9 +123,47 @@ _MANAGED_KINDS: frozenset[str] = frozenset(
     }
 )
 
+#: Capabilities whose drivers build every cloud client through a factory that
+#: takes the declared credential. Adding a name here is the second half of
+#: migrating a driver, and it is a claim the ratchet in
+#: ``core/tests/test_credential_threading.py`` checks against the driver
+#: source: a capability listed here whose module still calls ``boto3.client``
+#: directly fails that test. Listing one early is therefore not a shortcut --
+#: it is the specific mistake this module exists to prevent.
 CREDENTIAL_AWARE_CAPABILITIES: frozenset[str] = frozenset(
-    {"log_query", *(f"managed:{kind}" for kind in _MANAGED_KINDS)}
+    {
+        "log_query",
+        # Migrated in #1422: the cluster driver itself plus the three
+        # capability drivers that act on the cluster's own account.
+        "cluster",
+        "registry",
+        "identity",
+        "secrets",
+        *(f"managed:{kind}" for kind in _MANAGED_KINDS),
+    }
 )
+
+
+def stamp_credential(cfg: Any, cluster: TenantCluster) -> Any:
+    """Return ``cfg`` with the cluster's credential set, if it takes one.
+
+    The one rule, shared by all three config funnels (``managed_config_for``,
+    ``_config_for``, ``_config_for_capability``). It lived inline in the first
+    of those; a second and third copy is how two funnels come to disagree
+    about which configs get stamped, and the disagreement is invisible --
+    the unstamped one just quietly stays ambient.
+
+    ``dataclasses.replace`` rather than assignment because every driver config
+    is frozen. A config without the field is returned untouched: those are the
+    drivers not yet migrated, and :func:`assert_credential_supported` has
+    already refused the operation if the cluster declared a credential they
+    would ignore.
+    """
+    if not dataclasses.is_dataclass(cfg):
+        return cfg
+    if not any(f.name == "credential" for f in dataclasses.fields(cfg)):
+        return cfg
+    return dataclasses.replace(cfg, credential=credential_for_cluster(cluster))
 
 
 def credential_for_cluster(cluster: TenantCluster) -> CloudCredential:
