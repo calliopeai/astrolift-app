@@ -2,6 +2,7 @@ from astrolift_operations.models.alert import AlertEvent, AlertRule
 from astrolift_operations.models.alert_mute import AlertMute
 from astrolift_operations.models.app_log_export import AppLogExport
 from astrolift_operations.models.app_uptime_result import AppUptimeResult
+from astrolift_operations.models.audit_archive import AuditArchive
 from astrolift_operations.models.audit_event import AuditEvent
 from astrolift_operations.models.audit_export import AuditExport
 from astrolift_operations.models.device_registration import DeviceRegistration
@@ -29,6 +30,7 @@ __all__ = [
     "AlertRule",
     "AppLogExport",
     "AuditEvent",
+    "AuditArchive",
     "AuditExport",
     "DeviceRegistration",
     "Event",

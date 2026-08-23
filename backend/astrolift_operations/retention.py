@@ -108,6 +108,16 @@ def _row_to_record(row: Any, *, stream: str) -> dict[str, Any]:
             "payload": row.payload,
         }
     if stream == "audit":
+        # Field names are AuditEvent's, checked against the model (#1594).
+        # This branch read `row.resource_kind`, `row.resource_id` and
+        # `row.payload`, none of which exist on it -- the model carries
+        # `target_kind`, `target_id` and `data`. So `serialize_jsonl` raised
+        # AttributeError on the first real audit row it was ever handed, and
+        # nothing noticed because it had only ever been handed fakes shaped
+        # like the code rather than like the model.
+        #
+        # No compatibility concern in renaming these: the branch could not
+        # produce a record, so no audit export in this format exists.
         return {
             "schema_version": EXPORT_SCHEMA_VERSION,
             "stream": "audit",
@@ -115,12 +125,16 @@ def _row_to_record(row: Any, *, stream: str) -> dict[str, Any]:
             "organization_id": row.organization_id,
             "actor_kind": row.actor_kind,
             "actor_id": row.actor_id,
+            "actor_display": row.actor_display,
             "action": row.action,
             "decision": row.decision,
-            "resource_kind": row.resource_kind,
-            "resource_id": row.resource_id,
-            "payload": getattr(row, "payload", {}),
-            "request_id": getattr(row, "request_id", ""),
+            "target_kind": row.target_kind,
+            "target_id": row.target_id,
+            "target_slug": row.target_slug,
+            "data": row.data,
+            "reasoning": row.reasoning,
+            "request_id": row.request_id,
+            "request_ip": row.request_ip,
         }
     raise ValueError(f"unknown stream {stream!r}")
 

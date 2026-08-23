@@ -47,16 +47,32 @@ class _FakeEvent:
 
 @dataclasses.dataclass
 class _FakeAudit:
+    """Field-for-field with ``AuditEvent``, which it was not before (#1594).
+
+    It carried ``resource_kind`` / ``resource_id`` / ``payload`` because the
+    exporter read those names. The model has ``target_kind`` / ``target_id``
+    / ``data``, so the exporter raised AttributeError on the first real row
+    it was ever handed while this suite stayed green: the fake was shaped
+    like the code rather than like the thing the code exports.
+
+    Keep this in step with ``astrolift_operations/models/audit_event.py``. A
+    fake that drifts from its model tests the fake.
+    """
+
     occurred_at: datetime
     organization_id: int
     actor_kind: str
     actor_id: str
+    actor_display: str
     action: str
     decision: str
-    resource_kind: str
-    resource_id: str
-    payload: dict
+    target_kind: str
+    target_id: str
+    target_slug: str
+    data: dict
+    reasoning: list = dataclasses.field(default_factory=list)
     request_id: str = ""
+    request_ip: str = ""
 
 
 def _ev(**kw) -> _FakeEvent:
@@ -85,11 +101,13 @@ def _aud(**kw) -> _FakeAudit:
         "organization_id": 1,
         "actor_kind": "User",
         "actor_id": "7",
+        "actor_display": "ada@acme.test",
         "action": "app.create",
         "decision": "allow",
-        "resource_kind": "App",
-        "resource_id": "42",
-        "payload": {"reason": "ok"},
+        "target_kind": "App",
+        "target_id": "42",
+        "target_slug": "hello-app",
+        "data": {"reason": "ok"},
     }
     base.update(kw)
     return _FakeAudit(**base)
