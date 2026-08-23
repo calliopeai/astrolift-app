@@ -80,6 +80,42 @@ def _is_runner_only(labels: frozenset[str]) -> bool:
     return LABEL_SELF_HOSTED in labels or LABEL_MACOS in labels
 
 
+#: Selector labels the router interprets rather than matching literally.
+#: Module-level so the matcher and the no-match diagnostic below cannot
+#: disagree about what counts as an architecture selector.
+OS_LABELS = frozenset({"linux", "windows", "macos"})
+ARCH_LABELS = frozenset({"amd64", "arm64"})
+
+
+def _unrecorded_arch_hint(qs, required_arch: frozenset[str]) -> str:
+    """Explain an arch-label no-match that is really a missing column (#1604).
+
+    ``TenantCluster.node_arch`` has no writer anywhere in the repo -- the
+    column exists, this router reads it, and nothing has ever set it. It
+    defaults to ``""``, and the matcher above treats an unknown architecture
+    as a mismatch, so **every** arch-labelled job routes nowhere on every
+    install.
+
+    The bare "no cluster satisfies" message sends the operator to look at
+    their label selector or their cluster fleet, neither of which is the
+    problem. This says what is actually wrong, without changing what matches:
+    an unrecorded architecture is not evidence the cluster is unsuitable, but
+    treating it as a match would schedule arm64 work onto amd64 nodes, which
+    is a worse failure than an honest refusal.
+    """
+    if not required_arch:
+        return ""
+    unrecorded = [c.slug for c in qs if not (c.node_arch or "").strip()]
+    if not unrecorded:
+        return ""
+    return (
+        f" Note: {len(unrecorded)} cluster(s) have no recorded node architecture "
+        f"({', '.join(sorted(unrecorded)[:3])}"
+        f"{', ...' if len(unrecorded) > 3 else ''}), so an architecture selector "
+        f"cannot match them. Nothing populates TenantCluster.node_arch yet (#1604)."
+    )
+
+
 def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
     """Return True when the cluster's capabilities satisfy the label selector.
 
@@ -93,11 +129,8 @@ def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
     - Special routing labels (self-hosted, astrolift, astrolift/default,
       cluster:*) are consumed by the router before this function is called.
     """
-    os_labels = {"linux", "windows", "macos"}
-    arch_labels = {"amd64", "arm64"}
-
-    required_os = labels & os_labels
-    required_arch = labels & arch_labels
+    required_os = labels & OS_LABELS
+    required_arch = labels & ARCH_LABELS
     # Remaining labels after stripping OS, arch, and routing meta-labels.
     meta_labels = (
         {
@@ -106,8 +139,8 @@ def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
             LABEL_MACOS,
             LABEL_DEFAULT,
         }
-        | os_labels
-        | arch_labels
+        | OS_LABELS
+        | ARCH_LABELS
     )
     custom_required = labels - meta_labels - {lbl for lbl in labels if lbl.startswith("cluster:")}
 
@@ -223,6 +256,7 @@ def route(
     return RoutingResult(
         cluster=None,
         reason=(
-            f"No active managed cluster satisfies label selector " f"{sorted(labels)!r} for org '{org.slug}'."
+            f"No active managed cluster satisfies label selector "
+            f"{sorted(labels)!r} for org '{org.slug}'." + _unrecorded_arch_hint(qs, labels & ARCH_LABELS)
         ),
     )
