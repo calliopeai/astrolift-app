@@ -80,6 +80,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
+from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
 
@@ -293,6 +294,17 @@ class Command(BaseCommand):
         parser.add_argument("--endpoint", default=None)
         parser.add_argument("--ca-cert", default=None)
         parser.add_argument("--ingress-class", default=None)
+        parser.add_argument(
+            "--ingress-mode",
+            default=None,
+            choices=[m.value for m in IngressMode],
+            help=(
+                "shared_ingress: one load balancer fronts every app in the org, via the "
+                "ALB group annotation. per_app_ingress: one load balancer per app. "
+                "Only honoured on ALB clusters. Left alone when not passed, so "
+                "re-registering never re-groups load balancers already serving traffic."
+            ),
+        )
         parser.add_argument("--org-slug", default=None)
         parser.add_argument(
             "--auto-discover-aws",
@@ -371,6 +383,15 @@ class Command(BaseCommand):
             or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")
         )
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
+        # No default: absent means "leave whatever the row has". Unlike
+        # ingress_class, an unset ingress_mode must not resolve to a value
+        # here -- see the write site below (#1537).
+        ingress_mode = opts.get("ingress_mode") or _env("ASTROLIFT_CLUSTER_INGRESS_MODE") or None
+        if ingress_mode is not None and ingress_mode not in {m.value for m in IngressMode}:
+            raise CommandError(
+                f"--ingress-mode must be one of {sorted(m.value for m in IngressMode)}, "
+                f"got {ingress_mode!r}",
+            )
 
         _alb_auth_pool_arn = _env("ASTROLIFT_CLUSTER_ALB_AUTH_USER_POOL_ARN")
         _alb_auth_client_id = _env("ASTROLIFT_CLUSTER_ALB_AUTH_CLIENT_ID")
@@ -619,6 +640,12 @@ class Command(BaseCommand):
         # partially-configured re-run.
         if oidc_auth_config is not None:
             defaults["oidc_auth_config"] = oidc_auth_config
+        # Only when passed. Defaulting it here would re-group load balancers
+        # that are already serving traffic the next time anyone re-registers
+        # a cluster, which is the operator decision the model docstring
+        # deliberately refuses to make for them (#1537).
+        if ingress_mode is not None:
+            defaults["ingress_mode"] = ingress_mode
 
         obj, created = TenantCluster.all_objects.update_or_create(slug=slug, defaults=defaults)
 

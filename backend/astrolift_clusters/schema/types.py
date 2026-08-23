@@ -37,6 +37,7 @@ class TenantClusterType:
     endpoint: str
     auth_method: str
     ingress_class: str
+    ingress_mode: str
     alb_auth_config: JSON | None
     oidc_auth_config: JSON | None
     is_active: bool
@@ -275,6 +276,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
         endpoint=cluster.endpoint or "",
         auth_method=cluster.auth_method,
         ingress_class=cluster.ingress_class,
+        ingress_mode=cluster.ingress_mode,
         oidc_auth_config=redact_oidc_auth_config(cluster.oidc_auth_config),
         alb_auth_config=cluster.alb_auth_config,
         is_active=cluster.is_active,

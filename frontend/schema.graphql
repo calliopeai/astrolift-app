@@ -3804,6 +3804,7 @@ type AstroliftTenantCluster {
   endpoint: String!
   authMethod: String!
   ingressClass: String!
+  ingressMode: String!
   albAuthConfig: JSON
   oidcAuthConfig: JSON
   isActive: Boolean!
@@ -6930,6 +6931,7 @@ input UpdateTenantClusterInput {
   region: String = null
   endpoint: String = null
   ingressClass: String = null
+  ingressMode: String = null
   albAuthConfig: JSON
   oidcAuthConfig: JSON
 }

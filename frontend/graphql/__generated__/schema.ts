@@ -3769,6 +3769,7 @@ export type AstroliftTenantCluster = {
   heartbeatStatus: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   ingressClass: Scalars['String']['output'];
+  ingressMode: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   lastBootstrapRun?: Maybe<AstroliftClusterBootstrapRun>;
   lastHeartbeatAt?: Maybe<Scalars['DateTime']['output']>;
@@ -9916,6 +9917,7 @@ export type UpdateTenantClusterInput = {
   endpoint: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   ingressClass: InputMaybe<Scalars['String']['input']>;
+  ingressMode: InputMaybe<Scalars['String']['input']>;
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   oidcAuthConfig: InputMaybe<Scalars['JSON']['input']>;
   region: InputMaybe<Scalars['String']['input']>;
