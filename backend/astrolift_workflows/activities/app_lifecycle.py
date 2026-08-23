@@ -535,13 +535,20 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         if has_bindings:
             env_from.append(_bindings_secret_name(app.slug))
 
-        return manifest, app, env, d, env_from
+        # Resolve the namespace here, not after the await (#1577).
+        # namespace_for_app reads app.organization.slug whenever
+        # k8s_namespace is unpinned, which is every app the platform
+        # creates -- only imported agents set it. That is a lazy FK
+        # load, and Django refuses one from the event loop. Computing
+        # it inside _gather keeps the ORM access in the sync context
+        # and, unlike widening select_related, cannot be undone by a
+        # later edit to the query above.
+        from core.app_deploy import namespace_for_app
 
-    manifest, app, env, d, env_from = await sync_to_async(_gather)()
+        return manifest, app, env, d, env_from, namespace_for_app(app)
 
-    from core.app_deploy import namespace_for_app
+    manifest, app, env, d, env_from, namespace = await sync_to_async(_gather)()
 
-    namespace = namespace_for_app(app)
     resources = _render(
         manifest,
         app_slug=app.slug,
