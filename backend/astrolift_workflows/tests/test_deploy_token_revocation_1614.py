@@ -38,9 +38,7 @@ def app():
 
 
 def _token(app, name: str) -> DeployToken:
-    return DeployToken.objects.create(
-        registered_app=app, name=name, token_hash=f"hash-{name}"
-    )
+    return DeployToken.objects.create(registered_app=app, name=name, token_hash=f"hash-{name}")
 
 
 def test_every_live_token_for_the_app_is_revoked(app):
