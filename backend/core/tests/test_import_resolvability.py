@@ -73,11 +73,6 @@ FIRST_PARTY_PREFIXES = ("core", "config", "astrolift", "providers")
 # repaired in #1614 rather than listed.
 KNOWN_BROKEN: frozenset[str] = frozenset(
     {
-        # get_driver_for_org is defined nowhere in the repo, so the multicloud
-        # branch of blob-driver resolution has never run and every install
-        # falls through to the S3-shaped fallback. Tracked in #1610.
-        "astrolift_pipelines/artifact_store.py:72",
-        "astrolift_agents/snapshot_store.py:67",
         # astrolift_workflows.client has no get_temporal_client; pipeline
         # schedule sync cannot reach Temporal. Tracked in #1614.
         "astrolift_pipelines/schedule_sync.py:54",

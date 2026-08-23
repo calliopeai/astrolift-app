@@ -56,25 +56,20 @@ def snapshot_blob_key(task_guid: str) -> str:
 def _get_blob_driver(org: object) -> BlobStoreDriver:
     """Return the BlobStoreDriver for ``org``'s install, or raise.
 
-    Same resolution strategy as the pipeline artifact store: try the
-    provider plugin registry first, then the local-fs dev fallback.
+    Resolution order: an explicitly configured local path (dev and CI only),
+    then the install's platform-owned S3 bucket, then raise. The bucket step
+    is what makes this work on a production install at all; see
+    ``core.blob_store_resolution`` and #1610.
 
     ``org`` is the Django Organization instance; it is not imported here so
     the resolution stays usable from the providers-isolated layers.
     """
-    # Step 1 — provider plugin registry (production path).
-    try:
-        from astrolift_drivers.registry import get_driver_for_org  # type: ignore[import-not-found]
-
-        driver = get_driver_for_org(org, role="blob_store")
-        if driver is not None:
-            return driver  # type: ignore[return-value]
-    except ImportError:
-        pass
-
-    # Step 2 — local filesystem fallback. Snapshots share the artifact local
-    # path by default so they work wherever artifacts do, but can be split
-    # onto their own path via ASTROLIFT_SNAPSHOT_LOCAL_PATH.
+    # Step 1 — an explicitly configured local path. First, because it was
+    # first before #1610 and only dev and CI ever set it; putting the install
+    # bucket ahead of it would silently move a developer's snapshots to S3.
+    # Snapshots share the artifact local path by default so they work
+    # wherever artifacts do, but can be split onto their own path via
+    # ASTROLIFT_SNAPSHOT_LOCAL_PATH.
     local_path = os.environ.get("ASTROLIFT_SNAPSHOT_LOCAL_PATH") or os.environ.get(
         "PIPELINE_ARTIFACT_LOCAL_PATH", ""
     )
@@ -82,12 +77,25 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
         logger.debug("snapshot store using LocalFsBlobStoreDriver at %s", local_path)
         return LocalFsBlobStoreDriver(base_path=local_path)
 
+    # Step 2 — the install's platform-owned S3 bucket. New in #1610, and it
+    # occupies exactly the position that used to raise: what stood at the top
+    # of this function was a lookup of
+    # `astrolift_drivers.registry.get_driver_for_org`, which does not exist,
+    # so a production install reached the raise below with nowhere to put a
+    # snapshot. Adding it here rather than first means nothing that already
+    # worked resolves anywhere new.
+    from core.blob_store_resolution import install_s3_driver
+
+    driver = install_s3_driver(purpose="snapshot store")
+    if driver is not None:
+        return driver
+
     # Step 3 — nothing configured.
     raise BlobStoreNotConfiguredError(
         "No blob store is configured for VNC snapshots. Set "
+        "AWS_STORAGE_BUCKET_NAME for a normal install, or "
         "ASTROLIFT_SNAPSHOT_LOCAL_PATH (or PIPELINE_ARTIFACT_LOCAL_PATH) for "
-        "local dev, or configure a blob_store driver in the install's "
-        "provider plugin registry."
+        "local dev."
     )
 
 

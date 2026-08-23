@@ -70,9 +70,13 @@ def test_presigned_upload_url_does_not_require_existing_object(local_blob):
     assert "never-written" in url
 
 
-def test_no_blob_store_raises_not_configured(monkeypatch):
+def test_no_blob_store_raises_not_configured(monkeypatch, settings):
     monkeypatch.delenv("ASTROLIFT_SNAPSHOT_LOCAL_PATH", raising=False)
     monkeypatch.delenv("PIPELINE_ARTIFACT_LOCAL_PATH", raising=False)
+    # The install bucket is a configuration source for snapshots now (#1610),
+    # so "nothing configured" has to clear it too or this asserts against a
+    # state no install is in.
+    settings.AWS_STORAGE_BUCKET_NAME = ""
     with pytest.raises(BlobStoreNotConfiguredError):
         snapshot_store.presigned_snapshot_upload_url(org=object(), task_guid="g-2")
 
@@ -159,10 +163,13 @@ def test_inject_is_noop_for_non_vnc(org, local_blob):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_inject_noop_when_no_blob_store_configured(org, monkeypatch):
+def test_inject_noop_when_no_blob_store_configured(org, monkeypatch, settings):
     # VNC task but no blob store -> skip injection (uploader no-ops), no crash.
     monkeypatch.delenv("ASTROLIFT_SNAPSHOT_LOCAL_PATH", raising=False)
     monkeypatch.delenv("PIPELINE_ARTIFACT_LOCAL_PATH", raising=False)
+    # As above (#1610): the install bucket now resolves, so an unset one is
+    # part of what "no blob store" means.
+    settings.AWS_STORAGE_BUCKET_NAME = ""
     task = AgentTask.objects.create(
         organization=org,
         status=AgentTask.Status.DRAFT,
