@@ -759,6 +759,7 @@ export type AstroliftAppDomain = {
   certState: Scalars['String']['output'];
   certificateState: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  edgeAuthState: Scalars['String']['output'];
   expectedCnameTarget: Scalars['String']['output'];
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];

@@ -1530,7 +1530,12 @@ class LifecycleQuery:
         # operators see the previously-cached value (or no chip on
         # first refresh failure).
         _refresh_cert_metadata_if_stale(domains, app_slug=app_slug, org_id=org_id)
-        return [app_domain_to_type(d) for d in domains]
+        # #1621 — edge_auth_state is a function of (cluster, hostname), and
+        # the domain row has no FK to a cluster. Resolve it once for the app
+        # rather than per domain; the same helper the cert refresh above
+        # uses, so both agree on which cluster an app's domains live on.
+        cluster = _resolve_app_cluster(app_slug=app_slug, org_id=org_id, environment_name=None)
+        return [app_domain_to_type(d, cluster=cluster) for d in domains]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

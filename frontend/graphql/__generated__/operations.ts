@@ -759,6 +759,7 @@ export type AstroliftAppDomain = {
   certState: Scalars['String']['output'];
   certificateState: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  edgeAuthState: Scalars['String']['output'];
   expectedCnameTarget: Scalars['String']['output'];
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -11146,7 +11147,7 @@ export type ListAppDomainsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppDomainsQuery = { astroliftAppDomains: Array<{ id: string, hostname: string, certState: string, validationMethod: string, validationToken: string, lastCheckedAt?: string | null, isActive: boolean, registeredAppSlug: string, createdAt: string, txtChallengeToken: string, expectedCnameTarget: string, isPlatformManagedZone: boolean, lastValidationError: string, certificateState: string, lastCertificateError: string, byoCertificateUploadedAt?: string | null, certExpiresAt?: string | null, certIssuerSerial: string, certObservabilityStatus: string, isWildcard: boolean, sniCertRef: string, requiredDnsRecords: Array<{ kind: string, name: string, value: string, ttl: number, propagated: boolean, lastCheckedAt?: string | null, message: string }>, redirectRules: Array<{ id: string, kind: string, sourcePattern: string, destinationUrl: string, httpStatus: number, preserveQueryString: boolean, priority: number }>, pathRoutes: Array<{ id: string, pathPrefix: string, targetWorkloadSlug: string, targetPort: number, stripPrefix: boolean, priority: number }> }> };
+export type ListAppDomainsQuery = { astroliftAppDomains: Array<{ id: string, hostname: string, certState: string, validationMethod: string, validationToken: string, lastCheckedAt?: string | null, isActive: boolean, registeredAppSlug: string, createdAt: string, txtChallengeToken: string, expectedCnameTarget: string, isPlatformManagedZone: boolean, lastValidationError: string, certificateState: string, lastCertificateError: string, byoCertificateUploadedAt?: string | null, certExpiresAt?: string | null, certIssuerSerial: string, certObservabilityStatus: string, isWildcard: boolean, sniCertRef: string, edgeAuthState: string, requiredDnsRecords: Array<{ kind: string, name: string, value: string, ttl: number, propagated: boolean, lastCheckedAt?: string | null, message: string }>, redirectRules: Array<{ id: string, kind: string, sourcePattern: string, destinationUrl: string, httpStatus: number, preserveQueryString: boolean, priority: number }>, pathRoutes: Array<{ id: string, pathPrefix: string, targetWorkloadSlug: string, targetPort: number, stripPrefix: boolean, priority: number }> }> };
 
 export type ListAppDeployTokensQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];

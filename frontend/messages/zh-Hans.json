@@ -800,6 +800,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "无需登录",
+        "edgeAuthUngatedHelp": "该应用的平台子域受集群登录保护，而此自定义域不受保护，因此知道网址的任何人都能访问该应用。会话 Cookie 仅覆盖平台自身的区域，无法覆盖外部域名。",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",
