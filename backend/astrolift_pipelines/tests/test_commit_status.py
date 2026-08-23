@@ -483,7 +483,7 @@ def test_every_run_status_transition_posts_a_commit_status():
     # A structural test whose matcher matches nothing passes vacuously. The
     # metrics ratchet shipped in that state once; assert the sweep found the
     # sites before asserting anything about them.
-    assert len(sites) >= 4, (
+    assert len(sites) >= 3, (
         f"the sweep found only {len(sites)} run-status transitions: {sorted(sites)}. "
         "Fix the matcher rather than the assertion."
     )
@@ -493,4 +493,25 @@ def test_every_run_status_transition_posts_a_commit_status():
         "these change a pipeline run's status without reporting it to the SCM "
         f"host: {offenders}. The commit keeps a stale check, and a branch "
         "protection rule gating on Astrolift never resolves."
+    )
+
+
+def test_the_cancel_service_posts_a_commit_status():
+    """The fourth transition, pinned by name rather than by shape.
+
+    `cancel_pipeline_run` settles the run through the state machine, which
+    assigns from a variable, so the sweep above cannot see it. Without this
+    a cancelled run would leave a `pending` check on the commit forever --
+    the worst of the four outcomes, because a branch-protection rule waits
+    on it indefinitely.
+    """
+    target = run_status_sites.find_named("astrolift_pipelines/cancellation.py", "cancel_pipeline_run")
+
+    assert target is not None, (
+        "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "
+        "now blind. Point it at whatever cancels a run instead."
+    )
+    assert run_status_sites.calls_any(target, _POSTER_NAMES), (
+        "the cancel service settles a run without posting a commit status, so "
+        "a cancelled run leaves a pending check that never resolves"
     )

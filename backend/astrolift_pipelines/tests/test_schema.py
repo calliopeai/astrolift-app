@@ -329,6 +329,48 @@ def test_cancel_pipeline_run_transitions_to_cancelled(user, org, pipeline, permi
     assert run.finished_at is not None
 
 
+def test_cancel_pipeline_run_cascades_to_jobs_and_steps(user, org, pipeline, permission_resolver):
+    """The mutation must settle the whole run, not only its own row.
+
+    Asserted through the mutation rather than the service, because the
+    delegation *is* the fix: the service already cascaded and had no caller,
+    so a test that only exercised the service would pass with the mutation
+    still flipping status locally.
+
+    Nothing in the codebase cancelled step runs before this. The Temporal
+    workflow's cancel handler cascades to JobRun and stops, and step runs
+    are only settled when a pod actually completed -- so a cancelled run's
+    steps read `running` forever.
+    """
+    from astrolift_pipelines.models import Job, JobRun, Step, StepRun
+
+    run = PipelineRun.objects.create(
+        pipeline=pipeline,
+        run_number=3,
+        trigger_kind=PipelineRun.TriggerKind.PUSH,
+        trigger_ref="refs/heads/main",
+        status=PipelineRun.Status.RUNNING,
+    )
+    job = Job.objects.create(pipeline=pipeline, pipeline_run=run, job_id="build", name="Build")
+    job_run = JobRun.objects.create(pipeline_run=run, job=job, status=JobRun.Status.RUNNING)
+    step = Step.objects.create(job=job, step_id="compile", position=0, run="make")
+    step_run = StepRun.objects.create(job_run=job_run, step=step, status=StepRun.Status.RUNNING)
+
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
+        result = mutation.cancel_pipeline_run(info, run_id=str(run.guid))
+
+    assert result.ok, result.errors
+    run.refresh_from_db()
+    job_run.refresh_from_db()
+    step_run.refresh_from_db()
+    assert run.status == "cancelled"
+    assert job_run.status == "cancelled", "job run left running after its pipeline was cancelled"
+    assert step_run.status == "cancelled", "step run left running after its pipeline was cancelled"
+
+
 def test_cancel_pipeline_run_already_finished(user, org, pipeline, permission_resolver):
     run = PipelineRun.objects.create(
         pipeline=pipeline,

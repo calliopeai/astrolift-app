@@ -80,6 +80,11 @@ def transition_pipeline_run(run, next_status: str, *, actor_display: str = "syst
 
     validate_pipeline_run_transition(run.status, next_status)
 
+    # Captured before the assignment below: the log line read `run.status`
+    # after mutating it, so every transition printed "cancelled → cancelled"
+    # and the one thing the message exists to tell you was never in it.
+    previous_status = run.status
+
     now = timezone.now()
     update_fields = ["status", "updated_at", "version"]
 
@@ -98,7 +103,7 @@ def transition_pipeline_run(run, next_status: str, *, actor_display: str = "syst
     _emit_pipeline_run_event(run, next_status, actor_display=actor_display)
     logger.info(
         "pipelines.state_machine: PipelineRun %s → %s (run=%s)",
-        run.status,
+        previous_status,
         next_status,
         run.guid,
     )
@@ -129,41 +134,65 @@ def transition_job_run(job_run, next_status: str, *, actor_display: str = "syste
 
 
 def _emit_pipeline_run_event(run, status: str, *, actor_display: str) -> None:
-    """Emit a core audit event for a pipeline run status transition."""
-    try:
-        from core.events import emit_event
+    """Emit a core audit event for a pipeline run status transition.
 
-        emit_event(
-            action=f"pipeline_run.{status}",
-            resource_kind="pipeline_run",
-            resource_id=str(run.guid),
-            actor_display=actor_display,
-            org_id=run.pipeline.organization_id,
-            metadata={
+    This emitted nothing at all until now. It called ``emit_event`` with
+    ``action`` / ``org_id`` / ``metadata``; `core.events` exports no such
+    function, and the real entry point is ``Event.emit(event_type,
+    payload=..., organization_id=...)``. The ImportError went into the bare
+    ``except Exception: pass`` below, so every pipeline run and job run
+    transition since this module shipped has produced no audit trail --
+    including the live self-hosted completion path in ``runner_views``.
+
+    ``actor_display`` goes in the payload because ``Event.emit`` takes an
+    ``actor_user_id``, not a display string, and the transition callers pass
+    a name rather than a row.
+    """
+    try:
+        from core.events import Event
+
+        Event.emit(
+            f"pipeline_run.{status}",
+            payload={
+                "actor_display": actor_display,
                 "pipeline_name": run.pipeline.name,
                 "run_number": run.run_number,
                 "trigger_kind": run.trigger_kind,
             },
+            resource_kind="pipeline_run",
+            resource_id=str(run.guid),
+            organization_id=run.pipeline.organization_id,
         )
     except Exception:  # noqa: BLE001
-        pass  # Events are best-effort; don't break the state transition
+        # Still best-effort: an audit write must not break a state
+        # transition. But it logs now, because silence is what hid the
+        # broken call above for this module's entire life.
+        logger.warning(
+            "pipelines.state_machine: audit emit failed for run %s",
+            getattr(run, "guid", "?"),
+            exc_info=True,
+        )
 
 
 def _emit_job_run_event(job_run, status: str, *, actor_display: str) -> None:
     """Emit a core audit event for a job run status transition."""
     try:
-        from core.events import emit_event
+        from core.events import Event
 
-        emit_event(
-            action=f"pipeline_job_run.{status}",
-            resource_kind="pipeline_job_run",
-            resource_id=str(job_run.guid),
-            actor_display=actor_display,
-            org_id=job_run.pipeline_run.pipeline.organization_id,
-            metadata={
+        Event.emit(
+            f"pipeline_job_run.{status}",
+            payload={
+                "actor_display": actor_display,
                 "job_id": job_run.job.job_id if job_run.job_id else "",
                 "run_number": job_run.pipeline_run.run_number,
             },
+            resource_kind="pipeline_job_run",
+            resource_id=str(job_run.guid),
+            organization_id=job_run.pipeline_run.pipeline.organization_id,
         )
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning(
+            "pipelines.state_machine: audit emit failed for job run %s",
+            getattr(job_run, "guid", "?"),
+            exc_info=True,
+        )

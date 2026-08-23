@@ -104,6 +104,32 @@ def find_sites(
     return found
 
 
+def find_named(module_suffix: str, function: str) -> ast.FunctionDef | None:
+    """Return one function by module path suffix and name, or None.
+
+    For transitions that do not have the assignment shape. The cancel
+    service settles a run through ``state_machine.transition_pipeline_run``,
+    which assigns from a *variable* (``run.status = next_status``), so the
+    shape above never appears at either end. Same reason the metrics ratchet
+    pins the self-hosted runner endpoint by name.
+
+    A pin by name is narrower than the sweep and says so: it guards the path
+    it names and nothing else. Returning None (rather than raising) lets the
+    caller fail with "this ratchet is now blind" instead of a KeyError.
+    """
+    for path in _source_files():
+        if not path.as_posix().endswith(module_suffix):
+            continue
+        try:
+            tree = ast.parse(path.read_text())
+        except SyntaxError:  # pragma: no cover
+            return None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == function:
+                return node
+    return None
+
+
 def calls_any(fn: ast.FunctionDef, names: frozenset[str]) -> bool:
     """True when ``fn`` calls any function in ``names`` (by bare or attr name)."""
     for sub in ast.walk(fn):
