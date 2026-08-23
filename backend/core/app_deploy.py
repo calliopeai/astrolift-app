@@ -1076,6 +1076,77 @@ def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     return OIDCAuthConfig(auth_proxy_host=config["auth_proxy_host"])
 
 
+# --- Custom-domain edge auth state (#1621) -----------------------------
+# Values are stable API + label strings; do not rename without migrating
+# the ``astrolift.dev/edge-auth`` label and the GraphQL field together.
+EDGE_AUTH_NO_GATE = "no_gate"
+EDGE_AUTH_GATED = "gated"
+EDGE_AUTH_UNGATED = "ungated"
+
+
+def custom_domain_edge_auth_state(cluster: Any, hostname: str) -> str:
+    """Whether a custom domain sits behind the cluster's edge auth gate.
+
+    Third companion to :func:`oidc_auth_for_cluster` and
+    :func:`cognito_auth_for_cluster`, and here for the same reason: the
+    renderer, the API and anything that reports on a domain have to agree
+    on what "gated" means for a hostname the platform did not assign.
+
+    Returns one of:
+
+    * ``no_gate``  — the cluster has no edge auth configured, so there is
+      nothing for the domain to be outside of. Everything on this cluster
+      is reachable without a login by design.
+    * ``gated``    — the domain is covered by the gate.
+    * ``ungated``  — the cluster HAS a gate, the app's managed subdomain
+      is behind it, and this hostname is not. This is the state #1621
+      exists to make visible.
+
+    **Why an external custom domain cannot simply be gated.** The central
+    auth host (#1539) issues one session cookie scoped to the parent zone
+    of its own hostname -- ``cookie_scope_for`` is the whole mechanism.
+    The response that sets that cookie comes from ``auth.<base-zone>``,
+    and a response from one registrable domain cannot set a cookie for an
+    unrelated one; that is a browser rule, not an oauth2-proxy flag. So
+    adding ``customer.com`` to ``--cookie-domain`` / ``--whitelist-domain``
+    does not gate it: the auth sub-request still sees no session on every
+    request and the user loops through the auth host forever.
+
+    Stamping the annotations anyway would convert "no gate" into "infinite
+    redirect", which is strictly worse than the gap. So the renderer emits
+    the state and nothing else, and gating an external domain for real
+    needs a first-party auth endpoint on the domain itself -- tracked
+    separately. See the comment at the custom-domain loop in
+    ``astrolift_workflows.activities.app_lifecycle``.
+    """
+    if cluster is None or not hostname:
+        return EDGE_AUTH_NO_GATE
+
+    if getattr(cluster, "ingress_class", "") == "alb":
+        # authenticate-cognito is per-listener-rule, so cookie scope is not
+        # the obstacle here -- an exact callback registration for the
+        # domain is, which is the per-app registration #1539 removed. Until
+        # a domain carries one, an ALB custom-domain rule is ungated.
+        return EDGE_AUTH_NO_GATE if cognito_auth_for_cluster(cluster) is None else EDGE_AUTH_UNGATED
+
+    auth = oidc_auth_for_cluster(cluster)
+    if auth is None:
+        return EDGE_AUTH_NO_GATE
+
+    from providers.k8s_native.central_auth import cookie_scope_for
+
+    scope = cookie_scope_for(auth.auth_proxy_host)
+    if not scope:
+        # An auth host with no parent zone to scope to gates nothing (the
+        # flag is left off), so no hostname is covered by it.
+        return EDGE_AUTH_UNGATED
+
+    host = hostname.strip().rstrip(".").lower()
+    zone = scope.lower()
+    covered = host == zone.lstrip(".") or host.endswith(zone)
+    return EDGE_AUTH_GATED if covered else EDGE_AUTH_UNGATED
+
+
 def _render_managed_subdomain_ingress(
     deployment: Deployment,
     manifest: Any,

@@ -800,6 +800,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "Não exige login",
+        "edgeAuthUngatedHelp": "O subdomínio de plataforma deste app está atrás do login do cluster; este domínio personalizado não está, então qualquer pessoa com a URL alcança o app. O cookie de sessão cobre apenas a zona da plataforma e não pode abranger um domínio externo.",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",

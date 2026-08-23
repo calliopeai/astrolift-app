@@ -800,6 +800,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "Aucune connexion requise",
+        "edgeAuthUngatedHelp": "Le sous-domaine de plateforme de cette application est protégé par l'authentification du cluster ; ce domaine personnalisé ne l'est pas, donc quiconque a l'URL atteint l'application. Le cookie de session ne couvre que la zone de la plateforme et ne peut pas couvrir un domaine externe.",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",
