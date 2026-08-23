@@ -90,25 +90,51 @@ def post_commit_status(
 
     The activity layer wraps this so retries + rate-limit handling
     live in the workflow controller, not here.
+
+    Any org-level connection kind authenticates this, not only an App
+    installation. That matters because ``connection_resolver``'s
+    ``ORG_REPO_WRITE`` deliberately falls back to an org OAuth-user or PAT
+    connection so an App-less org still works; handing such a row to an
+    App-only poster resolves a perfectly good credential and then silently
+    posts nothing. ``providers.github._token`` is the superset helper --
+    it covers PAT, OAuth-user, and App-install -- and it is what every
+    other GitHub write in this package already uses.
     """
-    if connection.is_orphaned or not connection.installation_id:
+    if connection.is_orphaned:
+        return False
+    # Only an App-install row needs an installation id; requiring one of
+    # every kind is what made OAuth/PAT orgs silently unpostable.
+    if connection.kind == "github_app_install" and not connection.installation_id:
         return False
     # Lazy-import requests so the manifest layer doesn't haul it in
     # for unrelated tests.
     import requests
 
-    from astrolift_scm.providers import github_app
+    from astrolift_scm.providers.github import (
+        GITHUB_API_DEFAULT,
+        GithubProviderError,
+        _token,
+    )
 
-    token = github_app.installation_token(connection)
+    try:
+        token = _token(connection)
+    except GithubProviderError:
+        # An unusable credential is the same outcome as no credential: a
+        # commit status is advisory and must never fail the caller.
+        return False
     if not token:
         return False
-    url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+    # Honour api_base_url so this works against GitHub Enterprise, which
+    # the hardcoded api.github.com silently could not.
+    base = (connection.api_base_url or GITHUB_API_DEFAULT).rstrip("/")
+    url = f"{base}/repos/{owner}/{repo}/statuses/{sha}"
+    scheme = "Bearer" if connection.kind == "github_app_install" else "token"
     try:
         resp = requests.post(
             url,
             json=payload,
             headers={
-                "Authorization": f"Bearer {token}",
+                "Authorization": f"{scheme} {token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
             },

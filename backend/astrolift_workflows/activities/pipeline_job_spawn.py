@@ -86,6 +86,11 @@ def _mark_pipeline_run_running_sync(pipeline_run_id: int) -> dict:
     run.status = PipelineRun.Status.RUNNING
     run.started_at = timezone.now()
     run.save(update_fields=["status", "started_at", "updated_at", "version"])
+    # Post "pending" as soon as the run starts. A branch-protection rule
+    # requiring astrolift/{pipeline} needs the check to *exist* before it
+    # can be satisfied; without this the PR waits on a check that never
+    # appears.
+    _post_commit_status(run)
 
     # Load the definition the run is actually of. Until #1531 nothing did
     # this: the fetcher had no callers, there was no parser to hand it to,
@@ -156,6 +161,20 @@ def _record_run_metric(run) -> None:
         log.warning("pipeline metrics: pipeline_run=%s not recorded", run.pk, exc_info=True)
 
 
+def _post_commit_status(run) -> None:
+    """Reflect the run's current status onto the commit that triggered it.
+
+    Separate from the metric wrapper even though both are fire-and-forget:
+    a metric is local and cannot fail slowly, while this is an outbound
+    HTTP call to a host that may be down. The wrapper it calls swallows,
+    and this swallows again, because a status transition must land in the
+    database whether or not GitHub answers.
+    """
+    from astrolift_pipelines.commit_status import post_commit_status_for_run
+
+    post_commit_status_for_run(run)
+
+
 def _mark_pipeline_run_success_sync(pipeline_run_id: int) -> None:
     from django.utils import timezone
 
@@ -166,6 +185,7 @@ def _mark_pipeline_run_success_sync(pipeline_run_id: int) -> None:
     run.finished_at = timezone.now()
     run.save(update_fields=["status", "finished_at", "updated_at", "version"])
     _record_run_metric(run)
+    _post_commit_status(run)
 
 
 def _mark_pipeline_run_failed_sync(pipeline_run_id: int, reason: str) -> None:
@@ -178,6 +198,7 @@ def _mark_pipeline_run_failed_sync(pipeline_run_id: int, reason: str) -> None:
     run.finished_at = timezone.now()
     run.save(update_fields=["status", "finished_at", "updated_at", "version"])
     _record_run_metric(run)
+    _post_commit_status(run)
     log.info(
         "pipeline_run_failed id=%s reason=%s",
         pipeline_run_id,

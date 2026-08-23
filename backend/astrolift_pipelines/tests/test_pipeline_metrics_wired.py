@@ -34,6 +34,7 @@ from prometheus_client import REGISTRY
 from astrolift_identity.models import Organization
 from astrolift_pipelines import metrics as pipeline_metrics
 from astrolift_pipelines.models import Job, JobRun, Pipeline, PipelineRun
+from astrolift_pipelines.tests import run_status_sites
 
 pytestmark = pytest.mark.django_db
 
@@ -187,6 +188,20 @@ def test_webhook_signature_failures_are_counted(org):
 # record. Naming the models keeps the guard honest in both directions.
 _METERED_MODELS = {"JobRun", "PipelineRun"}
 
+# Every wrapper that ends in a metric being recorded. Named rather than
+# matched loosely because each module wraps the call its own way: the spawn
+# activity has _record_job_metric / _record_run_metric, the cancel mutation
+# has _record_cancelled_run.
+_RECORDER_NAMES = frozenset(
+    {
+        "_record_job_metric",
+        "_record_run_metric",
+        "_record_cancelled_run",
+        "record_job_completed",
+        "record_run_completed",
+    }
+)
+
 
 def _functions_assigning_terminal_status(module) -> dict[str, ast.FunctionDef]:
     """Every top-level function that sets a JobRun/PipelineRun terminal status."""
@@ -289,6 +304,34 @@ def test_the_runner_completion_endpoint_records():
     assert _records_a_metric(target), (
         "runner_job_complete settles a job run without recording a metric, so "
         "every self-hosted job is missing from astrolift_pipeline_job_duration_seconds"
+    )
+
+
+def test_every_terminal_transition_anywhere_records():
+    """The wider guard, added after the narrow one missed a module.
+
+    The version of this ratchet that shipped with #1585 parsed
+    `pipeline_job_spawn` and nothing else, so the fourth place a run
+    reaches a terminal status -- `cancel_pipeline_run`, a GraphQL mutation
+    in a different app -- was invisible to it. That path recorded no
+    metric, `astrolift_pipeline_runs_total` undercounted every
+    cancellation, and this suite was green.
+
+    Enumerating modules by hand is what allowed that, so this sweeps the
+    tree instead. A transition added in a module nobody thought of is
+    precisely the case that goes dark.
+    """
+    sites = run_status_sites.find_sites()
+
+    assert len(sites) >= 8, (
+        f"the sweep found only {len(sites)} status transitions: {sorted(sites)}. "
+        "A matcher that stops matching passes vacuously; fix the matcher."
+    )
+
+    offenders = [name for name, fn in sites.items() if not run_status_sites.calls_any(fn, _RECORDER_NAMES)]
+    assert not offenders, (
+        "these settle a run or job to a terminal status without recording a "
+        f"metric: {offenders}. /metrics goes quiet for each one."
     )
 
 
