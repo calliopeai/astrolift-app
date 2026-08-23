@@ -183,9 +183,9 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
             "reason": "app has no default_tenant_cluster bound",
         }
     try:
-        from core.cluster_observability import _driver_for_capability  # type: ignore[attr-defined]
+        from core.app_deploy import driver_for_capability
 
-        dns_driver = _driver_for_capability(cluster, "dns")
+        dns_driver = driver_for_capability(cluster, "dns")
     except Exception as exc:  # noqa: BLE001
         return {
             "ensured": [],
@@ -401,9 +401,9 @@ def _issue_cert_sync(custom_domain_id: int) -> dict[str, Any]:
     if cluster is None:
         return _persist_fail("app has no default_tenant_cluster — no TLS driver to call")
     try:
-        from core.cluster_observability import _driver_for_capability  # type: ignore[attr-defined]
+        from core.app_deploy import driver_for_capability
 
-        tls_driver = _driver_for_capability(cluster, "tls")
+        tls_driver = driver_for_capability(cluster, "tls")
     except Exception as exc:  # noqa: BLE001
         return _persist_fail(f"tls driver unresolvable: {exc}")
 

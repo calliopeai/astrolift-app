@@ -86,12 +86,6 @@ KNOWN_BROKEN: frozenset[str] = frozenset(
         # secret plumbing cannot reach the cluster. Tracked in #1614.
         "astrolift_pipelines/secret_plumbing.py:151",
         "astrolift_pipelines/secret_plumbing.py:168",
-        # astrolift_workflows.inputs has no PipelineRunInput. Tracked in #1614.
-        "astrolift_pipelines/webhook_views.py:318",
-        # core.cluster_observability has no _driver_for_capability; custom
-        # domain activities cannot reach a driver. Tracked in #1614.
-        "astrolift_workflows/activities/custom_domain.py:186",
-        "astrolift_workflows/activities/custom_domain.py:404",
     }
 )
 

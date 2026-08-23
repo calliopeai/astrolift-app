@@ -311,20 +311,45 @@ def _next_run_number(pipeline: Pipeline) -> int:
 def _dispatch_pipeline_run(run: PipelineRun) -> None:
     """Start PipelineRunWorkflow via the Temporal client.
 
-    No-ops gracefully when Temporal is disabled (dev/test installs).
-    """
-    try:
-        from astrolift_workflows.client import start_workflow
-        from astrolift_workflows.inputs import PipelineRunInput
+    Five things were wrong here and each on its own was fatal, so no webhook
+    has ever started a pipeline (#1614):
 
-        workflow_id = f"pipeline-run-{run.pipeline_id}-{run.run_number}"
+    * ``astrolift_workflows.inputs`` has no ``PipelineRunInput``. That raised
+      ImportError on the first line of the ``try``, which is why the other
+      four were never reached and never surfaced.
+    * ``start_workflow`` takes ``args`` as a *list*, not a single value.
+    * Its keyword is ``workflow_id``, not ``id``.
+    * ``PipelineRunWorkflow.run`` takes the integer PK, not a GUID string.
+    * ``task_queue="pipelines"`` names no queue anybody registers; the
+      workflow is in the single ``WORKFLOWS`` tuple served on
+      ``TEMPORAL_TASK_QUEUE``, so the default is the correct one.
+
+    The write of ``temporal_workflow_id`` was inside the same ``try``, which
+    made this worse than a dead dispatch: the field stayed empty, and
+    ``astrolift_pipelines.cancellation._signal_temporal_cancel`` returns
+    early on an empty one. So cancelling a pipeline run could not work
+    either, for a second and independent reason, even after that function's
+    own signature bug was fixed.
+
+    Still best-effort -- Temporal is genuinely optional on dev/test installs
+    -- but the failure is logged with its exception now. A bare
+    "dispatch skipped" is indistinguishable from "Temporal is off", and that
+    is precisely how the five above survived.
+    """
+    from astrolift_workflows.client import start_workflow
+
+    workflow_id = f"pipeline-run-{run.pipeline_id}-{run.run_number}"
+    try:
         start_workflow(
             "PipelineRunWorkflow",
-            PipelineRunInput(pipeline_run_id=str(run.guid)),
-            id=workflow_id,
-            task_queue="pipelines",
+            [run.pk],
+            workflow_id=workflow_id,
         )
-        run.temporal_workflow_id = workflow_id
-        run.save(update_fields=["temporal_workflow_id", "updated_at", "version"])
-    except Exception:  # noqa: BLE001 — Temporal may not be enabled
-        logger.info("pipelines.webhook: Temporal dispatch skipped for run %s", run.guid)
+    except Exception:
+        logger.exception("pipelines.webhook: Temporal dispatch failed for run %s", run.guid)
+        return
+
+    # Outside the try: a dispatch that succeeded must be recorded even if
+    # this save were to fail, and a save failure is not a dispatch failure.
+    run.temporal_workflow_id = workflow_id
+    run.save(update_fields=["temporal_workflow_id", "updated_at", "version"])
