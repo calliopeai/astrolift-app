@@ -755,29 +755,44 @@ def _resolve_cluster(run: Any, job: Any = None) -> Any:
 
 
 def _get_cluster_client(run: Any, job: Any = None) -> Any:
-    """Resolve the KubernetesDynamicClient for the pipeline run's org cluster."""
+    """Resolve the KubernetesDynamicClient for the pipeline run's org cluster.
 
-    from astrolift_drivers.registry import plugins
-    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+    Was wrong in four ways at once, and fired on its first statement, so no
+    pipeline job has ever spawned (#1625):
+
+    * ``plugins.get`` takes ``(plugin_id, driver)``; it was called with one
+      argument, and with ``provider_plugin_id`` -- the integer PK -- where a
+      slug belongs.
+    * ``PluginRegistry.get`` raises ``DriverNotFound`` rather than returning
+      ``None``, so the ``if plugin is None`` guard below it was unreachable.
+    * ``_config_for`` takes ``(plugin_slug, cluster)``, not ``(cluster)``.
+    * ``_k8s`` is a *method* taking a cluster slug on every driver, not an
+      attribute, so ``return driver._k8s`` handed the caller a bound method
+      and ``client.server_side_apply(...)`` failed on it.
+
+    None of that was reachable by any test: every suite patches this function
+    out. It is the same shape #1580 opens with -- ``_resolve_cluster``
+    raising ``FieldError`` on every call, surviving because the path was well
+    mocked.
+
+    So resolution goes through ``_driver_for_cluster``, which is the correct
+    version of all four steps and is what the rest of the tree already uses.
+    It also runs the credential guard, which this bypassed entirely.
+    """
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     cluster = _resolve_cluster(run, job)
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
 
-    plugin = plugins.get(cluster.provider_plugin_id)
-    if plugin is None:
+    build_client = getattr(driver, "_k8s", None)
+    if not callable(build_client):
         raise RuntimeError(
-            f"cluster {cluster.slug!r} plugin not loaded — cannot build K8s client for pipeline job spawn"
+            f"cluster {cluster.slug!r}: driver for plugin "
+            f"{ctx.provider_plugin_slug!r} exposes no K8s client -- pipeline job "
+            f"spawning requires a direct-apply cluster driver",
         )
-
-    config = _config_for(cluster)
-    driver = plugin.cluster_driver(config)
-    # Use the driver's internal dynamic client if exposed; otherwise
-    # build one via the cluster context.
-    if hasattr(driver, "_k8s"):
-        return driver._k8s
-    raise RuntimeError(
-        f"cluster driver for {cluster.slug!r} does not expose a K8s dynamic client — "
-        f"pipeline job spawning requires a direct-apply cluster driver"
-    )
+    return build_client(ctx.slug)
 
 
 def _ensure_pipeline_namespace(client: Any, namespace: str, org_slug: str) -> None:
