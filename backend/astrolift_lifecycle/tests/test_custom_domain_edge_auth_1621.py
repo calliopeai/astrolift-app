@@ -183,7 +183,10 @@ class TestEdgeAuthState:
 
 class TestRendererRecordsTheState:
     def test_custom_domain_ingress_is_labelled_ungated_on_a_gated_cluster(
-        self, deployment, cluster, external_domain,
+        self,
+        deployment,
+        cluster,
+        external_domain,
     ):
         cluster.ingress_class = "nginx"
         cluster.oidc_auth_config = OIDC_CONFIG
@@ -195,7 +198,10 @@ class TestRendererRecordsTheState:
             assert ingress["metadata"]["labels"][EDGE_AUTH_LABEL] == EDGE_AUTH_UNGATED
 
     def test_custom_domain_ingress_is_labelled_no_gate_on_an_open_cluster(
-        self, deployment, cluster, external_domain,
+        self,
+        deployment,
+        cluster,
+        external_domain,
     ):
         cluster.ingress_class = "nginx"
         cluster.oidc_auth_config = None
@@ -205,7 +211,10 @@ class TestRendererRecordsTheState:
             assert ingress["metadata"]["labels"][EDGE_AUTH_LABEL] == EDGE_AUTH_NO_GATE
 
     def test_custom_domain_carries_no_auth_annotations(
-        self, deployment, cluster, external_domain,
+        self,
+        deployment,
+        cluster,
+        external_domain,
     ):
         """The anti-regression, and the point of the whole issue.
 
@@ -224,7 +233,10 @@ class TestRendererRecordsTheState:
             assert not offenders, f"custom domain must not carry {offenders}"
 
     def test_alb_custom_domain_carries_no_cognito_annotations(
-        self, deployment, cluster, external_domain,
+        self,
+        deployment,
+        cluster,
+        external_domain,
     ):
         cluster.ingress_class = "alb"
         cluster.alb_auth_config = ALB_CONFIG
