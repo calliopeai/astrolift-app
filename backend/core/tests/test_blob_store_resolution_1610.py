@@ -30,7 +30,12 @@ def install_bucket(settings, monkeypatch):
 
 def test_snapshots_resolve_on_a_normal_install(install_bucket):
     """The regression. This raised BlobStoreNotConfiguredError before #1610,
-    on every install that was not a developer laptop."""
+    on every install that was not a developer laptop.
+
+    The fixture clears both local-path env vars, which is what a production
+    install looks like -- only dev and CI set them, and they still take
+    precedence when they are set.
+    """
     driver = snapshot_driver(object())
 
     assert driver._bucket == "astrolift-platform-media"
@@ -86,3 +91,19 @@ def test_snapshots_still_raise_when_nothing_at_all_is_configured(settings, monke
     # provider plugin registry, which nothing can do.
     assert "AWS_STORAGE_BUCKET_NAME" in str(exc.value)
     assert "provider plugin registry" not in str(exc.value)
+
+
+def test_an_explicit_local_path_still_wins_for_snapshots(settings, monkeypatch, tmp_path):
+    """Ordering, held explicitly.
+
+    #1610 added the S3 step *below* the local one rather than above it. The
+    other way round would have silently moved a developer's snapshots into
+    the install bucket the first time both were configured, which is a
+    behaviour change disguised as a bug fix.
+    """
+    from providers._sdk.blob_store import LocalFsBlobStoreDriver
+
+    settings.AWS_STORAGE_BUCKET_NAME = "astrolift-platform-media"
+    monkeypatch.setenv("ASTROLIFT_SNAPSHOT_LOCAL_PATH", str(tmp_path))
+
+    assert isinstance(snapshot_driver(object()), LocalFsBlobStoreDriver)
