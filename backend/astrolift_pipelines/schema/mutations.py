@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from django.db import transaction
 from django.utils import timezone
@@ -10,6 +12,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_pipelines.commit_status import post_commit_status_for_run
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
@@ -24,6 +27,22 @@ from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+logger = logging.getLogger(__name__)
+
+
+def _record_cancelled_run(run) -> None:
+    """Count the cancellation. Swallows: a cancel is already written to the
+    database and signalled to Temporal by the time this runs, so a metrics
+    failure must not turn a successful mutation into an operator-visible
+    error."""
+    from astrolift_pipelines.metrics import record_run_completed
+
+    try:
+        record_run_completed(run)
+    except Exception:  # noqa: BLE001
+        logger.warning("pipeline metrics: pipeline_run=%s not recorded", run.pk, exc_info=True)
+
 
 # ---------------------------------------------------------------------------
 # Input types
@@ -373,5 +392,18 @@ class PipelinesMutation:
         run.status = PipelineRun.Status.CANCELLED
         run.finished_at = timezone.now()
         run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+
+        # This is the fourth place a run reaches a terminal status, and the
+        # only one outside the spawn activity -- which is why #1585's
+        # ratchet, parsing that one module, did not notice this path was
+        # recording no metric. `pipeline_runs_total` undercounted every
+        # cancellation.
+        _record_cancelled_run(run)
+        # Called here rather than from the helper above so both ratchets can
+        # see their own call at the site. Burying it one level down is what
+        # the commit-status ratchet flagged when this was first written: the
+        # wiring existed but the transition did not declare it, and a later
+        # edit to the helper could drop it silently.
+        post_commit_status_for_run(run)
 
         return gql_success(pipeline_run_to_type(run))

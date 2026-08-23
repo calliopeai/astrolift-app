@@ -200,3 +200,115 @@ def test_post_commit_status_short_circuits_on_orphaned_connection(monkeypatch):
     )
     assert ok is False
     assert called["count"] == 0
+
+
+# ---- post authenticates any org connection kind, not only an App ------
+
+
+def test_post_commit_status_works_for_an_org_pat_connection(monkeypatch):
+    """``connection_resolver``'s ORG_REPO_WRITE deliberately falls back to
+    an org OAuth-user or PAT connection so an App-less org still works.
+    This poster used to require ``installation_id`` of every kind, so such
+    an org resolved a perfectly good credential and then silently posted
+    nothing: the deploy succeeded and the commit never got a status."""
+    c = _conn(kind=SourceConnection.Kind.GITHUB_PAT, installation_id="")
+
+    captured: dict = {}
+
+    def _fake_post(url, **kwargs):
+        captured["url"] = url
+        captured["headers"] = kwargs.get("headers", {})
+
+        class _R:
+            status_code = 201
+
+        return _R()
+
+    monkeypatch.setattr("astrolift_scm.providers.github._token", lambda conn: "ghp_x")
+    monkeypatch.setattr("requests.post", _fake_post)
+
+    ok = post_commit_status(
+        connection=c,
+        owner="acme",
+        repo="hello",
+        sha="abc",
+        payload={"state": "success"},
+    )
+
+    assert ok is True
+    # A PAT is a `token` credential; only App installation tokens are Bearer.
+    assert captured["headers"]["Authorization"] == "token ghp_x"
+
+
+def test_post_commit_status_still_requires_an_installation_id_for_an_app_row(monkeypatch):
+    """The guard was not wrong for App installs, only over-applied. An App
+    row with no installation id cannot mint a token."""
+    c = _conn(kind=SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="")
+
+    calls = {"n": 0}
+    monkeypatch.setattr("requests.post", lambda *a, **kw: calls.__setitem__("n", calls["n"] + 1))
+
+    assert (
+        post_commit_status(
+            connection=c,
+            owner="acme",
+            repo="hello",
+            sha="abc",
+            payload={"state": "success"},
+        )
+        is False
+    )
+    assert calls["n"] == 0
+
+
+def test_post_commit_status_honours_a_github_enterprise_api_base(monkeypatch):
+    """The URL was hardcoded to api.github.com, so a GHES org's statuses
+    went to the wrong host entirely."""
+    c = _conn(api_base_url="https://github.acme.internal/api/v3")
+
+    captured: dict = {}
+
+    def _fake_post(url, **kwargs):
+        captured["url"] = url
+
+        class _R:
+            status_code = 201
+
+        return _R()
+
+    monkeypatch.setattr("astrolift_scm.providers.github._token", lambda conn: "t")
+    monkeypatch.setattr("requests.post", _fake_post)
+
+    post_commit_status(
+        connection=c,
+        owner="acme",
+        repo="hello",
+        sha="abc",
+        payload={"state": "success"},
+    )
+
+    assert captured["url"] == "https://github.acme.internal/api/v3/repos/acme/hello/statuses/abc"
+
+
+def test_post_commit_status_treats_an_unusable_credential_as_no_credential(monkeypatch):
+    """A commit status is advisory. A credential that cannot be decrypted or
+    minted is a skip, never an exception thrown at the deploy path."""
+    from astrolift_scm.providers.github import GithubProviderError
+
+    c = _conn()
+
+    def _raise(conn):
+        raise GithubProviderError("UNSUPPORTED_AUTH", "nope")
+
+    monkeypatch.setattr("astrolift_scm.providers.github._token", _raise)
+
+    assert (
+        post_commit_status(
+            connection=c,
+            owner="acme",
+            repo="hello",
+            sha="abc",
+            payload={"state": "success"},
+        )
+        is False
+    )
