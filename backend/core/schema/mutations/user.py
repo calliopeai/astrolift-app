@@ -33,21 +33,56 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User:
-    """Resolve a User from a relay global ID, using the Graphene registry."""
-    from core.schema.user import UserType
-    return UserType.get_object(info, global_id, raise_not_found=raise_not_found)
+    """Resolve a User from a relay global ID.
+
+    ``core.schema.user`` does not exist; these helpers have raised ImportError
+    on every call since the Graphene migration (#1590). Resolution is a plain
+    pk lookup because ``UserType`` carries no ``get_queryset`` hook to scope
+    through - callers that accept an arbitrary user id own their own
+    authorization check, and ``switch_user`` below is the one that needed it.
+    """
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='UserType')
+    user = User.objects.filter(pk=pk).first() if pk else None
+    if user is None and raise_not_found:
+        raise GraphQLError(f'Object id User:{global_id} not found')
+    return user
 
 
 def _get_sign_request_object(info, global_id: str, raise_not_found: bool = True) -> SignRequest:
     """Resolve a SignRequest from a relay global ID."""
-    from core.schema.user import SignRequestType
-    return SignRequestType.get_object(info, global_id, raise_not_found=raise_not_found)
+    pk = _get_sign_request_pk(global_id)
+    sign_request = SignRequest.objects.filter(pk=pk).first() if pk else None
+    if sign_request is None and raise_not_found:
+        raise GraphQLError(f'Object id SignRequest:{global_id} not found')
+    return sign_request
 
 
 def _get_sign_request_pk(global_id: str) -> str:
     """Extract the PK from a SignRequest global ID."""
-    from core.schema.user import SignRequestType
-    return SignRequestType.get_pk(global_id)
+    return GlobalIDUtils.get_pk_flexible(global_id, expected_type='SignRequestType')
+
+
+def _may_switch_to(user: User, other_user: User) -> bool:
+    """Who may impersonate whom.
+
+    ``Profile.switch_group`` is the rule the data model already states -
+    "Users in the same group are allowed to switch between them" - and until
+    now nothing read it. Membership is the gate; superusers keep an override
+    because operator support work is what impersonation is for.
+
+    A null ``switch_group`` is not a group. Two users who have both been left
+    ungrouped must not be able to reach each other just because their columns
+    match.
+    """
+    if user.pk == other_user.pk:
+        return True
+    if user.is_superuser:
+        return True
+    group_id = getattr(getattr(user, 'profile', None), 'switch_group_id', None)
+    if group_id is None:
+        return False
+    other_group_id = getattr(getattr(other_user, 'profile', None), 'switch_group_id', None)
+    return group_id == other_group_id
 
 
 # ---------------------------------------------------------------------------
@@ -122,11 +157,17 @@ class UserMutations:
         request = info.context.request
 
         if id == '':
+            # Return-to-self: the session already proved this identity when it
+            # switched away, so it needs no further gate.
             if 'MAIN_USER_PK' not in request.session:
                 return SwitchUserResult(user=info.context.user)
             other_user = User.objects.get(pk=request.session['MAIN_USER_PK'])
         else:
             other_user = _get_user_object(info, id, raise_not_found=True)
+            if not _may_switch_to(user, other_user):
+                # Indistinguishable from "no such user", deliberately:
+                # confirming an id exists is its own disclosure.
+                raise GraphQLError(f'Object id User:{id} not found')
 
         # Clear cached user so context sees the switched user
         try:
@@ -146,8 +187,6 @@ class UserMutations:
 
     @strawberry.mutation(description="Upsert user profile via UtilityForm.apply_forms.")
     def upsert_user(self, info: Info, input: UserInput) -> UpsertUserResult:
-        from core.schema.user import UserType as GrapheneUserType
-
         # Convert strawberry input to dict for UtilityForm
         input_data = {}
         if input.id is not None:
@@ -164,7 +203,7 @@ class UserMutations:
             input_data['profile'] = profile_data
 
         # Set the user's global ID as the input ID (same as Graphene version)
-        input_data['id'] = GrapheneUserType.to_global_id(info.context.user)
+        input_data['id'] = GlobalIDUtils.to_global_id('UserType', info.context.user.pk)
 
         instance = UtilityForm.apply_forms(None, info, input_data)
         return UpsertUserResult(instance=instance)

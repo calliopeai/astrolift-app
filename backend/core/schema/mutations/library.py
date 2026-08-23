@@ -8,6 +8,7 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.models import SharedDirectory, SharedFile, Upload
+from core.schema.common import GlobalIDUtils
 from core.schema.types.library import SharedDirectoryType as StrawberrySharedDirectoryType
 from core.schema.types.upload import UploadType as StrawberryUploadType
 
@@ -17,13 +18,41 @@ from core.schema.types.upload import UploadType as StrawberryUploadType
 # ---------------------------------------------------------------------------
 
 def _get_shared_directory(info, global_id: str, raise_not_found: bool = True) -> SharedDirectory:
-    from core.schema.library import SharedDirectoryType
-    return SharedDirectoryType.get_object(info, global_id, raise_not_found=raise_not_found)
+    """Resolve a SharedDirectory from a relay global ID.
+
+    # tenancy: global-by-design. SharedDirectory has no organization column,
+    # its ``path`` is unique across the whole install, and access is expressed
+    # through ``owners`` plus the SharedResourcePermission ACL rather than
+    # tenant membership. There is no org boundary here to scope to, so an
+    # unscoped pk lookup is the correct read. Whether the ACL should also be
+    # enforced at this seam is a separate product question, not a leak.
+
+    ``core.schema.library`` does not exist; this raised ImportError on every
+    call since the Graphene migration (#1590).
+    """
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='SharedDirectoryType')
+    directory = SharedDirectory.objects.filter(pk=pk).first() if pk else None
+    if directory is None and raise_not_found:
+        raise GraphQLError(f'Object id SharedDirectory:{global_id} not found')
+    return directory
 
 
 def _get_upload(info, global_id: str, raise_not_found: bool = True) -> Upload:
-    from core.schema.upload import UploadType
-    return UploadType.get_object(info, global_id, raise_not_found=raise_not_found)
+    """Resolve an Upload through the scoped resolver the upload surface uses.
+
+    Unlike SharedDirectory, Upload is tenant data: ``UploadType.get_queryset``
+    applies ``with_view_permission_info``, and resolving straight off
+    ``Upload.objects`` is the leak ``test_tenancy_guardrail_byid`` exists to
+    stop. Reuses the resolver rather than restating it.
+    """
+    from core.schema.mutations.upload import _resolve_upload
+
+    if not raise_not_found:
+        try:
+            return _resolve_upload(info, global_id)
+        except GraphQLError:
+            return None
+    return _resolve_upload(info, global_id)
 
 
 # ---------------------------------------------------------------------------
