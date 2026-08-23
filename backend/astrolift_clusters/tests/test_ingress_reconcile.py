@@ -451,18 +451,38 @@ def test_mutation_not_found_on_unknown_cluster(org, permission_resolver):
     assert result.errors and result.errors[0].code == "NOT_FOUND"
 
 
-def test_mutation_precondition_on_non_alb_cluster(cluster, org, permission_resolver):
-    cluster.ingress_class = "nginx"
-    cluster.save(update_fields=["ingress_class"])
+def test_mutation_reconciles_a_non_alb_cluster(
+    org, team, cluster, domain, install_driver, permission_resolver
+):
+    """Non-ALB clusters used to be refused with PRECONDITION, which left
+    the central auth host with no way to push a gate onto Ingresses
+    already running -- the reason Stage B of #1539 had to hand-annotate
+    them. The class now selects the annotation keys instead of gating
+    the whole mutation."""
     permission_resolver.grant(Permission.CLUSTER_MANAGE)
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = {
+        "discovery_url": "https://issuer.example",
+        "client_id": "astrolift-proxy",
+        "auth_proxy_host": "auth.apps.example.net",
+    }
+    cluster.save(update_fields=["ingress_class", "oidc_auth_config"])
+    app = _make_app(org, team, "alpha")
+    _bind_env(app, cluster, domain=domain)
+
+    client = _RecordingK8sClient(ingresses_by_ns={f"{org.slug}-alpha": ["alpha-web"]})
+    install_driver(_RecordingDriver(client))
+
     with _ctx(org):
         result = ClustersMutation().reconcile_cluster_ingresses(
             _info(),
             ReconcileClusterIngressesInput(cluster_id=GUID(str(cluster.guid))),
         )
-    assert result.ok is False
-    assert result.errors and result.errors[0].code == "PRECONDITION"
-    assert "alb" in result.errors[0].message
+
+    assert result.ok is True, result.errors
+    assert result.data.reconciled_count == 1
+    patched = client.patch_calls[0]["patch"]["metadata"]["annotations"]
+    assert patched["nginx.ingress.kubernetes.io/auth-url"] == ("https://auth.apps.example.net/oauth2/auth")
 
 
 def test_mutation_happy_path_returns_reconciled_count(

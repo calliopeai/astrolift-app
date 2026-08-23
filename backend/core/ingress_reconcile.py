@@ -1,8 +1,11 @@
-"""Re-apply ALB Cognito auth annotations on managed-subdomain Ingresses.
+"""Re-apply the edge auth annotations on managed-subdomain Ingresses.
 
-Bridges "operator set ``alb_auth_config`` on a cluster" to "every running
+Bridges "operator changed the auth gate on a cluster" to "every running
 managed-subdomain Ingress on that cluster gets (or loses) the
-``alb.ingress.kubernetes.io/auth-*`` annotations immediately" (#851).
+annotations immediately" (#851). Covers both gates: the
+``alb.ingress.kubernetes.io/auth-*`` keys driven by ``alb_auth_config``
+on ALB clusters, and the ``nginx.ingress.kubernetes.io/auth-*`` keys
+driven by ``oidc_auth_config`` on every other class (#1539).
 
 Without this, a config change only takes effect on the next per-app
 deploy — the renderer reads ``alb_auth_config`` when it renders the
@@ -82,6 +85,49 @@ def _auth_annotation_patch(alb_auth_config: dict[str, Any] | None) -> dict[str, 
     }
 
 
+def _oidc_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
+    """The nginx-family half of :func:`auth_annotation_patch`.
+
+    Mirrors the ALB behaviour on the central-auth path: a complete
+    ``oidc_auth_config`` patches on the same three annotations the
+    renderer emits, anything less patches them to ``None`` so the
+    apiserver drops them. Delegates the "is this configured" test to
+    ``core.app_deploy.oidc_auth_for_cluster`` and the values to
+    ``nginx_auth_annotations`` so a reconciled Ingress and a
+    freshly-rendered one cannot disagree.
+    """
+    from core.app_deploy import oidc_auth_for_cluster
+    from providers.k8s_native.ingress import (
+        NGINX_AUTH_ANNOTATION_KEYS,
+        nginx_auth_annotations,
+    )
+
+    auth = oidc_auth_for_cluster(cluster)
+    if auth is None:
+        return dict.fromkeys(NGINX_AUTH_ANNOTATION_KEYS, None)
+    return nginx_auth_annotations(auth)
+
+
+def auth_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
+    """Annotation delta for ``cluster``, whichever gate its class uses.
+
+    The two ingress classes carry different annotation keys and read
+    different config, so the reconcile has to pick per cluster. It used
+    to assume ALB and the mutation refused every other class outright,
+    which left the central-auth path with no way to push a change onto
+    running Ingresses at all -- the reason Stage B of #1539 had to
+    hand-annotate live Ingresses.
+
+    Only the keys for the cluster's own class are touched. Keys
+    belonging to the other class are left alone rather than cleared: a
+    cluster serves one controller, and a reconcile has no business
+    editing annotations no renderer on this cluster emits.
+    """
+    if getattr(cluster, "ingress_class", "") == "alb":
+        return _auth_annotation_patch(cluster.alb_auth_config)
+    return _oidc_annotation_patch(cluster)
+
+
 def _ingress_name(ingress: Any) -> str:
     """Pull ``.metadata.name`` off a kubernetes-client V1Ingress object
     (attribute access) or a plain dict (key access) — the live client
@@ -118,7 +164,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     from core.app_deploy import namespace_for_app
     from core.cluster_management import _driver_for_cluster
 
-    patch_body = {"metadata": {"annotations": _auth_annotation_patch(cluster.alb_auth_config)}}
+    patch_body = {"metadata": {"annotations": auth_annotation_patch(cluster)}}
 
     reconciled = 0
     skipped = 0
@@ -195,9 +241,10 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
             reconciled += 1
 
     logger.info(
-        "reconcile_cluster_ingresses cluster=%s auth=%s reconciled=%d skipped=%d errors=%d",
+        "reconcile_cluster_ingresses cluster=%s class=%s auth=%s reconciled=%d skipped=%d errors=%d",
         cluster.slug,
-        bool(cluster.alb_auth_config),
+        cluster.ingress_class,
+        any(v is not None for v in patch_body["metadata"]["annotations"].values()),
         reconciled,
         skipped,
         len(errors),
@@ -208,5 +255,6 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
 __all__ = [
     "AUTH_ANNOTATION_KEYS",
     "MANAGED_SUBDOMAIN_SELECTOR",
+    "auth_annotation_patch",
     "reconcile_cluster_ingresses",
 ]

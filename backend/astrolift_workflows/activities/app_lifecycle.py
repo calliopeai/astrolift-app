@@ -783,12 +783,20 @@ def _render_app_ingresses_and_tls(
             )
             if computed:
                 if cluster.ingress_class == "alb":
-                    from core.app_deploy import shared_ingress_annotations
+                    from core.app_deploy import (
+                        cognito_auth_for_cluster,
+                        shared_ingress_annotations,
+                    )
                     from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
 
+                    # Same gate core.app_deploy renders. Omitting it here
+                    # made an app's authentication depend on which render
+                    # path ran -- the exact hazard the ALB-group comment
+                    # below already warns about (#1539).
                     alb_cfg = ALBConfig(
                         region=cluster.region or "us-east-1",
                         certificate_arn=cert_arn,
+                        cognito_auth=cognito_auth_for_cluster(cluster),
                     )
                     driver = ALBIngressDriver(config=alb_cfg)
                     tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
@@ -830,8 +838,19 @@ def _render_app_ingresses_and_tls(
                     # Generic Ingress for nginx, traefik, etc. All
                     # managed hostnames share one Ingress + one cert
                     # Secret (wildcard covers them all).
+                    from core.app_deploy import oidc_auth_for_cluster
+                    from providers.k8s_native.ingress import nginx_auth_annotations
+
                     all_hostnames = [wh.hostname for wh in computed]
                     managed_annotations: dict[str, str] = {}
+                    # Route through the cluster's central auth host, same
+                    # as K8sIngressDriver does on the other render path.
+                    # These hostnames all sit under the auth host's
+                    # parent zone, so the session cookie already covers
+                    # them and no per-app registration is involved.
+                    oidc_auth = oidc_auth_for_cluster(cluster)
+                    if oidc_auth is not None:
+                        managed_annotations.update(nginx_auth_annotations(oidc_auth))
                     if ingress_paused:
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'

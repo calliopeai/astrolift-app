@@ -1021,6 +1021,59 @@ def shared_ingress_annotations(cluster: Any, *, org_slug: str, app_slug: str) ->
     return out
 
 
+def cognito_auth_for_cluster(cluster: Any) -> Any | None:
+    """Build the ALB renderer's ``CognitoAuthConfig`` from a cluster row,
+    or ``None`` when no Cognito gate is configured.
+
+    Companion to :func:`oidc_auth_for_cluster` for the ALB ingress
+    class, and shared by both managed-subdomain renderers for the same
+    reason: the gate must not depend on which render path ran.
+
+    Truthiness, not presence -- a blank ``user_pool_arn`` renders an
+    ``authenticate-cognito`` action the load balancer controller
+    rejects, so a partial config counts as no gate. Matches
+    ``core.ingress_reconcile._auth_annotation_patch`` and
+    ``toml_writeback.ingress_auth_section_from_db``.
+    """
+    from providers.aws.ingress_alb import CognitoAuthConfig
+
+    config = getattr(cluster, "alb_auth_config", None) or {}
+    required = ("user_pool_arn", "user_pool_client_id", "user_pool_domain")
+    if not all(config.get(k) for k in required):
+        return None
+    return CognitoAuthConfig(
+        user_pool_arn=config["user_pool_arn"],
+        user_pool_client_id=config["user_pool_client_id"],
+        user_pool_domain=config["user_pool_domain"],
+    )
+
+
+def oidc_auth_for_cluster(cluster: Any) -> Any | None:
+    """Build the nginx renderer's ``OIDCAuthConfig`` from a cluster row,
+    or ``None`` when the cluster has no central auth host configured.
+
+    Every renderer that emits a managed-subdomain Ingress has to agree on
+    what "gated" means, or an app comes out authenticated on one deploy
+    path and public on another. Two renderers exist today -- this module
+    and ``astrolift_workflows.activities.app_lifecycle`` -- so the
+    decision lives here rather than in either of them.
+
+    The three keys are required and must be non-empty. Presence alone is
+    not enough: an ``auth_proxy_host`` of ``""`` renders
+    ``https:///oauth2/auth``, which fails open as a broken annotation
+    rather than a gate. Same truthiness test as
+    ``astrolift_clusters.schema.mutations._has_auth_gate``, so what the
+    API reports as gated and what the renderer actually gates cannot
+    disagree.
+    """
+    from providers.k8s_native.ingress import OIDCAuthConfig
+
+    config = getattr(cluster, "oidc_auth_config", None) or {}
+    if not all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host")):
+        return None
+    return OIDCAuthConfig(auth_proxy_host=config["auth_proxy_host"])
+
+
 def _render_managed_subdomain_ingress(
     deployment: Deployment,
     manifest: Any,
@@ -1112,18 +1165,9 @@ def _render_managed_subdomain_ingress(
         return "/"
 
     if getattr(cluster, "ingress_class", None) == "alb":
-        from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver, CognitoAuthConfig
+        from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
 
-        cognito_auth = None
-        alb_auth_cfg = getattr(cluster, "alb_auth_config", None)
-        if alb_auth_cfg and all(
-            k in alb_auth_cfg for k in ("user_pool_arn", "user_pool_client_id", "user_pool_domain")
-        ):
-            cognito_auth = CognitoAuthConfig(
-                user_pool_arn=alb_auth_cfg["user_pool_arn"],
-                user_pool_client_id=alb_auth_cfg["user_pool_client_id"],
-                user_pool_domain=alb_auth_cfg["user_pool_domain"],
-            )
+        cognito_auth = cognito_auth_for_cluster(cluster)
 
         # The ALB health-check path is a single global ALBConfig field, so it
         # must come from a REAL container workload -- never a container-less
@@ -1164,20 +1208,9 @@ def _render_managed_subdomain_ingress(
                     rendered["metadata"].setdefault("annotations", {}).update(group_annotations)
                 out.append(rendered)
     else:
-        from providers.k8s_native.ingress import (
-            K8sIngressConfig,
-            K8sIngressDriver,
-            OIDCAuthConfig,
-        )
+        from providers.k8s_native.ingress import K8sIngressConfig, K8sIngressDriver
 
-        oidc_auth = None
-        oidc_auth_cfg = getattr(cluster, "oidc_auth_config", None)
-        if oidc_auth_cfg and all(
-            k in oidc_auth_cfg for k in ("discovery_url", "client_id", "auth_proxy_host")
-        ):
-            oidc_auth = OIDCAuthConfig(
-                auth_proxy_host=oidc_auth_cfg["auth_proxy_host"],
-            )
+        oidc_auth = oidc_auth_for_cluster(cluster)
 
         ingress_class = getattr(cluster, "ingress_class", "nginx")
         # Map the cluster's ingress_class to the driver variant. "nginx" and

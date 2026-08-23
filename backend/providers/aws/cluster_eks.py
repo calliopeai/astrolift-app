@@ -93,6 +93,7 @@ from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
 from aws.session import aws_client
+from k8s_native.central_auth import central_auth_component
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -1645,6 +1646,15 @@ class EKSClusterDriver(ClusterDriver):
                     knative_serving_cr,
                 ],
             ),
+            # The central auth host (#1539). Astrolift's tenant runtime
+            # is EKS, so the cluster that actually serves tenant apps is
+            # the one that most needs it -- offering it only in the
+            # vanilla-k8s recipe is why the first install hand-assembled
+            # oauth2-proxy with Flux. Disabled until the cluster carries a
+            # complete oidc_auth_config, and it needs an nginx-family
+            # controller to gate against, so it is inert on an ALB-only
+            # cluster rather than harmful.
+            central_auth_component(getattr(cluster, "oidc_auth_config", None)),
         ]
 
     # ---- exec_plugin token materialization (#309) -----------------

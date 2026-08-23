@@ -87,6 +87,7 @@ def _context_for_cluster(cluster: TenantCluster) -> Any:
         ca_cert=cluster.ca_cert or "",
         ingress_class=cluster.ingress_class or "",
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
+        oidc_auth_config=cluster.oidc_auth_config or {},
     )
 
 

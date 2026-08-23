@@ -733,13 +733,17 @@ class ClustersMutation:
             )
         cluster.save()
 
-        # GitOps round-trip (#853): when the operator changes the ALB
-        # auth gate, mirror it back into every bound app's astrolift.toml
-        # so the repo (source of truth) doesn't drift from the DB. This
+        # GitOps round-trip (#853): when the operator changes the auth
+        # gate, mirror it back into every bound app's astrolift.toml
+        # so the repo (source of truth) doesn't drift from the DB. An
+        # ingress_class flip counts as a change even when neither config
+        # was touched: the class decides which gate is in force, so the
+        # manifest's [ingress.auth] describes a different gate after it
+        # (#1539). This
         # is best-effort and must never block the UI save — a missing
         # source connection is a graceful skip, and any SCM failure is
         # swallowed here and surfaced only in the logs.
-        if auth_config_changed:
+        if auth_config_changed or oidc_changed or class_changing:
             try:
                 from astrolift_clusters.services.toml_writeback import (
                     write_auth_config_for_cluster,
@@ -762,24 +766,29 @@ class ClustersMutation:
     def reconcile_cluster_ingresses(
         self, info: Info, input: ReconcileClusterIngressesInput
     ) -> MutationResultType[ReconcileClusterIngressesResult]:
-        """Re-apply the ALB Cognito auth gate across every managed-subdomain
-        Ingress on the cluster (#851).
+        """Re-apply the cluster's edge auth gate across every
+        managed-subdomain Ingress on it (#851, #1539).
 
-        The operator sets ``alb_auth_config`` via ``updateTenantCluster``;
-        that only changes what the *next* deploy renders. This mutation
-        pushes the change onto the live Ingresses now — patching the
-        ``alb.ingress.kubernetes.io/auth-*`` annotations on every Ingress
-        labelled ``astrolift.dev/managed-subdomain=true`` so the AWS Load
-        Balancer Controller reconciles the listener rules on its next
-        sync. Removing ``alb_auth_config`` (null) strips the annotations,
-        leaving the apps public.
+        The operator sets ``albAuthConfig`` / ``oidcAuthConfig`` via
+        ``updateTenantCluster``; that only changes what the *next* deploy
+        renders. This mutation pushes the change onto the live Ingresses
+        now — patching the auth annotations on every Ingress labelled
+        ``astrolift.dev/managed-subdomain=true`` so the controller
+        reconciles on its next sync. Clearing the config strips the
+        annotations, leaving the apps public; that is the supported way
+        to take a gate off deliberately.
 
-        Only meaningful for the ALB ingress class — nginx / other classes
-        don't carry these annotations, so the mutation refuses with
-        PRECONDITION rather than silently no-op'ing. Per-namespace
-        failures surface in ``errors`` without aborting the sweep; the
-        envelope stays ``ok=true`` so the operator sees partial progress
-        plus the specific namespaces that couldn't be reached."""
+        Which annotations get patched follows the cluster's ingress
+        class: the ``alb.ingress.kubernetes.io/auth-*`` keys on ALB, the
+        ``nginx.ingress.kubernetes.io/auth-*`` keys pointing at the
+        central auth host on every other class. This used to refuse
+        anything but ALB, which left the central-auth path with no way
+        to push a gate onto running Ingresses at all.
+
+        Per-namespace failures surface in ``errors`` without aborting the
+        sweep; the envelope stays ``ok=true`` so the operator sees
+        partial progress plus the specific namespaces that couldn't be
+        reached."""
 
         tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
@@ -789,13 +798,6 @@ class ClustersMutation:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        if cluster.ingress_class != "alb":
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "reconcile only supported for alb ingressClass",
-                field="clusterId",
-            )
-
         from core.ingress_reconcile import reconcile_cluster_ingresses
 
         result = reconcile_cluster_ingresses(cluster)

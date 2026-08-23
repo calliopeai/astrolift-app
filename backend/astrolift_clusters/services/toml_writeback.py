@@ -72,6 +72,13 @@ _WRITEABLE_SOURCE_KINDS = frozenset({"github", "gitlab", "bitbucket", "gitea"})
 # same three keys, so this is the canonical set.
 _COGNITO_FIELDS = ("user_pool_arn", "user_pool_client_id", "user_pool_domain")
 
+# The central-auth fields mirrored into ``[ingress.auth]`` on nginx-family
+# clusters. ``cookie_secret`` is deliberately absent: this table is
+# committed to the app's own git repo, and the cookie secret signs the
+# oauth2-proxy session. The manifest records where the gate points, never
+# what would let someone mint a session against it.
+_OIDC_FIELDS = ("auth_proxy_host", "discovery_url", "client_id")
+
 _FetchFn = Callable[[SourceConnection, str, str, str], "str | None"]
 _PutFn = Callable[..., Any]
 _OpenPrFn = Callable[..., Any]
@@ -214,6 +221,43 @@ def ingress_auth_section_from_db(
     return section
 
 
+def ingress_auth_section_for_cluster(cluster: Any) -> dict[str, str] | None:
+    """The ``[ingress.auth]`` table describing ``cluster``'s gate.
+
+    Dispatches on the ingress class, because the two classes are gated
+    by different configs and the manifest has to record the one actually
+    in force. Mirroring only the ALB config meant flipping a cluster to
+    nginx -- the migration #1539 exists to enable -- read
+    ``alb_auth_config`` as null and stripped ``[ingress.auth]`` from
+    every bound app's manifest, leaving the GitOps source of truth
+    recording "no auth" for apps that were in fact gated.
+    """
+    if getattr(cluster, "ingress_class", "alb") == "alb":
+        return ingress_auth_section_from_db(getattr(cluster, "alb_auth_config", None))
+    return oidc_auth_section_from_db(getattr(cluster, "oidc_auth_config", None))
+
+
+def oidc_auth_section_from_db(
+    oidc_auth_config: Mapping[str, Any] | None,
+) -> dict[str, str] | None:
+    """Map ``TenantCluster.oidc_auth_config`` to the ``[ingress.auth]``
+    TOML table, or ``None`` when the central auth gate is disabled.
+
+    Enabled only when all three routing fields are present and
+    non-empty, matching ``core.app_deploy.oidc_auth_for_cluster`` -- so
+    the manifest claims a gate exactly when the renderer emits one.
+    """
+    config = oidc_auth_config or {}
+    if not isinstance(config, Mapping):
+        return None
+    values = {field: str(config.get(field) or "") for field in _OIDC_FIELDS}
+    if not all(values.values()):
+        return None
+    section: dict[str, str] = {"kind": "oidc"}
+    section.update(values)
+    return section
+
+
 def apply_ingress_auth(
     toml_text: str,
     auth_section: dict[str, str] | None,
@@ -279,10 +323,12 @@ def write_auth_config_to_toml(
     put: _PutFn | None = None,
     open_pr: _OpenPrFn | None = None,
 ) -> WriteBackResult:
-    """Sync ``cluster``'s ALB auth config into ``app``'s ``astrolift.toml``.
+    """Sync ``cluster``'s edge auth config into ``app``'s ``astrolift.toml``.
 
     Fetches the current manifest from the app's repo, updates the
-    ``[ingress.auth]`` section to match ``cluster.alb_auth_config``, and
+    ``[ingress.auth]`` section to match whichever gate the cluster's
+    ingress class puts in force (``alb_auth_config`` on ALB,
+    ``oidc_auth_config`` elsewhere), and
     commits it back. Returns a :class:`WriteBackResult`; never raises
     (the caller is best-effort). See module docstring for the status
     matrix.
@@ -322,7 +368,7 @@ def write_auth_config_to_toml(
     deploy_branch = app.deploy_branch or app.default_branch or "main"
     manifest_path = app.manifest_path or "astrolift.toml"
     ingress_class = getattr(cluster, "ingress_class", "alb") or "alb"
-    auth_section = ingress_auth_section_from_db(getattr(cluster, "alb_auth_config", None))
+    auth_section = ingress_auth_section_for_cluster(cluster)
 
     # Fetch current manifest. Absent manifest -> start from empty so we
     # still write the [ingress] table when enabling auth on a repo that
