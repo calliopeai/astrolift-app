@@ -49,16 +49,12 @@ FIRST_PARTY_PREFIXES = ("core", "config", "astrolift", "providers")
 #
 # Making them *run* without settling that would turn "always fails" into
 # "works, across tenants", which is strictly worse.
-KNOWN_BROKEN: frozenset[str] = frozenset(
-    {
-        "core/schema/mutations/library.py:20",   # core.schema.library
-        "core/schema/mutations/library.py:25",   # core.schema.upload
-        "core/schema/mutations/user.py:37",      # core.schema.user
-        "core/schema/mutations/user.py:43",      # core.schema.user
-        "core/schema/mutations/user.py:49",      # core.schema.user
-        "core/schema/mutations/user.py:149",     # core.schema.user
-    }
-)
+# Empty, and the anti-rot test below keeps it that way: an entry may only be
+# added with a reason, and must be removed the moment the site resolves.
+# The six that lived here (core.schema.library, core.schema.upload,
+# core.schema.user) were repaired in #1593 - the user.py ones together with
+# the impersonation gate they were accidentally providing.
+KNOWN_BROKEN: frozenset[str] = frozenset()
 
 
 def _module_path(dotted: str) -> pathlib.Path | None:

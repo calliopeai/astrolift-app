@@ -156,9 +156,11 @@ _TENANCY_MARKER = "# tenancy:"
 # the operator is an install admin, not a tenant. Keyed ``app::qualname``.
 STAFF_EXEMPT: dict[str, str] = {
     "core::UserMutations.switch_user": (
-        "impersonation control (inherited core auth framework): switches the "
-        "active session to another user by pk. Not an org-scoped resolver — "
-        "gated by the core admin/auth layer, orthogonal to tenant context."
+        "#1593: gated by _may_switch_to — superuser, or shared "
+        "Profile.switch_group membership ('users in the same group are "
+        "allowed to switch between them'). Not an org-scoped resolver; the "
+        "gate is group membership, orthogonal to tenant context. The previous "
+        "justification here claimed a core admin/auth gate that did not exist."
     ),
     "core::PermissionAnalysisQuery.effective_permissions": (
         "#537: _require_self_or_superuser gate immediately precedes the "
