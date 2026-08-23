@@ -40,6 +40,37 @@ def _managed_services_for_environment(app_environment):
     ).distinct()
 
 
+def _binding_workloads_for_service(service, app_environment) -> tuple[str, ...]:
+    """Selectors for one consumer, with imperative rows staying universal."""
+    if service.registered_app_id:
+        values = list(getattr(service, "bind_workloads", None) or [])
+    else:
+        attachment = service.attachments.filter(
+            app_environment=app_environment,
+            deleted_at__isnull=True,
+        ).first()
+        values = list(getattr(attachment, "workload_names", None) or [])
+    return tuple(values or ["*"])
+
+
+def _binding_secret_refs_for_environment(app_environment) -> tuple[bool, dict[str, list[str]]]:
+    """Return universal-secret presence plus per-workload secret references."""
+    app_slug = app_environment.registered_app.slug
+    universal = False
+    by_workload: dict[str, list[str]] = {}
+    for service in _managed_services_for_environment(app_environment).prefetch_related("attachments"):
+        selectors = _binding_workloads_for_service(service, app_environment)
+        if "*" in selectors:
+            universal = True
+            continue
+        for workload in selectors:
+            ref = _bindings_secret_name(app_slug, workload)
+            by_workload.setdefault(workload, [])
+            if ref not in by_workload[workload]:
+                by_workload[workload].append(ref)
+    return universal, by_workload
+
+
 def _mark_app_provisioning_sync(registered_app_id: int) -> None:
     from astrolift_registry.models import RegisteredApp
 
@@ -530,7 +561,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
                 deleted_at__isnull=True,
             ).values_list("secret_bundle__slug", flat=True),
         )
-        has_bindings = _managed_services_for_environment(env).exists()
+        has_bindings, workload_env_from = _binding_secret_refs_for_environment(env)
         env_from = list(bundle_secret_names)
         if has_bindings:
             env_from.append(_bindings_secret_name(app.slug))
@@ -545,9 +576,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         # later edit to the query above.
         from core.app_deploy import namespace_for_app
 
-        return manifest, app, env, d, env_from, namespace_for_app(app)
+        return manifest, app, env, d, env_from, workload_env_from, namespace_for_app(app)
 
-    manifest, app, env, d, env_from, namespace = await sync_to_async(_gather)()
+    manifest, app, env, d, env_from, workload_env_from, namespace = await sync_to_async(_gather)()
 
     resources = _render(
         manifest,
@@ -558,6 +589,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         image_digest=d.image_digest,
         environment_name=env.name,
         env_from_secret_refs=env_from,
+        workload_env_from_secret_refs=workload_env_from,
     )
 
     # Fold in CustomDomain Ingress + TLS Secret resources (#397). Each
@@ -580,7 +612,11 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         env_from,
         extra={"deployment_id": deployment_id},
     )
-    return {"resources": resources, "env_from_secret_refs": env_from}
+    return {
+        "resources": resources,
+        "env_from_secret_refs": env_from,
+        "workload_env_from_secret_refs": workload_env_from,
+    }
 
 
 def _render_app_ingresses_and_tls(
@@ -908,13 +944,15 @@ def _render_app_ingresses_and_tls(
     return out
 
 
-def _bindings_secret_name(app_slug: str) -> str:
+def _bindings_secret_name(app_slug: str, workload_name: str = "") -> str:
     """Synthetic k8s Secret name for the per-app managed-service
     connection envelope. Kept in one helper so the producer (in
     ``update_secrets``) and the consumer (``render_manifests``) can
     never drift apart.
     """
-    return f"astrolift-bindings-{app_slug}"
+    from _sdk.k8s_naming import dns_label
+
+    return dns_label("astrolift", "bindings", app_slug, workload_name or None)
 
 
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
@@ -1057,9 +1095,8 @@ def _update_secrets_sync(deployment_id: int) -> int:
             )
 
     # ---- synthesized managed-service bindings Secret --------------
-    # One k8s Secret per (app, env) named ``astrolift-bindings-<slug>``
-    # carrying the connection envelope for every active ManagedService
-    # bound to this app+env. Resolves the driver-side ValueRefs (literal
+    # One universal Secret plus selector-scoped Secrets where the manifest
+    # names particular workloads. Resolves the driver-side ValueRefs (literal
     # or secret_ref) into raw values so workloads see a flat env-var
     # surface — they don't need to know whether DATABASE_PASSWORD came
     # from Secrets Manager or was inlined.
@@ -1067,24 +1104,25 @@ def _update_secrets_sync(deployment_id: int) -> int:
         _managed_services_for_environment(d.app_environment).order_by("kind", "name"),
     )
     if services:
-        bindings_data: dict[str, str] = {}
-        seen_keys: set[str] = set()
+        bindings_by_secret: dict[str, dict[str, str]] = {}
         secrets_backend = driver_for_capability(
             d.app_environment.tenant_cluster,
             "secrets",
         )
         for svc in services:
+            selectors = _binding_workloads_for_service(svc, d.app_environment)
+            secret_names = (
+                [_bindings_secret_name(d.registered_app.slug)]
+                if "*" in selectors
+                else [_bindings_secret_name(d.registered_app.slug, name) for name in selectors]
+            )
+            for secret_name in secret_names:
+                bindings_by_secret.setdefault(secret_name, {})
             for binding in ManagedServiceBinding.objects.filter(
                 managed_service=svc,
                 deleted_at__isnull=True,
             ).order_by("env_key"):
                 env_key = binding.env_key
-                if env_key in seen_keys:
-                    # Last writer wins per spec 05 §10. We keep declared
-                    # order: services iterate sorted by (kind, name),
-                    # bindings inside a service sorted by env_key.
-                    pass
-                seen_keys.add(env_key)
                 raw_value: str
                 if binding.is_secret:
                     # env_value_ref is a secrets-backend reference (ARN
@@ -1112,30 +1150,34 @@ def _update_secrets_sync(deployment_id: int) -> int:
                         )
                 else:
                     raw_value = binding.env_value_ref
-                bindings_data[env_key] = base64.b64encode(
+                encoded = base64.b64encode(
                     raw_value.encode("utf-8"),
                 ).decode("ascii")
+                for secret_name in secret_names:
+                    # Last writer wins per spec 05 §10, independently within
+                    # each selector scope.
+                    bindings_by_secret[secret_name][env_key] = encoded
 
-        bindings_secret_name = f"astrolift-bindings-{d.registered_app.slug}"
-        resources.append(
-            {
-                "apiVersion": "v1",
-                "kind": "Secret",
-                "metadata": {
-                    "name": bindings_secret_name,
-                    "namespace": namespace,
-                    "labels": {
-                        "astrolift.io/managed-by": "astrolift",
-                        "astrolift.io/bindings-for": d.registered_app.slug,
+        for bindings_secret_name, bindings_data in sorted(bindings_by_secret.items()):
+            resources.append(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Secret",
+                    "metadata": {
+                        "name": bindings_secret_name,
+                        "namespace": namespace,
+                        "labels": {
+                            "astrolift.io/managed-by": "astrolift",
+                            "astrolift.io/bindings-for": d.registered_app.slug,
+                        },
+                        "annotations": {
+                            "astrolift.io/binding-count": str(len(bindings_data)),
+                        },
                     },
-                    "annotations": {
-                        "astrolift.io/binding-count": str(len(bindings_data)),
-                    },
+                    "type": "Opaque",
+                    "data": bindings_data,
                 },
-                "type": "Opaque",
-                "data": bindings_data,
-            },
-        )
+            )
 
         from astrolift_services.filesystem_bindings import (
             FilesystemBindingError,
@@ -1394,6 +1436,22 @@ def _mark_running_sync(deployment_id: int) -> None:
         if d.status != Deployment.Status.RUNNING.value:
             d.transition_to(Deployment.Status.RUNNING)
 
+        # Record what this deploy actually put live (#1603). Every other
+        # write of config_snapshot copies it forward from a prior or source
+        # deployment, so the field propagated its `{}` default forever and
+        # `build_config_drift` compared against nothing: its guard reads
+        # `if snapshot_hash and current_hash and ...`, which an empty
+        # snapshot can never satisfy. The manifest-hash and image-tag halves
+        # of the drift banner have therefore never fired, silently -- it
+        # fails closed, so the operator sees no banner rather than a wrong
+        # one, which is why nobody noticed.
+        #
+        # Here, not at deploy creation: the snapshot has to describe what
+        # went live. A deploy that fails must leave the previous snapshot
+        # standing, or drift would be measured against config that never
+        # ran.
+        _write_config_snapshot(d)
+
     # Best-effort GitHub reflection, OUTSIDE the transaction so a slow
     # GitHub API never holds the select_for_update row locks (#1124).
     try:
@@ -1402,6 +1460,28 @@ def _mark_running_sync(deployment_id: int) -> None:
         reflect_deploy_succeeded(d)
     except Exception:  # noqa: BLE001
         log.warning("github reflect_deploy_succeeded errored for deploy %s", deployment_id, exc_info=True)
+
+
+def _write_config_snapshot(deployment) -> None:
+    """Snapshot the config this deploy put live, on the deployment row.
+
+    ``manifest_hash`` is the *app's* hash -- the normalised astrolift.toml
+    via ``astrolift_manifest.normalize`` -- and deliberately not the rendered
+    manifest-set hash. ``direct_apply`` documents why: the drift banner
+    compares this key against ``RegisteredApp.manifest_hash``, so storing the
+    hash of rendered k8s objects here would make the banner fire on every app
+    forever.
+
+    Merged onto whatever the row already carries rather than replacing it, so
+    a snapshot copied forward from a prior deploy keeps any keys this does
+    not own.
+    """
+    app = deployment.registered_app
+    snapshot = dict(deployment.config_snapshot or {})
+    snapshot["manifest_hash"] = (getattr(app, "manifest_hash", "") or "").strip()
+    snapshot["image_tag"] = (deployment.image_tag or "").strip()
+    deployment.config_snapshot = snapshot
+    deployment.save(update_fields=["config_snapshot", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.deploy.mark_running")
