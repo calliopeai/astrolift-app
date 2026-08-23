@@ -3776,6 +3776,7 @@ export type AstroliftTenantCluster = {
   lifecycle: Scalars['String']['output'];
   managedAt?: Maybe<Scalars['DateTime']['output']>;
   name: Scalars['String']['output'];
+  oidcAuthConfig?: Maybe<Scalars['JSON']['output']>;
   organizationSlug?: Maybe<Scalars['String']['output']>;
   providerPluginSlug: Scalars['String']['output'];
   region: Scalars['String']['output'];
@@ -9916,6 +9917,7 @@ export type UpdateTenantClusterInput = {
   id: Scalars['GUID']['input'];
   ingressClass: InputMaybe<Scalars['String']['input']>;
   isActive: InputMaybe<Scalars['Boolean']['input']>;
+  oidcAuthConfig: InputMaybe<Scalars['JSON']['input']>;
   region: InputMaybe<Scalars['String']['input']>;
 };
 
