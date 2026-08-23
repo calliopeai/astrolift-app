@@ -757,7 +757,8 @@ def _render_app_ingresses_and_tls(
                         ),
                         "astrolift.dev/ingress-state": ingress_state_label,
                         "astrolift.dev/edge-auth": custom_domain_edge_auth_state(
-                            edge_cluster, cd.hostname,
+                            edge_cluster,
+                            cd.hostname,
                         ),
                     },
                 },
@@ -1424,6 +1425,22 @@ def _mark_running_sync(deployment_id: int) -> None:
         if d.status != Deployment.Status.RUNNING.value:
             d.transition_to(Deployment.Status.RUNNING)
 
+        # Record what this deploy actually put live (#1603). Every other
+        # write of config_snapshot copies it forward from a prior or source
+        # deployment, so the field propagated its `{}` default forever and
+        # `build_config_drift` compared against nothing: its guard reads
+        # `if snapshot_hash and current_hash and ...`, which an empty
+        # snapshot can never satisfy. The manifest-hash and image-tag halves
+        # of the drift banner have therefore never fired, silently -- it
+        # fails closed, so the operator sees no banner rather than a wrong
+        # one, which is why nobody noticed.
+        #
+        # Here, not at deploy creation: the snapshot has to describe what
+        # went live. A deploy that fails must leave the previous snapshot
+        # standing, or drift would be measured against config that never
+        # ran.
+        _write_config_snapshot(d)
+
     # Best-effort GitHub reflection, OUTSIDE the transaction so a slow
     # GitHub API never holds the select_for_update row locks (#1124).
     try:
@@ -1432,6 +1449,28 @@ def _mark_running_sync(deployment_id: int) -> None:
         reflect_deploy_succeeded(d)
     except Exception:  # noqa: BLE001
         log.warning("github reflect_deploy_succeeded errored for deploy %s", deployment_id, exc_info=True)
+
+
+def _write_config_snapshot(deployment) -> None:
+    """Snapshot the config this deploy put live, on the deployment row.
+
+    ``manifest_hash`` is the *app's* hash -- the normalised astrolift.toml
+    via ``astrolift_manifest.normalize`` -- and deliberately not the rendered
+    manifest-set hash. ``direct_apply`` documents why: the drift banner
+    compares this key against ``RegisteredApp.manifest_hash``, so storing the
+    hash of rendered k8s objects here would make the banner fire on every app
+    forever.
+
+    Merged onto whatever the row already carries rather than replacing it, so
+    a snapshot copied forward from a prior deploy keeps any keys this does
+    not own.
+    """
+    app = deployment.registered_app
+    snapshot = dict(deployment.config_snapshot or {})
+    snapshot["manifest_hash"] = (getattr(app, "manifest_hash", "") or "").strip()
+    snapshot["image_tag"] = (deployment.image_tag or "").strip()
+    deployment.config_snapshot = snapshot
+    deployment.save(update_fields=["config_snapshot", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.deploy.mark_running")
