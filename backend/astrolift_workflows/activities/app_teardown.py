@@ -276,24 +276,21 @@ def _revoke_app_deploy_tokens_sync(registered_app_id: int) -> int:
     right primitive: the token's lookup path raises a clear
     DeployTokenNotFound at the auth layer.
     """
-    from datetime import UTC, datetime
+    # DeployToken lives in astrolift_lifecycle. The import here named
+    # astrolift_identity, which has no such model, and the except swallowed
+    # the ImportError -- so this returned 0 on every teardown and no deploy
+    # token has ever been revoked with its app (#1614). The guard is gone
+    # rather than repointed: a missing first-party model is not a slice that
+    # failed to load, it is a bug, and swallowing it is what hid this one.
+    from astrolift_lifecycle.models import DeployToken
 
-    try:
-        from astrolift_identity.models import DeployToken  # type: ignore
-    except ImportError:
-        # Identity app may not be loaded in every backend slice;
-        # treat the absence of the model as zero tokens to revoke.
-        return 0
-
-    now = datetime.now(UTC)
     qs = DeployToken.objects.filter(
         registered_app_id=registered_app_id,
         deleted_at__isnull=True,
     )
     count = qs.count()
     for token in qs:
-        token.deleted_at = now
-        token.save(update_fields=["deleted_at", "updated_at", "version"])
+        token.soft_delete()
     return count
 
 
