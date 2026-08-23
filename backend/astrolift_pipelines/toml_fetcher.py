@@ -58,15 +58,8 @@ def _fetch_from_github(pipeline: Pipeline, ref: str, path: str) -> str:
     import base64
     import json
 
-    org = pipeline.organization
-
-    # Look up the GitHub SourceConnection for this org/repo
-    token = _get_github_token(org, pipeline.repo_url)
-    if not token:
-        raise TomlFetchError(
-            f"No GitHub credentials configured for repo {pipeline.repo_url!r}. "
-            "Add a source connection via the SCM integration settings."
-        )
+    connection = _org_connection(pipeline.organization, source_kind="github")
+    token = _connection_token(connection, source_kind="github")
 
     # Extract owner/repo from URL
     owner_repo = _extract_owner_repo_github(pipeline.repo_url)
@@ -105,17 +98,21 @@ def _fetch_from_gitlab(pipeline: Pipeline, ref: str, path: str) -> str:
     import urllib.parse
     import urllib.request
 
-    org = pipeline.organization
-    token = _get_gitlab_token(org, pipeline.repo_url)
-    if not token:
-        raise TomlFetchError(f"No GitLab credentials configured for repo {pipeline.repo_url!r}.")
+    connection = _org_connection(pipeline.organization, source_kind="gitlab")
+    token = _connection_token(connection, source_kind="gitlab")
 
     project_path = _extract_project_path_gitlab(pipeline.repo_url)
     encoded_path = urllib.parse.quote(path, safe="")
     encoded_project = urllib.parse.quote(project_path, safe="")
 
-    gitlab_host = _extract_gitlab_host(pipeline.repo_url)
-    api_url = f"https://{gitlab_host}/api/v4/projects/{encoded_project}/repository/files/{encoded_path}/raw?ref={ref}"
+    # The connection's configured API base, not a host guessed from the repo
+    # URL. A self-hosted GitLab can serve its API somewhere other than
+    # https://<repo-host>/api/v4, and the connection is the only thing that
+    # knows where.
+    from astrolift_scm.providers.gitlab import _api_base
+
+    base = _api_base(connection).rstrip("/")
+    api_url = f"{base}/api/v4/projects/{encoded_project}/repository/files/{encoded_path}/raw?ref={ref}"
 
     req = urllib.request.Request(
         api_url,
@@ -139,48 +136,62 @@ def _fetch_generic_git(pipeline: Pipeline, ref: str, path: str) -> str:
     )
 
 
-def _get_github_token(org, repo_url: str) -> str | None:
-    """Look up a GitHub access token from the org's source connections."""
+def _org_connection(org, *, source_kind: str):
+    """The SourceConnection that authenticates a manifest read for ``org``.
+
+    Replaces two hand-rolled lookups that could never succeed (#1608).
+    Both read ``conn.access_token_ciphertext``, a column SourceConnection
+    has never had, and decrypted it through ``core.encryption``, a module
+    that does not exist. Both were wrapped in a bare ``except``, so a
+    private-repo fetch reported "no credentials configured" rather than
+    failing, and the two real defects stayed invisible.
+
+    ``connection_resolver`` already owns the question the hand-rolled
+    version answered with ``.first()``: which connection wins when an org
+    has several. It ranks App-install over OAuth-user over PAT per host,
+    and names manifest read as one of ORG_REPO_WRITE's own purposes.
+    """
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        ConnectionResolutionError,
+        resolve_connection,
+    )
+
     try:
-        from astrolift_scm.models import SourceConnection
-
-        conn = SourceConnection.objects.filter(
-            organization=org,
-            kind="github",
-            deleted_at__isnull=True,
-        ).first()
-        if conn and conn.access_token_ciphertext:
-            return _decrypt_token(conn.access_token_ciphertext)
-    except Exception:  # noqa: BLE001
-        pass
-    return None
+        return resolve_connection(org, purpose=ORG_REPO_WRITE, source_kind=source_kind)
+    except ConnectionResolutionError as exc:
+        raise TomlFetchError(exc.message) from exc
 
 
-def _get_gitlab_token(org, repo_url: str) -> str | None:
-    """Look up a GitLab access token from the org's source connections."""
+def _connection_token(connection, *, source_kind: str) -> str:
+    """The bearer credential for ``connection``.
+
+    Delegates to the provider driver, which is the only code that knows
+    how each connection kind stores its secret -- a GitHub App install
+    mints a short-lived installation token, a PAT is decrypted from the
+    envelope. ``astrolift_pipelines.commit_status`` reaches for the same
+    accessors for the same reason.
+    """
+    if source_kind == "github":
+        from astrolift_scm.providers.github import _token as github_token
+
+        accessor, label = github_token, "GitHub"
+    elif source_kind == "gitlab":
+        from astrolift_scm.providers.gitlab import _token as gitlab_token
+
+        accessor, label = gitlab_token, "GitLab"
+    else:  # pragma: no cover - the caller picks the kind, not a user
+        raise TomlFetchError(f"no TOML fetch driver for source kind {source_kind!r}")
+
     try:
-        from astrolift_scm.models import SourceConnection
-
-        conn = SourceConnection.objects.filter(
-            organization=org,
-            kind__in=["gitlab", "gitea"],
-            deleted_at__isnull=True,
-        ).first()
-        if conn and conn.access_token_ciphertext:
-            return _decrypt_token(conn.access_token_ciphertext)
-    except Exception:  # noqa: BLE001
-        pass
-    return None
-
-
-def _decrypt_token(ciphertext: str) -> str | None:
-    """Decrypt an access token ciphertext using the platform's key management."""
-    try:
-        from core.encryption import decrypt
-
-        return decrypt(ciphertext)
-    except Exception:  # noqa: BLE001
-        return None
+        token = accessor(connection)
+    except Exception as exc:  # noqa: BLE001 - provider errors differ per host
+        raise TomlFetchError(
+            f"The {label} connection for this organization cannot produce a " f"credential: {exc}"
+        ) from exc
+    if not token:
+        raise TomlFetchError(f"The {label} connection for this organization has no usable credential.")
+    return token
 
 
 def _extract_owner_repo_github(url: str) -> str:
@@ -204,13 +215,3 @@ def _extract_project_path_gitlab(url: str) -> str:
             break
     parts = url.split("/", 1)
     return parts[1] if len(parts) > 1 else url
-
-
-def _extract_gitlab_host(url: str) -> str:
-    """Extract the GitLab host from a repo URL."""
-    for prefix in ("https://", "http://"):
-        if url.startswith(prefix):
-            return url[len(prefix) :].split("/")[0]
-    if "gitlab.com" in url:
-        return "gitlab.com"
-    return "gitlab.com"
