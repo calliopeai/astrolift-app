@@ -299,7 +299,15 @@ def _patch_driver_and_issuer(monkeypatch, iam: _RecordingIam) -> None:
 
     import core.app_deploy as app_deploy
 
-    monkeypatch.setattr(irsa, "discover_oidc_issuer", lambda region, name: _DISCOVERED_ISSUER)
+    def _fake_discover(region, name, *, credential=None):  # noqa: ANN001
+        # Asserted rather than ignored: this path discovers the issuer from
+        # the tenant's own EKS cluster, so reaching it with the control
+        # plane's identity would fail on a cluster that declares a role
+        # (#1422). A stub that swallowed the keyword would hide that.
+        assert credential is not None, "discovery must be told which identity to use"
+        return _DISCOVERED_ISSUER
+
+    monkeypatch.setattr(irsa, "discover_oidc_issuer", _fake_discover)
 
     def _fake_driver(cluster, capability):  # noqa: ANN001
         assert capability == "identity"
