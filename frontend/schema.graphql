@@ -3805,6 +3805,7 @@ type AstroliftTenantCluster {
   authMethod: String!
   ingressClass: String!
   albAuthConfig: JSON
+  oidcAuthConfig: JSON
   isActive: Boolean!
   capabilities: JSON!
   capabilitiesProbedAt: DateTime
@@ -6930,6 +6931,7 @@ input UpdateTenantClusterInput {
   endpoint: String = null
   ingressClass: String = null
   albAuthConfig: JSON
+  oidcAuthConfig: JSON
 }
 
 input UpdateWebhookSubscriptionInput {

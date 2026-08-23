@@ -38,6 +38,7 @@ class TenantClusterType:
     auth_method: str
     ingress_class: str
     alb_auth_config: JSON | None
+    oidc_auth_config: JSON | None
     is_active: bool
     capabilities: JSON
     capabilities_probed_at: dt.datetime | None
@@ -225,6 +226,29 @@ class ProviderPluginType:
     is_enabled: bool
 
 
+# Keys of oidc_auth_config that are safe to read back. cookie_secret is not
+# one of them: it is the signing key for the oauth2-proxy session cookie, so
+# anyone who can read it can mint a session. alb_auth_config needs no
+# equivalent -- its keys (user_pool_arn, user_pool_client_id,
+# user_pool_domain) are identifiers, not credentials.
+_OIDC_PUBLIC_KEYS = ("discovery_url", "client_id", "upstream_connector", "auth_proxy_host")
+
+
+def redact_oidc_auth_config(config: dict | None) -> dict | None:
+    """The readable view of a cluster's OIDC edge-auth config.
+
+    An operator needs to know whether the gate is configured and where it
+    points, which is what makes a class flip safe to attempt (#1616). They
+    do not need the cookie secret, so it is reported as set or unset rather
+    than returned.
+    """
+    if not config:
+        return None
+    view = {k: config[k] for k in _OIDC_PUBLIC_KEYS if k in config}
+    view["cookie_secret_set"] = bool(config.get("cookie_secret"))
+    return view
+
+
 def cluster_to_type(cluster) -> TenantClusterType:
     from django.utils import timezone
 
@@ -251,6 +275,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
         endpoint=cluster.endpoint or "",
         auth_method=cluster.auth_method,
         ingress_class=cluster.ingress_class,
+        oidc_auth_config=redact_oidc_auth_config(cluster.oidc_auth_config),
         alb_auth_config=cluster.alb_auth_config,
         is_active=cluster.is_active,
         capabilities=cluster.capabilities or {},

@@ -607,11 +607,19 @@ class Command(BaseCommand):
             "provider_config": provider_config,
             "ingress_class": ingress_class,
             "alb_auth_config": alb_auth_config,
-            "oidc_auth_config": oidc_auth_config,
             "is_active": True,
             "deleted_at": None,
             "deleted_by": None,
         }
+        # Only write oidc_auth_config when this run actually built one.
+        # It used to sit in ``defaults`` unconditionally, so a re-run whose
+        # environment had lost any one of the three OIDC vars reset the field
+        # to null and every later deploy rendered unauthenticated Ingresses
+        # (#1616). Clearing a live gate should take a deliberate act, not a
+        # partially-configured re-run.
+        if oidc_auth_config is not None:
+            defaults["oidc_auth_config"] = oidc_auth_config
+
         obj, created = TenantCluster.all_objects.update_or_create(slug=slug, defaults=defaults)
 
         action = "created" if created else "updated"
