@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 import strawberry
 from django.db import transaction
 from django.utils import timezone
@@ -12,7 +10,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
-from astrolift_pipelines.commit_status import post_commit_status_for_run
+from astrolift_pipelines.cancellation import cancel_pipeline_run as cascade_cancel
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
@@ -22,27 +20,11 @@ from astrolift_pipelines.schema.types import (
     pipeline_to_type,
     trigger_to_type,
 )
-from astrolift_workflows.client import signal_workflow, start_workflow
+from astrolift_workflows.client import start_workflow
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
-
-logger = logging.getLogger(__name__)
-
-
-def _record_cancelled_run(run) -> None:
-    """Count the cancellation. Swallows: a cancel is already written to the
-    database and signalled to Temporal by the time this runs, so a metrics
-    failure must not turn a successful mutation into an operator-visible
-    error."""
-    from astrolift_pipelines.metrics import record_run_completed
-
-    try:
-        record_run_completed(run)
-    except Exception:  # noqa: BLE001
-        logger.warning("pipeline metrics: pipeline_run=%s not recorded", run.pk, exc_info=True)
-
 
 # ---------------------------------------------------------------------------
 # Input types
@@ -381,29 +363,24 @@ class PipelinesMutation:
                 f"run is in status {run.status!r} — only pending/running runs can be cancelled",
             )
 
-        # Signal the Temporal workflow to cancel cleanly. When Temporal
-        # is disabled, signal_workflow returns False and we fall through
-        # to a local status flip so the DB stays consistent.
-        if run.temporal_workflow_id:
-            signal_workflow(run.temporal_workflow_id, "cancel")
-
-        # Optimistically flip status so the UI reflects the cancel
-        # immediately, even before the workflow drains.
-        run.status = PipelineRun.Status.CANCELLED
-        run.finished_at = timezone.now()
-        run.save(update_fields=["status", "finished_at", "updated_at", "version"])
-
-        # This is the fourth place a run reaches a terminal status, and the
-        # only one outside the spawn activity -- which is why #1585's
-        # ratchet, parsing that one module, did not notice this path was
-        # recording no metric. `pipeline_runs_total` undercounted every
-        # cancellation.
-        _record_cancelled_run(run)
-        # Called here rather than from the helper above so both ratchets can
-        # see their own call at the site. Burying it one level down is what
-        # the commit-status ratchet flagged when this was first written: the
-        # wiring existed but the transition did not declare it, and a later
-        # edit to the helper could drop it silently.
-        post_commit_status_for_run(run)
+        # Delegate to the cancellation service rather than flipping the
+        # status here. Three things the local flip did not do:
+        #
+        #  * cascade to StepRun -- nothing in the codebase did, so a
+        #    cancelled run's steps read `running` forever;
+        #  * cascade to JobRun when the Temporal signal does not land
+        #    (Temporal disabled, workflow already gone, or a PENDING run
+        #    that was never dispatched and so has no workflow id);
+        #  * emit the `pipeline_run.cancelled` audit event, which only
+        #    `state_machine.transition_pipeline_run` emits.
+        #
+        # The workflow's own cancel handler still cascades job runs when it
+        # is alive to receive the signal; this makes the outcome the same
+        # when it is not.
+        actor = getattr(getattr(info.context, "request", None), "user", None)
+        # The service owns the cascade, the state transition, the metric and
+        # the commit status, so a second cancel entry point cannot forget
+        # half of them.
+        cascade_cancel(run, actor_display=str(actor) if actor else "operator")
 
         return gql_success(pipeline_run_to_type(run))

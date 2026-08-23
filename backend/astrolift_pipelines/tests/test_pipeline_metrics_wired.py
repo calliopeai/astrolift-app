@@ -323,7 +323,7 @@ def test_every_terminal_transition_anywhere_records():
     """
     sites = run_status_sites.find_sites()
 
-    assert len(sites) >= 8, (
+    assert len(sites) >= 7, (
         f"the sweep found only {len(sites)} status transitions: {sorted(sites)}. "
         "A matcher that stops matching passes vacuously; fix the matcher."
     )
@@ -332,6 +332,30 @@ def test_every_terminal_transition_anywhere_records():
     assert not offenders, (
         "these settle a run or job to a terminal status without recording a "
         f"metric: {offenders}. /metrics goes quiet for each one."
+    )
+
+
+def test_the_cancel_service_records():
+    """Pinned by name, because the cancel path has no assignment shape.
+
+    It settles the run through `state_machine.transition_pipeline_run`,
+    which assigns from a variable (`run.status = next_status`), so neither
+    end matches the sweep above. Same situation as the runner endpoint, and
+    the same remedy.
+
+    This is where the cancel metric lives now. It used to live in the
+    GraphQL mutation; moving it to the service means a second cancel entry
+    point cannot forget it.
+    """
+    target = run_status_sites.find_named("astrolift_pipelines/cancellation.py", "cancel_pipeline_run")
+
+    assert target is not None, (
+        "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "
+        "now blind. Point it at whatever cancels a run instead."
+    )
+    assert run_status_sites.calls_any(target, _RECORDER_NAMES), (
+        "the cancel service settles a run without recording a metric, so "
+        "astrolift_pipeline_runs_total undercounts every cancellation"
     )
 
 
