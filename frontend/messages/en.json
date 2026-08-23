@@ -913,6 +913,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "No login required",
+        "edgeAuthUngatedHelp": "This app's platform subdomain is behind the cluster's login gate; this custom domain is not, so anyone with the URL reaches the app. The gate's session cookie is scoped to the platform's own zone and cannot cover an external domain.",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",

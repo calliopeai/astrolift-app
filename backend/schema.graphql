@@ -764,6 +764,7 @@ type AstroliftAppDomain {
   pathRoutes: [AstroliftDomainPathRoute!]!
   isWildcard: Boolean!
   sniCertRef: String!
+  edgeAuthState: String!
 }
 
 type AstroliftAppDomainMutationResult {

@@ -1237,9 +1237,40 @@ class AppDomainType:
     name, Azure Key Vault cert URI). Empty when the platform
     auto-picks. Operator-set for multi-cert SNI scenarios."""
 
+    # ---- edge auth (#1621) ----------------------------------------
 
-def app_domain_to_type(d) -> AppDomainType:
+    edge_auth_state: str = "no_gate"
+    """Whether this domain sits behind the cluster's edge auth gate.
+
+    ``no_gate`` — the cluster has no edge auth at all, so nothing is
+    being bypassed. ``gated`` — the domain is covered by the gate.
+    ``ungated`` — the cluster HAS a gate and the app's managed
+    subdomain is behind it, but this hostname is not: the same backend
+    is reachable here without a login.
+
+    ``ungated`` is not a misconfiguration the operator can fix by
+    toggling something. The central auth host's session cookie is
+    scoped to its own parent zone and cannot be set for an unrelated
+    domain, so an external custom domain is outside the gate by
+    construction. Surfaced rather than silently accepted (#1621) —
+    before this, the only way to learn it was to open the URL.
+    """
+
+
+def app_domain_to_type(d, cluster=None) -> AppDomainType:
+    """Convert a ``CustomDomain`` row to its GraphQL type.
+
+    ``cluster`` is optional and only feeds ``edge_auth_state`` (#1621).
+    Callers that already hold the app's cluster pass it; the domain row
+    carries no FK to one, and resolving it here would be a query per
+    domain. Omitted, the field reports ``no_gate`` — the same answer as
+    a cluster with no gate, and the conservative one for a caller that
+    could not establish otherwise.
+    """
+    from core.app_deploy import custom_domain_edge_auth_state
+
     return AppDomainType(
+        edge_auth_state=custom_domain_edge_auth_state(cluster, d.hostname),
         id=GUID(str(d.guid)),
         hostname=d.hostname,
         cert_state=d.validation_status,

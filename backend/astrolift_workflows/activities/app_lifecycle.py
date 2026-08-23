@@ -644,6 +644,33 @@ def _render_app_ingresses_and_tls(
     ingress_paused = bool(getattr(d.app_environment, "ingress_paused", False))
     ingress_state_label = "paused" if ingress_paused else "live"
 
+    # Edge auth state for this cluster's custom domains (#1621). Computed
+    # once per render because it is a function of the cluster + hostname,
+    # not of the deployment.
+    #
+    # The custom-domain Ingresses below deliberately carry NO auth
+    # annotations, even on a cluster whose managed subdomains are gated.
+    # The central auth host's session cookie is scoped to the parent zone
+    # of the auth host, and a response from ``auth.<base-zone>`` cannot set
+    # a cookie for an unrelated registrable domain -- a browser rule, not
+    # an oauth2-proxy flag. Stamping the annotations here would send every
+    # request to the auth host, succeed, come back with still no cookie for
+    # this host, and loop: "no gate" would become "infinite redirect".
+    #
+    # So the gap is recorded rather than papered over. Each Ingress carries
+    # ``astrolift.dev/edge-auth`` so ``kubectl get ingress -L
+    # astrolift.dev/edge-auth`` shows it, and the same value is on
+    # ``AppDomainType.edge_auth_state`` for the UI. Gating an external
+    # domain for real needs a first-party ``/oauth2/*`` endpoint on the
+    # domain itself; see custom_domain_edge_auth_state.
+    from core.app_deploy import custom_domain_edge_auth_state
+
+    edge_cluster = (
+        d.app_environment.tenant_cluster
+        if d.app_environment and d.app_environment.tenant_cluster_id
+        else None
+    )
+
     out: list[dict[str, Any]] = []
     domains = CustomDomain.objects.filter(
         registered_app=d.registered_app,
@@ -729,6 +756,9 @@ def _render_app_ingresses_and_tls(
                             "byo" if state == CustomDomain.CertificateState.BYO else "auto"
                         ),
                         "astrolift.dev/ingress-state": ingress_state_label,
+                        "astrolift.dev/edge-auth": custom_domain_edge_auth_state(
+                            edge_cluster, cd.hostname,
+                        ),
                     },
                 },
                 "spec": {

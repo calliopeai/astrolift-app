@@ -800,6 +800,8 @@
         "validated": "Validated",
         "failed": "Failed",
         "platformZone": "Platform-managed zone",
+        "edgeAuthUngated": "ログイン不要",
+        "edgeAuthUngatedHelp": "このアプリのプラットフォームサブドメインはクラスターのログインで保護されていますが、このカスタムドメインは保護されていないため、URL を知っていれば誰でもアクセスできます。セッションクッキーはプラットフォームのゾーンにのみ適用され、外部ドメインには適用できません。",
         "managed": "Managed",
         "custom": "Custom",
         "lastChecked": "Last checked {at}",

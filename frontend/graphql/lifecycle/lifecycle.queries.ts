@@ -545,6 +545,7 @@ export const LIST_APP_DOMAINS = gql`
       }
       isWildcard
       sniCertRef
+      edgeAuthState
     }
   }
 `;
