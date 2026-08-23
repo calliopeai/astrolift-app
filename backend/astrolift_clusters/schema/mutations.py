@@ -251,6 +251,9 @@ class UpdateTenantClusterInput:
     endpoint: str | None = None
     ingress_class: str | None = None
     alb_auth_config: JSON | None = strawberry.UNSET
+    # Write-only: the read side comes back redacted on TenantClusterType
+    # because this carries the oauth2-proxy cookie secret (#1616).
+    oidc_auth_config: JSON | None = strawberry.UNSET
 
 
 @strawberry.input
@@ -466,6 +469,21 @@ class ReissueManagedDomainCertPayload:
 class _ProviderPluginConfigPayload:
     plugin_slug: str
     organization_scoped: bool
+
+
+def _has_auth_gate(ingress_class: str, cluster) -> bool:
+    """Whether apps on this cluster render behind an auth gate.
+
+    Each class reads a different config and ignores the other: ALB uses the
+    Cognito annotations from ``alb_auth_config`` (core/app_deploy.py), every
+    other class uses the oauth2-proxy annotations from ``oidc_auth_config``,
+    which the renderer emits only when the config carries all three of
+    discovery_url, client_id and auth_proxy_host.
+    """
+    if ingress_class == "alb":
+        return bool(cluster.alb_auth_config)
+    config = cluster.oidc_auth_config or {}
+    return all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host"))
 
 
 @strawberry.type
@@ -684,11 +702,35 @@ class ClustersMutation:
             cluster.region = input.region
         if input.endpoint is not None:
             cluster.endpoint = input.endpoint
+        auth_config_changed = input.alb_auth_config is not strawberry.UNSET
+        oidc_changed = input.oidc_auth_config is not strawberry.UNSET
+
+        # Refuse a class flip that would take the auth gate away as a side
+        # effect (#1616). Each ingress class reads its own config, so moving
+        # between them silently drops the old gate and renders nothing in its
+        # place: the apps go public with no warning and no log line.
+        #
+        # This guards the implicit case only. An operator who nulls the config
+        # for the current class is asking to remove the gate, and
+        # reconcile_cluster_ingresses documents that as supported.
+        class_changing = input.ingress_class is not None and input.ingress_class != cluster.ingress_class
+        had_gate = _has_auth_gate(cluster.ingress_class, cluster)
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
-        auth_config_changed = input.alb_auth_config is not strawberry.UNSET
         if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
+        if oidc_changed:
+            cluster.oidc_auth_config = input.oidc_auth_config
+        if class_changing and had_gate and not _has_auth_gate(cluster.ingress_class, cluster):
+            needs = "oidcAuthConfig" if cluster.ingress_class != "alb" else "albAuthConfig"
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"changing ingressClass to {cluster.ingress_class!r} would remove the "
+                f"authentication gate from every app on this cluster, because that class "
+                f"reads {needs} and none is set. Set {needs} in the same call, or clear "
+                f"the current gate explicitly first if going public is intended.",
+                field="ingressClass",
+            )
         cluster.save()
 
         # GitOps round-trip (#853): when the operator changes the ALB
