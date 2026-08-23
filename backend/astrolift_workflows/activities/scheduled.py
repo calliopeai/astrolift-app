@@ -404,30 +404,68 @@ async def reheal_webhook_subscriptions() -> int:
 
 
 def _prune_audit_log_sync(retention_days: int) -> int:
-    from datetime import timedelta
+    """Report how many audit events sit past their org's retention window.
 
+    Reports; does not delete. ``astrolift_operations/migrations/0003`` binds
+    a ``BEFORE UPDATE OR DELETE`` trigger to
+    ``astrolift_operations_auditevent`` (spec/04 §1 principle 7: append-only
+    logs refuse mutation at the storage layer), so the DELETE this schedule
+    is named for is refused by Postgres. The platform makes the opposite
+    promise elsewhere - ``Organization.audit_log_retention_days`` is
+    editable and ``astroliftAuditRetention`` renders "Audit events retained
+    for N days per compliance policy" - and the two cannot both hold. #1594
+    carries the decision; export-then-delete through a privileged path is
+    the likely answer, since ``retention.export_to_sink`` and the
+    ``AuditExport`` model already exist for it.
+
+    Until then this returns a true number instead of a false one. The
+    previous implementation imported ``AuditLog``, a model that does not
+    exist, and swallowed the ImportError, so the daily schedule reported 0
+    rows pruned no matter how far past retention the log ran.
+
+    The window is per-org, with rows whose organization was cleared (the FK
+    is SET_NULL) falling back to the activity-level ``retention_days``.
+    """
     from django.utils import timezone
 
-    cutoff = timezone.now() - timedelta(days=retention_days)
-    try:
-        from astrolift_operations.models import AuditLog
-    except ImportError:
-        return 0
-    # Soft-delete to preserve the row for legal-hold scenarios; a
-    # separate hard-delete sweep runs on a longer retention bucket.
-    n, _ = (
-        AuditLog.objects.filter(
-            created_at__lt=cutoff,
-            deleted_at__isnull=True,
-        ).update(deleted_at=timezone.now()),
-        None,
+    from astrolift_identity.models import Organization
+    from astrolift_operations.models import AuditEvent
+    from astrolift_operations.retention import RetentionPolicy, expired_queryset
+
+    now = timezone.now()
+    fallback_days = max(1, int(retention_days))
+
+    def _count(queryset, *, days: int) -> int:
+        policy = RetentionPolicy(stream="audit", retention_days=days)
+        return int(expired_queryset(AuditEvent, policy, now=now).filter(pk__in=queryset.values("pk")).count())
+
+    total = 0
+    org_windows = Organization.objects.filter(deleted_at__isnull=True).values_list(
+        "pk", "audit_log_retention_days"
     )
-    return int(n) if isinstance(n, int) else 0
+    for org_id, days in org_windows:
+        total += _count(
+            AuditEvent.objects.filter(organization_id=org_id),
+            days=max(1, int(days or fallback_days)),
+        )
+    total += _count(AuditEvent.objects.filter(organization__isnull=True), days=fallback_days)
+
+    if total:
+        log.warning(
+            "audit retention: %d event(s) are past their org retention window and "
+            "cannot be removed - the append-only trigger refuses DELETE (see #1594)",
+            total,
+        )
+    return total
 
 
 @activity.defn(name="astrolift.scheduled.prune_audit_log")
 async def prune_audit_log(retention_days: int = 365) -> int:
-    """Soft-delete audit log entries past the retention window."""
+    """Report audit events past their org's retention window.
+
+    Named prune for schedule compatibility; it cannot delete while the
+    append-only trigger stands. See ``_prune_audit_log_sync`` and #1594.
+    """
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
