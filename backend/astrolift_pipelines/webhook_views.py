@@ -27,8 +27,6 @@ retry queue stays empty for events we intentionally don't handle.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import logging
 
@@ -37,6 +35,12 @@ from django.views.decorators.http import require_http_methods
 
 from astrolift_identity.models import Organization
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
+from astrolift_pipelines.webhook_security import (
+    WebhookSecurityError,
+    check_payload_size,
+    check_replay,
+    check_webhook_rate_limit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,19 +49,26 @@ _HANDLED_EVENTS = {"push", "pull_request"}
 
 
 def verify_signature(secret: bytes, body: bytes, signature_header: str) -> bool:
-    """Verify GitHub's HMAC-SHA256 payload signature.
+    """Verify the ``X-Hub-Signature-256`` HMAC.
 
-    GitHub sends: ``X-Hub-Signature-256: sha256=<hex>``
-
-    Named ``verify_signature`` so the ``test_webhook_signature_guard`` CI
-    guard (#529) recognizes it as the HMAC trust boundary on
-    ``pipeline_github_webhook``. Returns False on a missing / malformed /
-    mismatched signature; the caller turns False into a generic 401.
+    A thin delegation to ``webhook_security.verify_github_hmac``, which had
+    the identical logic and no caller. Kept as a local function with this
+    name on purpose: ``core/tests/test_webhook_signature_guard.py`` requires
+    every webhook view to call a verifier from a small allowlist of names,
+    and it descends only one level and only within the same module. A
+    cross-module call would not satisfy it, so removing this wrapper would
+    trade a real duplicate for a failed security gate.
     """
-    if not signature_header.startswith("sha256="):
+    from astrolift_pipelines.webhook_security import (
+        WebhookSecurityError,
+        verify_github_hmac,
+    )
+
+    try:
+        verify_github_hmac(secret, body, signature_header)
+    except WebhookSecurityError:
         return False
-    expected = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature_header)
+    return True
 
 
 def _get_org_pipeline_secret(org: Organization) -> bytes | None:
@@ -169,6 +180,16 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     body = request.body
     event = request.headers.get("X-GitHub-Event", "")
     signature = request.headers.get("X-Hub-Signature-256", "")
+    delivery_id = request.headers.get("X-GitHub-Delivery", "")
+
+    # Payload size first, before spending CPU on an HMAC over a body that
+    # is already too large to be a real GitHub delivery.
+    try:
+        check_payload_size(body)
+    except WebhookSecurityError as exc:
+        logger.warning("pipelines.webhook: oversized payload for org %s: %s", org_slug, exc)
+        _record_webhook(org_slug, "rejected")
+        return JsonResponse({"error": "payload too large"}, status=413)
 
     # Signature verification — required for all events
     secret = _get_org_pipeline_secret(org)
@@ -184,6 +205,25 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         # endpoint, and until now it had no producer at all.
         _record_webhook(org_slug, "signature_invalid", signature_failure=True)
         return JsonResponse({"error": "invalid signature"}, status=401)
+
+    # Rate limit only *after* the signature passes. `org_slug` comes from
+    # the URL, so limiting before verification would let anyone who knows
+    # an org's slug spend its budget and lock out its real webhooks.
+    try:
+        check_webhook_rate_limit(org_slug)
+    except WebhookSecurityError as exc:
+        logger.warning("pipelines.webhook: rate limited org %s: %s", org_slug, exc)
+        _record_webhook(org_slug, "rate_limited")
+        return JsonResponse({"error": "rate limited"}, status=429)
+
+    # Replay protection. A duplicate returns 200: the delivery was already
+    # processed, and a non-2xx would make GitHub retry it forever.
+    try:
+        check_replay(delivery_id, org_slug)
+    except WebhookSecurityError as exc:
+        logger.info("pipelines.webhook: duplicate delivery for org %s: %s", org_slug, exc)
+        _record_webhook(org_slug, "replay")
+        return JsonResponse({"status": "duplicate", "delivery": delivery_id})
 
     # Parse payload
     try:
@@ -243,7 +283,13 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     return JsonResponse({"status": "ok", "dispatched": dispatched})
 
 
-def _record_webhook(org_slug: str, outcome: str, *, signature_failure: bool = False) -> None:
+def _record_webhook(
+    org_slug: str,
+    outcome: str,
+    *,
+    provider: str = "github",
+    signature_failure: bool = False,
+) -> None:
     """Count a webhook outcome (#98).
 
     ``astrolift_pipelines/metrics.py`` declared both of these counters and
@@ -261,9 +307,9 @@ def _record_webhook(org_slug: str, outcome: str, *, signature_failure: bool = Fa
             record_webhook_signature_failure,
         )
 
-        record_webhook_delivery(org_slug, "github", outcome)
+        record_webhook_delivery(org_slug, provider, outcome)
         if signature_failure:
-            record_webhook_signature_failure(org_slug, "github")
+            record_webhook_signature_failure(org_slug, provider)
     except Exception:  # noqa: BLE001
         logger.warning("pipeline metrics: webhook outcome %s not recorded", outcome, exc_info=True)
 

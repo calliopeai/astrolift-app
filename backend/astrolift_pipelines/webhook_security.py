@@ -98,44 +98,36 @@ def check_webhook_rate_limit(org_slug: str) -> None:
     minute = datetime.now(UTC).strftime("%Y%m%d%H%M")
     cache_key = f"webhook:rate:{org_slug}:{minute}"
 
-    count = cache.get(cache_key, 0)
-    if count >= _WEBHOOK_RATE_LIMIT_PER_MINUTE:
+    # `add` then `incr`, not `get` then `set`. The original was a
+    # read-modify-write: concurrent workers all read the same count and all
+    # passed, so the limit did not hold under exactly the load it exists
+    # for. `add` is a no-op when the key exists, and `incr` is atomic on
+    # every backend that matters here (Redis, memcached); the locmem
+    # backend used in tests serialises anyway.
+    #
+    # 2-minute TTL on a 1-minute bucket so a request that straddles the
+    # boundary cannot land on an already-expired key.
+    cache.add(cache_key, 0, 120)
+    try:
+        count = cache.incr(cache_key)
+    except ValueError:
+        # The key expired between `add` and `incr`. Treat as the first
+        # request of a fresh bucket rather than failing the webhook.
+        cache.set(cache_key, 1, 120)
+        count = 1
+
+    if count > _WEBHOOK_RATE_LIMIT_PER_MINUTE:
         raise WebhookSecurityError(
             f"Webhook rate limit exceeded for org {org_slug!r} "
             f"({count}/{_WEBHOOK_RATE_LIMIT_PER_MINUTE} per minute)"
         )
 
-    # Increment counter, expire at end of the next minute
-    cache.set(cache_key, count + 1, 120)  # 2-minute TTL to handle clock skew
 
-
-def full_security_check_github(
-    *,
-    body: bytes,
-    secret: bytes,
-    signature: str,
-    delivery_id: str,
-    org_slug: str,
-) -> None:
-    """Run all security checks for a GitHub webhook request.
-
-    Raises WebhookSecurityError on the first failing check.
-    """
-    check_payload_size(body)
-    check_webhook_rate_limit(org_slug)
-    verify_github_hmac(secret, body, signature)
-    check_replay(delivery_id, org_slug)
-
-
-def full_security_check_gitlab(
-    *,
-    body: bytes,
-    secret: str,
-    token: str,
-    org_slug: str,
-) -> None:
-    """Run all security checks for a GitLab webhook request."""
-    check_payload_size(body)
-    check_webhook_rate_limit(org_slug)
-    verify_gitlab_token(secret, token)
-    # GitLab doesn't consistently send delivery IDs, so no replay check
+# The two `full_security_check_*` wrappers that used to live here are
+# gone. Both ran `check_webhook_rate_limit` *before* verifying the
+# signature, and `org_slug` comes from the URL -- so anyone who knew an
+# org's slug could spend that org's 300/minute budget and lock out its real
+# webhooks, unauthenticated. The correct order also differs per host
+# (GitLab has no reliable delivery id, so no replay check), which makes the
+# receiver the honest place for it. Each receiver now orders the checks
+# explicitly: size, then signature, then rate, then replay.
