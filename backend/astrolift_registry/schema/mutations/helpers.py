@@ -395,14 +395,20 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_manifest.normalize import normalize
-    from astrolift_manifest.parser import parse_raw
+    from astrolift_manifest.parser import ManifestError, parse_raw
     from astrolift_manifest.persist import reconcile_managed_services
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, OnboardAppInput
 
     manifest_services = ()
     if app.manifest_raw:
-        manifest_services = normalize(parse_raw(app.manifest_raw)).managed_services
+        try:
+            manifest_services = normalize(parse_raw(app.manifest_raw)).managed_services
+        except ManifestError:
+            # Registration deliberately persists malformed inline manifests
+            # with a parse_failed status so operators can repair them later.
+            # Environment bootstrap must preserve that best-effort contract.
+            manifest_services = ()
 
     # Must have at least one managed cluster to bind environments to.
     # TenantCluster.organization is nullable: null means shared (available to

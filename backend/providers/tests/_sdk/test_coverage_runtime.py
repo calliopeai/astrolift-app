@@ -78,6 +78,7 @@ def test_the_in_cluster_portability_rule_names_the_kinds_we_think_it_does():
     of vacuous green that let #1484 through in the first place.
     """
     assert {row.kind for row in _in_cluster_only_rows()} == {
+        "api_gateway",
         "cache",
         "observability",
         "search",

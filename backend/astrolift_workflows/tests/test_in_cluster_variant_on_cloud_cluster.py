@@ -116,6 +116,13 @@ class _InertDriver:
     def provision(self, spec):  # noqa: ANN001 - test stub
         return SimpleNamespace(ok=True, handle="svc/handle", ready=True, message="", errors=[])
 
+    def snapshot(self, handle):  # noqa: ANN001 - test stub
+        return SimpleNamespace(
+            handle=handle.handle,
+            snapshot_id="test-snapshot",
+            created_at="",
+        )
+
     def deprovision(self, spec, **_kwargs):  # noqa: ANN001 - test stub
         return SimpleNamespace(ok=True, handle="", message="deleted", errors=[], retryable=False)
 
