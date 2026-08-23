@@ -17,7 +17,6 @@ Supported events (``X-Gitlab-Event`` header):
 
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 
@@ -26,9 +25,15 @@ from django.views.decorators.http import require_http_methods
 
 from astrolift_identity.models import Organization
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
+from astrolift_pipelines.webhook_security import (
+    WebhookSecurityError,
+    check_payload_size,
+    check_webhook_rate_limit,
+)
 from astrolift_pipelines.webhook_views import (
     _dispatch_pipeline_run,
     _next_run_number,
+    _record_webhook,
     _repo_url_matches,
     _trigger_matches,
 )
@@ -58,16 +63,24 @@ def _get_org_pipeline_secret(org: Organization) -> str | None:
 
 
 def verify_signature(secret: str, provided: str) -> bool:
-    """Constant-time compare for GitLab's opaque token scheme.
+    """Verify the ``X-Gitlab-Token`` header.
 
-    Named ``verify_signature`` so the ``test_webhook_signature_guard`` CI
-    guard (#529) recognizes it as the auth boundary on
-    ``pipeline_gitlab_webhook``. GitLab doesn't HMAC the body — it sends
-    a shared ``X-Gitlab-Token`` we compare against the stored per-org
-    secret in constant time. Returns False on mismatch; the caller turns
-    False into a generic 403.
+    Delegates to ``webhook_security.verify_gitlab_token``. Kept as a local
+    function with this name because
+    ``core/tests/test_webhook_signature_guard.py`` requires each webhook
+    view to call a verifier from a small allowlist, descending one level and
+    only within the same module.
     """
-    return hmac.compare_digest(secret.encode(), provided.encode())
+    from astrolift_pipelines.webhook_security import (
+        WebhookSecurityError,
+        verify_gitlab_token,
+    )
+
+    try:
+        verify_gitlab_token(secret, provided)
+    except WebhookSecurityError:
+        return False
+    return True
 
 
 def _extract_gitlab_info(event: str, payload: dict) -> tuple[str, str, str, str, str]:
@@ -118,15 +131,38 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     event = request.headers.get("X-Gitlab-Event", "")
     gitlab_token = request.headers.get("X-Gitlab-Token", "")
 
+    try:
+        check_payload_size(body)
+    except WebhookSecurityError as exc:
+        logger.warning("pipelines.gitlab_webhook: oversized payload for org %s: %s", org_slug, exc)
+        _record_webhook(org_slug, "rejected", provider="gitlab")
+        return JsonResponse({"error": "payload too large"}, status=413)
+
     # Token verification
     secret = _get_org_pipeline_secret(org)
     if not secret:
         logger.warning("pipelines.gitlab_webhook: org %s has no pipeline webhook secret", org_slug)
+        _record_webhook(org_slug, "signature_invalid", provider="gitlab", signature_failure=True)
         return JsonResponse({"error": "invalid token"}, status=403)
 
     if not verify_signature(secret, gitlab_token):
         logger.warning("pipelines.gitlab_webhook: token mismatch for org %s", org_slug)
+        _record_webhook(org_slug, "signature_invalid", provider="gitlab", signature_failure=True)
         return JsonResponse({"error": "invalid token"}, status=403)
+
+    # After the token, for the same reason as the GitHub receiver: the org
+    # slug is in the URL, so limiting before verification hands anyone a way
+    # to exhaust a real org's budget.
+    try:
+        check_webhook_rate_limit(org_slug)
+    except WebhookSecurityError as exc:
+        logger.warning("pipelines.gitlab_webhook: rate limited org %s: %s", org_slug, exc)
+        _record_webhook(org_slug, "rate_limited", provider="gitlab")
+        return JsonResponse({"error": "rate limited"}, status=429)
+
+    # No replay check: GitLab does not send a stable per-delivery id, so
+    # there is nothing to deduplicate on. Stated rather than omitted, so the
+    # asymmetry with the GitHub receiver reads as a decision.
 
     # Parse payload
     try:
@@ -135,10 +171,12 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         return JsonResponse({"error": "bad request", "detail": str(exc)}, status=400)
 
     if event not in _HANDLED_GITLAB_EVENTS:
+        _record_webhook(org_slug, "filtered", provider="gitlab")
         return JsonResponse({"status": "not handled", "event": event})
 
     canonical_kind = _gitlab_event_to_canonical(event, payload)
     if canonical_kind is None:
+        _record_webhook(org_slug, "filtered", provider="gitlab")
         return JsonResponse({"status": "not handled", "event": event, "reason": "action ignored"})
 
     clone_url, http_url, ref, actor, commit_sha = _extract_gitlab_info(event, payload)
@@ -177,4 +215,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                 logger.exception("pipelines.gitlab_webhook: failed to dispatch pipeline %s", pipeline.name)
             break
 
+    # Same convention as the GitHub receiver: `filtered` covers a delivery
+    # that matched no pipeline, since nothing was dispatched either way.
+    _record_webhook(org_slug, "dispatched" if dispatched else "filtered", provider="gitlab")
     return JsonResponse({"status": "ok", "dispatched": dispatched})
