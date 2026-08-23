@@ -272,6 +272,10 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
 
     try:
         client = _get_cluster_client(run, job)
+        # The secret helpers take a TenantCluster, not a client: they apply
+        # through the cluster driver. The parameter was being passed `client`
+        # (#1614), so its name and its contents disagreed.
+        secret_cluster = _resolve_cluster(run, job)
         _ensure_pipeline_namespace(client, namespace, org_slug)
 
         secret_env: list[dict] = []
@@ -280,7 +284,7 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
             # typo fails the job here with the name in the message rather
             # than inside the container as an unresolved reference.
             bundle = resolve_pipeline_secrets(run, secret_names)
-            k8s_secret = materialize_job_secrets(job_run, bundle, namespace=namespace, cluster=client)
+            k8s_secret = materialize_job_secrets(job_run, bundle, namespace=namespace, cluster=secret_cluster)
             secret_env = make_env_from_refs(k8s_secret, sorted(bundle))
 
         manifest = _build_job_manifest(k8s_job_name, namespace, job, run, script, secret_env)
@@ -608,7 +612,7 @@ def _cleanup_secrets_quietly(job_run: Any, namespace: str, run: Any, *, client: 
         cleanup_job_secrets(
             job_run,
             namespace=namespace,
-            cluster=client if client is not None else _get_cluster_client(run),
+            cluster=_resolve_cluster(run),
         )
     except Exception:  # noqa: BLE001
         log.warning(

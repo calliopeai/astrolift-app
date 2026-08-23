@@ -77,10 +77,6 @@ KNOWN_BROKEN: frozenset[str] = frozenset(
         # schedule sync cannot reach Temporal. Tracked in #1614.
         "astrolift_pipelines/schedule_sync.py:54",
         "astrolift_pipelines/schedule_sync.py:119",
-        # core.cluster_observability has no get_dynamic_client; pipeline
-        # secret plumbing cannot reach the cluster. Tracked in #1614.
-        "astrolift_pipelines/secret_plumbing.py:151",
-        "astrolift_pipelines/secret_plumbing.py:168",
     }
 )
 

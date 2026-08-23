@@ -147,29 +147,56 @@ def cleanup_job_secrets(
 
 
 def _apply_k8s_secret(cluster, manifest: dict, namespace: str) -> None:
-    """Apply a K8s Secret manifest via the cluster's dynamic client."""
-    from core.cluster_observability import get_dynamic_client
+    """Apply a K8s Secret manifest through the cluster driver.
 
-    client = get_dynamic_client(cluster)
-    api = client.resources.get(api_version="v1", kind="Secret")
-    try:
-        api.create(body=manifest, namespace=namespace)
-    except Exception:  # noqa: BLE001 — may already exist, try patch
-        api.patch(
-            name=manifest["metadata"]["name"],
-            body=manifest,
-            namespace=namespace,
-            content_type="application/merge-patch+json",
+    Was three separate breaks (#1614). ``core.cluster_observability`` has no
+    ``get_dynamic_client``, so this raised ImportError before doing anything;
+    behind that, the ``client.resources.get(...)`` / ``.create`` / ``.patch``
+    shape is the raw ``kubernetes.dynamic`` API, and the wrapper this repo
+    actually builds (``providers/_sdk/k8s_dynamic_client.py``) has no
+    ``.resources`` attribute at all. So even a working accessor would not have
+    made these lines run.
+
+    ``apply_manifests`` is the shape every other caller uses, and it is
+    create-or-update already, which is what the create-then-patch dance was
+    reaching for. Copied from ``secret_rotation._refresh_in_cluster_sync``,
+    which does exactly this against a real cluster.
+    """
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    result = driver.apply_manifests(ctx.slug, namespace, [manifest])
+    if not result.ok:
+        raise SecretResolutionError(
+            f"could not apply pipeline secret {manifest['metadata']['name']!r} "
+            f"to {namespace!r} on cluster {cluster.slug!r}: " + "; ".join(str(e) for e in result.errors),
         )
 
 
 def _delete_k8s_secret(cluster, name: str, namespace: str) -> None:
-    """Delete a K8s Secret by name."""
-    from core.cluster_observability import get_dynamic_client
+    """Delete a K8s Secret by name, through the cluster driver.
 
-    client = get_dynamic_client(cluster)
-    api = client.resources.get(api_version="v1", kind="Secret")
-    api.delete(name=name, namespace=namespace)
+    ``delete_manifests`` treats not-found as success per the SDK contract, so
+    only real failures land in ``errors``. That matters here: cleanup runs on
+    a path that may have partially failed, and a missing secret is the
+    outcome cleanup wants.
+    """
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    stub = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {"name": name, "namespace": namespace},
+    }
+    result = driver.delete_manifests(ctx.slug, namespace, [stub])
+    if result.errors:
+        raise SecretResolutionError(
+            f"could not delete pipeline secret {name!r} from {namespace!r} "
+            f"on cluster {cluster.slug!r}: " + "; ".join(str(e) for e in result.errors),
+        )
 
 
 def make_env_from_refs(secret_name: str, secret_keys: list[str]) -> list[dict]:
