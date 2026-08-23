@@ -174,10 +174,15 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     secret = _get_org_pipeline_secret(org)
     if not secret:
         logger.warning("pipelines.webhook: org %s has no pipeline webhook secret", org_slug)
+        _record_webhook(org_slug, "signature_invalid", signature_failure=True)
         return JsonResponse({"error": "invalid signature"}, status=401)
 
     if not verify_signature(secret, body, signature):
         logger.warning("pipelines.webhook: signature mismatch for org %s", org_slug)
+        # The counter this feeds is the one worth alerting on: a spike is
+        # either a rotated secret nobody updated or someone probing the
+        # endpoint, and until now it had no producer at all.
+        _record_webhook(org_slug, "signature_invalid", signature_failure=True)
         return JsonResponse({"error": "invalid signature"}, status=401)
 
     # Parse payload
@@ -188,6 +193,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
 
     # Filter to handled events
     if event not in _HANDLED_EVENTS:
+        _record_webhook(org_slug, "filtered")
         return JsonResponse({"status": "not handled", "event": event})
 
     clone_url, html_url, ref, actor, commit_sha = _extract_repo_info(event, payload)
@@ -233,7 +239,33 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                 logger.exception("pipelines.webhook: failed to dispatch pipeline %s", pipeline.name)
             break  # One trigger match per pipeline is enough
 
+    _record_webhook(org_slug, "dispatched" if dispatched else "filtered")
     return JsonResponse({"status": "ok", "dispatched": dispatched})
+
+
+def _record_webhook(org_slug: str, outcome: str, *, signature_failure: bool = False) -> None:
+    """Count a webhook outcome (#98).
+
+    ``astrolift_pipelines/metrics.py`` declared both of these counters and
+    nothing incremented either, so an operator could not see webhook volume
+    or a signature-failure spike at all.
+
+    ``filtered`` covers both an unhandled event type and a handled one that
+    matched no pipeline: neither dispatched anything, and the distinction is
+    already in the response body. Swallows, because a metrics failure must
+    not turn a webhook into a 500 and make the host retry it.
+    """
+    try:
+        from astrolift_pipelines.metrics import (
+            record_webhook_delivery,
+            record_webhook_signature_failure,
+        )
+
+        record_webhook_delivery(org_slug, "github", outcome)
+        if signature_failure:
+            record_webhook_signature_failure(org_slug, "github")
+    except Exception:  # noqa: BLE001
+        logger.warning("pipeline metrics: webhook outcome %s not recorded", outcome, exc_info=True)
 
 
 def _next_run_number(pipeline: Pipeline) -> int:
