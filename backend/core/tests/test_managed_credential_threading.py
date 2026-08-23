@@ -149,14 +149,27 @@ def test_managed_kinds_no_longer_refuse_a_declared_credential():
 
 
 def test_an_unmigrated_capability_still_refuses():
-    """PR 4 and PR 5 have not landed. Those paths must keep refusing rather
-    than quietly authenticate as the control plane."""
-    from core.cluster_credentials import ClusterCredentialUnsupported, assert_credential_supported
+    """Whatever is left unmigrated must keep refusing rather than quietly
+    authenticate as the control plane.
+
+    Subject derived from `CREDENTIAL_AWARE_CAPABILITIES` rather than named
+    here: this stood on `secrets` until PR 4/5 migrated it, and a hand-written
+    name turns into a vacuous assertion the moment the frontier moves.
+    """
+    from core.cluster_credentials import (
+        CREDENTIAL_AWARE_CAPABILITIES,
+        ClusterCredentialUnsupported,
+        assert_credential_supported,
+    )
+
+    unmigrated = sorted({"dns", "tls", "ingress", "notification"} - CREDENTIAL_AWARE_CAPABILITIES)
+    if not unmigrated:
+        pytest.skip("every capability is migrated; this test has nothing left to guard")
 
     cluster = _Cluster({"mode": "aws_assume_role", "role_arn": ROLE})
 
     with pytest.raises(ClusterCredentialUnsupported):
-        assert_credential_supported(cluster, capability="secrets")
+        assert_credential_supported(cluster, capability=unmigrated[0])
 
 
 # ---- ratchets, so the next driver cannot arrive ambient -------------------
