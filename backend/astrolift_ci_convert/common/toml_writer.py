@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from astrolift_ci_convert.common import schema_version as schema_version_module
 from astrolift_ci_convert.common.types import JobDef, PipelineDef, ServiceDef, StepDef
 
 
@@ -115,8 +116,11 @@ def write_toml(pipeline: PipelineDef) -> str:
     """Serialize a PipelineDef to an Astrolift pipeline TOML string."""
     sections: list[list[str]] = []
 
-    # Header
+    # Header. The dialect goes first so a human (or a bisect) can tell what
+    # a file is without reading it all, and so a reader can refuse an
+    # unknown document before parsing the rest of it.
     header: list[str] = []
+    header.append(f"{schema_version_module.FIELD} = {pipeline.schema_version}")
     header.append(f"name = {_toml_string(pipeline.name)}")
 
     sections.append(header)

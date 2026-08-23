@@ -43,6 +43,7 @@ Secret injection:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
@@ -95,6 +96,21 @@ def _mark_pipeline_run_running_sync(pipeline_run_id: int) -> dict:
         toml_text = fetch_pipeline_toml(run)
         definition = read_toml(toml_text)
         sync_definition(run, definition)
+        # Stamp what was executed, not what was asked for. `trigger_ref` is a
+        # branch, and a branch moves; the digest is the only thing that can
+        # answer "which document did THIS run behave according to" once the
+        # ref has advanced. Recorded after the sync so a run only claims a
+        # definition it managed to persist.
+        run.definition_digest = hashlib.sha256(toml_text.encode("utf-8")).hexdigest()
+        run.definition_schema_version = definition.schema_version
+        run.save(
+            update_fields=[
+                "definition_digest",
+                "definition_schema_version",
+                "updated_at",
+                "version",
+            ]
+        )
     except (TomlFetchError, TomlReadError) as exc:
         # Distinct from "the definition declares no jobs", which is a
         # legitimately empty run. Returning an empty job list here would
