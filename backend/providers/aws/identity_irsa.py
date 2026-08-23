@@ -31,8 +31,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.cloud_credentials import CloudCredential, CredentialedConfig
 from _sdk.identity import IdentityBinding, WorkloadIdentityDriver
 from aws._errors import NotFoundError, map_client_error
+from aws.session import aws_client
 
 # The aws-ebs-csi-driver Helm chart runs its controller as the
 # ``ebs-csi-controller-sa`` ServiceAccount in the platform bootstrap
@@ -295,7 +297,7 @@ EXTERNAL_DNS_POLICY_STATEMENTS: list[dict[str, Any]] = [
 
 
 @dataclass(frozen=True)
-class IRSAConfig:
+class IRSAConfig(CredentialedConfig):
     region: str
     account_id: str
     cluster_oidc_issuer: str
@@ -321,9 +323,7 @@ class IRSADriver(WorkloadIdentityDriver):
         if iam_client is not None:
             self._iam = iam_client
         else:
-            import boto3
-
-            self._iam = boto3.client("iam", region_name=config.region)
+            self._iam = aws_client("iam", region=config.region, credential=config.credential)
 
     @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
@@ -723,7 +723,12 @@ class IRSADriver(WorkloadIdentityDriver):
             raise map_client_error(exc) from exc
 
 
-def discover_oidc_issuer(region: str, cluster_name: str) -> str:
+def discover_oidc_issuer(
+    region: str,
+    cluster_name: str,
+    *,
+    credential: CloudCredential | None = None,
+) -> str:
     """Return the EKS cluster's OIDC issuer (host + path, no ``https://``),
     or ``""`` if it can't be read.
 
@@ -733,9 +738,7 @@ def discover_oidc_issuer(region: str, cluster_name: str) -> str:
     ``oidc-provider/<issuer>`` ARN + the ``<issuer>:sub`` trust condition are
     built from this, so an empty value yields a broken trust — callers
     should treat ``""`` as "cannot bind workload identity yet"."""
-    import boto3
-
-    eks = boto3.client("eks", region_name=region)
+    eks = aws_client("eks", region=region, credential=credential)
     try:
         cluster = eks.describe_cluster(name=cluster_name)["cluster"]
     except Exception:
