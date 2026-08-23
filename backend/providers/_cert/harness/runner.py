@@ -35,6 +35,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from _cert import billing
 from _cert.harness.fingerprint import Fingerprint, compare
 from _cert.harness.model import AssertionFailed as Failed
 from _cert.harness.model import (
@@ -45,6 +46,7 @@ from _cert.harness.model import (
     StepResult,
 )
 from _cert.harness.platform import PlatformError
+from _sdk.availability import MATRIX
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -113,6 +115,13 @@ class LifecycleRunner:
 
     provision_poll: Poll = field(default_factory=lambda: Poll(timeout_s=2700, interval_s=15))
     teardown_poll: Poll = field(default_factory=lambda: Poll(timeout_s=2700, interval_s=15))
+    estimate_logged: bool = False
+    """Explicit operator assertion for billing-class C cells.
+
+    The estimate itself must come from the live pricing estimator and be logged
+    on the campaign issue.  This switch records that the external prerequisite
+    happened; it is deliberately false by default.
+    """
     """Teardown's floor is not the workflow: ``deregisterAstroliftApp`` waits out
     a roughly five-minute grace window before its first destructive activity, so
     a timeout in minutes reports a platform failure that is really the harness
@@ -253,6 +262,7 @@ class LifecycleRunner:
     # -- 1. BUILDOUT ---------------------------------------------------------
 
     def _buildout(self, cell: Cell, state: dict[str, Any]) -> None:
+        self._check_spend_gate(cell)
         slug = cell.app_name
         if self.platform.get_app(slug) is not None:
             raise Failed(
@@ -290,6 +300,39 @@ class LifecycleRunner:
                 f"the first deploy of {slug!r} must succeed",
                 f"deployment {deployment.id or '<unknown>'} ended {deployment.status!r}",
             )
+
+    def _check_spend_gate(self, cell: Cell) -> None:
+        """Refuse a live preview cell before registration creates anything."""
+        for binding in cell.bindings:
+            matches = [
+                entry
+                for entry in MATRIX.managed_services
+                if entry.kind == binding.kind and entry.variant == binding.variant
+            ]
+            entry = next((item for item in matches if item.plugin_id == cell.cloud), None)
+            if entry is None:
+                entry = next((item for item in matches if item.plugin_id == "k8s_native"), None)
+            if entry is None:
+                raise Failed(
+                    f"{binding.kind}:{binding.variant} must exist in the availability matrix before BUILDOUT",
+                    "the manifest names a variant whose status and billing shape cannot be verified",
+                )
+            if entry.status not in {"preview", "experimental"}:
+                continue
+            if entry.plugin_id == "k8s_native":
+                continue  # no cloud resource, and therefore no cloud billing class
+            try:
+                billing.check_may_run(
+                    entry.plugin_id,
+                    entry.kind,
+                    entry.variant,
+                    estimate_logged=self.estimate_logged,
+                )
+            except (billing.UnclassifiedVariant, billing.EstimateRequired, billing.NotCertifiable) as exc:
+                raise Failed(
+                    f"the spend gate must approve {entry.plugin_id} {entry.kind}:{entry.variant} before BUILDOUT",
+                    str(exc),
+                ) from exc
 
     # -- 2. VERIFY-UP --------------------------------------------------------
 

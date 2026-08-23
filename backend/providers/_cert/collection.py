@@ -67,6 +67,20 @@ object storage. Binding names match the fixture's own ``full.toml`` so
 VERIFICATION_ROOT = Path(__file__).resolve().parents[3] / "verification"
 MANIFEST_ROOT = VERIFICATION_ROOT / "manifests"
 
+TOPOLOGIES: tuple[str, ...] = (
+    "deployment",
+    "statefulset",
+    "cronjob",
+    "task",
+    "function",
+    "agent",
+)
+"""The six runtime shapes required by spec 43 §3.1.
+
+They are cloud-neutral Kubernetes/control-plane shapes, so one committed cell
+per shape is sufficient; the tri-cloud managed-service grid is separate.
+"""
+
 
 @dataclass(frozen=True)
 class Cell:
@@ -315,6 +329,44 @@ def _worker_workload() -> list[str]:
     ]
 
 
+def _topology_workload(kind: str) -> list[str]:
+    """A second workload that makes one topology explicit in the manifest.
+
+    The web workload remains the harness probe surface.  Cronjobs and tasks do
+    not expose ingress, and a task-family agent deliberately has no standing
+    pod, so forcing those shapes to masquerade as the public workload would
+    make the manifest unrunnable rather than more representative.
+    """
+    lines = [
+        "[[workloads]]",
+        f'name = "{kind}"',
+        f'kind = "{kind}"',
+        "replicas = 1",
+        'cpu_request = "100m"',
+        'cpu_limit = "500m"',
+        'memory_request = "128Mi"',
+        'memory_limit = "256Mi"',
+    ]
+    if kind == "cronjob":
+        lines += ['schedule = "*/5 * * * *"', 'concurrency_policy = "forbid"']
+    if kind == "agent":
+        lines += ['run_family = "service"']
+    lines += [
+        "",
+        "  [[workloads.containers]]",
+        f'  name = "{kind}"',
+        "  is_primary = true",
+        f'  image_ref = "{FIXTURE_IMAGE}"',
+        "  port = 0",
+        '  command = ["python", "entrypoint.py", "worker"]',
+        "",
+        "    [workloads.containers.env]",
+        '    LOG_LEVEL = "info"',
+        "",
+    ]
+    return lines
+
+
 def _service(*, kind: str, name: str, variant: str) -> list[str]:
     return [
         "[[managed_services]]",
@@ -401,6 +453,31 @@ def render_per_kind(cell: Cell) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_topology(kind: str) -> str:
+    """One explicit runtime topology, backed only by the spec-42 fixture."""
+    if kind not in TOPOLOGIES:
+        raise ValueError(f"unknown certification topology {kind!r}")
+    lines = [
+        f"# TOPOLOGY / {kind} -- runtime-shape coverage (spec 43 §3.1).",
+        "#",
+        "# The web deployment is the harness probe surface. The second workload",
+        f"# is the {kind} shape under test; both use the pinned spec-42 fixture.",
+        "#",
+        "# Generated from providers/_cert/collection.py -- do not hand-edit.",
+        f'name = "{CAMPAIGN.slug}-topology-{kind}"',
+        "",
+        *_campaign_block(
+            cell=f"topology/{kind}",
+            cloud="aws",
+            purpose=f"topology coverage: {kind}",
+        ),
+        *_web_workload(),
+    ]
+    if kind != "deployment":
+        lines += _topology_workload(kind)
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def rendered() -> dict[Path, str]:
     """Every generated manifest, keyed by the path it is committed at."""
     out: dict[Path, str] = {}
@@ -408,6 +485,8 @@ def rendered() -> dict[Path, str]:
         out[MANIFEST_ROOT / "happy-path" / f"{cloud}.toml"] = render_happy_path(cloud)
     for cell in cells():
         out[cell.path] = render_per_kind(cell)
+    for kind in TOPOLOGIES:
+        out[MANIFEST_ROOT / "topology" / f"{kind}.toml"] = render_topology(kind)
     return out
 
 

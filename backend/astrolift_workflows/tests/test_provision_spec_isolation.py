@@ -125,3 +125,17 @@ def test_a_policy_for_another_kind_leaves_this_one_alone():
         status=ManagedService.Status.ACTIVE,
     )
     assert build_provision_spec(other, cluster=cluster).isolation == "dedicated"
+
+
+def test_portable_extensions_reach_the_driver_contract_not_provider_config():
+    _, svc, cluster = _scaffold("extensions")
+    svc.config = {
+        "size": "small",
+        "desired_extensions": ["vector", "pg_trgm", "vector"],
+    }
+    svc.save(update_fields=["config"])
+
+    spec = build_provision_spec(svc, cluster=cluster)
+
+    assert spec.desired_extensions == ["vector", "pg_trgm"]
+    assert "desired_extensions" not in spec.config

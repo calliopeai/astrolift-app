@@ -1,0 +1,67 @@
+# TOPOLOGY / cronjob -- runtime-shape coverage (spec 43 §3.1).
+#
+# The web deployment is the harness probe surface. The second workload
+# is the cronjob shape under test; both use the pinned spec-42 fixture.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-topology-cronjob"
+
+[campaign]
+slug = "cert2026q3"
+cell = "topology/cronjob"
+cloud = "aws"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "topology coverage: cronjob"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[workloads]]
+name = "cronjob"
+kind = "cronjob"
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+schedule = "*/5 * * * *"
+concurrency_policy = "forbid"
+
+  [[workloads.containers]]
+  name = "cronjob"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 0
+  command = ["python", "entrypoint.py", "worker"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"

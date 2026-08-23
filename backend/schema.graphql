@@ -2389,6 +2389,7 @@ type AstroliftManagedService {
   ownerScope: String!
   clusterSlug: String!
   environmentName: String!
+  providerPortalUrl: String!
   createdAt: DateTime!
   updatedAt: DateTime!
   lastActionAt: DateTime
@@ -2452,6 +2453,20 @@ type AstroliftManagedServiceConnectionMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedServiceConnection
+}
+
+type AstroliftManagedServiceCostPreview {
+  managedServiceId: GUID!
+  available: Boolean!
+  reason: String!
+  message: String!
+  monthlyTotal: Float
+  currency: String!
+  lineItems: JSON!
+  pricingSourceUrl: String!
+  pricingFetchedAt: String!
+  notes: [String!]!
+  approximate: Boolean!
 }
 
 type AstroliftManagedServiceMetricSeries {
@@ -6050,6 +6065,7 @@ type Query {
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]! @deprecated(reason: "Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage.")
   astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
+  astroliftManagedServiceCostPreview(managedServiceId: GUID!): AstroliftManagedServiceCostPreview
   astroliftWorkloadIdentityGrants(appSlug: String!, environmentName: String = null, unappliedOnly: Boolean! = false): [AstroliftWorkloadIdentityGrant!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth

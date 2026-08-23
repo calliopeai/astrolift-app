@@ -11,40 +11,40 @@ from providers._cert import billing
 from providers._sdk.availability import MATRIX
 
 
-def _aws_previews() -> list[tuple[str, str]]:
-    return [
-        (e.kind, e.variant) for e in MATRIX.managed_services if e.status == "preview" and e.plugin_id.startswith("aws")
-    ]
+def _previews(provider: str) -> list[tuple[str, str]]:
+    return [(e.kind, e.variant) for e in MATRIX.managed_services if e.status == "preview" and e.plugin_id == provider]
 
 
 # ---- coverage against the matrix --------------------------------------------
 
 
-def test_every_aws_preview_has_a_billing_class():
+@pytest.mark.parametrize("provider", ["aws", "gcp", "azure"])
+def test_every_cloud_preview_has_a_billing_class(provider):
     """The campaign's whole input list. An entry added to the matrix without a
     classification would otherwise be invisible until someone ran it."""
     unclassified = []
-    for kind, variant in _aws_previews():
+    for kind, variant in _previews(provider):
         try:
-            billing.classify("aws", kind, variant)
+            billing.classify(provider, kind, variant)
         except billing.UnclassifiedVariant:
             unclassified.append(f"{kind}:{variant}")
 
     assert not unclassified, (
-        "AWS preview variants with no billing class: "
+        f"{provider} preview variants with no billing class: "
         + ", ".join(sorted(unclassified))
         + ". Add them to providers/_cert/billing.py."
     )
 
 
-def test_the_classification_table_has_no_entries_the_matrix_lost():
+@pytest.mark.parametrize("provider", ["aws", "gcp", "azure"])
+def test_the_classification_table_has_no_entries_the_matrix_lost(provider):
     """A variant renamed or removed in the matrix leaves a dead row here, and a
     dead row is indistinguishable from a classified one when reading the table."""
-    known = set(_aws_previews())
-    ga_and_other = {(e.kind, e.variant) for e in MATRIX.managed_services if e.plugin_id.startswith("aws")}
+    known = set(_previews(provider))
+    ga_and_other = {(e.kind, e.variant) for e in MATRIX.managed_services if e.plugin_id == provider}
     stale = [
         f"{kind}:{variant}"
-        for (kind, variant) in billing.CLASSIFICATIONS["aws"]
+        for (kind, variant) in billing.CLASSIFICATIONS[provider]
         if (kind, variant) not in known and (kind, variant) not in ga_and_other
     ]
 
@@ -62,7 +62,7 @@ def test_an_unclassified_variant_is_refused_not_assumed_free():
 
 def test_an_unknown_provider_is_refused():
     with pytest.raises(billing.UnclassifiedVariant, match="no billing classification table"):
-        billing.check_may_run("gcp", "topic", "pubsub")
+        billing.check_may_run("oracle", "topic", "streams")
 
 
 def test_class_d_is_refused_even_with_an_estimate():

@@ -140,6 +140,19 @@ class ManagedServiceManifest:
     name: str = ""
     variant: str | None = None
     config: dict[str, Any] = dataclasses.field(default_factory=dict)
+    owner_scope: str = "app"
+    environment: str = "production"
+    bind_workloads: tuple[str, ...] = ("*",)
+    size: str = "small"
+    isolation: str = ""
+    auth_mode: str = ""
+    extensions: dict[str, Any] = dataclasses.field(default_factory=dict)
+    networking: dict[str, Any] = dataclasses.field(default_factory=dict)
+    retention: dict[str, Any] = dataclasses.field(default_factory=dict)
+    backup: dict[str, Any] = dataclasses.field(default_factory=dict)
+    restore: dict[str, Any] = dataclasses.field(default_factory=dict)
+    deletion_policy: str = "retain"
+    confirm_delete: bool = False
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

@@ -109,6 +109,25 @@ class ManagedService(BaseCoreModel):
         default="",
     )
     config = models.JSONField(default=dict, blank=True)
+    manifest_managed = models.BooleanField(
+        default=False,
+        help_text="True when astrolift.toml, rather than an imperative mutation, owns this row.",
+    )
+    bind_workloads = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Manifest workload selectors; ['*'] exposes the binding to every workload.",
+    )
+    deletion_policy = models.CharField(
+        max_length=16,
+        choices=[("retain", "retain"), ("delete", "delete")],
+        default="retain",
+    )
+    lifecycle_policy = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Typed manifest retention, backup, and restore intent plus explicit delete confirmation.",
+    )
     # Desired config can move ahead of the real resource while an asynchronous
     # update runs. Keep the last provider-confirmed config separately so the UI,
     # retries, and operators never mistake requested state for applied state.
@@ -155,9 +174,9 @@ class ManagedService(BaseCoreModel):
                 name="msvc_exactly_one_owner_scope",
             ),
             models.UniqueConstraint(
-                fields=["registered_app", "kind", "name"],
+                fields=["registered_app", "app_environment", "kind", "name"],
                 condition=models.Q(registered_app__isnull=False, deleted_at__isnull=True),
-                name="msvc_unique_active_per_app_kind_name",
+                name="msvc_unique_active_per_app_env_kind_name",
             ),
             models.UniqueConstraint(
                 fields=["project", "kind", "name"],
@@ -299,6 +318,12 @@ class ManagedServiceAttachment(BaseCoreModel):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
+    )
+    manifest_managed = models.BooleanField(default=False)
+    workload_names = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Manifest workload selectors for this consumer; ['*'] means every workload.",
     )
 
     class Meta:

@@ -15,10 +15,10 @@ data model. The contract:
 
 What this module does NOT do (deliberately):
 
-* Persist ManagedService / AppEnvironment rows. Both are tracked as
-  separate models with their own provisioning lifecycles; binding
-  them to manifest rows lands in a follow-up that needs the driver
-  protocol.
+* Create AppEnvironment rows. Registration owns cluster selection and
+  environment bootstrap. Managed-service reconciliation runs immediately when
+  those rows already exist and is repeated by the bootstrap helper after it
+  creates them.
 * Apply the rendered Kubernetes resources. That's
   ``apply_manifests`` in the deploy workflow.
 """
@@ -30,6 +30,7 @@ import dataclasses
 from astrolift_manifest.normalize import manifest_hash
 from astrolift_manifest.types import (
     ContainerManifest,
+    ManagedServiceManifest,
     NormalizedManifest,
     WorkloadManifest,
 )
@@ -46,6 +47,11 @@ class PersistResult:
     containers_created: int = 0
     containers_updated: int = 0
     containers_soft_deleted: int = 0
+    managed_services_created: int = 0
+    managed_services_updated: int = 0
+    managed_services_removed: int = 0
+    managed_service_attachments_created: int = 0
+    managed_service_attachments_removed: int = 0
     hash_changed: bool = False
 
     @property
@@ -58,6 +64,11 @@ class PersistResult:
             or self.containers_created
             or self.containers_updated
             or self.containers_soft_deleted
+            or self.managed_services_created
+            or self.managed_services_updated
+            or self.managed_services_removed
+            or self.managed_service_attachments_created
+            or self.managed_service_attachments_removed
         ) > 0
 
 
@@ -156,6 +167,294 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
         result.containers_created += c_result.created
         result.containers_updated += c_result.updated
         result.containers_soft_deleted += c_result.soft_deleted
+
+    managed = reconcile_managed_services(app, manifest.managed_services)
+    result.managed_services_created += managed.managed_services_created
+    result.managed_services_updated += managed.managed_services_updated
+    result.managed_services_removed += managed.managed_services_removed
+    result.managed_service_attachments_created += managed.managed_service_attachments_created
+    result.managed_service_attachments_removed += managed.managed_service_attachments_removed
+
+    return result
+
+
+def _merge_config(service: ManagedServiceManifest) -> dict:
+    """Materialize common and provider extension fields without collisions."""
+    merged = dict(service.config)
+    common = {"size": service.size}
+    if service.auth_mode:
+        common["auth_mode"] = service.auth_mode
+    for group in (common, service.networking, service.retention, service.backup, service.extensions):
+        for key, value in group.items():
+            if key in merged and merged[key] != value:
+                raise ValueError(
+                    f"managed service {service.name or service.kind!r} config field {key!r} "
+                    "is declared twice with different values"
+                )
+            merged[key] = value
+    return merged
+
+
+def _lifecycle_policy(service: ManagedServiceManifest) -> dict:
+    return {
+        "retention": dict(service.retention),
+        "backup": dict(service.backup),
+        "restore": dict(service.restore),
+        "confirm_delete": service.confirm_delete,
+    }
+
+
+def _enqueue_manifest_workflow(name: str, row, input_value) -> None:
+    """Start after commit; a queue outage must not roll back desired state."""
+    import logging
+
+    from django.db import transaction
+
+    def start() -> None:
+        try:
+            from astrolift_workflows.client import start_workflow
+
+            start_workflow(
+                name,
+                args=[input_value],
+                workflow_id=f"{name}-{row.guid}",
+            )
+        except Exception:  # noqa: BLE001 - desired state remains retryable
+            logging.getLogger(__name__).exception(
+                "manifest: failed to enqueue %s for managed service %s",
+                name,
+                row.guid,
+            )
+
+    transaction.on_commit(start)
+
+
+def _enqueue_provision(row) -> None:
+    from astrolift_workflows.inputs import Actor, ProvisionManagedServiceInput
+
+    _enqueue_manifest_workflow(
+        "ProvisionManagedServiceWorkflow",
+        row,
+        ProvisionManagedServiceInput(
+            managed_service_id=row.pk,
+            actor=Actor(kind="system", display="manifest-reconcile"),
+        ),
+    )
+
+
+def _enqueue_update(row) -> None:
+    from astrolift_workflows.inputs import Actor, UpdateManagedServiceInput
+
+    _enqueue_manifest_workflow(
+        "UpdateManagedServiceWorkflow",
+        row,
+        UpdateManagedServiceInput(
+            managed_service_id=row.pk,
+            actor=Actor(kind="system", display="manifest-reconcile"),
+        ),
+    )
+
+
+def _enqueue_deprovision(row) -> None:
+    from astrolift_workflows.inputs import Actor, DeprovisionManagedServiceInput
+
+    lifecycle = dict(row.lifecycle_policy or {})
+    delete_data = row.deletion_policy == "delete" and lifecycle.get("confirm_delete") is True
+    _enqueue_manifest_workflow(
+        "DeprovisionManagedServiceWorkflow",
+        row,
+        DeprovisionManagedServiceInput(
+            managed_service_id=row.pk,
+            actor=Actor(kind="system", display="manifest-reconcile"),
+            delete_data=delete_data,
+            force_destroy=False,
+        ),
+    )
+
+
+def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]) -> PersistResult:
+    """Reconcile manifest declarations into real lifecycle-owned rows.
+
+    App scope produces one resource per selected environment. Project scope
+    produces one shared project resource and one attachment per environment.
+    When environments do not exist yet registration calls this again after
+    bootstrap; returning an empty result here is therefore intentional.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.managed_service_catalog import resolve_variant, validate_config
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+
+    result = PersistResult()
+    environments = {
+        row.name: row
+        for row in AppEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+        ).select_related("tenant_cluster__provider_plugin")
+    }
+    if not environments:
+        return result
+
+    desired_app: set[tuple[int, str, str]] = set()
+    desired_attachments: set[int] = set()
+    project_rows: dict[tuple[str, str], ManagedService] = {}
+
+    for service in services:
+        env = environments.get(service.environment)
+        if env is None:
+            raise ValueError(
+                f"managed service {service.name or service.kind!r} selects unknown environment "
+                f"{service.environment!r}"
+            )
+        config = _merge_config(service)
+        item = resolve_variant(
+            plugin_slug=env.tenant_cluster.provider_plugin.slug,
+            kind=service.kind,
+            requested_variant=service.variant,
+        )
+        if item is not None:
+            validate_config(item, config)
+        variant = item.variant if item is not None else (service.variant or "")
+        name = (service.name or service.kind).strip()
+        lifecycle = _lifecycle_policy(service)
+
+        if service.owner_scope == "app":
+            key = (env.pk, service.kind, name)
+            desired_app.add(key)
+            row = ManagedService.objects.filter(
+                registered_app=app,
+                app_environment=env,
+                kind=service.kind,
+                name=name,
+                deleted_at__isnull=True,
+            ).first()
+            if row is None:
+                row = ManagedService.objects.create(
+                    registered_app=app,
+                    app_environment=env,
+                    kind=service.kind,
+                    name=name,
+                    variant=variant,
+                    isolation=service.isolation,
+                    config=config,
+                    manifest_managed=True,
+                    bind_workloads=list(service.bind_workloads),
+                    deletion_policy=service.deletion_policy,
+                    lifecycle_policy=lifecycle,
+                )
+                result.managed_services_created += 1
+                _enqueue_provision(row)
+                continue
+            if not row.manifest_managed:
+                raise ValueError(
+                    f"managed service ({service.kind}, {name!r}) already exists imperatively in "
+                    f"environment {env.name!r}; the manifest cannot take ownership"
+                )
+            changed = any(
+                (
+                    row.variant != variant,
+                    row.isolation != service.isolation,
+                    row.config != config,
+                    row.bind_workloads != list(service.bind_workloads),
+                    row.deletion_policy != service.deletion_policy,
+                    row.lifecycle_policy != lifecycle,
+                )
+            )
+            if changed:
+                variant_changed = row.variant != variant or row.isolation != service.isolation
+                if variant_changed and row.backend_ref:
+                    raise ValueError(
+                        f"managed service {name!r} changes variant or isolation; remove it, let safe "
+                        "deprovision finish, then add the replacement"
+                    )
+                row.variant = variant
+                row.isolation = service.isolation
+                row.config = config
+                row.bind_workloads = list(service.bind_workloads)
+                row.deletion_policy = service.deletion_policy
+                row.lifecycle_policy = lifecycle
+                row.save()
+                result.managed_services_updated += 1
+                _enqueue_update(row) if row.backend_ref else _enqueue_provision(row)
+            continue
+
+        project_key = (service.kind, name)
+        row = project_rows.get(project_key)
+        if row is None:
+            row = ManagedService.objects.filter(
+                project=app.project,
+                kind=service.kind,
+                name=name,
+                deleted_at__isnull=True,
+            ).first()
+            if row is None:
+                row = ManagedService.objects.create(
+                    project=app.project,
+                    tenant_cluster=env.tenant_cluster,
+                    environment_name=service.environment,
+                    kind=service.kind,
+                    name=name,
+                    variant=variant,
+                    isolation=service.isolation,
+                    config=config,
+                    manifest_managed=True,
+                    deletion_policy=service.deletion_policy,
+                    lifecycle_policy=lifecycle,
+                )
+                result.managed_services_created += 1
+                _enqueue_provision(row)
+            else:
+                if row.tenant_cluster_id != env.tenant_cluster_id:
+                    raise ValueError(f"project managed service {name!r} already belongs to another cluster")
+                if row.variant != variant or row.config != config or row.isolation != service.isolation:
+                    raise ValueError(
+                        f"project managed service {name!r} already exists with different desired state; "
+                        "shared consumers cannot overwrite it from an app manifest"
+                    )
+            project_rows[project_key] = row
+
+        attachment = ManagedServiceAttachment.objects.filter(
+            managed_service=row,
+            app_environment=env,
+            deleted_at__isnull=True,
+        ).first()
+        if attachment is None:
+            attachment = ManagedServiceAttachment.objects.create(
+                managed_service=row,
+                app_environment=env,
+                manifest_managed=True,
+                workload_names=list(service.bind_workloads),
+            )
+            result.managed_service_attachments_created += 1
+        elif attachment.manifest_managed and attachment.workload_names != list(service.bind_workloads):
+            attachment.workload_names = list(service.bind_workloads)
+            attachment.save(update_fields=["workload_names", "updated_at", "version"])
+        elif not attachment.manifest_managed:
+            raise ValueError(
+                f"project managed service {name!r} is already attached imperatively to {env.name!r}"
+            )
+        desired_attachments.add(attachment.pk)
+
+    for row in ManagedService.objects.filter(
+        registered_app=app,
+        manifest_managed=True,
+        deleted_at__isnull=True,
+    ):
+        if (row.app_environment_id, row.kind, row.name) in desired_app:
+            continue
+        row.manifest_managed = False
+        row.save(update_fields=["manifest_managed", "updated_at", "version"])
+        result.managed_services_removed += 1
+        _enqueue_deprovision(row)
+
+    stale_attachments = ManagedServiceAttachment.objects.filter(
+        app_environment__registered_app=app,
+        manifest_managed=True,
+        deleted_at__isnull=True,
+    ).exclude(pk__in=desired_attachments)
+    for attachment in stale_attachments:
+        attachment.soft_delete()
+        result.managed_service_attachments_removed += 1
 
     return result
 

@@ -2390,6 +2390,7 @@ export type AstroliftManagedService = {
   operationWorkflowId: Scalars['String']['output'];
   ownerScope: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
+  providerPortalUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   status: Scalars['String']['output'];
   statusError: Scalars['String']['output'];
@@ -2450,6 +2451,20 @@ export type AstroliftManagedServiceConnectionMutationResult = {
   data?: Maybe<AstroliftManagedServiceConnection>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceCostPreview = {
+  approximate: Scalars['Boolean']['output'];
+  available: Scalars['Boolean']['output'];
+  currency: Scalars['String']['output'];
+  lineItems: Scalars['JSON']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  message: Scalars['String']['output'];
+  monthlyTotal?: Maybe<Scalars['Float']['output']>;
+  notes: Array<Scalars['String']['output']>;
+  pricingFetchedAt: Scalars['String']['output'];
+  pricingSourceUrl: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
 };
 
 export type AstroliftManagedServiceMetricSeries = {
@@ -7583,6 +7598,7 @@ export type Query = {
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
+  astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
   astroliftManagedServiceObjects?: Maybe<AstroliftManagedServiceObjects>;
   astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
   /** @deprecated Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage. */
@@ -8450,6 +8466,11 @@ export type QueryAstroliftInvitationsPageArgs = {
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftManagedServiceCostPreviewArgs = {
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 

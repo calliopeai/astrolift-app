@@ -173,7 +173,91 @@ _AWS: dict[tuple[str, str], Classification] = {
 }
 
 
-CLASSIFICATIONS: dict[str, dict[tuple[str, str], Classification]] = {"aws": _AWS}
+# GCP.  The certification surface is intentionally small today, but it still
+# needs a complete table: an absent provider table made the spend policy
+# impossible to enforce on the real runner.
+_GCP: dict[tuple[str, str], Classification] = {
+    _c("email", "smtp"): Classification(
+        BillingClass.NO_IDLE_COST,
+        "The relay is external and billed per message; Astrolift provisions no idle capacity.",
+    ),
+    _c("workflow_engine", "workflows"): Classification(
+        BillingClass.NO_IDLE_COST, "Billed per workflow step and external call."
+    ),
+    _c("cdn", "cloud_cdn"): Classification(
+        BillingClass.NO_IDLE_COST, "Billed for requests and egress; an idle configuration has no capacity floor."
+    ),
+    _c("encryption_key", "cloud_kms"): Classification(
+        BillingClass.SMALL_FIXED_FLOOR, "A key version carries a small monthly floor plus operation charges."
+    ),
+    _c("private_endpoint", "private_service_connect"): Classification(
+        BillingClass.SMALL_FIXED_FLOOR, "The forwarding rule and endpoint carry a bounded hourly charge."
+    ),
+    _c("observability", "cloud_operations"): Classification(
+        BillingClass.SMALL_FIXED_FLOOR, "The workspace is near-zero idle; ingestion and retention are usage billed."
+    ),
+}
+
+
+# Azure.  Service names that contain "serverless" are not assumed free: SQL
+# serverless retains a billed compute floor while provisioned, just as the AWS
+# table treats Aurora Serverless v2.
+_AZURE: dict[tuple[str, str], Classification] = {
+    **{
+        _c(kind, variant): Classification(BillingClass.HOURLY_CAPACITY_FLOOR, rationale)
+        for kind, variant, rationale in [
+            (
+                "mssql",
+                "azure_sql_serverless",
+                "Auto-pause can reduce spend, but provisioned compute has a billed floor.",
+            ),
+            ("mssql", "azure_sql_database", "Provisioned vCores bill from creation."),
+            ("mssql", "azure_sql_hyperscale", "Provisioned compute and storage bill from creation."),
+            ("redis", "azure_managed_redis", "A cache capacity bills by the hour from creation."),
+            ("document_db", "cosmos_nosql", "The certification account provisions throughput with an hourly floor."),
+            ("document_db", "cosmos_mongodb", "The certification account provisions throughput with an hourly floor."),
+            ("graph_db", "cosmos_gremlin", "The certification account provisions throughput with an hourly floor."),
+            (
+                "wide_column",
+                "cosmos_cassandra",
+                "The certification account provisions throughput with an hourly floor.",
+            ),
+            ("kv_store", "cosmos_table", "The certification account provisions throughput with an hourly floor."),
+            ("filesystem", "azure_files", "Provisioned share capacity and transactions can bill while idle."),
+            ("filesystem", "azure_files_classic", "The backing storage account and share retain billable storage."),
+            ("event_bus", "event_grid_namespace", "Namespace throughput units retain an hourly capacity floor."),
+            ("stream", "event_hubs", "Throughput or processing units bill by the hour."),
+            ("event_stream", "event_hubs_kafka", "The Event Hubs namespace bills throughput units by the hour."),
+        ]
+    },
+    _c("event_bus", "event_grid"): Classification(
+        BillingClass.NO_IDLE_COST, "Basic Event Grid is billed per operation."
+    ),
+    _c("faas", "azure_functions"): Classification(
+        BillingClass.NO_IDLE_COST, "The certification shape uses consumption billing per execution and duration."
+    ),
+    _c("encryption_key", "key_vault_key"): Classification(
+        BillingClass.SMALL_FIXED_FLOOR, "Key Vault operations are usage billed and the key itself has a small floor."
+    ),
+    _c("private_endpoint", "private_link"): Classification(
+        BillingClass.SMALL_FIXED_FLOOR, "A private endpoint has a bounded endpoint-hour charge."
+    ),
+    _c("mssql", "azure_sql_managed_instance"): Classification(
+        BillingClass.HOURLY_FLOOR_SLOW_LIFECYCLE,
+        "Multi-hour provision and delete plus a substantial vCore floor. Decision 4.",
+    ),
+    _c("api_gateway", "api_management"): Classification(
+        BillingClass.HOURLY_FLOOR_SLOW_LIFECYCLE,
+        "APIM Developer has a material hourly floor and a slow lifecycle. Decision 4.",
+    ),
+}
+
+
+CLASSIFICATIONS: dict[str, dict[tuple[str, str], Classification]] = {
+    "aws": _AWS,
+    "gcp": _GCP,
+    "azure": _AZURE,
+}
 
 
 def classify(provider: str, kind: str, variant: str) -> Classification:

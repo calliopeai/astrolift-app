@@ -79,6 +79,7 @@ def render_manifests(
     environment_name: str,
     labels: dict[str, str] | None = None,
     env_from_secret_refs: list[str] | None = None,
+    workload_env_from_secret_refs: dict[str, list[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Render every workload in ``manifest`` into a list of K8s dicts.
 
@@ -102,6 +103,10 @@ def render_manifests(
     connection envelopes. Order matters: later secrets shadow earlier
     keys on collision per k8s envFrom semantics, so bindings appear
     after operator-authored bundles.
+
+    ``workload_env_from_secret_refs`` adds selector-scoped secrets to one
+    workload only. It is how a manifest can bind a shared service to ``api``
+    without leaking the same credentials into ``worker``.
     """
     base_labels = {
         # Use the app slug (DNS-safe) not the display name — K8s label
@@ -110,10 +115,12 @@ def render_manifests(
         "astrolift.dev/environment": environment_name,
         **(labels or {}),
     }
-    env_from = list(env_from_secret_refs or [])
+    common_env_from = list(env_from_secret_refs or [])
+    workload_env_from = workload_env_from_secret_refs or {}
 
     out: list[dict[str, Any]] = []
     for w in manifest.workloads:
+        env_from = [*common_env_from, *workload_env_from.get(w.name, [])]
         wl_labels = {
             **base_labels,
             "astrolift.dev/workload": w.name,

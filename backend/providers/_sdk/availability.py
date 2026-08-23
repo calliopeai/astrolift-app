@@ -34,13 +34,7 @@ _AWS_DATA_SEARCH_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/128
 _AWS_EVENTING_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1285"
 _AWS_PLATFORM_RESOURCES_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1286"
 _CROSS_CLOUD_PARITY_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1287"
-_AZURE_COSMOS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1347"
-_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1350"
-_AZURE_EVENT_GRID_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1354"
-_AZURE_EVENT_GRID_NAMESPACE_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1355"
-_AZURE_FILES_CLASSIC_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1361"
-_AZURE_FUNCTIONS_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1392"
-_AZURE_PRIVATE_LINK_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1335"
+_AZURE_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1471"
 _EMAIL_SMTP_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1453"
 
 
@@ -121,10 +115,7 @@ class AvailabilityMatrix:
         variant: str,
     ) -> bool:
         return any(
-            m.plugin_id == plugin_id
-            and m.kind == kind
-            and m.variant == variant
-            and m.status in {"ga", "preview", "experimental"}
+            m.plugin_id == plugin_id and m.kind == kind and m.variant == variant and m.status in {"ga", "preview"}
             for m in self.managed_services
         )
 
@@ -374,8 +365,8 @@ MATRIX = AvailabilityMatrix(
             kind="mssql",
             variant="rds_sqlserver_enterprise",
             plugin_id="aws",
-            status="preview",
-            description="Amazon RDS for SQL Server Enterprise",
+            status="experimental",
+            description="Amazon RDS for SQL Server Enterprise (unsupported; new provisioning disabled)",
             issue_url=_AWS_DATA_SEARCH_ISSUE,
         ),
         ManagedServiceEntry(
@@ -1050,7 +1041,6 @@ MATRIX = AvailabilityMatrix(
             plugin_id="gcp",
             status="planned",
             description="Elastic Cloud on GCP (stub driver)",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="vector_index",
@@ -1552,6 +1542,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure SQL Database serverless",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "MSSQL_HOST",
                 "MSSQL_PORT",
@@ -1568,6 +1559,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure SQL Database provisioned compute",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "MSSQL_HOST",
                 "MSSQL_PORT",
@@ -1584,6 +1576,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure SQL Database Hyperscale provisioned compute",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "MSSQL_HOST",
                 "MSSQL_PORT",
@@ -1600,14 +1593,21 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure SQL elastic pool",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="mssql",
+            variant="azure_sql_virtual_machine",
+            plugin_id="azure",
+            status="planned",
+            description="SQL Server on Azure Virtual Machines; Express remains available in-cluster",
         ),
         ManagedServiceEntry(
             kind="mssql",
             variant="azure_sql_managed_instance",
             plugin_id="azure",
-            status="preview",
-            description="Azure SQL Managed Instance",
+            status="experimental",
+            description="Azure SQL Managed Instance (unsupported; new provisioning disabled)",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "MSSQL_HOST",
                 "MSSQL_PORT",
@@ -1624,6 +1624,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Managed Redis",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
         ),
         ManagedServiceEntry(
             kind="document_db",
@@ -1631,7 +1632,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Cosmos DB for NoSQL database",
-            issue_url=_AZURE_COSMOS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "DOCDB_URI",
                 "DOCDB_DB",
@@ -1650,7 +1651,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Cosmos DB for MongoDB (RU-based API)",
-            issue_url=_AZURE_COSMOS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "DOCDB_URI",
                 "DOCDB_DB",
@@ -1669,7 +1670,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Cosmos DB for Apache Gremlin",
-            issue_url=_AZURE_COSMOS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "GRAPH_DB_URL",
                 "GRAPH_DB_ENDPOINT",
@@ -1691,7 +1692,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Cosmos DB for Apache Cassandra",
-            issue_url=_AZURE_COSMOS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "WIDE_COLUMN_ENDPOINT",
                 "WIDE_COLUMN_KEYSPACE",
@@ -1711,7 +1712,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Cosmos DB for Table",
-            issue_url=_AZURE_COSMOS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "KV_TABLE_NAME",
                 "KV_REGION",
@@ -1728,7 +1729,13 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure Synapse serverless SQL pool",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="warehouse",
+            variant="fabric_warehouse",
+            plugin_id="azure",
+            status="planned",
+            description="Microsoft Fabric Warehouse",
         ),
         ManagedServiceEntry(
             kind="filesystem",
@@ -1736,7 +1743,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Top-level Microsoft.FileShares provisioned-v2 NFS share",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "FILESYSTEM_HANDLE",
                 "FILESYSTEM_MOUNT_PATH",
@@ -1760,7 +1767,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Classic Azure Files storage-key SMB or network-authorized NFS share",
-            issue_url=_AZURE_FILES_CLASSIC_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "FILESYSTEM_HANDLE",
                 "FILESYSTEM_MOUNT_PATH",
@@ -1786,7 +1793,20 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure NetApp Files volume",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="filesystem",
+            variant="azure_managed_lustre",
+            plugin_id="azure",
+            status="planned",
+            description="Azure Managed Lustre filesystem",
+        ),
+        ManagedServiceEntry(
+            kind="queue",
+            variant="azure_storage_queue",
+            plugin_id="azure",
+            status="planned",
+            description="Azure Queue Storage queue",
         ),
         ManagedServiceEntry(
             kind="topic",
@@ -1809,7 +1829,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Event Grid topic and subscriptions",
-            issue_url=_AZURE_EVENT_GRID_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "EVENT_BUS_NAME",
                 "EVENT_BUS_ARN",
@@ -1827,7 +1847,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Event Grid Standard namespace topic with pull and push delivery",
-            issue_url=_AZURE_EVENT_GRID_NAMESPACE_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "EVENT_BUS_NAME",
                 "EVENT_BUS_ARN",
@@ -1848,7 +1868,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Event Hubs namespace and event hub",
-            issue_url=_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "STREAM_NAME",
                 "STREAM_ARN",
@@ -1867,7 +1887,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Event Hubs Kafka endpoint",
-            issue_url=_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "EVENT_STREAM_BROKERS",
                 "EVENT_STREAM_TLS",
@@ -1885,7 +1905,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Function App with identity-backed package or container deployment",
-            issue_url=_AZURE_FUNCTIONS_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "FUNCTION_NAME",
                 "FUNCTION_ARN",
@@ -1900,8 +1920,11 @@ MATRIX = AvailabilityMatrix(
             kind="api_gateway",
             variant="api_management",
             plugin_id="azure",
-            status="preview",
-            description="Azure API Management service with typed APIs and managed-identity backends",
+            status="experimental",
+            description=(
+                "Azure API Management service with typed APIs and managed-identity backends "
+                "(unsupported; new provisioning disabled)"
+            ),
             binding_envs=(
                 "API_GATEWAY_URL",
                 "API_GATEWAY_ID",
@@ -1911,7 +1934,7 @@ MATRIX = AvailabilityMatrix(
                 "AZURE_APIM_RESOURCE_ID",
                 "AZURE_LOCATION",
             ),
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
         ),
         ManagedServiceEntry(
             kind="workflow_engine",
@@ -1919,7 +1942,6 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure Logic Apps workflow",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="cdn",
@@ -1927,7 +1949,13 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure Front Door and CDN endpoint",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="cdn",
+            variant="azure_blob_static_website",
+            plugin_id="azure",
+            status="planned",
+            description="Azure Blob Storage static website with edge delivery",
         ),
         ManagedServiceEntry(
             kind="sms",
@@ -1935,7 +1963,6 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure Communication Services SMS",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="encryption_key",
@@ -1957,7 +1984,7 @@ MATRIX = AvailabilityMatrix(
                 "AZURE_KEY_VAULT_KEY_VERSION",
                 "AZURE_KEY_VAULT_KEY_TYPE",
             ),
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
         ),
         ManagedServiceEntry(
             kind="private_endpoint",
@@ -1965,7 +1992,7 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="preview",
             description="Azure Private Endpoint with optional Private DNS zone group",
-            issue_url=_AZURE_PRIVATE_LINK_ISSUE,
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
             binding_envs=(
                 "PRIVATE_ENDPOINT_ID",
                 "PRIVATE_ENDPOINT_NAME",
@@ -1986,7 +2013,20 @@ MATRIX = AvailabilityMatrix(
             plugin_id="azure",
             status="planned",
             description="Azure Monitor logs, metrics, and alerts",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="azure_ai_foundry",
+            plugin_id="azure",
+            status="planned",
+            description="Azure AI Foundry managed model deployment",
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="azure_ai_embedding",
+            plugin_id="azure",
+            status="planned",
+            description="Azure AI Foundry embedding deployment profile",
         ),
         # k8s_native (operator-backed)
         ManagedServiceEntry(
@@ -2123,7 +2163,6 @@ MATRIX = AvailabilityMatrix(
             plugin_id="k8s_native",
             status="planned",
             description="Commercial MinIO AIStor Operator tenant",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="object_store",

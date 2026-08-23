@@ -16,7 +16,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from _sdk.managed_service import DeprovisionResult
+from _sdk.managed_service import DeprovisionResult, SnapshotHandle
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -176,6 +176,53 @@ def test_real_error_still_fails():
         result = _deprovision_sync(svc.pk, delete_data=True, force_destroy=False)
     assert result["ok"] is False
     assert result["retryable"] is False
+
+
+def test_data_preserving_teardown_refuses_before_delete_when_snapshot_fails():
+    deleted = []
+
+    class _NoExportDriver:
+        def __init__(self, *, config) -> None:  # noqa: ANN001
+            pass
+
+        def snapshot(self, handle):  # noqa: ANN001
+            raise RuntimeError("provider does not support export")
+
+        def deprovision(self, spec, *, delete_data=False, force_destroy=False):  # noqa: ANN001
+            deleted.append(spec.handle)
+            return DeprovisionResult(ok=True, handle=spec.handle)
+
+    _, _, _, svc = _scaffold()
+    p_get, p_cfg = _patch_driver(_NoExportDriver)
+    with p_get, p_cfg, pytest.raises(RuntimeError, match="does not support export"):
+        _deprovision_sync(svc.pk, delete_data=False, force_destroy=False)
+
+    assert deleted == []
+
+
+def test_data_preserving_teardown_records_verified_snapshot_before_delete():
+    class _ExportingDriver:
+        def __init__(self, *, config) -> None:  # noqa: ANN001
+            pass
+
+        def snapshot(self, handle):  # noqa: ANN001
+            return SnapshotHandle(
+                handle=handle.handle,
+                snapshot_id="snapshot-verified",
+                created_at="2026-08-23T00:00:00Z",
+            )
+
+        def deprovision(self, spec, *, delete_data=False, force_destroy=False):  # noqa: ANN001
+            return DeprovisionResult(ok=True, handle=spec.handle, message="deprovisioned")
+
+    _, _, _, svc = _scaffold()
+    p_get, p_cfg = _patch_driver(_ExportingDriver)
+    with p_get, p_cfg:
+        result = _deprovision_sync(svc.pk, delete_data=False, force_destroy=False)
+
+    svc.refresh_from_db()
+    assert result["ok"] is True
+    assert svc.lifecycle_policy["last_retained_snapshot"]["snapshot_id"] == "snapshot-verified"
 
 
 def test_retryable_in_progress_result_survives_activity_adapter():

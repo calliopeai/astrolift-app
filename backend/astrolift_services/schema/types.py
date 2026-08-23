@@ -209,6 +209,7 @@ class ManagedServiceType:
     owner_scope: str
     cluster_slug: str
     environment_name: str
+    provider_portal_url: str
     created_at: dt.datetime
     updated_at: dt.datetime
     last_action_at: dt.datetime | None = None
@@ -240,6 +241,21 @@ class ManagedServiceType:
     workload_identity_grants: list[WorkloadIdentityGrantType] = strawberry.field(
         default_factory=list,
     )
+
+
+@strawberry.type(name="AstroliftManagedServiceCostPreview")
+class ManagedServiceCostPreviewType:
+    managed_service_id: GUID
+    available: bool
+    reason: str
+    message: str
+    monthly_total: float | None
+    currency: str
+    line_items: JSON
+    pricing_source_url: str
+    pricing_fetched_at: str
+    notes: list[str]
+    approximate: bool
 
 
 @strawberry.type(name="AstroliftManagedServiceCatalogEntry")
@@ -984,6 +1000,8 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
     editable = _editable_fields_for(svc) if resolve_editable_fields else ["*"]
     grants = [row for row in svc.workload_identity_grants.all() if row.deleted_at is None]
     state = grant_state_for(grants)
+    from astrolift_services.provider_links import provider_portal_url
+
     return ManagedServiceType(
         id=GUID(str(svc.guid)),
         name=svc.name,
@@ -1004,6 +1022,7 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
         owner_scope=svc.owner_scope,
         cluster_slug=(svc.effective_cluster.slug if svc.effective_cluster else ""),
         environment_name=svc.effective_environment_name,
+        provider_portal_url=provider_portal_url(svc),
         created_at=svc.created_at,
         updated_at=svc.updated_at,
         last_action_at=svc.last_action_at,

@@ -11,9 +11,11 @@ next person to read the wrong code.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
-from _cert.harness.cell import Cell, UnrunnableCell
+from _cert.harness.cell import Binding, Cell, UnrunnableCell
 from _cert.harness.model import Outcome, Step
 from _cert.harness.runner import LifecycleRunner, Poll
 from tests._cert.fake_platform import UPDATE_IMAGE, FakePlatform, happy_cell
@@ -29,6 +31,7 @@ def runner_for(platform: FakePlatform, **kwargs) -> LifecycleRunner:
         update_image_ref=UPDATE_IMAGE,
         provision_poll=instant,
         teardown_poll=instant,
+        estimate_logged=True,
         **kwargs,
     )
 
@@ -165,11 +168,29 @@ def test_buildout_refuses_to_start_on_a_previous_runs_leftover():
     assert "may exist before BUILDOUT" in second.first.result_for(Step.BUILDOUT).assertion
 
 
+def test_buildout_enforces_class_c_estimate_before_registering_anything():
+    platform = FakePlatform()
+    runner = runner_for(platform)
+    runner.estimate_logged = False
+    class_c_cell = replace(
+        happy_cell(),
+        bindings=(Binding("postgres", "records", "aurora_postgres_serverless_v2"),),
+    )
+
+    result = runner.run_cell(class_c_cell, reproduce=False)
+
+    buildout = result.first.result_for(Step.BUILDOUT)
+    assert buildout.outcome is Outcome.RED
+    assert "spend gate" in buildout.assertion
+    assert "pre-flight cost estimate" in buildout.detail
+    assert platform.get_app("cert2026q3-happy-aws") is None
+
+
 def test_a_cycle_without_an_orphan_scanner_cannot_claim_clean():
     """A scan is not optional decoration on VERIFY-CLEAN; it is the step. A
     runner with no scanner that reported green would certify teardown on the
     basis of the platform's own opinion of itself."""
-    runner = LifecycleRunner(platform=FakePlatform(), update_image_ref=UPDATE_IMAGE, scan=None)
+    runner = LifecycleRunner(platform=FakePlatform(), update_image_ref=UPDATE_IMAGE, scan=None, estimate_logged=True)
     runner.provision_poll = runner.teardown_poll = Poll(0.0, 0.0, sleep=lambda _: None, now=lambda: 0.0)
 
     result = runner.run_cell(happy_cell(), reproduce=False)

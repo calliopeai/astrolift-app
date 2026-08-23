@@ -49,6 +49,7 @@ const catalog = [
 ];
 
 vi.mock("@apollo/client/react", () => ({
+  useLazyQuery: () => [vi.fn(), { loading: false }],
   useMutation: () => [vi.fn(), { loading: false }],
   useQuery: (document: { definitions?: Array<{ kind: string; name?: { value: string } }> }) => {
     const operation =

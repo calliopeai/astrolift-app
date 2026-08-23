@@ -23,6 +23,24 @@ export const LIST_APP_SECRETS = gql`
   }
 `;
 
+export const PREVIEW_MANAGED_SERVICE_COST = gql`
+  query PreviewManagedServiceCost($managedServiceId: GUID!) {
+    astroliftManagedServiceCostPreview(managedServiceId: $managedServiceId) {
+      managedServiceId
+      available
+      reason
+      message
+      monthlyTotal
+      currency
+      lineItems
+      pricingSourceUrl
+      pricingFetchedAt
+      notes
+      approximate
+    }
+  }
+`;
+
 /**
  * Minimal version-only fetch on the parent app row (#497).
  *
@@ -104,6 +122,7 @@ export const LIST_PROJECT_RESOURCES = gql`
       ownerScope
       clusterSlug
       environmentName
+      providerPortalUrl
       createdAt
       updatedAt
       lastActionAt

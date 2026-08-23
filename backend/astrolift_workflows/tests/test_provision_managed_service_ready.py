@@ -131,3 +131,43 @@ def test_provision_sync_surfaces_ready_false():
         result = _provision_sync(svc.pk)
     assert result["ok"] is True
     assert result["ready"] is False
+
+
+def test_provision_sync_uses_manifest_restore_intent_instead_of_fresh_provision():
+    calls = []
+
+    class _RestoreDriver:
+        def __init__(self, *, config):  # noqa: ANN001
+            pass
+
+        def provision(self, spec):  # pragma: no cover - the assertion is that this is not called
+            raise AssertionError("fresh provision must not run for a restore declaration")
+
+        def restore(self, snapshot, target):  # noqa: ANN001
+            calls.append((snapshot, target))
+            return SimpleNamespace(
+                ok=True,
+                handle="model_endpoint/restored",
+                ready=True,
+                message="restored",
+                errors=[],
+            )
+
+    svc = _make_service()
+    svc.lifecycle_policy = {
+        "restore": {
+            "snapshot_id": "snapshot-123",
+            "source_handle": "model_endpoint/source",
+            "created_at": "2026-08-23T00:00:00Z",
+        }
+    }
+    svc.save(update_fields=["lifecycle_policy", "updated_at", "version"])
+    with (
+        patch("astrolift_drivers.registry.plugins.get", return_value=_RestoreDriver),
+        patch("core.cluster_observability.managed_config_for", return_value={}),
+    ):
+        result = _provision_sync(svc.pk)
+
+    assert result["handle"] == "model_endpoint/restored"
+    assert calls[0][0].snapshot_id == "snapshot-123"
+    assert calls[0][0].handle == "model_endpoint/source"

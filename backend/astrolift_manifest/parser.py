@@ -132,6 +132,26 @@ def parse_raw(toml_text: str) -> RawManifest:
         _parse_managed_service(item, f"managed_services[{i}]")
         for i, item in enumerate(data.get("managed_services", []))
     )
+    service_keys: set[tuple[str, str, str, str]] = set()
+    for i, service in enumerate(managed):
+        missing = set(service.bind_workloads) - workload_names - {"*"}
+        if missing:
+            raise ManifestError(
+                f"bind_workloads names unknown workload(s): {', '.join(sorted(missing))}",
+                path=f"managed_services[{i}].bind_workloads",
+            )
+        key = (
+            service.owner_scope,
+            service.environment,
+            service.kind,
+            service.name or service.kind,
+        )
+        if key in service_keys:
+            raise ManifestError(
+                f"duplicate managed service {key[-1]!r} in environment {service.environment!r}",
+                path=f"managed_services[{i}]",
+            )
+        service_keys.add(key)
 
     # Agent brief + skills (spec 38). Both keys are optional and only
     # meaningful for agent manifests; a manifest that omits them parses to
@@ -719,12 +739,166 @@ def _parse_volumes(raw_list: list, workload_path: str) -> tuple[dict, ...]:
 
 
 def _parse_managed_service(d: dict[str, Any], path: str) -> ManagedServiceManifest:
+    allowed = {
+        "kind",
+        "name",
+        "variant",
+        "config",
+        "owner_scope",
+        "scope",
+        "environment",
+        "bind_workloads",
+        "size",
+        "tier",
+        "isolation",
+        "auth_mode",
+        "extensions",
+        "networking",
+        "retention",
+        "backup",
+        "restore",
+        "deletion_policy",
+        "confirm_delete",
+        # Compatibility with early demo manifests. These are provider config,
+        # not lifecycle controls, and are preserved rather than ignored.
+        "version",
+        "inject_as",
+    }
+    unknown = sorted(set(d) - allowed)
+    if unknown:
+        raise ManifestError(
+            f"unknown managed-service field(s): {', '.join(unknown)}; provider-specific options belong in extensions",
+            path=path,
+        )
+
+    scope = str(d.get("owner_scope", d.get("scope", "app"))).lower()
+    if "owner_scope" in d and "scope" in d and d["owner_scope"] != d["scope"]:
+        raise ManifestError("owner_scope and scope disagree", path=f"{path}.owner_scope")
+    if scope not in {"app", "project"}:
+        raise ManifestError("owner_scope must be 'app' or 'project'", path=f"{path}.owner_scope")
+
+    environment = str(d.get("environment", "production") or "production")
+    raw_bind = d.get("bind_workloads", ["*"])
+    if isinstance(raw_bind, str):
+        raw_bind = [raw_bind]
+    if (
+        not isinstance(raw_bind, list)
+        or not raw_bind
+        or any(not isinstance(v, str) or not v for v in raw_bind)
+    ):
+        raise ManifestError("bind_workloads must be a non-empty string array", path=f"{path}.bind_workloads")
+    bind_workloads = tuple(dict.fromkeys(raw_bind))
+    if "*" in bind_workloads and len(bind_workloads) > 1:
+        raise ManifestError(
+            "'*' cannot be combined with named workload selectors", path=f"{path}.bind_workloads"
+        )
+
+    if "size" in d and "tier" in d and d["size"] != d["tier"]:
+        raise ManifestError("size and tier disagree", path=f"{path}.size")
+    size = str(d.get("size", d.get("tier", "small"))).lower()
+    if size not in {"small", "medium", "large", "xlarge", "custom"}:
+        raise ManifestError(
+            "size must be small, medium, large, xlarge, or custom; provider SKUs belong in extensions",
+            path=f"{path}.size",
+        )
+    isolation = str(d.get("isolation", "")).lower()
+    if isolation not in {"", "shared", "dedicated"}:
+        raise ManifestError("isolation must be shared or dedicated", path=f"{path}.isolation")
+    auth_mode = str(d.get("auth_mode", "")).lower()
+    if auth_mode not in {"", "password", "iam", "mtls"}:
+        raise ManifestError("auth_mode must be password, iam, or mtls", path=f"{path}.auth_mode")
+
+    groups: dict[str, dict[str, Any]] = {}
+    for key in ("config", "networking", "retention", "backup", "restore"):
+        value = d.get(key, {}) or {}
+        if not isinstance(value, dict):
+            raise ManifestError(f"{key} must be a table", path=f"{path}.{key}")
+        groups[key] = dict(value)
+        _reject_inline_secrets(groups[key], f"{path}.{key}")
+    raw_extensions = d.get("extensions", {}) or {}
+    if isinstance(raw_extensions, list):
+        if any(not isinstance(value, str) or not value for value in raw_extensions):
+            raise ManifestError(
+                "extensions must contain non-empty strings",
+                path=f"{path}.extensions",
+            )
+        groups["extensions"] = {"desired_extensions": list(dict.fromkeys(raw_extensions))}
+    elif isinstance(raw_extensions, dict):
+        groups["extensions"] = dict(raw_extensions)
+        _reject_inline_secrets(groups["extensions"], f"{path}.extensions")
+    else:
+        raise ManifestError(
+            "extensions must be a string array or provider-extension table",
+            path=f"{path}.extensions",
+        )
+    for legacy_key in ("version", "inject_as"):
+        if legacy_key in d:
+            groups["config"][legacy_key] = d[legacy_key]
+
+    restore = groups["restore"]
+    if restore and (not restore.get("snapshot_id") or not restore.get("source_handle")):
+        raise ManifestError(
+            "restore requires snapshot_id and source_handle",
+            path=f"{path}.restore",
+        )
+    deletion_policy = str(d.get("deletion_policy", "retain")).lower()
+    if deletion_policy not in {"retain", "delete"}:
+        raise ManifestError("deletion_policy must be retain or delete", path=f"{path}.deletion_policy")
+    confirm_delete = d.get("confirm_delete", False)
+    if not isinstance(confirm_delete, bool):
+        raise ManifestError("confirm_delete must be a boolean", path=f"{path}.confirm_delete")
+    if deletion_policy == "delete" and not confirm_delete:
+        raise ManifestError(
+            "deletion_policy='delete' requires confirm_delete=true",
+            path=f"{path}.confirm_delete",
+        )
+
+    variant = d.get("variant")
+    if variant is not None and (not isinstance(variant, str) or not variant):
+        raise ManifestError("variant must be a non-empty string", path=f"{path}.variant")
+
     return ManagedServiceManifest(
         kind=_require_str(d, "kind", f"{path}.kind"),
         name=str(d.get("name", "")),
-        variant=d.get("variant"),
-        config=dict(d.get("config", {}) or {}),
+        variant=variant,
+        config=groups["config"],
+        owner_scope=scope,
+        environment=environment,
+        bind_workloads=bind_workloads,
+        size=size,
+        isolation=isolation,
+        auth_mode=auth_mode,
+        extensions=groups["extensions"],
+        networking=groups["networking"],
+        retention=groups["retention"],
+        backup=groups["backup"],
+        restore=restore,
+        deletion_policy=deletion_policy,
+        confirm_delete=confirm_delete,
     )
+
+
+def _reject_inline_secrets(value: dict[str, Any], path: str) -> None:
+    """Manifest config may carry secret references, never secret material."""
+    for key, item in value.items():
+        normalized = str(key).lower()
+        is_reference = normalized.endswith(("_ref", "_name", "_id", "_path"))
+        if not is_reference and normalized in {
+            "password",
+            "secret",
+            "token",
+            "credential",
+            "connection_string",
+            "api_key",
+            "access_key",
+            "private_key",
+        }:
+            raise ManifestError(
+                f"inline secret field {key!r} is forbidden; use Workload Identity or a Key Vault reference",
+                path=f"{path}.{key}",
+            )
+        if isinstance(item, dict):
+            _reject_inline_secrets(item, f"{path}.{key}")
 
 
 def _require_str(d: dict[str, Any], key: str, path: str) -> str:

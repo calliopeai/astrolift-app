@@ -131,6 +131,11 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
     environment_id = str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
     environment_name = env.name if env is not None else svc.effective_environment_name
     svc_config = dict(svc.config or {})
+    desired_extensions = svc_config.pop("desired_extensions", [])
+    if not isinstance(desired_extensions, list) or any(
+        not isinstance(value, str) or not value for value in desired_extensions
+    ):
+        raise ValueError("managed-service desired_extensions must be a string list")
     return ProvisionSpec(
         organization_id=str(getattr(org, "guid", "") or ""),
         organization_slug=getattr(org, "slug", "") or "",
@@ -142,6 +147,7 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         service_handle_hint=svc.name or svc.kind,
         size=str(svc_config.get("size", "small")),
         config=svc_config,
+        desired_extensions=list(dict.fromkeys(desired_extensions)),
         isolation=_resolve_isolation(svc, org=org, cluster=cluster),
         managed_service_id=_service_identity(svc),
         # The operator's tag channel, distinct from the platform envelope
@@ -387,7 +393,34 @@ def _deprovision_sync(
                 "retryable": False,
             }
 
-    from _sdk.managed_service import DeprovisionSpec
+    from _sdk.managed_service import DeprovisionSpec, ServiceHandle
+
+    # ``delete_data=False`` is a preservation claim, not just a driver flag.
+    # Complete and record a provider-backed snapshot/export before allowing the
+    # destructive half of teardown to start. Unsupported snapshot methods fail
+    # here and leave the resource intact instead of reporting retained data
+    # that does not exist.
+    if not delete_data:
+        retained = driver.snapshot(
+            ServiceHandle(
+                handle=svc.backend_ref,
+                managed_service_id=_service_identity(svc),
+            )
+        )
+        snapshot_id = str(getattr(retained, "snapshot_id", "") or "")
+        source_handle = str(getattr(retained, "handle", "") or "")
+        if not snapshot_id or not source_handle:
+            raise RuntimeError(
+                "driver did not return a verifiable snapshot/export; refusing data-preserving teardown"
+            )
+        lifecycle = dict(getattr(svc, "lifecycle_policy", None) or {})
+        lifecycle["last_retained_snapshot"] = {
+            "snapshot_id": snapshot_id,
+            "source_handle": source_handle,
+            "created_at": str(getattr(retained, "created_at", "") or ""),
+        }
+        svc.lifecycle_policy = lifecycle
+        svc.save(update_fields=["lifecycle_policy", "updated_at", "version"])
 
     deprovision_config = dict(svc.config or {})
     if delete_data and is_dynamic_pvc:
@@ -575,7 +608,20 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     driver = resolved.driver_cls(config=cfg)
 
     spec = build_provision_spec(svc, cluster=cluster)
-    result = driver.provision(spec)
+    restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
+    if restore and not svc.backend_ref:
+        from _sdk.managed_service import SnapshotHandle
+
+        result = driver.restore(
+            SnapshotHandle(
+                handle=str(restore["source_handle"]),
+                snapshot_id=str(restore["snapshot_id"]),
+                created_at=str(restore.get("created_at", "")),
+            ),
+            spec,
+        )
+    else:
+        result = driver.provision(spec)
     return {
         "ok": bool(getattr(result, "ok", False)),
         "handle": str(getattr(result, "handle", "")),
