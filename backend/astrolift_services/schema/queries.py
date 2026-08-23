@@ -38,6 +38,7 @@ from astrolift_services.schema.types import (
     EmailSuppressionEntryType,
     EmailTemplateType,
     ManagedServiceCatalogEntryType,
+    ManagedServiceCostPreviewType,
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
@@ -83,6 +84,26 @@ def _project_for_caller(project_id):
     tenant = get_current_tenant()
     if tenant is not None and tenant.team_id is not None:
         rows = rows.filter(team_id=tenant.team_id)
+    return rows.first()
+
+
+def _managed_service_for_caller(managed_service_id):
+    org_id = _caller_org_id()
+    if org_id is None:
+        return None
+    rows = ManagedService.objects.select_related(
+        "registered_app__organization",
+        "project__organization",
+        "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
+    ).filter(
+        Q(registered_app__organization_id=org_id) | Q(project__organization_id=org_id),
+        guid=str(managed_service_id),
+        deleted_at__isnull=True,
+    )
+    tenant = get_current_tenant()
+    if tenant is not None and tenant.team_id is not None:
+        rows = rows.filter(Q(project__isnull=True) | Q(project__team_id=tenant.team_id))
     return rows.first()
 
 
@@ -583,8 +604,17 @@ class ServicesQuery:
             return []
         from astrolift_services.managed_service_catalog import list_catalog
 
+        # Discovery is the roadmap surface, not the provisioning picker.
+        # Return executable, experimental, deprecated, and planned entries so
+        # every client sees the matrix's explicit status. Mutations still call
+        # ``resolve_variant`` and fail closed for anything unprovisionable.
         return [
-            managed_service_catalog_entry_to_type(row) for row in list_catalog(cluster.provider_plugin.slug)
+            managed_service_catalog_entry_to_type(row)
+            for row in list_catalog(
+                cluster.provider_plugin.slug,
+                include_unprovisionable=True,
+                include_extended=True,
+            )
         ]
 
     @strawberry.field
@@ -901,6 +931,35 @@ class ServicesQuery:
             limit=limit,
         )
         return page.map(managed_service_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_managed_service_cost_preview(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+    ) -> ManagedServiceCostPreviewType | None:
+        """Live-pricing preview for the resource's current desired state."""
+        service = _managed_service_for_caller(managed_service_id)
+        if service is None:
+            return None
+        from astrolift_services.cost_preview import preview_managed_service_cost
+
+        preview = preview_managed_service_cost(service)
+        return ManagedServiceCostPreviewType(
+            managed_service_id=GUID(str(service.guid)),
+            available=preview.available,
+            reason=preview.reason,
+            message=preview.message,
+            monthly_total=preview.monthly_total,
+            currency=preview.currency,
+            line_items=list(preview.line_items),
+            pricing_source_url=preview.pricing_source_url,
+            pricing_fetched_at=preview.pricing_fetched_at,
+            notes=list(preview.notes),
+            approximate=preview.approximate,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

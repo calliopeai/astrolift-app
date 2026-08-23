@@ -55,7 +55,13 @@ def _deployment(app, env) -> Deployment:
     )
 
 
-def _binding(app, env, *, secret_ref: str) -> ManagedServiceBinding:
+def _binding(
+    app,
+    env,
+    *,
+    secret_ref: str,
+    bind_workloads: list[str] | None = None,
+) -> ManagedServiceBinding:
     service = ManagedService.objects.create(
         registered_app=app,
         app_environment=env,
@@ -63,6 +69,7 @@ def _binding(app, env, *, secret_ref: str) -> ManagedServiceBinding:
         name="orders",
         variant="postgres_flexible",
         status=ManagedService.Status.ACTIVE,
+        bind_workloads=bind_workloads or [],
     )
     return ManagedServiceBinding.objects.create(
         managed_service=service,
@@ -123,3 +130,14 @@ def test_empty_managed_secret_value_fails_closed(app, env, monkeypatch) -> None:
         _update_secrets_sync(deployment.pk)
 
     assert cluster_driver.applied == []
+
+
+def test_workload_selector_materializes_only_the_scoped_secret(app, env, monkeypatch) -> None:
+    secret_ref = "azure-kv://platform.vault.azure.net/secrets/astrolift-pg-orders-master"
+    _binding(app, env, secret_ref=secret_ref, bind_workloads=["api"])
+    deployment = _deployment(app, env)
+    _secret_client, cluster_driver = _install_drivers(monkeypatch, secret_value="scoped-value")
+
+    assert _update_secrets_sync(deployment.pk) == 1
+
+    assert [row["metadata"]["name"] for row in cluster_driver.applied] == ["astrolift-bindings-hello-app-api"]

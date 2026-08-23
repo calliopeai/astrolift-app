@@ -36,6 +36,7 @@ export type AstroliftManagedService = Pick<
   | "projectSlug"
   | "ownerScope"
   | "clusterSlug"
+  | "providerPortalUrl"
   | "createdAt"
   | "updatedAt"
   | "lastActionAt"

@@ -44,12 +44,12 @@ def test_planned_and_deprecated_are_not_coverage() -> None:
     assert gaps(matrix) == (("ledger_db", "azure"),)
 
 
-def test_experimental_counts_as_executable() -> None:
+def test_experimental_is_visible_but_not_executable() -> None:
     matrix = _matrix(
         ManagedServiceEntry(kind="ledger_db", variant="qldb", plugin_id="aws"),
         ManagedServiceEntry(kind="ledger_db", variant="confidential_ledger", plugin_id="azure", status="experimental"),
     )
-    assert gaps(matrix) == (("ledger_db", "gcp"),)
+    assert gaps(matrix) == (("ledger_db", "gcp"), ("ledger_db", "azure"))
 
 
 def test_a_kind_only_k8s_native_ships_is_not_a_cloud_gap() -> None:

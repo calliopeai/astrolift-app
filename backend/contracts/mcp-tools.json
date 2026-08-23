@@ -314,6 +314,29 @@
       ]
     },
     {
+      "description": "Preview one shared resource through the provider's live pricing API.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "managed_service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "managed_service_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_preview_project_resource_cost",
+      "required_permissions": [
+        "project.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
       "description": "Provision a shared managed resource and optionally attach project app or agent consumers.",
       "inputSchema": {
         "additionalProperties": false,

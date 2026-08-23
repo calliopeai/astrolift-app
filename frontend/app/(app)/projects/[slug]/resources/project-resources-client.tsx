@@ -1,11 +1,13 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 import {
   BoxIcon,
   ChevronRightIcon,
+  CircleDollarSignIcon,
   EyeIcon,
   EyeOffIcon,
+  ExternalLinkIcon,
   KeyRoundIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -64,6 +66,7 @@ import {
 import {
   LIST_PROJECT_MANAGED_SERVICE_CATALOG,
   LIST_PROJECT_RESOURCES,
+  PREVIEW_MANAGED_SERVICE_COST,
 } from "@/graphql/services/services.queries";
 import type {
   AstroliftManagedServiceCatalogEntry,
@@ -92,6 +95,20 @@ interface ResourcesData {
 }
 interface CatalogData {
   astroliftProjectManagedServiceCatalog: AstroliftManagedServiceCatalogEntry[];
+}
+interface CostPreviewData {
+  astroliftManagedServiceCostPreview: {
+    managedServiceId: string;
+    available: boolean;
+    reason: string;
+    message: string;
+    monthlyTotal: number | null;
+    currency: string;
+    pricingSourceUrl: string;
+    pricingFetchedAt: string;
+    notes: string[];
+    approximate: boolean;
+  } | null;
 }
 
 function firstError(result?: MutationResult<unknown> | null): string {
@@ -143,6 +160,13 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
     {}
   );
   const [revealed, setRevealed] = React.useState<Record<string, string>>({});
+  const [costPreviews, setCostPreviews] = React.useState<
+    Record<string, NonNullable<CostPreviewData["astroliftManagedServiceCostPreview"]>>
+  >({});
+  const [loadCostPreview, costPreviewRequest] = useLazyQuery<CostPreviewData>(
+    PREVIEW_MANAGED_SERVICE_COST,
+    { fetchPolicy: "network-only" }
+  );
   const refreshConsumerBundle = async (bundleId: string) => {
     const refreshed = await refetchResources();
     setConsumerBundle(
@@ -462,6 +486,66 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                     ))}
                   </div>
                 )}
+                {costPreviews[service.id] && (
+                  <div className="bg-muted/30 mt-3 rounded-md border p-3 text-xs">
+                    {costPreviews[service.id].available ? (
+                      <>
+                        <span className="font-medium">
+                          {costPreviews[service.id].approximate ? "Approx. " : ""}
+                          {new Intl.NumberFormat(undefined, {
+                            style: "currency",
+                            currency: costPreviews[service.id].currency,
+                          }).format(costPreviews[service.id].monthlyTotal ?? 0)}
+                          /month
+                        </span>
+                        {costPreviews[service.id].pricingSourceUrl && (
+                          <a
+                            className="ml-2 underline underline-offset-2"
+                            href={costPreviews[service.id].pricingSourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            pricing source
+                          </a>
+                        )}
+                        {costPreviews[service.id].notes[0] && (
+                          <p className="text-muted-foreground mt-1">
+                            {costPreviews[service.id].notes[0]}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Cost unavailable:{" "}
+                        {costPreviews[service.id].message || costPreviews[service.id].reason}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={costPreviewRequest.loading}
+                    onClick={async () => {
+                      const result = await loadCostPreview({
+                        variables: { managedServiceId: service.id },
+                      });
+                      const preview = result.data?.astroliftManagedServiceCostPreview;
+                      if (preview)
+                        setCostPreviews((current) => ({ ...current, [service.id]: preview }));
+                    }}
+                  >
+                    <CircleDollarSignIcon className="size-3" /> Cost preview
+                  </Button>
+                  {service.providerPortalUrl && (
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={service.providerPortalUrl} target="_blank" rel="noreferrer">
+                        <ExternalLinkIcon className="size-3" /> Provider portal
+                      </a>
+                    </Button>
+                  )}
+                </div>
                 {canUpdate && (
                   <div className="mt-3 flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setConsumerService(service)}>

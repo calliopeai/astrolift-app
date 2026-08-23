@@ -158,6 +158,108 @@ kind = "redis"
     assert raw.managed_services[0].variant == "small"
 
 
+def test_parse_managed_service_lifecycle_contract():
+    raw = parse_raw(
+        """
+name = "hello"
+
+[[workloads]]
+name = "api"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "api"
+  image_ref = "example/api:sha-123"
+
+[[managed_services]]
+kind = "mssql"
+name = "records"
+variant = "azure_sql_database"
+owner_scope = "project"
+environment = "production"
+bind_workloads = ["api"]
+size = "medium"
+isolation = "dedicated"
+auth_mode = "iam"
+deletion_policy = "retain"
+
+  [managed_services.networking]
+  private_endpoint = true
+
+  [managed_services.retention]
+  backup_retention_days = 14
+
+  [managed_services.backup]
+  schedule = "0 2 * * *"
+
+  [managed_services.restore]
+  snapshot_id = "snapshot-123"
+  source_handle = "/subscriptions/example/databases/source"
+
+  [managed_services.extensions]
+  sku_name = "GP_S_Gen5_2"
+"""
+    )
+
+    service = raw.managed_services[0]
+    assert service.owner_scope == "project"
+    assert service.bind_workloads == ("api",)
+    assert service.size == "medium"
+    assert service.networking == {"private_endpoint": True}
+    assert service.restore["snapshot_id"] == "snapshot-123"
+
+
+def test_managed_service_delete_policy_requires_explicit_confirmation():
+    with pytest.raises(ManifestError, match="confirm_delete=true"):
+        parse_raw(
+            """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+deletion_policy = "delete"
+"""
+        )
+
+
+def test_managed_service_portable_extensions_are_normalized():
+    raw = parse_raw(
+        """
+name = "extensions"
+
+[[managed_services]]
+kind = "postgres"
+extensions = ["vector", "pg_trgm", "vector"]
+"""
+    )
+
+    assert raw.managed_services[0].extensions == {"desired_extensions": ["vector", "pg_trgm"]}
+
+
+def test_managed_service_rejects_inline_secret_material():
+    with pytest.raises(ManifestError, match="inline secret"):
+        parse_raw(
+            """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+[managed_services.config]
+password = "do-not-store-me"
+"""
+        )
+
+
+def test_managed_service_binding_selector_must_name_a_workload():
+    with pytest.raises(ManifestError, match="unknown workload"):
+        parse_raw(
+            """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+bind_workloads = ["missing"]
+"""
+        )
+
+
 def test_parse_invalid_toml_surfaces_path():
     # Stray bracket — TOML decoder error
     with pytest.raises(ManifestError) as exc:

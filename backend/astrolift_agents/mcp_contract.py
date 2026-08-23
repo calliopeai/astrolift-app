@@ -148,6 +148,16 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "permission": Permission.PROJECT_READ,
         "inputSchema": _schema({"project_id": {"type": "string"}}, required=("project_id",)),
     },
+    "astrolift_preview_project_resource_cost": {
+        "description": "Preview one shared resource through the provider's live pricing API.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.PROJECT_READ,
+        "inputSchema": _schema(
+            {"managed_service_id": {"type": "string"}},
+            required=("managed_service_id",),
+        ),
+    },
     "astrolift_provision_project_resource": {
         "description": (
             "Provision a shared managed resource and optionally attach project app or agent consumers."

@@ -147,6 +147,20 @@ def test_the_grid_is_the_size_the_ledger_claims():
     assert sum(1 for cell in collection.cells() if cell.is_in_cluster) == 5
 
 
+def test_all_six_topology_manifests_exist_and_name_the_shape_under_test():
+    found = {}
+    for name, text in _manifests():
+        if not name.startswith("topology/"):
+            continue
+        data = tomllib.loads(text)
+        shape = name.removeprefix("topology/").removesuffix(".toml")
+        found[shape] = {workload["kind"] for workload in data["workloads"]}
+
+    assert set(found) == set(collection.TOPOLOGIES)
+    for shape, workload_kinds in found.items():
+        assert shape in workload_kinds
+
+
 # ---- every manifest is real ---------------------------------------------------
 
 

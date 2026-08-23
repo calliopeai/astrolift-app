@@ -887,7 +887,8 @@ def render_resources_for_deployment(
     # between apply_manifests and poll_rollout, so it exists before rollout.
     from astrolift_services.models import AppSecretBundleRef
     from astrolift_workflows.activities.app_lifecycle import (
-        _managed_services_for_environment,
+        _binding_secret_refs_for_environment,
+        _bindings_secret_name,
     )
 
     env_from = sorted(
@@ -897,9 +898,9 @@ def render_resources_for_deployment(
             deleted_at__isnull=True,
         ).values_list("secret_bundle__slug", flat=True),
     )
-    has_managed = _managed_services_for_environment(env).exists()
+    has_managed, workload_env_from = _binding_secret_refs_for_environment(env)
     if has_managed:
-        env_from.append(f"astrolift-bindings-{app.slug}")
+        env_from.append(_bindings_secret_name(app.slug))
 
     resources = _render(
         manifest,
@@ -914,6 +915,7 @@ def render_resources_for_deployment(
         image_digest=deployment.image_digest,
         environment_name=env.name,
         env_from_secret_refs=env_from,
+        workload_env_from_secret_refs=workload_env_from,
     )
 
     # Fold in the managed-subdomain Ingress if the environment has a

@@ -617,6 +617,27 @@ def test_env_from_preserves_inline_env():
     assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
 
 
+def test_workload_scoped_binding_secret_is_not_exposed_to_other_workloads():
+    out = _render(
+        (_deployment_workload("api"), _deployment_workload("worker")),
+        env_from_secret_refs=["operator-bundle", "bindings-universal"],
+        workload_env_from_secret_refs={"api": ["bindings-api-only"]},
+    )
+    deployments = {row["metadata"]["name"]: row for row in out if row["kind"] == "Deployment"}
+    api = deployments["api"]["spec"]["template"]["spec"]["containers"][0]
+    worker = deployments["worker"]["spec"]["template"]["spec"]["containers"][0]
+
+    assert api["envFrom"] == [
+        {"secretRef": {"name": "operator-bundle"}},
+        {"secretRef": {"name": "bindings-universal"}},
+        {"secretRef": {"name": "bindings-api-only"}},
+    ]
+    assert worker["envFrom"] == [
+        {"secretRef": {"name": "operator-bundle"}},
+        {"secretRef": {"name": "bindings-universal"}},
+    ]
+
+
 def test_cronjob_concurrency_policy_defaults_to_forbid():
     """A cronjob workload that omits ``concurrency_policy`` keeps the
     pre-#427 hard-coded ``Forbid`` so existing manifests don't change

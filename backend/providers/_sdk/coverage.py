@@ -22,10 +22,11 @@ from dataclasses import dataclass
 
 from _sdk.availability import MATRIX, AvailabilityMatrix
 
-EXECUTABLE_STATUSES = frozenset({"ga", "preview", "experimental"})
-"""Statuses a binding can actually be provisioned from. ``planned`` is roadmap
-metadata and ``deprecated`` is on its way out; neither satisfies capability
-negotiation, so neither counts as coverage."""
+EXECUTABLE_STATUSES = frozenset({"ga", "preview"})
+"""Statuses a binding can actually be provisioned from. ``experimental`` is
+implemented but unsupported and gated from new provisioning; ``planned`` is
+roadmap metadata and ``deprecated`` is on its way out. None of those statuses
+satisfies capability negotiation or counts as portable coverage."""
 
 CLOUDS: tuple[str, ...] = ("aws", "gcp", "azure")
 """Portability is judged across the public clouds. These are the columns a

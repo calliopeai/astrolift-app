@@ -394,8 +394,21 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     operator retry once a cluster is adopted.
     """
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_manifest.normalize import normalize
+    from astrolift_manifest.parser import ManifestError, parse_raw
+    from astrolift_manifest.persist import reconcile_managed_services
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, OnboardAppInput
+
+    manifest_services = ()
+    if app.manifest_raw:
+        try:
+            manifest_services = normalize(parse_raw(app.manifest_raw)).managed_services
+        except ManifestError:
+            # Registration deliberately persists malformed inline manifests
+            # with a parse_failed status so operators can repair them later.
+            # Environment bootstrap must preserve that best-effort contract.
+            manifest_services = ()
 
     # Must have at least one managed cluster to bind environments to.
     # TenantCluster.organization is nullable: null means shared (available to
@@ -437,6 +450,9 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     base_zone: str = getattr(_managed_domain, "zone", None) or org_slug
     created_any = False
     effective_env_names = list(env_names) if env_names else []
+    for service in manifest_services:
+        if service.environment not in effective_env_names:
+            effective_env_names.append(service.environment)
     if not effective_env_names:
         has_any = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).exists()
         if not has_any:
@@ -457,6 +473,13 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
                 required_approvals=0,
             )
             created_any = True
+
+    # ``persist_manifest`` runs before environment bootstrap during initial
+    # registration, so it deliberately defers managed services when there is
+    # no cluster-bound environment. Complete that reconciliation now, before
+    # onboarding can deploy workloads that expect the bindings.
+    if manifest_services:
+        reconcile_managed_services(app, manifest_services)
 
     # Trigger OnboardAppWorkflow when the app is still pending (never
     # provisioned). The workflow is idempotent via its workflow_id guard,

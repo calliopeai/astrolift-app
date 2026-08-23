@@ -169,7 +169,7 @@ def test_managed_service_binding_envs_recorded() -> None:
     )
     assert native.status == kafka.status == "preview"
     assert native.issue_url == kafka.issue_url
-    assert native.issue_url.endswith("/1350")
+    assert native.issue_url.endswith("/1471")
     assert "STREAM_NAME" in native.binding_envs
     assert "EVENT_STREAM_BROKERS" in kafka.binding_envs
 
@@ -203,7 +203,7 @@ def test_managed_service_binding_envs_recorded() -> None:
         entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_grid"
     )
     assert event_grid.status == "preview"
-    assert event_grid.issue_url.endswith("/1354")
+    assert event_grid.issue_url.endswith("/1471")
     assert "EVENT_BUS_ENDPOINT" in event_grid.binding_envs
 
     event_grid_namespace = next(
@@ -212,7 +212,7 @@ def test_managed_service_binding_envs_recorded() -> None:
         if entry.plugin_id == "azure" and entry.variant == "event_grid_namespace"
     )
     assert event_grid_namespace.status == "preview"
-    assert event_grid_namespace.issue_url.endswith("/1355")
+    assert event_grid_namespace.issue_url.endswith("/1471")
     assert "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT" in event_grid_namespace.binding_envs
 
     azure_files = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files")
@@ -232,11 +232,26 @@ def test_managed_service_keys_are_unique() -> None:
     assert len(keys) == len(set(keys))
 
 
-def test_every_planned_service_links_to_its_delivery_issue() -> None:
+def test_every_planned_service_has_no_stale_delivery_issue() -> None:
     planned = [entry for entry in MATRIX.managed_services if entry.status == "planned"]
 
     assert planned
-    assert all(entry.issue_url.startswith("https://github.com/calliopeai/astrolift-app/issues/") for entry in planned)
+    # A planned row is durable roadmap metadata, not proof that somebody is
+    # actively delivering it. Closed umbrella tickets had become misleading
+    # links on every UI surface. Only attach a URL while work is genuinely
+    # tracked; the steady state is an honest empty link.
+    assert all(not entry.issue_url for entry in planned)
+
+
+def test_every_uncertified_azure_runtime_row_points_to_one_campaign() -> None:
+    uncertified = [
+        entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.status in {"preview", "experimental"}
+    ]
+
+    assert uncertified
+    assert all(entry.issue_url.endswith("/1471") for entry in uncertified)
 
 
 def test_optional_roles_disjoint_from_required() -> None:

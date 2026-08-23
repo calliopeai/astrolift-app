@@ -589,5 +589,6 @@ def test_schema_catalog_and_plugin_registration_are_current(driver: AzureAPIMDri
         for item in MATRIX.managed_services
         if item.plugin_id == "azure" and item.kind == "api_gateway" and item.variant == "api_management"
     )
-    assert entry.status == "preview"
+    assert entry.status == "experimental"
+    assert entry.issue_url.endswith("/1471")
     assert "API_GATEWAY_URL" in entry.binding_envs

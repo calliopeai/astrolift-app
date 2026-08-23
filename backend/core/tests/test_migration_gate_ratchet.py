@@ -44,6 +44,10 @@ GRANDFATHERED_DESTRUCTIVE: frozenset[str] = frozenset(
         "astrolift_registry/0034_scope_repo_manifest_unique_to_organization",
         "astrolift_services/0014_managedserviceattachment_and_more",
         "astrolift_services/0018_managedservicevolumebinding_dynamic_pvc",
+        # Replaces the app-wide uniqueness constraint with an environment-
+        # scoped constraint. Constraint metadata is dropped and recreated;
+        # no table rows or columns are removed.
+        "astrolift_services/0023_manifest_managed_services",
         "core/0005_remove_domain_specific_profile_fields",
         "core/0010_drop_metabase",
         "core/0011_delete_historicalmetabasechart",

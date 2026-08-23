@@ -56,6 +56,7 @@ _DEFAULT_VARIANTS: dict[tuple[str, str], str] = {
     ("aws", "mysql"): "rds_mysql",
     ("aws", "postgres"): "rds",
     ("aws", "redis"): "elasticache_serverless_valkey",
+    ("azure", "mssql"): "azure_sql_database",
     ("azure", "object_store"): "azure_blob",
     ("azure", "queue"): "azure_servicebus",
     ("k8s_native", "event_stream"): "kafka_strimzi",
@@ -275,7 +276,7 @@ def list_catalog(
     native_by_kind: dict[str, list[str]] = defaultdict(list)
     for kind, variant in keys:
         meta = metadata.get((kind, variant))
-        if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview", "experimental"}):
+        if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview"}):
             available_by_kind[kind].append(variant)
             if (kind, variant) not in borrowed:
                 native_by_kind[kind].append(variant)
@@ -285,7 +286,11 @@ def list_catalog(
         meta = metadata.get((kind, variant))
         driver_cls = drivers.get((kind, variant))
         status = meta.status if meta is not None else "experimental"
-        available = driver_cls is not None and status in {"ga", "preview", "experimental"}
+        # ``experimental`` means implemented but unsupported.  It stays
+        # discoverable so existing estates and the reason for the gate remain
+        # visible, but it is not provisionable without a future explicit
+        # opt-in contract (#1417 decision 4).
+        available = driver_cls is not None and (meta is None or status in {"ga", "preview"})
         # Order matters. ``planned`` is checked before the missing-driver case
         # because a planned row has no driver *by definition*, so testing for
         # the driver first claimed the install was incomplete on eight of the
@@ -295,6 +300,10 @@ def list_catalog(
         # plugin install for a variant nobody has written (#1470).
         if status == "deprecated":
             unavailable_reason = "This provider variant is deprecated or retired and cannot be provisioned."
+        elif meta is not None and status == "experimental":
+            unavailable_reason = (
+                "This provider variant is experimental and unsupported; new provisioning is disabled."
+            )
         elif status == "planned":
             if kind_tier(kind) == TIER_EXTENDED:
                 # Roadmap metadata for a kind that has since been cut. Saying

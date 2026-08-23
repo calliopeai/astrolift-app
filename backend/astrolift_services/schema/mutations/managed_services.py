@@ -677,13 +677,14 @@ class ManagedServiceMutations:
         name = (input.name or input.kind).strip()
         if ManagedService.objects.filter(
             registered_app=app,
+            app_environment=env,
             kind=input.kind,
             name=name,
             deleted_at__isnull=True,
         ).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
-                f"managed service ({input.kind}, {name!r}) already exists for this app",
+                f"managed service ({input.kind}, {name!r}) already exists for this app environment",
                 field="name",
             )
         svc = ManagedService.objects.create(

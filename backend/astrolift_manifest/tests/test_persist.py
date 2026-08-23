@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import pytest
 
+from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
+from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.normalize import NormalizationDefaults, normalize
 from astrolift_manifest.parser import parse_raw
 from astrolift_manifest.persist import persist_manifest
 from astrolift_registry.models import Container, RegisteredApp, Workload
+from astrolift_services.models import ManagedService, ManagedServiceAttachment
 
 pytestmark = pytest.mark.django_db
 
@@ -32,6 +35,30 @@ def _scaffold():
         provisioning_status="ready",
     )
     return app
+
+
+def _add_environment(app, name="production"):
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="manifest-test-provider",
+        defaults={
+            "name": "Manifest test provider",
+            "plugin_version": "0.0.1",
+            "capabilities_manifest": {},
+            "config_schema": {},
+        },
+    )
+    cluster = TenantCluster.objects.create(
+        organization=app.organization,
+        slug=f"manifest-test-{app.pk}-{name}",
+        name=f"Manifest test {name}",
+        provider_plugin=plugin,
+        endpoint="https://example.invalid",
+    )
+    return AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster,
+        name=name,
+    )
 
 
 def _normalize(toml: str):
@@ -274,3 +301,91 @@ concurrency_policy = "queue"
     assert result.workloads_updated == 1
     w = Workload.objects.get(registered_app=app, slug="rolling")
     assert w.concurrency_policy == "queue"
+
+
+def test_persist_materializes_app_and_project_managed_services(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "astrolift_services.managed_service_catalog.resolve_variant",
+        lambda **kwargs: SimpleNamespace(variant=kwargs.get("requested_variant") or "resolved-default"),
+    )
+    monkeypatch.setattr("astrolift_services.managed_service_catalog.validate_config", lambda *_: None)
+    app = _scaffold()
+    env = _add_environment(app)
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+  [[workloads.containers]]
+  name = "web"
+
+[[managed_services]]
+kind = "postgres"
+name = "private-db"
+environment = "production"
+bind_workloads = ["web"]
+size = "medium"
+
+[[managed_services]]
+kind = "redis"
+name = "shared-cache"
+owner_scope = "project"
+environment = "production"
+"""
+
+    result = persist_manifest(app, _normalize(toml), raw_text=toml)
+
+    private = ManagedService.objects.get(registered_app=app, name="private-db")
+    assert private.app_environment == env
+    assert private.manifest_managed is True
+    assert private.bind_workloads == ["web"]
+    assert private.config["size"] == "medium"
+    shared = ManagedService.objects.get(project=app.project, name="shared-cache")
+    attachment = ManagedServiceAttachment.objects.get(managed_service=shared, app_environment=env)
+    assert shared.manifest_managed is True
+    assert attachment.manifest_managed is True
+    assert attachment.workload_names == ["*"]
+    assert result.managed_services_created == 2
+    assert result.managed_service_attachments_created == 1
+
+
+def test_removing_manifest_service_enqueues_non_destructive_teardown(
+    monkeypatch,
+    django_capture_on_commit_callbacks,
+):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "astrolift_services.managed_service_catalog.resolve_variant",
+        lambda **kwargs: SimpleNamespace(variant=kwargs.get("requested_variant") or "resolved-default"),
+    )
+    monkeypatch.setattr("astrolift_services.managed_service_catalog.validate_config", lambda *_: None)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+    with_service = """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+name = "records"
+deletion_policy = "retain"
+"""
+    without_service = 'name = "hello"\n'
+
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(with_service), raw_text=with_service)
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(without_service), raw_text=without_service)
+
+    name, workflow_input, _ = started[-1]
+    assert name == "DeprovisionManagedServiceWorkflow"
+    assert workflow_input.delete_data is False
+    assert workflow_input.force_destroy is False
