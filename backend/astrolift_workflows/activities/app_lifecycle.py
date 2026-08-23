@@ -793,7 +793,8 @@ def _render_app_ingresses_and_tls(
                         ),
                         "astrolift.dev/ingress-state": ingress_state_label,
                         "astrolift.dev/edge-auth": custom_domain_edge_auth_state(
-                            edge_cluster, cd.hostname,
+                            edge_cluster,
+                            cd.hostname,
                         ),
                     },
                 },
