@@ -167,20 +167,24 @@ def test_archiving_does_not_delete_anything(org, uploads):
     assert AuditEvent.objects.filter(organization=org).count() == 1
 
 
-def test_the_append_only_trigger_still_refuses_delete(org, uploads):
-    """The guard that must outlive this change.
+def test_archiving_alone_deletes_nothing(org, uploads):
+    """The archive and the delete stay separable.
 
-    If someone later adds a privileged delete path, this fails and they have
-    to go back to #1594 and make the posture decision explicitly rather than
-    by implementation.
+    This test previously asserted the trigger refused DELETE outright. #1594
+    was then decided as export-then-delete, so that is no longer true and the
+    assertion moved: see `test_an_ordinary_delete_is_still_refused` and
+    `test_update_is_still_refused_even_during_a_sweep`, which hold the parts
+    of the guarantee that survived.
+
+    What is held here is that archiving is not deleting. A caller that only
+    archives must leave every row standing, so an operator can turn the
+    archive on and observe it before anything is removed.
     """
-    from django.db import InternalError, transaction
-
     event = _event(org, days_ago=400)
+
     archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
 
-    with pytest.raises(InternalError), transaction.atomic():
-        AuditEvent.objects.filter(pk=event.pk).delete()
+    assert AuditEvent.objects.filter(pk=event.pk).exists()
 
 
 def test_the_exporter_reads_only_fields_the_model_has():
@@ -221,3 +225,171 @@ def test_the_exporter_reads_only_fields_the_model_has():
     assert record["stream"] == "audit"
     assert "target_kind" in record
     assert "resource_kind" not in record
+
+
+# ---- the delete half (#1594, decided: export then delete) ----------------
+
+
+def test_archived_events_are_deleted(org, uploads):
+    """The decision, working. Archive first, then remove."""
+    from astrolift_operations.audit_archive import prune_archived_audit_events
+
+    _event(org, days_ago=400)
+
+    result = archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
+    deleted = prune_archived_audit_events(result["archived_pks"])
+
+    assert deleted == 1
+    assert AuditEvent.objects.filter(organization=org).count() == 0
+
+
+def test_only_the_rows_that_were_archived_are_deleted(org, uploads):
+    """The ordering guarantee, and the reason the pruner takes explicit pks
+    rather than re-querying: an event that ages past the cutoff between the
+    archive and the delete would otherwise be removed with no copy of it."""
+    from astrolift_operations.audit_archive import prune_archived_audit_events
+
+    archived = _event(org, days_ago=400)
+    result = archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
+
+    # Arrives after the archive, also past retention.
+    latecomer = _event(org, days_ago=500)
+
+    prune_archived_audit_events(result["archived_pks"])
+
+    assert not AuditEvent.objects.filter(pk=archived.pk).exists()
+    assert AuditEvent.objects.filter(pk=latecomer.pk).exists()
+
+
+def test_nothing_is_deleted_when_the_archive_was_skipped(org, monkeypatch):
+    """No path where the delete runs and the export did not. An install with
+    no blob store keeps its events."""
+    import core.blob_store_resolution as res
+    from astrolift_operations.audit_archive import prune_archived_audit_events
+
+    monkeypatch.setattr(res, "install_s3_driver", lambda *, purpose: None)
+    _event(org, days_ago=400)
+
+    result = archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
+    deleted = prune_archived_audit_events(result.get("archived_pks", []))
+
+    assert deleted == 0
+    assert AuditEvent.objects.filter(organization=org).count() == 1
+
+
+def test_an_ordinary_delete_is_still_refused(org, uploads):
+    """The gate is not a hole. Only a transaction that opts in may delete,
+    and nothing outside the sweep does."""
+    from django.db import InternalError, transaction
+
+    event = _event(org, days_ago=400)
+
+    with pytest.raises(InternalError), transaction.atomic():
+        AuditEvent.objects.filter(pk=event.pk).delete()
+
+
+def test_update_is_still_refused_even_during_a_sweep(org, uploads):
+    """The line the decision does not cross.
+
+    Retention is about how long a record is kept, never about editing one.
+    An audit trail that can be rewritten is worth nothing, and the compliance
+    argument for deletion does not extend to mutation -- so the trigger
+    honours the gate for DELETE only.
+    """
+    from django.db import InternalError, connection, transaction
+
+    event = _event(org, days_ago=400)
+
+    with pytest.raises(InternalError), transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL astrolift.retention_sweep = 'on'")
+        AuditEvent.objects.filter(pk=event.pk).update(action="tampered")
+
+
+def test_the_gate_does_not_leak_past_its_transaction(org, uploads):
+    """A gate that outlived its own function would leave the next caller on
+    that connection able to delete audit events without knowing it.
+
+    This failed on the first attempt, which is why the gate is now closed
+    explicitly in a `finally` rather than left to `SET LOCAL` to unwind.
+    `SET LOCAL` is scoped to the *outermost* transaction, not the nearest
+    `atomic()` block, so under any outer transaction -- which is what this
+    test runs inside, and what `ATOMIC_REQUESTS` or a nested `atomic()`
+    would produce in production -- it stayed open for everything after.
+    """
+    from django.db import InternalError, transaction
+
+    from astrolift_operations.audit_archive import prune_archived_audit_events
+
+    _event(org, days_ago=400)
+    result = archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
+    prune_archived_audit_events(result["archived_pks"])
+
+    survivor = _event(org, days_ago=400)
+    with pytest.raises(InternalError), transaction.atomic():
+        AuditEvent.objects.filter(pk=survivor.pk).delete()
+
+
+def test_events_inside_the_window_survive_the_sweep(org, uploads):
+    from astrolift_operations.audit_archive import prune_archived_audit_events
+
+    recent = _event(org, days_ago=10)
+    _event(org, days_ago=400)
+
+    result = archive_expired_audit_events(org, now=timezone.now(), retention_days=365)
+    prune_archived_audit_events(result["archived_pks"])
+
+    assert AuditEvent.objects.filter(pk=recent.pk).exists()
+
+
+# ---- the wiring, not just the two halves --------------------------------
+
+
+def test_the_sweep_deletes_only_what_it_archived(org, uploads):
+    """Drives `_archive_org`, the code that actually runs on the schedule.
+
+    Added because a mutation survived: the two halves were well covered on
+    their own, and nothing exercised the call between them. Replacing the
+    sweep's `result["archived_pks"]` with a fresh query over the org's events
+    kept every other test green while deleting rows that had never been
+    written anywhere.
+
+    Testing the parts and not the seam is how export-then-delete would have
+    become delete-and-also-export-sometimes.
+    """
+    from astrolift_workflows.activities.scheduled import _archive_org
+
+    expired = _event(org, days_ago=400)
+    recent = _event(org, days_ago=10)
+
+    _archive_org(org.pk, now=timezone.now(), retention_days=365)
+
+    assert not AuditEvent.objects.filter(pk=expired.pk).exists()
+    assert AuditEvent.objects.filter(pk=recent.pk).exists()
+    assert uploads, "the sweep deleted without archiving"
+
+
+def test_the_sweep_deletes_nothing_when_there_is_no_blob_store(org, monkeypatch):
+    """The mutation this was written for. No archive, no delete -- ever."""
+    import core.blob_store_resolution as res
+    from astrolift_workflows.activities.scheduled import _archive_org
+
+    monkeypatch.setattr(res, "install_s3_driver", lambda *, purpose: None)
+    expired = _event(org, days_ago=400)
+
+    _archive_org(org.pk, now=timezone.now(), retention_days=365)
+
+    assert AuditEvent.objects.filter(pk=expired.pk).exists()
+
+
+def test_the_sweep_deletes_nothing_for_an_org_that_has_not_opted_in(org, uploads):
+    org.audit_export_enabled = False
+    org.save(update_fields=["audit_export_enabled"])
+    expired = _event(org, days_ago=400)
+
+    from astrolift_workflows.activities.scheduled import _archive_org
+
+    _archive_org(org.pk, now=timezone.now(), retention_days=365)
+
+    assert AuditEvent.objects.filter(pk=expired.pk).exists()
+    assert uploads == []
