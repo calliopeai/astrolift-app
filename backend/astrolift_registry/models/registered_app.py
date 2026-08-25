@@ -353,7 +353,7 @@ class RegisteredApp(NamedBaseCoreModel):
         default=dict,
         blank=True,
         help_text=(
-            "Per-app egress rules. Empty or {\"enabled\": false} emits no "
+            'Per-app egress rules. Empty or {"enabled": false} emits no '
             "NetworkPolicy. Enabling it applies a deny-by-default posture: "
             "anything not listed here, not a bound managed service, and not "
             "DNS becomes unreachable from this app's pods."
