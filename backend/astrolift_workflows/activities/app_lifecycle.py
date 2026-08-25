@@ -606,6 +606,22 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
             key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
         )
 
+    # Fold in the app's NetworkPolicy, when it has opted into one (#1599).
+    # Same shape as the Ingress fold-in above, and the same reason it is a
+    # list: an app with no policy contributes nothing and needs no special
+    # case here.
+    #
+    # `render_app_network_policy` returns empty unless
+    # `app.network_policy["enabled"]` is set, which is every app today. The
+    # policy is deny-by-default, so emitting one for an app that never had it
+    # cuts every egress nobody declared -- opting in has to be deliberate.
+    policy_resources = await sync_to_async(_render_app_network_policy)(d.pk, namespace)
+    if policy_resources:
+        resources = sorted(
+            [*resources, *policy_resources],
+            key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+        )
+
     log.info(
         "render_manifests produced %d resource(s) with envFrom=%s",
         len(resources),
@@ -617,6 +633,20 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         "env_from_secret_refs": env_from,
         "workload_env_from_secret_refs": workload_env_from,
     }
+
+
+def _render_app_network_policy(deployment_id: int, namespace: str) -> list[dict]:
+    """Sync half of the NetworkPolicy fold-in (#1599).
+
+    Its own function so the FK read happens in the sync context -- the same
+    reason `_render_app_ingresses_and_tls` is one, and the same trap #1577
+    was about: Django refuses a lazy FK load from the event loop.
+    """
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_workflows.activities.network_policy import render_app_network_policy
+
+    d = Deployment.all_objects.select_related("registered_app").get(pk=deployment_id)
+    return render_app_network_policy(d.registered_app, namespace=namespace)
 
 
 def _render_app_ingresses_and_tls(
