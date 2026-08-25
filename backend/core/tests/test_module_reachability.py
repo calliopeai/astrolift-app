@@ -461,6 +461,10 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         # Baselined from this detector's first stable run, reviewed as
         # families rather than one by one, same caveat as KNOWN_UNREACHABLE.
         #
+        # `core.cluster_observability_eviction` is #1602 step 4, the resolver.
+        # Same deliberate kind: the sweep that calls it is step 5. It leaves
+        # with the sweep, alongside `astrolift_operations.retention_holds`.
+        "core.cluster_observability_eviction",
         # `astrolift_operations.retention_holds` is the third of the same
         # deliberate kind: #1602 step 2 landed the hold table and its
         # projection onto the policy module, while the sweep that calls
