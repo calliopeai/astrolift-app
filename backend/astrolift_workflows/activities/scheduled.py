@@ -225,7 +225,21 @@ def _reconcile_cluster_capabilities_sync() -> int:
             continue
         cluster.capabilities = caps or {}
         cluster.capabilities_probed_at = timezone.now()
-        cluster.save(update_fields=["capabilities", "capabilities_probed_at", "updated_at", "version"])
+        fields = ["capabilities", "capabilities_probed_at", "updated_at", "version"]
+
+        # The producer `TenantCluster.node_archs` never had (#1604). Written
+        # only when the probe actually returned architectures: an empty list
+        # means the probe could not list nodes, and clearing a known value on
+        # a transient RBAC or network failure would make every arch-labelled
+        # job stop routing until the next successful tick.
+        archs = [
+            str(a).strip().lower() for a in (caps or {}).get("node_architectures") or [] if str(a).strip()
+        ]
+        if archs and sorted(set(archs)) != sorted(cluster.node_archs or []):
+            cluster.node_archs = sorted(set(archs))
+            fields.append("node_archs")
+
+        cluster.save(update_fields=fields)
         n += 1
     return n
 

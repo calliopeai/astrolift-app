@@ -56,7 +56,7 @@ def _managed_cluster(
     *,
     slug: str,
     node_os: str = "linux",
-    node_arch: str = "amd64",
+    node_archs: list | None = None,
     node_labels: list | None = None,
     is_active: bool = True,
 ) -> TenantCluster:
@@ -71,7 +71,7 @@ def _managed_cluster(
         auth_config={},
         lifecycle=TenantCluster.Lifecycle.MANAGED,
         node_os=node_os,
-        node_arch=node_arch,
+        node_archs=node_archs if node_archs is not None else ["amd64"],
         node_labels=node_labels or [],
         is_active=is_active,
     )
@@ -110,9 +110,9 @@ def test_is_runner_only_false_for_linux():
 
 
 class _FakeCluster:
-    def __init__(self, node_os="linux", node_arch="amd64", node_labels=None):
+    def __init__(self, node_os="linux", node_archs=("amd64",), node_labels=None):
         self.node_os = node_os
-        self.node_arch = node_arch
+        self.node_archs = list(node_archs)
         self.node_labels = node_labels or []
 
 
@@ -123,7 +123,7 @@ def test_cluster_matches_os():
 
 
 def test_cluster_matches_arch():
-    cluster = _FakeCluster(node_arch="arm64")
+    cluster = _FakeCluster(node_archs=["arm64"])
     assert _cluster_matches(cluster, frozenset({"arm64"})) is True  # type: ignore[arg-type]
     assert _cluster_matches(cluster, frozenset({"amd64"})) is False  # type: ignore[arg-type]
 
@@ -136,7 +136,7 @@ def test_cluster_matches_custom_labels():
 
 
 def test_cluster_matches_combined():
-    cluster = _FakeCluster(node_os="linux", node_arch="arm64", node_labels=["gpu"])
+    cluster = _FakeCluster(node_os="linux", node_archs=["arm64"], node_labels=["gpu"])
     labels = frozenset({"linux", "arm64", "gpu"})
     assert _cluster_matches(cluster, labels) is True  # type: ignore[arg-type]
 
@@ -215,7 +215,7 @@ def test_label_routing_os_no_match():
 def test_label_routing_arch_match():
     org = _org("arch-match-org")
     plugin = _plugin("arch-match")
-    _managed_cluster(org, plugin, slug="arm-c", node_arch="arm64")
+    _managed_cluster(org, plugin, slug="arm-c", node_archs=["arm64"])
     result = route(["arm64"], org)
     assert result.cluster is not None
     assert result.cluster.slug == "arm-c"

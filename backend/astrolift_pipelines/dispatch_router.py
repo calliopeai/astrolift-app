@@ -9,7 +9,7 @@ Decision logic (from issue #82):
    - ``macos`` → implies ``self-hosted``.
    - ``astrolift`` → K8s only; never runners.
 3. Find all active, managed TenantClusters for the org whose
-   node_os / node_arch / node_labels satisfy the selector.
+   node_os / node_archs / node_labels satisfy the selector.
 4. Return the first match (cluster-over-runner priority) or None.
 
 This module is a pure routing function — no side effects, no DB writes.
@@ -87,32 +87,50 @@ OS_LABELS = frozenset({"linux", "windows", "macos"})
 ARCH_LABELS = frozenset({"amd64", "arm64"})
 
 
+def _arch_set(cluster) -> frozenset[str]:
+    """The architectures a cluster reports, normalised.
+
+    Tolerates a bare string as well as a list: the field was a CharField
+    until #1604, and a fixture or an unmigrated caller handing over "amd64"
+    should match rather than iterate into {"a", "m", "d", ...}.
+    """
+    raw = getattr(cluster, "node_archs", None) or []
+    if isinstance(raw, str):
+        raw = [raw]
+    return frozenset(str(a).strip().lower() for a in raw if str(a).strip())
+
+
 def _unrecorded_arch_hint(qs, required_arch: frozenset[str]) -> str:
     """Explain an arch-label no-match that is really a missing column (#1604).
 
-    ``TenantCluster.node_arch`` has no writer anywhere in the repo -- the
-    column exists, this router reads it, and nothing has ever set it. It
-    defaults to ``""``, and the matcher above treats an unknown architecture
-    as a mismatch, so **every** arch-labelled job routes nowhere on every
-    install.
+    ``TenantCluster.node_archs`` is populated by
+    ``reconcile_cluster_capabilities`` from the cluster's own nodes, on a
+    schedule. A cluster brought into management moments ago, or one whose
+    node listing the platform's RBAC cannot reach, still has an empty list --
+    and the matcher treats unknown as a mismatch, deliberately.
 
-    The bare "no cluster satisfies" message sends the operator to look at
-    their label selector or their cluster fleet, neither of which is the
-    problem. This says what is actually wrong, without changing what matches:
+    The bare "no cluster satisfies" message would send the operator to look
+    at their label selector or their cluster fleet, neither of which is the
+    problem. This says what is actually wrong without changing what matches:
     an unrecorded architecture is not evidence the cluster is unsuitable, but
     treating it as a match would schedule arm64 work onto amd64 nodes, which
     is a worse failure than an honest refusal.
+
+    Before #1604 nothing wrote the column at all, so this hint fired for
+    every cluster on every install. It should now be rare, and a persistent
+    one points at the probe rather than at the selector.
     """
     if not required_arch:
         return ""
-    unrecorded = [c.slug for c in qs if not (c.node_arch or "").strip()]
+    unrecorded = [c.slug for c in qs if not _arch_set(c)]
     if not unrecorded:
         return ""
     return (
         f" Note: {len(unrecorded)} cluster(s) have no recorded node architecture "
         f"({', '.join(sorted(unrecorded)[:3])}"
         f"{', ...' if len(unrecorded) > 3 else ''}), so an architecture selector "
-        f"cannot match them. Nothing populates TenantCluster.node_arch yet (#1604)."
+        f"cannot match them -- capability reconcile has not recorded one yet, "
+        f"or cannot list their nodes."
     )
 
 
@@ -123,7 +141,7 @@ def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
     - OS labels (linux, windows, macos): if any OS label is in the selector,
       the cluster's node_os must match one of them.
     - Arch labels (amd64, arm64): if either appears in the selector, the
-      cluster's node_arch must match.
+      cluster's node_archs must contain at least one of them.
     - Remaining labels: all must appear in cluster.node_labels
       (case-insensitive).
     - Special routing labels (self-hosted, astrolift, astrolift/default,
@@ -147,7 +165,15 @@ def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
     if required_os and cluster.node_os not in required_os:
         return False
 
-    if required_arch and cluster.node_arch not in required_arch:
+    # Intersection, not membership (#1604): a cluster reports every
+    # architecture present across its nodes, so a job needing arm64 matches a
+    # mixed amd64+arm64 fleet. The old `not in` against a single value could
+    # not express that, which is why nothing ever wrote the column.
+    #
+    # An empty list still fails to match. An unrecorded architecture is not
+    # evidence a cluster is suitable, and scheduling arm64 work onto amd64
+    # nodes is a worse failure than an honest refusal.
+    if required_arch and not (required_arch & _arch_set(cluster)):
         return False
 
     # node_labels on the cluster model is a list of strings.
@@ -245,7 +271,7 @@ def route(
             reason=f"Matched cluster by name '{cluster.slug}'.",
         )
 
-    # --- Label matching against node_os / node_arch / node_labels ---
+    # --- Label matching against node_os / node_archs / node_labels ---
     for cluster in qs.order_by("created_at"):
         if _cluster_matches(cluster, labels):
             return RoutingResult(

@@ -103,6 +103,11 @@ _DEFAULT_CAPABILITIES: dict[str, Any] = {
     },
     "metrics_server": False,
     "prometheus": False,
+    # Distinct architectures across the cluster's nodes (#1604). Empty means
+    # "not probed", never "no nodes" -- the reconcile writes
+    # TenantCluster.node_archs from this and must not clear a known value
+    # because one probe failed.
+    "node_architectures": [],
 }
 
 
@@ -152,6 +157,14 @@ class ManagementBackend(Protocol):
 
     def list_storage_classes(self, *, auth: ClusterAuth) -> list[str]:
         """Return storage class names. Empty list when none defined."""
+
+    def list_node_architectures(self, *, auth: ClusterAuth) -> list[str]:
+        """Return the distinct CPU architectures across the cluster's nodes.
+
+        e.g. ``["amd64"]`` or ``["amd64", "arm64"]`` for a mixed fleet. Empty
+        when nodes cannot be listed, which the caller must treat as unknown
+        rather than as "no architectures" (#1604).
+        """
 
     def run_preflight_job(
         self,
@@ -629,6 +642,19 @@ def probe_cluster_capabilities(
 
     storage_classes = backend.list_storage_classes(auth=auth)
 
+    # Best-effort, like the pod discovery above: a backend that predates
+    # #1604 has no such method, and a cluster that refuses node listing (RBAC
+    # without cluster-wide node read) must not fail the whole probe over one
+    # optional field. Empty then means "not probed" and the reconcile leaves
+    # any known value alone.
+    node_architectures: list[str] = []
+    node_probe = getattr(backend, "list_node_architectures", None)
+    if callable(node_probe):
+        try:
+            node_architectures = list(node_probe(auth=auth))
+        except Exception as exc:
+            log.debug("probe: node architecture discovery unavailable: %s", exc)
+
     # When operators use the UI bootstrap recipe, all components land in
     # astrolift-system via Flux HelmRelease. Merge those pods into each
     # classifier's candidate list so detection works regardless of whether
@@ -728,6 +754,7 @@ def probe_cluster_capabilities(
         "cert_manager": cert_manager,
         "ingress": ingress,
         "storage_classes": list(storage_classes),
+        "node_architectures": node_architectures,
         "external_dns": external_dns,
         "service_mesh": service_mesh,
         "metrics_server": metrics_server,
@@ -1050,6 +1077,33 @@ class LiveManagementBackend:
         storage_v1 = k8s_client.StorageV1Api(api_client)
         resp = storage_v1.list_storage_class(timeout_seconds=10)
         return sorted(item.metadata.name for item in (resp.items or []))
+
+    def list_node_architectures(self, *, auth: ClusterAuth) -> list[str]:
+        """Distinct node architectures, from ``status.nodeInfo.architecture``.
+
+        Cloud-neutral on purpose: EKS, GKE, AKS and on-prem all reuse this
+        backend because only auth differs, so one implementation populates
+        `TenantCluster.node_archs` on every provider rather than four that
+        can disagree (#1604).
+
+        Reads the field Kubernetes itself reports rather than a cloud API
+        (`DescribeNodegroup` and friends), because that is what the scheduler
+        will actually match against -- a nodegroup's declared instance type
+        and a node's reported architecture can differ, and the node is right.
+        """
+        try:
+            from kubernetes import client as k8s_client
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("kubernetes python client is not installed") from exc
+        from k8s_native.observability import build_api_client
+
+        core_v1 = k8s_client.CoreV1Api(build_api_client(auth))
+        resp = core_v1.list_node(timeout_seconds=10)
+        archs = {
+            (getattr(getattr(item, "status", None), "node_info", None) and item.status.node_info.architecture) or ""
+            for item in (resp.items or [])
+        }
+        return sorted(a.strip().lower() for a in archs if a and a.strip())
 
     def run_preflight_job(
         self,
