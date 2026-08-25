@@ -1084,7 +1084,7 @@ EDGE_AUTH_GATED = "gated"
 EDGE_AUTH_UNGATED = "ungated"
 
 
-def custom_domain_edge_auth_state(cluster: Any, hostname: str) -> str:
+def custom_domain_edge_auth_state(cluster: Any, hostname: str, *, opted_in: bool = False) -> str:
     """Whether a custom domain sits behind the cluster's edge auth gate.
 
     Third companion to :func:`oidc_auth_for_cluster` and
@@ -1121,6 +1121,26 @@ def custom_domain_edge_auth_state(cluster: Any, hostname: str) -> str:
     """
     if cluster is None or not hostname:
         return EDGE_AUTH_NO_GATE
+
+    # #1631: a domain that has opted in and sits on a cluster with a gate is
+    # `gated`, because the renderer stamps a first-party `/oauth2` endpoint
+    # on the domain itself. That endpoint is what makes the cookie-scope
+    # obstacle below irrelevant -- the session cookie is set by a response
+    # from this hostname, not from the auth host, so there is no cross-domain
+    # cookie to fail to set.
+    #
+    # Checked here rather than beside the renderer so this stays the single
+    # place that decides what "gated" means for a hostname the platform did
+    # not assign. A second decision growing next to the render path is how
+    # the API and the cluster end up disagreeing about the same domain.
+    if opted_in:
+        if getattr(cluster, "ingress_class", "") == "alb":
+            # ALB gates per listener-rule via authenticate-cognito, which
+            # still needs an exact callback registration for the domain.
+            # Opting in does not conjure one, so this stays ungated until
+            # the ALB path grows its own handoff.
+            return EDGE_AUTH_NO_GATE if cognito_auth_for_cluster(cluster) is None else EDGE_AUTH_UNGATED
+        return EDGE_AUTH_GATED if oidc_auth_for_cluster(cluster) is not None else EDGE_AUTH_NO_GATE
 
     if getattr(cluster, "ingress_class", "") == "alb":
         # authenticate-cognito is per-listener-rule, so cookie scope is not

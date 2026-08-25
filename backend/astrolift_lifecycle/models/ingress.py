@@ -90,6 +90,24 @@ class CustomDomain(BaseCoreModel):
     validation_value = models.CharField(max_length=255, blank=True, default="")
     certificate_id = models.CharField(max_length=255, blank=True, default="")
     is_active = models.BooleanField(default=True)
+    edge_auth_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Opt this domain into the cluster's edge auth gate via a "
+            "first-party /oauth2 endpoint on the domain itself (#1631). "
+            "Default off, and that default is load-bearing: custom domains "
+            "serve ungated today, so turning the gate on is a behaviour "
+            "change for live traffic -- answering a silent security gap "
+            "with a silent outage is not an improvement. "
+            "Per-domain rather than per-app deliberately: an app routinely "
+            "carries several hostnames (a marketing site and an admin "
+            "console are the same app), and gating is the decision most "
+            "likely to differ between them. A per-app flag would force the "
+            "public hostname behind a login to protect the private one. "
+            "Setting this alone gates nothing -- the cluster also needs edge "
+            "auth configured; see core.app_deploy.custom_domain_edge_auth_state."
+        ),
+    )
 
     # ---- handshake surface (#397) ---------------------------------
 

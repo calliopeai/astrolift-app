@@ -1270,7 +1270,11 @@ def app_domain_to_type(d, cluster=None) -> AppDomainType:
     from core.app_deploy import custom_domain_edge_auth_state
 
     return AppDomainType(
-        edge_auth_state=custom_domain_edge_auth_state(cluster, d.hostname),
+        edge_auth_state=custom_domain_edge_auth_state(
+            cluster,
+            d.hostname,
+            opted_in=bool(getattr(d, "edge_auth_enabled", False)),
+        ),
         id=GUID(str(d.guid)),
         hostname=d.hostname,
         cert_state=d.validation_status,
