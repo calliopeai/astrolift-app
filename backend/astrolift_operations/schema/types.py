@@ -954,3 +954,47 @@ def user_alert_subscription_to_type(s) -> UserAlertSubscriptionType:
         channel=s.channel,
         enabled=s.enabled,
     )
+
+
+@strawberry.type
+class ObservabilityRetentionHoldType:
+    """A placed hold on a window of observability data (#1602).
+
+    GUID id, never the integer PK, per repo law. `stream` is one of the
+    four streams or `"*"`.
+    """
+
+    id: GUID
+    stream: str
+    starts_at: dt.datetime
+    ends_at: dt.datetime
+    resource_kind: str
+    resource_id: str
+    reason: str
+    released: bool
+    """True once released. The row is soft-deleted rather than removed, so
+    a post-incident review can still see the hold that was in force."""
+
+
+def observability_retention_hold_to_type(
+    row, *, released: bool | None = None
+) -> ObservabilityRetentionHoldType:
+    """Project a hold row onto its GraphQL type.
+
+    ``released`` overrides what the row says. Needed because the default
+    manager excludes soft-deleted rows, so the release mutation cannot read
+    its own write back -- `refresh_from_db()` raises `DoesNotExist` on the
+    row it just released. Passing the fact explicitly is honest; querying
+    through an unfiltered manager just to observe a soft delete would
+    reintroduce the deleted rows this manager exists to hide.
+    """
+    return ObservabilityRetentionHoldType(
+        id=GUID(str(row.guid)),
+        stream=row.stream,
+        starts_at=row.starts_at,
+        ends_at=row.ends_at,
+        resource_kind=row.resource_kind or "",
+        resource_id=row.resource_id or "",
+        reason=row.reason or "",
+        released=(row.deleted_at is not None) if released is None else released,
+    )
