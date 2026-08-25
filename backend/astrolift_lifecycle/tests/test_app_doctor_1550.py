@@ -209,3 +209,41 @@ def test_crashed_probe_reports_unknown_not_raise(app, monkeypatch):
 
     check = _by_key(run_app_doctor(app))[CHECK_MANIFEST]
     assert check.status == "unknown"
+
+
+def test_every_fix_is_a_machine_readable_verb():
+    """The frontend switches on `fix` to pick a mutation, so a prose
+    sentence there reaches its default branch and the button does nothing.
+
+    I introduced four prose values adding the identity, image and cached-DNS
+    checks (#1550) before noticing the pre-existing convention. This is the
+    guard so the next person does not.
+
+    Empty is allowed and is the honest answer when no mutation repairs the
+    finding -- a missing cluster `account_id` is a cluster-config change, and
+    an unprobed hostname resolves itself on the next sweep. The explanation
+    goes in `detail`.
+    """
+    import inspect
+
+    import astrolift_registry.services.app_doctor as doctor
+
+    known = {"", "resync_manifest", "retry_autowire", "rerun_onboarding", "redeploy"}
+
+    offenders = []
+    for name, fn in vars(doctor).items():
+        if not name.startswith("_check_") or not callable(fn):
+            continue
+        for line in inspect.getsource(fn).splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("fix="):
+                continue
+            value = stripped[len("fix=") :].strip().rstrip(",").strip('"').strip("'")
+            if value not in known:
+                offenders.append(f"{name}: {value!r}")
+
+    assert not offenders, (
+        "these `fix` values are not verbs the frontend can map to a mutation:\n  "
+        + "\n  ".join(offenders)
+        + f"\n\nUse one of {sorted(known - {''})}, or empty with the explanation in `detail`."
+    )

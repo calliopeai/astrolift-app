@@ -48,7 +48,17 @@ class DoctorCheck:
     key: str
     status: str  # pass | fail | warn | skip | unknown
     detail: str
+
     fix: str = ""
+    """A machine-readable verb the frontend maps to a mutation, not prose.
+
+    One of ``resync_manifest`` / ``retry_autowire`` / ``rerun_onboarding`` /
+    ``redeploy``, or empty. Empty is the honest answer when no mutation
+    repairs the finding -- a missing cluster ``account_id`` is a cluster-config
+    change and an unprobed hostname resolves itself on the next sweep. The
+    explanation belongs in ``detail``; a sentence here reaches a frontend
+    switching on the value and falls through to its default (#1550).
+    """
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -175,16 +185,15 @@ def _check_dns(app) -> DoctorCheck:
         return DoctorCheck(
             CHECK_DNS,
             "unknown",
-            f"{len(hostnames)} hostname(s) not probed yet",
-            fix="wait for the next DNS probe, or trigger one",
+            f"{len(hostnames)} hostname(s) not probed yet; the probe runs every 30 minutes",
         )
     age, dead = cached
     if age > DNS_PROBE_MAX_AGE:
         return DoctorCheck(
             CHECK_DNS,
             "unknown",
-            f"last DNS probe was {_humanise(age)} ago, too old to report",
-            fix="trigger a DNS probe",
+            f"last DNS probe was {_humanise(age)} ago, too old to report; "
+            f"the probe runs every 30 minutes",
         )
     if dead:
         return DoctorCheck(
@@ -271,8 +280,8 @@ def _check_identity(app) -> DoctorCheck:
             CHECK_IDENTITY,
             "fail",
             f"cluster {getattr(cluster, 'slug', '?')!r} is missing the provider config "
-            f"needed to build a pod identity, so pods deploy with none",
-            fix="set the cluster's account/project identifier and reprovision",
+            f"needed to build a pod identity, so pods deploy with none — set the "
+            f"cluster's account or project identifier",
         )
     return DoctorCheck(CHECK_IDENTITY, "pass", "pod identity resolvable")
 
@@ -305,7 +314,7 @@ def _check_image(app) -> DoctorCheck:
             "warn",
             "the latest deployment references an unpinned image tag, so it "
             "cannot be reproduced and cannot be scanned by digest",
-            fix="redeploy to pin the image by digest",
+            fix="redeploy",
         )
     return DoctorCheck(CHECK_IMAGE, "pass", "pinned by digest (registry presence not verified from here)")
 
