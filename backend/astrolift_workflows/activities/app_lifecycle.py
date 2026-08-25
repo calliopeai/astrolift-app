@@ -755,6 +755,33 @@ def _render_app_ingresses_and_tls(
         secret_name = f"{d.registered_app.slug}-{host_slug}-tls"
         ingress_name = f"{d.registered_app.slug}-{host_slug}"
         annotations: dict[str, str] = {}
+
+        # #1631: a domain that has opted in gets a **first-party** gate --
+        # `auth-signin` points at this hostname's own `/oauth2/start`, not
+        # at the central auth host.
+        #
+        # That difference is the whole issue. Pointing `auth-signin` at the
+        # auth host is the obvious-looking fix and produces an infinite
+        # redirect, because the session cookie is scoped to the auth host's
+        # parent zone and a response from there cannot set a cookie for an
+        # unrelated registrable domain. Pointed at this host, the cookie the
+        # proxy sets is first-party and the gate holds.
+        #
+        # `auth-url` stays a sub-request against the same hostname, so a
+        # request that already has the cookie never leaves the domain.
+        if (
+            custom_domain_edge_auth_state(
+                edge_cluster,
+                cd.hostname,
+                opted_in=bool(getattr(cd, "edge_auth_enabled", False)),
+            )
+            == "gated"
+        ):
+            annotations["nginx.ingress.kubernetes.io/auth-url"] = f"https://{cd.hostname}/oauth2/auth"
+            annotations["nginx.ingress.kubernetes.io/auth-signin"] = (
+                f"https://{cd.hostname}/oauth2/start?rd=$escaped_request_uri"
+            )
+
         if ingress_paused:
             # nginx-ingress-controller honors server-snippet to inject
             # raw nginx config into the per-host server block; a bare
@@ -825,6 +852,7 @@ def _render_app_ingresses_and_tls(
                         "astrolift.dev/edge-auth": custom_domain_edge_auth_state(
                             edge_cluster,
                             cd.hostname,
+                            opted_in=bool(getattr(cd, "edge_auth_enabled", False)),
                         ),
                     },
                 },
