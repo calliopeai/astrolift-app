@@ -404,27 +404,30 @@ async def reheal_webhook_subscriptions() -> int:
 
 
 def _prune_audit_log_sync(retention_days: int) -> int:
-    """Report how many audit events sit past their org's retention window.
+    """Archive and then delete audit events past their org's retention window.
 
-    Reports; does not delete. ``astrolift_operations/migrations/0003`` binds
-    a ``BEFORE UPDATE OR DELETE`` trigger to
-    ``astrolift_operations_auditevent`` (spec/04 §1 principle 7: append-only
-    logs refuse mutation at the storage layer), so the DELETE this schedule
-    is named for is refused by Postgres. The platform makes the opposite
-    promise elsewhere - ``Organization.audit_log_retention_days`` is
-    editable and ``astroliftAuditRetention`` renders "Audit events retained
-    for N days per compliance policy" - and the two cannot both hold. #1594
-    carries the decision; export-then-delete through a privileged path is
-    the likely answer, since ``retention.export_to_sink`` and the
-    ``AuditExport`` model already exist for it.
+    Deletes now, for orgs that have opted into `audit_export_enabled`, and
+    only after the events are safely in the blob store (#1594). Orgs without
+    it still only get the count.
 
-    Until then this returns a true number instead of a false one. The
-    previous implementation imported ``AuditLog``, a model that does not
-    exist, and swallowed the ImportError, so the daily schedule reported 0
-    rows pruned no matter how far past retention the log ran.
+    The contradiction this resolves: ``migrations/0003`` binds a
+    ``BEFORE UPDATE OR DELETE`` trigger to ``astrolift_operations_auditevent``
+    per spec/04 §1 principle 7, while ``Organization.audit_log_retention_days``
+    is editable and the UI renders "Audit events retained for N days per
+    compliance policy". Both shipped; only one could hold. #1594 settled it as
+    export-then-delete, so ``migrations/0023`` narrows the guarantee to
+    **append-only except scheduled retention** -- the trigger honours a
+    session-local gate, for DELETE only, that this sweep is the only caller
+    to set. UPDATE stays refused unconditionally.
+
+    The count this returns is still every row past its window, including
+    orgs that have not opted in and rows the archive skipped, so it stays a
+    true measure of exposure rather than a measure of what was deleted.
 
     The window is per-org, with rows whose organization was cleared (the FK
-    is SET_NULL) falling back to the activity-level ``retention_days``.
+    is SET_NULL) falling back to the activity-level ``retention_days``. Those
+    are counted and never archived or deleted: an event with no organization
+    has no ``audit_export_enabled`` to consult and no org slug to file under.
     """
     from django.utils import timezone
 
@@ -450,9 +453,9 @@ def _prune_audit_log_sync(retention_days: int) -> int:
     total += _count(AuditEvent.objects.filter(organization__isnull=True), days=fallback_days)
 
     if total:
-        log.warning(
-            "audit retention: %d event(s) are past their org retention window and "
-            "cannot be removed - the append-only trigger refuses DELETE (see #1594)",
+        log.info(
+            "audit retention: %d event(s) past their org retention window; "
+            "orgs with audit_export_enabled have had theirs archived and removed",
             total,
         )
     return total
@@ -470,23 +473,33 @@ def _archive_org(org_id: int, *, now, retention_days: int) -> None:
     events off-platform before whichever way that decision goes.
     """
     from astrolift_identity.models import Organization
-    from astrolift_operations.audit_archive import archive_expired_audit_events
+    from astrolift_operations.audit_archive import (
+        archive_expired_audit_events,
+        prune_archived_audit_events,
+    )
 
     try:
         org = Organization.objects.get(pk=org_id)
         if not org.audit_export_enabled:
             return
-        archive_expired_audit_events(org, now=now, retention_days=retention_days)
+        result = archive_expired_audit_events(org, now=now, retention_days=retention_days)
+        # Delete only what the archive actually wrote. If the archive was
+        # skipped -- export disabled, no blob store, nothing past retention --
+        # `archived_pks` is absent and nothing is deleted. Export-then-delete
+        # means exactly that order, with no path where the delete runs and
+        # the export did not (#1594).
+        prune_archived_audit_events(result.get("archived_pks", []))
     except Exception:  # noqa: BLE001
         log.exception("audit archive: failed for organization %s", org_id)
 
 
 @activity.defn(name="astrolift.scheduled.prune_audit_log")
 async def prune_audit_log(retention_days: int = 365) -> int:
-    """Report audit events past their org's retention window.
+    """Archive then delete audit events past their org's retention window.
 
-    Named prune for schedule compatibility; it cannot delete while the
-    append-only trigger stands. See ``_prune_audit_log_sync`` and #1594.
+    Returns the count past retention, which is not the count deleted: orgs
+    without ``audit_export_enabled`` are counted and left alone. See
+    ``_prune_audit_log_sync`` and #1594.
     """
     from asgiref.sync import sync_to_async
 

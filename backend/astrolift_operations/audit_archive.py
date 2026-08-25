@@ -132,7 +132,58 @@ def archive_expired_audit_events(org, *, now, retention_days: int) -> dict[str, 
         getattr(org, "slug", org),
         written.get("key", ""),
     )
-    return {"rows": len(rows), "bytes": byte_count, "key": written.get("key", "")}
+    return {
+        "rows": len(rows),
+        "bytes": byte_count,
+        "key": written.get("key", ""),
+        # The exact rows that are now safely off-platform. The pruner deletes
+        # these and only these -- never a re-query -- so an event written
+        # between the archive and the delete cannot be removed unarchived.
+        "archived_pks": [r.pk for r in rows],
+    }
+
+
+def prune_archived_audit_events(pks: list[int]) -> int:
+    """Delete audit events that have already been archived (#1594).
+
+    The delete half of export-then-delete. Refuses to run on anything it was
+    not handed: ``pks`` comes from :func:`archive_expired_audit_events`'s
+    return value, which is the set of rows actually written to the blob
+    store and recorded in ``AuditArchive``. Re-querying for expired rows here
+    instead would delete anything that aged past the cutoff between the two
+    steps, without a copy.
+
+    The gate is opened and closed explicitly, in a ``finally``, rather than
+    left to ``SET LOCAL``'s transaction scope. That scope is the *outermost*
+    transaction, not the nearest ``atomic()`` block, so under any outer
+    transaction -- a nested ``atomic()``, ``ATOMIC_REQUESTS``, or a test's
+    wrapper -- a gate left to unwind on its own stays open for everything
+    that follows on that connection. A test caught exactly that here.
+    Closing it by hand makes the window this function's own, whatever it is
+    nested inside.
+
+    UPDATE stays refused throughout. The trigger only honours the gate for
+    DELETE, because retention is about how long a record is kept and never
+    about editing one.
+    """
+    if not pks:
+        return 0
+
+    from django.db import connection, transaction
+
+    from astrolift_operations.models import AuditEvent
+
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL astrolift.retention_sweep = 'on'")
+        try:
+            deleted, _ = AuditEvent.objects.filter(pk__in=pks).delete()
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL astrolift.retention_sweep = 'off'")
+
+    logger.info("audit retention: deleted %d archived event(s)", deleted)
+    return int(deleted)
 
 
 def _record_archive(org, *, key: str, rows: list, byte_count: int, cutoff) -> None:
