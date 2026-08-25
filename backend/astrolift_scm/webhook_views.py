@@ -188,6 +188,10 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     hostname = (f"{base}.{zone}" if zone else base).lower()
     env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
 
+    from astrolift_lifecycle.services.preview_lineage import (
+        resolve_previewed_environment,
+    )
+
     with transaction.atomic():
         env = AppEnvironment.objects.create(
             registered_app=app,
@@ -196,6 +200,11 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
             url=f"https://{hostname}",
             managed_domain=_managed_domain,
             required_approvals=0,
+            # What this is a preview OF (#1578 feature 2). Resolved at
+            # creation and stored, not derived on read: the answer must not
+            # change under a preview because someone added an environment
+            # after it was created.
+            previewed_environment=resolve_previewed_environment(app, cluster),
         )
         preview = PreviewEnvironment.objects.create(
             registered_app=app,
