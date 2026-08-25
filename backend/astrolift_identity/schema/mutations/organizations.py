@@ -33,7 +33,12 @@ from astrolift_identity.schema.types import (
     OrganizationType,
     organization_to_type,
 )
-from astrolift_operations.observability_profile import RETENTION_LOGS
+from astrolift_operations.observability_profile import (
+    RETENTION_LOGS,
+    RETENTION_METRICS,
+    RETENTION_METRICS_ROLLUP,
+    RETENTION_TRACES,
+)
 from core.appearance import AppearanceError, validate_appearance
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -121,6 +126,48 @@ class OrganizationMutations:
                     field="logRetentionDaysDefault",
                 )
             org.log_retention_days_default = log_days
+        # The same shape three more times (#1602), each against its own
+        # window. Table-driven rather than three more copies of the branch
+        # above: the branches differ only in which field, which ceiling and
+        # which camelCase name go in, and the ceiling is the part that must
+        # not get copy-pasted wrong. The table puts all three side by side
+        # where a mismatched pairing is visible.
+        #
+        # The rollup gets RETENTION_METRICS_ROLLUP and not RETENTION_METRICS
+        # deliberately: its column defaults to 365 and RETENTION_METRICS
+        # caps at 365, so bounding it there would leave a knob whose only
+        # legal value is the one it already has.
+        for field_name, column, window, camel in (
+            (
+                "metrics_retention_days_default",
+                "metrics_retention_days_default",
+                RETENTION_METRICS,
+                "metricsRetentionDaysDefault",
+            ),
+            (
+                "metrics_rollup_retention_days_default",
+                "metrics_rollup_retention_days_default",
+                RETENTION_METRICS_ROLLUP,
+                "metricsRollupRetentionDaysDefault",
+            ),
+            (
+                "trace_retention_days_default",
+                "trace_retention_days_default",
+                RETENTION_TRACES,
+                "traceRetentionDaysDefault",
+            ),
+        ):
+            supplied = getattr(input, field_name, None)
+            if supplied is None:
+                continue
+            days_value = int(supplied)
+            if days_value < 1 or days_value > window.max_days:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"{camel} must be between 1 and {window.max_days}",
+                    field=camel,
+                )
+            setattr(org, column, days_value)
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
         if input.default_resource_tags is not None:

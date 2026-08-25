@@ -123,6 +123,21 @@ class RetentionWindow:
 # level approval (separate ticket).
 RETENTION_LOGS = RetentionWindow(default_days=30, max_days=365)
 RETENTION_METRICS = RetentionWindow(default_days=30, max_days=365)
+RETENTION_METRICS_ROLLUP = RetentionWindow(default_days=365, max_days=1095)
+"""Rolled-up metrics, kept longer than raw and needing their own window.
+
+`Organization.metrics_rollup_retention_days_default` has defaulted to 365
+since it was added, and the only ceiling available to bound it was
+`RETENTION_METRICS.max_days`, which is also 365. So the column's default
+sat exactly on its ceiling and no operator could ever raise it -- a knob
+whose only legal value was the one it already had (#1602).
+
+Longer than raw because that is the point of a rollup: a 5-minute
+aggregate costs a fraction of the samples it replaces, so year-over-year
+capacity trends stay affordable long after the raw series are gone. Three
+years is the ceiling because a rollup is still per-series storage, not
+free.
+"""
 RETENTION_TRACES = RetentionWindow(default_days=14, max_days=90)
 RETENTION_EVENTS = RetentionWindow(default_days=90, max_days=730)
 RETENTION_AUDIT = RetentionWindow(default_days=365, max_days=2555)

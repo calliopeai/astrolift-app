@@ -26,6 +26,15 @@ class OrganizationType:
     audit_log_retention_days: int
     preview_max_active_default: int
     log_retention_days_default: int
+    # The other three retention columns (#1602). Added to `Organization` in
+    # migration 0006 and never readable through the API until now: an
+    # operator could set them through no surface and read them through no
+    # surface, while the eviction that would honour them did not exist
+    # either. Exposed first so the values are visible before anything acts
+    # on them.
+    metrics_retention_days_default: int
+    metrics_rollup_retention_days_default: int
+    trace_retention_days_default: int
     allow_user_profile_edit: bool
     # Operator tags stamped on every cloud resource this org provisions
     # (#1505). Portable by construction: refused on write unless all three
@@ -105,6 +114,9 @@ def organization_to_type(org) -> OrganizationType:
         audit_log_retention_days=org.audit_log_retention_days,
         preview_max_active_default=org.preview_max_active_default,
         log_retention_days_default=org.log_retention_days_default,
+        metrics_retention_days_default=org.metrics_retention_days_default,
+        metrics_rollup_retention_days_default=org.metrics_rollup_retention_days_default,
+        trace_retention_days_default=org.trace_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
         default_resource_tags=dict(org.default_resource_tags or {}),
         managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
