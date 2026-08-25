@@ -84,9 +84,9 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
     # so a production install reached the raise below with nowhere to put a
     # snapshot. Adding it here rather than first means nothing that already
     # worked resolves anywhere new.
-    from core.blob_store_resolution import install_s3_driver
+    from core.blob_store_resolution import driver_for_org
 
-    driver = install_s3_driver(purpose="snapshot store")
+    driver = driver_for_org(org, purpose="snapshot store")
     if driver is not None:
         return driver
 

@@ -29,18 +29,30 @@ into different fallback chains while sharing a copied first step is the
 argument for a single home: nothing compared them, so one could lose its
 production path without the other showing any sign.
 
-**No plugin registry step.** There is no `blob_store` role in any plugin
-manifest, so a lookup would be a branch that cannot be taken, which is what
-was here before. `GCSBlobStoreDriver`, `ABSBlobStoreDriver` and
-`MinioBlobStoreDriver` exist in `_sdk/blob_store.py` and are never
-constructed outside tests. Restoring genuine multicloud resolution means
-registering those drivers and deciding what keys the choice -- the org's
-default cluster's plugin, or explicit install settings. That is tracked in
-#1610 and wants a design decision, not another unreachable branch.
+**Per-org resolution, keyed on the org's default cluster's plugin.** That
+was the decision on #1610: artifacts and snapshots land in the same cloud as
+the workloads that produce them, which is the behaviour a BYOC operator
+expects. An org with no default cluster, a cloud with no builder, or a
+cluster that has not been told which bucket to use all fall through to the
+install bucket, so nothing that worked before resolves anywhere new.
 
-What the S3 path does reach today: `AWS_S3_ENDPOINT_URL` is honoured, so
-MinIO, SeaweedFS, Ceph RGW and GCS's S3-compatible XML API all work against
-it. Azure Blob has no S3-compatible surface and is genuinely unreachable.
+Construction lives here rather than behind `plugins.get(slug, "blob_store")`
+because the four drivers do not share a config protocol -- S3 takes
+bucket/region/kms, GCS takes a bucket, ABS takes an account URL and a
+container. A registry lookup would return a class the caller still could not
+build, which is the shape of defect this module was written to remove.
+
+**MinIO is deliberately absent.** `MinioBlobStoreDriver` needs an access key
+and a secret key, and `provider_config` is a plaintext JSON column whose own
+guard (`_sdk.binding_policy.classify_key`, via
+`_reject_inline_secrets`) refuses credential-bearing keys outright. So an
+on-prem object store cannot be configured this way at all; it needs the
+secret-reference indirection that `_sdk.cloud_credentials` documents as
+absent for the same reason. Tracked separately rather than half-supported.
+
+The install S3 path honours `AWS_S3_ENDPOINT_URL`, so MinIO, SeaweedFS, Ceph
+RGW and GCS's S3-compatible XML API remain reachable that way -- as the
+install's own store, not per-org.
 """
 
 from __future__ import annotations
@@ -104,3 +116,116 @@ def install_s3_driver(*, purpose: str) -> Any | None:
         region=region,
         s3_client=boto3.client("s3", **client_kwargs),
     )
+
+
+# ---- per-org resolution (#1610) --------------------------------------
+
+
+#: `provider_config` keys a cluster uses to say where its blobs go. Absent
+#: means "use the install bucket" rather than "fail": an operator who has not
+#: configured per-org storage has not made a mistake.
+BUCKET_KEY = "blob_bucket"
+PREFIX_KEY = "blob_prefix"
+
+
+def _aws_blob_driver(cluster, pc: dict) -> Any | None:
+    bucket = str(pc.get(BUCKET_KEY, "") or "").strip()
+    if not bucket:
+        return None
+    import boto3
+
+    from providers._sdk.blob_store import S3BlobStoreDriver
+
+    region = str(pc.get("region", "") or getattr(cluster, "region", "") or "us-east-1")
+    endpoint = str(pc.get("blob_endpoint_url", "") or "").strip()
+    kwargs: dict[str, str] = {"region_name": region}
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    return S3BlobStoreDriver(
+        bucket=bucket,
+        region=region,
+        prefix=str(pc.get(PREFIX_KEY, "") or ""),
+        kms_key_id=(pc.get("blob_kms_key_id") or None),
+        s3_client=boto3.client("s3", **kwargs),
+    )
+
+
+def _gcp_blob_driver(cluster, pc: dict) -> Any | None:
+    bucket = str(pc.get(BUCKET_KEY, "") or "").strip()
+    if not bucket:
+        return None
+    from providers._sdk.blob_store import GCSBlobStoreDriver
+
+    return GCSBlobStoreDriver(bucket=bucket, prefix=str(pc.get(PREFIX_KEY, "") or ""))
+
+
+def _azure_blob_driver(cluster, pc: dict) -> Any | None:
+    """Azure needs two values, and half of them is not a configuration.
+
+    A container with no account URL cannot be addressed, so this returns None
+    rather than constructing a driver that fails on first use -- the install
+    bucket is a working answer and a broken driver is not.
+    """
+    container = str(pc.get("blob_container", "") or "").strip()
+    account_url = str(pc.get("blob_account_url", "") or "").strip()
+    if not (container and account_url):
+        return None
+    from providers._sdk.blob_store import ABSBlobStoreDriver
+
+    return ABSBlobStoreDriver(
+        account_url=account_url,
+        container=container,
+        prefix=str(pc.get(PREFIX_KEY, "") or ""),
+    )
+
+
+#: Keyed on `ProviderPlugin.slug`. A cloud absent from this map falls through
+#: to the install bucket; see the module docstring on MinIO.
+_BLOB_BUILDERS = {
+    "aws": _aws_blob_driver,
+    "gcp": _gcp_blob_driver,
+    "azure": _azure_blob_driver,
+}
+
+
+def driver_for_org(org, *, purpose: str) -> Any | None:
+    """The blob store for ``org``, or the install's, or None.
+
+    Resolution order, per the #1610 decision:
+
+    1. The org's ``default_tenant_cluster``'s plugin, when that cluster names
+       a bucket in its ``provider_config``. Blobs then live in the same cloud
+       as the workloads that produce them.
+    2. The install's own S3 bucket.
+    3. None, which callers treat as "not configured" rather than an error.
+
+    Every failure to resolve at step 1 is a fall-through, never a raise: no
+    default cluster, no builder for the cloud, no bucket configured, or a
+    driver whose dependencies are not installed. An org that has not
+    configured per-org storage has not made a mistake, and turning that into
+    an exception would break every install that works today.
+    """
+    cluster = getattr(org, "default_tenant_cluster", None)
+    if cluster is not None:
+        slug = str(getattr(getattr(cluster, "provider_plugin", None), "slug", "") or "")
+        builder = _BLOB_BUILDERS.get(slug)
+        if builder is not None:
+            pc = getattr(cluster, "provider_config", None) or {}
+            try:
+                driver = builder(cluster, pc)
+            except Exception:  # noqa: BLE001
+                # A missing cloud SDK or a malformed value must not take the
+                # install bucket down with it. Logged, not swallowed silently.
+                logger.exception(
+                    "%s: per-org blob driver for cluster %s failed to build; using the install bucket",
+                    purpose,
+                    getattr(cluster, "slug", cluster),
+                )
+                driver = None
+            if driver is not None:
+                logger.debug(
+                    "%s: using per-org %s blob store for %s", purpose, slug, getattr(org, "slug", org)
+                )
+                return driver
+
+    return install_s3_driver(purpose=purpose)
