@@ -82,7 +82,7 @@ class Organization(NamedBaseCoreModel):
         default=dict,
         blank=True,
         help_text=(
-            "Image signature verification. Empty or {\"enforcement\": \"disabled\"} "
+            'Image signature verification. Empty or {"enforcement": "disabled"} '
             "verifies nothing. 'optional' warns on unsigned or unrecognised "
             "signers; 'required' blocks. Needs at least one allowed signer to "
             "be anything but disabled."
