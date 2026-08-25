@@ -385,6 +385,10 @@ class PreviewMutations:
         _zone = getattr(_managed_domain, "zone", None)
         hostname = (f"{_base}.{_zone}" if _zone else _base).lower()
 
+        from astrolift_lifecycle.services.preview_lineage import (
+            resolve_previewed_environment,
+        )
+
         with transaction.atomic():
             env = AppEnvironment.objects.create(
                 registered_app=app,
@@ -393,6 +397,11 @@ class PreviewMutations:
                 url=f"https://{hostname}",
                 managed_domain=_managed_domain,
                 required_approvals=0,
+                # What this is a preview OF (#1578 feature 2). Both preview
+                # creation paths resolve it the same way; a manual
+                # branch preview is no less a preview of something than a
+                # PR one.
+                previewed_environment=resolve_previewed_environment(app, cluster),
             )
             preview = PreviewEnvironment.objects.create(
                 registered_app=app,
