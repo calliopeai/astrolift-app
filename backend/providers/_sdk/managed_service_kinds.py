@@ -110,6 +110,12 @@ KINDS = KindCatalog(
                 "REDIS_URL",
                 "REDIS_AUTH_MODE",
                 "REDIS_RESOURCE_ARN",
+                # Carries a slice's key namespace (#1578). Redis has no
+                # database-per-tenant equivalent worth using, so isolation
+                # inside a shared instance is a key prefix the workload has
+                # to honour. Optional: an unsliced binding sets nothing and
+                # the client prefixes nothing.
+                "REDIS_KEY_PREFIX",
             ),
             snapshot_supported=True,
         ),
@@ -126,6 +132,12 @@ KINDS = KindCatalog(
         ManagedServiceKind(
             name="object_store",
             description="Blob / object storage (bucket-shaped)",
+            # Carries a slice's key prefix (#1578). A shared bucket is
+            # subdivided by prefix rather than by a second bucket, so this is
+            # how a preview gets its own space inside the main one. Optional:
+            # an unsliced binding sets nothing and the workload writes at the
+            # bucket root as before.
+            binding_envs_optional=("OBJECT_STORE_PREFIX",),
             snapshot_supported=True,
             cross_region_replicate_supported=True,
         ),

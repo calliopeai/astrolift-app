@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -284,6 +285,69 @@ class Binding:
 
 
 @dataclass(frozen=True)
+class SliceSpec:
+    """A request to carve an isolated slice out of an existing instance (#1578).
+
+    The shape `PreviewPolicy.SHARED_WITH_MAIN` was written for and that no
+    driver could satisfy: `ManagedServiceDriver` exposed provision, update,
+    deprovision, binding, status, snapshot and restore, and none of them
+    creates a logical database, an ACL user, or a key/bucket prefix *inside*
+    an instance that already exists. So every `SharedResource` identifier
+    `preview_managed_services` computed had nowhere to be created.
+
+    ``slice_id`` is the caller's stable name for the slice -- for a preview,
+    the environment slug. Drivers must derive their own identifiers from it
+    deterministically rather than generating one, because the caller has to
+    be able to ask for the same slice twice and tear the right one down.
+    """
+
+    slice_id: str
+    """Stable, caller-owned. e.g. ``preview-pr-42``."""
+
+    parent: ServiceHandle
+    """The instance to carve out of. Must already exist."""
+
+    labels: dict[str, str] = field(default_factory=dict)
+    """Provider tags/labels to stamp, so an orphaned slice is attributable."""
+
+    def __post_init__(self) -> None:
+        if not (self.slice_id or "").strip():
+            raise ValueError("slice_id is required: a slice nobody can name cannot be torn down")
+        if not (self.parent.handle or "").strip():
+            raise ValueError("SliceSpec.parent must reference an existing instance")
+
+
+@dataclass(frozen=True)
+class SliceResult:
+    """What a driver created, as envelope overrides.
+
+    ``env_overrides`` is layered *on top of* the parent instance's
+    ``Binding.env_vars`` rather than replacing it: a sliced postgres reuses
+    the parent's host, port and credentials and overrides only
+    ``POSTGRES_DB``. Returning a whole binding instead would let a driver
+    quietly hand back the parent's database and nothing would notice --
+    which is the failure mode #1578 names, production data in a PR preview.
+
+    ``slice_handle`` is what ``deprovision_slice`` is given back.
+    """
+
+    slice_handle: str
+    env_overrides: dict[str, ValueRef] = field(default_factory=dict)
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        if not (self.slice_handle or "").strip():
+            raise ValueError("slice_handle is required")
+        if not self.env_overrides:
+            # A slice that changes no envelope key is not isolation: the
+            # workload would connect to exactly what the parent connects to.
+            raise ValueError(
+                f"slice {self.slice_handle!r} produced no env overrides, so a workload "
+                f"using it would reach the parent instance unchanged",
+            )
+
+
+@dataclass(frozen=True)
 class SnapshotHandle:
     handle: str
     snapshot_id: str
@@ -410,3 +474,68 @@ class ManagedServiceDriver(Protocol):
         ``unsupported_update()``.
         """
         return ["*"]
+
+
+class SliceCapableDriver(Protocol):
+    """A driver that can subdivide an existing instance (#1578).
+
+    A **separate** protocol rather than two more methods on
+    ``ManagedServiceDriver``, and the parity gate is why: that protocol is a
+    conformance contract -- `tests/_sdk/test_parity.py` asserts every real
+    driver implements every method on it -- so an optional capability
+    declared there is not optional at all. Adding them inline made forty-odd
+    drivers non-conformant in one commit.
+
+    Which is the right outcome for a gate to force. Not every backing service
+    can be subdivided meaningfully: a queue or a topic has no equivalent of a
+    logical database, and a driver made to pretend would hand the caller the
+    parent under a different name -- production data in a PR preview, which
+    is the failure #1578 exists to prevent.
+
+    So slicing is opt-in per driver, and ``supports_slicing`` is the runtime
+    check for callers that hold a driver rather than a type.
+    """
+
+    def provision_slice(self, spec: SliceSpec) -> SliceResult:
+        """Carve an isolated slice out of an existing instance.
+
+        Idempotent, like every lifecycle method in this SDK: called twice
+        with the same ``slice_id`` it returns the same slice rather than a
+        second one.
+        """
+        ...
+
+    def deprovision_slice(self, spec: SliceSpec, slice_handle: str) -> None:
+        """Drop a slice, leaving the parent instance alone.
+
+        The parent is passed so a driver can reach it without a second
+        lookup, and to make the asymmetry explicit: this must never
+        deprovision ``spec.parent``. A preview teardown that dropped the
+        shared instance is the worst outcome this path can produce.
+        """
+        ...
+
+
+def supports_slicing(driver: object) -> bool:
+    """Whether ``driver`` implements the optional slice verbs (#1578).
+
+    Both, not either. A driver that can create a slice and not remove one
+    leaves a preview's database behind on every teardown, and the leak is
+    invisible until someone reads the instance's database list.
+    """
+    return callable(getattr(driver, "provision_slice", None)) and callable(getattr(driver, "deprovision_slice", None))
+
+
+def apply_slice(binding: Binding, result: SliceResult) -> Binding:
+    """The parent's binding with the slice's overrides layered on.
+
+    The composition rule, in one place, so no driver or caller invents a
+    second one. Overrides replace keys and never remove them: a sliced
+    postgres keeps the parent's host, port, user and password and changes
+    only ``POSTGRES_DB``.
+    """
+    return dataclasses.replace(
+        binding,
+        env_vars={**binding.env_vars, **result.env_overrides},
+        notes="; ".join(part for part in (binding.notes, result.notes) if part),
+    )
