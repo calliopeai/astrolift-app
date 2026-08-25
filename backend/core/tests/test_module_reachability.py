@@ -509,7 +509,6 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         "core.collections.bag",
         "core.collections.collectors",
         "core.collections.histogram",
-        "core.domain_handoff",
         "core.migration_gate",
         "core.secrets.envelope",
         "core.secrets.rotation",
