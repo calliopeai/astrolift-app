@@ -349,6 +349,23 @@ class RegisteredApp(NamedBaseCoreModel):
     # Shape: {"enabled": bool, "allowed_cidrs": [...], "allowed_fqdns": [...],
     #         "extra_internal_cidrs": [...], "source_ip_mode": "...",
     #         "allow_internet_https": bool}
+    # Cached DNS resolution result for the app doctor (#1550). The panel
+    # reads this instead of resolving live: it renders on every app-detail
+    # load, and making that latency a function of DNS is worse than an
+    # honest, dated answer.
+    #
+    # Shape: {"probed_at": iso8601, "unresolved": ["host", ...]}
+    # Absent means never probed, which the doctor reports as unknown rather
+    # than pass.
+    dns_probe = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Cached hostname-resolution probe for the app doctor. Written by "
+            "the scheduled prober; read by the doctor with its age."
+        ),
+    )
+
     network_policy = models.JSONField(
         default=dict,
         blank=True,

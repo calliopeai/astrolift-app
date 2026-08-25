@@ -324,6 +324,49 @@ def _apply_cloudwatch_retention(cluster, *, days: int) -> dict:
     return driver.apply_retention(days)
 
 
+def _probe_app_dns_sync() -> int:
+    """Refresh every app's cached hostname-resolution probe (#1550).
+
+    The live half of the app doctor's DNS check, on a schedule so the panel
+    can read a cached answer instead of resolving on a page load. Returns the
+    number of apps whose result changed, so the log says something only when
+    it has something to say.
+    """
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.services.app_doctor import probe_app_dns
+
+    changed = 0
+    for app in RegisteredApp.objects.filter(deleted_at__isnull=True).iterator():
+        previous = (app.dns_probe or {}).get("unresolved")
+        try:
+            record = probe_app_dns(app)
+        except Exception:  # noqa: BLE001
+            # One app's resolver trouble must not stop the sweep. `probe_app_dns`
+            # already records a failed lookup as unresolved, so reaching here
+            # means something worse than a NXDOMAIN.
+            log.exception("dns probe: failed for app %s", app.slug)
+            continue
+        if record["unresolved"] != previous:
+            changed += 1
+            if record["unresolved"]:
+                log.warning(
+                    "dns probe: %s hostname(s) answer nothing for app %s: %s",
+                    len(record["unresolved"]),
+                    app.slug,
+                    ", ".join(record["unresolved"]),
+                )
+    return changed
+
+
+@activity.defn(name="astrolift.scheduled.probe_app_dns")
+async def probe_app_dns_activity() -> int:
+    """Refresh cached DNS probes for the app doctor."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_probe_app_dns_sync)()
+
+
 @activity.defn(name="astrolift.scheduled.apply_observability_retention")
 async def apply_observability_retention() -> int:
     """Apply each org's configured observability retention. Returns the

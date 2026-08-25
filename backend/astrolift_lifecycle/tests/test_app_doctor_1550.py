@@ -56,7 +56,7 @@ def test_healthy_app_passes(app, env, in_sync_manifest):
         image_tag="v1",
     )
 
-    report = run_app_doctor(app, resolve=lambda host: ["1.2.3.4"])
+    report = run_app_doctor(app)
 
     checks = _by_key(report)
     assert checks[CHECK_MANIFEST].status == "pass"
@@ -77,7 +77,7 @@ def test_manifest_parse_failure_names_resync_fix(app, monkeypatch):
         lambda a, **k: _Result("fetch_failed", "repo manifest failed to parse: name missing"),
     )
 
-    check = _by_key(run_app_doctor(app, resolve=lambda h: []))[CHECK_MANIFEST]
+    check = _by_key(run_app_doctor(app))[CHECK_MANIFEST]
     assert check.status == "fail"
     assert check.fix == "resync_manifest"
     assert "parse" in check.detail
@@ -89,7 +89,7 @@ def test_missing_provisioning_fails_with_remedies(app, in_sync_manifest):
     app.push_role_ref = ""
     app.save()
 
-    checks = _by_key(run_app_doctor(app, resolve=lambda h: []))
+    checks = _by_key(run_app_doctor(app))
     assert checks[CHECK_REGISTRY].status == "fail"
     assert checks[CHECK_REGISTRY].fix == "rerun_onboarding"
     assert checks[CHECK_PUSH_ROLE].status == "fail"
@@ -97,16 +97,88 @@ def test_missing_provisioning_fails_with_remedies(app, in_sync_manifest):
 
 
 def test_dns_requires_resolution_not_record_existence(app, in_sync_manifest, monkeypatch):
+    """Unchanged in substance, moved in mechanism (#1550).
+
+    The doctor reads a cached probe now instead of resolving live, so the
+    resolver is injected into `probe_app_dns` rather than into the report.
+    What is asserted is the same thing #1534 was about: a hostname that
+    answers nothing fails, and record-existence is not resolution.
+    """
+    import astrolift_registry.services.app_doctor as doctor
+    from astrolift_registry.services.app_doctor import probe_app_dns
+
+    monkeypatch.setattr(doctor, "_public_hostnames", lambda a: ["app.example.test"])
+
+    probe_app_dns(app, resolve=lambda host: [])
+    dead = _by_key(run_app_doctor(app))[CHECK_DNS]
+    assert dead.status == "fail"
+    assert "answer" in dead.detail
+
+    probe_app_dns(app, resolve=lambda host: ["1.2.3.4"])
+    alive = _by_key(run_app_doctor(app))[CHECK_DNS]
+    assert alive.status == "pass"
+
+
+def test_an_unprobed_app_is_unknown_not_pass(app, in_sync_manifest, monkeypatch):
+    """The property the cache introduces, and the one worth guarding: "nobody
+    has checked" and "it resolves" are different answers."""
     import astrolift_registry.services.app_doctor as doctor
 
     monkeypatch.setattr(doctor, "_public_hostnames", lambda a: ["app.example.test"])
 
-    dead = _by_key(run_app_doctor(app, resolve=lambda host: []))[CHECK_DNS]
-    assert dead.status == "fail"
-    assert "answer" in dead.detail
+    assert _by_key(run_app_doctor(app))[CHECK_DNS].status == "unknown"
 
-    alive = _by_key(run_app_doctor(app, resolve=lambda host: ["1.2.3.4"]))[CHECK_DNS]
-    assert alive.status == "pass"
+
+def test_a_stale_probe_is_unknown_not_pass(app, in_sync_manifest, monkeypatch):
+    """A record that resolved a week ago and has not been re-probed is not
+    evidence that it resolves now."""
+    import datetime as dt
+
+    import astrolift_registry.services.app_doctor as doctor
+
+    monkeypatch.setattr(doctor, "_public_hostnames", lambda a: ["app.example.test"])
+    app.dns_probe = {
+        "probed_at": (dt.datetime.now(dt.UTC) - dt.timedelta(days=7)).isoformat(),
+        "unresolved": [],
+    }
+    app.save(update_fields=["dns_probe"])
+
+    check = _by_key(run_app_doctor(app))[CHECK_DNS]
+    assert check.status == "unknown"
+    assert "too old" in check.detail
+
+
+def test_a_probe_that_could_not_resolve_records_the_host_as_dead(app, monkeypatch):
+    """A resolver error is not a pass. Recording it as unresolved is the
+    conservative direction -- a failed lookup has not established the name
+    works, and treating it as fine is the #1534 failure one level up."""
+    import astrolift_registry.services.app_doctor as doctor
+    from astrolift_registry.services.app_doctor import probe_app_dns
+
+    monkeypatch.setattr(doctor, "_public_hostnames", lambda a: ["app.example.test"])
+
+    def _boom(host):
+        raise OSError("resolver unreachable")
+
+    record = probe_app_dns(app, resolve=_boom)
+
+    assert record["unresolved"] == ["app.example.test"]
+
+
+def test_the_report_makes_no_network_call(app, in_sync_manifest, monkeypatch):
+    """The whole point of the cache. This renders on every app-detail load."""
+    import socket
+
+    import astrolift_registry.services.app_doctor as doctor
+
+    monkeypatch.setattr(doctor, "_public_hostnames", lambda a: ["app.example.test"])
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("the doctor resolved a hostname on a page load")
+
+    monkeypatch.setattr(socket, "getaddrinfo", _forbidden)
+
+    run_app_doctor(app)
 
 
 def test_stranded_in_flight_rows_warn(app, env, in_sync_manifest):
@@ -119,7 +191,7 @@ def test_stranded_in_flight_rows_warn(app, env, in_sync_manifest):
             image_tag="v1",
         )
 
-    check = _by_key(run_app_doctor(app, resolve=lambda h: []))[CHECK_DEPLOYMENTS]
+    check = _by_key(run_app_doctor(app))[CHECK_DEPLOYMENTS]
     assert check.status == "warn"
     assert "#1536" in check.detail
 
@@ -135,5 +207,5 @@ def test_crashed_probe_reports_unknown_not_raise(app, monkeypatch):
 
     monkeypatch.setattr(manifest_sync, "resync_app_manifest_from_repo", _boom)
 
-    check = _by_key(run_app_doctor(app, resolve=lambda h: []))[CHECK_MANIFEST]
+    check = _by_key(run_app_doctor(app))[CHECK_MANIFEST]
     assert check.status == "unknown"

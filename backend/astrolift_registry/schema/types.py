@@ -1408,16 +1408,22 @@ def build_ci_workflow_sync_status(app) -> AppCiWorkflowSyncStatusType:
     )
 
 
-def build_app_doctor_report(app, *, resolve=None) -> AppDoctorReportType:
+def build_app_doctor_report(app) -> AppDoctorReportType:
     """Run the doctor and shape it for GraphQL.
 
     Thin on purpose: every judgement lives in the service, which promises
     never to raise, so this resolver has nothing to catch and no policy of
     its own.
+
+    The ``resolve`` parameter is gone (#1550). The doctor no longer resolves
+    hostnames -- it reads a cached probe refreshed on a schedule -- so there
+    is no resolver for a caller to inject, and this resolver now makes no
+    network call at all. That is the property that makes it safe on the
+    app-detail page.
     """
     from astrolift_registry.services.app_doctor import run_app_doctor
 
-    report = run_app_doctor(app, resolve=resolve)
+    report = run_app_doctor(app)
     return AppDoctorReportType(
         healthy=report.healthy,
         checks=[
