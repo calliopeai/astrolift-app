@@ -212,6 +212,14 @@ def test_default_excludes_every_hold_kind():
         # quota reconciliation populates current_usage — sibling to the cost
         # snapshot, opt-in via env.
         ScheduleKind.CAPTURE_QUOTA_USAGE_SNAPSHOT,
+        # Log-retention application ships HELD (#1602). It is idempotent and
+        # it deletes nothing itself, but setting a policy on a group that had
+        # none makes AWS age out everything older than the window -- a
+        # one-time deletion of history, on the first tick, for every cluster.
+        # That is the HOLD category exactly: opt in per operator via
+        # ASTROLIFT_ACTIVE_SCHEDULES once they have decided the window is
+        # right.
+        ScheduleKind.APPLY_OBSERVABILITY_RETENTION,
     }
     assert hold.isdisjoint(PHASE_3A_ACTIVE_KINDS)
     # Sanity: YES set + HOLD set together cover the whole enum.
