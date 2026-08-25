@@ -167,6 +167,7 @@ from astrolift_workflows.activities.command_run_exec import (
     poll_command_run,
     start_command_run,
 )
+from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
 from astrolift_workflows.workflows import (
     AgentBoxReapTickWorkflow,
@@ -198,6 +199,7 @@ from astrolift_workflows.workflows import (
     NamespaceProvisionWorkflow,
     OnboardAppWorkflow,
     PipelineRunWorkflow,
+    PipelineScheduleWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
     PromoteDeploymentWorkflow,
@@ -254,6 +256,7 @@ WORKFLOWS = (
     DeliverWebhookWorkflow,
     RunScheduledJobWorkflow,
     PipelineRunWorkflow,
+    PipelineScheduleWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
     PromoteDeploymentWorkflow,
@@ -281,6 +284,7 @@ WORKFLOWS = (
 ACTIVITIES = (
     abort_in_flight_deploys,
     assert_no_concurrent,
+    create_scheduled_pipeline_run,
     deliver_webhook,
     finish_command_run,
     poll_command_run,

@@ -90,6 +90,7 @@ from astrolift_workflows.workflows.command_run import (
 )
 from astrolift_workflows.workflows.deliver_webhook import DeliverWebhookWorkflow
 from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
+from astrolift_workflows.workflows.pipeline_schedule import PipelineScheduleWorkflow
 __all__ = [
     "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",
@@ -121,6 +122,7 @@ __all__ = [
     "DeliverWebhookWorkflow",
     "RunScheduledJobWorkflow",
     "PipelineRunWorkflow",
+    "PipelineScheduleWorkflow",
     "PollScheduledJobRunsWorkflow",
     "PreviewGarbageCollectWorkflow",
     "PromoteDeploymentWorkflow",

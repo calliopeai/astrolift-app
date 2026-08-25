@@ -21,6 +21,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from asgiref.sync import async_to_sync
+
 if TYPE_CHECKING:
     pass
 
@@ -40,6 +42,64 @@ def _cron_from_trigger(trigger) -> str | None:
     return config.get("cron")
 
 
+def _temporal_enabled() -> bool:
+    """Reuse the client's own switch rather than a second one.
+
+    `astrolift_workflows.client._temporal_enabled` resolves the constance
+    toggle and the settings kill switch in that precedence. A local copy here
+    would be a second answer to the same question, free to disagree.
+    """
+    from astrolift_workflows.client import _temporal_enabled as enabled
+
+    return bool(enabled())
+
+
+@async_to_sync
+async def _write_schedule(*, schedule_id: str, cron: str, action_input: dict) -> None:
+    """Create or replace one pipeline schedule in Temporal.
+
+    Async, bridged with ``async_to_sync`` (#1614). What stood here called
+    ``client.get_schedule_handle(...).delete()`` and ``client.create_schedule(...)``
+    synchronously on the Temporal SDK's async client, so both returned
+    un-awaited coroutines and neither ran -- behind an import of
+    ``astrolift_workflows.client.get_temporal_client``, which does not exist,
+    so the whole block raised ImportError on its first line and the bare
+    ``except`` logged "Temporal not available" on every schedule-trigger save.
+
+    Delete-then-create rather than ``handle.update``: the cron expression and
+    the action both change, and a delete of a schedule that is not there is
+    already the no-op this needs. ``schedule_boot`` uses ``update`` because it
+    reconciles a fixed catalog, where the schedule reliably exists.
+
+    ``task_queue`` comes from settings. The literal ``"pipelines"`` that stood
+    here names no queue any worker polls -- the same defect as the webhook
+    dispatch in #1623.
+    """
+    from django.conf import settings
+    from temporalio.client import Schedule, ScheduleActionStartWorkflow, ScheduleSpec
+
+    from astrolift_workflows.client import _get_client_async
+
+    client = await _get_client_async()
+    try:
+        await client.get_schedule_handle(schedule_id).delete()
+    except Exception:  # noqa: BLE001 - not present is the common case
+        pass
+
+    await client.create_schedule(
+        schedule_id,
+        Schedule(
+            action=ScheduleActionStartWorkflow(
+                "PipelineScheduleWorkflow",
+                action_input,
+                id=f"{schedule_id}-run",
+                task_queue=getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main"),
+            ),
+            spec=ScheduleSpec(cron_expressions=[cron]),
+        ),
+    )
+
+
 def create_or_update_schedule(trigger) -> None:
     """Create or update a Temporal schedule for a cron trigger.
 
@@ -48,14 +108,6 @@ def create_or_update_schedule(trigger) -> None:
     cron = _cron_from_trigger(trigger)
     if not cron:
         logger.warning("pipelines.schedule_sync: trigger %s has no cron expression — skipping", trigger.guid)
-        return
-
-    try:
-        from astrolift_workflows.client import get_temporal_client
-
-        client = get_temporal_client()
-    except Exception:  # noqa: BLE001 — Temporal may not be running
-        logger.info("pipelines.schedule_sync: Temporal not available, skipping schedule sync")
         return
 
     schedule_id = _temporal_schedule_id(trigger)
@@ -71,34 +123,16 @@ def create_or_update_schedule(trigger) -> None:
         "trigger_kind": "schedule",
     }
 
+    if not _temporal_enabled():
+        # Same kill switch `start_workflow` honours. Without this, every
+        # schedule-trigger save on a Temporal-less install pays a connection
+        # timeout -- which is new as of #1614, because before the fix this
+        # path died on an ImportError long before it tried to connect.
+        logger.info("pipelines.schedule_sync: Temporal disabled, skipping schedule %s", schedule_id)
+        return
+
     try:
-        from temporalio.client import (
-            Schedule,
-            ScheduleActionStartWorkflow,
-            ScheduleSpec,
-        )
-
-        # Try to delete existing schedule (update via delete+recreate)
-        try:
-            handle = client.get_schedule_handle(schedule_id)
-            handle.delete()
-        except Exception:  # noqa: BLE001 — schedule may not exist
-            pass
-
-        client.create_schedule(
-            schedule_id,
-            Schedule(
-                action=ScheduleActionStartWorkflow(
-                    workflow="PipelineScheduleWorkflow",
-                    arg=action_input,
-                    id=f"{schedule_id}-run",
-                    task_queue="pipelines",
-                ),
-                spec=ScheduleSpec(
-                    cron_expressions=[cron],
-                ),
-            ),
-        )
+        _write_schedule(schedule_id=schedule_id, cron=cron, action_input=action_input)
         logger.info("pipelines.schedule_sync: schedule %s created/updated (cron=%s)", schedule_id, cron)
     except ImportError:
         # Temporal SDK not fully installed — fallback to a simpler note
@@ -109,18 +143,27 @@ def create_or_update_schedule(trigger) -> None:
         logger.exception("pipelines.schedule_sync: failed to sync schedule %s", schedule_id)
 
 
+@async_to_sync
+async def _drop_schedule(*, schedule_id: str) -> None:
+    """Delete one schedule. Same fault as the writer above (#1614): this
+    imported a factory that does not exist and then called an async delete
+    synchronously, so a soft-deleted trigger kept firing."""
+    from astrolift_workflows.client import _get_client_async
+
+    client = await _get_client_async()
+    await client.get_schedule_handle(schedule_id).delete()
+
+
 def delete_schedule(trigger) -> None:
     """Delete the Temporal schedule for a cron trigger.
 
     Called on trigger soft-delete or pipeline delete.
     """
     schedule_id = _temporal_schedule_id(trigger)
+    if not _temporal_enabled():
+        return
     try:
-        from astrolift_workflows.client import get_temporal_client
-
-        client = get_temporal_client()
-        handle = client.get_schedule_handle(schedule_id)
-        handle.delete()
+        _drop_schedule(schedule_id=schedule_id)
         logger.info("pipelines.schedule_sync: schedule %s deleted", schedule_id)
     except Exception:  # noqa: BLE001 — schedule may not exist or Temporal may be down
         logger.debug("pipelines.schedule_sync: could not delete schedule %s (may not exist)", schedule_id)
