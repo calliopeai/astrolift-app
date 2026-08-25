@@ -279,7 +279,7 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     # the invariant is "every app is deployable" rather than "every app
     # registered after the bootstrap landed is deployable". The helper is
     # idempotent, creates a single ``production`` env bound to the app's
-    # managed cluster, and starts the (workflow-id-guarded) OnboardAppWorkflow
+    # managed cluster, and starts OnboardAppWorkflow
     # — which such an app needs anyway, since it was never provisioned.
     if not registered_envs:
         from astrolift_registry.schema.mutations import _bootstrap_app_environments

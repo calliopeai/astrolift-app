@@ -3233,6 +3233,19 @@ export type AstroliftRenderedManifest = {
   resources: Scalars['JSON']['output'];
 };
 
+export type AstroliftRerunOnboardingPayload = {
+  alreadyRunning: Scalars['Boolean']['output'];
+  detail: Scalars['String']['output'];
+  started: Scalars['Boolean']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftRerunOnboardingPayloadMutationResult = {
+  data?: Maybe<AstroliftRerunOnboardingPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftRetentionPolicy = {
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
@@ -5321,6 +5334,7 @@ export type Mutation = {
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
+  rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
@@ -6530,6 +6544,11 @@ export type MutationRequestAttestationChallengeArgs = {
 
 export type MutationRequestQuotaIncreaseArgs = {
   input: RequestQuotaIncreaseInput;
+};
+
+
+export type MutationRerunAstroliftOnboardingArgs = {
+  input: RerunOnboardingInput;
 };
 
 
@@ -9332,6 +9351,10 @@ export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
   reason: Scalars['String']['input'];
+};
+
+export type RerunOnboardingInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type ResendInvitationInput = {

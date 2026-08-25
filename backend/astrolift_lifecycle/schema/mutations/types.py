@@ -882,3 +882,33 @@ class ReapCloudOrphanPayload:
     reaped: bool
     already_gone: bool
     message: str
+
+
+@strawberry.input
+class RerunOnboardingInput:
+    """Input for the onboarding re-run recovery mutation (#1550).
+
+    ``app_slug`` resolves the RegisteredApp. No confirm field: re-running
+    onboarding provisions what is missing and touches nothing that is
+    already there, so unlike force-redeploy it cannot drop live traffic."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftRerunOnboardingPayload")
+class RerunOnboardingPayload:
+    """Read-back for an onboarding re-run (#1550).
+
+    ``started`` is false without being an error in the two cases the
+    operator most needs told apart, and ``detail`` says which:
+    onboarding is already running (so a second run was correctly
+    refused), or Temporal is disabled in this environment (so nothing
+    was enqueued and nothing will happen).
+
+    ``workflow_id`` is the id the run was submitted under, so an
+    operator can find it in Temporal without guessing the format."""
+
+    started: bool
+    already_running: bool
+    workflow_id: str
+    detail: str

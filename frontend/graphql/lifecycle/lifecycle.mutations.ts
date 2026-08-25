@@ -861,7 +861,11 @@ export const SET_DOMAIN_REDIRECTS = gql`
   mutation SetDomainRedirects($input: SetDomainRedirectsInput!) {
     setDomainRedirects(input: $input) {
       ok
-      errors { code message field }
+      errors {
+        code
+        message
+        field
+      }
       data {
         id
         hostname
@@ -892,7 +896,11 @@ export const SET_DOMAIN_PATH_ROUTES = gql`
   mutation SetDomainPathRoutes($input: SetDomainPathRoutesInput!) {
     setDomainPathRoutes(input: $input) {
       ok
-      errors { code message field }
+      errors {
+        code
+        message
+        field
+      }
       data {
         id
         hostname
@@ -924,7 +932,11 @@ export const BULK_ROLLING_RESTART = gql`
     bulkRollingRestart(input: $input) {
       okCount
       failedCount
-      perApp { appSlug ok errors }
+      perApp {
+        appSlug
+        ok
+        errors
+      }
     }
   }
 `;
@@ -935,7 +947,11 @@ export const BULK_PUSH_SECRETS = gql`
     bulkPushSecrets(input: $input) {
       okCount
       failedCount
-      perApp { appSlug ok errors }
+      perApp {
+        appSlug
+        ok
+        errors
+      }
     }
   }
 `;
@@ -946,7 +962,11 @@ export const BULK_RESYNC_MANIFEST = gql`
     bulkResyncManifest(input: $input) {
       okCount
       failedCount
-      perApp { appSlug ok errors }
+      perApp {
+        appSlug
+        ok
+        errors
+      }
     }
   }
 `;
@@ -956,7 +976,11 @@ export const SET_ALERT_SUBSCRIPTION = gql`
   mutation SetAlertSubscription($input: SetAlertSubscriptionInput!) {
     setAlertSubscription(input: $input) {
       ok
-      errors { code message field }
+      errors {
+        code
+        message
+        field
+      }
       data {
         id
         appSlug
@@ -973,7 +997,11 @@ export const CLEAR_ALERT_SUBSCRIPTION = gql`
   mutation ClearAlertSubscription($input: ClearAlertSubscriptionInput!) {
     clearAlertSubscription(input: $input) {
       ok
-      errors { code message field }
+      errors {
+        code
+        message
+        field
+      }
       data {
         id
         appSlug
@@ -995,13 +1023,49 @@ export const RUN_TASK = gql`
   mutation RunTask($input: RunTaskInput!) {
     runTask(input: $input) {
       ok
-      errors { code message field }
+      errors {
+        code
+        message
+        field
+      }
       data {
         id
         registeredAppSlug
         workloadSlug
         status
         createdAt
+      }
+    }
+  }
+`;
+
+// --- Re-run onboarding (#1550) -------------------------------------
+//
+// The doctor's `rerun_onboarding` fix verb, which had no mutation until
+// now: the check that fires when an app has no registry repo -- never
+// provisioned, can never build -- pointed the panel at nothing.
+//
+// Declines rather than starting a second run while one is in flight,
+// and that refusal is the load-bearing part. The shared workflow
+// starter submits under TERMINATE_IF_RUNNING, so reusing the onboarding
+// id kills a provisioning run halfway through instead of joining it.
+// Both non-start outcomes come back `ok` with `started: false` --
+// already running, or Temporal switched off -- so read `started` and
+// `detail`, never `ok` alone, or "nothing happened" renders as success.
+export const RERUN_ONBOARDING = gql`
+  mutation RerunAstroliftOnboarding($input: RerunOnboardingInput!) {
+    rerunAstroliftOnboarding(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        started
+        alreadyRunning
+        workflowId
+        detail
       }
     }
   }

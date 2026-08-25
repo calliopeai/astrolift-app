@@ -482,8 +482,19 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
         reconcile_managed_services(app, manifest_services)
 
     # Trigger OnboardAppWorkflow when the app is still pending (never
-    # provisioned). The workflow is idempotent via its workflow_id guard,
-    # so a concurrent click is safe.
+    # provisioned).
+    #
+    # The workflow_id is NOT a dedupe guard, despite reading like one:
+    # `start_workflow` submits under `WorkflowIDReusePolicy.
+    # TERMINATE_IF_RUNNING`, chosen so a re-deploy always wins over a
+    # draining one. Reusing the id therefore *terminates* an onboarding
+    # run in flight and starts over rather than joining it, so a
+    # concurrent click costs a half-provisioned app a restart. Tolerable
+    # here because the provisioning activities are individually
+    # idempotent and this path is reached only from an explicit resync;
+    # the repair mutation that operators drive (#1550,
+    # `rerun_astrolift_onboarding`) checks for a RUNNING instance first
+    # and refuses instead.
     provisioning_pending = getattr(app, "provisioning_status", None) in (
         None,
         "pending",
