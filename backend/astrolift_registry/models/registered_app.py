@@ -335,6 +335,31 @@ class RegisteredApp(NamedBaseCoreModel):
     # keys are populated. Empty dict means "use defaults everywhere".
     security_policy = models.JSONField(default=dict, blank=True)
 
+    # Per-app egress, opt-in (#1599). Empty means no NetworkPolicy is
+    # emitted for this app at all, which is every app today.
+    #
+    # The opt-in is not caution for its own sake. `render_network_policy`
+    # builds a deny-by-default policy -- ingress only from the ingress
+    # controller, egress only to DNS, bound managed services and whatever is
+    # listed here. Emitting that for an app that has never had a
+    # NetworkPolicy silently cuts every egress nobody thought to declare, and
+    # the symptom is a production app that cannot reach a third-party API it
+    # has always reached. Enabling it has to be somebody's decision.
+    #
+    # Shape: {"enabled": bool, "allowed_cidrs": [...], "allowed_fqdns": [...],
+    #         "extra_internal_cidrs": [...], "source_ip_mode": "...",
+    #         "allow_internet_https": bool}
+    network_policy = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Per-app egress rules. Empty or {"enabled": false} emits no '
+            "NetworkPolicy. Enabling it applies a deny-by-default posture: "
+            "anything not listed here, not a bound managed service, and not "
+            "DNS becomes unreachable from this app's pods."
+        ),
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

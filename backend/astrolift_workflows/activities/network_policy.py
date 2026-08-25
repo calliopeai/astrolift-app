@@ -20,10 +20,13 @@ there; this module renders it as NetworkPolicy YAML/dict).
 from __future__ import annotations
 
 import dataclasses
+import logging
 from collections.abc import Sequence
 
-from astrolift_clusters.egress import EgressPolicy
+from astrolift_clusters.egress import EgressPolicy, EgressPolicyError, SourceIPMode
 from astrolift_clusters.egress import render as render_egress
+
+log = logging.getLogger(__name__)
 
 # Standard cluster DNS port + protocol — covers CoreDNS / kube-dns.
 _DNS_PORTS = (
@@ -177,3 +180,81 @@ def edge_annotations(
     if overrides:
         out.update(overrides)
     return out
+
+
+# ---- the producer (#1599) -------------------------------------------
+
+
+def egress_policy_for_app(app) -> EgressPolicy | None:
+    """Build an ``EgressPolicy`` from ``app.network_policy``, or None.
+
+    None means "emit nothing", and it is what every app returns until
+    somebody opts in. `render_network_policy` builds a deny-by-default
+    posture, so emitting one for an app that has never had a NetworkPolicy
+    silently cuts every egress nobody thought to declare -- the symptom being
+    a production app that can no longer reach a third-party API it has always
+    reached. That is why the switch exists and why absent means off.
+
+    A malformed block is also None rather than a partial policy. Half an
+    allow-list is not a safer allow-list; it is a deny-list of everything
+    somebody meant to permit.
+    """
+    raw = getattr(app, "network_policy", None) or {}
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return None
+
+    def _tuple(key: str) -> tuple[str, ...]:
+        value = raw.get(key) or []
+        if isinstance(value, str):
+            value = [value]
+        return tuple(str(v).strip() for v in value if str(v).strip())
+
+    mode = SourceIPMode.DEFAULT
+    declared = str(raw.get("source_ip_mode", "") or "").strip().lower()
+    if declared:
+        try:
+            mode = SourceIPMode(declared)
+        except ValueError:
+            log.warning(
+                "network policy: app %s declares unknown source_ip_mode %r; using default",
+                getattr(app, "slug", app),
+                declared,
+            )
+
+    try:
+        return EgressPolicy(
+            allowed_cidrs=_tuple("allowed_cidrs"),
+            allowed_fqdns=_tuple("allowed_fqdns"),
+            extra_internal_cidrs=_tuple("extra_internal_cidrs"),
+            source_ip_mode=mode,
+        )
+    except EgressPolicyError:
+        # `EgressPolicy.__post_init__` validates CIDRs and FQDNs. A typo in
+        # one entry must not produce a policy missing that entry.
+        log.exception(
+            "network policy: app %s has an invalid egress declaration; emitting no policy",
+            getattr(app, "slug", app),
+        )
+        return None
+
+
+def render_app_network_policy(app, *, namespace: str) -> list[dict]:
+    """The app's NetworkPolicy as a one-item list, or empty.
+
+    A list so the caller can splice it into the rendered resource set the
+    same way it splices the CustomDomain Ingresses, and so "no policy" needs
+    no special case at the call site.
+    """
+    policy = egress_policy_for_app(app)
+    if policy is None:
+        return []
+
+    raw = getattr(app, "network_policy", None) or {}
+    return [
+        render_network_policy(
+            namespace=namespace,
+            app_label=app.slug,
+            egress_policy=policy,
+            allow_internet_https=bool(raw.get("allow_internet_https", True)),
+        )
+    ]
