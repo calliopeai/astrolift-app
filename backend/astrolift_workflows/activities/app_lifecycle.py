@@ -1696,6 +1696,53 @@ def _provision_preview_namespace_sync(preview_environment_id: int) -> str:
     return p.namespace
 
 
+@activity.defn(name="astrolift.preview.provision_managed_services")
+async def provision_preview_managed_services_activity(preview_environment_id: int) -> dict:
+    """Attach and slice the previewed environment's managed services (#1578).
+
+    The step `preview_build.BUILD_ORDER` has named since it was written and
+    nothing performed: `PROVISION_MANAGED_SERVICES`. Without it a preview
+    `AppEnvironment` owns zero `ManagedService` rows and inherits none, and
+    the deploy render only synthesizes the bindings Secret when that set is
+    non-empty -- so a preview workload boots with no DB / redis / queue
+    envelope at all.
+
+    Returns the outcome as a dict rather than raising on a partial result:
+    a preview whose redis could not be sliced should still get its postgres,
+    and the caller decides whether the remainder is fatal.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_provision_preview_managed_services_sync, thread_sensitive=False)(
+        preview_environment_id
+    )
+
+
+def _provision_preview_managed_services_sync(preview_environment_id: int) -> dict:
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from astrolift_lifecycle.services.preview_service_provisioning import (
+        provision_preview_managed_services,
+    )
+
+    preview = (
+        PreviewEnvironment.objects.select_related("app_environment")
+        .filter(pk=preview_environment_id, deleted_at__isnull=True)
+        .first()
+    )
+    if preview is None or preview.app_environment is None:
+        return {"attached": [], "sliced": [], "shared_unsliced": [], "skipped": [], "errors": {}}
+
+    outcome = provision_preview_managed_services(preview.app_environment)
+    return {
+        "attached": list(outcome.attached),
+        "sliced": list(outcome.sliced),
+        "shared_unsliced": list(outcome.shared_unsliced),
+        "skipped": list(outcome.skipped),
+        "errors": dict(outcome.errors),
+    }
+
+
 @activity.defn(name="astrolift.preview.provision_namespace")
 async def provision_preview_namespace(preview_environment_id: int) -> str:
     """Ensure the preview environment's Kubernetes namespace exists.
