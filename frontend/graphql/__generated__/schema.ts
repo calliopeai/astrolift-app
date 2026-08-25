@@ -4778,6 +4778,7 @@ export type EnsureAgentBoxInput = {
   agentSlug: Scalars['String']['input'];
   environmentSpecSlug: Scalars['String']['input'];
   idleTimeoutSeconds: InputMaybe<Scalars['Int']['input']>;
+  image: Scalars['String']['input'];
   name: Scalars['String']['input'];
 };
 

@@ -4832,6 +4832,7 @@ type EmailtemplatedeletedpayloadMutationResult {
 input EnsureAgentBoxInput {
   environmentSpecSlug: String! = ""
   agentSlug: String! = ""
+  image: String! = ""
   name: String! = ""
   idleTimeoutSeconds: Int = null
 }

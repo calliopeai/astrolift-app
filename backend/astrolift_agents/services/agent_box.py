@@ -663,7 +663,7 @@ class AgentBoxEnsureError(RuntimeError):
         return self.message
 
 
-def box_slug_for(*, environment_spec, agent, owner_id: int | None) -> str:
+def box_slug_for(*, environment_spec, agent, owner_id: int | None, image: str = "") -> str:
     """The address an ensured box gets, derived rather than generated.
 
     This is what makes ensure idempotent *in the database* rather than only
@@ -677,11 +677,30 @@ def box_slug_for(*, environment_spec, agent, owner_id: int | None) -> str:
     It is also what an IDE remembers between sessions, so it stays readable:
     the agent or spec it came from, suffixed with the owner only when there
     is one, because two people on the same spec must not share a box.
+
+    ``image`` participates when a caller asked for a one-off box by image
+    rather than by durable spec (astrolift-cli#84). It has to: the constraint
+    the verb exists to satisfy is "the org must not grow a node per *press*",
+    and pressing twice with the same image still yields one box. Pressing
+    with a *different* image is a different request, and a node per distinct
+    image is inherent to having asked for a different image.
+
+    Hashed rather than embedded, because an image reference carries a
+    registry host, a path and a tag or digest, none of which survives being
+    squeezed into a slug — and a truncated one would collide two images that
+    share a prefix, silently attaching a caller to the wrong box.
     """
     base = getattr(agent, "slug", "") or getattr(environment_spec, "slug", "")
     parts = ["box", str(base)]
+    if not base and image:
+        # No agent and no spec: the image is the only thing naming this box.
+        parts = ["box", "img"]
     if owner_id is not None:
         parts.append(f"u{owner_id}")
+    if image:
+        import hashlib
+
+        parts.append(hashlib.sha256(image.strip().encode("utf-8")).hexdigest()[:12])
     return "-".join(p for p in parts if p)[:200]
 
 
@@ -690,6 +709,7 @@ def ensure_agent_box(
     organization,
     environment_spec_slug: str = "",
     agent_slug: str = "",
+    image: str = "",
     name: str = "",
     idle_timeout_seconds: int | None = None,
     owner=None,
@@ -712,11 +732,23 @@ def ensure_agent_box(
 
     spec_slug = (environment_spec_slug or "").strip()
     agent_ref = (agent_slug or "").strip()
-    if not spec_slug and not agent_ref:
+    image_ref = (image or "").strip()
+    if not spec_slug and not agent_ref and not image_ref:
         raise AgentBoxEnsureError(
             "validation",
-            "a box needs an agent or an environment spec to know what to run",
+            "a box needs an agent, an environment spec, or an image to know what to run",
             "environmentSpecSlug",
+        )
+
+    if image_ref and spec_slug:
+        # Mutually exclusive by construction, not by preference: a spec names
+        # an image and so does this, and silently preferring one would make
+        # the box's contents depend on which the caller happened to send
+        # (astrolift-cli#84).
+        raise AgentBoxEnsureError(
+            "validation",
+            "pass an environment spec or an image, not both: a spec already names an image",
+            "image",
         )
 
     if idle_timeout_seconds is not None and idle_timeout_seconds < 0:
@@ -764,7 +796,12 @@ def ensure_agent_box(
                 "agentSlug",
             )
 
-    slug = box_slug_for(environment_spec=spec, agent=agent, owner_id=getattr(owner, "pk", None))
+    slug = box_slug_for(
+        environment_spec=spec,
+        agent=agent,
+        owner_id=getattr(owner, "pk", None),
+        image=image_ref,
+    )
     box, created = _get_or_create_box(
         organization=organization,
         slug=slug,
@@ -773,6 +810,7 @@ def ensure_agent_box(
         agent=agent,
         owner=owner,
         idle_timeout_seconds=idle_timeout_seconds,
+        image=image_ref,
     )
     if not created and box.is_live:
         return box
@@ -790,6 +828,7 @@ def _get_or_create_box(
     agent,
     owner,
     idle_timeout_seconds: int | None,
+    image: str = "",
 ):
     """Find this caller's box or create it, tolerating a concurrent press.
 
@@ -816,6 +855,12 @@ def _get_or_create_box(
             "agent_definition": agent,
             "status": AgentBox.Status.PENDING,
         }
+        if image:
+            # Frozen here rather than at spawn, because with no spec there is
+            # nothing to freeze *from* later: the image reference the caller
+            # passed is the only record of what this box runs
+            # (astrolift-cli#84).
+            fields["image"] = image
         if idle_timeout_seconds is not None:
             fields["idle_timeout_seconds"] = idle_timeout_seconds
         try:
