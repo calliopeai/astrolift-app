@@ -27,6 +27,7 @@ probe set.
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import logging
 from collections.abc import Callable
 
@@ -147,29 +148,166 @@ def _check_push_role(app) -> DoctorCheck:
     return DoctorCheck(CHECK_PUSH_ROLE, "pass", f"push role {app.push_role_ref}")
 
 
-def _check_dns(app, *, resolve: Probe) -> DoctorCheck:
-    """Public hostnames must RESOLVE — record-exists is not enough (#1534)."""
+#: How long a cached DNS answer is worth reporting (#1550).
+#: A record that started answering an hour ago is news; one that started
+#: answering a week ago and has not been re-probed is not evidence.
+DNS_PROBE_MAX_AGE = dt.timedelta(hours=6)
+
+
+def _check_dns(app) -> DoctorCheck:
+    """Public hostnames must RESOLVE — record-exists is not enough (#1534).
+
+    Answers from the cached probe on the app row, not from a live lookup.
+    This runs on every app-detail page load, and `socket.getaddrinfo` on
+    each hostname made the page's latency a function of DNS -- for a panel
+    whose whole job is trust, slow and flaky is worse than honest and stale.
+
+    So the probe runs on a schedule and this reports its result plus how old
+    it is. A stale or absent probe is `unknown`, never `pass`: "nobody has
+    checked recently" and "it resolves" are different answers.
+    """
     hostnames = [h for h in _public_hostnames(app) if h]
     if not hostnames:
         return DoctorCheck(CHECK_DNS, "skip", "no public workload; no hostname to resolve")
-    dead = []
-    for host in hostnames:
-        try:
-            answers = resolve(host)
-        except Exception:  # noqa: BLE001 — resolver errors leave state unverified
-            return DoctorCheck(CHECK_DNS, "unknown", f"could not probe DNS for {host}")
-        if not answers:
-            dead.append(host)
+
+    cached = _cached_dns_probe(app)
+    if cached is None:
+        return DoctorCheck(
+            CHECK_DNS,
+            "unknown",
+            f"{len(hostnames)} hostname(s) not probed yet",
+            fix="wait for the next DNS probe, or trigger one",
+        )
+    age, dead = cached
+    if age > DNS_PROBE_MAX_AGE:
+        return DoctorCheck(
+            CHECK_DNS,
+            "unknown",
+            f"last DNS probe was {_humanise(age)} ago, too old to report",
+            fix="trigger a DNS probe",
+        )
     if dead:
         return DoctorCheck(
             CHECK_DNS,
             "fail",
             "hostname(s) answer nothing: "
-            + ", ".join(dead)
-            + " — a record can exist and still answer nothing (#1534)",
+            + ", ".join(sorted(dead))
+            + f" — a record can exist and still answer nothing (#1534); probed {_humanise(age)} ago",
             fix="redeploy",
         )
-    return DoctorCheck(CHECK_DNS, "pass", f"{len(hostnames)} hostname(s) resolve")
+    return DoctorCheck(
+        CHECK_DNS,
+        "pass",
+        f"{len(hostnames)} hostname(s) resolve (probed {_humanise(age)} ago)",
+    )
+
+
+def _cached_dns_probe(app) -> tuple[dt.timedelta, list[str]] | None:
+    """``(age, hostnames_that_answered_nothing)`` from the app row, or None.
+
+    None means never probed. A malformed or unparseable record reads the same
+    way, deliberately: a panel that reports `pass` off a record it could not
+    parse is worse than one that admits it does not know.
+    """
+    raw = getattr(app, "dns_probe", None) or {}
+    if not isinstance(raw, dict):
+        return None
+    stamp = raw.get("probed_at")
+    if not stamp:
+        return None
+    try:
+        probed_at = dt.datetime.fromisoformat(str(stamp))
+    except (TypeError, ValueError):
+        return None
+    if probed_at.tzinfo is None:
+        probed_at = probed_at.replace(tzinfo=dt.UTC)
+
+    dead = raw.get("unresolved") or []
+    if not isinstance(dead, list):
+        return None
+    return (dt.datetime.now(dt.UTC) - probed_at, [str(h) for h in dead])
+
+
+def _humanise(age: dt.timedelta) -> str:
+    """Coarse and readable. An operator wants "3h", not "3:07:42.119"."""
+    seconds = int(age.total_seconds())
+    if seconds < 90:
+        return f"{max(seconds, 0)}s"
+    if seconds < 90 * 60:
+        return f"{seconds // 60}m"
+    if seconds < 48 * 3600:
+        return f"{seconds // 3600}h"
+    return f"{seconds // 86400}d"
+
+
+CHECK_IDENTITY = "identity"
+CHECK_IMAGE = "image"
+
+
+def _check_identity(app) -> DoctorCheck:
+    """The platform can build a pod-identity annotation for this app.
+
+    Nothing persists the binding: `_workload_identity_annotations` computes it
+    at deploy time from the *cluster's* `provider_config`. So the check is
+    whether that computation would produce anything -- and it is a real
+    check, because the AWS branch returns `{}` when `account_id` is absent,
+    which means pods deploy with no identity at all and every AWS call they
+    make fails at runtime, from a cluster row that looks configured.
+    """
+    cluster = getattr(app, "default_tenant_cluster", None)
+    if cluster is None:
+        return DoctorCheck(CHECK_IDENTITY, "skip", "no cluster bound, so no pod identity applies yet")
+
+    from core.app_deploy import _workload_identity_annotations
+
+    annotations = _workload_identity_annotations(
+        plugin_slug=str(getattr(getattr(cluster, "provider_plugin", None), "slug", "") or ""),
+        provider_config=getattr(cluster, "provider_config", None) or {},
+        auth_config=getattr(cluster, "auth_config", None) or {},
+        role_name=f"astrolift-{app.slug}",
+    )
+    if not annotations:
+        return DoctorCheck(
+            CHECK_IDENTITY,
+            "fail",
+            f"cluster {getattr(cluster, 'slug', '?')!r} is missing the provider config "
+            f"needed to build a pod identity, so pods deploy with none",
+            fix="set the cluster's account/project identifier and reprovision",
+        )
+    return DoctorCheck(CHECK_IDENTITY, "pass", "pod identity resolvable")
+
+
+def _check_image(app) -> DoctorCheck:
+    """The latest deployment pins its image by digest.
+
+    Registry presence needs a live call and is not claimed here. An
+    *unpinned* tag is still a fail: a deployment on a floating tag cannot be
+    reproduced whatever the registry currently holds, and that is knowable
+    from the row.
+    """
+    from astrolift_lifecycle.models import Deployment
+
+    latest = (
+        Deployment.objects.filter(registered_app_id=app.pk, deleted_at__isnull=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if latest is None:
+        return DoctorCheck(CHECK_IMAGE, "skip", "never deployed")
+    if not (latest.image_digest or "").strip():
+        # `warn`, not `fail`, to match how the platform already treats this:
+        # `supply_chain_gate` reports an unpinned digest as a failed *scan*
+        # and lets `fail_open_on_scanner_error` decide, so it is notable
+        # rather than broken. A doctor that called it broken would disagree
+        # with the gate about the same deployment.
+        return DoctorCheck(
+            CHECK_IMAGE,
+            "warn",
+            "the latest deployment references an unpinned image tag, so it "
+            "cannot be reproduced and cannot be scanned by digest",
+            fix="redeploy to pin the image by digest",
+        )
+    return DoctorCheck(CHECK_IMAGE, "pass", "pinned by digest (registry presence not verified from here)")
 
 
 def _check_deployments(app) -> DoctorCheck:
@@ -222,19 +360,58 @@ _CHECKS: tuple[tuple[str, Callable], ...] = (
     (CHECK_REGISTRY, _check_registry),
     (CHECK_PUSH_ROLE, _check_push_role),
     (CHECK_DNS, _check_dns),
+    (CHECK_IDENTITY, _check_identity),
+    (CHECK_IMAGE, _check_image),
     (CHECK_DEPLOYMENTS, _check_deployments),
 )
 
 
-def run_app_doctor(app, *, resolve: Probe | None = None) -> DoctorReport:
-    """Run every check; a crashed check reports ``unknown``, never raises."""
-    resolve_fn = resolve if resolve is not None else _default_resolve
+def run_app_doctor(app) -> DoctorReport:
+    """Run every check; a crashed check reports ``unknown``, never raises.
+
+    No live network call anywhere in here now (#1550). The DNS check reads
+    the cached probe on the app row, so this is safe on a page load and its
+    latency is the sum of a few queries rather than a DNS round-trip per
+    hostname. `probe_app_dns` is what refreshes the cache, on a schedule.
+    """
     out: list[DoctorCheck] = []
     for key, fn in _CHECKS:
         try:
-            check = fn(app, resolve=resolve_fn) if key == CHECK_DNS else fn(app)
+            check = fn(app)
         except Exception:  # noqa: BLE001 — one broken probe must not sink the report
             logger.warning("app doctor: check %s crashed for %s", key, app.slug, exc_info=True)
             check = DoctorCheck(key, "unknown", "check crashed; state unverified")
         out.append(check)
     return DoctorReport(checks=tuple(out))
+
+
+def probe_app_dns(app, *, resolve: Probe | None = None) -> dict:
+    """Resolve the app's public hostnames and cache the result on the row.
+
+    The live half, moved out of the doctor and onto a schedule. Returns the
+    record it wrote so a caller can log a change.
+
+    A resolver error records the hostname as unresolved rather than skipping
+    it, and that is the conservative direction: a probe that cannot resolve
+    a name has not established that the name works, and reporting `pass`
+    off a failed lookup is the #1534 failure again one level up.
+    """
+    hostnames = [h for h in _public_hostnames(app) if h]
+    resolve_fn = resolve if resolve is not None else _default_resolve
+
+    unresolved: list[str] = []
+    for host in hostnames:
+        try:
+            if not resolve_fn(host):
+                unresolved.append(host)
+        except Exception:  # noqa: BLE001 - a failed lookup is not a pass
+            unresolved.append(host)
+
+    record = {
+        "probed_at": dt.datetime.now(dt.UTC).isoformat(),
+        "unresolved": sorted(unresolved),
+        "checked": sorted(hostnames),
+    }
+    app.dns_probe = record
+    app.save(update_fields=["dns_probe", "updated_at", "version"])
+    return record

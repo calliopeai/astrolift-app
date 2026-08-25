@@ -83,6 +83,12 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # with per-run try/except; an unreachable cluster or torn-down Job
         # leaves the row as-is, and terminal rows are never re-touched.
         ScheduleKind.RUN_STATUS_RECONCILE,
+        # DNS probing ships active (#1550). Read-only against the network and
+        # idempotent: it resolves names and records what it found. Held, the
+        # app doctor's DNS check reads "not probed yet" forever, which is the
+        # panel saying nothing rather than saying something wrong -- but it is
+        # of no value held.
+        ScheduleKind.PROBE_APP_DNS,
         # Agent-box reaping ships active — held, a box that reaped itself
         # keeps claiming RUNNING and its plaintext-bearing Secret outlives
         # the pod, so holding it costs correctness rather than buying safety.

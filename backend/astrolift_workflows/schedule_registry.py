@@ -69,6 +69,10 @@ class ScheduleKind(StrEnum):
     """Daily 02:00 UTC — delete audit log past retention
     (per ObservabilityProfile retention bounds, #9)."""
 
+    PROBE_APP_DNS = "probe_app_dns"
+    """Every 30 min — refresh the app doctor's cached hostname-resolution
+    answers so the panel reads instantly (#1550)."""
+
     APPLY_OBSERVABILITY_RETENTION = "apply_observability_retention"
     """Daily — set each org's configured log retention on its CloudWatch log
     groups (#1602). A policy, not a delete: AWS ages the data out."""
@@ -335,6 +339,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.PRUNE_AUDIT_LOG,
         ),
         description="Delete audit log past retention",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.PROBE_APP_DNS,
+        workflow_name="ProbeAppDnsWorkflow",
+        interval_seconds=30 * 60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.PROBE_APP_DNS),
+        description="Refresh cached hostname resolution for the app doctor",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.APPLY_OBSERVABILITY_RETENTION,

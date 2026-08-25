@@ -32,6 +32,7 @@ with workflow.unsafe.imports_passed_through():
         gc_stale_previews,
         poll_scheduled_job_runs,
         apply_observability_retention,
+    probe_app_dns_activity,
     prune_audit_log,
         prune_stale_sessions,
         reconcile_cluster_capabilities,
@@ -122,6 +123,23 @@ class PruneAuditLogWorkflow:
             start_to_close_timeout=_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"pruned {n} audit log entr{'y' if n == 1 else 'ies'}")
+
+
+@workflow.defn(name="ProbeAppDnsWorkflow")
+class ProbeAppDnsWorkflow:
+    """Refresh the app doctor's cached DNS answers.
+
+    Read-only against the network and idempotent -- it resolves names and
+    writes what it found -- so it ships active rather than held.
+    """
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            probe_app_dns_activity,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"dns probe changed for {n} app(s)")
 
 
 @workflow.defn(name="ApplyObservabilityRetentionWorkflow")

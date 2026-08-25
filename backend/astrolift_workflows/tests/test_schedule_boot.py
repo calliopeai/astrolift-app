@@ -190,6 +190,12 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # a production TLS outage. Read-only provider reads, per-domain
         # try/except, watermarked so a threshold pages once.
         ScheduleKind.CERT_EXPIRY,
+        # App-doctor DNS probing ships active (#1550) — read-only against the
+        # network and idempotent, it resolves names and records what it found.
+        # Held, the doctor's DNS check reads "not probed yet" forever, which
+        # is the panel saying nothing rather than something wrong, but it is
+        # of no value held.
+        ScheduleKind.PROBE_APP_DNS,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)
