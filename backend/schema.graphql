@@ -2752,6 +2752,9 @@ type AstroliftOrganization {
   auditLogRetentionDays: Int!
   previewMaxActiveDefault: Int!
   logRetentionDaysDefault: Int!
+  metricsRetentionDaysDefault: Int!
+  metricsRollupRetentionDaysDefault: Int!
+  traceRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
@@ -6892,6 +6895,9 @@ input UpdateOrganizationInput {
   website: String = null
   auditLogRetentionDays: Int = null
   logRetentionDaysDefault: Int = null
+  metricsRetentionDaysDefault: Int = null
+  metricsRollupRetentionDaysDefault: Int = null
+  traceRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null

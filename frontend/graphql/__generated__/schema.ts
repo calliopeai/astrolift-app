@@ -2747,11 +2747,14 @@ export type AstroliftOrganization = {
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
   managedServiceIsolationPolicy: Scalars['JSON']['output'];
+  metricsRetentionDaysDefault: Scalars['Int']['output'];
+  metricsRollupRetentionDaysDefault: Scalars['Int']['output'];
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
+  traceRetentionDaysDefault: Scalars['Int']['output'];
   updatedAt: Scalars['DateTime']['output'];
   website: Scalars['String']['output'];
 };
@@ -9892,7 +9895,10 @@ export type UpdateOrganizationInput = {
   id: Scalars['GUID']['input'];
   logRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   managedServiceIsolationPolicy: InputMaybe<Scalars['JSON']['input']>;
+  metricsRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  metricsRollupRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
+  traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
 
