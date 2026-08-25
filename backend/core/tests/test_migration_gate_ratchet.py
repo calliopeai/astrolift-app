@@ -48,6 +48,18 @@ GRANDFATHERED_DESTRUCTIVE: frozenset[str] = frozenset(
         # scoped constraint. Constraint metadata is dropped and recreated;
         # no table rows or columns are removed.
         "astrolift_services/0023_manifest_managed_services",
+        # Drops `TenantCluster.node_arch` after copying it into the new
+        # `node_archs` list (#1604). Accepted deliberately, and the data loss
+        # is bounded to a case that cannot occur in this tree: nothing has
+        # ever written `node_arch`, so every row holds the empty default. The
+        # migration still copies rather than assuming that, because the one
+        # way a value could exist is an operator having set it by hand.
+        #
+        # What no rollback restores: a hand-set value on a cluster whose new
+        # list has since been overwritten by a capability probe. That is a
+        # correction rather than a loss -- the probe reads the cluster's
+        # actual nodes, and the hand-set value was a guess at the same thing.
+        "astrolift_clusters/0016_node_archs_list",
         "core/0005_remove_domain_specific_profile_fields",
         "core/0010_drop_metabase",
         "core/0011_delete_historicalmetabasechart",
