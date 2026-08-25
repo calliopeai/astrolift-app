@@ -198,6 +198,12 @@ class EnsureAgentBoxInput:
 
     environment_spec_slug: str = ""
     agent_slug: str = ""
+    # A one-off box against a stock image, with no durable spec to register
+    # first (astrolift-cli#84). Mutually exclusive with
+    # ``environment_spec_slug``: a spec already names an image, and silently
+    # preferring one would make the box's contents depend on which field the
+    # caller happened to send.
+    image: str = ""
     name: str = ""
     idle_timeout_seconds: int | None = None
 
@@ -1805,7 +1811,7 @@ class AgentsMutation:
         action="agents.box.ensure",
         target=lambda self, info, input, org_id=None: (
             "AgentBox",
-            input.agent_slug or input.environment_spec_slug,
+            input.agent_slug or input.environment_spec_slug or input.image,
         ),
     )
     @require_permission(Permission.AGENT_DISPATCH)
@@ -1843,6 +1849,7 @@ class AgentsMutation:
             box = ensure_agent_box(
                 organization=org,
                 environment_spec_slug=input.environment_spec_slug,
+                image=input.image,
                 agent_slug=input.agent_slug,
                 name=input.name,
                 idle_timeout_seconds=input.idle_timeout_seconds,
