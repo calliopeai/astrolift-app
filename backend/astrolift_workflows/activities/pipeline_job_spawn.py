@@ -229,7 +229,11 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
     job = job_for_run(run, job_id_str)
 
     steps = list(Step.objects.filter(job=job, deleted_at__isnull=True).order_by("position"))
-    script = render_step_script(steps)
+    # `cluster_run` tells the renderer this is an unprivileged in-cluster Job,
+    # so it can refuse an action that cannot work here before the pod exists
+    # (#1584). A self-hosted runner renders without the flag and keeps its
+    # docker daemon.
+    script = render_step_script(steps, context={"cluster_run": True})
 
     job_run = JobRun.objects.create(
         pipeline_run=run,
