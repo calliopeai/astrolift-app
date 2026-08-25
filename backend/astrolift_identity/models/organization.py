@@ -63,6 +63,31 @@ class Organization(NamedBaseCoreModel):
     # points AWS_STORAGE_BUCKET_NAME. It also does not change what is
     # retained -- the append-only trigger still refuses DELETE, so this
     # archives and never prunes.
+    # Container image signing (#1605). Astrolift does not sign images; it
+    # verifies signatures the customer's own build already produced, which
+    # is the scope decided on the issue.
+    #
+    # Shape: {"enforcement": "disabled|optional|required",
+    #         "allowed_signers": [{"kind": "oidc|kms", "identity": "..."}]}
+    #
+    # Empty means disabled, and disabled is the default. A cluster of
+    # installs already carry `block_on_missing_signature: true` in their app
+    # policy, which nothing has ever evaluated -- turning that into real
+    # enforcement without an operator opting in would block every promote on
+    # every one of them.
+    #
+    # Identities only. No keys, no certificates: an OIDC subject+issuer or a
+    # KMS ARN is a pointer, and this is a plaintext column.
+    image_signing_policy = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Image signature verification. Empty or {"enforcement": "disabled"} '
+            "verifies nothing. 'optional' warns on unsigned or unrecognised "
+            "signers; 'required' blocks. Needs at least one allowed signer to "
+            "be anything but disabled."
+        ),
+    )
     audit_export_enabled = models.BooleanField(
         default=False,
         help_text=(
