@@ -3250,6 +3250,19 @@ type AstroliftRenderedManifest {
   errorColumn: Int
 }
 
+type AstroliftRerunOnboardingPayload {
+  started: Boolean!
+  alreadyRunning: Boolean!
+  workflowId: String!
+  detail: String!
+}
+
+type AstroliftRerunOnboardingPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRerunOnboardingPayload
+}
+
 type AstroliftRetentionPolicy {
   id: GUID!
   signal: String!
@@ -5424,6 +5437,7 @@ type Mutation {
   cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
   runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
+  rerunAstroliftOnboarding(input: RerunOnboardingInput!): AstroliftRerunOnboardingPayloadMutationResult!
   setEnvironmentSetting(input: SetEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   clearEnvironmentSetting(input: ClearEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   runTask(input: RunTaskInput!): AstroliftTaskRunPayloadMutationResult!
@@ -6368,6 +6382,10 @@ input RequestQuotaIncreaseInput {
   quotaId: GUID!
   factor: Float!
   reason: String!
+}
+
+input RerunOnboardingInput {
+  appSlug: String!
 }
 
 input ResendInvitationInput {

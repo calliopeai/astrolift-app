@@ -18,6 +18,8 @@ from astrolift_lifecycle.schema.mutations.helpers import (
 from astrolift_lifecycle.schema.mutations.types import (
     ForceRedeployInput,
     ForceRedeployPayload,
+    RerunOnboardingInput,
+    RerunOnboardingPayload,
     RunJobOnceInput,
     RunJobOncePayload,
 )
@@ -230,5 +232,148 @@ class RecoveryMutations:
                 run_name=result.run_name,
                 namespace=result.namespace,
                 logs_url=result.logs_url,
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # #1550 — re-run onboarding for an app it never finished
+    # ----------------------------------------------------------------
+    #
+    # The app doctor emits a `fix` verb per failing check and the panel
+    # maps each to a mutation. Three of the four verbs already had one;
+    # `rerun_onboarding` did not, so the check that fires when an app
+    # has no `registry_repo_uri` -- provisioning never completed, the
+    # app can never build -- told the frontend to offer a button with
+    # nothing behind it. Same shape as the class this sweep has been
+    # clearing, arriving from the producer side instead.
+    #
+    # `OnboardAppWorkflow` reads only `registered_app_id` from its input
+    # (verified against the workflow, not the docstring); the other
+    # three fields are carried for dataclass stability. Provisioning
+    # activities are individually idempotent, so a re-run against a
+    # partly-provisioned app fills the gaps rather than duplicating.
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.rerun_onboarding",
+        extras=lambda result: (
+            {
+                "started": result.data.started,
+                "already_running": result.data.already_running,
+                "workflow_id": result.data.workflow_id,
+            }
+            if getattr(result, "ok", False) and getattr(result, "data", None) is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_UPDATE, Permission.APP_CREATE)
+    @tenant_scoped()
+    def rerun_astrolift_onboarding(
+        self,
+        info: Info,
+        input: RerunOnboardingInput,
+    ) -> MutationResultType[RerunOnboardingPayload]:
+        """Re-run ``OnboardAppWorkflow`` for an app whose provisioning
+        never completed (#1550).
+
+        Refuses while a run is already in flight rather than starting a
+        second one. That refusal is deliberate and load-bearing: the
+        shared ``start_workflow`` submits under
+        ``WorkflowIDReusePolicy.TERMINATE_IF_RUNNING``, which is right
+        for a deploy (an operator re-deploying wants the new one to win)
+        and wrong here -- it would kill a provisioning run halfway
+        through and start over, so the impatient second click is the one
+        that costs you the most. Two call sites describe the id as a
+        dedupe guard that makes a concurrent click safe; it is not, and
+        their comments are corrected alongside this.
+
+        Both non-start outcomes come back as ``ok`` with ``started``
+        false, because neither is the caller's error: one means the
+        repair is already underway, the other that Temporal is switched
+        off in this environment. ``detail`` says which.
+        """
+        from astrolift_workflows.client import (
+            describe_workflow_instance,
+            start_workflow,
+        )
+        from astrolift_workflows.inputs import OnboardAppInput
+
+        # Org-scope the lookup before provisioning anything. Slugs are
+        # unique only within an org; fails closed (NOT_FOUND) when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        workflow_id = f"OnboardAppWorkflow-{app.guid}"
+
+        # `describe` returns None when Temporal is disabled or the id was
+        # never used -- both mean "nothing running", so only an explicit
+        # RUNNING blocks. A describe that fails for any other reason also
+        # lands here as None; starting is the safe reading, since the
+        # alternative is refusing to repair an app on a transient error.
+        existing = describe_workflow_instance(workflow_id)
+        if existing and existing.get("status") == "RUNNING":
+            return gql_success(
+                RerunOnboardingPayload(
+                    started=False,
+                    already_running=True,
+                    workflow_id=workflow_id,
+                    detail=(
+                        "onboarding is already running for this app; "
+                        "starting another would terminate it mid-provision"
+                    ),
+                ),
+            )
+
+        try:
+            handle = start_workflow(
+                "OnboardAppWorkflow",
+                args=[
+                    OnboardAppInput(
+                        registered_app_id=app.pk,
+                        # Straight through: the helper already resolves the
+                        # system-actor case, and rebuilding an Actor from its
+                        # fields would relabel a system caller as a user.
+                        actor=_actor_from_request(info),
+                        # Legacy input fields the workflow does not read.
+                        provider_plugin_id=0,
+                        tenant_cluster_id=0,
+                    )
+                ],
+                workflow_id=workflow_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - a mutation never raises
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                f"couldn't start onboarding for {app.slug!r}: {exc}",
+            )
+
+        if not handle.enqueued:
+            return gql_success(
+                RerunOnboardingPayload(
+                    started=False,
+                    already_running=False,
+                    workflow_id=workflow_id,
+                    detail="Temporal is disabled in this environment; nothing was enqueued",
+                ),
+            )
+
+        return gql_success(
+            RerunOnboardingPayload(
+                started=True,
+                already_running=False,
+                workflow_id=workflow_id,
+                detail="onboarding re-run submitted",
             ),
         )
