@@ -4,6 +4,7 @@ from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
+from astrolift_lifecycle.models.domain_handoff import DomainSessionHandoff
 from astrolift_lifecycle.models.environment_setting import EnvironmentSetting
 from astrolift_lifecycle.models.function_invocation import FunctionInvocation
 from astrolift_lifecycle.models.ingress import (
@@ -19,6 +20,7 @@ from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
+    "DomainSessionHandoff",
     "AgentRun",
     "AppEnvironment",
     "CommandRun",
