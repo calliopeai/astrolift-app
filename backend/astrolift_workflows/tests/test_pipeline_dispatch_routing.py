@@ -100,7 +100,7 @@ def test_a_cluster_directive_picks_that_cluster(org, plugin):
 def test_an_arch_selector_will_not_take_a_mismatched_cluster(org, plugin):
     """The silently-wrong case: an arm64 job used to be scheduled onto
     whatever the org's oldest cluster was, amd64 included."""
-    _cluster(org, plugin, "amd-only", node_arch="amd64")
+    _cluster(org, plugin, "amd-only", node_archs=["amd64"])
     run, job = _run(org, plugin, runs_on="arm64")
 
     with pytest.raises(RuntimeError, match="no cluster matching"):
@@ -108,8 +108,8 @@ def test_an_arch_selector_will_not_take_a_mismatched_cluster(org, plugin):
 
 
 def test_an_arch_selector_takes_the_matching_cluster(org, plugin):
-    _cluster(org, plugin, "amd-c", node_arch="amd64")
-    arm = _cluster(org, plugin, "arm-c", node_arch="arm64")
+    _cluster(org, plugin, "amd-c", node_archs=["amd64"])
+    arm = _cluster(org, plugin, "arm-c", node_archs=["arm64"])
     run, job = _run(org, plugin, runs_on="arm64")
 
     assert _resolve_cluster(run, job).pk == arm.pk

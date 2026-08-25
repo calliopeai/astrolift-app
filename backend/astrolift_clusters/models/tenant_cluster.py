@@ -251,11 +251,26 @@ class TenantCluster(NamedBaseCoreModel):
         default=NodeOs.LINUX,
         blank=True,
     )
-    node_arch = models.CharField(
-        max_length=8,
-        choices=NodeArch.choices,
-        default="",
+    # A list, not a single value (#1604). A cluster with amd64 and arm64
+    # node groups is ordinary, and the old CharField could not say so: the
+    # dispatch matcher did `cluster.node_arch not in required_arch`, which
+    # forces every cluster to claim exactly one architecture or none. That
+    # is why nothing ever wrote it -- the producer had no honest value to
+    # write for a mixed fleet, so the column sat at its empty default and
+    # every arch-labelled job routed nowhere.
+    #
+    # Populated by `reconcile_cluster_capabilities` from the cluster's own
+    # nodes. Empty still means "unknown", and the matcher still treats
+    # unknown as a non-match, because an unrecorded architecture is not
+    # evidence a cluster is suitable.
+    node_archs = models.JSONField(
+        default=list,
         blank=True,
+        help_text=(
+            "Architectures present across this cluster's nodes, e.g. "
+            '["amd64", "arm64"]. Discovered on capability reconcile; empty '
+            "means not yet probed."
+        ),
     )
     node_labels = models.JSONField(
         default=list,

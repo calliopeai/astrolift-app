@@ -28,9 +28,18 @@ pytestmark = pytest.mark.django_db
 
 
 class _Cluster:
-    def __init__(self, slug, node_arch=""):
+    """Stands in for TenantCluster across the matcher's three label checks.
+
+    `node_archs` is stored as given, not coerced with `list()`: coercing
+    would turn the bare-string case into ['a','m','d','6','4'] inside the
+    stub and test the stub rather than `_arch_set`.
+    """
+
+    def __init__(self, slug, node_archs=(), node_os="linux", node_labels=None):
         self.slug = slug
-        self.node_arch = node_arch
+        self.node_archs = node_archs
+        self.node_os = node_os
+        self.node_labels = node_labels or []
 
 
 def test_the_hint_names_the_real_cause():
@@ -40,7 +49,7 @@ def test_the_hint_names_the_real_cause():
 
     assert "no recorded node architecture" in hint
     assert "prod-a" in hint
-    assert "#1604" in hint
+    assert "capability reconcile" in hint
 
 
 def test_no_hint_when_the_selector_has_no_arch():
@@ -54,7 +63,7 @@ def test_no_hint_when_the_selector_has_no_arch():
 def test_no_hint_once_architectures_are_recorded():
     """The hint has to disappear on its own when #1604's producer lands, or
     it becomes a permanent lie."""
-    clusters = [_Cluster("prod-a", node_arch="amd64"), _Cluster("prod-b", node_arch="arm64")]
+    clusters = [_Cluster("prod-a", ["amd64"]), _Cluster("prod-b", ["arm64"])]
 
     assert _unrecorded_arch_hint(clusters, frozenset({"arm64"})) == ""
 
@@ -87,3 +96,110 @@ def test_the_matcher_and_the_diagnostic_share_one_definition():
 
     assert literals == [], "the matcher re-declares the arch label set instead of using ARCH_LABELS"
     assert "arm64" in ARCH_LABELS
+
+
+# ---- the list, and the producer behind it (#1604) -----------------------
+
+
+def test_a_mixed_fleet_matches_either_architecture():
+    """The whole reason the column became a list.
+
+    A cluster with amd64 and arm64 node groups is ordinary. The old
+    CharField forced it to claim one or neither, so a producer had no honest
+    value to write and never wrote one.
+    """
+    from astrolift_pipelines.dispatch_router import _cluster_matches
+
+    mixed = _Cluster("mixed", ["amd64", "arm64"])
+
+    assert _cluster_matches(mixed, frozenset({"arm64"}))
+    assert _cluster_matches(mixed, frozenset({"amd64"}))
+
+
+def test_a_single_arch_cluster_still_refuses_the_other():
+    from astrolift_pipelines.dispatch_router import _cluster_matches
+
+    assert not _cluster_matches(_Cluster("amd-only", ["amd64"]), frozenset({"arm64"}))
+
+
+def test_an_unprobed_cluster_matches_no_architecture():
+    """Unknown is not a match. Scheduling arm64 work onto nodes whose
+    architecture nobody recorded is worse than refusing."""
+    from astrolift_pipelines.dispatch_router import _cluster_matches
+
+    assert not _cluster_matches(_Cluster("fresh", []), frozenset({"arm64"}))
+
+
+def test_a_bare_string_is_tolerated():
+    """The field was a CharField until #1604. A fixture or an unmigrated
+    caller handing over "amd64" must match, not iterate into single letters."""
+    from astrolift_pipelines.dispatch_router import _arch_set
+
+    assert _arch_set(_Cluster("legacy", "amd64")) == frozenset({"amd64"})
+
+
+def test_the_reconcile_records_what_the_probe_found(db):
+    """The producer. Before #1604 nothing wrote this column at all."""
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_workflows.activities import scheduled
+
+    plugin = ProviderPlugin.objects.create(
+        name="k8s_native", slug="k8s_native", capabilities_manifest={}, config_schema={}
+    )
+    cluster = TenantCluster.objects.create(
+        slug="probe-me",
+        name="probe-me",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+
+    import core.cluster_management as cm
+
+    original = cm.probe_cluster_capabilities_dispatch
+    cm.probe_cluster_capabilities_dispatch = lambda *, cluster: {"node_architectures": ["arm64", "amd64"]}
+    try:
+        scheduled._reconcile_cluster_capabilities_sync()
+    finally:
+        cm.probe_cluster_capabilities_dispatch = original
+
+    cluster.refresh_from_db()
+    assert cluster.node_archs == ["amd64", "arm64"]
+
+
+def test_a_probe_that_found_nothing_does_not_clear_a_known_value(db):
+    """A transient RBAC or network failure returns an empty list. Clearing on
+    that would stop every arch-labelled job routing until the next successful
+    tick, which is a worse outcome than a stale value."""
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_workflows.activities import scheduled
+
+    plugin = ProviderPlugin.objects.create(
+        name="k8s_native", slug="k8s_native", capabilities_manifest={}, config_schema={}
+    )
+    cluster = TenantCluster.objects.create(
+        slug="known",
+        name="known",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        node_archs=["amd64"],
+    )
+
+    import core.cluster_management as cm
+
+    original = cm.probe_cluster_capabilities_dispatch
+    cm.probe_cluster_capabilities_dispatch = lambda *, cluster: {"node_architectures": []}
+    try:
+        scheduled._reconcile_cluster_capabilities_sync()
+    finally:
+        cm.probe_cluster_capabilities_dispatch = original
+
+    cluster.refresh_from_db()
+    assert cluster.node_archs == ["amd64"]
