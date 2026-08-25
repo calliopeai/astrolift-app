@@ -84,6 +84,10 @@ from astrolift_workflows.workflows.workflow_definition_run import (
     WorkflowDefinitionRunWorkflow,
 )
 
+from astrolift_workflows.workflows.command_run import (
+    CommandRunWorkflow,
+    RunScheduledJobWorkflow,
+)
 from astrolift_workflows.workflows.deliver_webhook import DeliverWebhookWorkflow
 from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
 __all__ = [
@@ -113,7 +117,9 @@ __all__ = [
     "MigrateAppWorkflow",
     "NamespaceProvisionWorkflow",
     "OnboardAppWorkflow",
+    "CommandRunWorkflow",
     "DeliverWebhookWorkflow",
+    "RunScheduledJobWorkflow",
     "PipelineRunWorkflow",
     "PollScheduledJobRunsWorkflow",
     "PreviewGarbageCollectWorkflow",
