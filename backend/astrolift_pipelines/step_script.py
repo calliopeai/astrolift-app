@@ -64,6 +64,43 @@ class StepScriptError(ValueError):
     """A job whose steps cannot be rendered into a runnable script."""
 
 
+#: Actions that cannot work in a cluster-run pipeline job, and why (#1584).
+#:
+#: `_build_job_manifest` renders every job with `privileged: False`,
+#: `allowPrivilegeEscalation: False`, `runAsNonRoot: True` and no docker
+#: socket. A `docker build` step therefore has no daemon to reach, cannot
+#: start one, and cannot escalate to try. The usual escapes are ruled out by
+#: the same spec: kaniko needs root, and rootless buildah needs user
+#: namespaces plus `/dev/fuse` and seccomp allowances the spec does not grant.
+#:
+#: Refused here rather than left to fail in the container, for the reason the
+#: unknown-action check above already exists: this runs before the Job is
+#: created, so the operator gets the action name and a next step instead of a
+#: pod that starts, runs, and dies confusingly.
+IMPOSSIBLE_IN_CLUSTER_JOB: dict[str, str] = {
+    "astrolift/docker-build": (
+        "cluster-run pipeline jobs are unprivileged and have no docker socket, "
+        "so an image build cannot run in one. Build on a self-hosted runner, or "
+        "push the build to your own CI (see `astro ci` and pushCiWorkflow)"
+    ),
+}
+
+
+def _refuse_if_impossible_here(uses: str, *, label: str, context: dict) -> None:
+    """Refuse an action the execution environment cannot support.
+
+    Only when the caller says it is rendering for a cluster-run job. A
+    self-hosted runner has a daemon and its own security context, and
+    refusing there would break the one path that works today -- so the
+    default is to allow, and the spawner opts in.
+    """
+    if not context.get("cluster_run"):
+        return
+    reason = IMPOSSIBLE_IN_CLUSTER_JOB.get(str(uses).split("@", 1)[0].strip())
+    if reason:
+        raise StepScriptError(f"{label}: {uses}: {reason}")
+
+
 def render_step_script(steps: list[Any], *, context: dict | None = None) -> str:
     """The `/bin/sh` script for *steps*, in order.
 
@@ -150,6 +187,8 @@ def _render_uses(step: Any, *, uses: str, label: str, context: dict | None) -> s
     """
     from astrolift_pipelines.actions import ActionInputError
     from astrolift_pipelines.actions.registry import UnknownActionError, resolve_action
+
+    _refuse_if_impossible_here(uses, label=label, context=context or {})
 
     try:
         action = resolve_action(uses)
