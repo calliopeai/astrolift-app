@@ -161,6 +161,12 @@ from astrolift_workflows.activities.agent_stage import (
     execute_agent_stage,
 )
 from astrolift_workflows.activities.build_image import build_image
+from astrolift_workflows.activities.command_run_exec import (
+    assert_no_concurrent,
+    finish_command_run,
+    poll_command_run,
+    start_command_run,
+)
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
 from astrolift_workflows.workflows import (
     AgentBoxReapTickWorkflow,
@@ -175,6 +181,7 @@ from astrolift_workflows.workflows import (
     CaptureQuotaUsageSnapshotWorkflow,
     CertExpiryTickWorkflow,
     CiWorkflowResyncTickWorkflow,
+    CommandRunWorkflow,
     CreateDevEnvironmentWorkflow,
     CronDeployTickWorkflow,
     DecommissionClusterWorkflow,
@@ -203,6 +210,7 @@ from astrolift_workflows.workflows import (
     RehealWebhookSubscriptionsWorkflow,
     RollbackDeploymentWorkflow,
     RotateSecretBundleWorkflow,
+    RunScheduledJobWorkflow,
     RunStatusReconcileTickWorkflow,
     SecretBundleScheduledRefreshWorkflow,
     SyncAppDomainWorkflow,
@@ -242,7 +250,9 @@ WORKFLOWS = (
     MigrateAppWorkflow,
     NamespaceProvisionWorkflow,
     OnboardAppWorkflow,
+    CommandRunWorkflow,
     DeliverWebhookWorkflow,
+    RunScheduledJobWorkflow,
     PipelineRunWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
@@ -270,7 +280,11 @@ WORKFLOWS = (
 
 ACTIVITIES = (
     abort_in_flight_deploys,
+    assert_no_concurrent,
     deliver_webhook,
+    finish_command_run,
+    poll_command_run,
+    start_command_run,
     aggregate_fan_out,
     apply_manifests,
     apply_platform_rbac,
