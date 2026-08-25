@@ -31,7 +31,8 @@ with workflow.unsafe.imports_passed_through():
         expire_pending_approval_deployments,
         gc_stale_previews,
         poll_scheduled_job_runs,
-        prune_audit_log,
+        apply_observability_retention,
+    prune_audit_log,
         prune_stale_sessions,
         reconcile_cluster_capabilities,
         reheal_webhook_subscriptions,
@@ -121,6 +122,25 @@ class PruneAuditLogWorkflow:
             start_to_close_timeout=_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"pruned {n} audit log entr{'y' if n == 1 else 'ies'}")
+
+
+@workflow.defn(name="ApplyObservabilityRetentionWorkflow")
+class ApplyObservabilityRetentionWorkflow:
+    """Apply each org's configured log retention to its CloudWatch groups.
+
+    Sets a retention *policy* rather than deleting anything (#1602): AWS ages
+    the data out itself, so there is nothing for a schedule to delete and a
+    platform-side delete loop would be strictly worse than the one AWS
+    already runs.
+    """
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            apply_observability_retention,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"retention applied to {n} log group(s)")
 
 
 @workflow.defn(name="CapturePlatformCostSnapshotWorkflow")

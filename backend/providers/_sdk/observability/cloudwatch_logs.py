@@ -132,6 +132,111 @@ class CloudWatchLogsQueryDriver:
         )
 
 
+class CloudWatchLogsRetentionDriver:
+    """Apply a retention window to a CloudWatch log group (#1602).
+
+    CloudWatch is the one observability backend in this tree with a *native*
+    retention primitive: ``PutRetentionPolicy`` sets the window and AWS ages
+    the data out itself. So "evict per the retention the org configures"
+    means setting a policy here, not issuing deletes -- there is nothing to
+    delete on a schedule, and a platform-side delete loop would be strictly
+    worse than the one AWS already runs.
+
+    That is why this is a separate driver from the query one rather than a
+    method on it. The query surface is read-only by construction, and a
+    write on it would be reachable from every log-viewing code path.
+
+    Loki, Mimir and Tempo are deliberately absent. Their eviction stories are
+    each different (a compactor-mediated delete API, a series-delete
+    endpoint, and block retention configured on the compactor rather than
+    requested over the wire), so one shared "evict" verb across the four
+    would either lie about what it does on three of them or reduce to the
+    lowest common denominator. #1602 keeps them, and the AWS-first rule puts
+    them after this.
+    """
+
+    #: Windows CloudWatch actually accepts. An arbitrary day count is
+    #: rejected by the API, so a request is snapped up to the next valid one
+    #: -- never down, because keeping data slightly longer than asked is
+    #: recoverable and deleting it early is not.
+    VALID_DAYS = (
+        1,
+        3,
+        5,
+        7,
+        14,
+        30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        365,
+        400,
+        545,
+        731,
+        1096,
+        1827,
+        2192,
+        2557,
+        2922,
+        3288,
+        3653,
+    )
+
+    def __init__(self, *, config: CloudWatchLogsConfig) -> None:
+        self._config = config
+        if config.client is not None:
+            self._logs = config.client
+        else:
+            self._logs = _build_logs_client(region=config.region, role_arn=config.role_arn)
+
+    @classmethod
+    def snap_days(cls, days: int) -> int:
+        """The smallest accepted window that is at least ``days``.
+
+        Rounding up rather than to nearest: an org asking for 100 days gets
+        120, not 90. Under-retaining is a compliance failure and
+        over-retaining is a cost line, and only one of those is reversible.
+        """
+        if days <= 0:
+            raise ValueError("retention days must be positive")
+        for candidate in cls.VALID_DAYS:
+            if candidate >= days:
+                return candidate
+        return cls.VALID_DAYS[-1]
+
+    def current_retention_days(self) -> int | None:
+        """The window on the group now, or None when it never expires.
+
+        None is CloudWatch's own default and its meaning is "keep forever",
+        which is the state every group is in until something sets a policy.
+        """
+        resp = self._logs.describe_log_groups(logGroupNamePrefix=self._config.log_group)
+        for group in resp.get("logGroups", []):
+            if group.get("logGroupName") == self._config.log_group:
+                return group.get("retentionInDays")
+        return None
+
+    def apply_retention(self, days: int) -> dict:
+        """Set the group's retention window. Idempotent.
+
+        Returns what happened rather than None so the caller can log a real
+        change and stay quiet otherwise -- a scheduled task that logs
+        "applied retention" every tick trains operators to ignore it.
+        """
+        wanted = self.snap_days(days)
+        current = self.current_retention_days()
+        if current == wanted:
+            return {"changed": False, "days": wanted}
+
+        self._logs.put_retention_policy(
+            logGroupName=self._config.log_group,
+            retentionInDays=wanted,
+        )
+        return {"changed": True, "days": wanted, "previous": current}
+
+
 def _build_logs_client(*, region: str, role_arn: str | None) -> Any:
     """Build a boto3 CloudWatch Logs client using ambient credentials,
     assuming ``role_arn`` first for a cross-account tenant cluster.

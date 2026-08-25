@@ -69,6 +69,10 @@ class ScheduleKind(StrEnum):
     """Daily 02:00 UTC — delete audit log past retention
     (per ObservabilityProfile retention bounds, #9)."""
 
+    APPLY_OBSERVABILITY_RETENTION = "apply_observability_retention"
+    """Daily — set each org's configured log retention on its CloudWatch log
+    groups (#1602). A policy, not a delete: AWS ages the data out."""
+
     CAPTURE_PLATFORM_COST_SNAPSHOT = "capture_platform_cost_snapshot"
     """Daily — platform-wide cost snapshot for billing reports."""
 
@@ -331,6 +335,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.PRUNE_AUDIT_LOG,
         ),
         description="Delete audit log past retention",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.APPLY_OBSERVABILITY_RETENTION,
+        workflow_name="ApplyObservabilityRetentionWorkflow",
+        interval_seconds=24 * 60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.APPLY_OBSERVABILITY_RETENTION,
+        ),
+        description="Apply configured log retention to CloudWatch log groups",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT,

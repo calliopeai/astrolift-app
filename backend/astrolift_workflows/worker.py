@@ -168,6 +168,7 @@ from astrolift_workflows.activities.command_run_exec import (
     start_command_run,
 )
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
+from astrolift_workflows.activities.scheduled import apply_observability_retention
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
 from astrolift_workflows.workflows import (
     AgentBoxReapTickWorkflow,
@@ -176,6 +177,7 @@ from astrolift_workflows.workflows import (
     AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
     AlertEvalTickWorkflow,
+    ApplyObservabilityRetentionWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
     CapturePlatformCostSnapshotWorkflow,
@@ -262,6 +264,7 @@ WORKFLOWS = (
     PromoteDeploymentWorkflow,
     ProvisionManagedDomainWorkflow,
     ProvisionManagedServiceWorkflow,
+    ApplyObservabilityRetentionWorkflow,
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
@@ -284,6 +287,7 @@ WORKFLOWS = (
 ACTIVITIES = (
     abort_in_flight_deploys,
     assert_no_concurrent,
+    apply_observability_retention,
     create_scheduled_pipeline_run,
     deliver_webhook,
     finish_command_run,

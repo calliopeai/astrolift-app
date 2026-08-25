@@ -106,9 +106,9 @@ def test_default_schedules_complete():
     the bidirectional CI-workflow sync (#1211) added the held CI-workflow
     resync sweep; #1182 added the held per-quota usage snapshot collector;
     #128 added the agent-box reaper; #155 added the daily cert-expiry
-    monitor.
+    monitor; #1602 added the held log-retention application.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 22
+    assert len(DEFAULT_SCHEDULES) == 23
 
 
 def test_default_schedules_include_all_kinds():
