@@ -82,6 +82,29 @@ class RetentionHoldMutations:
                 field="endsAt",
             )
 
+        # Refused rather than accepted-and-ignored (#1663).
+        #
+        # The columns exist and the policy's match rules honour them, but
+        # nothing between a scoped hold and a delete does: the window
+        # subtraction cannot express "some rows in this window and not
+        # others" so it skips scoped holds, and `is_held`'s interior probe
+        # carries no resource so it does not match one either. The whole
+        # stream window survives and the held resource's rows go with it.
+        #
+        # Accepting the input would be the worst available behaviour: an
+        # operator places a hold during an incident, the API says ok, and
+        # the data is deleted anyway. Refusing is honest, and points at the
+        # form that does work.
+        if (input.resource_kind or "").strip() or (input.resource_id or "").strip():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "resource-scoped holds are not enforced yet (#1663): a hold on "
+                "one resource cannot currently exclude its rows from a "
+                "stream-wide eviction. Place a stream or wildcard hold "
+                "instead, which is enforced.",
+                field="resourceKind",
+            )
+
         stream = (input.stream or ObservabilityRetentionHold.Stream.ANY).strip()
         valid = {choice for choice, _ in ObservabilityRetentionHold.Stream.choices}
         if stream not in valid:

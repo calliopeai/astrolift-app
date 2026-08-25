@@ -313,3 +313,31 @@ def test_no_tenant_context_denies_rather_than_defaulting(actor, fake_info, permi
 
     assert not result.ok
     assert not ObservabilityRetentionHold.objects.exists()
+
+
+def test_a_resource_scoped_hold_is_refused_rather_than_silently_ignored(
+    org, actor, fake_info, permission_resolver
+):
+    """#1663. The columns exist and `is_held` honours them, but nothing
+    between a scoped hold and a delete does -- the window subtraction
+    cannot express "some rows in this window and not others", and
+    `is_held`'s interior probe carries no resource.
+
+    Accepting it would be the worst available behaviour: an operator places
+    a hold mid-incident, the API says ok, and the data is deleted anyway.
+    """
+    permission_resolver.grant(Permission.ORG_UPDATE)
+
+    result = _place(org, actor, fake_info, resource_kind="App", resource_id="42")
+
+    assert not result.ok
+    assert _err(result) == "VALIDATION"
+    assert "1663" in result.errors[0].message
+    assert not ObservabilityRetentionHold.objects.exists()
+
+
+def test_a_stream_hold_is_still_accepted(org, actor, fake_info, permission_resolver):
+    """The refusal above must not take the working form with it."""
+    permission_resolver.grant(Permission.ORG_UPDATE)
+
+    assert _place(org, actor, fake_info, stream="log").ok
