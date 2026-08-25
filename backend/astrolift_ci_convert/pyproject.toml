@@ -1,0 +1,40 @@
+# Packaging for the standalone CI converter (#1601).
+#
+# Its own project rather than a script on the backend's pyproject, because
+# the backend's has no [project] table at all -- it is tool config -- and
+# adding one would turn the whole Django tree into a distributable package
+# for the sake of one console script.
+#
+# This mirrors backend/providers/pyproject.toml: a self-contained subtree
+# with hatchling and an explicit package list. The `astrolift_ci_convert`
+# import path is unchanged either way, so the Django side that reads
+# `common.toml_reader` is unaffected by this file existing.
+#
+# Install for development from this directory:
+#     pip install -e .
+# which puts `alci` on PATH. From a checkout with no install,
+# `python -m astrolift_ci_convert` is the same CLI.
+
+[project]
+name = "astrolift-ci-convert"
+version = "0.1.0"
+description = "Convert GitHub Actions and GitLab CI pipelines to Astrolift TOML"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+# PyYAML only. The package docstring's "zero Django dependencies" is the
+# point of the tool: it runs in a repo that has never heard of Astrolift,
+# as a one-shot migration step.
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+alci = "astrolift_ci_convert.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Flat layout: the package sits beside this file's parent, so point at it
+# explicitly rather than letting hatchling guess from the project name
+# (which would look for `astrolift_ci_convert/astrolift_ci_convert`).
+packages = ["../astrolift_ci_convert"]
