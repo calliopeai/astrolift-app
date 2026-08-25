@@ -22,3 +22,16 @@ class AstroliftOperationsConfig(AppConfig):
         # envelope *after* the persistent Event row write — see
         # ``notification_dispatch.dispatch_event`` for the policy.
         register_event_subscriber(dispatch_event)
+
+        # Outbound webhooks (#1598). The subscriber mechanism has existed
+        # since events landed and nothing registered a webhook against it, so
+        # `WebhookSubscription` rows were creatable, listable, testable --
+        # and never delivered to.
+        #
+        # Registered alongside notification dispatch rather than inside it:
+        # they are different egress channels with different failure
+        # semantics, and a webhook endpoint being down must not affect
+        # whether an in-app notification was written.
+        from astrolift_operations.webhook_fanout import dispatch as dispatch_webhooks
+
+        register_event_subscriber(dispatch_webhooks)

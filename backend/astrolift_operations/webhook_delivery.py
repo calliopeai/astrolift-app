@@ -221,3 +221,103 @@ def can_send(*, current_inflight: int) -> bool:
     """Per-subscription concurrency check. Worker consults before
     starting a new attempt."""
     return current_inflight < MAX_INFLIGHT_PER_SUBSCRIPTION
+
+
+# ---- the actual POST (#1598) ----------------------------------------
+
+
+DELIVERY_TIMEOUT_SECONDS = 10
+
+
+def post_webhook(
+    *,
+    url: str,
+    secret: bytes,
+    payload: dict,
+    event_type: str,
+    format: str = "generic",
+    delivery_id: str = "",
+    timeout_seconds: int = DELIVERY_TIMEOUT_SECONDS,
+) -> dict:
+    """Sign and POST one webhook. Returns an outcome dict.
+
+    Lifted out of ``schema.mutations.helpers._deliver_test_webhook`` so the
+    manual test and real delivery sign, shape and send **identically**
+    (#1598). They differed only in that the test path existed: a test that
+    exercises a different code path than the thing it is testing is worth
+    less than no test.
+
+    What still differs is the caller, and only that: the test path does not
+    call ``record_delivery_outcome``, deliberately, because a manual test
+    must not move ``failure_count``.
+
+    ``delivered=True`` with a 4xx/5xx is a *response*, not a success. The
+    caller passes ``status_code`` to :func:`classify` to decide whether to
+    retry -- a 410 and a 503 are both "delivered" here and mean opposite
+    things.
+    """
+    import json
+    import secrets as _secrets
+    import time as _time
+    import urllib.error
+    import urllib.request
+
+    from astrolift_operations.webhook_format import adapt_payload
+
+    shaped = adapt_payload(format=format, envelope=payload)
+    raw_body = json.dumps(shaped, separators=(",", ":")).encode("utf-8")
+    timestamp_unix = int(_time.time())
+    delivery_id = delivery_id or _secrets.token_urlsafe(16)
+    headers = build_headers(
+        event_type=event_type,
+        event_id=delivery_id,
+        delivery_id=delivery_id,
+        schema_version="1",
+        signature=sign_payload(secret=secret, timestamp_unix=timestamp_unix, raw_body=raw_body),
+        timestamp_unix=timestamp_unix,
+    )
+
+    req = urllib.request.Request(  # noqa: S310 - url validated by URLField on save
+        url,
+        data=raw_body,
+        method="POST",
+        headers=headers,
+    )
+
+    started = _time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:  # noqa: S310
+            body = resp.read(2048)
+            return {
+                "delivered": True,
+                "status_code": resp.status,
+                "duration_ms": int((_time.monotonic() - started) * 1000),
+                "response_body_excerpt": body.decode("utf-8", errors="replace")[:512],
+                "error": "",
+                "delivery_id": delivery_id,
+                "timestamp_unix": timestamp_unix,
+            }
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read(2048) or b""
+        except Exception:  # noqa: BLE001 - best-effort body read
+            body = b""
+        return {
+            "delivered": True,
+            "status_code": exc.code,
+            "duration_ms": int((_time.monotonic() - started) * 1000),
+            "response_body_excerpt": body.decode("utf-8", errors="replace")[:512],
+            "error": "",
+            "delivery_id": delivery_id,
+            "timestamp_unix": timestamp_unix,
+        }
+    except Exception as exc:  # noqa: BLE001 - every transport error is a delivery miss
+        return {
+            "delivered": False,
+            "status_code": None,
+            "duration_ms": int((_time.monotonic() - started) * 1000),
+            "response_body_excerpt": "",
+            "error": str(exc),
+            "delivery_id": delivery_id,
+            "timestamp_unix": timestamp_unix,
+        }
