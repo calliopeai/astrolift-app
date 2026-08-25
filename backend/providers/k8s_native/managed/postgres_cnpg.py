@@ -31,6 +31,8 @@ from _sdk.managed_service import (
     ProvisionSpec,
     ServiceHandle,
     ServiceStatus,
+    SliceResult,
+    SliceSpec,
     SnapshotHandle,
     UpdateResult,
     UpdateSpec,
@@ -220,6 +222,244 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             handle=spec.handle,
             message=(f"CNPG Cluster {parsed.name} deleted ({'with data' if delete_data else 'PVCs retained'})"),
         )
+
+    # ---- per-preview slices (#1578) --------------------------------
+    #
+    # Why CNPG first, and why it is written this way rather than the
+    # shorter way.
+    #
+    # A slice needs a database and a role created *inside* a running
+    # instance. No cloud API does that -- RDS has no "create database" call
+    # -- so the alternative is the platform holding an admin credential for
+    # a production database and running SQL against it. CNPG needs neither:
+    # its operator already holds the superuser credential and reconciles
+    # `Database` CRDs and `Cluster.spec.managed.roles` declaratively, so
+    # the platform writes manifests and never sees a credential.
+    #
+    # **A dedicated role, not the parent's app credentials.** Overriding
+    # only `POSTGRES_DB` and reusing the parent's credentials is far less
+    # code and passes every guard in `SliceResult`. It also leaves the
+    # preview holding a credential that opens the parent database, so a
+    # workload ignoring `POSTGRES_DB` -- or any dependency with a hardcoded
+    # connection string, or a migration tool defaulting to `postgres` --
+    # reaches production data. That is the exact failure #1578 was filed
+    # about, and renaming the default database does not prevent it.
+    #
+    # **The role list is read-modify-written from the parent's FULL spec,
+    # never patched.** This is the part that has to be right. The shared
+    # `server_side_apply` uses one field manager (`astrolift`) with
+    # `force_conflicts=True`, so applying a partial Cluster carrying only
+    # `spec.managed.roles` makes that manager relinquish every field it
+    # owns and is not carrying -- pruning `spec.instances` and
+    # `spec.storage` off a live production database. Re-applying the
+    # complete spec with the role merged in is safe precisely because
+    # nothing is absent.
+
+    SLICE_DB_PREFIX = "slice"
+
+    def supports_slicing(self) -> bool:
+        return True
+
+    def _slice_names(self, spec: SliceSpec) -> tuple[str, str, str]:
+        """Deterministic (database, role, secret) names for a slice.
+
+        Derived from `slice_id`, never generated: the caller has to be able
+        to ask for the same slice twice and tear down the one it means.
+        Postgres identifiers may not contain `-` and k8s object names may
+        not contain `_`, so the same slice carries two spellings.
+        """
+        stem = dns_label(f"{self.SLICE_DB_PREFIX}-{spec.slice_id}")
+        ident = stem.replace("-", "_")
+        return ident, f"{ident}_owner", f"{stem}-owner"
+
+    @driver_op(
+        cloud="k8s_native",
+        driver="postgres_cnpg",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
+    def provision_slice(self, spec: SliceSpec) -> SliceResult:
+        parsed = _unpack_handle(spec.parent.handle)
+        if parsed.is_legacy:
+            raise ValueError(
+                "legacy 2-segment parent handle cannot be sliced: it carries no "
+                "cluster or namespace locator, so the slice would be created "
+                "somewhere this driver cannot later find it"
+            )
+
+        database, role, secret_name = self._slice_names(spec)
+        labels = {
+            "app.kubernetes.io/managed-by": "astrolift",
+            "ai.astrolift.slice-id": dns_label(spec.slice_id),
+            **spec.labels,
+        }
+        db_object = dns_label(database.replace("_", "-"))
+
+        manifests: list[dict[str, Any]] = [
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {"name": secret_name, "namespace": parsed.namespace, "labels": labels},
+                "type": "kubernetes.io/basic-auth",
+                # Username only. A literal password here would put a
+                # database credential into a rendered manifest, which is the
+                # one thing this driver must never emit; the platform's
+                # secret pipeline fills it in.
+                "stringData": {"username": role},
+            },
+            {
+                "apiVersion": "postgresql.cnpg.io/v1",
+                "kind": "Database",
+                "metadata": {"name": db_object, "namespace": parsed.namespace, "labels": labels},
+                "spec": {
+                    "name": database,
+                    "owner": role,
+                    "cluster": {"name": parsed.name},
+                    # Keep the data when the CRD goes, so a mis-fired
+                    # teardown does not destroy a preview's database before
+                    # anyone can look at why it fired.
+                    "databaseReclaimPolicy": "retain",
+                },
+            },
+        ]
+
+        if self._config.cluster_driver is not None:
+            parent_patch = self._parent_with_role(parsed=parsed, role=role, secret_name=secret_name)
+            if parent_patch is not None:
+                # Role first: CNPG's Database reconciler needs the owner to
+                # exist, and the role reconciler reads the password Secret.
+                manifests = [manifests[0], parent_patch, manifests[1]]
+            result = self._config.cluster_driver.apply_manifests(
+                parsed.cluster_id,
+                parsed.namespace,
+                manifests,
+            )
+            if result.errors:
+                raise RuntimeError(f"slice apply failed: {result.summary()}")
+
+        return SliceResult(
+            slice_handle=_pack_handle(
+                kind=f"{KIND}_slice",
+                cluster_id=parsed.cluster_id,
+                namespace=parsed.namespace,
+                name=database,
+            ),
+            env_overrides={
+                # The database, and credentials that reach only it. Host and
+                # port are absent so they fall through to the parent's
+                # binding -- it is the same instance.
+                "POSTGRES_DB": ValueRef(literal=database),
+                "POSTGRES_USER": ValueRef(literal=role),
+                "POSTGRES_PASSWORD": ValueRef(secret_ref=f"{secret_name}#password"),
+                # The pre-#1003 aliases the parent binding also publishes.
+                # Omitting them would leave a workload reading DATABASE_NAME
+                # pointed at the parent while POSTGRES_DB pointed at the
+                # slice: a half-applied override, worse than none because it
+                # looks isolated.
+                "DATABASE_NAME": ValueRef(literal=database),
+                "DATABASE_USER": ValueRef(literal=role),
+                "DATABASE_PASSWORD": ValueRef(secret_ref=f"{secret_name}#password"),
+                # DATABASE_URL is one composed string in the parent Secret
+                # and cannot be partially overridden, so it is replaced
+                # wholesale by the slice's own.
+                "DATABASE_URL": ValueRef(secret_ref=f"{secret_name}#uri"),
+            },
+            notes=(
+                f"CNPG Database {database} owned by role {role}; credentials in "
+                f"Secret {secret_name}. Host/port inherited from the parent cluster."
+            ),
+        )
+
+    def _parent_with_role(self, *, parsed: Any, role: str, secret_name: str) -> dict[str, Any] | None:
+        """The parent Cluster, complete, with ``role`` merged into
+        ``spec.managed.roles``. None when it cannot be read.
+
+        Full spec, never a patch -- see the block comment above. Returning
+        None on an unreadable parent means the slice is created without its
+        role, which CNPG leaves as a Database whose owner does not exist;
+        that is visible and repairable, where a pruned parent spec is
+        neither.
+        """
+        existing = self._config.cluster_driver.get_manifest(
+            parsed.cluster_id,
+            parsed.namespace,
+            "postgresql.cnpg.io/v1/Cluster",
+            parsed.name,
+        )
+        if not existing or not isinstance(existing.get("spec"), dict):
+            return None
+
+        spec = existing["spec"]
+        managed = dict(spec.get("managed") or {})
+        roles = [dict(r) for r in (managed.get("roles") or []) if isinstance(r, dict)]
+        entry = {
+            "name": role,
+            "ensure": "present",
+            "login": True,
+            "passwordSecret": {"name": secret_name},
+        }
+        # Merge by name, so re-provisioning the same slice is idempotent and
+        # a concurrent slice's role is preserved rather than replaced. This
+        # is still read-modify-write: two provisions interleaving between
+        # the read and the apply can lose one role. Bounded and repairable
+        # (re-firing the slice restores it), and the fix is optimistic
+        # concurrency on resourceVersion, which the driver protocol does not
+        # expose today.
+        roles = [r for r in roles if r.get("name") != role] + [entry]
+        managed["roles"] = roles
+
+        return {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
+            # The parent's own spec, carried whole.
+            "spec": {**spec, "managed": managed},
+        }
+
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg", audit=True)
+    def deprovision_slice(self, slice_handle: str) -> bool:
+        """Delete the slice's Database CRD and credential Secret.
+
+        Returns False rather than raising when a delete does not land, so a
+        teardown workflow can record the leak and continue: a slice left
+        behind is a database sitting in the parent instance that nobody sees
+        until someone reads the instance's database list.
+
+        The role is deliberately left in the parent's `spec.managed.roles`.
+        Removing it is a read-modify-write on a shared spec from a teardown
+        path, which can drop a role another slice added concurrently -- and
+        an orphaned login with no database is a much smaller problem than a
+        live preview losing its credentials.
+        """
+        parsed = _unpack_handle(slice_handle)
+        if self._config.cluster_driver is None:
+            return True
+
+        database = parsed.name
+        db_object = dns_label(database.replace("_", "-"))
+        secret_name = f"{db_object}-owner"
+
+        stubs = [
+            {
+                "apiVersion": "postgresql.cnpg.io/v1",
+                "kind": "Database",
+                "metadata": {"name": db_object, "namespace": parsed.namespace},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {"name": secret_name, "namespace": parsed.namespace},
+            },
+        ]
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            stubs,
+        )
+        return not result.errors
 
     # ---- read-only -------------------------------------------------
 
