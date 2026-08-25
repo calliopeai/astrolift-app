@@ -41,6 +41,7 @@ from astrolift_operations.schema.types import (
     EventType,
     NotificationPreferenceType,
     NotificationType,
+    ObservabilityRetentionType,
     UserAlertSubscriptionType,
     WebhookDeliveryType,
     WebhookSubscriptionType,
@@ -752,6 +753,62 @@ class OperationsQuery:
         org = Organization.objects.filter(pk=org_id).only("audit_log_retention_days").first()
         days = org.audit_log_retention_days if org is not None else 365
         return AuditRetentionType(days=max(1, int(days)))
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_observability_retention(self, info: Info) -> list[ObservabilityRetentionType]:
+        """The caller org's effective retention for all four streams (#1602).
+
+        This is the read surface the four `Organization` columns never had:
+        an operator could set `metrics_retention_days_default` and had no
+        way to see what the platform would do with it.
+
+        Resolved through `effective_for` rather than read off the columns,
+        so what is reported is what the sweep will enforce. Reading the
+        columns directly would show the number an operator typed even when
+        it sits above the platform ceiling, and the sweep would then evict
+        on a different one -- the surface and the behaviour disagreeing
+        about the same policy.
+
+        Deny-by-default: `_caller_org_id()` of None returns an empty list
+        rather than the platform defaults. Platform defaults are not
+        secret, but a query that answers without a tenant is one somebody
+        later extends to answer *with* the wrong tenant (#1183).
+        """
+        from astrolift_identity.models import Organization
+        from astrolift_operations.observability_retention import (
+            ALL_STREAMS,
+            billable_window_days,
+            effective_for,
+            warn_threshold_for,
+        )
+        from astrolift_operations.observability_retention_sweep import STREAM_COLUMNS
+
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return []
+
+        out: list[ObservabilityRetentionType] = []
+        for stream in ALL_STREAMS:
+            # The same column map the sweep uses, imported rather than
+            # restated: a surface reading one column while the sweep evicts
+            # on another is the failure this whole issue is about.
+            override = getattr(org, STREAM_COLUMNS[stream], None)
+            retention = effective_for(stream=stream, org_override_days=override)
+            out.append(
+                ObservabilityRetentionType(
+                    stream=stream,
+                    days=retention.days,
+                    source=retention.source,
+                    billable_window_days=billable_window_days(retention),
+                    warn_threshold_days=warn_threshold_for(retention),
+                )
+            )
+        return out
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)

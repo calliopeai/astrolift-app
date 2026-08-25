@@ -998,3 +998,28 @@ def observability_retention_hold_to_type(
         reason=row.reason or "",
         released=(row.deleted_at is not None) if released is None else released,
     )
+
+
+@strawberry.type
+class ObservabilityRetentionType:
+    """The effective retention for one observability stream (#1602).
+
+    One row per stream, resolved through the policy module rather than read
+    off the column, so the surface reports what the sweep will actually
+    enforce. Reading the column directly would show an operator the number
+    they typed even when it is above the platform ceiling -- and then the
+    sweep would evict on a different one.
+    """
+
+    stream: str
+    days: int
+    source: str
+    """``org_override`` or ``platform_default`` -- so the UI can say whether
+    this org has actually set anything, rather than presenting an inherited
+    default as a choice."""
+
+    billable_window_days: int
+    """What the usage dashboard bills against."""
+
+    warn_threshold_days: int
+    """When to warn an admin before retention closes on a row."""

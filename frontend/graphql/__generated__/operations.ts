@@ -7282,6 +7282,14 @@ export type ObservabilityRetentionHoldTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ObservabilityRetentionType = {
+  billableWindowDays: Scalars['Int']['output'];
+  days: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  stream: Scalars['String']['output'];
+  warnThresholdDays: Scalars['Int']['output'];
+};
+
 export type OrganizationInput = {
   id: InputMaybe<Scalars['ID']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
@@ -7680,6 +7688,7 @@ export type Query = {
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
+  astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
