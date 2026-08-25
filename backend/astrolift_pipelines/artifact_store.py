@@ -72,9 +72,9 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
     # comment claimed the module was "not yet wired". The module is wired;
     # only the name was missing, so the per-org branch was never taken
     # (#1610).
-    from core.blob_store_resolution import install_s3_driver
+    from core.blob_store_resolution import driver_for_org
 
-    driver = install_s3_driver(purpose="pipeline artifact store")
+    driver = driver_for_org(org, purpose="pipeline artifact store")
     if driver is not None:
         return driver
 

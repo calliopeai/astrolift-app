@@ -79,9 +79,9 @@ def archive_expired_audit_events(org, *, now, retention_days: int) -> dict[str, 
     if not getattr(org, "audit_export_enabled", False):
         return {"skipped": "export not enabled for this organization", "bytes": 0, "rows": 0}
 
-    from core.blob_store_resolution import install_s3_driver
+    from core.blob_store_resolution import driver_for_org
 
-    driver = install_s3_driver(purpose="audit archive")
+    driver = driver_for_org(org, purpose="audit archive")
     if driver is None:
         # Not an error: an install with no bucket simply has nowhere to put
         # this. Loud enough to find, because an operator who switched the
