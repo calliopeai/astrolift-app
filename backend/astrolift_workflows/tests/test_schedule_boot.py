@@ -226,6 +226,14 @@ def test_default_excludes_every_hold_kind():
         # ASTROLIFT_ACTIVE_SCHEDULES once they have decided the window is
         # right.
         ScheduleKind.APPLY_OBSERVABILITY_RETENTION,
+        # Observability *eviction* ships HELD (#1602) -- the strongest case
+        # in the catalog. Every other HOLD kind is held because a mistake
+        # would be expensive or noisy; this one is held because its entire
+        # purpose is deleting tenant data, and a tick that deletes a window
+        # cannot be undone by the next one. Sibling to, and distinct from,
+        # APPLY_OBSERVABILITY_RETENTION above: that sets the window, this
+        # enforces it.
+        ScheduleKind.PRUNE_OBSERVABILITY_DATA,
     }
     assert hold.isdisjoint(PHASE_3A_ACTIVE_KINDS)
     # Sanity: YES set + HOLD set together cover the whole enum.

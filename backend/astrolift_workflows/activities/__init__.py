@@ -135,6 +135,10 @@ from astrolift_workflows.activities.migration import (
     switch_app_env_binding,
     validate_migration_target,
 )
+from astrolift_workflows.activities.observability_retention import (
+    ObservabilityRetentionSummary,
+    prune_observability_data,
+)
 from astrolift_workflows.activities.pipeline_job_spawn import (
     cancel_pipeline_job,
     mark_job_run_cancelled,
@@ -213,7 +217,9 @@ __all__ = [
     "cancel_pipeline_job",
     "capture_platform_cost_snapshot",
     "capture_quota_usage_snapshot",
+    "ObservabilityRetentionSummary",
     "check_cert_expiry_tick",
+    "prune_observability_data",
     "check_managed_service_ready",
     "cleanup_cluster_acm_certs",
     "cleanup_cluster_dns_records",

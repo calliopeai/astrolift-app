@@ -208,6 +208,21 @@ class ScheduleKind(StrEnum):
     certificate."""
 
     CERT_EXPIRY = "cert_expiry"
+    PRUNE_OBSERVABILITY_DATA = "prune_observability_data"
+    """Evict observability data past each org's configured retention (#1602).
+
+    Ships **HELD**, and this is the strongest HOLD case in the catalog: it
+    is the only schedule whose whole purpose is to delete tenant data. Not
+    idempotent in the way the active kinds are -- a tick that deletes a
+    window cannot be undone by the next one.
+
+    Distinct from APPLY_OBSERVABILITY_RETENTION, which sets a log group's
+    retention window on the provider. That one configures the policy; this
+    one enforces it.
+
+    Activated per operator via ASTROLIFT_ACTIVE_SCHEDULES, after they have
+    run the sweep in dry-run and read the window counts.
+    """
     """Daily — refresh each live custom domain's cached TLS-cert snapshot
     from its provider and evaluate it against the 30 / 14 / 7-day reminder
     thresholds (spec 13 §5.3, #155), emitting domain.cert_expiring on a
@@ -481,6 +496,18 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.CERT_EXPIRY,
         ),
         description="Daily TLS cert expiry check: 30/14/7-day reminders + renewal-failure escalation (#155)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.PRUNE_OBSERVABILITY_DATA,
+        workflow_name="ObservabilityRetentionTickWorkflow",
+        interval_seconds=24 * 60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.PRUNE_OBSERVABILITY_DATA,
+        ),
+        description=(
+            "Daily eviction of observability data past each org's configured "
+            "retention. Ships HELD -- it deletes tenant data (#1602)"
+        ),
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CI_WORKFLOW_RESYNC,

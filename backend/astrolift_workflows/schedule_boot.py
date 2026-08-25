@@ -57,6 +57,11 @@ ACTIVE_SCHEDULES_ENV = "ASTROLIFT_ACTIVE_SCHEDULES"
 # explicitly configured with the matching run-mode (≈zero prod blast radius).
 # The HOLD kinds (deletes / teardowns / cost-API / auto-deploy / auto-fail)
 # are deliberately absent — Phase 3b adds them one at a time via the env.
+# NB PRUNE_OBSERVABILITY_DATA (#1602) is deliberately absent below. It is
+# the only schedule in the catalog whose purpose is to delete tenant data,
+# so it is opted into per operator via ASTROLIFT_ACTIVE_SCHEDULES after a
+# dry-run pass -- the same treatment CI_WORKFLOW_RESYNC gets for writing to
+# tenant repos, one category more serious.
 PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
     {
         ScheduleKind.AGENT_RECONCILE_TICK,
