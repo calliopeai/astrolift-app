@@ -479,7 +479,6 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         "astrolift_identity.org_subdomain",
         "astrolift_identity.scim_tokens",
         "astrolift_lifecycle.drift",
-        "astrolift_lifecycle.preview_managed_services",
         "astrolift_manifest.env_overrides",
         "astrolift_manifest.portability",
         "astrolift_manifest.portability_surfacing",

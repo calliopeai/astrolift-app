@@ -31,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
         mark_preview_building,
         mark_preview_failed,
         mark_preview_running,
+        provision_preview_managed_services_activity,
         provision_preview_namespace,
     )
 
@@ -65,9 +66,32 @@ class BuildPreviewWorkflow:
             )
             return WorkflowResult(ok=False, message=f"preview namespace provision failed: {exc}")
 
+        # PROVISION_MANAGED_SERVICES (#1578). Named in
+        # `preview_build.BUILD_ORDER` since that tuple was written and
+        # performed by nothing until now, which is why a preview booted with
+        # no DB / redis / queue envelope.
+        #
+        # Non-fatal by design. A preview with a namespace and no database is
+        # useful -- the operator can look at why -- where failing the whole
+        # build leaves them with neither and no diagnosis. The outcome's
+        # `shared_unsliced` and `errors` carry what did not happen.
+        services: dict = {}
+        try:
+            services = await workflow.execute_activity(
+                provision_preview_managed_services_activity,
+                pid,
+                start_to_close_timeout=_STEP_TIMEOUT,
+            )
+        except Exception as exc:  # noqa: BLE001 - workflow error envelope
+            workflow.logger.warning("preview managed services failed: %s", exc)
+
         await workflow.execute_activity(
             mark_preview_running,
             pid,
             start_to_close_timeout=_STEP_TIMEOUT,
         )
-        return WorkflowResult(ok=True, message=f"preview namespace {namespace} ready")
+        attached = ", ".join(services.get("attached") or []) or "none"
+        return WorkflowResult(
+            ok=True,
+            message=f"preview namespace {namespace} ready; services attached: {attached}",
+        )
