@@ -5674,6 +5674,14 @@ type ObservabilityRetentionHoldTypeMutationResult {
   data: ObservabilityRetentionHoldType
 }
 
+type ObservabilityRetentionType {
+  stream: String!
+  days: Int!
+  source: String!
+  billableWindowDays: Int!
+  warnThresholdDays: Int!
+}
+
 input OrganizationInput {
   id: ID = null
   website: String = null
@@ -6000,6 +6008,7 @@ type Query {
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
   astroliftAuditRetention: AstroliftAuditRetention!
+  astroliftObservabilityRetention: [ObservabilityRetentionType!]!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage.")
   astroliftWebhookSubscriptionsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookSubscriptionPage!
