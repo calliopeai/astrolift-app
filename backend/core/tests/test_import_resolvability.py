@@ -71,14 +71,7 @@ FIRST_PARTY_PREFIXES = ("core", "config", "astrolift", "providers")
 # the impersonation gate they were accidentally providing. Two more
 # (app_teardown's DeployToken, pipeline_secrets' list_org_secrets) were
 # repaired in #1614 rather than listed.
-KNOWN_BROKEN: frozenset[str] = frozenset(
-    {
-        # astrolift_workflows.client has no get_temporal_client; pipeline
-        # schedule sync cannot reach Temporal. Tracked in #1614.
-        "astrolift_pipelines/schedule_sync.py:54",
-        "astrolift_pipelines/schedule_sync.py:119",
-    }
-)
+KNOWN_BROKEN: frozenset[str] = frozenset({})
 
 
 def _module_path(dotted: str) -> pathlib.Path | None:
