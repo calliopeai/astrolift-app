@@ -5374,6 +5374,8 @@ type Mutation {
   bulkRollingRestart(input: BulkRollingRestartInput!): BulkOperationResult!
   bulkPushSecrets(input: BulkPushSecretsInput!): BulkOperationResult!
   bulkResyncManifest(input: BulkResyncManifestInput!): BulkOperationResult!
+  placeObservabilityRetentionHold(input: PlaceObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
+  releaseObservabilityRetentionHold(input: ReleaseObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -5655,6 +5657,23 @@ type NoneTypeMutationResult {
   data: Void
 }
 
+type ObservabilityRetentionHoldType {
+  id: GUID!
+  stream: String!
+  startsAt: DateTime!
+  endsAt: DateTime!
+  resourceKind: String!
+  resourceId: String!
+  reason: String!
+  released: Boolean!
+}
+
+type ObservabilityRetentionHoldTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ObservabilityRetentionHoldType
+}
+
 input OrganizationInput {
   id: ID = null
   website: String = null
@@ -5758,6 +5777,15 @@ type PermissionTraceStep {
   check: String!
   result: Boolean!
   detail: String!
+}
+
+input PlaceObservabilityRetentionHoldInput {
+  startsAt: DateTime!
+  endsAt: DateTime!
+  reason: String!
+  stream: String! = "*"
+  resourceKind: String! = ""
+  resourceId: String! = ""
 }
 
 type PreSignedUrlUploadResult {
@@ -6354,6 +6382,10 @@ input RejectByTokenInput {
 input RejectSecretChangeInput {
   proposalId: GUID!
   reason: String!
+}
+
+input ReleaseObservabilityRetentionHoldInput {
+  holdId: GUID!
 }
 
 input RemoveAppDomainInput {

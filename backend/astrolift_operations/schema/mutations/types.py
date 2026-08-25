@@ -366,3 +366,26 @@ class BulkPushSecretsInput:
 @strawberry.input
 class BulkResyncManifestInput:
     app_slugs: list[str]
+
+
+@strawberry.input
+class PlaceObservabilityRetentionHoldInput:
+    """Hold a window of observability data against eviction (#1602).
+
+    No TTL field, deliberately: the window bounds a slice of *data*, not a
+    period during which the hold applies, so an auto-expiry would delete
+    the exact data the hold was placed to keep, on a timer, silently.
+    Release is explicit.
+    """
+
+    starts_at: dt.datetime
+    ends_at: dt.datetime
+    reason: str
+    stream: str = "*"
+    resource_kind: str = ""
+    resource_id: str = ""
+
+
+@strawberry.input
+class ReleaseObservabilityRetentionHoldInput:
+    hold_id: GUID

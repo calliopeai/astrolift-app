@@ -5286,6 +5286,7 @@ export type Mutation = {
   pinTransaction: Scalars['Boolean']['output'];
   /** Update or set the user's PIN. */
   pinUpdate: Scalars['Boolean']['output'];
+  placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
   /** Process a previously uploaded data import file. */
@@ -5326,6 +5327,7 @@ export type Mutation = {
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
+  releaseObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
@@ -6312,6 +6314,11 @@ export type MutationPinUpdateArgs = {
 };
 
 
+export type MutationPlaceObservabilityRetentionHoldArgs = {
+  input: PlaceObservabilityRetentionHoldInput;
+};
+
+
 export type MutationPreSignedUrlImageUploadArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
   globalId: Scalars['ID']['input'];
@@ -6495,6 +6502,11 @@ export type MutationRejectDeploymentByTokenArgs = {
 
 export type MutationRejectSecretChangeArgs = {
   input: RejectSecretChangeInput;
+};
+
+
+export type MutationReleaseObservabilityRetentionHoldArgs = {
+  input: ReleaseObservabilityRetentionHoldInput;
 };
 
 
@@ -7253,6 +7265,23 @@ export type NoneTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ObservabilityRetentionHoldType = {
+  endsAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  reason: Scalars['String']['output'];
+  released: Scalars['Boolean']['output'];
+  resourceId: Scalars['String']['output'];
+  resourceKind: Scalars['String']['output'];
+  startsAt: Scalars['DateTime']['output'];
+  stream: Scalars['String']['output'];
+};
+
+export type ObservabilityRetentionHoldTypeMutationResult = {
+  data?: Maybe<ObservabilityRetentionHoldType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type OrganizationInput = {
   id: InputMaybe<Scalars['ID']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
@@ -7352,6 +7381,15 @@ export type PermissionTraceStep = {
   check: Scalars['String']['output'];
   detail: Scalars['String']['output'];
   result: Scalars['Boolean']['output'];
+};
+
+export type PlaceObservabilityRetentionHoldInput = {
+  endsAt: Scalars['DateTime']['input'];
+  reason: Scalars['String']['input'];
+  resourceId: Scalars['String']['input'];
+  resourceKind: Scalars['String']['input'];
+  startsAt: Scalars['DateTime']['input'];
+  stream: Scalars['String']['input'];
 };
 
 export type PreSignedUrlUploadResult = {
@@ -9323,6 +9361,10 @@ export type RejectByTokenInput = {
 export type RejectSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
   reason: Scalars['String']['input'];
+};
+
+export type ReleaseObservabilityRetentionHoldInput = {
+  holdId: Scalars['GUID']['input'];
 };
 
 export type RemoveAppDomainInput = {

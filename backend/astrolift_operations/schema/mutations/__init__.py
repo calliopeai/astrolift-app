@@ -25,6 +25,7 @@ from astrolift_operations.schema.mutations.helpers import (  # noqa: F401
     log,
 )
 from astrolift_operations.schema.mutations.notifications import NotificationMutations
+from astrolift_operations.schema.mutations.retention_holds import RetentionHoldMutations
 
 # Re-exported for the public import surface (tests / cross-app importers).
 from astrolift_operations.schema.mutations.types import (  # noqa: F401
@@ -43,7 +44,9 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     ExportAuditEventsInput,
     MarkNotificationReadInput,
     MuteAlertRuleInput,
+    PlaceObservabilityRetentionHoldInput,
     RegisterMobileDeviceInput,
+    ReleaseObservabilityRetentionHoldInput,
     RevokeMobileDeviceInput,
     RotateOutboundWebhookSecretInput,
     SetAlertSubscriptionInput,
@@ -71,5 +74,6 @@ class OperationsMutation(
     ExportMutations,
     AlertSubscriptionMutations,
     BulkOpsMutations,
+    RetentionHoldMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""
