@@ -8,6 +8,7 @@ Surfaces:
 
   * Calliope App Builder  (/api/builder/v1/, #767, #768)
   * CLI + CI deploy       (/api/cli/v1/,     #777)
+  * Domain session handoff (/api/edge/v1/,   #1631)
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from __future__ import annotations
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
-from astrolift_lifecycle import builder_views, cli_views
+from astrolift_lifecycle import builder_views, cli_views, domain_handoff_views
 
 app_name = "astrolift_lifecycle"
 
@@ -56,5 +57,15 @@ urlpatterns = [
         "api/cli/v1/apps/<str:app_slug>/static/<str:workload>/upload/",
         csrf_exempt(cli_views.ci_static_upload),
         name="cli-static-upload",
+    ),
+    # ── Cross-domain session handoff (/api/edge/v1/) ─────────────────────
+    # Called server-to-server by a custom domain's oauth2-proxy, never by a
+    # browser: it trades the opaque id from the auth host's redirect for the
+    # verified identity, so the proxy can set a first-party cookie on a
+    # domain the central auth host's cookie can never reach.
+    path(
+        "api/edge/v1/domain-handoff/exchange/",
+        csrf_exempt(domain_handoff_views.exchange_domain_handoff),
+        name="domain-handoff-exchange",
     ),
 ]
