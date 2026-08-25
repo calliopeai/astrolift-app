@@ -27,13 +27,23 @@ driver's own findings are used when it exposes them. When neither is
 available the scan is reported as *failed*, never as clean, and
 ``ScanPolicy.fail_open_on_scanner_error`` decides what that means.
 
-Signature enforcement (``block_on_missing_signature``) is deliberately
-NOT evaluated here. ``activities.image_signing`` needs a verifier and an
-allowed-signer allow-list; the repo has neither (no cosign/sigstore
-dependency, no column or mutation that declares a signer), and with no
-verifier every image would report unsigned and block every promote by
-default. The knob is reported on the blocked payload's
-``signature_required`` and otherwise left to the verifier work.
+Signature enforcement is evaluated here now (#1605), and it is keyed on the
+**org**, not on ``RegisteredApp.block_on_missing_signature``. That field
+defaults to True and has never been evaluated, so honouring it would arm
+enforcement on every install at once; it stays reported on the blocked
+payload's ``signature_required`` rather than acting.
+
+``Organization.image_signing_policy`` is the switch, disabled by default.
+Astrolift does not sign images -- it verifies signatures a customer's own
+build already produced, which is the scope decided on #1605 -- so an install
+with no verifier registered and no policy set behaves exactly as before.
+
+Signing runs *before* the CVE early-return, because an org that requires
+signed images wants that whether or not a given app arms a CVE knob. It also
+fails **closed** where the scan path fails open: a scan that could not run
+leaves an unknown, while a signature check that could not run leaves an
+explicit "only these identities" unenforced, and promoting anyway is the
+outcome that policy exists to prevent.
 """
 
 from __future__ import annotations
@@ -52,6 +62,7 @@ from astrolift_workflows.activities.image_scan import (
     evaluate_policy,
     get_scanner,
 )
+from astrolift_workflows.activities.image_signing import SigningDecision
 
 log = logging.getLogger("astrolift_workflows.activities.supply_chain_gate")
 
@@ -243,6 +254,56 @@ def _emit_scanned(deployment, app, result: ScanResult, findings: list[dict]) -> 
     )
 
 
+def _image_uri_for(deployment, app) -> str:
+    """The digest-pinned image URI, or the repo when nothing is pinned.
+
+    Same construction ``_scan`` uses; shared so a signature and a scan can
+    never disagree about which image they were talking about.
+    """
+    digest = deployment.image_digest or ""
+    repo = f"{app.organization.slug}/{app.slug}"
+    base = app.registry_repo_uri or repo
+    return f"{base}@{digest}" if digest else base
+
+
+def _evaluate_signing(deployment, app):
+    """Verify the image against the org's signing policy, or None.
+
+    Returns None when signing is not in play at all, which is every org that
+    has not opted in -- and that is deliberately indistinguishable from a
+    PASS to the caller, because it is one.
+
+    A misconfiguration -- enforcement on with no verifier registered, or an
+    unparseable allow-list -- BLOCKS. That is the one place this differs from
+    the CVE path, which fails open on a scanner error by policy. A scan that
+    could not run leaves an unknown; a signature check that could not run
+    leaves an org's explicit "only run images signed by these identities"
+    unenforced, and quietly promoting anyway is the outcome that policy
+    exists to prevent.
+    """
+    from astrolift_workflows.activities.image_signing import (
+        SigningDecision,
+        SigningMisconfigured,
+        verify_image_for_org,
+    )
+
+    try:
+        return verify_image_for_org(app.organization, _image_uri_for(deployment, app))
+    except SigningMisconfigured as exc:
+        log.error(
+            "supply-chain gate: signing misconfigured for app=%s: %s",
+            app.slug,
+            exc,
+        )
+        from astrolift_workflows.activities.image_signing import PolicyDecision
+
+        return PolicyDecision(
+            decision=SigningDecision.BLOCK,
+            matched_signer=None,
+            reason=f"signature verification could not run: {exc}",
+        )
+
+
 def _emit_blocked(deployment, app, *, reason: str, result: ScanResult, signature_required: bool) -> None:
     from django.utils import timezone
 
@@ -280,6 +341,32 @@ def _evaluate_supply_chain_gate_sync(deployment_id: int) -> dict:
     high_threshold = resolved["block_on_high_cve_threshold"]
     signature_required = bool(resolved["block_on_missing_signature"])
 
+    # Signatures first, and deliberately ahead of the CVE early-return
+    # below: an org that requires signed images wants that enforced whether
+    # or not this particular app arms a CVE knob. Putting it after would
+    # silently skip verification for every app with CVE gating off (#1605).
+    signing = _evaluate_signing(deployment, app)
+    if signing is not None and signing.decision is SigningDecision.BLOCK:
+        log.info(
+            "supply-chain gate BLOCK for deploy %s (app=%s): %s",
+            deployment_id,
+            app.slug,
+            signing.reason,
+        )
+        _emit_blocked(
+            deployment,
+            app,
+            reason="unsigned_or_untrusted_image",
+            result=_failed_scan(_image_uri_for(deployment, app), "none", "blocked before scan"),
+            signature_required=signature_required,
+        )
+        return {
+            "decision": ScanDecision.BLOCK.value,
+            "reason": signing.reason,
+            "scanned": False,
+            "signing": signing.decision.value,
+        }
+
     if not block_critical and high_threshold is None:
         # Neither CVE knob is armed, so there is nothing a scan could
         # change about this promote.
@@ -287,6 +374,7 @@ def _evaluate_supply_chain_gate_sync(deployment_id: int) -> dict:
             "decision": ScanDecision.PASS.value,
             "reason": "no CVE gate armed for this app",
             "scanned": False,
+            "signing": signing.decision.value if signing else SigningDecision.PASS.value,
         }
 
     policy = ScanPolicy(block_at=_BLOCK_AT, warn_at=_WARN_AT)

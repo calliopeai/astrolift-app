@@ -197,3 +197,98 @@ def get_verifier(name: str) -> VerifierCallable:
 
 def unregister_verifier(name: str) -> None:
     _VERIFIERS.pop(name, None)
+
+
+# ---- producers: org row -> policy, and the gate's entry point (#1605) ----
+
+
+class SigningMisconfigured(RuntimeError):
+    """The org asked for enforcement that cannot be carried out.
+
+    Distinct from a policy BLOCK: a block means the image failed a check that
+    ran, this means the check could not run. They want opposite operator
+    responses, and conflating them is how "we could not verify" becomes
+    indistinguishable from "we verified and it failed".
+    """
+
+
+def policy_for_org(org) -> SigningPolicy:
+    """Read an org's signing policy off its row.
+
+    Absent, empty, or malformed all resolve to DISABLED. That is deliberate
+    rather than lenient: every install today has an empty column, and any
+    reading that turned an unset policy into enforcement would block every
+    promote on every one of them.
+
+    Note what this does *not* consult: `RegisteredApp`'s
+    `block_on_missing_signature`, which defaults to True and which the
+    supply-chain gate has never evaluated. Honouring that default now would
+    be exactly the silent flip described above -- so enforcement is opt-in at
+    the org, and the app-level knob stays reported rather than enforced until
+    an org turns signing on.
+    """
+    raw = getattr(org, "image_signing_policy", None) or {}
+    if not isinstance(raw, dict):
+        return SigningPolicy()
+
+    try:
+        enforcement = SigningEnforcement(str(raw.get("enforcement", "disabled")).strip().lower())
+    except ValueError:
+        return SigningPolicy()
+
+    if enforcement is SigningEnforcement.DISABLED:
+        return SigningPolicy()
+
+    signers: list[AllowedSigner] = []
+    for entry in raw.get("allowed_signers") or []:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            signers.append(
+                AllowedSigner(
+                    kind=SignerKind(str(entry.get("kind", "")).strip().lower()),
+                    identity=str(entry.get("identity", "") or "").strip(),
+                )
+            )
+        except ValueError:
+            # One malformed entry must not silently shrink the allow-list
+            # into something that rejects everything.
+            raise SigningMisconfigured(
+                f"organization {getattr(org, 'slug', org)!r}: allowed_signers entry {entry!r} is invalid",
+            ) from None
+
+    if not signers:
+        raise SigningMisconfigured(
+            f"organization {getattr(org, 'slug', org)!r}: enforcement is "
+            f"{enforcement.value!r} but no allowed signers are configured",
+        )
+    return SigningPolicy(enforcement=enforcement, allowed_signers=tuple(signers))
+
+
+def verify_image_for_org(org, image_uri: str, *, verifier_name: str = "cosign") -> PolicyDecision:
+    """Verify ``image_uri`` against ``org``'s policy.
+
+    Returns a PASS decision without calling any verifier when enforcement is
+    disabled, which is every org until one opts in. Raises
+    :class:`SigningMisconfigured` when an org asked for enforcement and the
+    install cannot deliver it -- no verifier registered, most likely, since
+    the repo ships no cosign dependency. The caller decides whether that
+    fails the deploy; it must not read as a clean pass.
+    """
+    policy = policy_for_org(org)
+    if policy.enforcement is SigningEnforcement.DISABLED:
+        return PolicyDecision(
+            decision=SigningDecision.PASS,
+            matched_signer=None,
+            reason="signing enforcement disabled for this org",
+        )
+
+    try:
+        verifier = get_verifier(verifier_name)
+    except KeyError as exc:
+        raise SigningMisconfigured(
+            f"organization {getattr(org, 'slug', org)!r} requires signature verification "
+            f"but no {verifier_name!r} verifier is registered on this install",
+        ) from exc
+
+    return evaluate_policy(result=verifier(image_uri), policy=policy)
