@@ -161,6 +161,7 @@ from astrolift_workflows.activities.agent_stage import (
     execute_agent_stage,
 )
 from astrolift_workflows.activities.build_image import build_image
+from astrolift_workflows.activities.webhook_deliver import deliver_webhook
 from astrolift_workflows.workflows import (
     AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
@@ -178,6 +179,7 @@ from astrolift_workflows.workflows import (
     CronDeployTickWorkflow,
     DecommissionClusterWorkflow,
     DeleteSecretBundleFromClustersWorkflow,
+    DeliverWebhookWorkflow,
     DeployAppWorkflow,
     DeprovisionManagedServiceWorkflow,
     DeregisterAppWorkflow,
@@ -240,6 +242,7 @@ WORKFLOWS = (
     MigrateAppWorkflow,
     NamespaceProvisionWorkflow,
     OnboardAppWorkflow,
+    DeliverWebhookWorkflow,
     PipelineRunWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
@@ -267,6 +270,7 @@ WORKFLOWS = (
 
 ACTIVITIES = (
     abort_in_flight_deploys,
+    deliver_webhook,
     aggregate_fan_out,
     apply_manifests,
     apply_platform_rbac,

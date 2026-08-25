@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import datetime as dt
-import json
 import logging
-import secrets
-import time
-import urllib.error
-import urllib.request
 
 from strawberry.types import Info
 
-from astrolift_operations.webhook_delivery import build_headers, sign_payload
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -49,84 +43,30 @@ def _deliver_test_webhook(
     + HMAC signature. Returns a result dict the caller folds into
     :class:`WebhookTestResultType`.
 
-    Synchronous on purpose: the real DeliverWebhookWorkflow handles
-    retries + backoff, but a manual test wants the immediate verdict
-    so the operator can wire the integration without leaving the UI.
+    Delegates to :func:`webhook_delivery.post_webhook`, which is the same
+    function ``DeliverWebhookWorkflow`` uses (#1598). It used to be a second
+    copy of the signing and sending logic, which meant a passing manual test
+    proved nothing about real delivery -- and real delivery did not exist, so
+    nobody could notice.
 
-    ``format`` selects the outbound shape: subscribers wired to
-    Slack / Discord get a vendor-shaped body so the test message
-    renders correctly in their channel.
+    Synchronous on purpose: the workflow handles retries and backoff, but a
+    manual test wants the immediate verdict so the operator can wire the
+    integration without leaving the UI.
+
+    Still does *not* call ``record_delivery_outcome``. A test fire must not
+    move ``failure_count`` or trip the auto-disable, and that is the one
+    difference between this path and the real one.
     """
-    from astrolift_operations.webhook_format import adapt_payload
+    from astrolift_operations.webhook_delivery import post_webhook
 
-    shaped = adapt_payload(format=format, envelope=payload)
-    raw_body = json.dumps(shaped, separators=(",", ":")).encode("utf-8")
-    timestamp_unix = int(time.time())
-    signature = sign_payload(
+    return post_webhook(
+        url=url,
         secret=secret,
-        timestamp_unix=timestamp_unix,
-        raw_body=raw_body,
-    )
-    delivery_id = secrets.token_urlsafe(16)
-    headers = build_headers(
+        payload=payload,
         event_type=event_type,
-        event_id=delivery_id,
-        delivery_id=delivery_id,
-        schema_version="1",
-        signature=signature,
-        timestamp_unix=timestamp_unix,
+        format=format,
+        timeout_seconds=_WEBHOOK_TEST_TIMEOUT_SECONDS,
     )
-
-    req = urllib.request.Request(  # noqa: S310 — url validated by URLField on save
-        url,
-        data=raw_body,
-        method="POST",
-        headers=headers,
-    )
-
-    started = time.monotonic()
-    try:
-        with urllib.request.urlopen(req, timeout=_WEBHOOK_TEST_TIMEOUT_SECONDS) as resp:  # noqa: S310
-            body = resp.read(2048)
-            duration_ms = int((time.monotonic() - started) * 1000)
-            return {
-                "delivered": True,
-                "status_code": resp.status,
-                "duration_ms": duration_ms,
-                "response_body_excerpt": body.decode("utf-8", errors="replace")[:512],
-                "error": "",
-                "delivery_id": delivery_id,
-                "timestamp_unix": timestamp_unix,
-            }
-    except urllib.error.HTTPError as exc:
-        # Got a response but non-2xx → record it as a delivered failure
-        # so operators can see the 4xx/5xx + body.
-        body = b""
-        try:
-            body = exc.read(2048) or b""
-        except Exception:  # noqa: BLE001 — best-effort body read
-            body = b""
-        duration_ms = int((time.monotonic() - started) * 1000)
-        return {
-            "delivered": True,
-            "status_code": exc.code,
-            "duration_ms": duration_ms,
-            "response_body_excerpt": body.decode("utf-8", errors="replace")[:512],
-            "error": "",
-            "delivery_id": delivery_id,
-            "timestamp_unix": timestamp_unix,
-        }
-    except Exception as exc:  # noqa: BLE001 — every transport error is a delivery miss
-        duration_ms = int((time.monotonic() - started) * 1000)
-        return {
-            "delivered": False,
-            "status_code": None,
-            "duration_ms": duration_ms,
-            "response_body_excerpt": "",
-            "error": str(exc)[:512],
-            "delivery_id": delivery_id,
-            "timestamp_unix": timestamp_unix,
-        }
 
 
 def _materialize_app_log_lines(
