@@ -244,6 +244,96 @@ def _reconcile_cluster_capabilities_sync() -> int:
     return n
 
 
+def _apply_observability_retention_sync() -> int:
+    """Apply each org's configured log retention to its CloudWatch groups (#1602).
+
+    `observability_retention.effective_for` has resolved the platform default,
+    the per-org override and incident holds since the feature was specced, and
+    nothing called it. Four `Organization` columns --
+    `log_retention_days_default`, `metrics_retention_days_default`,
+    `metrics_rollup_retention_days_default`, `trace_retention_days_default` --
+    are settable through `updateOrganization` and were read by nobody, so an
+    operator could set them and the data lived forever.
+
+    AWS only, deliberately, per the AWS-first rule. CloudWatch is the one
+    backend here with a *native* retention primitive: `PutRetentionPolicy`
+    sets the window and AWS ages the data out itself, so there is nothing to
+    delete on a schedule and a platform-side delete loop would be strictly
+    worse than the one AWS already runs. Loki, Mimir and Tempo each need a
+    different mechanism and stay on #1602.
+
+    Logs only, for the same reason: metrics and traces on AWS are not
+    CloudWatch log groups, and the columns for them have no CloudWatch
+    equivalent to set.
+    """
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_identity.models import Organization
+    from astrolift_operations.observability_retention import effective_for
+
+    changed = 0
+    for org in Organization.objects.filter(deleted_at__isnull=True).iterator():
+        retention = effective_for(stream="log", org_override_days=org.log_retention_days_default)
+        clusters = TenantCluster.objects.filter(
+            organization_id=org.pk,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            deleted_at__isnull=True,
+        )
+        for cluster in clusters:
+            if str(getattr(getattr(cluster, "provider_plugin", None), "slug", "")) != "aws":
+                continue
+            try:
+                result = _apply_cloudwatch_retention(cluster, days=retention.days)
+            except Exception:  # noqa: BLE001
+                # One cluster's IAM gap must not stop the rest. Logged rather
+                # than swallowed: an org that set a retention expects it to
+                # take effect, and silence here is the defect this fixes.
+                log.exception(
+                    "observability retention: could not apply %d day(s) to cluster %s",
+                    retention.days,
+                    cluster.slug,
+                )
+                continue
+            if result.get("changed"):
+                changed += 1
+                log.info(
+                    "observability retention: cluster %s log group set to %d day(s) (was %s)",
+                    cluster.slug,
+                    result["days"],
+                    result.get("previous"),
+                )
+    return changed
+
+
+def _apply_cloudwatch_retention(cluster, *, days: int) -> dict:
+    """Build the retention driver for one cluster's log group and apply."""
+    from _sdk.observability.cloudwatch_logs import (
+        CloudWatchLogsConfig,
+        CloudWatchLogsRetentionDriver,
+    )
+
+    pc = cluster.provider_config or {}
+    region = str(pc.get("region", "") or cluster.region or "")
+    log_group = str(pc.get("log_group", "") or f"/aws/containerinsights/{cluster.slug}/application")
+    driver = CloudWatchLogsRetentionDriver(
+        config=CloudWatchLogsConfig(
+            region=region,
+            log_group=log_group,
+            role_arn=(pc.get("observability_role_arn") or None),
+        )
+    )
+    return driver.apply_retention(days)
+
+
+@activity.defn(name="astrolift.scheduled.apply_observability_retention")
+async def apply_observability_retention() -> int:
+    """Apply each org's configured observability retention. Returns the
+    number of log groups whose window changed."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_apply_observability_retention_sync)()
+
+
 @activity.defn(name="astrolift.scheduled.reconcile_cluster_capabilities")
 async def reconcile_cluster_capabilities() -> int:
     """Re-probe every managed cluster — keeps the capability table fresh.
