@@ -461,6 +461,12 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         # Baselined from this detector's first stable run, reviewed as
         # families rather than one by one, same caveat as KNOWN_UNREACHABLE.
         #
+        # `astrolift_operations.observability_retention_sweep` is #1602 step 5.
+        # It imports the two below, so they are reachable *through* it -- but
+        # it is itself only reached from tests until step 6 adds the Temporal
+        # activity, so all three are still test-only and all three come out
+        # of this list together when that lands.
+        "astrolift_operations.observability_retention_sweep",
         # `core.cluster_observability_eviction` is #1602 step 4, the resolver.
         # Same deliberate kind: the sweep that calls it is step 5. It leaves
         # with the sweep, alongside `astrolift_operations.retention_holds`.
