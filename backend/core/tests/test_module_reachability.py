@@ -461,35 +461,6 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         # Baselined from this detector's first stable run, reviewed as
         # families rather than one by one, same caveat as KNOWN_UNREACHABLE.
         #
-        # `astrolift_operations.observability_retention_sweep` is #1602 step 5.
-        # It imports the two below, so they are reachable *through* it -- but
-        # it is itself only reached from tests until step 6 adds the Temporal
-        # activity, so all three are still test-only and all three come out
-        # of this list together when that lands.
-        "astrolift_operations.observability_retention_sweep",
-        # `core.cluster_observability_eviction` is #1602 step 4, the resolver.
-        # Same deliberate kind: the sweep that calls it is step 5. It leaves
-        # with the sweep, alongside `astrolift_operations.retention_holds`.
-        "core.cluster_observability_eviction",
-        # `astrolift_operations.retention_holds` is the third of the same
-        # deliberate kind: #1602 step 2 landed the hold table and its
-        # projection onto the policy module, while the sweep that calls
-        # `active_holds_for` is step 4. Holds ship first on purpose --
-        # eviction arriving before them would delete data an incident is
-        # depending on with nothing available to stop it. It leaves when the
-        # sweep lands.
-        "astrolift_operations.retention_holds",
-        # Two entries are legitimate and expected to stay. `core.migration_gate`
-        # is a gate a test calls by design. `core.domain_handoff` is #1631's
-        # handoff token, landed with its suite while the endpoint that calls
-        # it waits on two design questions on that issue; it leaves when the
-        # exchange endpoint lands.
-        #
-        # The rest are the defect. The reason to trust the number is that
-        # several corroborate work reached from other directions:
-        # `astrolift_lifecycle.preview_managed_services` is #1578's subject,
-        # and `astrolift_lifecycle.drift` is the config-drift banner whose
-        # signals had never fired.
         "astrolift_ci_convert.policy",
         "astrolift_clusters.delivery",
         "astrolift_clusters.emit_all",
