@@ -108,3 +108,54 @@ def test_every_retention_column_on_organization_is_now_exposed():
         "these Organization retention columns are not on OrganizationType, so "
         "nothing can read them:\n  " + "\n  ".join(missing)
     )
+
+
+# ---- the rollup ceiling is an install-level knob ----------------------
+#
+# Exercised through `resolve_rollup_max_days`, not by reloading the policy
+# module. Reload rebinds `ObservabilityProfileError`, and every
+# `pytest.raises` elsewhere in the suite holding the old class stops
+# matching -- 16 unrelated failures, all of them the test's fault.
+
+
+def test_the_shipped_ceiling_is_370_days():
+    """A year plus a fortnight, so a year-over-year comparison at the
+    boundary has something on both sides of it. Three years of rollup
+    series at fleet scale is a lot of storage kept alive for a question
+    almost nobody asks."""
+    from astrolift_operations.observability_profile import resolve_rollup_max_days
+
+    assert RETENTION_METRICS_ROLLUP.max_days == 370
+    assert resolve_rollup_max_days(None) == 370
+
+
+def test_an_install_can_raise_the_ceiling():
+    """The point of the knob: the right number depends on the fleet, so the
+    install that needs three years says so out loud rather than inheriting
+    it from a default chosen for someone else."""
+    from astrolift_operations.observability_profile import resolve_rollup_max_days
+
+    assert resolve_rollup_max_days("1095") == 1095
+
+
+@pytest.mark.parametrize("value", [None, "", "not-a-number", "0", "-30"])
+def test_an_unusable_value_falls_back_instead_of_crashing(value):
+    """This module is imported at startup by everything touching
+    observability config. Raising on a typo would take the process down
+    over the one setting the operator got wrong."""
+    from astrolift_operations.observability_profile import resolve_rollup_max_days
+
+    assert resolve_rollup_max_days(value) == 370
+
+
+def test_a_ceiling_below_the_default_is_clamped_not_fatal():
+    """RetentionWindow refuses a max below its default, so an operator
+    setting 90 would otherwise crash every process that imports this
+    module -- at import time, with a traceback pointing at a dataclass
+    rather than at their env var."""
+    from astrolift_operations.observability_profile import (
+        METRICS_ROLLUP_DEFAULT_DAYS,
+        resolve_rollup_max_days,
+    )
+
+    assert resolve_rollup_max_days("90") == METRICS_ROLLUP_DEFAULT_DAYS == 365
