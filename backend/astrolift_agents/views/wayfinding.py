@@ -56,7 +56,12 @@ _SYSTEM_PROMPT = (
     "anything. The most you do is tell someone where to go.\n"
     "- Be brief. One or two sentences, then the route.\n"
     "- If a screen exists but has no nav entry, say it is reachable by direct "
-    "link so the person is not left hunting the sidebar for it."
+    "link so the person is not left hunting the sidebar for it.\n"
+    "- You are also given the product documentation. Answer how-do-I questions "
+    "from it, and cite the doc route you used so the person can read the rest.\n"
+    "- Answer only from the screens and documentation given. If neither covers "
+    "it, say the product does not document it rather than describing what a "
+    "platform like this usually does."
 )
 
 
@@ -89,7 +94,12 @@ def wayfinding_ask(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    from astrolift_agents.services.wayfinding import index_for_prompt, visible_routes
+    from astrolift_agents.services.wayfinding import (
+        docs_for_prompt,
+        index_for_prompt,
+        load_docs,
+        visible_routes,
+    )
 
     routes = visible_routes(_viewer_modules(request))
     if not routes:
@@ -108,12 +118,20 @@ def wayfinding_ask(request: HttpRequest) -> JsonResponse:
         log.warning("wayfinding: ANTHROPIC_API_KEY not set")
         return JsonResponse({"error": "wayfinding not configured"}, status=503)
 
-    prompt = f"Screens this user can reach:\n{index_for_prompt(routes)}\n\nQuestion: {question}"
+    # Documentation is not entitlement-filtered: every /documentation route
+    # is unscoped, so the pages are readable by anyone who can sign in. What
+    # is filtered is the screens an answer may point at, which is where the
+    # 403 would land.
+    prompt = (
+        f"Screens this user can reach:\n{index_for_prompt(routes)}\n\n"
+        f"Product documentation:\n{docs_for_prompt()}\n\n"
+        f"Question: {question}"
+    )
     try:
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=512,
+            max_tokens=1024,
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -127,6 +145,7 @@ def wayfinding_ask(request: HttpRequest) -> JsonResponse:
     # is instructed not to invent a path, and a model following instructions
     # is not a security boundary; this is.
     reachable = {r.path for r in routes}
+    reachable |= {s.route for s in load_docs()}
     cited = [path for path in sorted(reachable, key=len, reverse=True) if path in answer]
 
     return JsonResponse({"answer": answer, "routes": cited})

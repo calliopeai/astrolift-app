@@ -16,6 +16,8 @@ Two properties carry the risk:
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from astrolift_agents.services.wayfinding import (
@@ -67,7 +69,7 @@ def test_the_packaged_dictionary_matches_the_frontend():
 
     assert ROUTES_MD.read_text() == FRONTEND_ROUTES_MD.read_text(), (
         "backend/astrolift_agents/data/routes.md is stale. Refresh it with:\n"
-        "  cp frontend/ROUTES.md backend/astrolift_agents/data/routes.md"
+        "  cd frontend && npm run routes:dict   (writes both copies)"
     )
 
 
@@ -204,3 +206,77 @@ def test_every_mapped_module_is_a_real_entitlement_key():
         f"module_entitlements emits {sorted(real)}. Routes under those segments are now "
         "invisible to every viewer, silently."
     )
+
+
+# ---- the documentation corpus ----------------------------------------
+
+
+def test_the_docs_corpus_parses():
+    """Grounding premise for the how-do-I intent, same as the dictionary is
+    for the find-a-screen one."""
+    from astrolift_agents.services.wayfinding import load_docs
+
+    sections = load_docs()
+
+    assert len(sections) > 5
+    assert all(s.route.startswith("/documentation") for s in sections)
+    assert all(s.body for s in sections), "a section with no body is not grounding"
+
+
+def test_the_packaged_corpus_matches_the_frontend():
+    """Same gate, same reason as the dictionary's: the backend image has no
+    sibling frontend/ to read at runtime."""
+    from astrolift_agents.services.wayfinding import DOCS_MD, FRONTEND_DOCS_MD
+
+    if not FRONTEND_DOCS_MD.exists():
+        pytest.skip("frontend package not present; nothing to compare against")
+
+    assert DOCS_MD.read_text() == FRONTEND_DOCS_MD.read_text(), (
+        "backend/astrolift_agents/data/docs.md is stale. Refresh it with:\n"
+        "  cd frontend && npm run docs:corpus   (writes both copies)"
+    )
+
+
+def test_a_missing_corpus_is_empty_not_an_exception(monkeypatch):
+    """A help bubble that 500s is worse than one that reports nothing."""
+    from astrolift_agents.services import wayfinding as mod
+
+    mod.load_docs.cache_clear()
+    monkeypatch.setattr(mod, "DOCS_MD", pathlib.Path("/nonexistent/docs.md"))
+    try:
+        assert mod.load_docs() == ()
+    finally:
+        mod.load_docs.cache_clear()
+
+
+def test_sections_are_split_by_route_not_run_together():
+    """One blob would answer without being able to say where to read the
+    rest, which is the difference between an answer someone can check and
+    one they have to take on trust."""
+    from astrolift_agents.services.wayfinding import load_docs
+
+    routes = [s.route for s in load_docs()]
+
+    assert len(routes) == len(set(routes)), "a route claimed twice means the split is wrong"
+    assert "/documentation/custom-domains" in routes
+
+
+def test_no_dynamic_segment_is_offered_as_a_destination():
+    """`/documentation/tutorials/[slug]` is not somewhere anyone can be
+    sent, and the prose around it is template chrome, not content."""
+    from astrolift_agents.services.wayfinding import load_docs
+
+    assert not [s.route for s in load_docs() if "[" in s.route]
+
+
+def test_the_corpus_carries_prose_not_markup():
+    """The pages are TSX, so the risk is shipping className strings as
+    content and spending the prompt on Tailwind."""
+    from astrolift_agents.services.wayfinding import docs_for_prompt
+
+    block = docs_for_prompt()
+
+    assert "className" not in block
+    assert "text-muted-foreground" not in block
+    assert "&apos;" not in block, "HTML entities should be decoded, not shown to the model"
+    assert "cert-manager" in block, "the fixture would be vacuous otherwise"

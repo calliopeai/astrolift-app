@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Route dictionary generator — emits frontend/ROUTES.md.
+// Route dictionary generator — emits frontend/ROUTES.md and the packaged
+// backend copy the wayfinding assistant reads (#1101).
 //
 // Walks app/(app)/**/page.tsx and classifies every route:
 //   page             — a real surface
@@ -12,7 +13,7 @@
 // reachable from. Output is deterministic (sorted, no timestamps) — run
 // it twice, get the same bytes.
 //
-// Usage: npm run routes:dict   (writes frontend/ROUTES.md)
+// Usage: npm run routes:dict   (writes both copies)
 
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, dirname, sep } from "node:path";
@@ -27,6 +28,12 @@ const NAV_TREE_FILE = join(FRONTEND, "components", "NavTree.tsx");
 const NAV_USER_FILE = join(FRONTEND, "components", "NavUser.tsx");
 const KEYBOARD_FILE = join(FRONTEND, "components", "KeyboardShortcuts.tsx");
 const OUT_FILE = join(FRONTEND, "ROUTES.md");
+// The backend serves this dictionary to the wayfinding assistant (#1101)
+// and cannot read a sibling frontend/ path: its image contains backend/
+// only. Written here rather than copied by hand so the frontend lint
+// job's `git diff --exit-code` catches drift -- that job is the only one
+// that runs when a route change touches nothing under backend/.
+const PACKAGED = join(FRONTEND, "..", "backend", "astrolift_agents", "data", "routes.md");
 
 // ─── collect app/(app)/**/page.tsx ─────────────────────────────────────────
 
@@ -160,5 +167,9 @@ const lines = [
   "",
 ];
 
-writeFileSync(OUT_FILE, lines.join("\n"));
-console.log(`route-dictionary: wrote ${relative(process.cwd(), OUT_FILE)} (${rows.length} routes)`);
+const text = lines.join("\n");
+writeFileSync(OUT_FILE, text);
+writeFileSync(PACKAGED, text);
+console.log(
+  `route-dictionary: wrote ${relative(process.cwd(), OUT_FILE)} and the packaged copy (${rows.length} routes)`
+);

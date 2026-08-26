@@ -158,3 +158,67 @@ def index_for_prompt(routes: tuple[Route, ...], *, limit: int = 200) -> str:
     if len(routes) > limit:
         lines.append(f"... and {len(routes) - limit} more routes not listed here")
     return "\n".join(lines)
+
+
+# ---- the documentation corpus ----------------------------------------
+
+DOCS_MD = pathlib.Path(__file__).resolve().parent.parent / "data" / "docs.md"
+
+FRONTEND_DOCS_MD = pathlib.Path(__file__).resolve().parents[2].parent / "frontend" / "DOCS.md"
+"""Where the source lives on a full checkout. Used only by the drift test."""
+
+_SECTION = re.compile(r"^## (/documentation\S*)\s*$")
+
+
+@dataclass(frozen=True, slots=True)
+class DocSection:
+    route: str
+    body: str
+
+
+@functools.lru_cache(maxsize=1)
+def load_docs() -> tuple[DocSection, ...]:
+    """Parse the extracted documentation corpus, one section per route.
+
+    Sectioned by route rather than kept as one blob so an answer can cite
+    the page it came from. "Here is how, and here is where to read it" is
+    the difference between an answer someone can check and one they have
+    to take on trust.
+
+    Absent file yields empty, matching `load_routes`: a help bubble that
+    500s is worse than one that reports nothing to find.
+    """
+    try:
+        text = DOCS_MD.read_text()
+    except OSError:
+        return ()
+
+    sections: list[DocSection] = []
+    route: str | None = None
+    body: list[str] = []
+    for line in text.splitlines():
+        match = _SECTION.match(line)
+        if match is None:
+            if route is not None:
+                body.append(line)
+            continue
+        if route is not None:
+            sections.append(DocSection(route=route, body="\n".join(body).strip()))
+        route = match.group(1)
+        body = []
+    if route is not None:
+        sections.append(DocSection(route=route, body="\n".join(body).strip()))
+    return tuple(s for s in sections if s.body)
+
+
+def docs_for_prompt(sections: tuple[DocSection, ...] | None = None) -> str:
+    """The corpus as a prompt block.
+
+    Whole, not retrieved-over. The corpus is roughly 6k tokens; a retrieval
+    step here would add a way to miss the relevant page in exchange for
+    saving context this prompt is not short of. If it outgrows that, this
+    is the seam to put retrieval behind.
+    """
+    if sections is None:
+        sections = load_docs()
+    return "\n\n".join(f"[{s.route}]\n{s.body}" for s in sections)
