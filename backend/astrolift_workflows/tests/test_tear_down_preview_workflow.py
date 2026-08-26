@@ -73,13 +73,22 @@ def _run(state: dict, *, extra_results: dict[str, object] | None = None):
 
 def test_running_preview_walks_the_policy_sequence():
     """A live preview runs the implemented steps in the policy's order,
-    including the event emission that never happened before."""
+    including the event emission that never happened before.
+
+    The managed-service cleanup sits after the namespace delete and before
+    the torn-down stamp, and both halves of that placement are load-bearing.
+    After the delete, because dropping a preview's database while its pods
+    still run lets a write race the drop. Before the stamp, because a
+    preview marked torn down is one nobody looks at again, so a slice left
+    behind after that point is a leak with no observer (#1670).
+    """
     fake, result = _run({"preview_id": 7, "status": "running", "torn_down_at_unix": None})
 
     assert result.ok is True
     assert fake.names() == [
         "load_preview_teardown_state",
         "delete_preview_namespace",
+        "cleanup_preview_managed_services_activity",
         "mark_preview_torn_down",
         "emit_preview_torn_down_event",
     ]

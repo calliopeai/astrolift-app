@@ -259,7 +259,7 @@ def test_deprovision_removes_the_database_and_secret():
     driver, fake = _driver(parent=_parent_object())
     handle = driver.provision_slice(_spec()).slice_handle
 
-    assert driver.deprovision_slice(handle) is True
+    assert driver.deprovision_slice(_spec(), handle) is True
 
     kinds = {m["kind"] for m in fake.deleted}
     assert kinds == {"Database", "Secret"}
@@ -274,7 +274,7 @@ def test_deprovision_leaves_the_parents_role_list_alone():
     handle = driver.provision_slice(_spec()).slice_handle
     fake.applied.clear()
 
-    driver.deprovision_slice(handle)
+    driver.deprovision_slice(_spec(), handle)
 
     assert _of_kind(fake.deleted, "Cluster") == []
     assert _of_kind(fake.applied, "Cluster") == []
@@ -292,7 +292,7 @@ def test_a_failed_delete_returns_false_rather_than_raising():
 
     fake.delete_manifests = failing
 
-    assert driver.deprovision_slice(handle) is False
+    assert driver.deprovision_slice(_spec(), handle) is False
 
 
 def test_a_legacy_parent_handle_is_refused():

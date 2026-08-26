@@ -325,6 +325,18 @@ class ManagedServiceAttachment(BaseCoreModel):
         blank=True,
         help_text="Manifest workload selectors for this consumer; ['*'] means every workload.",
     )
+    slice_handle = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text=(
+            "Driver handle for the isolated slice carved for this consumer, "
+            "when the attachment is to a shared service (#1578). Blank means "
+            "the consumer reaches the parent instance directly. Teardown drops "
+            "the slice this names; without it the slice is an orphan database "
+            "in the parent that nobody sees (#1670)."
+        ),
+    )
 
     class Meta:
         constraints = [

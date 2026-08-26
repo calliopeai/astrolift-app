@@ -420,8 +420,15 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         }
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg", audit=True)
-    def deprovision_slice(self, slice_handle: str) -> bool:
+    def deprovision_slice(self, spec: SliceSpec, slice_handle: str) -> bool:
         """Delete the slice's Database CRD and credential Secret.
+
+        ``spec`` is unused here: this driver's handle already encodes the
+        cluster, namespace and database name, so the parent needs no second
+        lookup. It stays in the signature because it is the contract's, and
+        because a driver whose handle does not carry the parent needs it.
+        The signature drifted from the protocol (`spec` absent, `-> None` vs
+        `-> bool`) and nothing caught it, because nothing called this at all.
 
         Returns False rather than raising when a delete does not land, so a
         teardown workflow can record the leak and continue: a slice left

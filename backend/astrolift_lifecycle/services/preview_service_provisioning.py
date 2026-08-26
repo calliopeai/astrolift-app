@@ -70,6 +70,27 @@ class PreviewServiceOutcome:
         self._overrides: dict[str, Any] = {}
 
 
+@dataclass
+class PreviewTeardownOutcome:
+    """What a teardown dropped, and what it left behind."""
+
+    dropped: list[str] = field(default_factory=list)
+    """Slugs whose slice is gone."""
+
+    leaked: list[str] = field(default_factory=list)
+    """Slugs whose driver reported a delete that did not land.
+
+    Separate from `errors` because nothing is broken -- something is left
+    behind. A leak wants someone to go and drop a database; an error wants
+    someone to work out why the call failed.
+    """
+
+    no_slice: list[str] = field(default_factory=list)
+    """Attached directly to the parent, so there was nothing to drop."""
+
+    errors: dict[str, str] = field(default_factory=dict)
+
+
 def provision_preview_managed_services(preview_env: Any) -> PreviewServiceOutcome:
     """Attach and slice the primary environment's services onto a preview.
 
@@ -136,10 +157,20 @@ def provision_preview_managed_services(preview_env: Any) -> PreviewServiceOutcom
             outcome.shared_unsliced.append(slug)
             continue
 
-        ManagedServiceAttachment.objects.get_or_create(
+        attachment, _ = ManagedServiceAttachment.objects.get_or_create(
             managed_service=service,
             app_environment=preview_env,
         )
+        # The handle is what teardown drops. Persisted here because it is
+        # the only moment it exists: `provision_slice` derives it from
+        # `slice_id` and returns it, and nothing else can recover it. Without
+        # this the slice outlives the preview as an orphan database in the
+        # parent instance, invisible until someone reads the database list
+        # (#1670).
+        handle = getattr(slice_result, "slice_handle", "") or ""
+        if handle and attachment.slice_handle != handle:
+            attachment.slice_handle = handle
+            attachment.save(update_fields=["slice_handle"])
         outcome.attached.append(slug)
         outcome.sliced.append(slug)
         outcome.env_overrides.update(slice_result.env_overrides)
@@ -191,5 +222,108 @@ def _slice_for(*, service: Any, preview_env: Any) -> Any | None:
             slice_id=preview_env.name,
             parent=ServiceHandle(handle=backend_ref),
             labels={"ai.astrolift.preview-env": str(preview_env.name)},
+        )
+    )
+
+
+def deprovision_preview_managed_services(preview_env: Any) -> PreviewTeardownOutcome:
+    """Drop the slices a preview owns, leaving every parent instance alone.
+
+    The counterpart `provision_preview_managed_services` never had (#1670).
+    `supports_slicing` requires both verbs precisely so a driver cannot
+    carve a slice it can never remove, and then nothing called the removal
+    half: the capability was present, tested, and reachable from its own
+    test suite, so coverage stayed green while every teardown leaked.
+
+    Returns an outcome rather than raising, and rather than returning
+    nothing. A slice that will not drop is a database sitting in a shared
+    instance; the operator needs to see which one, and the rest of the
+    teardown needs to continue regardless. Raising here would strand the
+    preview's namespace and DNS cleanup behind one stuck database.
+
+    Idempotent: a preview torn down twice, or torn down after a partially
+    failed provision, finds no handle to drop and reports nothing rather
+    than failing.
+    """
+    from astrolift_services.models import ManagedServiceAttachment
+
+    outcome = PreviewTeardownOutcome()
+
+    attachments = ManagedServiceAttachment.objects.filter(
+        app_environment=preview_env,
+        deleted_at__isnull=True,
+    ).select_related("managed_service")
+
+    for attachment in attachments:
+        service = attachment.managed_service
+        slug = (getattr(service, "name", "") or "").strip() or f"service-{service.pk}"
+
+        if not attachment.slice_handle:
+            # Attached straight to the parent, or attached before #1670 gave
+            # the row somewhere to record its slice. Nothing to drop either
+            # way, and guessing a handle would risk dropping the parent's
+            # own database.
+            outcome.no_slice.append(slug)
+            continue
+
+        try:
+            dropped = _drop_slice(service=service, attachment=attachment, preview_env=preview_env)
+        except Exception as exc:  # noqa: BLE001 - one stuck slice must not stop the rest
+            log.exception("preview teardown: slice drop failed for %s", slug)
+            outcome.errors[slug] = str(exc)
+            continue
+
+        if not dropped:
+            # The driver reports a delete that did not land. Recorded as a
+            # leak, not an error: nothing is broken, something is left
+            # behind, and those want different operator responses.
+            outcome.leaked.append(slug)
+            continue
+
+        attachment.slice_handle = ""
+        attachment.save(update_fields=["slice_handle"])
+        outcome.dropped.append(slug)
+
+    return outcome
+
+
+def _drop_slice(*, service: Any, attachment: Any, preview_env: Any) -> bool:
+    """Ask the driver to drop this attachment's slice.
+
+    Mirrors `_slice_for` on the way up, including the `supports_slicing`
+    check: a driver that has lost its slice verbs between provision and
+    teardown must not be called with a handle it can no longer interpret.
+    """
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from providers._sdk.managed_service import ServiceHandle, SliceSpec
+
+    cluster = getattr(preview_env, "tenant_cluster", None)
+    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    if not plugin_slug:
+        raise RuntimeError("preview environment's cluster has no provider plugin")
+
+    resolved = resolve_managed_driver(
+        cluster_plugin_slug=plugin_slug,
+        kind=service.kind,
+        variant=getattr(service, "variant", "") or "",
+    )
+    driver = resolved.driver_cls()
+
+    if not getattr(driver, "supports_slicing", lambda: False)():
+        raise RuntimeError(
+            f"driver for {service.kind} no longer supports slicing, so the "
+            f"slice recorded on attachment {attachment.pk} cannot be dropped"
+        )
+
+    # The parent is passed and must never be deprovisioned; that asymmetry
+    # is the contract's whole point. The handle names the slice.
+    return bool(
+        driver.deprovision_slice(
+            SliceSpec(
+                slice_id=preview_env.name,
+                parent=ServiceHandle(handle=getattr(service, "backend_ref", "") or ""),
+                labels={"ai.astrolift.preview-env": str(preview_env.name)},
+            ),
+            attachment.slice_handle,
         )
     )

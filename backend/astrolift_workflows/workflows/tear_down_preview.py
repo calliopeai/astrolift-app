@@ -14,12 +14,18 @@ Per-step timeouts come from the policy's budget table, which sums to
 the spec's 15-minute teardown deadline; the previous flat 10-minute
 timeout per activity could overrun it by minutes.
 
-DELETE_DNS, CLEANUP_MANAGED_SERVICES and COMMENT_PR are in the
-sequence but have no activity yet — the platform creates no per-preview
-DNS record (the wildcard covers the host), carves no per-preview
-managed-service slice, and has no PR-comment surface at all. They are
-skipped rather than faked; the loop below picks them up for free once
-their activities land.
+CLEANUP_MANAGED_SERVICES now runs: #1578 started carving a per-preview
+slice out of the shared instance, which turned this docstring's claim that
+the platform "carves no per-preview managed-service slice" from true into
+false, and the skip from a no-op into a leak. That stale sentence is why
+nobody noticed for as long as they did, so it is worth saying plainly:
+a "no activity yet" note is a claim about the rest of the system, and it
+goes stale silently.
+
+DELETE_DNS and COMMENT_PR remain in the sequence with no activity — the
+platform creates no per-preview DNS record (the wildcard covers the host)
+and has no PR-comment surface at all. They are skipped rather than faked;
+the loop below picks them up for free once their activities land.
 """
 
 from __future__ import annotations
@@ -32,6 +38,7 @@ from astrolift_workflows.inputs import TearDownPreviewInput, WorkflowResult
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        cleanup_preview_managed_services_activity,
         delete_preview_namespace,
         emit_preview_torn_down_event,
         load_preview_teardown_state,
@@ -82,6 +89,19 @@ class TearDownPreviewWorkflow:
                     # down while its pods still run is a worse state
                     # than a failed teardown an operator can re-fire.
                     return WorkflowResult(ok=False, message=f"namespace delete failed: {exc}")
+            elif step is TeardownStep.CLEANUP_MANAGED_SERVICES:
+                # Deliberately not wrapped in the bail-out the namespace
+                # step uses. A slice that will not drop is a database left
+                # in a shared instance; the steps after this are the
+                # torn-down stamp and the event, and withholding those
+                # would leave the preview reading as live over a leak an
+                # operator can clear by hand. The activity reports the
+                # leak rather than raising.
+                await workflow.execute_activity(
+                    cleanup_preview_managed_services_activity,
+                    pid,
+                    start_to_close_timeout=timeout,
+                )
             elif step is TeardownStep.MARK_TORN_DOWN:
                 await workflow.execute_activity(
                     mark_preview_torn_down,

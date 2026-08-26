@@ -1771,6 +1771,61 @@ def _provision_preview_managed_services_sync(preview_environment_id: int) -> dic
     }
 
 
+@activity.defn(name="astrolift.preview.cleanup_managed_services")
+async def cleanup_preview_managed_services_activity(preview_environment_id: int) -> dict:
+    """Drop the slices this preview owns (#1670).
+
+    The counterpart to `provision_preview_managed_services_activity`, and
+    the reason `TeardownStep.CLEANUP_MANAGED_SERVICES` sat in the locked
+    sequence with nothing behind it: once #1578 started carving slices, the
+    step that had genuinely been a no-op became a leak, and its "no activity
+    yet" note read as intentional.
+
+    Never raises on a stuck slice. Everything after this step is bookkeeping
+    the operator needs -- the torn-down stamp, the event -- and stranding it
+    behind one undroppable database would leave the preview looking live.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_cleanup_preview_managed_services_sync, thread_sensitive=False)(
+        preview_environment_id
+    )
+
+
+def _cleanup_preview_managed_services_sync(preview_environment_id: int) -> dict:
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from astrolift_lifecycle.services.preview_service_provisioning import (
+        deprovision_preview_managed_services,
+    )
+
+    empty = {"dropped": [], "leaked": [], "no_slice": [], "errors": {}}
+
+    preview = (
+        PreviewEnvironment.objects.select_related("app_environment").filter(pk=preview_environment_id).first()
+    )
+    # No `deleted_at__isnull=True` here, unlike the provision side. A preview
+    # being torn down may already be soft-deleted, and refusing to clean up
+    # its slices because the row is gone is how the leak survives the fix.
+    if preview is None or preview.app_environment is None:
+        return empty
+
+    outcome = deprovision_preview_managed_services(preview.app_environment)
+    if outcome.leaked or outcome.errors:
+        log.warning(
+            "preview %s teardown left slices behind: leaked=%s errors=%s",
+            preview_environment_id,
+            outcome.leaked,
+            outcome.errors,
+        )
+    return {
+        "dropped": list(outcome.dropped),
+        "leaked": list(outcome.leaked),
+        "no_slice": list(outcome.no_slice),
+        "errors": dict(outcome.errors),
+    }
+
+
 @activity.defn(name="astrolift.preview.provision_namespace")
 async def provision_preview_namespace(preview_environment_id: int) -> str:
     """Ensure the preview environment's Kubernetes namespace exists.
