@@ -11,6 +11,7 @@ import { ScmCallbackToast } from "@/components/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
+import { WayfindingBubble } from "@/components/WayfindingBubble";
 import { getClient } from "@/lib/apollo";
 import { ActiveOrgProvider } from "@/graphql/identity/identity.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
@@ -100,6 +101,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <ScmCallbackToast />
             <SessionExpiredModal />
             <StepUpPrompt />
+            {/* Read-only help (#1101). Global chrome, not entitlement-gated:
+                the people who most need to ask where a thing is are the ones
+                who have seen the least of the product. */}
+            <WayfindingBubble />
           </SidebarProvider>
         </div>
       </ActiveOrgProvider>

@@ -624,4 +624,11 @@ jobs:
       - name: Verify the route dictionary
         run: |
           npm run routes:dict
-          git diff --exit-code -- ROUTES.md
+          git diff --exit-code -- ROUTES.md ../backend/astrolift_agents/data/routes.md
+      - name: Verify the documentation corpus
+        # Both paths, because this job is the only one that runs when a doc
+        # page is the sole change: the backend drift test would not fire, and
+        # the assistant would answer from a stale corpus.
+        run: |
+          npm run docs:corpus
+          git diff --exit-code -- DOCS.md ../backend/astrolift_agents/data/docs.md
