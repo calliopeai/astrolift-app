@@ -505,13 +505,23 @@ class SliceCapableDriver(Protocol):
         """
         ...
 
-    def deprovision_slice(self, spec: SliceSpec, slice_handle: str) -> None:
+    def deprovision_slice(self, spec: SliceSpec, slice_handle: str) -> bool:
         """Drop a slice, leaving the parent instance alone.
 
         The parent is passed so a driver can reach it without a second
         lookup, and to make the asymmetry explicit: this must never
         deprovision ``spec.parent``. A preview teardown that dropped the
         shared instance is the worst outcome this path can produce.
+
+        Returns False rather than raising when a delete does not land, so a
+        teardown can record the leak and carry on: one undroppable slice
+        must not strand the rest of a preview's cleanup. ``-> None`` left a
+        caller no way to tell a leak from a success, which is how the leak
+        stays invisible until someone reads the instance's database list.
+
+        ``supports_slicing`` requires this verb alongside ``provision_slice``
+        precisely so a driver cannot offer to carve a slice it can never
+        remove.
         """
         ...
 

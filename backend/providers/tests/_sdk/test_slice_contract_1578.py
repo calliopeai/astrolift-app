@@ -20,6 +20,7 @@ import pytest
 from _sdk.managed_service import (
     Binding,
     ServiceHandle,
+    SliceCapableDriver,
     SliceResult,
     SliceSpec,
     ValueRef,
@@ -200,3 +201,35 @@ def test_slicing_is_not_on_the_conformance_protocol():
     assert not hasattr(ManagedServiceDriver, "provision_slice")
     assert hasattr(SliceCapableDriver, "provision_slice")
     assert hasattr(SliceCapableDriver, "deprovision_slice")
+
+
+def test_every_slicing_driver_matches_the_protocol_signature():
+    """The gate that was missing (#1670).
+
+    `CNPGPostgresDriver.deprovision_slice` shipped as
+    `(self, slice_handle) -> bool` against a protocol declaring
+    `(self, spec, slice_handle) -> None`. Calling it per the contract
+    raised TypeError; calling it per the implementation broke the
+    contract. Neither happened, because nothing called it at all -- the
+    slice could be carved and never removed, which is the leak.
+
+    `supports_slicing` only checks the names are callable, so it returned
+    True for a driver whose remove verb could not be invoked. Checking
+    arity is what closes that gap.
+    """
+    import inspect
+
+    from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
+
+    expected = inspect.signature(SliceCapableDriver.deprovision_slice)
+
+    for driver_cls in (CNPGPostgresDriver,):
+        if not supports_slicing(driver_cls()):
+            continue
+        actual = inspect.signature(driver_cls.deprovision_slice)
+        assert list(actual.parameters) == list(expected.parameters), (
+            f"{driver_cls.__name__}.deprovision_slice takes "
+            f"{list(actual.parameters)}, the contract takes "
+            f"{list(expected.parameters)}. supports_slicing() would still "
+            "say True, and the call would raise TypeError at teardown."
+        )

@@ -21,6 +21,7 @@ from astrolift_workflows.activities.app_domain_sync import (
 )
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
+    cleanup_preview_managed_services_activity,
     create_promotion_deployment,
     create_rollback_deployment,
     delete_preview_namespace,
@@ -220,6 +221,7 @@ __all__ = [
     "capture_quota_usage_snapshot",
     "ObservabilityRetentionSummary",
     "check_cert_expiry_tick",
+    "cleanup_preview_managed_services_activity",
     "provision_preview_managed_services_activity",
     "prune_observability_data",
     "check_managed_service_ready",
