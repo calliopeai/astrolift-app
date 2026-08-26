@@ -21,6 +21,7 @@ shape contract orgs configure against.
 from __future__ import annotations
 
 import dataclasses
+import os
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
 
@@ -123,7 +124,62 @@ class RetentionWindow:
 # level approval (separate ticket).
 RETENTION_LOGS = RetentionWindow(default_days=30, max_days=365)
 RETENTION_METRICS = RetentionWindow(default_days=30, max_days=365)
-RETENTION_METRICS_ROLLUP = RetentionWindow(default_days=365, max_days=1095)
+
+
+def _coerce_days(raw: str | None, default: int) -> int:
+    """A positive int day-count, falling back to ``default``.
+
+    A malformed value falls back rather than raising. This module is
+    imported at startup by everything that touches observability config,
+    so a typo in one operator's env would otherwise take the process down
+    instead of the one setting they got wrong.
+    """
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Rollup metrics are the one window where the ceiling is a storage
+# decision rather than a policy one: at fleet scale the difference between
+# one year and three is a lot of series kept alive for a question almost
+# nobody asks. So the ceiling is configurable and ships at 370 days --
+# a year plus a fortnight, so a year-over-year comparison at the boundary
+# has something on both sides of it rather than falling off the end.
+#
+# Raise it per install with ASTROLIFT_METRICS_ROLLUP_MAX_DAYS. Env rather
+# than a hardcoded headroom because the number that is right depends on
+# the fleet, and the install that needs three years should say so out loud
+# rather than inheriting it from a default chosen for someone else.
+METRICS_ROLLUP_DEFAULT_DAYS = 365
+METRICS_ROLLUP_SHIPPED_MAX_DAYS = 370
+
+
+def resolve_rollup_max_days(raw: str | None) -> int:
+    """The rollup ceiling from a raw env value.
+
+    A pure function so the behaviour can be tested without reloading this
+    module. That matters more than it looks: reloading rebinds
+    ``ObservabilityProfileError``, and every ``pytest.raises`` elsewhere in
+    the suite holding the old class silently stops matching.
+
+    Clamped up, never down. ``RetentionWindow`` refuses a max below its
+    default, so an operator setting 90 here would otherwise crash every
+    process that imports this module, at import time, with a traceback
+    pointing at a dataclass rather than at their env var.
+    """
+    return max(_coerce_days(raw, METRICS_ROLLUP_SHIPPED_MAX_DAYS), METRICS_ROLLUP_DEFAULT_DAYS)
+
+
+METRICS_ROLLUP_MAX_DAYS = resolve_rollup_max_days(os.environ.get("ASTROLIFT_METRICS_ROLLUP_MAX_DAYS"))
+
+RETENTION_METRICS_ROLLUP = RetentionWindow(
+    default_days=METRICS_ROLLUP_DEFAULT_DAYS,
+    max_days=METRICS_ROLLUP_MAX_DAYS,
+)
 """Rolled-up metrics, kept longer than raw and needing their own window.
 
 `Organization.metrics_rollup_retention_days_default` has defaulted to 365
