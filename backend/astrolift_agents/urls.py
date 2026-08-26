@@ -26,6 +26,7 @@ from django.urls import path
 from astrolift_agents.mcp_contract import MCP_ROUTE
 from astrolift_agents.views.mcp import mcp_gateway
 from astrolift_agents.views.skill_ai_assist import skill_ai_assist
+from astrolift_agents.views.wayfinding import wayfinding_ask
 from astrolift_agents.views.workflow_webhook import workflow_webhook
 
 app_name = "astrolift_agents"
@@ -39,6 +40,15 @@ urlpatterns = [
         "api/agents/v1/skills/ai-assist/",
         skill_ai_assist,
         name="skill-ai-assist",
+    ),
+    # Wayfinding assistant (#1101).
+    # Read-only help/find: answers "where do I ..." over the routes THIS
+    # viewer can reach. No mutation path exists on it, so it cannot take an
+    # action even if a prompt asks for one.
+    path(
+        "api/agents/v1/wayfinding/ask/",
+        wayfinding_ask,
+        name="wayfinding-ask",
     ),
     # Generic inbound workflow/agent trigger (#983). Org-level webhook the
     # WorkflowWebhook model documents; secret-authenticated, csrf-exempt.
