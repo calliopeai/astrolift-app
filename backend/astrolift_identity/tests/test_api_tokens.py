@@ -438,8 +438,10 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert token_scope_allows_permission(token, Permission.TEAM_CREATE)
     assert token_scope_allows_permission(token, Permission.TEAM_UPDATE)
     assert token_scope_allows_permission(token, Permission.TEAM_DELETE)
+    # write:apps covers the agent. prefix too, so agent.delete rides along
+    # with app.deploy/app.delete — the CLI has all three as commands.
+    assert token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
-    assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
     assert not token_scope_allows_permission(token, Permission.API_TOKEN_CREATE)
 
