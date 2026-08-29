@@ -489,6 +489,29 @@ def test_provision_aws_controller_role_idempotent(monkeypatch):
     )
 
 
+def test_provision_s3_csi_role_minted_when_enabled(monkeypatch):
+    """aws-mountpoint-s3-csi-driver selected → mint
+    <cluster_name>-aws-mountpoint-s3-csi-driver bound to
+    astrolift-system:s3-csi-driver-sa (#1675)."""
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    arn = _provision_aws_controller_irsa_role(
+        cluster,
+        {"aws-mountpoint-s3-csi-driver"},
+        component_key="aws-mountpoint-s3-csi-driver",
+        mint_method="provision_s3_csi_role",
+    )
+
+    role = "astrolift-eks-aws-mountpoint-s3-csi-driver"
+    assert arn == f"arn:aws:iam::123456789012:role/{role}"
+    cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:s3-csi-driver-sa"
+
+
 def test_provision_aws_controller_role_noop_when_disabled(monkeypatch):
     """Component not selected → short-circuit before discovery / driver."""
     import aws.identity_irsa as irsa

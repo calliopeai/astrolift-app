@@ -1414,6 +1414,39 @@ class EKSClusterDriver(ClusterDriver):
                 install_timeout="10m",
             ),
             BootstrapComponent(
+                key="aws-mountpoint-s3-csi-driver",
+                title="Mountpoint S3 CSI Driver (S3 buckets as pod volumes)",
+                default_enabled=False,
+                rationale=(
+                    "Mounts S3 buckets into pods as static CSI volumes (#1675) "
+                    "— the S3 object-store binding's mount_path option depends "
+                    "on it. Read-heavy semantics only: sequential writes to new "
+                    "objects, no appends, renames, or POSIX locking; EFS stays "
+                    "the answer for a real shared filesystem. Opt-in because "
+                    "driver-level IRSA grants every mount the shared "
+                    "platform-bucket scope."
+                ),
+                # Driver-level IRSA on the node DaemonSet's SA. Name pinned to
+                # the chart default (s3-csi-driver-sa) so it matches the
+                # astrolift-system:s3-csi-driver-sa subject the platform scopes
+                # the IRSA trust to (IRSADriver.provision_s3_csi_role).
+                helm_values={
+                    "node": {
+                        "serviceAccount": {
+                            **_sa_with_irsa("aws-mountpoint-s3-csi-driver"),
+                            "name": "s3-csi-driver-sa",
+                        },
+                    },
+                },
+                requires=["irsa:aws-mountpoint-s3-csi-driver"],
+                options=[],
+                chart_name="aws-mountpoint-s3-csi-driver",
+                chart_repo_url="https://awslabs.github.io/mountpoint-s3-csi-driver",
+                chart_repo_type="default",
+                chart_version="2.7.0",
+                install_timeout="10m",
+            ),
+            BootstrapComponent(
                 key="kube-prometheus-stack",
                 title="Prometheus + Grafana + Alertmanager",
                 default_enabled=True,

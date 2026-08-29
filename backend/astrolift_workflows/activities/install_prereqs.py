@@ -476,6 +476,7 @@ def _provision_ebs_csi_irsa_role(cluster: Any, selected_set: set[str]) -> str | 
 _ALB_CONTROLLER_COMPONENT_KEY = "aws-load-balancer-controller"
 _EXTERNAL_DNS_COMPONENT_KEY = "external-dns"
 _CLOUDWATCH_EXPORTER_COMPONENT_KEY = "cloudwatch-exporter"
+_S3_CSI_COMPONENT_KEY = "aws-mountpoint-s3-csi-driver"
 
 
 def _provision_aws_controller_irsa_role(
@@ -602,6 +603,12 @@ def _install_cluster_prereqs_sync(
         selected_set,
         component_key=_CLOUDWATCH_EXPORTER_COMPONENT_KEY,
         mint_method="provision_cloudwatch_exporter_role",
+    )
+    _provision_aws_controller_irsa_role(
+        cluster,
+        selected_set,
+        component_key=_S3_CSI_COMPONENT_KEY,
+        mint_method="provision_s3_csi_role",
     )
 
     resources: list[dict[str, Any]] = []

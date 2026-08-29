@@ -64,6 +64,36 @@ EXTERNAL_DNS_SA = "external-dns"
 CLOUDWATCH_EXPORTER_NAMESPACE = "astrolift-system"
 CLOUDWATCH_EXPORTER_SA = "cloudwatch-exporter"
 
+# The aws-mountpoint-s3-csi-driver chart (v2.x) runs its node DaemonSet as the
+# ``s3-csi-driver-sa`` ServiceAccount; driver-level credentials come from that
+# SA's IRSA role. Name pinned to the chart default so the trust subject
+# matches what EKSCluster.bootstrap_components annotates.
+S3_CSI_NAMESPACE = "astrolift-system"
+S3_CSI_NODE_SA = "s3-csi-driver-sa"
+
+# Mountpoint's documented permission set, scoped to the buckets the S3
+# object-store driver provisions (S3Config.bucket_name_prefix, default
+# "astrolift"). Driver-level credentials mean every mount shares this role,
+# so the scope IS the security boundary: arbitrary operator buckets are
+# deliberately not mountable without an irsa_roles override.
+S3_CSI_POLICY_STATEMENTS: list[dict[str, Any]] = [
+    {
+        "Effect": "Allow",
+        "Action": ["s3:ListBucket"],
+        "Resource": "arn:aws:s3:::astrolift-*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:AbortMultipartUpload",
+            "s3:DeleteObject",
+        ],
+        "Resource": "arn:aws:s3:::astrolift-*/*",
+    },
+]
+
 # Read-only statements for the CloudWatch exporter (#1225): GetMetricData /
 # ListMetrics to pull ALB edge metrics, tag:GetResources so YACE's tag-based
 # discovery can find the ALB controller's load balancers and export the
@@ -516,6 +546,32 @@ class IRSADriver(WorkloadIdentityDriver):
             role_name=role_name,
             namespace=CLOUDWATCH_EXPORTER_NAMESPACE,
             sa_name=CLOUDWATCH_EXPORTER_SA,
+        )
+        return role_arn
+
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        audit=True,
+        sensitive_kind="identity.provision_s3_csi_role",
+    )
+    def provision_s3_csi_role(self, role_name: str) -> str:
+        """Self-provision the IRSA role the Mountpoint S3 CSI node driver
+        assumes (#1675).
+
+        The driver mounts S3 buckets into pods as static CSI volumes (the
+        S3 object-store driver emits the ``VolumeMount`` when a binding asks
+        for ``mount_path``). Driver-level credentials: the node DaemonSet's
+        ``astrolift-system:s3-csi-driver-sa`` subject gets an inline policy
+        scoped to platform-provisioned buckets (``astrolift-*``).
+
+        Idempotent: re-runs reconcile the trust subject + re-write the inline
+        policy. Returns the role ARN."""
+        role_arn = self.create_identity_role(role_name, permissions=S3_CSI_POLICY_STATEMENTS)
+        self._ensure_trust_includes(
+            role_name=role_name,
+            namespace=S3_CSI_NAMESPACE,
+            sa_name=S3_CSI_NODE_SA,
         )
         return role_arn
 

@@ -31,6 +31,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
     unsupported_update,
 )
 from aws._errors import map_client_error
@@ -294,9 +296,45 @@ class S3Driver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="aws", driver="object_store_s3")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         _, bucket_name = parse_handle(handle.handle)
         bucket_arn = f"arn:aws:s3:::{bucket_name}"
+        cfg = config or {}
+
+        # Optional pod mount via the Mountpoint S3 CSI driver (#1675): a
+        # binding that sets ``mount_path`` gets the bucket as a static CSI
+        # volume alongside the env envelope. Requires the
+        # aws-mountpoint-s3-csi-driver platform component on the cluster.
+        # Mountpoint semantics, not POSIX: sequential writes to new objects
+        # only, no appends/renames/locking — read-heavy workloads.
+        volume_mounts: list[VolumeMount] = []
+        mount_path = str(cfg.get("mount_path") or "")
+        if mount_path:
+            read_only = bool(cfg.get("mount_read_only", False))
+            options = ["region " + self._config.region]
+            prefix = str(cfg.get("mount_prefix") or "")
+            if prefix:
+                options.append(f"prefix {prefix}")
+            if not read_only:
+                # Mountpoint mounts read-only by default for deletes; the
+                # binding's write intent has to opt object deletion in
+                # explicitly or DeleteObject calls fail at the FUSE layer.
+                options.append("allow-delete")
+            volume_mounts.append(
+                VolumeMount(
+                    name=f"s3-{bucket_name}"[:63].rstrip("-"),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="s3",
+                    csi_driver="s3.csi.aws.com",
+                    volume_handle=f"s3-{bucket_name}",
+                    volume_attributes={"bucketName": bucket_name},
+                    mount_options=options,
+                    read_only=read_only,
+                    capacity="1200Gi",
+                ),
+            )
+
         return Binding(
             # Canonical object_store envelope (env_injection._ENVELOPES
             # ["object_store"]) — the contract apps read. S3_BUCKET_ARN is
@@ -327,10 +365,17 @@ class S3Driver(ManagedServiceDriver):
                     ],
                 ),
             ],
+            pod_volume_mounts=volume_mounts,
             notes=(
                 "Object operations (Get/Put/Delete) are scoped to "
                 "the bucket's contents; bucket-level operations "
                 "are limited to read-only."
+                + (
+                    " Mounted via the Mountpoint S3 CSI driver: sequential"
+                    " writes to new objects only, no appends or renames."
+                    if volume_mounts
+                    else ""
+                )
             ),
         )
 
@@ -385,6 +430,23 @@ class S3Driver(ManagedServiceDriver):
                     "type": "boolean",
                     "description": ("Override the cluster-level versioning default for this binding."),
                 },
+                "mount_path": {
+                    "type": "string",
+                    "description": (
+                        "Absolute pod path to mount the bucket at via the "
+                        "Mountpoint S3 CSI driver (requires the "
+                        "aws-mountpoint-s3-csi-driver platform component). "
+                        "Empty = env-var binding only."
+                    ),
+                },
+                "mount_prefix": {
+                    "type": "string",
+                    "description": "Only expose keys under this prefix in the mount.",
+                },
+                "mount_read_only": {
+                    "type": "boolean",
+                    "description": "Mount the bucket read-only.",
+                },
             },
         }
 
@@ -399,10 +461,15 @@ class S3Driver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        """No config key can be applied without a reprovision (#1376)."""
+        """Only the binding-time mount keys apply without a reprovision (#1376)."""
         # versioning_override is applied while provisioning the bucket; this
-        # driver has no in-place path for it.
-        return []
+        # driver has no in-place path for it. The mount_* keys are read at
+        # binding render, so an edit + rebind is enough (#1675).
+        return [
+            "mount_path",
+            "mount_prefix",
+            "mount_read_only",
+        ]
 
     # ---- internals ------------------------------------------------
 

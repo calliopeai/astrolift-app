@@ -292,3 +292,56 @@ def test_binding_schema_documents_env_vars(driver: S3Driver) -> None:
     schema = driver.binding_schema()
     assert "S3_BUCKET_NAME" in schema.env_vars
     assert "S3_BUCKET_ARN" in schema.env_vars
+
+
+# ---- CSI mount binding (#1675) ---------------------------------
+
+
+def test_binding_without_mount_path_has_no_volumes(driver: S3Driver) -> None:
+    result = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(handle=result.handle))
+    assert binding.pod_volume_mounts == []
+
+
+def test_binding_mount_path_emits_s3_csi_volume(driver: S3Driver) -> None:
+    """mount_path in the binding config renders a static Mountpoint S3 CSI
+    volume: bucketName attribute, region option, allow-delete for writable
+    mounts (Mountpoint refuses DeleteObject without it)."""
+    result = driver.provision(_spec())
+    _, bucket_name = parse_handle(result.handle)
+    binding = driver.binding(
+        ServiceHandle(handle=result.handle),
+        config={"mount_path": "/data/models"},
+    )
+    assert len(binding.pod_volume_mounts) == 1
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "s3.csi.aws.com"
+    assert volume.mount_path == "/data/models"
+    assert volume.volume_attributes == {"bucketName": bucket_name}
+    assert volume.read_only is False
+    assert "allow-delete" in volume.mount_options
+    assert any(opt.startswith("region ") for opt in volume.mount_options)
+
+
+def test_binding_mount_read_only_drops_allow_delete(driver: S3Driver) -> None:
+    result = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=result.handle),
+        config={"mount_path": "/data/models", "mount_read_only": True},
+    )
+    volume = binding.pod_volume_mounts[0]
+    assert volume.read_only is True
+    assert "allow-delete" not in volume.mount_options
+
+
+def test_binding_mount_prefix_scopes_the_mount(driver: S3Driver) -> None:
+    result = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=result.handle),
+        config={"mount_path": "/data", "mount_prefix": "models/"},
+    )
+    assert "prefix models/" in binding.pod_volume_mounts[0].mount_options
+
+
+def test_mount_keys_are_editable_without_reprovision(driver: S3Driver) -> None:
+    assert set(driver.editable_fields()) == {"mount_path", "mount_prefix", "mount_read_only"}

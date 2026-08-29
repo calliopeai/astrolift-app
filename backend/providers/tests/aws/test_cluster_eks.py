@@ -576,6 +576,26 @@ def test_bootstrap_includes_ebs_csi_with_irsa_sa(fake_k8s_client) -> None:
     )
 
 
+def test_bootstrap_includes_s3_csi_opt_in_with_irsa_sa(fake_k8s_client) -> None:
+    """The EKS recipe offers aws-mountpoint-s3-csi-driver (#1675) so S3
+    object-store bindings can mount buckets into pods. Opt-in
+    (default_enabled=False — driver-level IRSA is a shared scope), node SA
+    pinned to the chart default with the convention IRSA annotation."""
+    driver = _mock_bootstrap_driver(fake_k8s_client)
+    ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+    component = _component(driver.bootstrap_components(ctx), "aws-mountpoint-s3-csi-driver")
+
+    assert component.chart_name == "aws-mountpoint-s3-csi-driver"
+    assert component.default_enabled is False
+    assert "irsa:aws-mountpoint-s3-csi-driver" in component.requires
+    sa = component.helm_values["node"]["serviceAccount"]
+    assert sa["name"] == "s3-csi-driver-sa"
+    assert sa["annotations"]["eks.amazonaws.com/role-arn"] == (
+        f"arn:aws:iam::123456789012:role/{_CLUSTER}-aws-mountpoint-s3-csi-driver"
+    )
+
+
 def _component(components: list, key: str):
     for c in components:
         if c.key == key:
