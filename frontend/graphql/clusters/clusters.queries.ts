@@ -369,6 +369,9 @@ export const LIST_MANAGED_DOMAINS = gql`
       defaultFor
       isWildcardManaged
       createdAt
+      provisionState
+      provisionNameservers
+      provisionValidationRecords
     }
   }
 `;

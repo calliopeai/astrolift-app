@@ -356,6 +356,45 @@ class Route53Driver(DnsDriver):
         self._zone_cache[canonical] = zone_id
         return {"zone_id": zone_id, "nameservers": nameservers}
 
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.deprovision_zone")
+    def deprovision_zone(self, zone: str) -> dict[str, Any]:
+        """Delete the hosted zone and every record set in it.
+
+        Route53 refuses DeleteHostedZone while any record other than the
+        apex NS/SOA pair exists, so those are removed first. Idempotent:
+        a zone that is already gone returns ``{"deleted": False}``.
+        """
+        try:
+            zone_id = self._resolve_zone(zone)
+        except NotFoundError:
+            return {"deleted": False, "records_removed": 0}
+
+        removed = 0
+        try:
+            paginator = self._r53.get_paginator("list_resource_record_sets")
+            doomed: list[dict[str, Any]] = []
+            for page in paginator.paginate(HostedZoneId=zone_id):
+                for rs in page.get("ResourceRecordSets", []):
+                    is_apex = rs.get("Name", "").rstrip(".") == zone.rstrip(".")
+                    if is_apex and rs.get("Type") in ("NS", "SOA"):
+                        continue
+                    doomed.append(rs)
+            if doomed:
+                self._r53.change_resource_record_sets(
+                    HostedZoneId=zone_id,
+                    ChangeBatch={
+                        "Changes": [{"Action": "DELETE", "ResourceRecordSet": rs} for rs in doomed],
+                    },
+                )
+                removed = len(doomed)
+            self._r53.delete_hosted_zone(Id=zone_id)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+        canonical = zone.rstrip(".") + "."
+        self._zone_cache.pop(canonical, None)
+        return {"deleted": True, "records_removed": removed}
+
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.request_wildcard_cert")
     def request_wildcard_cert(
         self,

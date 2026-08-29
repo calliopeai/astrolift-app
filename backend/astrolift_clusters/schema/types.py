@@ -145,6 +145,13 @@ class ManagedDomainType:
     default_for: str
     is_wildcard_managed: bool
     created_at: dt.datetime
+    # Zone provisioning progress (#781): the ZoneRegistrationStep the
+    # workflow has reached ('' = not started, 'mark_active' = done), the
+    # NS records the operator must point the registrar at, and the cert
+    # DNS-01 validation CNAMEs for zones the platform does not host.
+    provision_state: str
+    provision_nameservers: JSON
+    provision_validation_records: JSON
 
 
 # ---- Certificate picker (#858) ------------------------------------
@@ -307,6 +314,9 @@ def domain_to_type(domain) -> ManagedDomainType:
         default_for=domain.default_for,
         is_wildcard_managed=domain.is_wildcard_managed,
         created_at=domain.created_at,
+        provision_state=domain.provision_state,
+        provision_nameservers=domain.provision_nameservers or [],
+        provision_validation_records=domain.provision_validation_records or [],
     )
 
 

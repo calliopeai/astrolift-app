@@ -47,6 +47,7 @@ from astrolift_workflows.inputs import (
     Actor,
     BringClusterIntoManagementInput,
     DecommissionClusterInput,
+    DeprovisionManagedDomainInput,
     InstallClusterPrereqsInput,
     ProvisionManagedDomainInput,
 )
@@ -130,6 +131,25 @@ def _bring_workflow_id(cluster_guid: str) -> str:
     """Workflow id pattern — re-firing the same cluster joins the
     existing run rather than spawning a parallel one."""
     return f"BringClusterIntoManagement-{cluster_guid}"
+
+
+def _first_dns_cluster():
+    """The TenantCluster whose DnsDriver hosts managed-domain operations.
+
+    Managed domains are org-level, not cluster-level, so zone workflows
+    pick a cluster only as the vehicle for cloud credentials: the first
+    active cluster visible to the tenant.
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    return (
+        TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+            deleted_at__isnull=True,
+        )
+        .order_by("pk")
+        .first()
+    )
 
 
 def _actor_from_request(info: Info) -> Actor:
@@ -1212,6 +1232,29 @@ class ClustersMutation:
             is_wildcard_managed=input.is_wildcard_managed,
             dns_config=input.dns_config or {},
         )
+
+        # Registering a zone without provisioning it is a dead end the
+        # operator cannot see (#1673): the row exists but no hosted zone,
+        # no NS records to delegate to, no cert. Kick off the provisioning
+        # workflow against the first cluster whose driver can host the
+        # zone; the row's provision_state / provision_nameservers fill in
+        # as it runs and the UI surfaces them.
+        cluster = _first_dns_cluster()
+        if cluster is not None:
+            start_workflow(
+                "ProvisionManagedDomainWorkflow",
+                args=[
+                    ProvisionManagedDomainInput(
+                        cluster_id=cluster.pk,
+                        zone=input.zone,
+                        is_platform_managed_zone=True,
+                        actor=_actor_from_request(info),
+                    ),
+                ],
+                workflow_id=(
+                    f"ProvisionManagedDomainWorkflow-{cluster.guid}-" f"{input.zone.replace('.', '-')}"
+                ),
+            )
         return gql_success(domain_to_type(domain))
 
     @strawberry.field
@@ -1252,6 +1295,26 @@ class ClustersMutation:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain.soft_delete()
+
+        # The cloud resources must die with the row: a delete that only
+        # soft-deletes leaves the hosted zone billing monthly and the
+        # wildcard cert orphaned (found live: myastrolift.net survived
+        # its own deletion). Fire-and-forget; the activity is idempotent.
+        cluster = _first_dns_cluster()
+        if cluster is not None:
+            start_workflow(
+                "DeprovisionManagedDomainWorkflow",
+                args=[
+                    DeprovisionManagedDomainInput(
+                        cluster_id=cluster.pk,
+                        zone=domain.zone,
+                        actor=_actor_from_request(info),
+                    ),
+                ],
+                workflow_id=(
+                    f"DeprovisionManagedDomainWorkflow-{cluster.guid}-" f"{domain.zone.replace('.', '-')}"
+                ),
+            )
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
     @strawberry.mutation

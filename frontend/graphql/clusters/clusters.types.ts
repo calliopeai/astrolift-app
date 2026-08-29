@@ -20,6 +20,9 @@ export type AstroliftManagedDomain = Omit<
   "defaultFor"
 > & {
   defaultFor: ManagedDomainDefaultFor;
+  provisionState: string;
+  provisionNameservers: string[];
+  provisionValidationRecords: Array<Record<string, string>>;
 };
 
 export type AstroliftProviderPlugin = GeneratedProviderPlugin;

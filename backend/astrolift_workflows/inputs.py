@@ -382,6 +382,21 @@ class ProvisionManagedDomainInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DeprovisionManagedDomainInput:
+    """Input for ``DeprovisionManagedDomainWorkflow``.
+
+    The inverse of ``ProvisionManagedDomainInput``: tears down the cloud
+    resources ``ProvisionManagedDomainWorkflow`` created for ``zone`` —
+    the wildcard certificate first, then the hosted zone — via the
+    ``DnsDriver`` of the TenantCluster at ``cluster_id``.
+    """
+
+    cluster_id: int
+    zone: str
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowDefinitionRunInput:
     """Input for ``WorkflowDefinitionRunWorkflow`` — the agent workflow
     stage executor.

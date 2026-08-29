@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -58,10 +58,32 @@ const defaultForBadge: Record<string, string> = {
   none: "bg-foreground/5 text-muted-foreground",
 };
 
+function provisionBadge(state: string): { label: string; className: string } {
+  if (state === "mark_active") {
+    return { label: "active", className: "bg-success/15 text-success-fg" };
+  }
+  if (state === "") {
+    return { label: "not provisioned", className: "bg-foreground/5 text-muted-foreground" };
+  }
+  return { label: state.replace(/_/g, " "), className: "bg-info/15 text-info-fg" };
+}
+
 export function DomainsClient() {
   const fmt = useFormatters();
   const router = useRouter();
-  const { data, loading } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
+  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
+
+  // NS records land on the row a few seconds after the provisioning
+  // workflow creates the zone; poll until every domain settles so the
+  // operator sees them without refreshing.
+  const provisioning = (data?.astroliftManagedDomains ?? []).some(
+    (d) => d.provisionState !== "mark_active",
+  );
+  React.useEffect(() => {
+    if (provisioning) startPolling(10_000);
+    else stopPolling();
+    return () => stopPolling();
+  }, [provisioning, startPolling, stopPolling]);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftManagedDomain | null>(null);
   const [zone, setZone] = React.useState("");
@@ -105,7 +127,7 @@ export function DomainsClient() {
       },
     });
     if (data?.createManagedDomain.ok) {
-      toast.success(`Created ${zone}`);
+      toast.success(`Created ${zone} — provisioning; nameservers will appear shortly`);
       setCreateOpen(false);
     } else {
       toast.error(data?.createManagedDomain.errors?.[0]?.message ?? "Failed");
@@ -155,6 +177,8 @@ export function DomainsClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Zone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Nameservers (point your registrar here)</TableHead>
                   <TableHead>DNS driver</TableHead>
                   <TableHead>Default for</TableHead>
                   <TableHead>Wildcard</TableHead>
@@ -179,6 +203,39 @@ export function DomainsClient() {
                     className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
                   >
                     <TableCell className="font-mono">{d.zone}</TableCell>
+                    <TableCell>
+                      <Badge className={provisionBadge(d.provisionState).className} variant="secondary">
+                        {provisionBadge(d.provisionState).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell onClick={(ev) => ev.stopPropagation()}>
+                      {d.provisionNameservers.length > 0 ? (
+                        <div className="flex items-start gap-2">
+                          <div className="font-mono text-xs leading-5">
+                            {d.provisionNameservers.map((ns) => (
+                              <div key={ns}>{ns}</div>
+                            ))}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Copy nameservers for ${d.zone}`}
+                            onClick={async () => {
+                              await navigator.clipboard.writeText(
+                                d.provisionNameservers.join("\n"),
+                              );
+                              toast.success("Nameservers copied");
+                            }}
+                          >
+                            <CopyIcon className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          {d.provisionState === "" ? "—" : "pending…"}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{d.dnsDriver}</Badge>
                     </TableCell>
@@ -291,7 +348,7 @@ export function DomainsClient() {
         title={
           deleteTarget ? `Delete managed domain ${deleteTarget.zone}?` : "Delete managed domain?"
         }
-        description="Existing apps using hostnames in this zone keep their current DNS records, but new records will no longer be created or updated. Re-add the zone to resume management."
+        description="The hosted zone, its records, and the wildcard certificate are deleted from the cloud account. Apps using hostnames in this zone stop resolving. Re-add the zone to provision it again."
         confirmLabel="Delete zone"
         destructive
         onConfirm={async () => {

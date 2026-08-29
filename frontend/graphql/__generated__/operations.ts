@@ -2359,6 +2359,9 @@ export type AstroliftManagedDomain = {
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
+  provisionNameservers: Scalars['JSON']['output'];
+  provisionState: Scalars['String']['output'];
+  provisionValidationRecords: Scalars['JSON']['output'];
   zone: Scalars['String']['output'];
 };
 
@@ -10729,7 +10732,7 @@ export type RefreshClusterManagementMutation = { refreshClusterManagement: { ok:
 export type ListManagedDomainsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string }> };
+export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: Record<string, unknown>, provisionValidationRecords: Record<string, unknown> }> };
 
 export type ClusterHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];

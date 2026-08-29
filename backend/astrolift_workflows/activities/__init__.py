@@ -105,6 +105,9 @@ from astrolift_workflows.activities.custom_domain import (
     probe_required_records,
     transition_domain_status,
 )
+from astrolift_workflows.activities.deprovision_managed_domain import (
+    deprovision_managed_domain_resources,
+)
 from astrolift_workflows.activities.dev_environment import (
     mark_dev_environment_failed,
     provision_dev_environment,
@@ -244,6 +247,7 @@ __all__ = [
     "deprovision_app_identity_role",
     "deprovision_app_ingress",
     "deprovision_app_registry_repo",
+    "deprovision_managed_domain_resources",
     "deprovision_managed_service",
     "detect_drift",
     "dispatch_agent_crons",

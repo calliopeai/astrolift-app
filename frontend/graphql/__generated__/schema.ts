@@ -2359,6 +2359,9 @@ export type AstroliftManagedDomain = {
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
+  provisionNameservers: Scalars['JSON']['output'];
+  provisionState: Scalars['String']['output'];
+  provisionValidationRecords: Scalars['JSON']['output'];
   zone: Scalars['String']['output'];
 };
 

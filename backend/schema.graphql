@@ -2362,6 +2362,9 @@ type AstroliftManagedDomain {
   defaultFor: String!
   isWildcardManaged: Boolean!
   createdAt: DateTime!
+  provisionState: String!
+  provisionNameservers: JSON!
+  provisionValidationRecords: JSON!
 }
 
 type AstroliftManagedDomainMutationResult {
