@@ -177,13 +177,37 @@ class S3Driver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="object_store_s3")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         if spec.size is None and set(spec.config or {}) - self._BINDING_ONLY_KEYS <= {"versioning_override"}:
-            # Nothing to reconcile on the bucket itself; the mount keys are
-            # applied when the binding envelope re-renders (#1675). ok=True is
-            # honest here — after finalize, the resource DOES match the spec.
+            # The mount keys are applied when the binding envelope re-renders
+            # (#1675); the bucket work here is verification — finalize copies
+            # the desired config onto applied_config, so a mount edit must not
+            # be recorded against a bucket that no longer exists.
+            _, bucket_name = parse_handle(spec.handle)
+            try:
+                self._s3.head_bucket(Bucket=bucket_name)
+            except Exception as exc:
+                # head_bucket on a missing bucket surfaces as NoSuchBucket or
+                # a generic ClientError with HTTP 404 (same as status()).
+                response = getattr(exc, "response", None) or {}
+                metadata = response.get("ResponseMetadata", {}) or {}
+                error_code = response.get("Error", {}).get("Code", "")
+                if metadata.get("HTTPStatusCode") == 404 or error_code in ("404", "NoSuchBucket"):
+                    return UpdateResult(
+                        False,
+                        spec.handle,
+                        f"bucket {bucket_name} not found",
+                        ["not_found"],
+                        retryable=False,
+                    )
+                return UpdateResult(
+                    False,
+                    spec.handle,
+                    f"head_bucket {bucket_name}: {exc}",
+                    [str(exc)],
+                )
             return UpdateResult(
                 True,
                 spec.handle,
-                "mount options apply at binding render; no bucket changes needed",
+                "bucket verified; mount options apply at binding render",
             )
         return unsupported_update(spec.handle, "S3 bucket attributes reconcile on provision, not in place")
 

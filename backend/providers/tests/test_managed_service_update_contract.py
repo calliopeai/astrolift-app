@@ -369,7 +369,8 @@ def test_drivers_with_no_editable_fields_are_the_expected_set() -> None:
     """
     assert {driver.key for driver in _no_editable_fields_drivers()} == {
         ("aws", "cdn", "cloudfront"),
-        ("aws", "object_store", "s3"),
+        # aws/object_store/s3 left this set in #1675: the binding-time mount
+        # keys became editable and update() verifies the bucket before finalize.
         ("azure", "object_store", "azure_blob"),
         ("azure", "object_store", "blob"),
         ("azure", "queue", "servicebus"),
