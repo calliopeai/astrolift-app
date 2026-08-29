@@ -169,8 +169,22 @@ class S3Driver(ManagedServiceDriver):
             message=f"bucket {bucket_name} provisioned",
         )
 
+    # Binding-time keys the update path may accept: they carry no bucket
+    # work — finalize's binding re-sync renders the new mount and the
+    # workflow bounces bound workloads. Everything else stays a refusal.
+    _BINDING_ONLY_KEYS = frozenset({"mount_path", "mount_prefix", "mount_read_only"})
+
     @driver_op(cloud="aws", driver="object_store_s3")
     def update(self, spec: UpdateSpec) -> UpdateResult:
+        if spec.size is None and set(spec.config or {}) - self._BINDING_ONLY_KEYS <= {"versioning_override"}:
+            # Nothing to reconcile on the bucket itself; the mount keys are
+            # applied when the binding envelope re-renders (#1675). ok=True is
+            # honest here — after finalize, the resource DOES match the spec.
+            return UpdateResult(
+                True,
+                spec.handle,
+                "mount options apply at binding render; no bucket changes needed",
+            )
         return unsupported_update(spec.handle, "S3 bucket attributes reconcile on provision, not in place")
 
     @driver_op(

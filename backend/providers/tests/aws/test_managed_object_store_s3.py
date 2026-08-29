@@ -181,11 +181,13 @@ def test_binding_emits_iam_grants(driver: S3Driver) -> None:
 
 
 def test_update_refuses_instead_of_reporting_a_no_op_success(driver: S3Driver) -> None:
-    """This driver applies nothing in ``update()``, so it must not claim it did.
+    """Bucket-level changes apply nothing in ``update()``, so it must not
+    claim they did.
 
     It used to return ``ok=True``, which the update workflow records as
-    "applied" on the row (#1376). Nothing about a bucket is editable in place
-    here, so the honest answer is a permanent refusal pointing at reprovision.
+    "applied" on the row (#1376). No bucket attribute is editable in place,
+    so anything beyond the binding-time mount keys (#1675) is a permanent
+    refusal pointing at reprovision.
     """
     result = driver.provision(_spec())
     update = driver.update(UpdateSpec(handle=result.handle, size="medium"))
@@ -193,7 +195,17 @@ def test_update_refuses_instead_of_reporting_a_no_op_success(driver: S3Driver) -
     assert update.retryable is False
     assert update.errors == ["update_not_supported_in_place"]
     assert "reprovisionManagedService" in update.message
-    assert driver.editable_fields() == []
+    assert "versioning_override" not in driver.editable_fields()
+
+
+def test_update_accepts_binding_only_mount_keys(driver: S3Driver) -> None:
+    """A mount-key-only config edit is a cloud no-op the update workflow may
+    finalize: the binding re-render applies it (#1675)."""
+    result = driver.provision(_spec())
+    update = driver.update(
+        UpdateSpec(handle=result.handle, config={"mount_path": "/data", "mount_read_only": True}),
+    )
+    assert update.ok is True
 
 
 # ---- deprovision ----------------------------------------------
