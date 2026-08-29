@@ -74,8 +74,13 @@ const SCOPE_CHOICES = [
   },
   {
     value: "project:write",
-    label: "Write project resources",
-    hint: "Provision and manage project-owned shared resources without broader app writes.",
+    label: "Write projects",
+    hint: "Create, update, and delete projects and project-owned shared resources without broader app writes.",
+  },
+  {
+    value: "team:write",
+    label: "Write teams",
+    hint: "Create, update, and delete teams without broader org administration.",
   },
   {
     value: "secret:read",

@@ -47,6 +47,7 @@ SCOPE_MCP_WRITE = "mcp:write"
 SCOPE_WORKFLOW_WRITE = "workflow:write"
 SCOPE_WORKFLOW_TRIGGER = "workflow:trigger"
 SCOPE_APP_ONBOARD = "app:onboard"
+SCOPE_TEAM_WRITE = "team:write"
 SCOPE_ADMIN = "admin"
 
 ALLOWED_SCOPES: frozenset[str] = frozenset(
@@ -64,6 +65,7 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_WORKFLOW_WRITE,
         SCOPE_WORKFLOW_TRIGGER,
         SCOPE_APP_ONBOARD,
+        SCOPE_TEAM_WRITE,
         SCOPE_ADMIN,
     }
 )
@@ -75,15 +77,21 @@ DEFAULT_SCOPES: tuple[str, ...] = (
 )
 
 # Browser-approved CLI sessions need to exercise the CLI's documented
-# operator commands. Keep this separate from DEFAULT_SCOPES: generic API
-# tokens and mobile/browser enrollment stay read-only unless the operator
-# explicitly selects a stronger scope. ``app:onboard`` covers exactly
-# ``astro app register`` + ``astro ci setup`` (#1533) — deliberately NOT
-# ``write:apps``, which would also flip app.deploy/app.delete on.
+# operator commands — ALL of them (#1676): #1533's ``app:onboard`` covered
+# register/ci-setup but left ``astro app deploy``, ``astro team create`` and
+# ``astro project create`` ceiling-blocked for every token the CLI can mint,
+# admins included. The ceiling is sized to the CLI surface; RBAC remains the
+# authority on who may actually do each of these. Keep this separate from
+# DEFAULT_SCOPES: generic API tokens and mobile/browser enrollment stay
+# read-only unless the operator explicitly selects a stronger scope. Still
+# excluded on purpose: ``admin`` (org/billing/cluster surfaces) and any path
+# to ``api_token.create`` — a leaked CLI token must not mint its successors.
 CLI_DEVICE_SCOPES: tuple[str, ...] = (
     *DEFAULT_SCOPES,
+    SCOPE_WRITE_APPS,
     SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_PROJECT_WRITE,
+    SCOPE_TEAM_WRITE,
     SCOPE_SECRET_WRITE,
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_WRITE,
@@ -148,7 +156,17 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         "agent_env_spec.delete",
     }:
         return True
-    if SCOPE_PROJECT_WRITE in scopes and permission == "project.update":
+    if SCOPE_PROJECT_WRITE in scopes and permission in {
+        "project.create",
+        "project.update",
+        "project.delete",
+    }:
+        return True
+    if SCOPE_TEAM_WRITE in scopes and permission in {
+        "team.create",
+        "team.update",
+        "team.delete",
+    }:
         return True
     if SCOPE_SECRET_READ in scopes and permission == "secret.read":
         return True

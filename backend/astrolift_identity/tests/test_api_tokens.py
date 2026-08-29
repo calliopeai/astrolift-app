@@ -45,6 +45,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_READ_APPS,
     SCOPE_SECRET_READ,
     SCOPE_SECRET_WRITE,
+    SCOPE_TEAM_WRITE,
     SCOPE_WORKFLOW_TRIGGER,
     SCOPE_WORKFLOW_WRITE,
     SCOPE_WRITE_APPS,
@@ -427,11 +428,20 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert token_scope_allows_permission(token, Permission.WORKFLOW_UPDATE)
     assert token_scope_allows_permission(token, Permission.WORKFLOW_DELETE)
     assert token_scope_allows_permission(token, Permission.WORKFLOW_TRIGGER)
+    # #1676: the ceiling is sized to the CLI's documented commands — deploy,
+    # team create, project create all work on a fresh device login. RBAC is
+    # still the authority on who may run them.
+    assert token_scope_allows_permission(token, Permission.APP_DEPLOY)
+    assert token_scope_allows_permission(token, Permission.APP_DELETE)
+    assert token_scope_allows_permission(token, Permission.PROJECT_CREATE)
+    assert token_scope_allows_permission(token, Permission.PROJECT_DELETE)
+    assert token_scope_allows_permission(token, Permission.TEAM_CREATE)
+    assert token_scope_allows_permission(token, Permission.TEAM_UPDATE)
+    assert token_scope_allows_permission(token, Permission.TEAM_DELETE)
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
-    assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
-    assert not token_scope_allows_permission(token, Permission.APP_DELETE)
     assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
+    assert not token_scope_allows_permission(token, Permission.API_TOKEN_CREATE)
 
 
 def test_app_onboard_scope_maps_only_to_register_and_update():
@@ -446,6 +456,24 @@ def test_app_onboard_scope_maps_only_to_register_and_update():
     assert not token_scope_allows_permission(token, Permission.APP_DELETE)
     assert not token_scope_allows_permission(token, Permission.APP_READ)
     assert not token_scope_allows_permission(token, Permission.SECRET_WRITE)
+
+
+def test_team_write_scope_maps_to_team_lifecycle_only():
+    """``team:write`` (#1676) covers team create/update/delete and nothing
+    else; ``project:write`` covers the full project lifecycle its name
+    promises, not just update."""
+    team_token = SimpleNamespace(scopes=[SCOPE_TEAM_WRITE])
+    project_token = SimpleNamespace(scopes=["project:write"])
+
+    assert token_scope_allows_permission(team_token, Permission.TEAM_CREATE)
+    assert token_scope_allows_permission(team_token, Permission.TEAM_UPDATE)
+    assert token_scope_allows_permission(team_token, Permission.TEAM_DELETE)
+    assert not token_scope_allows_permission(team_token, Permission.TEAM_READ)
+    assert not token_scope_allows_permission(team_token, Permission.PROJECT_CREATE)
+    assert token_scope_allows_permission(project_token, Permission.PROJECT_CREATE)
+    assert token_scope_allows_permission(project_token, Permission.PROJECT_UPDATE)
+    assert token_scope_allows_permission(project_token, Permission.PROJECT_DELETE)
+    assert not token_scope_allows_permission(project_token, Permission.TEAM_CREATE)
 
 
 def test_workflow_scopes_are_narrow_write_and_trigger_ceilings():
