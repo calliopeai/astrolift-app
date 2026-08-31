@@ -511,3 +511,58 @@ def test_provision_external_dns_role_idempotent() -> None:
     assert a == b
     cond = iam.roles[_EXTERNAL_DNS_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
     assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:external-dns"
+
+
+# ---- permissions boundary (#1678) --------------------------------
+
+
+def _boundary_driver(iam_client, boundary: str) -> IRSADriver:
+    return IRSADriver(
+        config=IRSAConfig(
+            region="us-east-1",
+            account_id="123456789012",
+            cluster_oidc_issuer="oidc.eks.us-east-1.amazonaws.com/id/ABC123",
+            permissions_boundary_arn=boundary,
+        ),
+        iam_client=iam_client,
+    )
+
+
+def test_create_role_attaches_the_configured_permissions_boundary(iam_client) -> None:
+    """On an agent-installed (pull mode) cluster the agent's own boundary
+    carries ``DenyRoleCreationWithoutThisBoundary``, refusing any CreateRole
+    that does not attach that same boundary. Without this the platform can
+    create no workload-identity role at all, so every managed-service binding
+    and the in-cluster build role are unreachable."""
+    boundary = "arn:aws:iam::123456789012:policy/calliope-agent-boundary"
+    driver = _boundary_driver(iam_client, boundary)
+
+    driver.create_identity_role(name="astrolift-acme-api", permissions=[])
+
+    role = iam_client.get_role(RoleName="astrolift-acme-api")["Role"]
+    assert role.get("PermissionsBoundary", {}).get("PermissionsBoundaryArn") == boundary
+
+
+def test_create_role_omits_the_boundary_when_there_is_none(iam_client) -> None:
+    """Admin-provisioned (push mode) installs have no boundary. IAM rejects an
+    empty PermissionsBoundary, so it has to be omitted rather than passed
+    through as an empty string."""
+    driver = _boundary_driver(iam_client, "")
+
+    driver.create_identity_role(name="astrolift-acme-api", permissions=[])
+
+    role = iam_client.get_role(RoleName="astrolift-acme-api")["Role"]
+    assert "PermissionsBoundary" not in role
+
+
+def test_boundary_defaults_to_absent(iam_client) -> None:
+    """The field is opt-in: a config that never mentions it behaves exactly as
+    it did before this existed."""
+    assert (
+        IRSAConfig(
+            region="us-east-1",
+            account_id="123456789012",
+            cluster_oidc_issuer="oidc.eks.us-east-1.amazonaws.com/id/ABC123",
+        ).permissions_boundary_arn
+        == ""
+    )

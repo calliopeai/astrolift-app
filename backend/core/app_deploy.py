@@ -441,6 +441,10 @@ def _config_for_capability_uncredentialed(
                 account_id=str(pc.get("account_id", "")),
                 cluster_oidc_issuer=str(ac.get("cluster_oidc_issuer", "")),
                 role_path=str(pc.get("irsa_role_path", "/")),
+                # Set on an agent-installed (pull mode) cluster, whose agent
+                # boundary denies creating a role that does not carry it;
+                # empty on an admin-provisioned one, which has no boundary.
+                permissions_boundary_arn=str(pc.get("iam_permissions_boundary_arn", "")),
             )
         if capability == "secrets":
             from aws.secrets import SecretsConfig
