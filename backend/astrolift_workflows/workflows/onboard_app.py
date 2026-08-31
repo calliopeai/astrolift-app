@@ -44,6 +44,7 @@ from astrolift_workflows.inputs import OnboardAppInput, WorkflowResult
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        mark_app_failed,
         mark_app_provisioning,
         mark_app_ready,
         provision_managed_services_initial,
@@ -94,6 +95,26 @@ class OnboardAppWorkflow:
 
     @workflow.run
     async def run(self, input: OnboardAppInput) -> WorkflowResult:
+        # Record why a provision died before letting it die. Until #1677 a
+        # failure left the app at `provisioning` with an empty
+        # `provisioning_error` forever, indistinguishable from one still in
+        # flight -- and there is no CLI route to the worker's logs, so a tenant
+        # had nothing to go on at all.
+        #
+        # The failure is re-raised, not swallowed: the workflow still fails, so
+        # Temporal's retry and history semantics are exactly as before. This
+        # only writes down the reason on the way past.
+        try:
+            return await self._provision(input)
+        except Exception as error:
+            await workflow.execute_activity(
+                mark_app_failed,
+                args=[input.registered_app_id, f"{self._step}: {error}"],
+                start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            )
+            raise
+
+    async def _provision(self, input: OnboardAppInput) -> WorkflowResult:
         self._step = "provisioning"
         await workflow.execute_activity(
             mark_app_provisioning,
