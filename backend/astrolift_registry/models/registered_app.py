@@ -437,6 +437,28 @@ class RegisteredApp(NamedBaseCoreModel):
     }
 
     @property
+    def builds_an_image(self) -> bool:
+        """Whether the platform ever needs a registry repo + push role here.
+
+        An app produces an image -- and therefore needs somewhere to push it --
+        unless it points at a pre-built one. Two model states mean "pre-built,
+        no build step": ``build_mode == none`` (the operator supplies a
+        published tag and nothing builds) and ``source_kind == direct_upload``
+        (an App Builder promote with no source repo, baked out of band). Both
+        ``ci_pushed`` and ``platform_build`` produce images, so they still need
+        registry coordinates.
+
+        Lives on the model because it is derived from two model fields and has
+        to be read from both a workflow activity and the GraphQL layer. It was
+        previously a private helper in the schema module, which meant the
+        provisioning activity that actually creates the repository could not
+        reach it and created one for every app regardless (#1682).
+        """
+        if (self.build_mode or "").strip() == RegisteredApp.BuildMode.NONE.value:
+            return False
+        return (self.source_kind or "").strip() != RegisteredApp.SourceKind.DIRECT_UPLOAD.value
+
+    @property
     def security_policy_resolved(self) -> dict:
         """Return the supply-chain policy with platform defaults filled in.
 
