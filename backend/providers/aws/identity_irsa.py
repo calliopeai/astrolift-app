@@ -346,6 +346,20 @@ class IRSAConfig(CredentialedConfig):
     ``astrolift.io/managed-by`` tag. Override per-install only if the
     task-role policy is broadened to cover the chosen path."""
 
+    permissions_boundary_arn: str = ""
+    """Permissions boundary to attach to every role this driver creates.
+
+    Empty on an admin-provisioned (push mode) install, where no boundary
+    exists. Non-empty on an agent-installed (pull mode) one, where the
+    installer agent's own boundary carries a
+    ``DenyRoleCreationWithoutThisBoundary`` statement refusing any
+    ``iam:CreateRole`` that does not attach that same boundary — so leaving
+    this empty there means every workload-identity role is denied, and with
+    it every managed-service binding and the in-cluster build role.
+
+    Attaching it is also what stops the control plane minting a role wider
+    than the boundary constraining the agent that installed it."""
+
 
 class IRSADriver(WorkloadIdentityDriver):
     def __init__(self, *, config: IRSAConfig, iam_client: Any | None = None) -> None:
@@ -384,19 +398,24 @@ class IRSADriver(WorkloadIdentityDriver):
         """Creates a role with an OIDC-trust policy + an inline
         policy from the high-level permissions."""
         trust_policy = self._oidc_trust_policy()
+        create_kwargs: dict[str, Any] = {
+            "Path": self._config.role_path,
+            "RoleName": name,
+            "AssumeRolePolicyDocument": json.dumps(trust_policy),
+            "Description": f"Astrolift workload identity role for {name}",
+            "Tags": [
+                {
+                    "Key": "astrolift.io/managed-by",
+                    "Value": "platform",
+                }
+            ],
+        }
+        # Omitted rather than passed empty: IAM rejects an empty
+        # PermissionsBoundary, and push-mode installs legitimately have none.
+        if self._config.permissions_boundary_arn:
+            create_kwargs["PermissionsBoundary"] = self._config.permissions_boundary_arn
         try:
-            response = self._iam.create_role(
-                Path=self._config.role_path,
-                RoleName=name,
-                AssumeRolePolicyDocument=json.dumps(trust_policy),
-                Description=f"Astrolift workload identity role for {name}",
-                Tags=[
-                    {
-                        "Key": "astrolift.io/managed-by",
-                        "Value": "platform",
-                    }
-                ],
-            )
+            response = self._iam.create_role(**create_kwargs)
         except self._iam.exceptions.EntityAlreadyExistsException:
             # Idempotent + self-healing: the role exists, but its trust or
             # inline policy may be stale — e.g. the OIDC issuer was empty on
