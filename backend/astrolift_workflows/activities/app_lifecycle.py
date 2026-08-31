@@ -177,6 +177,22 @@ def _provision_registry_repo_sync(registered_app_id: int) -> str:
     if app.registry_repo_uri:
         # Already provisioned — idempotent fast-path.
         return app.registry_repo_uri
+    if not app.builds_an_image:
+        # A pre-built-image app (``build_mode == none`` or a direct upload)
+        # never pushes anything, so creating a repository for it leaks a
+        # resource per app — and, on an install whose task role cannot write
+        # to the registry, wedges the onboard on a repo it was never going to
+        # use (#1682). An empty ``registry_repo_uri`` is the documented steady
+        # state for these apps; ``build_reprovision_state`` already suppresses
+        # the missing-registry callout for them.
+        log.info(
+            "provision_registry_repo skipped: %s does not build an image (build_mode=%s source_kind=%s)",
+            app.slug,
+            app.build_mode,
+            app.source_kind,
+            extra={"registered_app_id": registered_app_id},
+        )
+        return ""
     # Pick a cluster whose provider plugin registers a ``registry``
     # driver. The driver is plugin-scoped not cluster-scoped, but the
     # ImageRegistryDriver constructor takes the plugin config, so any

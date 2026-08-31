@@ -1114,14 +1114,10 @@ _REPROVISION_REASONS = {
 def _app_builds_an_image(app) -> bool:
     """Whether the platform ever needs an ECR repo + push role for this app.
 
-    An app produces an image — and therefore needs a container registry
-    repo to push to — unless it points at a pre-built image. Two model
-    states mean "pre-built, no build step": ``build_mode == none`` (the
-    operator supplies a published tag and nothing builds) and
-    ``source_kind == direct_upload`` (a Calliope App Builder promote with
-    no source repo — the platform bakes the file tree into an image out of
-    band). Both ``ci_pushed`` and ``platform_build`` produce images, so
-    they still need the registry coordinates.
+    Thin delegate to ``RegisteredApp.builds_an_image``, which is where the rule
+    lives now: the provisioning activity needs the same predicate and cannot
+    import this schema module (#1682). Kept as a function so the duck-typed
+    callers in this module's tests keep working.
     """
     from astrolift_registry.models import RegisteredApp
 
@@ -1129,9 +1125,7 @@ def _app_builds_an_image(app) -> bool:
     source_kind = (getattr(app, "source_kind", "") or "").strip()
     if build_mode == RegisteredApp.BuildMode.NONE.value:
         return False
-    if source_kind == RegisteredApp.SourceKind.DIRECT_UPLOAD.value:
-        return False
-    return True
+    return source_kind != RegisteredApp.SourceKind.DIRECT_UPLOAD.value
 
 
 def build_reprovision_state(app) -> AppReprovisionStateType:
