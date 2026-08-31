@@ -481,7 +481,9 @@ class RegisteredApp(NamedBaseCoreModel):
             "block_on_high_cve_threshold": policy.get("block_on_high_cve_threshold"),
         }
 
-    def transition_provisioning(self, new_status: RegisteredApp.ProvisioningStatus) -> None:
+    def transition_provisioning(
+        self, new_status: RegisteredApp.ProvisioningStatus, *, reason: str = ""
+    ) -> None:
         current = RegisteredApp.ProvisioningStatus(self.provisioning_status)
         # Idempotent: re-marking the current state is a no-op, not an error.
         # Without this, a deregister re-fired to recover an app stuck at
@@ -498,4 +500,11 @@ class RegisteredApp(NamedBaseCoreModel):
         self.provisioning_status = new_status.value
         if new_status is RegisteredApp.ProvisioningStatus.READY:
             self.provisioning_error = ""
+        elif new_status is RegisteredApp.ProvisioningStatus.FAILED:
+            # The whole point of the FAILED state. Until #1677 nothing ever
+            # reached it and nothing ever wrote this field, so a provision that
+            # died looked identical to one still running -- for as long as
+            # anyone cared to wait. Truncated because a driver traceback can
+            # be long and this is rendered inline by the CLI and the UI.
+            self.provisioning_error = reason[:2000]
         self.save(update_fields=["provisioning_status", "provisioning_error", "updated_at", "version"])
