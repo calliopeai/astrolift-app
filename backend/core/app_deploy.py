@@ -1077,7 +1077,15 @@ def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     config = getattr(cluster, "oidc_auth_config", None) or {}
     if not all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host")):
         return None
-    return OIDCAuthConfig(auth_proxy_host=config["auth_proxy_host"])
+    # gateway_secret is deliberately NOT part of the completeness test above.
+    # Those three keys decide whether the cluster has a gate at all; the secret
+    # only decides whether the gate stamps proof it was crossed. Requiring it
+    # would take the gate off every app on a cluster that has not set one yet,
+    # turning an incremental hardening into an outage (#1726).
+    return OIDCAuthConfig(
+        auth_proxy_host=config["auth_proxy_host"],
+        gateway_secret=str(config.get("gateway_secret") or ""),
+    )
 
 
 # --- Custom-domain edge auth state (#1621) -----------------------------

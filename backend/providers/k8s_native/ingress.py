@@ -18,7 +18,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
-from k8s_native.central_auth import GATEWAY_SECRET_HEADER
 
 SUPPORTED_VARIANTS = (
     "nginx_ingress",
@@ -60,16 +59,26 @@ class OIDCAuthConfig:
         "X-Auth-Request-User",
         "X-Auth-Request-Email",
         "X-Auth-Request-Access-Token",
-        # The gate's proof-of-passage (#1726). oauth2-proxy stamps it on the
-        # auth response; nginx only forwards headers named here, so leaving it
-        # out means the proxy sets it and the gate drops it -- the app then
-        # sees identity headers with nothing attesting where they came from,
-        # which is the state this header exists to end.
-        GATEWAY_SECRET_HEADER,
     )
     """Headers oauth2-proxy injects after a successful auth check.
     The Ingress controller passes them upstream so the app can see
-    the authenticated identity, and tell that it came through the gate."""
+    the authenticated identity."""
+
+    gateway_secret: str = ""
+    """Shared secret stamped on every request the gate lets through (#1726).
+
+    Without it the gate is only an edge check: nothing distinguishes a request
+    that came through the auth host from anything else that can reach the app's
+    Service port in-cluster. A careful app refuses everyone on that basis; a
+    careless one trusts identity headers any pod could forge.
+
+    Empty omits the header rather than stamping a blank one, which would read
+    as "the gate vouched for this" to an app testing presence rather than
+    value."""
+
+    gateway_secret_header: str = "X-Astrolift-Gateway-Secret"
+    """Header the shared secret is stamped on. Apps point their own
+    proxy-secret setting at this name."""
 
 
 # The three annotation keys that route an nginx-family Ingress through
@@ -80,6 +89,11 @@ NGINX_AUTH_ANNOTATION_KEYS = (
     "nginx.ingress.kubernetes.io/auth-url",
     "nginx.ingress.kubernetes.io/auth-signin",
     "nginx.ingress.kubernetes.io/auth-response-headers",
+    # The gateway-secret snippet is part of the gate, so the live patcher owns
+    # it too: a reconcile that refreshed the auth-* keys but left a stale
+    # snippet would have the app comparing against a secret the gate no longer
+    # sends, and every request would fail closed.
+    "nginx.ingress.kubernetes.io/configuration-snippet",
 )
 
 
@@ -95,7 +109,7 @@ def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
     the gate is how an app ends up authenticated on one render path and
     public on another.
     """
-    return {
+    annotations = {
         "nginx.ingress.kubernetes.io/auth-url": f"https://{auth.auth_proxy_host}/oauth2/auth",
         # rd must be the FULL app URL: the auth host lives on its own
         # hostname, so a path-only rd lands the user on the auth host
@@ -107,6 +121,19 @@ def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
         ),
         "nginx.ingress.kubernetes.io/auth-response-headers": ",".join(auth.response_headers),
     }
+    if auth.gateway_secret:
+        # Stamp proof-of-passage on the proxied request. proxy_set_header runs
+        # after auth_request, so this lands on requests the gate admitted and
+        # on nothing else -- a request that never passed the gate never reaches
+        # this block.
+        #
+        # The header is set unconditionally rather than copied from the client,
+        # which is what makes it unforgeable from outside: whatever a caller
+        # sends under this name is overwritten before the app sees it.
+        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = (
+            f'proxy_set_header {auth.gateway_secret_header} "{auth.gateway_secret}";\n'
+        )
+    return annotations
 
 
 @dataclass(frozen=True)
