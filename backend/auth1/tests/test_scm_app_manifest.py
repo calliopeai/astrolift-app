@@ -760,3 +760,45 @@ def test_start_reuse_falls_back_to_create_when_slug_unrecoverable(settings):
     assert 'name="manifest"' in resp.content.decode()
     pending_b = SourceConnection.objects.get(organization=org_b, kind="github_app_install")
     assert pending_b.oauth_client_id == ""  # a fresh pending, not a copy
+
+
+# ---- manifest permissions match what autowire uses (#1713) -----------
+
+
+def _permissions():
+    """The manifest's permission block, built through the real code path."""
+    from django.test import RequestFactory
+
+    from auth1.scm_app_manifest import _manifest_json
+
+    request = RequestFactory().get("/", HTTP_HOST="astrolift.example.com")
+    manifest = _manifest_json(request, install_slug="astrolift", connection_guid="c" * 8)
+    return manifest["default_permissions"]
+
+
+def test_the_manifest_grants_every_permission_autowire_uses():
+    """The manifest asked for four permissions and autowire needs seven, so an
+    operator who followed the product's own App-creation flow got an App that
+    could not do any of the things autowire exists to do -- and it surfaced as a
+    403 from GitHub, which reads like their misconfiguration."""
+    perms = _permissions()
+    assert perms["contents"] == "write", "cannot commit the CI workflow file"
+    assert perms["workflows"] == "write", "GitHub refuses a push touching .github/workflows"
+    assert perms["secrets"] == "write", "cannot push Actions secrets"
+    assert perms["actions"] == "write", "cannot trigger or read workflow runs"
+    assert perms["repository_hooks"] == "write", "cannot install the source webhook"
+
+
+def test_contents_is_not_read_only():
+    """The specific regression: contents: read passes a casual reading of the
+    manifest while making the first autowire step impossible."""
+    assert _permissions()["contents"] != "read"
+
+
+def test_workflows_write_accompanies_contents_write():
+    """GitHub rejects a push that touches .github/workflows unless workflows is
+    granted too, even when contents is write. Granting one without the other
+    looks correct and fails at the same step."""
+    perms = _permissions()
+    if perms.get("contents") == "write":
+        assert perms.get("workflows") == "write"
