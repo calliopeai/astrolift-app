@@ -497,7 +497,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                 f"deploy will apply cleanly and time out the same way. Fix the workload, "
                 f"or delete the pod to force it onto the new revision."
             )
-        except Exception:  # noqa: BLE001 - diagnosis must never fail the caller
+        except Exception:
+            # Diagnosis must never fail the caller: this runs on a path that is
+            # already failing, and a broken diagnosis turning a timeout into an
+            # exception would be worse than no diagnosis at all.
             return False, ""
 
     # ---- exec / port-forward --------------------------------------
