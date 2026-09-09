@@ -89,7 +89,7 @@ def _oidc_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
     """The nginx-family half of :func:`auth_annotation_patch`.
 
     Mirrors the ALB behaviour on the central-auth path: a complete
-    ``oidc_auth_config`` patches on the same three annotations the
+    ``oidc_auth_config`` patches on the same annotations the
     renderer emits, anything less patches them to ``None`` so the
     apiserver drops them. Delegates the "is this configured" test to
     ``core.app_deploy.oidc_auth_for_cluster`` and the values to
@@ -105,7 +105,14 @@ def _oidc_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
     auth = oidc_auth_for_cluster(cluster)
     if auth is None:
         return dict.fromkeys(NGINX_AUTH_ANNOTATION_KEYS, None)
-    return nginx_auth_annotations(auth)
+    # Every key the reconcile owns has to appear in the patch, including the
+    # ones this cluster does not currently populate. nginx_auth_annotations
+    # omits the gateway-secret snippet when no secret is configured (#1726);
+    # omitting it here too would leave a previously-stamped snippet on the live
+    # Ingress after the secret was removed, so the gate would keep sending a
+    # secret the platform no longer knows about. Patching it to None clears it.
+    rendered = nginx_auth_annotations(auth)
+    return {key: rendered.get(key) for key in NGINX_AUTH_ANNOTATION_KEYS}
 
 
 def auth_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:

@@ -26,9 +26,7 @@ SLUG = "gate-cluster"
 
 @pytest.fixture
 def aws_plugin(db):
-    plugin, _ = ProviderPlugin.objects.get_or_create(
-        slug="aws", defaults={"name": "AWS", "is_active": True}
-    )
+    plugin, _ = ProviderPlugin.objects.get_or_create(slug="aws", defaults={"name": "AWS", "is_active": True})
     return plugin
 
 

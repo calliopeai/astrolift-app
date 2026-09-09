@@ -389,9 +389,7 @@ class Command(BaseCommand):
         # ``ingress_mode`` fix in #1537, in this same function: absent means
         # "leave whatever the row has". The plugin default still applies, but
         # only when the row is being created.
-        explicit_ingress_class = (
-            opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or None
-        )
+        explicit_ingress_class = opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or None
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
         # No default: absent means "leave whatever the row has". Unlike
         # ingress_class, an unset ingress_mode must not resolve to a value
@@ -441,6 +439,24 @@ class Command(BaseCommand):
                 "upstream_connector": _env("ASTROLIFT_CLUSTER_OIDC_UPSTREAM_CONNECTOR") or "google",
                 "auth_proxy_host": _oidc_auth_proxy_host,
             }
+            # The gate's proof-of-passage secret (#1726). This dict REPLACES
+            # oidc_auth_config wholesale, so a key the environment does not
+            # carry is not merely left unset -- it is deleted. Without this
+            # line, declaring the OIDC vars silently strips the gateway secret
+            # on the next container start and every gated app starts refusing
+            # traffic it can no longer prove came through the gate.
+            #
+            # Carried forward from the existing row when the environment does
+            # not supply one, so adopting the declarative path does not have to
+            # mean re-issuing a secret that is already deployed and working.
+            _oidc_gateway_secret = _env("ASTROLIFT_CLUSTER_OIDC_GATEWAY_SECRET")
+            if not _oidc_gateway_secret:
+                _existing = TenantCluster.all_objects.filter(slug=slug).first()
+                _oidc_gateway_secret = ((_existing.oidc_auth_config or {}) if _existing else {}).get(
+                    "gateway_secret", ""
+                )
+            if _oidc_gateway_secret:
+                oidc_auth_config["gateway_secret"] = _oidc_gateway_secret
 
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
@@ -663,9 +679,7 @@ class Command(BaseCommand):
         # the operator set.
         create_defaults = {
             **defaults,
-            "ingress_class": (
-                explicit_ingress_class or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")
-            ),
+            "ingress_class": (explicit_ingress_class or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")),
         }
         obj, created = TenantCluster.all_objects.update_or_create(
             slug=slug, defaults=defaults, create_defaults=create_defaults
