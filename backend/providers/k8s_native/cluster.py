@@ -442,18 +442,63 @@ class K8sNativeClusterDriver(ClusterDriver):
                         timed_out=False,
                     )
             time.sleep(min(15, max(1, timeout // 20)))
+        stalled, stall_message = self._diagnose_stall(cluster, namespace, kind, name)
         return RolloutResult(
             success=False,
             kind=kind,
             name=name,
             namespace=namespace,
             message=(
-                last_status.conditions[-1].get("message", "")
-                if last_status and last_status.conditions
-                else "rollout timed out"
+                stall_message
+                or (
+                    last_status.conditions[-1].get("message", "")
+                    if last_status and last_status.conditions
+                    else "rollout timed out"
+                )
             ),
             timed_out=True,
+            stalled=stalled,
         )
+
+    def _diagnose_stall(
+        self, cluster: str, namespace: str, kind: str, name: str
+    ) -> tuple[bool, str]:
+        """Say why a StatefulSet rollout could not finish (#1724).
+
+        ``RollingUpdate`` will not advance past a pod that never becomes Ready.
+        A workload that crashes on startup therefore keeps its old pod on the
+        previous revision indefinitely while the StatefulSet already carries the
+        new template -- so a fix can be applied and inert at the same time, and
+        every deploy after it reports a bare "rollout timed out" that says
+        nothing about the change being stuck one revision away.
+
+        ``currentRevision != updateRevision`` is the whole signal: the
+        StatefulSet has accepted a new template and no pod has moved to it.
+
+        Best-effort. Any failure to read the cluster degrades to
+        ``(False, "")`` and the caller keeps its original message -- a
+        diagnosis is not worth failing a deploy path over.
+        """
+        if kind.lower() != "statefulset":
+            return False, ""
+        try:
+            obj = self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+            status = (obj or {}).get("status") or {}
+            current = status.get("currentRevision")
+            update = status.get("updateRevision")
+            if not current or not update or current == update:
+                return False, ""
+            ready = status.get("readyReplicas") or 0
+            return True, (
+                f"{kind}/{name}: the new template is applied but cannot roll out. "
+                f"Pods are still on revision {current}; the StatefulSet wants {update}. "
+                f"RollingUpdate will not replace a pod that never becomes Ready "
+                f"({ready} ready), so this will not resolve on its own -- every further "
+                f"deploy will apply cleanly and time out the same way. Fix the workload, "
+                f"or delete the pod to force it onto the new revision."
+            )
+        except Exception:  # noqa: BLE001 - diagnosis must never fail the caller
+            return False, ""
 
     # ---- exec / port-forward --------------------------------------
 

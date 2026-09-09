@@ -277,6 +277,21 @@ class RolloutResult:
     message: str
     timed_out: bool
 
+    stalled: bool = False
+    """The manifests applied, and the rollout cannot finish on its own (#1724).
+
+    A StatefulSet's ``RollingUpdate`` will not advance past a pod that never
+    becomes Ready, so a workload that crashes on startup keeps its old pod on
+    the previous ``controller-revision-hash`` indefinitely while the StatefulSet
+    already carries the corrected template. Every subsequent deploy applies
+    cleanly, times out, and reports ``failed`` -- while the fix sits one
+    revision away, applied and inert.
+
+    Distinct from ``timed_out`` alone, which cannot tell "the workload is slow"
+    from "the workload will never come up and neither will the change you just
+    shipped". Callers use it to say so rather than making an operator infer it
+    from a bare timeout."""
+
 
 @dataclass(frozen=True)
 class ExecResult:
