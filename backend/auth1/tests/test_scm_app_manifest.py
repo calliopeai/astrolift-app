@@ -399,11 +399,17 @@ def test_manifest_setup_refuses_non_install_action(org_user_member):
 # ---------------------------------------------------------------------------
 
 
-def test_manifest_payload_declares_minimal_permissions(org_user_member):
-    """The HTML form embeds the manifest as a hidden input value. We
-    decode it back out to assert the permission/event surface stays
-    minimal — broadening permissions later should be an explicit edit
-    on github.com, not a silent shrink/grow from a code change."""
+def test_manifest_payload_declares_the_permissions_autowire_uses(org_user_member):
+    """The HTML form embeds the manifest as a hidden input value. We decode it
+    back out to assert the permission/event surface is exactly what autowire
+    uses — neither a silent grow nor a silent shrink from a code change.
+
+    This used to assert a deliberately minimal set on the argument that
+    broadening should be an explicit edit on github.com. That was reversed in
+    #1713: the minimal set left the App unable to perform any autowire step,
+    and the failure surfaced as a 403 that reads like operator error. The
+    guard is still here and still exact -- what changed is which set it
+    guards, not whether the surface is pinned."""
     _, user = org_user_member
     client = Client()
     _login(client, user)
@@ -422,11 +428,16 @@ def test_manifest_payload_declares_minimal_permissions(org_user_member):
     raw = _html.unescape(m.group(1))
     manifest = json.loads(raw)
     assert manifest["public"] is False
+    # Each grant is tied to one autowire step; anything no step uses stays out.
     assert manifest["default_permissions"] == {
-        "contents": "read",
+        "actions": "write",  # trigger and read workflow runs
+        "checks": "write",  # report check runs
+        "contents": "write",  # commit the CI workflow file
         "metadata": "read",
-        "pull_requests": "write",
-        "checks": "write",
+        "pull_requests": "write",  # PR comments
+        "repository_hooks": "write",  # install the source webhook
+        "secrets": "write",  # push Actions secrets
+        "workflows": "write",  # GitHub gates .github/workflows separately
     }
     assert set(manifest["default_events"]) == {"push", "pull_request"}
     assert manifest["url"].startswith("https://astrolift.test")
