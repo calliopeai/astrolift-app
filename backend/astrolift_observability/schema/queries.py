@@ -1068,17 +1068,22 @@ class GoldenSignalsQuery:
         start_unix = end_unix - seconds
         step = prom_queries.pick_step_seconds(seconds)
 
+        # cAdvisor carries no app label, so these have to be namespace-scoped
+        # or they match nothing (#1703).
+        pod_namespace = namespace_for_app(app)
         cpu_plan = prom_queries.build_pod_cpu_usage_query(
             app_slug=app.slug,
             environment_name=environment_name,
             pod_name=pod_name,
             range_seconds=seconds,
+            namespace=pod_namespace,
         )
         mem_plan = prom_queries.build_pod_memory_usage_query(
             app_slug=app.slug,
             environment_name=environment_name,
             pod_name=pod_name,
             range_seconds=seconds,
+            namespace=pod_namespace,
         )
 
         try:
