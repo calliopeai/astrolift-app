@@ -377,10 +377,20 @@ class Command(BaseCommand):
             region = _env("AWS_REGION") or ""
         endpoint = opts["endpoint"] or _env("ASTROLIFT_CLUSTER_ENDPOINT") or ""
         ca_cert = opts["ca_cert"] or _env("ASTROLIFT_CLUSTER_CA_CERT") or ""
-        ingress_class = (
-            opts["ingress_class"]
-            or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS")
-            or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")
+        # No default at resolve time. This command runs on every container
+        # start (``startup.py``), so resolving a fallback here and putting it
+        # in ``defaults`` overwrote the operator's ingress class on every
+        # deploy: a cluster moved onto the central auth host silently went
+        # back to ``alb`` the next time the control plane restarted, taking
+        # the gate off every app on it, with no audit event because a
+        # management command emits none (#1729).
+        #
+        # Same shape as the ``oidc_auth_config`` fix in #1616 and the
+        # ``ingress_mode`` fix in #1537, in this same function: absent means
+        # "leave whatever the row has". The plugin default still applies, but
+        # only when the row is being created.
+        explicit_ingress_class = (
+            opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or None
         )
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
         # No default: absent means "leave whatever the row has". Unlike
@@ -626,7 +636,6 @@ class Command(BaseCommand):
             "ca_cert": ca_cert,
             "auth_config": auth_config,
             "provider_config": provider_config,
-            "ingress_class": ingress_class,
             "alb_auth_config": alb_auth_config,
             "is_active": True,
             "deleted_at": None,
@@ -646,8 +655,21 @@ class Command(BaseCommand):
         # deliberately refuses to make for them (#1537).
         if ingress_mode is not None:
             defaults["ingress_mode"] = ingress_mode
+        if explicit_ingress_class is not None:
+            defaults["ingress_class"] = explicit_ingress_class
 
-        obj, created = TenantCluster.all_objects.update_or_create(slug=slug, defaults=defaults)
+        # ``create_defaults`` applies only on insert, so a brand-new row still
+        # gets the plugin's ingress class while an existing row keeps the one
+        # the operator set.
+        create_defaults = {
+            **defaults,
+            "ingress_class": (
+                explicit_ingress_class or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")
+            ),
+        }
+        obj, created = TenantCluster.all_objects.update_or_create(
+            slug=slug, defaults=defaults, create_defaults=create_defaults
+        )
 
         action = "created" if created else "updated"
         scope = f"org={org.slug}" if org else "shared"
