@@ -972,6 +972,69 @@ def test_statefulset_storage_size_still_wins_over_declaration():
     assert mounts == [{"name": "legacy-data", "mountPath": "/srv"}]
 
 
+def test_statefulset_pvc_gets_default_fsgroup():
+    # A PVC arrives root-owned, so a container running as a non-root uid
+    # cannot write to it and dies on its own data directory. fsGroup is added
+    # to the container's supplementary groups, so one default works for every
+    # image without the app declaring the uid it runs as.
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=3000),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["spec"]["template"]["spec"]["securityContext"]["fsGroup"] == 1000
+
+
+def test_statefulset_explicit_fs_group_wins():
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        fs_group=2000,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["spec"]["template"]["spec"]["securityContext"]["fsGroup"] == 2000
+
+
+def test_statefulset_without_pvc_gets_no_fsgroup():
+    # fsGroup relabels every volume the pod carries, so a workload that
+    # mounts no claim must not acquire one just by being a StatefulSet.
+    w = WorkloadManifest(
+        name="plain",
+        kind="statefulset",
+        replicas=1,
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/plain",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert "fsGroup" not in (sts["spec"]["template"]["spec"].get("securityContext") or {})
+
+
 def test_statefulset_non_pvc_volume_emits_no_claim():
     # An emptyDir declaration is not persistent storage; it must not conjure a
     # PVC. Guards the new lookup against matching any volume kind.

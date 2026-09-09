@@ -505,6 +505,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     )
 
     volumes = _parse_volumes(d.get("volumes", []), path)
+    fs_group = _parse_fs_group(d, path)
 
     return WorkloadManifest(
         name=name,
@@ -525,6 +526,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         hpa_target_cpu_pct=int(d.get("hpa_target_cpu_pct", 80)),
         storage_class=d.get("storage_class"),
         storage_size=d.get("storage_size"),
+        fs_group=fs_group,
         containers=containers,
         volumes=volumes,
         # Agent dispatch tuning (#795). Only meaningful when
@@ -706,6 +708,32 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_size=None,
         containers=(container,),
     )
+
+
+def _parse_fs_group(d: dict, path: str) -> int | None:
+    """Explicit ``fs_group`` on the workload, else ``run_as_user`` from its
+    ``[workloads.<name>.security]`` block.
+
+    Only the one key is read from ``security`` -- the rest of that block
+    (``run_as_non_root``, capabilities, ...) is parsed by
+    ``security_volumes.parse_security_context`` but not yet rendered, and
+    reading it here would imply a coverage this renderer does not have.
+
+    Returning ``None`` means "no explicit intent"; the renderer applies the
+    platform default, and only for workloads that mount a pvc.
+    """
+    raw = d.get("fs_group")
+    if raw is None:
+        sec = d.get("security")
+        if isinstance(sec, dict):
+            raw = sec.get("run_as_user")
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ManifestError(f"fs_group must be an int (GID), got {raw!r}", path=f"{path}.fs_group")
+    if raw < 0:
+        raise ManifestError("fs_group must be non-negative", path=f"{path}.fs_group")
+    return raw
 
 
 def _parse_volumes(raw_list: list, workload_path: str) -> tuple[dict, ...]:

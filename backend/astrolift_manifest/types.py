@@ -50,6 +50,17 @@ class WorkloadManifest:
     # parsing the TOML. Kept as dicts (not VolumeDecl) so this module
     # stays independent of security_volumes.py.
     volumes: tuple[dict, ...] = ()
+    # Pod-level ``securityContext.fsGroup`` for workloads that mount a
+    # persistent volume (#1722). A PVC mounts root-owned, so a container
+    # running as any non-root uid cannot write to it. Setting fsGroup makes
+    # the kubelet chown the volume to that GID with g+rwx AND adds the GID
+    # to the container's supplementary groups -- which is why a single
+    # platform default works for every image regardless of the uid it runs
+    # as, rather than each app having to declare its own.
+    # From ``[[workloads]] fs_group``, else the workload's
+    # ``[workloads.<name>.security] run_as_user``, else the platform
+    # default. Only emitted when the workload actually mounts a pvc.
+    fs_group: int | None = None
     # Agent dispatch tuning (#795). Only meaningful when
     # ``kind == "agent"`` — the renderer injects ``max_retries`` /
     # ``tool_timeout_seconds`` as the ``ASTROLIFT_MAX_RETRIES`` /

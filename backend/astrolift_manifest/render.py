@@ -905,6 +905,24 @@ def _render_function(
     }
 
 
+# Pod ``securityContext.fsGroup`` applied to a workload that mounts a pvc
+# when neither ``fs_group`` nor ``security.run_as_user`` says otherwise
+# (#1722).
+#
+# A PVC arrives root-owned. A container running as any non-root uid cannot
+# write to it, which surfaces as the app dying on its own data directory.
+# fsGroup fixes that for EVERY image without the app declaring its uid,
+# because the kubelet both chowns the volume to this GID with g+rwx and adds
+# the GID to the container's supplementary groups -- so the write succeeds
+# whatever uid the image runs as. That property is what lets this be a
+# default instead of required configuration.
+#
+# Emitted only for workloads that actually mount a pvc: an unmounted
+# workload gains nothing from it, and a blanket fsGroup would relabel
+# every other volume kind a pod carries.
+DEFAULT_PVC_FS_GROUP = 1000
+
+
 def _render_statefulset(
     w: WorkloadManifest,
     *,
@@ -985,6 +1003,9 @@ def _render_statefulset(
         for container in pod_spec.get("containers", []):
             if primary is not None and container["name"] == primary.name:
                 container.setdefault("volumeMounts", []).append({"name": claim_name, "mountPath": mount_path})
+        # Make the claim writable by the container regardless of its uid.
+        fs_group = w.fs_group if w.fs_group is not None else DEFAULT_PVC_FS_GROUP
+        pod_spec.setdefault("securityContext", {})["fsGroup"] = fs_group
 
     sts: dict[str, Any] = {
         "apiVersion": "apps/v1",

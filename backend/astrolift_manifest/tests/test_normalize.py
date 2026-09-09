@@ -165,3 +165,50 @@ def test_faas_without_public_stays_private():
     n = normalize(raw)
     assert n.workloads[0].is_public is False
     assert "workload.api.is_public" not in n.defaults_applied
+
+
+def _raw_with_workload(**kw) -> RawManifest:
+    return RawManifest(
+        name="hello",
+        workloads=(
+            WorkloadManifest(
+                name="web",
+                kind="statefulset",
+                containers=(ContainerManifest(name="app", is_primary=True),),
+                **kw,
+            ),
+        ),
+    )
+
+
+def test_manifest_hash_changes_when_a_volume_is_declared():
+    # A deploy whose only change is a [[workloads.volumes]] entry must not
+    # hash identically to the previous one, or it collapses to a no-op and
+    # the claim the operator just asked for is never rendered.
+    bare = normalize(_raw_with_workload())
+    with_vol = normalize(
+        _raw_with_workload(
+            volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},)
+        )
+    )
+    assert manifest_hash(bare.serialized) != manifest_hash(with_vol.serialized)
+
+
+def test_manifest_hash_changes_when_volume_size_changes():
+    small = normalize(_raw_with_workload(volumes=({"name": "data", "kind": "pvc", "size": "5Gi"},)))
+    big = normalize(_raw_with_workload(volumes=({"name": "data", "kind": "pvc", "size": "20Gi"},)))
+    assert manifest_hash(small.serialized) != manifest_hash(big.serialized)
+
+
+def test_manifest_hash_changes_with_fs_group():
+    a = normalize(_raw_with_workload(fs_group=1000))
+    b = normalize(_raw_with_workload(fs_group=2000))
+    assert manifest_hash(a.serialized) != manifest_hash(b.serialized)
+
+
+def test_manifest_hash_ignores_volume_key_order():
+    # Key order in the TOML must not move the hash, or an unrelated reformat
+    # reads as a real change and forces a redeploy.
+    a = normalize(_raw_with_workload(volumes=({"name": "data", "kind": "pvc", "size": "5Gi"},)))
+    b = normalize(_raw_with_workload(volumes=({"size": "5Gi", "kind": "pvc", "name": "data"},)))
+    assert manifest_hash(a.serialized) == manifest_hash(b.serialized)
