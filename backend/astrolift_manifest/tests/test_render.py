@@ -313,7 +313,9 @@ def test_env_pairs_render_as_name_value():
     w = _deployment_workload(containers=(_container(env=(("DATABASE_URL", "postgres://x"),)),))
     out = _render((w,))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [{"name": "DATABASE_URL", "value": "postgres://x"}]
+    # The platform also injects the commit (#1709); this asserts the manifest's
+    # own pair survives rendering, which is what the test is about.
+    assert {"name": "DATABASE_URL", "value": "postgres://x"} in container["env"]
 
 
 def test_command_and_args_render_as_lists():
@@ -470,12 +472,17 @@ def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
     # Dispatch env vars are injected ahead of the manifest-authored env,
     # so an explicit operator override (later entry) wins under k8s.
     container = dep["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [
-        {"name": "ASTROLIFT_WORKLOAD_KIND", "value": "agent"},
-        {"name": "ASTROLIFT_MAX_RETRIES", "value": "8"},
-        {"name": "ASTROLIFT_TOOL_TIMEOUT", "value": "120"},
-        {"name": "MY_FLAG", "value": "1"},
-    ]
+    # The ordering contract, stated as ordering rather than as an exact list so
+    # the platform's own injections (#1709) do not read as a violation of it.
+    names = [e["name"] for e in container["env"]]
+    assert names.index("ASTROLIFT_WORKLOAD_KIND") < names.index("MY_FLAG")
+    assert names.index("ASTROLIFT_MAX_RETRIES") < names.index("MY_FLAG")
+    assert names.index("ASTROLIFT_TOOL_TIMEOUT") < names.index("MY_FLAG")
+    by_name = {e["name"]: e["value"] for e in container["env"]}
+    assert by_name["ASTROLIFT_WORKLOAD_KIND"] == "agent"
+    assert by_name["ASTROLIFT_MAX_RETRIES"] == "8"
+    assert by_name["ASTROLIFT_TOOL_TIMEOUT"] == "120"
+    assert by_name["MY_FLAG"] == "1"
 
     # HPA targets the agent's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
@@ -613,7 +620,7 @@ def test_env_from_preserves_inline_env():
         env_from_secret_refs=["app-shared"],
     )
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [{"name": "FOO", "value": "bar"}]
+    assert {"name": "FOO", "value": "bar"} in container["env"]
     assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
 
 
@@ -765,12 +772,16 @@ def test_workflow_worker_renders_deployment_service_hpa_with_annotation_and_env(
     # so an explicit operator override (later entry) wins under k8s.
     # The poller concurrency caps are not rendered as K8s output.
     container = dep["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [
-        {"name": "ASTROLIFT_WORKFLOW_TYPE", "value": "ApprovalWorkflow"},
-        {"name": "ASTROLIFT_TASK_QUEUE", "value": "approvals"},
-        {"name": "TEMPORAL_NAMESPACE", "value": "prod"},
-        {"name": "MY_FLAG", "value": "1"},
-    ]
+    # Ordering contract, stated as ordering rather than as an exact list so the
+    # platform's own injections (#1709) do not read as a violation of it.
+    names = [e["name"] for e in container["env"]]
+    for injected in ("ASTROLIFT_WORKFLOW_TYPE", "ASTROLIFT_TASK_QUEUE", "TEMPORAL_NAMESPACE"):
+        assert names.index(injected) < names.index("MY_FLAG")
+    by_name = {e["name"]: e["value"] for e in container["env"]}
+    assert by_name["ASTROLIFT_WORKFLOW_TYPE"] == "ApprovalWorkflow"
+    assert by_name["ASTROLIFT_TASK_QUEUE"] == "approvals"
+    assert by_name["TEMPORAL_NAMESPACE"] == "prod"
+    assert by_name["MY_FLAG"] == "1"
 
     # HPA targets the worker's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")

@@ -732,8 +732,26 @@ def _render_container(
         spec["command"] = list(c.command)
     if c.args:
         spec["args"] = list(c.args)
-    if c.env:
-        spec["env"] = [{"name": name, "value": value} for name, value in c.env]
+    # The commit the container is running, from the tag the platform deploys
+    # (#1709). The tag IS the commit SHA, and nothing put it anywhere the
+    # process could read it -- so an app had no way to report its own version
+    # and the only answer available was the tag on the workload.
+    #
+    # That distinction matters for confirming a rollout: the tag can be right
+    # while the pod is stale (a StatefulSet whose pod never rolled, for
+    # instance), so the honest check is what the running container says about
+    # itself, not what the spec says about it.
+    #
+    # Injected before the manifest's own env so an app that already sets either
+    # name keeps its value -- later entries win in the list this builds, and
+    # this is a default, not an override.
+    version_env = [
+        {"name": key, "value": image_tag}
+        for key in ("ASTROLIFT_COMMIT", "GIT_SHA")
+        if image_tag and key not in {name for name, _ in c.env}
+    ]
+    if c.env or version_env:
+        spec["env"] = version_env + [{"name": name, "value": value} for name, value in c.env]
     if env_from_secret_refs:
         # Auto-inject every operator-authored SecretBundle + the
         # synthesized managed-service bindings Secret. Later refs
