@@ -688,6 +688,26 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # nothing scrapes it and the RED panels stay empty.
                             "serviceMonitor": {"enabled": True},
                         },
+                        # Header buffers sized for a cookie-bearing auth gate
+                        # (#1725). Every app behind the central auth host
+                        # carries a session cookie, and nginx copies the whole
+                        # Cookie header into the auth_request subrequest. The
+                        # chart defaults (large_client_header_buffers 4 8k,
+                        # proxy_buffer_size 4k) reject a Cookie header past
+                        # 8KB, and nginx reports that as an auth subrequest
+                        # failure -- which surfaces to the user as a bare 502
+                        # / 500 from the edge, with nothing logged by
+                        # oauth2-proxy because the subrequest never reached
+                        # it. A browser accumulates well past 8KB: an
+                        # oauth2-proxy session split across _0/_1 alongside
+                        # the AWSELBAuthSessionCookie pair a cluster leaves
+                        # behind when it migrates off ALB auth is already
+                        # ~16KB, so the ceiling is reached in normal use
+                        # rather than by abuse.
+                        "config": {
+                            "large-client-header-buffers": "4 32k",
+                            "proxy-buffer-size": "16k",
+                        },
                     },
                 },
                 requires=["metallb"],
