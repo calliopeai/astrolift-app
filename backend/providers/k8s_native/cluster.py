@@ -460,9 +460,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             stalled=stalled,
         )
 
-    def _diagnose_stall(
-        self, cluster: str, namespace: str, kind: str, name: str
-    ) -> tuple[bool, str]:
+    def _diagnose_stall(self, cluster: str, namespace: str, kind: str, name: str) -> tuple[bool, str]:
         """Say why a StatefulSet rollout could not finish (#1724).
 
         ``RollingUpdate`` will not advance past a pod that never becomes Ready.
