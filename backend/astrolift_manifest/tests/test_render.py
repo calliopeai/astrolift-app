@@ -884,6 +884,115 @@ def test_statefulset_storage_size_defaults_mount_path():
     assert mounts == [{"name": "db-data", "mountPath": "/data"}]
 
 
+def test_statefulset_volume_declaration_alone_emits_claim():
+    # Regression: a workload that declares [[workloads.volumes]] and no
+    # top-level storage_size rendered NO claim and NO mount, while still being
+    # scheduled as a StatefulSet -- the app came up with its data path pointing
+    # at an unmounted directory. Every pre-existing test set storage_size AND
+    # volumes together, so the declaration-only path was never covered.
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=3000),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"]
+    assert len(vct) == 1
+    assert vct[0]["metadata"]["name"] == "web-data"
+    assert vct[0]["spec"]["resources"]["requests"]["storage"] == "5Gi"
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mounts == [{"name": "web-data", "mountPath": "/app/data"}]
+
+
+def test_statefulset_volume_declaration_honours_access_mode_and_class():
+    w = WorkloadManifest(
+        name="shared",
+        kind="statefulset",
+        replicas=1,
+        volumes=(
+            {
+                "name": "data",
+                "kind": "pvc",
+                "mount_path": "/data",
+                "size": "20Gi",
+                "access_mode": "ReadWriteMany",
+                "storage_class": "efs-sc",
+            },
+        ),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/shared",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    spec = sts["spec"]["volumeClaimTemplates"][0]["spec"]
+    assert spec["accessModes"] == ["ReadWriteMany"]
+    assert spec["storageClassName"] == "efs-sc"
+
+
+def test_statefulset_storage_size_still_wins_over_declaration():
+    # Back-compat: the top-level key keeps its meaning for workloads that
+    # already set it, and the claim name stays <workload>-data so an existing
+    # StatefulSet's PVCs are never orphaned by a rename.
+    w = WorkloadManifest(
+        name="legacy",
+        kind="statefulset",
+        replicas=1,
+        storage_size="10Gi",
+        storage_class="gp3",
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/srv", "size": "5Gi"},),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/legacy",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"][0]
+    assert vct["metadata"]["name"] == "legacy-data"
+    assert vct["spec"]["resources"]["requests"]["storage"] == "10Gi"
+    assert vct["spec"]["storageClassName"] == "gp3"
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mounts == [{"name": "legacy-data", "mountPath": "/srv"}]
+
+
+def test_statefulset_non_pvc_volume_emits_no_claim():
+    # An emptyDir declaration is not persistent storage; it must not conjure a
+    # PVC. Guards the new lookup against matching any volume kind.
+    w = WorkloadManifest(
+        name="scratch",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "tmp", "kind": "empty_dir", "mount_path": "/tmp/work"},),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/scratch",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert "volumeClaimTemplates" not in sts["spec"]
+
+
 def test_function_renders_knative_service():
     # Regression for #988: kind=function previously raised NameError
     # (_resource_spec undefined) at render time.

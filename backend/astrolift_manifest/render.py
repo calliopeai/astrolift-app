@@ -230,7 +230,8 @@ def render_manifests(
             )
         elif w.kind == "statefulset":
             # StatefulSet + headless Service for stable DNS per pod.
-            # VolumeClaimTemplates are added when storage_size is set.
+            # VolumeClaimTemplates are added when the workload declares a
+            # size, via storage_size or a [[workloads.volumes]] pvc entry.
             sts, headless_svc = _render_statefulset(
                 w,
                 namespace=namespace,
@@ -920,8 +921,9 @@ def _render_statefulset(
     Service (``clusterIP: None``) gives each pod a stable DNS name:
     ``<pod-name>.<svc-name>.<namespace>.svc.cluster.local``.
 
-    When ``storage_size`` is set, a ``volumeClaimTemplate`` is emitted
-    so each pod gets its own persistent volume.
+    When the workload declares a size -- via ``storage_size`` or a
+    ``[[workloads.volumes]]`` pvc entry -- a ``volumeClaimTemplate`` is
+    emitted so each pod gets its own persistent volume.
     """
     selector = {
         "astrolift.dev/workload": w.name,
@@ -938,15 +940,38 @@ def _render_statefulset(
     )
 
     volume_claim_templates: list[dict[str, Any]] = []
-    if w.storage_size:
+    # The claim is described in either of two places and they have to agree.
+    # ``storage_size`` is the original top-level key; ``[[workloads.volumes]]``
+    # is the declaration operators actually write, and it carries the size the
+    # same way it carries mount_path. Gating on storage_size alone meant a
+    # workload that declared a pvc volume and nothing else rendered no claim
+    # and no mount at all, while still being scheduled as a StatefulSet with
+    # the app's data path pointing at an unmounted directory -- a silent
+    # data-loss shape, and the app either crashes on the missing mount or
+    # writes to the pod's ephemeral FS.
+    pvc_volume = (
+        next(
+            (v for v in w.volumes if v.get("kind", "pvc") == "pvc"),
+            None,
+        )
+        or {}
+    )
+    storage_size = w.storage_size or pvc_volume.get("size") or ""
+    if storage_size:
         claim_name = f"{w.name}-data"
+        # Claim name stays derived from the workload name rather than the
+        # declaration's ``name``: a StatefulSet's volumeClaimTemplates are
+        # immutable and its PVCs are named <claim>-<pod>, so renaming here
+        # would orphan the volumes of every already-deployed workload.
+        access_mode = pvc_volume.get("access_mode") or "ReadWriteOnce"
+        storage_class = w.storage_class or pvc_volume.get("storage_class") or ""
         volume_claim_templates.append(
             {
                 "metadata": {"name": claim_name},
                 "spec": {
-                    "accessModes": ["ReadWriteOnce"],
-                    "resources": {"requests": {"storage": w.storage_size}},
-                    **({"storageClassName": w.storage_class} if w.storage_class else {}),
+                    "accessModes": [access_mode],
+                    "resources": {"requests": {"storage": storage_size}},
+                    **({"storageClassName": storage_class} if storage_class else {}),
                 },
             }
         )
@@ -955,10 +980,7 @@ def _render_statefulset(
         # writes land on the pod's ephemeral FS and don't survive a restart
         # (#989). Mount path comes from the workload's pvc volume declaration
         # ([[workloads.volumes]] mount_path), defaulting to /data.
-        mount_path = next(
-            (v.get("mount_path") for v in w.volumes if v.get("kind", "pvc") == "pvc" and v.get("mount_path")),
-            "/data",
-        )
+        mount_path = pvc_volume.get("mount_path") or "/data"
         primary = _primary_container(w)
         for container in pod_spec.get("containers", []):
             if primary is not None and container["name"] == primary.name:
