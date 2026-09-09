@@ -18,6 +18,7 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
+from k8s_native.central_auth import GATEWAY_SECRET_HEADER
 
 SUPPORTED_VARIANTS = (
     "nginx_ingress",
@@ -59,10 +60,16 @@ class OIDCAuthConfig:
         "X-Auth-Request-User",
         "X-Auth-Request-Email",
         "X-Auth-Request-Access-Token",
+        # The gate's proof-of-passage (#1726). oauth2-proxy stamps it on the
+        # auth response; nginx only forwards headers named here, so leaving it
+        # out means the proxy sets it and the gate drops it -- the app then
+        # sees identity headers with nothing attesting where they came from,
+        # which is the state this header exists to end.
+        GATEWAY_SECRET_HEADER,
     )
     """Headers oauth2-proxy injects after a successful auth check.
     The Ingress controller passes them upstream so the app can see
-    the authenticated identity."""
+    the authenticated identity, and tell that it came through the gate."""
 
 
 # The three annotation keys that route an nginx-family Ingress through

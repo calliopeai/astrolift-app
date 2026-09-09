@@ -33,6 +33,23 @@ CENTRAL_AUTH_SECRET_NAME = "astrolift-central-auth"
 
 CENTRAL_AUTH_TLS_SECRET_NAME = "astrolift-central-auth-tls"
 
+# Secret holding the rendered oauth2-proxy alpha config (#1726). It is a
+# separate object from CENTRAL_AUTH_SECRET_NAME because its contents are a
+# whole config file rather than individual keys, and because it carries the
+# gateway secret -- which, like cookie_secret, must never reach helm_values:
+# that dict is returned to operators over GraphQL.
+CENTRAL_AUTH_ALPHA_CONFIG_SECRET_NAME = "astrolift-central-auth-alpha"
+
+# Header the gate stamps on every authenticated request so an app can tell
+# gateway traffic from anything else that can reach its Service port (#1726).
+#
+# The value is injected by oauth2-proxy itself, not by an Ingress annotation.
+# Stamping it at the proxy keeps the secret inside the component that already
+# holds the session, and means gating an app needs no nginx snippet -- which
+# would otherwise require allow-snippet-annotations cluster-wide, letting any
+# Ingress author inject arbitrary nginx config.
+GATEWAY_SECRET_HEADER = "X-Astrolift-Gateway-Secret"
+
 
 def cookie_scope_for(auth_proxy_host: str) -> str:
     """The parent zone of the auth host, dot-prefixed.
@@ -66,6 +83,51 @@ def issuer_from_discovery_url(discovery_url: str) -> str:
     return url
 
 
+def alpha_config_document(gateway_secret: str) -> str:
+    """The oauth2-proxy alpha config this component runs with (#1726).
+
+    Rendered separately from ``helm_values`` and written to
+    ``CENTRAL_AUTH_ALPHA_CONFIG_SECRET_NAME`` by whoever installs the
+    component, because it carries the gateway secret and ``helm_values`` is
+    served to operators over GraphQL.
+
+    Two things have to be declared here rather than as flags, because
+    ``--alpha-config`` takes ownership of both:
+
+    * ``upstreams`` -- the auth host proxies nothing; it exists to answer
+      ``/oauth2/auth`` for nginx's ``auth_request``. A static 202 upstream is
+      the documented shape for that, and omitting the section entirely makes
+      oauth2-proxy refuse to start.
+    * ``injectResponseHeaders`` -- replaces ``--set-xauthrequest``. The two
+      identity headers are the same ones that flag produced, so an app that
+      already reads ``X-Auth-Request-*`` sees no change.
+
+    The gateway secret is a static value rather than a claim: its point is to
+    prove the request passed through this proxy, which is a property of the
+    path, not of the user.
+    """
+    import base64
+
+    encoded = base64.b64encode(gateway_secret.encode()).decode()
+    return (
+        "upstreams:\n"
+        "  - id: static-202\n"
+        "    path: /\n"
+        "    static: true\n"
+        "    staticCode: 202\n"
+        "injectResponseHeaders:\n"
+        "  - name: X-Auth-Request-User\n"
+        "    values:\n"
+        "      - claim: user\n"
+        "  - name: X-Auth-Request-Email\n"
+        "    values:\n"
+        "      - claim: email\n"
+        f"  - name: {GATEWAY_SECRET_HEADER}\n"
+        "    values:\n"
+        f"      - value: {encoded}\n"
+    )
+
+
 def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> BootstrapComponent:
     """The ``oauth2-proxy`` component rendered from a cluster's config.
 
@@ -87,8 +149,12 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
         # with the original Host preserved; without this the proxy builds
         # its redirects from the internal address.
         "reverse-proxy": "true",
-        "set-xauthrequest": "true",
+        # NOT set-xauthrequest: with --alpha-config in play, oauth2-proxy
+        # rejects that flag and the identity headers are declared in
+        # injectResponseHeaders instead. Setting both is a startup error, so
+        # the two must not drift apart.
         "skip-provider-button": "true",
+        "alpha-config": "/etc/oauth2-proxy/alpha/alpha_config.yaml",
     }
     if issuer_url:
         extra_args["oidc-issuer-url"] = issuer_url
@@ -129,10 +195,31 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
                 "emailDomains": ["*"],
                 "scope": "openid email profile groups",
                 "passAccessToken": True,
-                "setXauthrequest": True,
+                # setXauthrequest is deliberately absent: the chart renders it
+                # as --set-xauthrequest, which oauth2-proxy rejects alongside
+                # --alpha-config. The same two identity headers are declared in
+                # alpha_config_document() instead, so the app sees no
+                # difference -- but leaving both in place is a startup failure,
+                # not a warning.
                 "upstreamInsecureSkipVerify": False,
             },
             "extraArgs": extra_args,
+            # The alpha config lives in its own Secret and is mounted at the
+            # path --alpha-config points at. Referenced by name, never
+            # inlined: it carries the gateway secret.
+            "extraVolumes": [
+                {
+                    "name": "alpha-config",
+                    "secret": {"secretName": CENTRAL_AUTH_ALPHA_CONFIG_SECRET_NAME},
+                }
+            ],
+            "extraVolumeMounts": [
+                {
+                    "name": "alpha-config",
+                    "mountPath": "/etc/oauth2-proxy/alpha",
+                    "readOnly": True,
+                }
+            ],
             "ingress": {
                 "enabled": True,
                 "className": "nginx",
@@ -152,6 +239,10 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
             "dex or external OIDC provider",
             "oidc_auth_config set on cluster (discovery_url, client_id, auth_proxy_host)",
             f"Secret {CENTRAL_AUTH_SECRET_NAME} (client-secret, cookie-secret) in the release namespace",
+            (
+                f"Secret {CENTRAL_AUTH_ALPHA_CONFIG_SECRET_NAME} with key alpha_config.yaml "
+                f"(render via alpha_config_document(); carries the gateway secret)"
+            ),
         ],
         options=[],
         chart_name="oauth2-proxy",
@@ -163,7 +254,10 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
 
 
 __all__ = [
+    "CENTRAL_AUTH_ALPHA_CONFIG_SECRET_NAME",
     "CENTRAL_AUTH_SECRET_NAME",
+    "GATEWAY_SECRET_HEADER",
+    "alpha_config_document",
     "CENTRAL_AUTH_TLS_SECRET_NAME",
     "central_auth_component",
     "cookie_scope_for",
