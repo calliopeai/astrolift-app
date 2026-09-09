@@ -18,8 +18,8 @@ import sentry_sdk
 
 # patch https://stackoverflow.com/questions/70382084/import-error-force-text-from-django-utils-encoding
 from corsheaders.defaults import default_headers
-from django.core.exceptions import ImproperlyConfigured
 from django.core.cache import DEFAULT_CACHE_ALIAS
+from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
 from django.utils.encoding import force_str
 from dotenv import load_dotenv
