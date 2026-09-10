@@ -433,6 +433,34 @@ def _resolve_dispatcher_sync(organization_id: int | None):
     return qs.order_by("created_at").first()
 
 
+def _dispatch_label(dispatcher, backend: str) -> str:
+    """How to name the thing that spawned, for an error message."""
+    return f"dispatcher {dispatcher.slug!r}" if dispatcher is not None else f"backend {backend!r}"
+
+
+def _dispatch_target_sync(organization, dispatcher):
+    """The ``(backend, cluster)`` a stage's agent spawns and polls through.
+
+    A registered Dispatch Service names both. Nothing on an install
+    produces one, though -- the registration endpoint exists for a
+    service to register *itself*, and no installer component runs such a
+    service (#1704) -- so with none registered this falls back to what
+    the direct-dispatch path has always used: the ``k8s_job`` backend
+    against the org's managed cluster. The two paths disagreeing is why
+    ``astro agent dispatch`` worked on an install where every workflow
+    stage hung.
+
+    Raises whatever :func:`resolve_agent_cluster` raises when the org has
+    no managed cluster. That is a real, reportable failure -- unlike the
+    missing dispatcher, which is the normal state.
+    """
+    if dispatcher is not None:
+        return dispatcher.backend, dispatcher.tenant_cluster
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+
+    return "k8s_job", resolve_agent_cluster(organization)
+
+
 def _dispatch_agent_for_stage_sync(
     stage_id: str,
     execution_id: str,
@@ -572,17 +600,31 @@ def _dispatch_agent_for_stage_sync(
         task.transition_to(AgentTask.Status.QUEUED)
 
     dispatcher = _resolve_dispatcher_sync(organization_id)
+    try:
+        backend, cluster = _dispatch_target_sync(run.organization, dispatcher)
+    except Exception as exc:  # noqa: BLE001 — a stage that cannot dispatch must settle visibly
+        # This used to leave the AgentRun PENDING and return, on the
+        # theory that a dispatcher registration might be in flight. On an
+        # install where none is ever registered that read as the run
+        # hanging in ``running`` forever, with the only trace a WARNING in
+        # the worker log (#1704). A stage that cannot dispatch fails the
+        # run with the reason attached.
+        task.failure = {"message": f"no dispatch target: {exc}"}
+        task.save(update_fields=["failure", "updated_at", "version"])
+        task.transition_to(AgentTask.Status.FAILED)
+        agent_run.status = AgentRun.Status.FAILED
+        agent_run.ended_at = timezone.now()
+        agent_run.output = {"dispatch_error": str(exc)}
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+        raise RuntimeError(f"no dispatch target for stage {stage_id}: {exc}") from exc
     if dispatcher is None:
-        # No dispatcher registered — leave the AgentRun PENDING. The
-        # workflow's timeout governs how long it waits; an operator (or a
-        # push-mode callback) can still advance the run. We do NOT fail
-        # the dispatch here because registration may be in flight.
-        log.warning(
-            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; AgentRun %s left PENDING",
+        log.info(
+            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; "
+            "spawning through the direct path (backend=%s cluster=%s)",
             organization_id,
-            agent_run.pk,
+            backend,
+            getattr(cluster, "slug", None),
         )
-        return str(agent_run.pk)
 
     if task.status == AgentTask.Status.QUEUED:
         task.transition_to(AgentTask.Status.PROVISIONING)
@@ -611,7 +653,7 @@ def _dispatch_agent_for_stage_sync(
         agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
         return str(agent_run.pk)
 
-    spawner = get_spawner(dispatcher.backend, cluster=dispatcher.tenant_cluster, namespace=namespace)
+    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
     try:
         result = spawner.spawn(task)
     except Exception as exc:  # noqa: BLE001 — fail this attempt; workflow policy may retry
@@ -623,7 +665,7 @@ def _dispatch_agent_for_stage_sync(
         agent_run.output = {"spawn_error": str(exc)}
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
         raise RuntimeError(
-            f"spawn failed for stage {stage_id} via dispatcher {dispatcher.slug!r}: {exc}"
+            f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {exc}"
         ) from exc
     task.external_id = result.external_id
     task.namespace = namespace
@@ -646,7 +688,7 @@ def _dispatch_agent_for_stage_sync(
         agent_run.output = {"spawn_error": result.error}
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
         raise RuntimeError(
-            f"spawn failed for stage {stage_id} via dispatcher {dispatcher.slug!r}: {result.error}"
+            f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {result.error}"
         )
 
     task.transition_to(AgentTask.Status.RUNNING)
@@ -702,10 +744,13 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         agent_run.ended_at = task.ended_at or timezone.now()
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
         return agent_run.status
-    if task is None or not task.external_id or task.dispatcher_id is None:
-        # Nothing to poll (no dispatcher / push-mode only). Leave as-is.
+    if task is None or not task.external_id:
+        # Nothing to poll (push-mode only, or nothing spawned). Leave as-is.
         return agent_run.status
 
+    # A task spawned through the no-dispatcher path carries no dispatcher
+    # row, and bailing on that left the run reconciling never -- the same
+    # hang from the other end (#1704).
     dispatcher = task.dispatcher
     # Spawn freezes the per-org namespace on the task. Poll the same location;
     # the registry default is the literal ``default`` namespace, where this
@@ -717,9 +762,14 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         from astrolift_workflows.activities.agent_stage import _agent_namespace
 
         namespace = _agent_namespace(task.organization.slug)
+    try:
+        backend, cluster = _dispatch_target_sync(task.organization, dispatcher)
+    except Exception as exc:  # noqa: BLE001 — treat as a transient poll failure
+        log.warning("poll_agent_run_status: no dispatch target for %s: %s", agent_run_id, exc)
+        return agent_run.status
     spawner = get_spawner(
-        dispatcher.backend,
-        cluster=dispatcher.tenant_cluster,
+        backend,
+        cluster=cluster,
         namespace=namespace,
     )
     try:
