@@ -9,10 +9,9 @@ import {
   type Dot,
 } from "@/components/detail/EntityDetailShell";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/EmptyState";
-import { UsersIcon } from "lucide-react";
 import { LIST_MEMBERS, LIST_ROLE_BINDINGS } from "@/graphql/identity/identity.queries";
+
+import { MemberRolesPanel } from "./member-roles-panel";
 import type { AstroliftMember, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 
 interface MembersResp {
@@ -64,14 +63,20 @@ export function MemberDetailClient({ id }: { id: string }) {
       breadcrumb={{ label: "Members", href: "/administration/members" }}
       heading={m ? m.user.username : `Member ${id.slice(0, 8)}`}
       status={m?.lifecycle}
-      statusTone={m ? LIFECYCLE_TONE[m.lifecycle] ?? "muted" : undefined}
+      statusTone={m ? (LIFECYCLE_TONE[m.lifecycle] ?? "muted") : undefined}
       createdAt={m?.joinedAt ?? m?.createdAt}
       notFoundLabel="member"
       overview={
         m
           ? [
-              { term: "Username", description: <span className="font-medium">{m.user.username}</span> },
-              { term: "Email", description: <span className="font-mono text-xs">{m.user.email}</span> },
+              {
+                term: "Username",
+                description: <span className="font-medium">{m.user.username}</span>,
+              },
+              {
+                term: "Email",
+                description: <span className="font-mono text-xs">{m.user.email}</span>,
+              },
               {
                 term: "Account",
                 description: m.user.isActive ? (
@@ -109,43 +114,7 @@ export function MemberDetailClient({ id }: { id: string }) {
           : []
       }
     >
-      {m ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Roles</CardTitle>
-          </CardHeader>
-          <CardContent className={roleBindings.length === 0 ? "" : "p-0"}>
-            {bindingsQuery.loading && roleBindings.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Loading roles…</p>
-            ) : roleBindings.length === 0 ? (
-              <EmptyState
-                icon={<UsersIcon className="size-5" />}
-                title="No role bindings"
-                description="This member has no roles granted directly to their account."
-              />
-            ) : (
-              <ul className="divide-border divide-y">
-                {roleBindings.map((b) => (
-                  <li key={b.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-                    <Badge variant="secondary">{b.role.name}</Badge>
-                    <span className="text-muted-foreground text-xs">
-                      {b.sourceScopeLabel || `${b.scopeKind}${b.scopeId ? `:${b.scopeId}` : ""}`}
-                    </span>
-                    {b.inherits ? (
-                      <Badge variant="outline" className="text-2xs">
-                        inherited
-                      </Badge>
-                    ) : null}
-                    <span className="text-muted-foreground ml-auto text-xs">
-                      granted <DetailTimestamp iso={b.grantedAt} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+      {m ? <MemberRolesPanel bindings={roleBindings} loading={bindingsQuery.loading} /> : null}
     </EntityDetailShell>
   );
 }
