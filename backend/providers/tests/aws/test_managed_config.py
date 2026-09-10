@@ -659,8 +659,20 @@ def test_ensure_db_networking_discovers_and_creates():
     assert sorted(sg_call["SubnetIds"]) == ["subnet-a", "subnet-b"]
 
 
+def _sg_admitting(*ports):
+    return {
+        "SecurityGroups": [
+            {
+                "GroupId": "sg-x",
+                "IpPermissions": [{"IpProtocol": "tcp", "FromPort": p, "ToPort": p} for p in ports],
+            }
+        ]
+    }
+
+
 def test_ensure_db_networking_override_short_circuits():
     ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = _sg_admitting(5432)
     grp, sgs = ensure_db_networking(
         _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
         region="us-west-2",
@@ -671,6 +683,133 @@ def test_ensure_db_networking_override_short_circuits():
     assert grp == "pinned"
     assert sgs == ["sg-x"]
     ec2.describe_vpcs.assert_not_called()  # no discovery when pinned
+
+
+# ---- the engine's port has to be open (#1702) ------------------------
+#
+# A `kind = "mysql"` service behind a group that only admits 5432 is
+# unreachable: the SYN is dropped and the client hangs for its whole
+# connect timeout, which reads exactly like a serverless cluster
+# resuming from zero. Postgres working beside it on the same group is
+# what made it expensive to find.
+
+
+def test_a_pinned_group_missing_the_engine_port_is_refused():
+    from aws.managed._networking import PortNotAdmitted
+
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = _sg_admitting(5432)
+
+    with pytest.raises(PortNotAdmitted) as excinfo:
+        ensure_db_networking(
+            _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
+            region="us-west-2",
+            port=3306,
+            service="rds",
+            clients=(ec2, MagicMock(), MagicMock(), MagicMock()),
+        )
+
+    # The message has to carry the fix, not just the fact.
+    assert "3306" in str(excinfo.value)
+    assert "sg-x" in str(excinfo.value)
+
+
+def test_a_pinned_group_with_the_engine_port_is_accepted():
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = _sg_admitting(5432, 3306)
+
+    grp, sgs = ensure_db_networking(
+        _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
+        region="us-west-2",
+        port=3306,
+        service="rds",
+        clients=(ec2, MagicMock(), MagicMock(), MagicMock()),
+    )
+    assert (grp, sgs) == ("pinned", ["sg-x"])
+
+
+def test_a_port_range_covering_the_engine_port_is_accepted():
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = {
+        "SecurityGroups": [
+            {"GroupId": "sg-x", "IpPermissions": [{"IpProtocol": "tcp", "FromPort": 3000, "ToPort": 4000}]}
+        ]
+    }
+
+    grp, _sgs = ensure_db_networking(
+        _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
+        region="us-west-2",
+        port=3306,
+        service="rds",
+        clients=(ec2, MagicMock(), MagicMock(), MagicMock()),
+    )
+    assert grp == "pinned"
+
+
+def test_an_all_protocols_rule_is_accepted():
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = {
+        "SecurityGroups": [{"GroupId": "sg-x", "IpPermissions": [{"IpProtocol": "-1"}]}]
+    }
+
+    grp, _sgs = ensure_db_networking(
+        _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
+        region="us-west-2",
+        port=3306,
+        service="rds",
+        clients=(ec2, MagicMock(), MagicMock(), MagicMock()),
+    )
+    assert grp == "pinned"
+
+
+def test_a_describe_that_fails_does_not_block_provisioning():
+    """Not knowing the answer is not the same as knowing it is wrong --
+    blocking a provision on a permissions gap in a diagnostic would be
+    its own bug."""
+
+    ec2 = MagicMock()
+    ec2.describe_security_groups.side_effect = RuntimeError("AccessDenied")
+
+    grp, _sgs = ensure_db_networking(
+        _cluster({"db_subnet_group": "pinned", "db_security_group_ids": ["sg-x"]}),
+        region="us-west-2",
+        port=3306,
+        service="rds",
+        clients=(ec2, MagicMock(), MagicMock(), MagicMock()),
+    )
+    assert grp == "pinned"
+
+
+def test_the_platform_group_gets_the_engine_port_not_a_hardcoded_one():
+    """The platform's own group is shared across engines by name, so the
+    MySQL rule has to land on the group Postgres already created."""
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    eks.describe_cluster.return_value = {"cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}}}
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {"SubnetId": "subnet-a", "AvailabilityZone": "us-west-2a", "MapPublicIpOnLaunch": False},
+            {"SubnetId": "subnet-b", "AvailabilityZone": "us-west-2b", "MapPublicIpOnLaunch": False},
+        ],
+    }
+    # The group already exists from an earlier Postgres provision.
+    ec2.describe_security_groups.return_value = {"SecurityGroups": [{"GroupId": "sg-shared"}]}
+
+    _grp, sgs = ensure_db_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        port=3306,
+        service="rds",
+        clients=(ec2, MagicMock(), MagicMock(), eks),
+    )
+
+    assert sgs == ["sg-shared"]
+    ec2.create_security_group.assert_not_called()
+    [call] = ec2.authorize_security_group_ingress.call_args_list
+    [permission] = call.kwargs["IpPermissions"]
+    assert (permission["FromPort"], permission["ToPort"]) == (3306, 3306)
 
 
 def test_ensure_memorydb_networking_discovers_and_creates():
