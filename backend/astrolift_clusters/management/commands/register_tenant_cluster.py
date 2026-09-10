@@ -345,6 +345,15 @@ class Command(BaseCommand):
             help="EKS cluster name to describe (default: --slug or EKS_CLUSTER_NAME)",
         )
         parser.add_argument(
+            "--iam-permissions-boundary-arn",
+            default=None,
+            help=(
+                "IAM permissions boundary every role this cluster mints must carry "
+                "(default: ASTROLIFT_CLUSTER_IAM_PERMISSIONS_BOUNDARY_ARN). Required in "
+                "pull-mode installs whose installer boundary denies CreateRole without it."
+            ),
+        )
+        parser.add_argument(
             "--auto-discover-azure",
             action="store_true",
             default=None,
@@ -682,6 +691,33 @@ class Command(BaseCommand):
             org = Organization.objects.filter(slug=org_slug).first()
             if org is None:
                 raise CommandError(f"organization {org_slug!r} not found")
+
+        # The boundary the cloud requires every role this cluster mints to
+        # carry (#1681). #1679 added ``IRSAConfig.permissions_boundary_arn``,
+        # read from ``provider_config["iam_permissions_boundary_arn"]`` --
+        # and nothing ever wrote that key, so the fix was correct, tested
+        # and inert on every install. In pull mode the installer runs under
+        # a boundary whose DenyRoleCreationWithoutThisBoundary statement
+        # refuses any CreateRole that does not attach the same boundary, so
+        # both roles Astrolift mints per app (IRSA + kaniko build) are denied
+        # until the cluster knows which one to attach.
+        _boundary = opts.get("iam_permissions_boundary_arn") or _env(
+            "ASTROLIFT_CLUSTER_IAM_PERMISSIONS_BOUNDARY_ARN"
+        )
+        if _boundary:
+            provider_config["iam_permissions_boundary_arn"] = _boundary
+
+        # Merge over what the row already carries rather than replacing it.
+        # ``provider_config`` is assigned wholesale, and it is ``{}`` on any
+        # run that does not auto-discover -- so a re-register with discovery
+        # off deleted every discovered value (account id, OIDC provider arn,
+        # ECR registry) and took managed services and workload identity with
+        # them. Same rule #1616 settled for oidc_auth_config: clearing live
+        # config should take a deliberate act, not a partially-configured
+        # re-run that happens on every container start.
+        _existing_row_pc = TenantCluster.all_objects.filter(slug=slug).first()
+        if _existing_row_pc is not None:
+            provider_config = {**(_existing_row_pc.provider_config or {}), **provider_config}
 
         # Upsert. all_objects to bypass soft-delete filtering so an
         # accidentally-deleted row gets restored rather than duplicated.
