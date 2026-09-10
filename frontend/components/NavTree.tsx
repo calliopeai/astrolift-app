@@ -24,7 +24,6 @@ import * as React from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -161,7 +160,6 @@ interface NavTreeSkeletonProps {
 function NavTreeSkeleton({ rows = 3 }: NavTreeSkeletonProps) {
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Workspace</SidebarGroupLabel>
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton disabled>
@@ -344,7 +342,6 @@ export function NavTree() {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Workspace</SidebarGroupLabel>
       <SidebarMenu>
         <Collapsible open={orgOpen} onOpenChange={() => toggle(orgKey, true)} asChild>
           <SidebarMenuItem>
