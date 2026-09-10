@@ -980,7 +980,10 @@ def render_resources_for_deployment(
             )
 
     log.info(
-        "render_resources_for_deployment: app=%s env=%s md_id=%s cluster_id=%s "
+        # ``md_id`` read as "managed service id" to more than one person
+        # triaging #1688; it is the env's managed *domain*, and null is the
+        # ordinary state for an app that never claimed one.
+        "render_resources_for_deployment: app=%s env=%s managed_domain_id=%s cluster_id=%s "
         "base+ingress=%d ingress=%d kinds=%s",
         app.slug,
         getattr(env, "name", None),
