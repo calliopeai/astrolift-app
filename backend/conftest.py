@@ -150,14 +150,33 @@ def permission_resolver():
         key = (permission.value, scope.kind.value if scope else None, scope.id if scope else None)
         if key in grants:
             return grants[key], "test grant" if grants[key] else "test deny"
+        # An unscoped ``grant(perm)`` means "the caller holds this
+        # permission", so it answers a scoped check too (#1717 threaded
+        # ``scope=`` through resolvers these tests reach unscoped).
+        # ``deny(perm, scope=...)`` still wins, because the exact key is
+        # consulted first.
+        unscoped = (permission.value, None, None)
+        if scope is not None and unscoped in grants:
+            return grants[unscoped], "test grant" if grants[unscoped] else "test deny"
         return False, "no grant in test"
 
-    from core.permissions import get_permission_resolver
+    from core.permissions import (
+        get_granted_scopes_provider,
+        get_permission_resolver,
+        register_granted_scopes_provider,
+        scopes_from_resolver,
+    )
 
     previous = get_permission_resolver()
+    # ``any_scope=True`` gates read the granted-scopes provider, not the
+    # resolver. Point it back at this stub so one ``grant()`` still
+    # controls both halves of the gate.
+    previous_provider = get_granted_scopes_provider()
     register_permission_resolver(_resolver)
+    register_granted_scopes_provider(scopes_from_resolver)
     yield type("Resolver", (), {"grant": staticmethod(grant), "deny": staticmethod(deny)})
     register_permission_resolver(previous)
+    register_granted_scopes_provider(previous_provider)
 
 
 @pytest.fixture

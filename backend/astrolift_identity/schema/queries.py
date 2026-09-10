@@ -71,6 +71,8 @@ from astrolift_identity.schema.types import (
     role_to_type,
     team_to_type,
 )
+from astrolift_identity.scope_visibility import visible_projects, visible_teams
+from astrolift_identity.scopes import team_scope_by_guid
 from core.decorators import tenant_scoped
 from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
 from core.permissions import Permission, module_entitlements, require_permission
@@ -106,18 +108,25 @@ class MeType:
     def modules(self, info: Info) -> list[ModuleEntitlementType]:
         """Capability manifest for the active tenant (spec 34/36 §0.3).
 
-        Computed from the viewer's effective permission slugs for the
-        active tenant via the single source-of-truth mapping
+        Computed from the viewer's effective permission slugs via the
+        single source-of-truth mapping
         (:func:`core.permissions.module_entitlements`), which reuses
-        :func:`~astrolift_identity.permission_resolver.resolve_effective_permissions`
+        :func:`~astrolift_identity.permission_resolver.resolve_effective_permissions_anywhere`
         so the manifest and the ``@require_permission`` gates stay in
         lockstep.
+
+        The slug set is the union over every scope in the active org, not
+        the org scope alone (#1717): a viewer whose only binding is
+        team-scoped resolves to nothing at org scope, and the shell would
+        hide Apps, Agents and Workflows from someone who can use all
+        three on her own team. This is a visibility decision -- every
+        action behind these modules still runs its own scoped check.
 
         Anonymous / no-tenant returns ``[]`` (no slug catalog leak — the
         shell renders only Dashboard). Superuser → every capability true.
         ``dashboard`` is never listed; the shell always renders it.
         """
-        from astrolift_identity.permission_resolver import resolve_effective_permissions
+        from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
@@ -129,7 +138,7 @@ class MeType:
         is_superuser = bool(getattr(user, "is_superuser", False) and getattr(user, "is_active", True))
         is_staff = bool(getattr(user, "is_staff", False) and getattr(user, "is_active", True))
 
-        perms = resolve_effective_permissions(tenant)
+        perms = resolve_effective_permissions_anywhere(tenant)
         rows = module_entitlements(perms, is_superuser=is_superuser, is_staff=is_staff)
         return [
             ModuleEntitlementType(
@@ -156,7 +165,10 @@ def _teams_qs(*, search: str | None = None):
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return Team.objects.none()
-    qs = Team.objects.filter(organization_id=org_id).select_related("organization")
+    qs = visible_teams(
+        Team.objects.filter(organization_id=org_id).select_related("organization"),
+        Permission.TEAM_READ,
+    )
     term = (search or "").strip()
     if term:
         qs = qs.filter(search_q(term, "slug", "name", "description"))
@@ -175,7 +187,10 @@ def _projects_qs(*, search: str | None = None):
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return Project.objects.none()
-    qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")
+    qs = visible_projects(
+        Project.objects.filter(organization_id=org_id).select_related("organization", "team"),
+        Permission.PROJECT_READ,
+    )
     term = (search or "").strip()
     if term:
         qs = qs.filter(search_q(term, "slug", "name", "description", "team__slug", "team__name"))
@@ -417,13 +432,13 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage."
     )
-    @require_permission(Permission.TEAM_READ)
+    @require_permission(Permission.TEAM_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_teams(self, info: Info) -> list[TeamType]:
         return [team_to_type(t) for t in _teams_qs()[:200]]
 
     @strawberry.field
-    @require_permission(Permission.TEAM_READ)
+    @require_permission(Permission.TEAM_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_teams_page(
         self,
@@ -456,13 +471,13 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage."
     )
-    @require_permission(Permission.PROJECT_READ)
+    @require_permission(Permission.PROJECT_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_projects(self, info: Info) -> list[ProjectType]:
         return [project_to_type(p) for p in _projects_qs()[:200]]
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_READ)
+    @require_permission(Permission.PROJECT_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_projects_page(
         self,
@@ -849,7 +864,7 @@ class IdentityQuery:
         return page.map(lambda m: member_to_type(m, last_active_at=last_active.get(m.user_id)))
 
     @strawberry.field
-    @require_permission(Permission.TEAM_READ)
+    @require_permission(Permission.TEAM_READ, scope=team_scope_by_guid("team_id"))
     @tenant_scoped()
     def astrolift_team_members(self, info: Info, team_id: GUID) -> list[MemberType]:
         """Members attached to one team, by team GUID.
@@ -1480,17 +1495,22 @@ class IdentityQuery:
         bypass in ``astrolift_identity.permission_resolver.resolve``
         — the bootstrap admin path doesn't need explicit role bindings.
 
-        Routes through ``permission_resolver.resolve_effective_permissions``
+        Routes through
+        ``permission_resolver.resolve_effective_permissions_anywhere``
         so the read-side and the gate share the same scope-traversal
-        logic (#478) — fix-once-apply-everywhere.
+        logic (#478) — fix-once-apply-everywhere. That union spans every
+        scope in the active org, so a team- or app-scoped viewer sees the
+        slugs she actually holds rather than an empty list (#1717); the
+        per-app ``viewerPermissions`` field stays point-scoped because it
+        answers about one app.
         """
-        from astrolift_identity.permission_resolver import resolve_effective_permissions
+        from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
-        return sorted(resolve_effective_permissions(tenant))
+        return sorted(resolve_effective_permissions_anywhere(tenant))
 
     @strawberry.field
     @tenant_scoped()

@@ -159,7 +159,7 @@ def _viewer_modules(request: HttpRequest) -> dict[str, bool]:
     errors must not widen what the assistant offers.
     """
     try:
-        from astrolift_identity.permission_resolver import resolve_effective_permissions
+        from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.permissions import module_entitlements
         from core.tenancy import get_current_tenant
 
@@ -169,7 +169,7 @@ def _viewer_modules(request: HttpRequest) -> dict[str, bool]:
             # user-only permission read: without an org there is no scope
             # the entitlements would be correct for.
             return {}
-        perms = resolve_effective_permissions(tenant)
+        perms = resolve_effective_permissions_anywhere(tenant)
         entitlements = module_entitlements(
             perms,
             is_superuser=bool(getattr(request.user, "is_superuser", False)),

@@ -15,7 +15,14 @@ from collections.abc import Iterable
 
 from django.utils import timezone
 
-from core.permissions import Permission, PermissionScope
+from core.permissions import (
+    ALL_SCOPES,
+    NO_SCOPES,
+    GrantedScopes,
+    Permission,
+    PermissionScope,
+    ScopeKind,
+)
 from core.tenancy import TenantContext
 
 # Order matters: when we match a binding at a higher scope, it grants
@@ -68,13 +75,153 @@ def resolve(
     return False, "no role binding grants this permission"
 
 
+def _org_confined_bindings(tenant: TenantContext) -> list:
+    """The actor's live RoleBindings whose scope lies in the active org.
+
+    One scan, shared by both any-scope readers below. Bindings are
+    dropped if expired, and scope ids are confined to the active org so a
+    TEAM binding in org A contributes nothing while org B is active --
+    without that, cross-tenant ids would reach the row filters.
+    """
+
+    from astrolift_identity.models import Project, RoleBinding, Team
+    from astrolift_registry.models import RegisteredApp
+
+    org_id = tenant.organization_id
+    now = timezone.now()
+    live = [
+        b
+        for b in RoleBinding.objects.select_related("role").filter(user_id=tenant.actor_user_id)
+        if b.expires_at is None or b.expires_at > now
+    ]
+
+    ids_by_kind: dict[str, set[int]] = {}
+    for binding in live:
+        ids_by_kind.setdefault(binding.scope_kind, set()).add(binding.scope_id)
+
+    allowed: dict[str, set[int]] = {"ORG": {org_id} & ids_by_kind.get("ORG", set())}
+    for kind, model in (("TEAM", Team), ("PROJECT", Project), ("APP", RegisteredApp)):
+        ids = ids_by_kind.get(kind, set())
+        allowed[kind] = (
+            set(model.objects.filter(pk__in=ids, organization_id=org_id).values_list("pk", flat=True))
+            if ids
+            else set()
+        )
+
+    return [b for b in live if b.scope_id in allowed.get(b.scope_kind, set())]
+
+
+def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScopes:
+    """RoleBinding-backed :data:`core.permissions.GrantedScopesProvider`.
+
+    Every scope in the active org where ``tenant``'s actor holds
+    ``permission``.
+    """
+
+    if tenant.actor_user_id is None:
+        return NO_SCOPES
+    if _is_superuser(tenant.actor_user_id):
+        return ALL_SCOPES
+    if tenant.organization_id is None:
+        return NO_SCOPES
+
+    by_kind: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set(), "APP": set()}
+    for binding in _org_confined_bindings(tenant):
+        if permission.value in (binding.role.permissions or ()):
+            by_kind[binding.scope_kind].add(binding.scope_id)
+
+    if by_kind["ORG"]:
+        return ALL_SCOPES
+    return GrantedScopes(
+        org=False,
+        team_ids=frozenset(by_kind["TEAM"]),
+        project_ids=frozenset(by_kind["PROJECT"]),
+        app_ids=frozenset(by_kind["APP"]),
+    )
+
+
+def resolve_effective_permissions_anywhere(tenant: TenantContext) -> set[str]:
+    """Every permission slug the viewer holds *somewhere* in the active org.
+
+    :func:`resolve_effective_permissions` answers for one point in the
+    hierarchy, which is right for a per-app ``viewerPermissions`` field.
+    It is the wrong question for the capability manifest that decides
+    which modules the nav renders: a viewer whose only binding is
+    TEAM-scoped resolves to the empty set at org scope, so the shell
+    hides Apps, Agents and Workflows from someone who can use all three
+    on her own team (#1717).
+
+    Capability, not authority: every real action still runs its own
+    scoped check, which is what stops this from being a grant.
+    """
+
+    if tenant.actor_user_id is None:
+        return set()
+    if _is_superuser(tenant.actor_user_id):
+        return {p.value for p in Permission}
+    if tenant.organization_id is None:
+        return set()
+
+    effective: set[str] = set()
+    for binding in _org_confined_bindings(tenant):
+        effective.update(binding.role.permissions or ())
+    return effective
+
+
+def _scope_ancestry(tenant: TenantContext, scope: PermissionScope) -> list[tuple[str, int]]:
+    """``scope`` plus the scopes it inherits from, inside the active org.
+
+    The module docstring promises a walk up App -> Project -> Team -> Org,
+    but until #1717 the walk only ever climbed the *tenant context*. A
+    check aimed at one app therefore saw ``("APP", id)`` and the caller's
+    org, and nothing between: a TEAM-scoped binding on that app's own
+    team could not satisfy it, which is the same over-denial that made
+    the whole sub-org tier unusable.
+
+    The ancestry is read off the object, then confined to the active org
+    -- an object in another tenant contributes nothing, so a stray id
+    can never widen the candidate list. The org link itself is left to
+    the caller, which already projects it from the tenant context.
+    """
+
+    out: list[tuple[str, int]] = [(scope.kind.value, scope.id)]
+    org_id = tenant.organization_id
+    if org_id is None:
+        return out
+
+    if scope.kind == ScopeKind.APP:
+        from astrolift_registry.models import RegisteredApp
+
+        row = (
+            RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id)
+            .values("project_id", "team_id")
+            .first()
+        )
+        if row is not None:
+            if row["project_id"] is not None:
+                out.append(("PROJECT", row["project_id"]))
+            if row["team_id"] is not None:
+                out.append(("TEAM", row["team_id"]))
+    elif scope.kind == ScopeKind.PROJECT:
+        from astrolift_identity.models import Project
+
+        team_id = (
+            Project.objects.filter(pk=scope.id, organization_id=org_id)
+            .values_list("team_id", flat=True)
+            .first()
+        )
+        if team_id is not None:
+            out.append(("TEAM", team_id))
+    return out
+
+
 def _candidate_scopes(
     tenant: TenantContext,
     scope: PermissionScope | None,
 ) -> list[tuple[str, int]]:
     out: list[tuple[str, int]] = []
     if scope is not None:
-        out.append((scope.kind.value, scope.id))
+        out.extend(_scope_ancestry(tenant, scope))
     if tenant.project_id is not None:
         out.append(("PROJECT", tenant.project_id))
     if tenant.team_id is not None:
@@ -266,7 +413,11 @@ def _effective_scope_chain(
     """
     out: list[tuple[str, int]] = []
     if extra_scope is not None:
-        out.append(extra_scope)
+        # Same walk the gate runs (#1717): the object's own ancestry, not
+        # just the object, so a TEAM binding covers the app under it.
+        out.extend(
+            _scope_ancestry(tenant, PermissionScope(kind=ScopeKind(extra_scope[0]), id=extra_scope[1]))
+        )
     if tenant.project_id is not None:
         out.append(("PROJECT", tenant.project_id))
     if tenant.team_id is not None:
