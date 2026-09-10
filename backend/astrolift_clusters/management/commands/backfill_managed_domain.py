@@ -1,11 +1,18 @@
 """
 backfill_managed_domain — bind the platform ManagedDomain FK on
-AppEnvironment rows that pre-date the resolve_managed_domain fix.
+AppEnvironment rows that pre-date the resolve_managed_domain fix, and
+recompute the URL each row advertises to match.
 
 Usage:
     python manage.py backfill_managed_domain [--dry-run]
 
 Idempotent: rows that already have a managed_domain FK are skipped.
+
+Binding the FK alone was not enough (#1690). The render reads the FK, so
+the Ingress came out right, while the UI kept showing whatever URL the
+row was created with — for rows created before #1689 that was
+``https://<app>.<org-slug>``, an address that never resolved. Immediately
+after a command that reported success, the app still read as broken.
 """
 
 from __future__ import annotations
@@ -50,9 +57,20 @@ class Command(BaseCommand):
                 skipped += 1
                 continue
 
-            self.stdout.write(f"  {prefix}SET   {env.registered_app.slug}/{env.name} → {domain.zone}")
+            app = env.registered_app
+            host = (app.subdomain or app.slug or "").strip()
+            new_url = f"https://{host}.{domain.zone}" if host else env.url
+            changes: dict = {"managed_domain": domain}
+            if new_url != env.url:
+                changes["url"] = new_url
+                self.stdout.write(
+                    f"  {prefix}SET   {app.slug}/{env.name} → {domain.zone} "
+                    f"(url {env.url or '(empty)'} → {new_url})"
+                )
+            else:
+                self.stdout.write(f"  {prefix}SET   {app.slug}/{env.name} → {domain.zone}")
             if not dry_run:
-                AppEnvironment.objects.filter(pk=env.pk).update(managed_domain=domain)
+                AppEnvironment.objects.filter(pk=env.pk).update(**changes)
             updated += 1
 
         self.stdout.write(

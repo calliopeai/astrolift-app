@@ -4568,7 +4568,7 @@ input CreateInvitationInput {
 input CreateManagedDomainInput {
   zone: String!
   dnsDriver: String!
-  defaultFor: String! = "none"
+  defaultFor: String! = "tenant_apps"
   isWildcardManaged: Boolean! = false
   dnsConfig: JSON = null
   organizationScoped: Boolean! = true
