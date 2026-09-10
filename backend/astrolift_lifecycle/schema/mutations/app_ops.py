@@ -321,6 +321,14 @@ class AppOpsMutations:
                 ErrorCode.PRECONDITION.value,
                 result.error or "the GitHub App is not installed on this repo",
             )
+        if result.status == "no_public_url":
+            # The hook would point at an address the source host cannot
+            # reach (#1693). Say so instead of registering it and
+            # reporting a wired webhook that never delivers.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "this install has no publicly reachable API URL",
+            )
         if result.status == "fetch_failed":
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
