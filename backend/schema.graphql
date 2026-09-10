@@ -1691,6 +1691,7 @@ type AstroliftDeployment {
   awaitingApprovers: [AstroliftDeploymentApprover!]!
   manifestResyncStatus: String!
   manifestResyncError: String!
+  buildError: String!
   startedAt: DateTime
   succeededAt: DateTime
   failedAt: DateTime

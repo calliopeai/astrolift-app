@@ -1010,6 +1010,51 @@ class K8sNativeClusterDriver(ClusterDriver):
     # ---- Cluster health (#68 slice 1) -----------------------------
 
     @driver_op(cloud="k8s_native", driver="cluster")
+    def read_job_pod_logs(
+        self,
+        cluster: str,
+        namespace: str,
+        job_name: str,
+        *,
+        tail_lines: int = 100,
+    ) -> str:
+        """Tail of the logs from the pods a Job ran, newest attempt last.
+
+        A failed Job reports only "Job has reached the specified backoff
+        limit"; what actually went wrong is in the pod (#1686). Slug-keyed
+        rather than auth-keyed because the build driver holds a slug, and
+        because this is the same read path ``get_workload_status`` uses.
+
+        Best-effort by contract: a diagnostic must never turn a failure
+        into a different failure, so every error here degrades to a note
+        in the returned text.
+        """
+
+        try:
+            client = self._k8s(cluster)
+        except Exception as exc:
+            return f"(could not reach the cluster to read build logs: {exc})"
+
+        try:
+            pods = client.list_namespaced_pod(namespace=namespace, label_selector=f"job-name={job_name}")
+            names = [p.metadata.name for p in getattr(pods, "items", []) or []]
+        except Exception as exc:
+            return f"(could not list build pods: {exc})"
+        if not names:
+            return "(no build pods found — the Job may have been garbage-collected)"
+
+        chunks: list[str] = []
+        for pod_name in sorted(names):
+            try:
+                text = client.read_namespaced_pod_log(namespace=namespace, name=pod_name, tail_lines=tail_lines)
+            except Exception as exc:
+                chunks.append(f"--- {pod_name}: could not read logs: {exc}")
+                continue
+            body = (text or "").strip()
+            chunks.append(f"--- {pod_name}\n{body}" if body else f"--- {pod_name}: (no output)")
+        return "\n".join(chunks)
+
+    @driver_op(cloud="k8s_native", driver="cluster")
     def list_pod_phase_summary(
         self,
         cluster: ClusterContext,

@@ -203,6 +203,13 @@ class DeploymentType:
     branch and path it looked at, or the reason a staged draft blocked it.
     Empty when the resync succeeded."""
 
+    build_error: str
+    """Why the image build failed, with the tail of the build pod's own
+    output (#1686). The Job condition alone reads the same for every
+    cause, and ``abortedReason`` keeps a single line, so this is where an
+    operator finds what the builder actually said. Empty unless a
+    platform build failed on this deploy."""
+
     started_at: dt.datetime | None
     succeeded_at: dt.datetime | None
     failed_at: dt.datetime | None
@@ -487,6 +494,7 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         awaiting_approvers=awaiting,
         manifest_resync_status=getattr(d, "manifest_resync_status", "") or "",
         manifest_resync_error=getattr(d, "manifest_resync_error", "") or "",
+        build_error=getattr(d, "build_error", "") or "",
         started_at=d.started_at,
         succeeded_at=d.succeeded_at,
         failed_at=d.failed_at,

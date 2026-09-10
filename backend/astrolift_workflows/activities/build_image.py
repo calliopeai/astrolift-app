@@ -96,14 +96,19 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         raise RuntimeError(f"Deployment with pk={inp.deployment_id!r} not found") from None
 
     app = deployment.registered_app
-    build_strategy = app.build_strategy or "off"
+    build_strategy = app.effective_build_strategy
     if build_strategy == "off":
-        # Caller should not reach here when build_strategy is "off", but be
-        # defensive and return early rather than erroring.
+        # Caller should not reach here, but be defensive and return early
+        # rather than erroring. Reads the effective strategy so an app
+        # whose build_mode does not ask for a platform build is skipped
+        # here too, not just at the workflow branch (#1687).
         log.warning(
-            "build_image called for deployment %s (app=%s) with build_strategy='off' — skipping",
+            "build_image called for deployment %s (app=%s) with build_mode=%s "
+            "build_strategy=%s — nothing to build, skipping",
             inp.deployment_id,
             app.slug,
+            app.build_mode,
+            app.build_strategy,
         )
         return _stub(inp.image_tag)
 
@@ -151,8 +156,13 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         raise RuntimeError(f"BuildDriver.build failed: {exc}") from exc
 
     if not getattr(result, "success", False):
-        errors = "; ".join(getattr(result, "errors", []) or []) or "unknown build failure"
-        raise RuntimeError(f"image build failed: {errors}")
+        parts = [str(e) for e in (getattr(result, "errors", []) or [])] or ["unknown build failure"]
+        # The Job condition is the first entry and the only single-line
+        # one; the driver appends the build pod's own output after it
+        # (#1686). ``aborted_reason`` keeps one line, so the full text is
+        # persisted on the deploy row rather than truncated away there.
+        _record_build_failure(deployment, "\n".join(parts))
+        raise RuntimeError(f"image build failed: {parts[0]}")
 
     digest = result.digest or _read_pushed_digest(prepared.registry_driver, prepared.repo_name, inp.image_tag)
     _record_build_outcome(deployment, image_tag=inp.image_tag, digest=digest)
@@ -344,6 +354,20 @@ def _record_build_outcome(deployment, *, image_tag: str, digest: str) -> None:
         deployment.save(update_fields=fields)
 
 
+def _record_build_failure(deployment, detail: str) -> None:
+    """Persist why the build failed, pod output included (#1686).
+
+    Best-effort: the deploy is already failing, and losing the
+    diagnostic must not replace that failure with a different one.
+    """
+
+    try:
+        deployment.build_error = detail
+        deployment.save(update_fields=["build_error", "updated_at", "version"])
+    except Exception:
+        log.warning("could not persist build_error for deployment %s", deployment.pk, exc_info=True)
+
+
 def _resolve_source_url(app, commit_sha: str) -> str:
     """Build a git source URL (``git+https://host/path#<ref>``) for the build.
 
@@ -380,22 +404,30 @@ def _resolve_source_url(app, commit_sha: str) -> str:
 
 
 def _fetch_app_build_strategy_sync(registered_app_id: int) -> str:
-    """Return the ``build_strategy`` value for the given RegisteredApp PK."""
+    """Return the *effective* build strategy for the given RegisteredApp PK.
+
+    Reads both build axes via ``RegisteredApp.effective_build_strategy``:
+    an app whose ``build_mode`` is not ``platform_build`` resolves to
+    ``off`` however its ``build_strategy`` column happens to read
+    (#1687).
+    """
     from astrolift_registry.models import RegisteredApp
 
     try:
-        app = RegisteredApp.all_objects.only("build_strategy").get(pk=registered_app_id)
-        return app.build_strategy or "off"
+        app = RegisteredApp.all_objects.only("build_mode", "build_strategy").get(pk=registered_app_id)
+        return app.effective_build_strategy
     except RegisteredApp.DoesNotExist:
         return "off"
 
 
 @activity.defn(name="astrolift.build.fetch_app_build_strategy")
 async def fetch_app_build_strategy(registered_app_id: int) -> str:
-    """Return the ``build_strategy`` for a RegisteredApp.
+    """Return the effective build strategy for a RegisteredApp.
 
     Called by ``DeployAppWorkflow`` before the build step so the workflow
     can branch without embedding Django model access in workflow code.
+    Effective, not raw: ``off`` unless the app's ``build_mode`` actually
+    asks the platform to build (#1687).
     """
     from asgiref.sync import sync_to_async
 

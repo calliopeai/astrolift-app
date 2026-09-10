@@ -56,6 +56,11 @@ _PUSH_RETRY = 6
 # matters if the entire pod's projected token needs a clean re-assume.
 _BACKOFF_LIMIT = 2
 
+# How much of the build pod's output to carry back on a failure. Enough
+# to hold a clone error, a Dockerfile step failure and its context;
+# small enough to sit in an error message and a Deployment row.
+_FAILURE_LOG_LINES = 100
+
 # Modest resource floor so the kaniko pod schedules without starving the
 # node; the limit gives a real build headroom without being unbounded.
 _BUILD_RESOURCES = {
@@ -309,14 +314,40 @@ class KanikoBuildDriver:
                 return {"success": True, "errors": []}
             if _condition_true(conditions, "Failed"):
                 reason = _condition_message(conditions, "Failed") or "kaniko build failed"
-                return {"success": False, "errors": [reason]}
+                return {"success": False, "errors": [reason, *self._failure_logs(job_name)]}
 
             if self._clock() - started >= self._timeout:
                 return {
                     "success": False,
-                    "errors": [f"build timed out after {self._timeout:.0f}s"],
+                    "errors": [
+                        f"build timed out after {self._timeout:.0f}s",
+                        *self._failure_logs(job_name),
+                    ],
                 }
             self._sleep(self._poll)
+
+    def _failure_logs(self, job_name: str) -> list[str]:
+        """The build pod's own output, for a failure that has none.
+
+        A failed Job reports "Job has reached the specified backoff
+        limit" and nothing else, so every build failure read the same
+        (#1686) -- and on a private-endpoint cluster the operator cannot
+        go and look either. What actually went wrong is in the pod.
+
+        Strictly diagnostic: any problem reading the logs degrades to a
+        note in the returned list, because a build that failed must not
+        be reported as failing for a second, invented reason.
+        """
+
+        reader = getattr(self._cluster_driver, "read_job_pod_logs", None)
+        if reader is None:
+            return []
+        try:
+            text = reader(self._cluster_slug, self._namespace, job_name, tail_lines=_FAILURE_LOG_LINES)
+        except Exception as exc:
+            return [f"build pod logs unavailable: {exc}"]
+        text = (text or "").strip()
+        return [f"build pod logs (last {_FAILURE_LOG_LINES} lines):\n{text}"] if text else []
 
 
 def _condition_true(conditions: list[dict[str, Any]], cond_type: str) -> bool:

@@ -466,6 +466,28 @@ class RegisteredApp(NamedBaseCoreModel):
         return (self.source_kind or "").strip() != RegisteredApp.SourceKind.DIRECT_UPLOAD.value
 
     @property
+    def effective_build_strategy(self) -> str:
+        """Which builder this deploy should invoke, or ``"off"`` for none.
+
+        The two build axes have to agree and only one was ever read
+        (#1687): ``DeployAppWorkflow`` branched on ``build_strategy !=
+        "off"`` alone, so an app moved to ``ci_pushed`` kept running a
+        full platform build on every deploy -- ``platform_build``
+        registration persists a ``dockerfile`` strategy, and a mode-only
+        change always lands in that state.
+
+        ``build_mode`` decides *whether* the platform builds;
+        ``build_strategy`` only decides *which* builder it uses when it
+        does. Deriving the answer from both, here, is what stops the two
+        drifting apart again -- and it needs no migration, because an
+        inconsistent pair already stored resolves correctly on read.
+        """
+
+        if (self.build_mode or "").strip() != RegisteredApp.BuildMode.PLATFORM_BUILD.value:
+            return RegisteredApp.BuildStrategy.OFF.value
+        return (self.build_strategy or "").strip() or RegisteredApp.BuildStrategy.OFF.value
+
+    @property
     def security_policy_resolved(self) -> dict:
         """Return the supply-chain policy with platform defaults filled in.
 

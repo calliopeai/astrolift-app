@@ -214,3 +214,110 @@ def test_cancel_deletes_job():
     assert ns == "astrolift-system"
     assert manifests[0]["kind"] == "Job"
     assert manifests[0]["metadata"]["name"] == _job_name("42-abc")
+
+
+# --------------------------------------------------------------------------
+# Failure diagnostics (#1686)
+# --------------------------------------------------------------------------
+#
+# A failed Job reports "Job has reached the specified backoff limit" and
+# nothing else, so every possible cause -- a repo it cannot clone, a
+# Dockerfile step that exits non-zero, a push it cannot authenticate --
+# read identically. On a private-endpoint cluster the operator cannot
+# reach the pod to look either. The build pod's own output comes back
+# with the failure.
+
+
+class LoggingClusterDriver(FakeClusterDriver):
+    def __init__(self, *, log_text="", raises=None, **kw):
+        super().__init__(**kw)
+        self._log_text = log_text
+        self._raises = raises
+        self.log_calls = []
+
+    def read_job_pod_logs(self, cluster, namespace, job_name, *, tail_lines=100):
+        self.log_calls.append((cluster, namespace, job_name, tail_lines))
+        if self._raises is not None:
+            raise self._raises
+        return self._log_text
+
+
+def test_a_failed_build_carries_the_pod_output():
+    cluster = LoggingClusterDriver(
+        statuses=[_status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}])],
+        log_text="error: failed to clone: authentication required",
+    )
+    result = _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert result.success is False
+    # The condition still leads -- it is what the platform observed.
+    assert "BackoffLimitExceeded" in result.errors[0]
+    assert any("authentication required" in e for e in result.errors)
+    # Read against the Job actually applied, in the build namespace.
+    [(cluster_slug, namespace, job_name, _tail)] = cluster.log_calls
+    assert cluster_slug == "tenant-1"
+    assert namespace == "astrolift-system"
+    assert job_name == cluster.applied[0][2][1]["metadata"]["name"]
+
+
+def test_a_timed_out_build_carries_the_pod_output_too():
+    """A build still running at the deadline is the case where the pod's
+    output is the only thing that says what it is stuck on."""
+
+    clock = iter([0.0, 0.0, 99.0, 99.0, 99.0])
+    cluster = LoggingClusterDriver(
+        statuses=[_status([]), _status([])],
+        log_text="INFO: RUN npm ci",
+    )
+    result = _driver(cluster, timeout_seconds=5, clock=lambda: next(clock)).build(_SPEC, "repo", "t")
+
+    assert result.success is False
+    assert "timed out" in result.errors[0]
+    assert any("npm ci" in e for e in result.errors)
+
+
+def test_a_driver_that_cannot_read_logs_still_reports_the_failure():
+    """The plain FakeClusterDriver has no ``read_job_pod_logs``."""
+
+    cluster = FakeClusterDriver(
+        statuses=[_status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}])]
+    )
+    result = _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert result.success is False
+    assert result.errors == ["BackoffLimitExceeded"]
+
+
+def test_a_log_read_that_raises_does_not_replace_the_failure():
+    """A diagnostic must never turn one failure into a different one."""
+
+    cluster = LoggingClusterDriver(
+        statuses=[_status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}])],
+        raises=RuntimeError("forbidden"),
+    )
+    result = _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert result.success is False
+    assert "BackoffLimitExceeded" in result.errors[0]
+    assert any("forbidden" in e for e in result.errors)
+
+
+def test_empty_pod_output_adds_nothing():
+    cluster = LoggingClusterDriver(
+        statuses=[_status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}])],
+        log_text="   ",
+    )
+    result = _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert result.errors == ["BackoffLimitExceeded"]
+
+
+def test_a_successful_build_reads_no_logs():
+    cluster = LoggingClusterDriver(
+        statuses=[_status([{"type": "Complete", "status": "True"}])],
+        log_text="should not be read",
+    )
+    result = _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert result.success is True
+    assert cluster.log_calls == []
