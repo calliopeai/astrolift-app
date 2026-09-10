@@ -41,6 +41,7 @@ from astrolift_identity.schema.types import (
     RoleBindingType,
     role_binding_to_type,
 )
+from astrolift_identity.scopes import team_scope_by_guid
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
@@ -294,7 +295,7 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_assign_team")
     @requires_elevation(action_label="role_binding.bulk_assign_team")
-    @require_permission(Permission.TEAM_MANAGE_MEMBERS)
+    @require_permission(Permission.TEAM_MANAGE_MEMBERS, scope=team_scope_by_guid("input.team_id"))
     @tenant_scoped()
     def bulk_assign_astrolift_team_member_roles(
         self, info: Info, input: BulkAssignTeamMemberRolesInput

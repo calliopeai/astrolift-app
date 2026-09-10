@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.permissions import PermissionScope, ScopeKind
-from core.scope_args import read_arg
+from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
 
@@ -43,7 +43,7 @@ def app_scope_via(
     """
 
     def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        key = read_arg(args, field)
+        key = read_guid(args, field)
         if not key:
             return None
         org_id = _org_id()

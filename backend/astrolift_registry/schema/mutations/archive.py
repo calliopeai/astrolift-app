@@ -18,6 +18,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppType,
     app_to_type,
 )
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -28,7 +29,7 @@ from core.tenancy import get_current_tenant
 class ArchiveMutations:
     @strawberry.mutation
     @mutation_audit(action="app.archive")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def archive_app(self, info: Info, input: ArchiveAppInput) -> MutationResultType[RegisteredAppType]:
         """Scale all workloads to zero and suppress deploys. Idempotent."""
@@ -61,7 +62,7 @@ class ArchiveMutations:
 
     @strawberry.mutation
     @mutation_audit(action="app.restore")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def restore_app(self, info: Info, input: RestoreAppInput) -> MutationResultType[RegisteredAppType]:
         """Restore archived app: un-archive and return workloads to pre-archive replicas."""

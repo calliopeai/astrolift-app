@@ -14,6 +14,7 @@ key the caller cannot be trusted about must never open a door.
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 _UNSET = object()
@@ -43,3 +44,24 @@ def read_arg(args: dict[str, Any], path: str) -> Any | None:
     if type(current).__name__ == "UnsetType":
         return None
     return current
+
+
+def read_guid(args: dict[str, Any], path: str) -> str | None:
+    """:func:`read_arg`, but only for values that are actually GUIDs.
+
+    Route params reach these resolvers verbatim -- ``/agents/runs/overview``
+    arrives as ``id="overview"`` -- and a scope factory runs *before* the
+    resolver's own not-found handling. Handing that to a ``UUIDField``
+    lookup raises ValidationError and turns a page that should render
+    empty into a 500, so anything that is not a UUID reads as absent and
+    leaves the stricter org check standing.
+    """
+    value = read_arg(args, path)
+    if value is None:
+        return None
+    text = str(value)
+    try:
+        uuid.UUID(text)
+    except (ValueError, AttributeError, TypeError):
+        return None
+    return text

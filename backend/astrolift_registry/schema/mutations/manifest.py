@@ -16,6 +16,7 @@ from astrolift_registry.schema.mutations.types import (
     _ManifestPushPayload,
     _ManifestStagePayload,
 )
+from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -26,7 +27,7 @@ from core.tenancy import get_current_tenant
 class ManifestMutations:
     @strawberry.field
     @mutation_audit(action="app.update_manifest")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def update_manifest(
         self,
@@ -97,7 +98,7 @@ class ManifestMutations:
 
     @strawberry.field
     @mutation_audit(action="app.sync_manifest_from_repo")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def sync_manifest_from_repo(
         self,
@@ -172,7 +173,7 @@ class ManifestMutations:
 
     @strawberry.field
     @mutation_audit(action="app.push_manifest_to_repo")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def push_manifest_to_repo(
         self,

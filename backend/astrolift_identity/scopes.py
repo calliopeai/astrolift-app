@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.permissions import PermissionScope, ScopeKind
-from core.scope_args import read_arg
+from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
 
@@ -40,8 +40,8 @@ def team_scope_by_guid(field: str = "team_id"):
     """
 
     def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_arg(args, field)
-        return _scope_for("Team", ScopeKind.TEAM, guid=str(guid)) if guid else None
+        guid = read_guid(args, field)
+        return _scope_for("Team", ScopeKind.TEAM, guid=guid) if guid else None
 
     return _scope
 
@@ -60,8 +60,8 @@ def project_scope_by_guid(field: str = "project_id"):
     """Scope on the project named by ``field`` (a GUID argument)."""
 
     def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_arg(args, field)
-        return _scope_for("Project", ScopeKind.PROJECT, guid=str(guid)) if guid else None
+        guid = read_guid(args, field)
+        return _scope_for("Project", ScopeKind.PROJECT, guid=guid) if guid else None
 
     return _scope
 

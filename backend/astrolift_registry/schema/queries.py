@@ -48,7 +48,7 @@ from astrolift_registry.schema.types import (
     container_to_type,
     workload_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_slug
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -1471,7 +1471,7 @@ class RegistryQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_workload_slug("workload_slug"))
     @tenant_scoped()
     def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
         org_id = _caller_org_id()

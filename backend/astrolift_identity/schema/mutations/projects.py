@@ -32,6 +32,7 @@ from astrolift_identity.schema.types import (
     ProjectType,
     project_to_type,
 )
+from astrolift_identity.scopes import project_scope_by_guid, team_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.naming import PROJECT_SLUG, NamingViolation
@@ -45,7 +46,7 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.create")
-    @require_permission(Permission.PROJECT_CREATE)
+    @require_permission(Permission.PROJECT_CREATE, scope=team_scope_by_guid("input.team_id"))
     @tenant_scoped()
     def create_project(self, info: Info, input: CreateProjectInput) -> MutationResultType[ProjectType]:
         tenant = get_current_tenant()
@@ -71,7 +72,7 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.update")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(Permission.PROJECT_UPDATE, scope=project_scope_by_guid("input.id"))
     @tenant_scoped()
     def update_project(self, info: Info, input: UpdateProjectInput) -> MutationResultType[ProjectType]:
         tenant = get_current_tenant()
@@ -117,7 +118,7 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.delete")
-    @require_permission(Permission.PROJECT_DELETE)
+    @require_permission(Permission.PROJECT_DELETE, scope=project_scope_by_guid("input.id"))
     @tenant_scoped()
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput

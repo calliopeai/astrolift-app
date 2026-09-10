@@ -59,6 +59,7 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
+from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
 from astrolift_agents.services.agent_package import (
     AgentPackageError,
     normalize_environment_values,
@@ -1638,7 +1639,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.cancel")
-    @require_permission(Permission.AGENT_DISPATCH)
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id"))
     @tenant_scoped()
     def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
         """Cancel an AgentTask.
@@ -1676,7 +1677,7 @@ class AgentsMutation:
         action="agents.task.send_input",
         target=lambda self, info, task_id, message: ("AgentTask", str(task_id)),
     )
-    @require_permission(Permission.AGENT_TASK_SEND_INPUT)
+    @require_permission(Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id"))
     @tenant_scoped()
     def send_agent_task_input(
         self, info: Info, task_id: strawberry.ID, message: str
@@ -1736,7 +1737,7 @@ class AgentsMutation:
         action="agents.agent.dispatch",
         target=lambda self, info, input: ("workload", input.agent_slug),
     )
-    @require_permission(Permission.AGENT_DISPATCH)
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_workload_app_scope("input.agent_slug"))
     @tenant_scoped()
     def run_astrolift_agent(
         self, info: Info, input: RunAstroliftAgentInput
@@ -1906,7 +1907,7 @@ class AgentsMutation:
         return gql_success(payload)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
     @tenant_scoped()
     def create_agent_trigger(
         self,
@@ -2012,7 +2013,7 @@ class AgentsMutation:
         return AgentTriggerResult(ok=True, slug=hook.slug)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
     @tenant_scoped()
     def scale_service_agent(self, info: Info, agent_slug: str, target_replicas: int) -> AgentScaleResult:
         """On-demand scale of a Service-family agent's Deployment (#1012).
@@ -2076,7 +2077,7 @@ class AgentsMutation:
         action="agents.agent.configure_run_spec",
         target=lambda self, info, agent_slug, input: ("workload", agent_slug),
     )
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
     @tenant_scoped()
     def update_agent_run_spec(
         self, info: Info, agent_slug: str, input: AgentRunSpecInput

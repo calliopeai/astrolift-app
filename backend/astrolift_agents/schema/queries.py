@@ -70,6 +70,7 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
+from astrolift_agents.scopes import agent_task_scope
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -557,7 +558,7 @@ class AgentsQuery:
         return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_task_scope("id"))
     @tenant_scoped()
     def agent_task(self, info: Info, id: strawberry.ID) -> AgentTaskType | None:
         """One AgentTask by GUID, scoped to the caller's org."""
@@ -679,7 +680,7 @@ class AgentsQuery:
         return [agent_interaction_to_type(r) for r in qs]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("id"))
     @tenant_scoped()
     def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
         """Recent stdout/stderr lines from an AgentTask's pod.

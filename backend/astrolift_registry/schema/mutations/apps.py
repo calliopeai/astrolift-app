@@ -31,6 +31,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppType,
     app_to_type,
 )
+from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -42,7 +43,7 @@ from core.tenancy import get_current_tenant
 class AppMutations:
     @strawberry.field
     @mutation_audit(action="app.update")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def update_app(self, info: Info, input: UpdateAppInput) -> MutationResultType[RegisteredAppType]:
         # Org-scope the by-guid lookup to the caller's tenant. Fails closed
@@ -188,7 +189,7 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.set_subdomain")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def set_app_subdomain(
         self, info: Info, input: SetAppSubdomainInput
@@ -269,7 +270,7 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def soft_delete_app(
         self, info: Info, input: SoftDeleteAppInput
@@ -286,7 +287,7 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.tear_down")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.id"))
     @tenant_scoped()
     def tear_down_app(self, info: Info, input: TearDownAppInput) -> MutationResultType[_SoftDeletePayload]:
         """Fires ``TearDownAppWorkflow`` (#358) — symmetric inverse

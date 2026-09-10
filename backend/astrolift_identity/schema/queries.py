@@ -537,7 +537,7 @@ class IdentityQuery:
         return not qs.exists()
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(Permission.PROJECT_UPDATE, scope=team_scope_by_guid("team_id"))
     @tenant_scoped()
     def astrolift_project_slug_available(
         self, info: Info, team_id: GUID, slug: str, exclude_id: GUID | None = None

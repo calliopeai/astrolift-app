@@ -19,6 +19,7 @@ from astrolift_manifest.env_edit import (
 )
 from astrolift_manifest.parser import ManifestError
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     AppSecretMetadata,
     SecretChangeProposal,
@@ -60,7 +61,7 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.set", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.set")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def set_app_secret(
         self,
@@ -139,7 +140,7 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.rotate", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.rotate")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def rotate_app_secret(
         self,
@@ -214,7 +215,7 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.delete", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.delete")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def delete_app_secret(
         self,
@@ -279,7 +280,7 @@ class SecretMutations:
 
     @strawberry.field
     @mutation_audit(action="app.secret.metadata.set", target=_app_secret_target_from_input)
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def set_app_secret_metadata(
         self,
@@ -336,7 +337,7 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.bulk_import")
     @requires_elevation(action_label="app.secret.bulk_import")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def bulk_import_app_secrets(
         self,
@@ -408,7 +409,9 @@ class SecretMutations:
         ),
     )
     @requires_elevation(action_label="app.secret.reveal")
-    @require_permission(Permission.APP_READ, Permission.SECRET_READ)
+    @require_permission(
+        Permission.APP_READ, Permission.SECRET_READ, scope=app_scope_by_slug("input.app_slug")
+    )
     @tenant_scoped()
     def reveal_app_secret(
         self,

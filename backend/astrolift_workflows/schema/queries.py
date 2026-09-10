@@ -37,6 +37,11 @@ from astrolift_workflows.schema.workflow_config_types import (
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+from workflows.scopes import (
+    definition_scope_by_slug,
+    workflow_scope_by_guid,
+    workflow_scope_by_slug,
+)
 
 
 def _caller_org_pk() -> int | None:
@@ -370,7 +375,7 @@ class WorkflowsQuery:
         return page.map(workflow_to_type)
 
     @strawberry.field(description="One configured Workflow by slug, with its recent runs.")
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, scope=workflow_scope_by_slug("slug"))
     @tenant_scoped()
     def workflow(
         self, info: Info, slug: str, org_id: strawberry.ID | None = None
@@ -465,7 +470,7 @@ class WorkflowsQuery:
     @strawberry.field(
         description="One visible workflow definition by slug (prefers the org's over a global)."
     )
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, scope=definition_scope_by_slug("slug"))
     @tenant_scoped()
     def workflow_definition(
         self, info: Info, slug: str, org_id: strawberry.ID | None = None
@@ -494,7 +499,7 @@ class WorkflowsQuery:
         return definition_summary(d, environment_models=environment_model_map([d]))
 
     @strawberry.field(description="Runs (tier 3) of one configured Workflow, newest first.")
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, scope=workflow_scope_by_guid("workflow_id"))
     @tenant_scoped()
     def workflow_runs(
         self, info: Info, workflow_id: strawberry.ID, org_id: strawberry.ID | None = None

@@ -27,6 +27,7 @@ from astrolift_registry.schema.types import (
     app_team_access_to_type,
     app_to_type,
 )
+from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -116,7 +117,7 @@ class TeamAccessMutations:
 
     @strawberry.field
     @mutation_audit(action="app.grant_team_access")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def grant_team_access_to_app(
         self, info: Info, input: GrantTeamAccessInput
@@ -189,7 +190,7 @@ class TeamAccessMutations:
 
     @strawberry.field
     @mutation_audit(action="app.revoke_team_access")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def revoke_team_access_from_app(
         self, info: Info, input: RevokeTeamAccessInput

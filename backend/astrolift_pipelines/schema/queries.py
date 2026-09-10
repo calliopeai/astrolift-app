@@ -13,6 +13,7 @@ from astrolift_pipelines.schema.types import (
     pipeline_run_to_type,
     pipeline_to_type,
 )
+from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_run_app_scope
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -128,7 +129,7 @@ class PipelinesQuery:
         return page.map(pipeline_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=pipeline_app_scope("id"))
     @tenant_scoped()
     def astrolift_pipeline(self, info: Info, id: str) -> PipelineType | None:
         """Single pipeline by guid, scoped to the current tenant."""
@@ -149,7 +150,7 @@ class PipelinesQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage.")
     )
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=pipeline_app_scope("pipeline_id"))
     @tenant_scoped()
     def astrolift_pipeline_runs(self, info: Info, pipeline_id: str, limit: int = 50) -> list[PipelineRunType]:
         """Pipeline runs for a given pipeline, most-recent first.
@@ -161,7 +162,7 @@ class PipelinesQuery:
         return [pipeline_run_to_type(pr) for pr in qs[: max(1, min(limit, 200))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=pipeline_app_scope("pipeline_id"))
     @tenant_scoped()
     def astrolift_pipeline_runs_page(
         self,
@@ -196,7 +197,7 @@ class PipelinesQuery:
         return page.map(pipeline_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=pipeline_run_app_scope("id"))
     @tenant_scoped()
     def astrolift_pipeline_run(self, info: Info, id: str) -> PipelineRunType | None:
         """Single pipeline run by guid, tenant-scoped via pipeline FK."""

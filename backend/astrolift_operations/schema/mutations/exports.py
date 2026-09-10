@@ -30,6 +30,7 @@ from astrolift_operations.schema.types import (
     app_log_export_to_type,
     audit_export_to_type,
 )
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -170,7 +171,7 @@ class ExportMutations:
 
     @strawberry.field
     @mutation_audit(action="app.log_export")
-    @require_permission(Permission.APP_LOG_EXPORT)
+    @require_permission(Permission.APP_LOG_EXPORT, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def export_astrolift_app_logs(
         self, info: Info, input: ExportAppLogsInput

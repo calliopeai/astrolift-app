@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.permissions import PermissionScope, ScopeKind
-from core.scope_args import read_arg
+from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
 
@@ -56,8 +56,8 @@ def app_scope_by_guid(field: str = "app_id"):
     """Scope on the app named by ``field`` (a GUID argument)."""
 
     def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_arg(args, field)
-        return _app_scope(guid=str(guid)) if guid else None
+        guid = read_guid(args, field)
+        return _app_scope(guid=guid) if guid else None
 
     return _scope
 
@@ -70,7 +70,7 @@ def app_scope_by_workload_guid(field: str = "workload_id"):
     """
 
     def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_arg(args, field)
+        guid = read_guid(args, field)
         if not guid:
             return None
         org_id = _org_id()
@@ -84,5 +84,39 @@ def app_scope_by_workload_guid(field: str = "workload_id"):
             .first()
         )
         return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
+
+    return _scope
+
+
+def app_scope_by_workload_slug(field: str = "workload_slug"):
+    """Scope on the app owning the workload ``field`` names (a slug).
+
+    Workload slugs are unique per app, not per org, so a slug matching in
+    more than one app resolves to nothing rather than to whichever row
+    the database returned first -- one app's binding must never become
+    authority over another app's workload.
+    """
+
+    def _scope(args: dict[str, Any]) -> PermissionScope | None:
+        slug = read_arg(args, field)
+        if not slug:
+            return None
+        org_id = _org_id()
+        if org_id is None:
+            return None
+        from astrolift_registry.models import Workload
+
+        app_ids = list(
+            Workload.objects.filter(
+                slug=str(slug),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .values_list("registered_app_id", flat=True)
+            .distinct()[:2]
+        )
+        if len(app_ids) != 1:
+            return None
+        return PermissionScope(kind=ScopeKind.APP, id=app_ids[0])
 
     return _scope

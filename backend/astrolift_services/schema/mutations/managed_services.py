@@ -15,9 +15,11 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
+from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp, Workload
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     ManagedService,
     ManagedServiceAttachment,
@@ -48,6 +50,7 @@ from astrolift_services.schema.types import (
     managed_service_attachment_to_type,
     managed_service_to_type,
 )
+from astrolift_services.scopes import managed_service_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
@@ -231,7 +234,7 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.provision")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(Permission.PROJECT_UPDATE, scope=project_scope_by_guid("input.project_id"))
     @tenant_scoped()
     def provision_project_managed_service(
         self,
@@ -390,7 +393,9 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.attach")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(
+        Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+    )
     @tenant_scoped()
     def attach_project_managed_service(
         self,
@@ -493,7 +498,7 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.update")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.id"))
     @tenant_scoped()
     def update_project_managed_service(
         self,
@@ -569,7 +574,9 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.reprovision")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(
+        Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+    )
     @tenant_scoped()
     def reprovision_project_managed_service(
         self,
@@ -595,7 +602,7 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="project.managed_service.deprovision")
     @requires_elevation(action_label="project.managed_service.deprovision")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.id"))
     @tenant_scoped()
     def deprovision_project_managed_service(
         self,
@@ -617,7 +624,7 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.provision")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def provision_managed_service(
         self,
@@ -731,7 +738,7 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.update")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.id"))
     @tenant_scoped()
     def update_managed_service(
         self,
@@ -822,7 +829,9 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.reprovision")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+    )
     @tenant_scoped()
     def reprovision_managed_service(
         self,
@@ -904,7 +913,7 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.deprovision")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.id"))
     @tenant_scoped()
     def deprovision_managed_service(
         self,
@@ -984,7 +993,7 @@ class ManagedServiceMutations:
         ),
     )
     @requires_elevation(action_label="managed_service.resource.adopt")
-    @require_permission(Permission.MANAGED_SERVICE_ADOPT)
+    @require_permission(Permission.MANAGED_SERVICE_ADOPT, scope=managed_service_scope_by_guid("input.id"))
     @tenant_scoped()
     def adopt_managed_resource(
         self,
@@ -1087,7 +1096,11 @@ class ManagedServiceMutations:
         ),
     )
     @requires_elevation(action_label="managed_service.connection.reveal")
-    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_READ,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def reveal_managed_service_connection(
         self,

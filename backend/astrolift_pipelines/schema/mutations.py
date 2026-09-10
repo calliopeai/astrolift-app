@@ -20,6 +20,7 @@ from astrolift_pipelines.schema.types import (
     pipeline_to_type,
     trigger_to_type,
 )
+from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_run_app_scope
 from astrolift_workflows.client import start_workflow
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
@@ -105,7 +106,7 @@ class PipelinesMutation:
         return gql_success(pipeline_to_type(pipeline))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("id"))
     @tenant_scoped()
     def update_pipeline(
         self, info: Info, id: GUID, input: UpdatePipelineInput
@@ -173,7 +174,7 @@ class PipelinesMutation:
         return gql_success(pipeline_to_type(pipeline))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("id"))
     @tenant_scoped()
     def delete_pipeline(self, info: Info, id: GUID) -> MutationResultType[PipelineType]:
         tenant = get_current_tenant()
@@ -201,7 +202,7 @@ class PipelinesMutation:
         return gql_success(snapshot)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("input.pipeline_id"))
     @tenant_scoped()
     def create_trigger(self, info: Info, input: CreateTriggerInput) -> MutationResultType[TriggerType]:
         kind = (input.kind or "").strip().lower()
@@ -248,7 +249,7 @@ class PipelinesMutation:
         return gql_success(trigger_to_type(trigger))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("pipeline_id"))
     @tenant_scoped()
     def trigger_pipeline_run(
         self,
@@ -325,7 +326,7 @@ class PipelinesMutation:
         return gql_success(pipeline_run_to_type(run))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_run_app_scope("run_id"))
     @tenant_scoped()
     def cancel_pipeline_run(self, info: Info, run_id: GUID) -> MutationResultType[PipelineRunType]:
         """Send a cancel signal to the running PipelineRunWorkflow (#68, #75).

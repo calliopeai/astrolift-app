@@ -60,6 +60,7 @@ from astrolift_operations.schema.types import (
     webhook_to_type,
     workflow_run_to_type,
 )
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -274,7 +275,7 @@ def _alert_events_qs(
 @strawberry.type
 class OperationsQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_uptime(
         self,
@@ -1151,7 +1152,7 @@ class OperationsQuery:
         return page.map(alert_rule_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_METRICS)
+    @require_permission(Permission.APP_READ_METRICS, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_metrics(
         self,
