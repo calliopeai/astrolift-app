@@ -79,23 +79,50 @@ def resolve_managed_domain(
 
     Resolution order:
     1. ``organization.default_managed_domain`` when set and not deleted.
-    2. A platform-level domain (``organization=None``) whose
+    2. An **org-scoped** domain belonging to ``organization`` whose
        ``default_for`` covers the requested use-case.
-    3. ``None`` — no managed domain; the env gets no platform hostname.
+    3. A platform-level domain (``organization=None``) whose
+       ``default_for`` covers the requested use-case.
+    4. ``None`` — no managed domain; the env gets no platform hostname.
+
+    Step 2 is the one that makes the supported path work (#1714).
+    ``createManagedDomain`` defaults to ``organizationScoped=true``, and
+    nothing anywhere writes ``organization.default_managed_domain`` — no
+    mutation, no command — so before this an operator who registered a
+    zone through the UI got a row that was accepted, listed, and matched
+    by nothing, and their apps still came up with no hostname. That is the
+    same defect #1689 fixed for ``default_for``, one level down.
+
+    An org's own domain outranks the platform default: an install that
+    offers a shared zone should not override the zone an org registered
+    for itself.
 
     ``for_preview=True`` matches ``preview_envs`` and ``both``;
     ``for_preview=False`` (default) matches ``tenant_apps`` and ``both``.
     """
-    if organization is not None:
-        org_default = getattr(organization, "default_managed_domain", None)
-        if org_default is not None and getattr(org_default, "deleted_at", None) is None:
-            return org_default  # type: ignore[return-value]
-
     target_values = (
         [ManagedDomain.DefaultFor.PREVIEW_ENVS, ManagedDomain.DefaultFor.BOTH]
         if for_preview
         else [ManagedDomain.DefaultFor.TENANT_APPS, ManagedDomain.DefaultFor.BOTH]
     )
+    if organization is not None:
+        org_default = getattr(organization, "default_managed_domain", None)
+        if org_default is not None and getattr(org_default, "deleted_at", None) is None:
+            return org_default  # type: ignore[return-value]
+        org_pk = getattr(organization, "pk", None)
+        if org_pk is not None:
+            own = (
+                ManagedDomain.objects.filter(
+                    organization_id=org_pk,
+                    default_for__in=target_values,
+                    deleted_at__isnull=True,
+                )
+                .order_by("pk")
+                .first()
+            )
+            if own is not None:
+                return own
+
     return (
         ManagedDomain.objects.filter(
             organization__isnull=True,
