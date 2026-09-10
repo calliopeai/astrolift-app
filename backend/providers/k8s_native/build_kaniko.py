@@ -29,6 +29,7 @@ reusing the existing ``list_tags`` surface).
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -114,6 +115,45 @@ def render_build_service_account(*, name: str, namespace: str, role_arn: str) ->
     }
 
 
+def git_secret_name(job_name: str) -> str:
+    """Name of the per-build Secret carrying the clone credential."""
+
+    return f"{job_name}-git"[:253]
+
+
+def render_git_credentials_secret(
+    *,
+    name: str,
+    namespace: str,
+    username: str,
+    password: str,
+) -> dict[str, Any]:
+    """Secret holding the git clone credential for a private source repo.
+
+    kaniko's git build context reads ``GIT_USERNAME`` / ``GIT_PASSWORD``
+    and turns them into HTTP basic auth (``pkg/buildcontext/git.go``),
+    which is the form GitHub documents for an App installation token:
+    ``x-access-token`` as the user, the token as the password. A PAT
+    works through the same pair.
+
+    A Secret rather than the clone URL because the URL is rendered into
+    the Job's ``args``, logged by the activity, and readable by anyone
+    who can get the Job -- a credential does not belong in any of those.
+    """
+
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {"astrolift.io/managed-by": "platform", "astrolift.io/component": "build"},
+        },
+        "type": "Opaque",
+        "stringData": {"GIT_USERNAME": username, "GIT_PASSWORD": password},
+    }
+
+
 def render_kaniko_job(
     *,
     job_name: str,
@@ -125,6 +165,7 @@ def render_kaniko_job(
     context_sub_path: str = "",
     build_args: dict[str, str] | None = None,
     image: str = KANIKO_IMAGE,
+    git_secret: str = "",
 ) -> dict[str, Any]:
     """Render the one-shot kaniko build Job.
 
@@ -185,6 +226,10 @@ def render_kaniko_job(
                             "image": image,
                             "args": args,
                             "resources": _BUILD_RESOURCES,
+                            # Clone credential by reference only -- never
+                            # in args, which are logged and readable off
+                            # the Job (#1685).
+                            **({"envFrom": [{"secretRef": {"name": git_secret}}]} if git_secret else {}),
                         }
                     ],
                 },
@@ -219,6 +264,8 @@ class KanikoBuildDriver:
         namespace: str = BUILD_NAMESPACE,
         build_id: str = "",
         image: str = KANIKO_IMAGE,
+        git_username: str = "",
+        git_password: str = "",
         poll_interval_seconds: float = 10.0,
         timeout_seconds: float = 1800.0,
         sleep: Any = time.sleep,
@@ -231,6 +278,8 @@ class KanikoBuildDriver:
         self._namespace = namespace
         self._build_id = build_id
         self._image = image
+        self._git_username = git_username
+        self._git_password = git_password
         self._poll = poll_interval_seconds
         self._timeout = timeout_seconds
         self._sleep = sleep
@@ -240,12 +289,26 @@ class KanikoBuildDriver:
     def build(self, spec: BuildSpec, repo: str, tag: str) -> BuildResult:
         destination = f"{repo}:{tag}"
         job_name = _job_name(self._build_id or f"{repo}-{tag}")
+        # A private repo needs a clone credential; a public one must not
+        # get a Secret it does not use (#1685).
+        secret_name = git_secret_name(job_name) if self._git_password else ""
         manifests = [
             render_build_service_account(
                 name=self._service_account,
                 namespace=self._namespace,
                 role_arn=self._sa_role_arn,
             ),
+        ]
+        if secret_name:
+            manifests.append(
+                render_git_credentials_secret(
+                    name=secret_name,
+                    namespace=self._namespace,
+                    username=self._git_username or "x-access-token",
+                    password=self._git_password,
+                )
+            )
+        manifests.append(
             render_kaniko_job(
                 job_name=job_name,
                 namespace=self._namespace,
@@ -256,29 +319,53 @@ class KanikoBuildDriver:
                 context_sub_path=spec.context_path or "",
                 build_args=dict(spec.build_args or {}),
                 image=self._image,
-            ),
-        ]
+                git_secret=secret_name,
+            )
+        )
 
         started = self._clock()
-        apply_result = self._cluster_driver.apply_manifests(self._cluster_slug, self._namespace, manifests)
-        if not getattr(apply_result, "ok", False):
-            errors = apply_result.summary() if hasattr(apply_result, "summary") else ["apply failed"]
+        try:
+            apply_result = self._cluster_driver.apply_manifests(self._cluster_slug, self._namespace, manifests)
+            if not getattr(apply_result, "ok", False):
+                errors = apply_result.summary() if hasattr(apply_result, "summary") else ["apply failed"]
+                return BuildResult(
+                    success=False,
+                    image_uri=destination,
+                    digest="",
+                    duration_seconds=self._clock() - started,
+                    errors=[str(e) for e in errors],
+                )
+
+            outcome = self._poll_to_completion(job_name, started)
             return BuildResult(
-                success=False,
+                success=outcome["success"],
                 image_uri=destination,
                 digest="",
                 duration_seconds=self._clock() - started,
-                errors=[str(e) for e in errors],
+                errors=outcome["errors"],
             )
+        finally:
+            # The Job self-deletes on its TTL; the Secret would outlive
+            # it, so a short-lived credential would sit in the namespace
+            # indefinitely. Removed on every exit, success or not.
+            self._delete_git_secret(secret_name)
 
-        outcome = self._poll_to_completion(job_name, started)
-        return BuildResult(
-            success=outcome["success"],
-            image_uri=destination,
-            digest="",
-            duration_seconds=self._clock() - started,
-            errors=outcome["errors"],
-        )
+    def _delete_git_secret(self, secret_name: str) -> None:
+        if not secret_name:
+            return
+        ref = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {"name": secret_name, "namespace": self._namespace},
+        }
+        try:
+            self._cluster_driver.delete_manifests(self._cluster_slug, self._namespace, [ref])
+        except Exception:
+            # Cleanup must never mask the build's own outcome. The Secret
+            # holds a short-lived token that expires on its own.
+            logging.getLogger(__name__).warning(
+                "could not delete build git credential secret %s", secret_name, exc_info=True
+            )
 
     def cancel(self, build_id: str) -> None:
         job_name = _job_name(build_id)

@@ -263,6 +263,7 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
 
     from providers.k8s_native.build_kaniko import KanikoBuildDriver  # noqa: PLC0415
 
+    git_username, git_password = _clone_credential(app)
     driver = KanikoBuildDriver(
         cluster_driver=cluster_driver,
         cluster_slug=ctx.slug,
@@ -270,6 +271,8 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
         service_account_role_arn=role_arn,
         namespace=_BUILD_NAMESPACE,
         build_id=f"{deployment_pk}-{(commit_sha or image_tag)}",
+        git_username=git_username,
+        git_password=git_password,
     )
     return _PreparedBuild(
         driver=driver,
@@ -352,6 +355,51 @@ def _record_build_outcome(deployment, *, image_tag: str, digest: str) -> None:
     if fields:
         fields += ["updated_at", "version"]
         deployment.save(update_fields=fields)
+
+
+def _clone_credential(app) -> tuple[str, str]:
+    """A (username, password) pair the builder can clone ``app``'s repo with.
+
+    The build pod got a bare clone URL and no credential, so on any
+    private repo kaniko could not clone and the pod died immediately
+    (#1685) -- reported as "Job has reached the specified backoff limit"
+    and nothing more. The install already holds a GitHub App that can
+    mint an installation token with ``contents: read``; the build path
+    simply never asked for one.
+
+    ``x-access-token`` is the username GitHub documents for an
+    installation token, and works for a PAT through the same basic-auth
+    pair. Returns empty strings when there is nothing to mint from -- a
+    public repo clones anonymously exactly as before, and a private one
+    fails with the clone error in its logs rather than a credential the
+    platform guessed at.
+    """
+
+    if not (app.source_repo or "").strip():
+        return "", ""
+    if (app.source_kind or "") != "github":
+        # Only the GitHub token path is wired; other hosts keep the
+        # anonymous clone until their provider grows the same surface.
+        return "", ""
+    try:
+        # The same picker the manifest fetch uses -- reading this app's
+        # repo is the operation, and it already prefers the org App over
+        # an OAuth user or a PAT.
+        from astrolift_registry.services.manifest_sync import _pick_source_connection
+        from astrolift_scm.providers.github import _token as github_token
+
+        connection = _pick_source_connection(app)
+        if connection is None:
+            return "", ""
+        token = github_token(connection)
+    except Exception:
+        log.warning(
+            "build_image: could not mint a clone credential for app=%s — " "the build will clone anonymously",
+            app.slug,
+            exc_info=True,
+        )
+        return "", ""
+    return ("x-access-token", token) if token else ("", "")
 
 
 def _record_build_failure(deployment, detail: str) -> None:

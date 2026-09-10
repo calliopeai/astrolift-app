@@ -428,3 +428,81 @@ def test_the_activity_and_the_builder_agree_on_the_answer(monkeypatch):
 
 def test_fetch_app_build_strategy_returns_off_for_missing_app():
     assert _fetch_app_build_strategy_sync(999_999_999) == "off"
+
+
+# --- clone credential for a private repo (#1685) ----------------------
+#
+# The build pod got a bare clone URL and no credential, so kaniko could
+# not clone any private repo and the pod died immediately. The install
+# already holds a GitHub App that can mint an installation token; the
+# build path simply never asked for one.
+
+
+def _connection(app, kind="github_app_install"):
+    from astrolift_scm.models import SourceConnection
+    from core.secrets import encrypt_at_rest
+
+    encrypted = encrypt_at_rest(b"pem-or-pat")
+    return SourceConnection.objects.create(
+        organization=app.organization,
+        kind=kind,
+        account_login="acme",
+        installation_id="987" if kind == "github_app_install" else "",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+
+def test_the_clone_credential_is_the_github_documented_pair(monkeypatch):
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    _connection(app)
+    monkeypatch.setattr("astrolift_scm.providers.github._token", lambda _c: "ghs_minted")
+
+    assert build_image_mod._clone_credential(app) == ("x-access-token", "ghs_minted")
+
+
+def test_no_connection_means_an_anonymous_clone(monkeypatch):
+    """A public repo must keep cloning exactly as it did."""
+
+    deployment = _make_deployment()
+    assert build_image_mod._clone_credential(deployment.registered_app) == ("", "")
+
+
+def test_a_token_that_cannot_be_minted_does_not_fail_the_build(monkeypatch):
+    """Better a clone error in the pod logs than a build that never
+    starts because the credential lookup raised."""
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    _connection(app)
+
+    def _boom(_c):
+        raise RuntimeError("app not installed on this repo")
+
+    monkeypatch.setattr("astrolift_scm.providers.github._token", _boom)
+
+    assert build_image_mod._clone_credential(app) == ("", "")
+
+
+def test_an_app_with_no_source_repo_needs_no_credential():
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.source_repo = ""
+    app.save(update_fields=["source_repo"])
+
+    assert build_image_mod._clone_credential(app) == ("", "")
+
+
+def test_a_non_github_host_keeps_the_anonymous_clone(monkeypatch):
+    """Only the GitHub token path is wired; guessing at another host's
+    credential shape would be worse than the clone error."""
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.source_kind = "gitlab"
+    app.save(update_fields=["source_kind"])
+    _connection(app, kind="gitlab_pat")
+
+    assert build_image_mod._clone_credential(app) == ("", "")

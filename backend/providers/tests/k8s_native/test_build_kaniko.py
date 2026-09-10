@@ -321,3 +321,87 @@ def test_a_successful_build_reads_no_logs():
 
     assert result.success is True
     assert cluster.log_calls == []
+
+
+# --------------------------------------------------------------------------
+# Private-repo clone credential (#1685)
+# --------------------------------------------------------------------------
+#
+# The build pod got a bare clone URL and no credential, so any private
+# repo failed to clone and the pod died immediately. kaniko's git build
+# context reads GIT_USERNAME / GIT_PASSWORD and turns them into HTTP
+# basic auth, so the credential rides a Secret -- never the args, which
+# are logged and readable off the Job.
+
+
+def _job_of(cluster):
+    [(_c, _ns, manifests)] = cluster.applied
+    return next(m for m in manifests if m["kind"] == "Job")
+
+
+def _secrets_of(cluster):
+    [(_c, _ns, manifests)] = cluster.applied
+    return [m for m in manifests if m["kind"] == "Secret"]
+
+
+def test_a_credential_rides_a_secret_not_the_args():
+    cluster = FakeClusterDriver(statuses=[_status([{"type": "Complete", "status": "True"}])])
+    _driver(cluster, git_username="x-access-token", git_password="ghs_secret").build(_SPEC, "repo", "t")
+
+    [secret] = _secrets_of(cluster)
+    assert secret["stringData"] == {"GIT_USERNAME": "x-access-token", "GIT_PASSWORD": "ghs_secret"}
+
+    job = _job_of(cluster)
+    container = job["spec"]["template"]["spec"]["containers"][0]
+    assert container["envFrom"] == [{"secretRef": {"name": secret["metadata"]["name"]}}]
+    # The token appears nowhere a log line or a `kubectl get job` would show it.
+    assert not any("ghs_secret" in a for a in container["args"])
+    assert "ghs_secret" not in str(job)
+
+
+def test_a_public_repo_gets_no_secret_and_no_envfrom():
+    cluster = FakeClusterDriver(statuses=[_status([{"type": "Complete", "status": "True"}])])
+    _driver(cluster).build(_SPEC, "repo", "t")
+
+    assert _secrets_of(cluster) == []
+    assert "envFrom" not in _job_of(cluster)["spec"]["template"]["spec"]["containers"][0]
+
+
+def test_the_secret_is_deleted_after_the_build():
+    cluster = FakeClusterDriver(statuses=[_status([{"type": "Complete", "status": "True"}])])
+    _driver(cluster, git_password="ghs_secret").build(_SPEC, "repo", "t")
+
+    [(_c, _ns, deleted)] = cluster.deleted
+    assert deleted[0]["kind"] == "Secret"
+    assert deleted[0]["metadata"]["name"] == _secrets_of(cluster)[0]["metadata"]["name"]
+
+
+def test_the_secret_is_deleted_after_a_failed_build_too():
+    """The Job self-deletes on its TTL; the Secret would otherwise
+    outlive it, leaving a credential in the namespace."""
+
+    cluster = FakeClusterDriver(
+        statuses=[_status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}])]
+    )
+    result = _driver(cluster, git_password="ghs_secret").build(_SPEC, "repo", "t")
+
+    assert result.success is False
+    assert cluster.deleted and cluster.deleted[0][2][0]["kind"] == "Secret"
+
+
+def test_a_cleanup_failure_does_not_mask_the_build_outcome():
+    class UndeletableCluster(FakeClusterDriver):
+        def delete_manifests(self, cluster, namespace, manifests):
+            raise RuntimeError("forbidden")
+
+    cluster = UndeletableCluster(statuses=[_status([{"type": "Complete", "status": "True"}])])
+    result = _driver(cluster, git_password="ghs_secret").build(_SPEC, "repo", "t")
+
+    assert result.success is True
+
+
+def test_the_username_defaults_to_the_github_documented_one():
+    cluster = FakeClusterDriver(statuses=[_status([{"type": "Complete", "status": "True"}])])
+    _driver(cluster, git_password="ghs_secret").build(_SPEC, "repo", "t")
+
+    assert _secrets_of(cluster)[0]["stringData"]["GIT_USERNAME"] == "x-access-token"
