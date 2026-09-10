@@ -1683,6 +1683,7 @@ export type AstroliftDeployment = {
   approvedBy: Array<AstroliftDeploymentApprover>;
   awaitingApprovers: Array<AstroliftDeploymentApprover>;
   branch: Scalars['String']['output'];
+  buildError: Scalars['String']['output'];
   ciActorKind: Scalars['String']['output'];
   ciProvider: Scalars['String']['output'];
   ciRunUrl: Scalars['String']['output'];
