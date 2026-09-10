@@ -119,7 +119,20 @@ class Command(BaseCommand):
                     "name": org_name or org.title(),
                     # Use the provided website, or leave blank — never store a
                     # placeholder like https://{org}.example that leaks into UI.
-                    "website": org_website or None,
+                    #
+                    # Blank is "", not None. Organization.website is
+                    # `URLField(blank=True, default="")`, which is NOT NULL at
+                    # the database: blank means an empty string, and only the
+                    # form layer reads `blank`. Passing None sent an INSERT with
+                    # a null and Postgres refused it --
+                    # `NotNullViolation: null value in column "website"` -- so
+                    # bootstrap_admin could not create an Organization on a
+                    # fresh database at all. bootstrap_idp runs next and binds
+                    # the IdP to that org, so it failed too ("organization with
+                    # slug=... does not exist"), and the install came up with
+                    # active_idp.json answering {"kind": "local"} however
+                    # completely its identity variables were set.
+                    "website": org_website or "",
                 },
             )
             update_fields: list[str] = []
