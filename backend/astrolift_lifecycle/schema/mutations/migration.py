@@ -27,6 +27,7 @@ from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
     app_env_to_type,
 )
+from astrolift_lifecycle.scopes import environment_app_scope
 from astrolift_workflows.client import (
     start_workflow,
 )
@@ -45,7 +46,7 @@ class MigrationMutations:
 
     @strawberry.field
     @mutation_audit(action="app.migrate_to_cluster")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.app_environment_id"))
     @tenant_scoped()
     def migrate_app_to_cluster(
         self, info: Info, input: MigrateAppInputGql

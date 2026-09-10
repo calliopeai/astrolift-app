@@ -30,6 +30,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     _WorkloadOpPayload,
 )
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -40,7 +41,7 @@ from core.tenancy import get_current_tenant
 class AppOpsMutations:
     @strawberry.field
     @mutation_audit(action="app.ci.dispatch")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def trigger_astrolift_deploy_workflow(
         self,
@@ -137,7 +138,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.workload.restart")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_workload_guid("input.workload_id"))
     @tenant_scoped()
     def restart_astrolift_workload(
         self,
@@ -190,7 +191,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.workload.scale")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_workload_guid("input.workload_id"))
     @tenant_scoped()
     def scale_astrolift_workload(
         self,
@@ -252,7 +253,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.install_webhook")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def install_astrolift_source_webhook(
         self,
@@ -351,7 +352,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.push_secrets")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def push_astrolift_ci_secrets_to_repo(
         self,
@@ -436,7 +437,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.validate_secrets")
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def validate_astrolift_ci_secrets(
         self,
@@ -511,7 +512,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.push_workflow")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def push_astrolift_ci_workflow_to_repo(
         self,
@@ -588,7 +589,7 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.retry_autowire")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def retry_astrolift_autowire(
         self,

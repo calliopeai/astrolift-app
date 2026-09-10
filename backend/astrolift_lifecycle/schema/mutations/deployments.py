@@ -61,7 +61,9 @@ from astrolift_lifecycle.schema.types import (
     DeploymentType,
     deployment_to_type,
 )
+from astrolift_lifecycle.scopes import deployment_app_scope
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.capability_projection import check_promotion
 from astrolift_workflows.client import (
     signal_workflow,
@@ -85,7 +87,7 @@ class DeploymentMutations:
         action="deployment.start",
         extras=lambda result: _start_extras(result),
     )
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
         if _deploy_pipeline_disabled():
@@ -262,7 +264,7 @@ class DeploymentMutations:
         action="deployment.approve",
         target=_deployment_target_from_input,
     )
-    @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @require_permission(Permission.APP_APPROVE_DEPLOY, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def approve_deployment(
         self, info: Info, input: DeploymentByIdInput
@@ -321,7 +323,7 @@ class DeploymentMutations:
         target=_deployment_target_from_input,
         extras=lambda result: _abort_extras(result),
     )
-    @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @require_permission(Permission.APP_APPROVE_DEPLOY, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def reject_deployment(
         self, info: Info, input: AbortDeploymentInput
@@ -581,7 +583,7 @@ class DeploymentMutations:
         target=_deployment_target_from_input,
         extras=lambda result: _abort_extras(result),
     )
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def abort_deployment(self, info: Info, input: AbortDeploymentInput) -> MutationResultType[DeploymentType]:
         """Abort an in-flight deploy.
@@ -660,7 +662,7 @@ class DeploymentMutations:
         action="deployment.delete",
         target=_deployment_target_from_input,
     )
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def delete_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         """Dismiss / delete a deployment the operator is done with.
@@ -722,7 +724,7 @@ class DeploymentMutations:
 
     @strawberry.field
     @mutation_audit(action="deployment.rollback")
-    @require_permission(Permission.APP_ROLLBACK)
+    @require_permission(Permission.APP_ROLLBACK, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def rollback_deployment(
         self, info: Info, input: DeploymentByIdInput
@@ -805,7 +807,7 @@ class DeploymentMutations:
 
     @strawberry.field
     @mutation_audit(action="deployment.redeploy")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=deployment_app_scope("input.id"))
     @tenant_scoped()
     def redeploy_app(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         # Org-scope the by-guid lookup to the caller's tenant before the
@@ -879,7 +881,7 @@ class DeploymentMutations:
 
     @strawberry.field
     @mutation_audit(action="deployment.promote")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def promote_deployment(
         self, info: Info, input: PromoteDeploymentInput

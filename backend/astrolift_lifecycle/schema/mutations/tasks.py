@@ -20,6 +20,7 @@ from astrolift_lifecycle.schema.types import (
     task_run_to_payload,
 )
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -34,7 +35,7 @@ class TaskMutations:
 
     @strawberry.field
     @mutation_audit(action="task.run")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def run_task(
         self,

@@ -19,7 +19,9 @@ from astrolift_lifecycle.schema.mutations.types import (
     RevokeAppCertificateInput,
     _CapabilityDeprovisionPayload,
 )
+from astrolift_lifecycle.scopes import custom_domain_app_scope
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -32,7 +34,7 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.dns_record.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def delete_app_dns_record(
         self,
@@ -86,7 +88,7 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.certificate.revoke")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=custom_domain_app_scope("input.custom_domain_id"))
     @tenant_scoped()
     def revoke_app_certificate(
         self,
@@ -141,7 +143,7 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.identity_role.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def delete_app_identity_role(
         self,
@@ -183,7 +185,7 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.registry_repo.archive")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def archive_app_registry_repo(
         self,
@@ -230,7 +232,7 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ingress.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
     @tenant_scoped()
     def delete_app_ingress(
         self,

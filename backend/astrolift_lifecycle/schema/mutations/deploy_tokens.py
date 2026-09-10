@@ -24,7 +24,9 @@ from astrolift_lifecycle.schema.mutations.types import (
 from astrolift_lifecycle.schema.types import (
     deploy_token_to_type,
 )
+from astrolift_lifecycle.scopes import deploy_token_app_scope
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -37,7 +39,7 @@ class DeployTokenMutations:
 
     @strawberry.field
     @mutation_audit(action="app.deploy_token.create")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def create_deploy_token(
         self,
@@ -97,7 +99,7 @@ class DeployTokenMutations:
     @strawberry.field
     @mutation_audit(action="app.deploy_token.rotate")
     @requires_elevation(action_label="app.deploy_token.rotate")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id"))
     @tenant_scoped()
     def rotate_deploy_token(
         self,
@@ -167,7 +169,7 @@ class DeployTokenMutations:
     @strawberry.field
     @mutation_audit(action="app.deploy_token.revoke")
     @requires_elevation(action_label="app.deploy_token.revoke")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id"))
     @tenant_scoped()
     def revoke_deploy_token(
         self,

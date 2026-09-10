@@ -36,7 +36,9 @@ from astrolift_lifecycle.schema.types import (
     deployment_to_type,
     preview_to_type,
 )
+from astrolift_lifecycle.scopes import preview_environment_app_scope
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_workflows.client import (
     start_workflow,
 )
@@ -91,7 +93,7 @@ def _pinning_user(info: Info):
 class PreviewMutations:
     @strawberry.field
     @mutation_audit(action="preview.tear_down")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
     @tenant_scoped()
     def tear_down_preview(
         self, info: Info, input: TearDownPreviewInputGql
@@ -152,7 +154,7 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.extend_ttl")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
     @tenant_scoped()
     def extend_preview_ttl(
         self, info: Info, input: ExtendPreviewTtlInputGql
@@ -212,7 +214,7 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.set_pinned", target=_set_preview_pinned_target)
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
     @tenant_scoped()
     def set_preview_pinned(
         self, info: Info, input: SetPreviewPinnedInput
@@ -276,7 +278,7 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.create_manual")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def create_preview_environment(
         self,
