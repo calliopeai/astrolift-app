@@ -61,6 +61,69 @@ _VALID_WORKLOAD_KINDS = {
 }
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
+
+# Mirrors ``astrolift_registry.models.Workload.RunMode`` (#1680). Kept as a
+# literal rather than imported so this parser stays free of Django models --
+# ``test_run_mode_matches_the_model`` asserts the two agree.
+_VALID_RUN_MODES = {"once", "loop", "schedule", "trigger", "persistent"}
+
+# Every key ``_parse_workload`` reads. Unknown keys are refused rather than
+# dropped (#1680): the sibling ``_parse_managed_service`` has always been
+# strict, and the asymmetry is what let a manifest declare ``run_mode`` --
+# a field that did not exist -- and parse clean, so the operator learned
+# nothing until the workload did not behave. A manifest is a contract.
+_WORKLOAD_KEYS = frozenset(
+    {
+        "concurrency",
+        "concurrency_policy",
+        "containers",
+        "cpu_limit",
+        "cpu_request",
+        "faas_architecture",
+        "faas_build_command",
+        "faas_handler",
+        "faas_memory_mb",
+        "faas_output_dir",
+        "faas_package_type",
+        "faas_public",
+        "faas_runtime",
+        "faas_timeout_seconds",
+        "fs_group",
+        "hpa_max",
+        "hpa_min",
+        "hpa_target_cpu_pct",
+        "is_public",
+        "kind",
+        "max_concurrent_activities",
+        "max_concurrent_workflows",
+        "max_retries",
+        "max_scale",
+        "memory_limit",
+        "memory_request",
+        "metrics",
+        "min_scale",
+        "name",
+        "replicas",
+        "result_ttl_hours",
+        "run_cron_expression",
+        "run_family",
+        "run_mode",
+        "schedule",
+        "security",
+        "static_build_command",
+        "static_index",
+        "static_output_dir",
+        "static_spa",
+        "storage_class",
+        "storage_size",
+        "task_queue",
+        "temporal_namespace",
+        "timeout_seconds",
+        "tool_timeout_seconds",
+        "volumes",
+        "workflow_type",
+    }
+)
 _VALID_AGENT_RUN_FAMILY = {"task", "service"}
 
 
@@ -356,6 +419,12 @@ def _parse_local_skill_table(entry: dict, entry_path: str) -> SkillRef:
 
 
 def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
+    unknown = sorted(set(d) - _WORKLOAD_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown workload field(s): {', '.join(unknown)}",
+            path=path,
+        )
     kind = _require_str(d, "kind", f"{path}.kind")
     if kind not in _VALID_WORKLOAD_KINDS:
         raise ManifestError(
@@ -435,6 +504,46 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
             f"agent run_family must be one of {sorted(_VALID_AGENT_RUN_FAMILY)}, got {run_family!r}",
             path=f"{path}.run_family",
         )
+
+    # Agent trigger mode (#1680), bound to kind the way `schedule` is bound
+    # to cronjob: declaring it on a workload that can never dispatch is a
+    # mistake worth naming, not a value to carry.
+    run_mode = str(d.get("run_mode", "") or "").strip().lower()
+    run_cron_expression = str(d.get("run_cron_expression", "") or "").strip()
+    if run_mode or run_cron_expression:
+        if kind != "agent":
+            raise ManifestError(
+                "run_mode / run_cron_expression apply to agent workloads only, " f"got kind={kind!r}",
+                path=f"{path}.run_mode",
+            )
+        if run_mode and run_mode not in _VALID_RUN_MODES:
+            raise ManifestError(
+                f"run_mode must be one of {sorted(_VALID_RUN_MODES)}, got {run_mode!r}",
+                path=f"{path}.run_mode",
+            )
+    if run_mode == "schedule" and not run_cron_expression:
+        raise ManifestError(
+            "run_mode = \"schedule\" requires a 'run_cron_expression'",
+            path=f"{path}.run_cron_expression",
+        )
+    if run_cron_expression and run_mode not in ("", "schedule"):
+        raise ManifestError(
+            f'run_cron_expression is only read for run_mode = "schedule", got {run_mode!r}',
+            path=f"{path}.run_cron_expression",
+        )
+    if run_cron_expression:
+        # The platform's own validator, so a manifest cannot declare a
+        # schedule the scheduler will later refuse. Pure-python and
+        # model-free, so importing it keeps this parser Django-free.
+        from astrolift_registry.cron import CronValidationError, validate_cron_expression
+
+        try:
+            run_cron_expression = validate_cron_expression(run_cron_expression)
+        except CronValidationError as exc:
+            raise ManifestError(
+                f"run_cron_expression is not a valid cron expression: {exc}",
+                path=f"{path}.run_cron_expression",
+            ) from exc
 
     # Static-site (#1010). A static_site serves built assets from object
     # storage + a CDN — it has no container/pod, so declaring containers is
@@ -537,6 +646,8 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         tool_timeout_seconds=int(d.get("tool_timeout_seconds", 300)),
         result_ttl_hours=int(d.get("result_ttl_hours", 72)),
         run_family=run_family,
+        run_mode=run_mode,
+        run_cron_expression=run_cron_expression,
         # Temporal worker config (#796). Required pair validated above for
         # ``kind == "workflow"``; other kinds carry the empty/default
         # values and ignore them. Read unconditionally so a manifest that
@@ -571,7 +682,41 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     )
 
 
+# Every key ``_parse_container`` reads. Strict for the same reason
+# ``_WORKLOAD_KEYS`` is (#1680) -- a container block that silently drops
+# what it does not recognise teaches the operator nothing until the pod
+# runs without it.
+_CONTAINER_KEYS = frozenset(
+    {
+        "args",
+        "build_context",
+        "command",
+        "concurrency_policy",
+        "cpu_limit",
+        "cpu_request",
+        "dockerfile",
+        "dockerfile_path",
+        "env",
+        "healthcheck",
+        "image_ref",
+        "is_primary",
+        "memory_limit",
+        "memory_request",
+        "name",
+        "port",
+        "schedule",
+    }
+)
+
+
 def _parse_container(d: dict[str, Any], path: str) -> ContainerManifest:
+    unknown = sorted(set(d) - _CONTAINER_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown container field(s): {', '.join(unknown)}",
+            path=path,
+        )
+
     name = _require_str(d, "name", f"{path}.name")
     healthcheck = d.get("healthcheck", {}) or {}
     hk = str(healthcheck.get("kind", "none"))

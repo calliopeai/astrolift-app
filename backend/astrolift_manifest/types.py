@@ -78,6 +78,22 @@ class WorkloadManifest:
     # ``service``-family agent is a long-running Deployment (+Service/HPA).
     # Only meaningful when ``kind == "agent"``.
     run_family: str = "task"
+    # Agent trigger mode (#1680). Mirrors ``astrolift_registry`` RunMode:
+    # ``once`` (dispatched on demand), ``loop``, ``schedule`` (with
+    # ``run_cron_expression``), ``trigger`` (fired by a webhook or a
+    # workflow stage) and ``persistent``. Only meaningful when
+    # ``kind == "agent"``.
+    #
+    # The model has had these since #795; the manifest had neither, so an
+    # agent's trigger mode could be set only through the registration API
+    # and never declared in the repo that defines the agent -- which is
+    # the reverse of what spec 42 §5 specifies, and left the declarative
+    # path stopping short of a feature the platform already supports.
+    #
+    # Empty means "not declared", which the registration path reads as
+    # "leave whatever the model default or an operator already set".
+    run_mode: str = ""
+    run_cron_expression: str = ""
     # Temporal worker config (#796). Only meaningful when
     # ``kind == "workflow"`` — the renderer stamps a
     # ``astrolift.dev/workload-kind: workflow`` pod annotation and injects
