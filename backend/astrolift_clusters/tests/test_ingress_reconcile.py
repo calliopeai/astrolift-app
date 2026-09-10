@@ -149,8 +149,8 @@ def _bind_env(app: RegisteredApp, cluster: TenantCluster, *, domain: ManagedDoma
 
 
 class _FakeIngressItem:
-    def __init__(self, name: str) -> None:
-        self.metadata = SimpleNamespace(name=name)
+    def __init__(self, name: str, annotations: dict[str, str] | None = None) -> None:
+        self.metadata = SimpleNamespace(name=name, annotations=dict(annotations or {}))
 
 
 class _FakeListing:
@@ -181,7 +181,7 @@ class _RecordingK8sClient:
         if self._list_raises is not None:
             raise self._list_raises
         names = self.ingresses_by_ns.get(namespace, [])
-        return _FakeListing([_FakeIngressItem(n) for n in names])
+        return _FakeListing([n if isinstance(n, _FakeIngressItem) else _FakeIngressItem(n) for n in names])
 
     def merge_patch_ingress(self, *, namespace: str, name: str, patch: dict[str, Any]) -> dict[str, Any]:
         self.patch_calls.append({"namespace": namespace, "name": name, "patch": patch})
@@ -506,3 +506,123 @@ def test_mutation_happy_path_returns_reconciled_count(
     assert result.data.reconciled_count == 1
     assert result.data.skipped_count == 0
     assert result.data.errors == []
+
+
+# ---------------------------------------------------------------------
+# The snippet annotation is shared, not owned (#1726)
+# ---------------------------------------------------------------------
+#
+# `configuration-snippet` is a general nginx annotation. The first shape
+# of the gateway-secret feature patched the whole key, so a reconcile
+# deleted whatever the app had put there. On the SteadyMD install that
+# content derives the per-request identity headers one app's backend
+# requires; losing it makes the app refuse every request -- the exact
+# failure the gateway secret exists to let it avoid.
+
+_SNIPPET_KEY = "nginx.ingress.kubernetes.io/configuration-snippet"
+_APP_SNIPPET = 'proxy_set_header x-qsr-proxy-secret "app-owned";'
+
+
+def _nginx_cluster(cluster, **auth):
+    cluster.ingress_class = "nginx"
+    cluster.alb_auth_config = None
+    cluster.oidc_auth_config = {
+        "auth_proxy_host": "auth.example.com",
+        "discovery_url": "https://idp.example.com/.well-known/openid-configuration",
+        "client_id": "abc",
+        **auth,
+    }
+    cluster.save(update_fields=["ingress_class", "alb_auth_config", "oidc_auth_config"])
+    return cluster
+
+
+def test_reconcile_keeps_an_apps_own_snippet(org, team, cluster, domain, install_driver):
+    """The bug: this patch used to blow the app's line away."""
+
+    _nginx_cluster(cluster, gateway_secret="s3cret")
+    app = _make_app(org, team, "alpha")
+    _bind_env(app, cluster, domain=domain)
+
+    client = _RecordingK8sClient(
+        ingresses_by_ns={f"{org.slug}-alpha": [_FakeIngressItem("alpha-web", {_SNIPPET_KEY: _APP_SNIPPET})]}
+    )
+    install_driver(_RecordingDriver(client))
+
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 1
+    snippet = client.patch_calls[0]["patch"]["metadata"]["annotations"][_SNIPPET_KEY]
+    assert "x-qsr-proxy-secret" in snippet
+    assert "X-Astrolift-Gateway-Secret" in snippet
+
+
+def test_reconcile_with_auth_off_keeps_an_apps_own_snippet(org, team, cluster, domain, install_driver):
+    """Turning the gate off removes the platform's block, not the app's."""
+
+    cluster.ingress_class = "nginx"
+    cluster.alb_auth_config = None
+    cluster.oidc_auth_config = None
+    cluster.save(update_fields=["ingress_class", "alb_auth_config", "oidc_auth_config"])
+    app = _make_app(org, team, "alpha")
+    _bind_env(app, cluster, domain=domain)
+
+    client = _RecordingK8sClient(
+        ingresses_by_ns={f"{org.slug}-alpha": [_FakeIngressItem("alpha-web", {_SNIPPET_KEY: _APP_SNIPPET})]}
+    )
+    install_driver(_RecordingDriver(client))
+
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 1
+    annotations = client.patch_calls[0]["patch"]["metadata"]["annotations"]
+    assert annotations[_SNIPPET_KEY] is not None
+    assert "x-qsr-proxy-secret" in annotations[_SNIPPET_KEY]
+    # The auth keys still come off.
+    assert annotations["nginx.ingress.kubernetes.io/auth-url"] is None
+
+
+def test_reconcile_clears_the_key_when_nothing_is_left(org, team, cluster, domain, install_driver):
+    """An Ingress carrying only the platform's block loses the key."""
+
+    cluster.ingress_class = "nginx"
+    cluster.alb_auth_config = None
+    cluster.oidc_auth_config = None
+    cluster.save(update_fields=["ingress_class", "alb_auth_config", "oidc_auth_config"])
+    app = _make_app(org, team, "alpha")
+    _bind_env(app, cluster, domain=domain)
+
+    from providers.k8s_native.ingress import PLATFORM_SNIPPET_BEGIN, PLATFORM_SNIPPET_END
+
+    only_platform = (
+        f'{PLATFORM_SNIPPET_BEGIN}\nproxy_set_header X-Astrolift-Gateway-Secret "s";\n{PLATFORM_SNIPPET_END}'
+    )
+    client = _RecordingK8sClient(
+        ingresses_by_ns={f"{org.slug}-alpha": [_FakeIngressItem("alpha-web", {_SNIPPET_KEY: only_platform})]}
+    )
+    install_driver(_RecordingDriver(client))
+
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 1
+    assert client.patch_calls[0]["patch"]["metadata"]["annotations"][_SNIPPET_KEY] is None
+
+
+def test_reconcile_composes_per_ingress_not_once_per_sweep(org, team, cluster, domain, install_driver):
+    """Two apps with different snippets must each keep their own."""
+
+    _nginx_cluster(cluster, gateway_secret="s3cret")
+    app1 = _make_app(org, team, "alpha")
+    app2 = _make_app(org, team, "beta")
+    _bind_env(app1, cluster, domain=domain)
+    _bind_env(app2, cluster, domain=domain)
+
+    client = _RecordingK8sClient(
+        ingresses_by_ns={
+            f"{org.slug}-alpha": [
+                _FakeIngressItem("alpha-web", {_SNIPPET_KEY: 'proxy_set_header X-Alpha "a";'})
+            ],
+            f"{org.slug}-beta": [
+                _FakeIngressItem("beta-web", {_SNIPPET_KEY: 'proxy_set_header X-Beta "b";'})
+            ],
+        }
+    )
+    install_driver(_RecordingDriver(client))
+
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 2
+    by_name = {c["name"]: c["patch"]["metadata"]["annotations"][_SNIPPET_KEY] for c in client.patch_calls}
+    assert "X-Alpha" in by_name["alpha-web"] and "X-Beta" not in by_name["alpha-web"]
+    assert "X-Beta" in by_name["beta-web"] and "X-Alpha" not in by_name["beta-web"]

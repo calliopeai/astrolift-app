@@ -36,7 +36,12 @@ def test_the_header_is_set_not_copied_from_the_client():
     forward the client's own value and prove nothing."""
     snippet = _annotations(gateway_secret=SECRET)[SNIPPET]
     assert "$http_" not in snippet
-    assert snippet.strip().startswith("proxy_set_header")
+    # The directive, not the first characters: the platform's block is
+    # fenced by marker comments so it can share the annotation with an
+    # app's own snippet (#1726), so position is not the property under
+    # test -- that the header is *set* is.
+    directives = [ln.strip() for ln in snippet.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    assert directives and all(d.startswith("proxy_set_header") for d in directives)
 
 
 def test_no_secret_means_no_header_rather_than_a_blank_one():

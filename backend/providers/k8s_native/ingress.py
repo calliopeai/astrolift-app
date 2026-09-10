@@ -97,7 +97,74 @@ NGINX_AUTH_ANNOTATION_KEYS = (
 )
 
 
-def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
+# The platform's contribution to ``configuration-snippet`` is fenced by
+# these markers so it can be replaced, or removed, without touching
+# anything else in the same annotation (#1726).
+#
+# The key is not the platform's to own outright. An app can have its own
+# reason to need snippet content -- one live app derives per-request
+# identity headers its backend requires -- and the first shape of this
+# feature rendered the whole key, so a reconcile deleted that content and
+# the app started refusing every request. Fencing makes the platform's
+# block identifiable, so composing is possible and clobbering is not.
+PLATFORM_SNIPPET_BEGIN = "# BEGIN astrolift managed gateway headers"
+PLATFORM_SNIPPET_END = "# END astrolift managed gateway headers"
+
+
+def platform_gateway_snippet(auth: OIDCAuthConfig) -> str:
+    """The fenced snippet block the platform contributes, or ``""``.
+
+    Stamps proof-of-passage on the proxied request. ``proxy_set_header``
+    runs after ``auth_request``, so this lands on requests the gate
+    admitted and on nothing else -- a request that never passed the gate
+    never reaches this block.
+
+    The header is set unconditionally rather than copied from the client,
+    which is what makes it unforgeable from outside: whatever a caller
+    sends under this name is overwritten before the app sees it.
+    """
+
+    if not auth.gateway_secret:
+        return ""
+    return (
+        f"{PLATFORM_SNIPPET_BEGIN}\n"
+        f'proxy_set_header {auth.gateway_secret_header} "{auth.gateway_secret}";\n'
+        f"{PLATFORM_SNIPPET_END}"
+    )
+
+
+def strip_platform_snippet(existing: str) -> str:
+    """``existing`` with any previously-rendered platform block removed."""
+
+    text = existing or ""
+    while True:
+        start = text.find(PLATFORM_SNIPPET_BEGIN)
+        if start == -1:
+            return text.strip("\n")
+        end = text.find(PLATFORM_SNIPPET_END, start)
+        if end == -1:
+            # An unterminated marker means someone edited inside the
+            # fence. Drop from the marker to the end rather than guess
+            # where the platform's content stopped.
+            return text[:start].strip("\n")
+        text = text[:start] + text[end + len(PLATFORM_SNIPPET_END) :]
+
+
+def compose_configuration_snippet(existing: str, block: str) -> str | None:
+    """Merge the platform's ``block`` into ``existing``, keeping the rest.
+
+    Returns ``None`` when nothing is left to write, which the callers
+    turn into a delete of the annotation -- so removing the gateway
+    secret from a cluster whose apps contribute nothing of their own
+    still clears the key, while an app that does contribute keeps it.
+    """
+
+    foreign = strip_platform_snippet(existing)
+    parts = [p for p in (foreign, block) if p]
+    return "\n".join(parts) + "\n" if parts else None
+
+
+def nginx_auth_annotations(auth: OIDCAuthConfig, *, existing_snippet: str = "") -> dict[str, str]:
     """Annotations pointing an nginx-family Ingress at the central auth
     host.
 
@@ -121,18 +188,9 @@ def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
         ),
         "nginx.ingress.kubernetes.io/auth-response-headers": ",".join(auth.response_headers),
     }
-    if auth.gateway_secret:
-        # Stamp proof-of-passage on the proxied request. proxy_set_header runs
-        # after auth_request, so this lands on requests the gate admitted and
-        # on nothing else -- a request that never passed the gate never reaches
-        # this block.
-        #
-        # The header is set unconditionally rather than copied from the client,
-        # which is what makes it unforgeable from outside: whatever a caller
-        # sends under this name is overwritten before the app sees it.
-        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = (
-            f'proxy_set_header {auth.gateway_secret_header} "{auth.gateway_secret}";\n'
-        )
+    snippet = compose_configuration_snippet(existing_snippet, platform_gateway_snippet(auth))
+    if snippet is not None:
+        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = snippet
     return annotations
 
 

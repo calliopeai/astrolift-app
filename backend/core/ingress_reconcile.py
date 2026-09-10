@@ -85,7 +85,7 @@ def _auth_annotation_patch(alb_auth_config: dict[str, Any] | None) -> dict[str, 
     }
 
 
-def _oidc_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
+def _oidc_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") -> dict[str, str | None]:
     """The nginx-family half of :func:`auth_annotation_patch`.
 
     Mirrors the ALB behaviour on the central-auth path: a complete
@@ -99,23 +99,30 @@ def _oidc_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
     from core.app_deploy import oidc_auth_for_cluster
     from providers.k8s_native.ingress import (
         NGINX_AUTH_ANNOTATION_KEYS,
+        compose_configuration_snippet,
         nginx_auth_annotations,
     )
 
     auth = oidc_auth_for_cluster(cluster)
     if auth is None:
-        return dict.fromkeys(NGINX_AUTH_ANNOTATION_KEYS, None)
+        # Auth off: drop the keys the reconcile owns. The snippet is the
+        # exception -- it is a shared annotation, so only the platform's
+        # own fenced block comes out and anything the app contributes
+        # stays (#1726).
+        patch: dict[str, str | None] = dict.fromkeys(NGINX_AUTH_ANNOTATION_KEYS, None)
+        patch[_SNIPPET_KEY] = compose_configuration_snippet(existing_snippet, "")
+        return patch
     # Every key the reconcile owns has to appear in the patch, including the
     # ones this cluster does not currently populate. nginx_auth_annotations
     # omits the gateway-secret snippet when no secret is configured (#1726);
     # omitting it here too would leave a previously-stamped snippet on the live
     # Ingress after the secret was removed, so the gate would keep sending a
-    # secret the platform no longer knows about. Patching it to None clears it.
-    rendered = nginx_auth_annotations(auth)
+    # secret the platform no longer knows about.
+    rendered = nginx_auth_annotations(auth, existing_snippet=existing_snippet)
     return {key: rendered.get(key) for key in NGINX_AUTH_ANNOTATION_KEYS}
 
 
-def auth_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
+def auth_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") -> dict[str, str | None]:
     """Annotation delta for ``cluster``, whichever gate its class uses.
 
     The two ingress classes carry different annotation keys and read
@@ -132,7 +139,7 @@ def auth_annotation_patch(cluster: TenantCluster) -> dict[str, str | None]:
     """
     if getattr(cluster, "ingress_class", "") == "alb":
         return _auth_annotation_patch(cluster.alb_auth_config)
-    return _oidc_annotation_patch(cluster)
+    return _oidc_annotation_patch(cluster, existing_snippet)
 
 
 def _ingress_name(ingress: Any) -> str:
@@ -146,6 +153,27 @@ def _ingress_name(ingress: Any) -> str:
     if name is None and isinstance(meta, dict):
         name = meta.get("name")
     return str(name) if name else ""
+
+
+_SNIPPET_KEY = "nginx.ingress.kubernetes.io/configuration-snippet"
+
+
+def _existing_snippet(ingress: Any) -> str:
+    """Current ``configuration-snippet`` on a live Ingress object.
+
+    Same attribute-or-dict tolerance as :func:`_ingress_name`: the live
+    kubernetes client returns objects, test fakes return plain dicts.
+    """
+
+    meta = getattr(ingress, "metadata", None)
+    if meta is None and isinstance(ingress, dict):
+        meta = ingress.get("metadata")
+    annotations = getattr(meta, "annotations", None)
+    if annotations is None and isinstance(meta, dict):
+        annotations = meta.get("annotations")
+    if not isinstance(annotations, dict):
+        return ""
+    return str(annotations.get(_SNIPPET_KEY) or "")
 
 
 def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
@@ -170,8 +198,6 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     from astrolift_lifecycle.models import AppEnvironment
     from core.app_deploy import namespace_for_app
     from core.cluster_management import _driver_for_cluster
-
-    patch_body = {"metadata": {"annotations": auth_annotation_patch(cluster)}}
 
     reconciled = 0
     skipped = 0
@@ -240,7 +266,15 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
                 client.merge_patch_ingress(
                     namespace=namespace,
                     name=name,
-                    patch=patch_body,
+                    # Built per Ingress, not once for the sweep: the
+                    # snippet annotation is shared with whatever the app
+                    # put there, so the patch has to be composed against
+                    # that Ingress's current value (#1726).
+                    patch={
+                        "metadata": {
+                            "annotations": auth_annotation_patch(cluster, _existing_snippet(ingress))
+                        }
+                    },
                 )
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{namespace}/{name}: patch failed: {exc}")
@@ -251,7 +285,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
         "reconcile_cluster_ingresses cluster=%s class=%s auth=%s reconciled=%d skipped=%d errors=%d",
         cluster.slug,
         cluster.ingress_class,
-        any(v is not None for v in patch_body["metadata"]["annotations"].values()),
+        any(v is not None for v in auth_annotation_patch(cluster).values()),
         reconciled,
         skipped,
         len(errors),
