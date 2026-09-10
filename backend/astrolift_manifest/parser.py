@@ -8,6 +8,7 @@ surface a useful message ("workloads[0].kind must be one of …").
 
 from __future__ import annotations
 
+import re
 import tomllib
 from typing import Any
 
@@ -15,6 +16,7 @@ from astrolift_manifest.security_volumes import parse_volume
 from astrolift_manifest.types import (
     BriefRef,
     ContainerManifest,
+    EdgeIdentityConfig,
     ManagedServiceManifest,
     RawManifest,
     SkillRef,
@@ -221,6 +223,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     # ``brief=None`` / ``skills=()`` and round-trips unchanged.
     brief = _parse_brief(data.get("brief"), "brief")
     skills = _parse_skills(data.get("skills", []), "skills")
+    edge = _parse_edge(data.get("edge"), "edge")
 
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
@@ -235,7 +238,94 @@ def parse_raw(toml_text: str) -> RawManifest:
         managed_services=managed,
         brief=brief,
         skills=skills,
+        edge=edge,
         raw=data,
+    )
+
+
+# The gate identities an app may ask to have forwarded, and the
+# oauth2-proxy response header each one arrives on. Restricted to what the
+# gate actually sets (``OIDCAuthConfig.response_headers``): a mapping for a
+# header the gate never sends would render config that silently forwards
+# nothing (#1733).
+_EDGE_IDENTITIES = {
+    "user": "X-Auth-Request-User",
+    "email": "X-Auth-Request-Email",
+    "access_token": "X-Auth-Request-Access-Token",
+}
+
+# RFC 7230 token: what a header name may contain. Anything else would be
+# injected verbatim into the ingress controller's config.
+_HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
+
+_EDGE_KEYS = frozenset({"gateway_secret_header", "identity_headers"})
+
+
+def _valid_header_name(value: str, path: str) -> str:
+    text = str(value).strip()
+    if not text or not _HEADER_NAME_RE.match(text):
+        raise ManifestError(
+            f"{text!r} is not a valid HTTP header name",
+            path=path,
+        )
+    return text
+
+
+def _parse_edge(value: Any, path: str) -> EdgeIdentityConfig | None:
+    """Parse the optional top-level ``[edge]`` block (#1733).
+
+    Absent → ``None``, which renders exactly what the platform rendered
+    before this existed.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ManifestError("edge must be a table", path=path)
+    unknown = sorted(set(value) - _EDGE_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown edge key(s): {', '.join(unknown)}; valid keys are " f"{', '.join(sorted(_EDGE_KEYS))}",
+            path=path,
+        )
+
+    secret_header = ""
+    if value.get("gateway_secret_header") is not None:
+        secret_header = _valid_header_name(
+            value["gateway_secret_header"],
+            f"{path}.gateway_secret_header",
+        )
+
+    raw_headers = value.get("identity_headers") or {}
+    if not isinstance(raw_headers, dict):
+        raise ManifestError(
+            "edge.identity_headers must be a table of identity = header-name",
+            path=f"{path}.identity_headers",
+        )
+    pairs: list[tuple[str, str]] = []
+    for identity in sorted(raw_headers):
+        if identity not in _EDGE_IDENTITIES:
+            raise ManifestError(
+                f"unknown edge identity {identity!r}; the gate forwards "
+                f"{', '.join(sorted(_EDGE_IDENTITIES))}",
+                path=f"{path}.identity_headers",
+            )
+        pairs.append(
+            (
+                identity,
+                _valid_header_name(
+                    raw_headers[identity],
+                    f"{path}.identity_headers.{identity}",
+                ),
+            )
+        )
+    if not secret_header and not pairs:
+        raise ManifestError(
+            "edge declares nothing; set gateway_secret_header, identity_headers, or drop the block",
+            path=path,
+        )
+    return EdgeIdentityConfig(
+        gateway_secret_header=secret_header,
+        identity_headers=tuple(pairs),
     )
 
 

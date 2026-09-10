@@ -85,6 +85,13 @@ _PRINT_POSTURE = (
 
 
 def _posture(configuration: str) -> dict:
+    """Import settings the way a deployment does and report its posture.
+
+    The POSTGRES_* variables are set because a server configuration
+    refuses to start without a database engine -- correctly, and a test
+    that imports without them is testing the refusal, not the posture.
+    Nothing connects; ``DATABASES`` is only read.
+    """
     import json
 
     result = subprocess.run(
@@ -95,6 +102,12 @@ def _posture(configuration: str) -> dict:
             "DJANGO_CONFIGURATION": configuration,
             "DJANGO_SETTINGS_MODULE": "config.settings",
             "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+            "POSTGRES_ENGINE": "django.db.backends.postgresql",
+            "POSTGRES_DB": "astrolift",
+            "POSTGRES_USER": "astrolift",
+            "POSTGRES_PASSWORD": "unused-by-an-import",
+            "POSTGRES_HOST": "postgres.invalid",
+            "POSTGRES_PORT": "5432",
         },
         capture_output=True,
         text=True,
@@ -123,3 +136,32 @@ def test_the_developer_configuration_keeps_the_technical_error_page():
     """The trade is right on a laptop and wrong on a server; this is the
     laptop."""
     assert _posture("dev")["debug"] is True
+
+
+def test_a_server_configuration_with_no_database_engine_refuses_to_start(tmp_path):
+    """The membership test in the SQLite guard raised TypeError on an unset
+    engine -- an unhandled crash from the guard written to make exactly this
+    situation readable.
+
+    ``DOTENV`` points at a path that does not exist so the outcome does not
+    depend on whether the machine running the tests happens to have a
+    ``config/local.env`` full of POSTGRES_* values.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_SETTINGS],
+        cwd=BACKEND,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "DJANGO_CONFIGURATION": "prd",
+            "DJANGO_SETTINGS_MODULE": "config.settings",
+            "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+            "DOTENV": str(tmp_path / "absent.env"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode != 0
+    assert "no database engine configured" in result.stderr
+    assert "TypeError" not in result.stderr

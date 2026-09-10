@@ -85,7 +85,11 @@ def _auth_annotation_patch(alb_auth_config: dict[str, Any] | None) -> dict[str, 
     }
 
 
-def _oidc_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") -> dict[str, str | None]:
+def _oidc_annotation_patch(
+    cluster: TenantCluster,
+    existing_snippet: str = "",
+    edge: dict | None = None,
+) -> dict[str, str | None]:
     """The nginx-family half of :func:`auth_annotation_patch`.
 
     Mirrors the ALB behaviour on the central-auth path: a complete
@@ -118,11 +122,15 @@ def _oidc_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") -
     # omitting it here too would leave a previously-stamped snippet on the live
     # Ingress after the secret was removed, so the gate would keep sending a
     # secret the platform no longer knows about.
-    rendered = nginx_auth_annotations(auth, existing_snippet=existing_snippet)
+    rendered = nginx_auth_annotations(auth, existing_snippet=existing_snippet, edge=edge)
     return {key: rendered.get(key) for key in NGINX_AUTH_ANNOTATION_KEYS}
 
 
-def auth_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") -> dict[str, str | None]:
+def auth_annotation_patch(
+    cluster: TenantCluster,
+    existing_snippet: str = "",
+    edge: dict | None = None,
+) -> dict[str, str | None]:
     """Annotation delta for ``cluster``, whichever gate its class uses.
 
     The two ingress classes carry different annotation keys and read
@@ -139,7 +147,7 @@ def auth_annotation_patch(cluster: TenantCluster, existing_snippet: str = "") ->
     """
     if getattr(cluster, "ingress_class", "") == "alb":
         return _auth_annotation_patch(cluster.alb_auth_config)
-    return _oidc_annotation_patch(cluster, existing_snippet)
+    return _oidc_annotation_patch(cluster, existing_snippet, edge)
 
 
 def _ingress_name(ingress: Any) -> str:
@@ -156,6 +164,13 @@ def _ingress_name(ingress: Any) -> str:
 
 
 _SNIPPET_KEY = "nginx.ingress.kubernetes.io/configuration-snippet"
+
+
+def _edge_config(app: Any) -> dict | None:
+    """The app's normalized ``[edge]`` block, or ``None`` (#1733)."""
+    manifest = getattr(app, "manifest_normalized", None) or {}
+    edge = manifest.get("edge") if isinstance(manifest, dict) else None
+    return edge if isinstance(edge, dict) else None
 
 
 def _existing_snippet(ingress: Any) -> str:
@@ -272,7 +287,17 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
                     # that Ingress's current value (#1726).
                     patch={
                         "metadata": {
-                            "annotations": auth_annotation_patch(cluster, _existing_snippet(ingress))
+                            "annotations": auth_annotation_patch(
+                                cluster,
+                                _existing_snippet(ingress),
+                                # The app's declared edge mapping (#1733).
+                                # A reconcile that dropped it would take the
+                                # app's identity headers away, which is the
+                                # same failure #1726 fixed for hand-applied
+                                # content -- for declared content the
+                                # platform can just render it again.
+                                _edge_config(env.registered_app),
+                            )
                         }
                     },
                 )

@@ -1074,7 +1074,16 @@ else:
 # import order change -- and turns it into a refusal instead of silent data
 # loss. Tests declare sqlite deliberately and are excluded by name.
 if not IS_DEV and not IS_LOCAL and CONFIGURATION.lower() != "tests":
-    _engine = DATABASES[DEFAULT_DB_ALIAS]["ENGINE"]
+    # ``POSTGRES_ENGINE`` unset reads as None, and the membership test
+    # below raised TypeError on it -- an unhandled crash from the guard
+    # written to turn this exact situation into a readable refusal.
+    _engine = str(DATABASES[DEFAULT_DB_ALIAS].get("ENGINE") or "")
+    if not _engine:
+        raise ImproperlyConfigured(
+            f"DJANGO_CONFIGURATION={CONFIGURATION!r} has no database engine configured. "
+            f"A server configuration cannot run without one. Set POSTGRES_ENGINE and the "
+            f"rest of the POSTGRES_* variables."
+        )
     if "sqlite" in _engine:
         raise ImproperlyConfigured(
             f"DJANGO_CONFIGURATION={CONFIGURATION!r} resolved to {_engine}. "

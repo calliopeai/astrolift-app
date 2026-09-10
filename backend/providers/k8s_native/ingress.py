@@ -111,7 +111,22 @@ PLATFORM_SNIPPET_BEGIN = "# BEGIN astrolift managed gateway headers"
 PLATFORM_SNIPPET_END = "# END astrolift managed gateway headers"
 
 
-def platform_gateway_snippet(auth: OIDCAuthConfig) -> str:
+# Which oauth2-proxy response header each declarable identity arrives on.
+# Mirrors ``astrolift_manifest.parser._EDGE_IDENTITIES``; the manifest
+# parser refuses anything outside it, so a name reaching here is known.
+_EDGE_IDENTITY_SOURCES = {
+    "user": "X-Auth-Request-User",
+    "email": "X-Auth-Request-Email",
+    "access_token": "X-Auth-Request-Access-Token",
+}
+
+
+def _nginx_variable(header: str) -> str:
+    """The ``$upstream_http_*`` variable an auth-response header lands on."""
+    return "$upstream_http_" + header.lower().replace("-", "_")
+
+
+def platform_gateway_snippet(auth: OIDCAuthConfig, *, edge: dict | None = None) -> str:
     """The fenced snippet block the platform contributes, or ``""``.
 
     Stamps proof-of-passage on the proxied request. ``proxy_set_header``
@@ -122,15 +137,37 @@ def platform_gateway_snippet(auth: OIDCAuthConfig) -> str:
     The header is set unconditionally rather than copied from the client,
     which is what makes it unforgeable from outside: whatever a caller
     sends under this name is overwritten before the app sees it.
+
+    ``edge`` is the app's ``[edge]`` manifest block (#1733), already
+    normalized: an app whose backend reads the gate's identity under names
+    it chose declares the mapping and the platform renders it here, inside
+    the same fence, instead of the operator applying it to the live
+    Ingress by hand where nothing recreates or records it.
     """
 
-    if not auth.gateway_secret:
+    edge = edge or {}
+    secret_header = str(edge.get("gateway_secret_header") or "") or auth.gateway_secret_header
+    lines: list[str] = []
+    if auth.gateway_secret:
+        lines.append(f'proxy_set_header {secret_header} "{auth.gateway_secret}";')
+    for pair in edge.get("identity_headers") or []:
+        try:
+            identity, header = pair
+        except (TypeError, ValueError):
+            continue
+        source = _EDGE_IDENTITY_SOURCES.get(str(identity))
+        if not source or not header:
+            continue
+        # A local variable per identity, named for the target header, so
+        # two apps on one controller cannot collide and re-rendering is
+        # byte-stable.
+        var = "$astrolift_edge_" + str(identity)
+        lines.append(f"auth_request_set {var} {_nginx_variable(source)};")
+        lines.append(f"proxy_set_header {header} {var};")
+    if not lines:
         return ""
-    return (
-        f"{PLATFORM_SNIPPET_BEGIN}\n"
-        f'proxy_set_header {auth.gateway_secret_header} "{auth.gateway_secret}";\n'
-        f"{PLATFORM_SNIPPET_END}"
-    )
+    body = "\n".join(lines)
+    return f"{PLATFORM_SNIPPET_BEGIN}\n{body}\n{PLATFORM_SNIPPET_END}"
 
 
 def strip_platform_snippet(existing: str) -> str:
@@ -164,7 +201,12 @@ def compose_configuration_snippet(existing: str, block: str) -> str | None:
     return "\n".join(parts) + "\n" if parts else None
 
 
-def nginx_auth_annotations(auth: OIDCAuthConfig, *, existing_snippet: str = "") -> dict[str, str]:
+def nginx_auth_annotations(
+    auth: OIDCAuthConfig,
+    *,
+    existing_snippet: str = "",
+    edge: dict | None = None,
+) -> dict[str, str]:
     """Annotations pointing an nginx-family Ingress at the central auth
     host.
 
@@ -188,7 +230,10 @@ def nginx_auth_annotations(auth: OIDCAuthConfig, *, existing_snippet: str = "") 
         ),
         "nginx.ingress.kubernetes.io/auth-response-headers": ",".join(auth.response_headers),
     }
-    snippet = compose_configuration_snippet(existing_snippet, platform_gateway_snippet(auth))
+    snippet = compose_configuration_snippet(
+        existing_snippet,
+        platform_gateway_snippet(auth, edge=edge),
+    )
     if snippet is not None:
         annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = snippet
     return annotations

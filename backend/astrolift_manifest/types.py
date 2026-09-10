@@ -251,6 +251,35 @@ class SkillRef:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class EdgeIdentityConfig:
+    """How an app wants the gateway's identity presented to it (#1733).
+
+    The central auth gate stamps a shared secret and forwards
+    oauth2-proxy's ``X-Auth-Request-*`` headers. An app whose backend
+    reads those under names it chose -- one live app does -- had no way to
+    say so: the config existed only as a hand-applied ``kubectl annotate``
+    on the live Ingress, which nothing recreates, records or reviews.
+
+    This is deliberately a *mapping*, not a raw nginx snippet. A snippet
+    is an escape hatch into the ingress controller's config language: it
+    ties the app to nginx and hands it a sharp edge, and ingress-nginx has
+    been narrowing ``allow-snippet-annotations`` for CVE reasons. A rename
+    map covers the observed case and stays portable across ingress
+    classes.
+    """
+
+    gateway_secret_header: str = ""
+    """Header name the gate's shared secret is stamped on for this app.
+    Empty keeps the platform default. The *value* is never declared here
+    -- it comes from the cluster's auth config."""
+
+    identity_headers: tuple[tuple[str, str], ...] = ()
+    """``(identity, header_name)`` pairs: which gate identity to forward,
+    and the header name this app reads it under. Ordered and tuple-typed
+    so the rendered snippet is byte-stable across deploys."""
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class RawManifest:
     name: str
     workloads: tuple[WorkloadManifest, ...] = ()
@@ -262,6 +291,9 @@ class RawManifest:
     # ``None`` for non-agent manifests that declare neither.
     brief: BriefRef | None = None
     skills: tuple[SkillRef, ...] = ()
+    # Optional ``[edge]`` block (#1733). App-level, not per workload: the
+    # managed-subdomain render puts every hostname on one Ingress.
+    edge: EdgeIdentityConfig | None = None
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 

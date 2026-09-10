@@ -1028,7 +1028,15 @@ def _render_app_ingresses_and_tls(
                     # them and no per-app registration is involved.
                     oidc_auth = oidc_auth_for_cluster(cluster)
                     if oidc_auth is not None:
-                        managed_annotations.update(nginx_auth_annotations(oidc_auth))
+                        from core.ingress_reconcile import _edge_config
+
+                        managed_annotations.update(
+                            # The app's declared edge mapping rides in the
+                            # platform's own fenced block (#1733), so a
+                            # redeploy reproduces the identity headers its
+                            # backend reads instead of losing them.
+                            nginx_auth_annotations(oidc_auth, edge=_edge_config(d.registered_app)),
+                        )
                     if ingress_paused:
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'

@@ -48,6 +48,11 @@ def normalize(
         "workloads": [_workload_dict(w) for w in workloads],
         "managed_services": [_msvc_dict(m) for m in raw.managed_services],
     }
+    # Only when declared: an app that has no ``[edge]`` block keeps the
+    # exact serialized shape (and therefore the same manifest hash) it had
+    # before the block existed, so nothing re-deploys on the upgrade alone.
+    if raw.edge is not None:
+        serialized["edge"] = _edge_dict(raw.edge)
     return NormalizedManifest(
         name=raw.name,
         workloads=workloads,
@@ -55,6 +60,15 @@ def normalize(
         defaults_applied=tuple(applied),
         serialized=serialized,
     )
+
+
+def _edge_dict(edge: Any) -> dict[str, Any]:
+    return {
+        "gateway_secret_header": edge.gateway_secret_header,
+        # A list of pairs, not a mapping: the render walks them in order
+        # and JSON object ordering is not something to lean on.
+        "identity_headers": [[identity, header] for identity, header in edge.identity_headers],
+    }
 
 
 def manifest_hash(serialized: dict[str, Any]) -> str:
