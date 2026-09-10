@@ -129,6 +129,9 @@ class K8sJobSpawner(ContainerSpawner):
                 secret_name=task_secret_name(job_name),
                 namespace=self._namespace,
                 task_guid=str(task.guid),
+                # An agent that belongs to an app inherits that app's
+                # managed-service bindings through this Secret (#1700).
+                workload=workload,
             )
         except AgentSecretResolutionError as exc:
             logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
@@ -601,7 +604,13 @@ def _render_agent_job(
     # keys are collapsed by the authoritative dedupe in K8sJobSpawner.spawn,
     # which runs after the Brief also prepends env (SSA rejects duplicate env
     # keys, so the dedupe must see every source).
-    container_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
+    container_env = list(model_env or []) + agent_container_env(
+        spec,
+        task_secret_name(job_name),
+        # An agent that belongs to an app reads that app's managed-service
+        # bindings; they sit lowest in precedence (#1700).
+        workload=workload,
+    )
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
