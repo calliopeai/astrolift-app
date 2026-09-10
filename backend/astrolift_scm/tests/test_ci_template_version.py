@@ -73,7 +73,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 6
+PINNED_TEMPLATE_VERSION = 7
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -166,7 +166,12 @@ def test_agent_github_workflow_validates_package_without_app_build_or_deploy(set
     assert "group: astrolift-hello-app" in body
     assert "cancel-in-progress: true" in body
     assert "agents/emr-bug-triage/**" in body
-    assert "selected manifest must declare exactly one agent workload" in body
+    # v7 (#1697): at least one agent workload, not exactly one workload in
+    # total. The old rule failed every app+agent repo -- the template was
+    # selected because the app HAS an agent workload, then refused the
+    # manifest for having anything else beside it.
+    assert "selected manifest declares no agent workload" in body
+    assert "exactly one agent workload" not in body
     assert "docker build" not in body
     assert "/api/cli/v1/apps/" not in body
     assert "ASTROLIFT_DEPLOY_TOKEN" not in body
