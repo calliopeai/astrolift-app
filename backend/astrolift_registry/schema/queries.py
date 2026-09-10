@@ -1204,6 +1204,14 @@ class RegistryQuery:
         the config-drift rollup — ``configDrift`` is left null when
         False so the cheap header query stays cheap. The app overview
         passes True; sidebar / breadcrumb queries pass False.
+
+        Freshness (``latestDeployment`` / ``lastDeployedAt`` /
+        ``healthPulse``) is not opt-in here. The opt-in on the list
+        resolvers exists to keep a 200-row page from paying for a
+        rollup nobody asked for; a detail request is one row, and
+        leaving it null made the field structurally always null on this
+        path (#1691) — an app with a healthy pod and several successful
+        deploys read as though nothing had ever shipped.
         """
         org_id = _caller_org_id()
         app = (
@@ -1225,6 +1233,7 @@ class RegistryQuery:
         ci_workflow_sync = build_ci_workflow_sync_status(app)
         return app_to_type(
             app,
+            freshness=_freshness_for_apps([app]).get(app.pk),
             drift=drift,
             autowire=autowire,
             ci_workflow_sync_status=ci_workflow_sync,

@@ -431,6 +431,29 @@ def resync_app_manifest_from_repo(
     return result
 
 
+def _clear_stale_bootstrap_failure(app: RegisteredApp) -> list[str]:
+    """Retire a registration-time bootstrap failure the repo has fixed (#1692).
+
+    ``manifest_bootstrap_status`` records why an app registered without
+    its workloads, and the app detail page renders it as "This app
+    registered without its workloads ... no services were created from
+    it". It was written once, at registration, and never revisited -- so
+    an app whose manifest was fixed and resynced, with its workloads
+    materialised and a working source connection, kept telling the
+    operator it had neither. The banner is a current-state signal (that
+    is what it is for), not an audit record; the registration attempt
+    itself stays in the audit log.
+
+    Returns the fields to add to the caller's ``update_fields``.
+    """
+
+    if app.manifest_bootstrap_status in ("", "applied"):
+        return []
+    app.manifest_bootstrap_status = "applied"
+    app.manifest_bootstrap_error = ""
+    return ["manifest_bootstrap_status", "manifest_bootstrap_error"]
+
+
 def _resync_app_manifest_from_repo(
     app: RegisteredApp,
     *,
@@ -572,6 +595,7 @@ def _resync_app_manifest_from_repo(
             now = timezone.now()
             app.last_resync_at = now
             fields.append("last_resync_at")
+            fields += _clear_stale_bootstrap_failure(app)
             fields += ["updated_at", "version"]
             app.save(update_fields=fields)
         return ResyncResult(status="in_sync", changes=ResyncChanges(), env_names=env_names)
@@ -590,6 +614,7 @@ def _resync_app_manifest_from_repo(
         # repo == buffer (operator's pending draft already landed
         # upstream — clearing it is the right thing). We've already
         # refused above when the buffer would lose work.
+        healed = _clear_stale_bootstrap_failure(app)
         if staged.strip() and repo_text.strip() == staged.strip():
             app.manifest_raw_staged = ""
             app.save(
@@ -597,6 +622,7 @@ def _resync_app_manifest_from_repo(
                     "manifest_raw_staged",
                     "last_synced_hash",
                     "last_resync_at",
+                    *healed,
                     "updated_at",
                     "version",
                 ]
@@ -606,6 +632,7 @@ def _resync_app_manifest_from_repo(
                 update_fields=[
                     "last_synced_hash",
                     "last_resync_at",
+                    *healed,
                     "updated_at",
                     "version",
                 ]

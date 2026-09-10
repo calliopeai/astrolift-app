@@ -270,6 +270,13 @@ class RegisteredApp(NamedBaseCoreModel):
     # ``parse_failed`` an inline manifest was unusable; ``fetch_failed`` /
     # ``diverged`` came back from the repo fetch; ``no_source`` there was
     # nothing to bootstrap from. Empty means the app predates the field.
+    #
+    # Current state, not a registration audit record (#1692). A later
+    # resync that applies clears a failure back to ``applied``: the
+    # banner tells the operator what still needs attention, and an app
+    # whose manifest has since been fixed and whose workloads exist was
+    # otherwise told forever that it had neither. The registration
+    # attempt itself stays in the audit log.
     manifest_bootstrap_status = models.CharField(max_length=32, blank=True, default="")
     manifest_bootstrap_error = models.TextField(blank=True, default="")
 
