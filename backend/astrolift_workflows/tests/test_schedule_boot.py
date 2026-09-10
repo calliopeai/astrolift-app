@@ -196,6 +196,7 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # is the panel saying nothing rather than something wrong, but it is
         # of no value held.
         ScheduleKind.PROBE_APP_DNS,
+        ScheduleKind.PROBE_APP_CRONJOB_RUNS,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)

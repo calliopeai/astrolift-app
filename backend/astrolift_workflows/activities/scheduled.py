@@ -367,6 +367,51 @@ async def probe_app_dns_activity() -> int:
     return await sync_to_async(_probe_app_dns_sync)()
 
 
+def _probe_app_cronjob_runs_sync() -> int:
+    """Refresh every app's cached cronjob-run probe (#1710).
+
+    A failed CronJob run left no trace in the product: app health was the
+    ``web`` Deployment, and the cronjob is a different workload of the
+    same app, so the app read healthy while its scheduled work had been
+    failing for hours. The only way to find out was kubectl -- and by
+    then the pod was reaped and the Job's events had aged out.
+
+    Same shape as the DNS probe, and for the same reason: the doctor
+    renders on every app-detail load, so the live read belongs here.
+    Returns the number of apps whose failure set changed.
+    """
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.services.app_doctor import probe_app_cronjob_runs
+
+    changed = 0
+    for app in RegisteredApp.objects.filter(deleted_at__isnull=True).iterator():
+        previous = (app.cronjob_probe or {}).get("failed")
+        try:
+            record = probe_app_cronjob_runs(app)
+        except Exception:  # noqa: BLE001 — one unreachable cluster must not stop the sweep
+            log.exception("cronjob probe: failed for app %s", app.slug)
+            continue
+        if record.get("failed") != previous:
+            changed += 1
+            if record.get("failed"):
+                log.warning(
+                    "cronjob probe: %s failed run(s) for app %s: %s",
+                    len(record["failed"]),
+                    app.slug,
+                    ", ".join(record["failed"]),
+                )
+    return changed
+
+
+@activity.defn(name="astrolift.scheduled.probe_app_cronjob_runs")
+async def probe_app_cronjob_runs_activity() -> int:
+    """Refresh cached cronjob-run probes for the app doctor."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_probe_app_cronjob_runs_sync)()
+
+
 @activity.defn(name="astrolift.scheduled.apply_observability_retention")
 async def apply_observability_retention() -> int:
     """Apply each org's configured observability retention. Returns the

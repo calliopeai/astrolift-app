@@ -41,6 +41,7 @@ CHECK_REGISTRY = "registry_repo"
 CHECK_PUSH_ROLE = "push_role"
 CHECK_DNS = "dns"
 CHECK_DEPLOYMENTS = "deployments"
+CHECK_CRONJOB_RUNS = "cronjob_runs"
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -344,6 +345,164 @@ def _check_deployments(app) -> DoctorCheck:
     return DoctorCheck(CHECK_DEPLOYMENTS, "pass", "deployment history is clean")
 
 
+CRONJOB_PROBE_MAX_AGE = dt.timedelta(hours=6)
+
+
+def _default_list_jobs(cluster, namespace: str) -> list[dict]:
+    """Jobs in ``namespace`` on ``cluster``, as plain dicts.
+
+    Injected so the probe is drivable in tests without a cluster, the
+    same way every other live probe here is.
+    """
+
+    from core.cluster_management import _driver_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    client = driver._k8s(cluster.slug)  # noqa: SLF001 — the driver's own accessor
+    return client.list(kind="Job", namespace=namespace)
+
+
+def _job_failed(job) -> bool:
+    if not isinstance(job, dict):
+        return False
+    conditions = (job.get("status") or {}).get("conditions") or []
+    return any(str(c.get("type")) == "Failed" and str(c.get("status")) == "True" for c in conditions)
+
+
+def _owned_by_cronjob(job) -> bool:
+    if not isinstance(job, dict):
+        return False
+    owners = (job.get("metadata") or {}).get("ownerReferences") or []
+    return any(str(o.get("kind")) == "CronJob" for o in owners)
+
+
+def _job_name(job) -> str:
+    return str(((job or {}).get("metadata") or {}).get("name") or "?")
+
+
+def _declares_cronjob(app) -> bool:
+    workloads = (getattr(app, "manifest_normalized", None) or {}).get("workloads") or []
+    return any(str(w.get("kind", "")) == "cronjob" for w in workloads if isinstance(w, dict))
+
+
+def probe_app_cronjob_runs(app, *, list_jobs: Probe | None = None) -> dict:
+    """Record how this app's cronjob runs ended, for the doctor to read.
+
+    The live half, on a schedule, for the same reason the DNS probe is
+    (#1534): the doctor renders on every app-detail load, and a
+    kubernetes round-trip per load is a latency nobody asked for.
+
+    A failed CronJob run used to leave no trace in the product at all
+    (#1710) -- the app read as healthy throughout, because health was the
+    ``web`` Deployment and the cronjob is a different workload of the
+    same app. The only way to learn about it was kubectl, and by the time
+    anyone looked the pod had been reaped and the Job's events had aged
+    out, so the reason was gone too.
+
+    Reads the Jobs a CronJob owns rather than the CronJob itself:
+    ``status.lastScheduleTime`` says a run started, never how it ended.
+    """
+
+    record: dict = {"probed_at": dt.datetime.now(dt.UTC).isoformat(), "failed": [], "total": 0}
+    cluster = getattr(app, "default_tenant_cluster", None)
+    if not _declares_cronjob(app) or cluster is None:
+        record["skipped"] = True
+    else:
+        from core.app_deploy import namespace_for_app
+
+        fn = list_jobs if list_jobs is not None else _default_list_jobs
+        try:
+            jobs = fn(cluster, namespace_for_app(app)) or []
+        except Exception as exc:  # noqa: BLE001 — an unreadable cluster is not a pass
+            logger.warning("cronjob probe: could not list jobs for %s: %s", app.slug, exc)
+            record["error"] = str(exc)
+            jobs = []
+        owned = [j for j in jobs if _owned_by_cronjob(j)]
+        record["total"] = len(owned)
+        record["failed"] = sorted(_job_name(j) for j in owned if _job_failed(j))
+
+    app.cronjob_probe = record
+    app.save(update_fields=["cronjob_probe", "updated_at", "version"])
+    return record
+
+
+def _cached_cronjob_probe(app) -> tuple[dt.timedelta, dict] | None:
+    """``(age, record)`` from the app row, or None when unusable.
+
+    A malformed record reads as never-probed, deliberately: reporting
+    ``pass`` off something that could not be parsed is the failure this
+    whole panel exists to avoid.
+    """
+
+    raw = getattr(app, "cronjob_probe", None) or {}
+    if not isinstance(raw, dict):
+        return None
+    stamp = raw.get("probed_at")
+    if not stamp:
+        return None
+    try:
+        probed_at = dt.datetime.fromisoformat(str(stamp))
+    except (TypeError, ValueError):
+        return None
+    if probed_at.tzinfo is None:
+        probed_at = probed_at.replace(tzinfo=dt.UTC)
+    return dt.datetime.now(dt.UTC) - probed_at, raw
+
+
+def _check_cronjob_runs(app) -> DoctorCheck:
+    """A cronjob workload whose last run failed (#1710).
+
+    Answers from the cached probe, never a live call — see
+    :func:`probe_app_cronjob_runs`.
+    """
+
+    if not _declares_cronjob(app):
+        return DoctorCheck(CHECK_CRONJOB_RUNS, "skip", "no cronjob workload declared")
+    if getattr(app, "default_tenant_cluster", None) is None:
+        return DoctorCheck(CHECK_CRONJOB_RUNS, "skip", "no cluster bound, so nothing has run yet")
+
+    cached = _cached_cronjob_probe(app)
+    if cached is None:
+        return DoctorCheck(
+            CHECK_CRONJOB_RUNS,
+            "unknown",
+            "cronjob runs not probed yet; the probe runs every 30 minutes",
+        )
+    age, record = cached
+    if age > CRONJOB_PROBE_MAX_AGE:
+        return DoctorCheck(
+            CHECK_CRONJOB_RUNS,
+            "unknown",
+            f"last cronjob probe was {_humanise(age)} ago, too old to report",
+        )
+    if record.get("error"):
+        return DoctorCheck(
+            CHECK_CRONJOB_RUNS,
+            "unknown",
+            f"could not read this app's Jobs from the cluster: {record['error']}",
+        )
+    failed = record.get("failed") or []
+    if failed:
+        return DoctorCheck(
+            CHECK_CRONJOB_RUNS,
+            "fail",
+            f"{len(failed)} failed cronjob run(s): {', '.join(failed)} — read the pod logs "
+            f"before the Job's TTL reaps them (probed {_humanise(age)} ago)",
+        )
+    total = record.get("total") or 0
+    if not total:
+        return DoctorCheck(
+            CHECK_CRONJOB_RUNS,
+            "warn",
+            f"a cronjob workload is declared but no run has happened yet " f"(probed {_humanise(age)} ago)",
+        )
+    return DoctorCheck(
+        CHECK_CRONJOB_RUNS,
+        "pass",
+        f"{total} cronjob run(s), none failed (probed {_humanise(age)} ago)",
+    )
+
+
 def _public_hostnames(app) -> list[str]:
     """Managed hostnames for the app's public workloads, best-effort."""
     try:
@@ -372,6 +531,7 @@ _CHECKS: tuple[tuple[str, Callable], ...] = (
     (CHECK_IDENTITY, _check_identity),
     (CHECK_IMAGE, _check_image),
     (CHECK_DEPLOYMENTS, _check_deployments),
+    (CHECK_CRONJOB_RUNS, _check_cronjob_runs),
 )
 
 

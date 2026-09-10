@@ -373,6 +373,25 @@ class RegisteredApp(NamedBaseCoreModel):
         ),
     )
 
+    # Cached cronjob-run probe for the app doctor (#1710). Same pattern and
+    # the same reason as ``dns_probe``: a failed CronJob run left no trace in
+    # the product -- app health was the ``web`` Deployment, and the cronjob is
+    # a different workload of the same app -- so the only way to learn about
+    # one was kubectl, by which time the pod was reaped and the Job's events
+    # had aged out.
+    #
+    # Shape: {"probed_at": iso8601, "failed": ["job-name", ...], "total": int,
+    #         "error"?: str, "skipped"?: bool}
+    # Absent means never probed, which the doctor reports as unknown, not pass.
+    cronjob_probe = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Cached cronjob-run probe for the app doctor. Written by the "
+            "scheduled prober; read by the doctor with its age."
+        ),
+    )
+
     network_policy = models.JSONField(
         default=dict,
         blank=True,

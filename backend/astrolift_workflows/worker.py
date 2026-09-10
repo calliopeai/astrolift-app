@@ -175,6 +175,7 @@ from astrolift_workflows.activities.command_run_exec import (
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
+    probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
 )
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
@@ -214,6 +215,7 @@ from astrolift_workflows.workflows import (
     PipelineScheduleWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
+    ProbeAppCronjobRunsWorkflow,
     ProbeAppDnsWorkflow,
     PromoteDeploymentWorkflow,
     ProvisionManagedDomainWorkflow,
@@ -278,6 +280,7 @@ WORKFLOWS = (
     ProvisionManagedDomainWorkflow,
     ProvisionManagedServiceWorkflow,
     ApplyObservabilityRetentionWorkflow,
+    ProbeAppCronjobRunsWorkflow,
     ProbeAppDnsWorkflow,
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
@@ -302,6 +305,7 @@ ACTIVITIES = (
     abort_in_flight_deploys,
     assert_no_concurrent,
     apply_observability_retention,
+    probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
     create_scheduled_pipeline_run,
     deliver_webhook,

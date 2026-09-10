@@ -94,6 +94,11 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # panel saying nothing rather than saying something wrong -- but it is
         # of no value held.
         ScheduleKind.PROBE_APP_DNS,
+        # The cronjob-run probe ships active for the same reasons (#1710):
+        # read-only cluster listing, idempotent, and of no value held --
+        # held, a failed scheduled run stays invisible in the product,
+        # which is the bug it exists to fix.
+        ScheduleKind.PROBE_APP_CRONJOB_RUNS,
         # Agent-box reaping ships active — held, a box that reaped itself
         # keeps claiming RUNNING and its plaintext-bearing Secret outlives
         # the pod, so holding it costs correctness rather than buying safety.
