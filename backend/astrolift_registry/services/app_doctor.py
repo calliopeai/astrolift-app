@@ -42,6 +42,7 @@ CHECK_PUSH_ROLE = "push_role"
 CHECK_DNS = "dns"
 CHECK_DEPLOYMENTS = "deployments"
 CHECK_CRONJOB_RUNS = "cronjob_runs"
+CHECK_MANAGED_SERVICES = "managed_services"
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -522,6 +523,45 @@ def _default_resolve(host: str) -> list[str]:
         return []
 
 
+def _check_managed_services(app) -> DoctorCheck:
+    """Every managed service the app declares actually has a backend.
+
+    ``ManagedService.backend_ref`` is what the provisioning workflow writes
+    when the cloud resource exists. Empty means the row was reconciled from
+    the manifest and never provisioned -- and the consequences do not
+    announce themselves (#1701): the binding secret is created empty, so the
+    app gets no host or bucket name, and the workload's identity role is
+    created with no policy attached, because the grants are read off the
+    binding a provisioned service would have. The app then fails at runtime
+    with AccessDenied or a missing env var, one layer away from the cause.
+    """
+    from astrolift_services.models import ManagedService
+
+    rows = list(
+        ManagedService.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+        ).values_list("name", "kind", "backend_ref", "status")
+    )
+    if not rows:
+        return DoctorCheck(CHECK_MANAGED_SERVICES, "skip", "app declares no managed services")
+
+    missing = [f"{name or kind}" for name, kind, backend_ref, _status in rows if not backend_ref]
+    if missing:
+        return DoctorCheck(
+            CHECK_MANAGED_SERVICES,
+            "fail",
+            f"{len(missing)} of {len(rows)} managed services have never been provisioned "
+            f"({', '.join(sorted(missing))}) — their binding secrets are empty and the "
+            f"workload identity carries no grants for them; re-run provisioning",
+        )
+    return DoctorCheck(
+        CHECK_MANAGED_SERVICES,
+        "pass",
+        f"{len(rows)} managed service(s) provisioned",
+    )
+
+
 _CHECKS: tuple[tuple[str, Callable], ...] = (
     (CHECK_MANIFEST, _check_manifest),
     (CHECK_AUTOWIRE, _check_autowire),
@@ -532,6 +572,7 @@ _CHECKS: tuple[tuple[str, Callable], ...] = (
     (CHECK_IMAGE, _check_image),
     (CHECK_DEPLOYMENTS, _check_deployments),
     (CHECK_CRONJOB_RUNS, _check_cronjob_runs),
+    (CHECK_MANAGED_SERVICES, _check_managed_services),
 )
 
 

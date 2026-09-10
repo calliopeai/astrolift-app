@@ -251,6 +251,23 @@ def _ensure_workload_identity_sync(
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
     bindings = [_managed_binding_for(svc) for svc in services]
     permissions = _permissions_from_bindings(bindings, plugin_slug=plugin_slug)
+    # A service with no ``backend_ref`` has no binding, so it contributes no
+    # grants -- and the role is then created authorised for nothing, which
+    # surfaces much later as an AccessDenied from the app's own SDK rather
+    # than as a provisioning problem (#1701). Say it here, where the cause
+    # is still in hand.
+    unprovisioned = [
+        (svc.name or svc.kind) for svc, binding in zip(services, bindings, strict=True) if binding is None
+    ]
+    if unprovisioned:
+        log.warning(
+            "workload identity for app %s: %d of %d managed services have no backend yet "
+            "(%s); the role will carry no grants for them",
+            app.slug,
+            len(unprovisioned),
+            len(services),
+            ", ".join(sorted(unprovisioned)),
+        )
     declared_by_service = _permissions_by_binding(bindings, plugin_slug=plugin_slug)
     # Self-sufficient: the IRSA trust policy needs the cluster's OIDC issuer.
     # Discover it from EKS + cache on the cluster row when absent, so the
@@ -308,6 +325,9 @@ def _ensure_workload_identity_sync(
         "namespace": namespace,
         "cluster_slug": cluster.slug,
         "grants": len(permissions),
+        # Named so the activity result carries the reason a role came out
+        # empty, not only the count (#1701).
+        "unprovisioned_services": sorted(unprovisioned),
         "grants_pending": states.get("pending", 0),
         "grants_failed": states.get("failed", 0),
         "prune_refusals": len(refusals),
