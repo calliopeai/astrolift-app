@@ -85,6 +85,7 @@ from django.core.management.base import BaseCommand, CommandError
 from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
+from astrolift_observability.prom_client import is_cluster_internal_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +322,19 @@ class Command(BaseCommand):
         parser.add_argument("--endpoint", default=None)
         parser.add_argument("--ca-cert", default=None)
         parser.add_argument("--ingress-class", default=None)
+        parser.add_argument(
+            "--prometheus-endpoint",
+            default=None,
+            help=(
+                "Base URL of the cluster's Prometheus, as the control plane must reach it "
+                "(default: ASTROLIFT_CLUSTER_PROMETHEUS_ENDPOINT). Written to "
+                "provider_config['prometheus_endpoint'], which every metrics panel reads. "
+                "The control plane queries it over HTTP from outside the cluster, so a "
+                "Service ClusterIP or *.svc name will not resolve -- front it with an "
+                "internal load balancer. Absent leaves whatever the row has, including the "
+                "pod IP the capability probe discovers."
+            ),
+        )
         parser.add_argument(
             "--ingress-mode",
             default=None,
@@ -706,6 +720,29 @@ class Command(BaseCommand):
         )
         if _boundary:
             provider_config["iam_permissions_boundary_arn"] = _boundary
+
+        # The endpoint every metrics panel reads (#1711). Until now the only
+        # write paths were the registration UI and the capability probe's
+        # pod-IP discovery, which re-resolves to nothing when the Prometheus
+        # pod is rescheduled -- an install with a stable internal load
+        # balancer in front of Prometheus had no supported way to say so.
+        _prometheus_endpoint = (
+            opts.get("prometheus_endpoint") or _env("ASTROLIFT_CLUSTER_PROMETHEUS_ENDPOINT") or ""
+        ).strip()
+        if _prometheus_endpoint:
+            provider_config["prometheus_endpoint"] = _prometheus_endpoint
+            if is_cluster_internal_endpoint(_prometheus_endpoint):
+                # Not an error: a control plane deployed into the same
+                # cluster reaches this fine. Said out loud because for the
+                # deployment shape this command usually runs in it does not,
+                # and the failure it produces reads as "Prometheus is down".
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"prometheus_endpoint {_prometheus_endpoint!r} is a cluster-internal "
+                        "address. Unless the control plane runs inside this cluster it cannot "
+                        "reach it; front Prometheus with an internal load balancer."
+                    )
+                )
 
         # Merge over what the row already carries rather than replacing it.
         # ``provider_config`` is assigned wholesale, and it is ``{}`` on any
