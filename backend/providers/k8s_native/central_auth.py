@@ -66,6 +66,46 @@ def issuer_from_discovery_url(discovery_url: str) -> str:
     return url
 
 
+# Flags the platform computes from the cluster's own configuration.
+# Overridable like any other -- an operator who knows their provider
+# better than we do should not have to hand-edit a rendered HelmRelease
+# -- but each has a reason, recorded at the assignment above.
+COMPUTED_PROXY_ARGS = frozenset({"oidc-issuer-url", "redirect-url", "cookie-domain", "whitelist-domain"})
+
+
+def proxy_extra_args(oidc_auth_config: dict[str, Any] | None) -> dict[str, str]:
+    """Operator overrides for the proxy's ``extraArgs`` (#1716).
+
+    ``extra_args`` was a closed dict, so anything an operator had to set
+    for their provider was unreachable without hand-editing the rendered
+    HelmRelease. The flag that surfaced it was
+    ``insecure-oidc-allow-unverified-email``: oauth2-proxy rejects a
+    login whose id_token does not assert ``email_verified``, and where
+    the upstream *cannot* assert it -- common for SAML federations that
+    emit no equivalent, on a tenant the cluster operator does not
+    control -- the proxy flag is the only lever there is.
+
+    A general seam rather than one named boolean, because the same gap
+    covers ``email-domain`` (hardcoded to ``*``, so any address the IdP
+    returns is authorized) and every provider-specific flag after it.
+
+    Keys are given without the leading dashes, matching the chart's
+    ``extraArgs`` map. Values are coerced to strings: helm renders them
+    onto a command line, and a YAML bool would arrive as ``True``.
+    """
+
+    raw = (oidc_auth_config or {}).get("proxy_extra_args") or {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in raw.items():
+        flag = str(key).strip().lstrip("-")
+        if not flag or value is None:
+            continue
+        out[flag] = "true" if value is True else "false" if value is False else str(value)
+    return out
+
+
 def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> BootstrapComponent:
     """The ``oauth2-proxy`` component rendered from a cluster's config.
 
@@ -82,6 +122,8 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
 
     extra_args: dict[str, str] = {
         "provider": "oidc",
+        # Any address the IdP returns is authorized. Narrowing this is a
+        # per-cluster decision, reachable through ``proxy_extra_args``.
         "email-domain": "*",
         # nginx's auth_request calls the proxy over the cluster network
         # with the original Host preserved; without this the proxy builds
@@ -104,6 +146,8 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
         # without this the proxy refuses the redirect and strands the
         # user on the auth host after a successful login.
         extra_args["whitelist-domain"] = cookie_scope
+
+    extra_args.update(proxy_extra_args(config))
 
     return BootstrapComponent(
         key="oauth2-proxy",

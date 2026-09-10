@@ -75,6 +75,8 @@ include the call unconditionally.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from typing import Any
 
@@ -83,6 +85,8 @@ from django.core.management.base import BaseCommand, CommandError
 from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
+
+logger = logging.getLogger(__name__)
 
 _VALID_AUTH = {"kubeconfig", "exec_plugin", "service_account_token"}
 
@@ -97,6 +101,29 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _json_env(name: str) -> dict[str, Any] | None:
+    """A JSON object from the environment, or None.
+
+    Malformed JSON is a startup-time misconfiguration, and this command
+    runs on every container start -- refusing here would take the control
+    plane down over a stray comma. Warn and fall back to what the row
+    already carries, which is what the caller does with None.
+    """
+
+    raw = _env(name)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        logger.warning("%s is not valid JSON; ignoring it", name)
+        return None
+    if not isinstance(parsed, dict):
+        logger.warning("%s must be a JSON object, got %s; ignoring it", name, type(parsed).__name__)
+        return None
+    return parsed
 
 
 def _discover_aws(cluster_name: str, region: str) -> dict[str, Any]:
@@ -439,24 +466,40 @@ class Command(BaseCommand):
                 "upstream_connector": _env("ASTROLIFT_CLUSTER_OIDC_UPSTREAM_CONNECTOR") or "google",
                 "auth_proxy_host": _oidc_auth_proxy_host,
             }
-            # The gate's proof-of-passage secret (#1726). This dict REPLACES
-            # oidc_auth_config wholesale, so a key the environment does not
-            # carry is not merely left unset -- it is deleted. Without this
-            # line, declaring the OIDC vars silently strips the gateway secret
-            # on the next container start and every gated app starts refusing
-            # traffic it can no longer prove came through the gate.
+            # This dict REPLACES oidc_auth_config wholesale, so a key the
+            # environment does not carry is not merely left unset -- it is
+            # deleted on the next container start. Two keys are owned by the
+            # operator rather than by the environment, and both have to be
+            # carried forward or declaring the OIDC vars silently destroys
+            # them:
             #
-            # Carried forward from the existing row when the environment does
-            # not supply one, so adopting the declarative path does not have to
-            # mean re-issuing a secret that is already deployed and working.
-            _oidc_gateway_secret = _env("ASTROLIFT_CLUSTER_OIDC_GATEWAY_SECRET")
-            if not _oidc_gateway_secret:
-                _existing = TenantCluster.all_objects.filter(slug=slug).first()
-                _oidc_gateway_secret = ((_existing.oidc_auth_config or {}) if _existing else {}).get(
-                    "gateway_secret", ""
-                )
+            # ``gateway_secret`` (#1726) -- lose it and every gated app starts
+            # refusing traffic it can no longer prove came through the gate.
+            #
+            # ``proxy_extra_args`` (#1716) -- the operator's provider flags,
+            # e.g. ``insecure-oidc-allow-unverified-email`` for a federation
+            # whose upstream cannot assert the claim. Lose it and every
+            # federated login 500s at the callback again.
+            #
+            # Environment wins where it declares one, so an install can move
+            # either to the declarative path without re-issuing a secret or
+            # re-deriving flags that are already deployed and working.
+            _existing_oidc: dict = {}
+            _existing_row = TenantCluster.all_objects.filter(slug=slug).first()
+            if _existing_row is not None:
+                _existing_oidc = _existing_row.oidc_auth_config or {}
+
+            _oidc_gateway_secret = _env("ASTROLIFT_CLUSTER_OIDC_GATEWAY_SECRET") or _existing_oidc.get(
+                "gateway_secret", ""
+            )
             if _oidc_gateway_secret:
                 oidc_auth_config["gateway_secret"] = _oidc_gateway_secret
+
+            _proxy_args = _json_env("ASTROLIFT_CLUSTER_OIDC_PROXY_EXTRA_ARGS") or _existing_oidc.get(
+                "proxy_extra_args"
+            )
+            if _proxy_args:
+                oidc_auth_config["proxy_extra_args"] = _proxy_args
 
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
