@@ -34,6 +34,7 @@ export const GET_APP_GOLDEN_SIGNALS = gql`
         rangeSeconds
         unit
         promql
+        reason
         samples {
           ${TIME_SERIES_POINT_FIELDS}
         }
@@ -286,11 +287,7 @@ export const GET_APP_TRACES = gql`
 
 export const GET_TRACE_SPANS = gql`
   query GetTraceSpans($appSlug: String!, $traceId: String!, $environmentName: String) {
-    astroliftTraceSpans(
-      appSlug: $appSlug
-      traceId: $traceId
-      environmentName: $environmentName
-    ) {
+    astroliftTraceSpans(appSlug: $appSlug, traceId: $traceId, environmentName: $environmentName) {
       traceId
       spanId
       parentSpanId
@@ -320,11 +317,7 @@ export const GET_TRACE_SPANS = gql`
  */
 export const APP_METRIC_NAMES = gql`
   query AppMetricNames($appSlug: String!, $environmentName: String, $limit: Int) {
-    astroliftAppMetricNames(
-      appSlug: $appSlug
-      environmentName: $environmentName
-      limit: $limit
-    ) {
+    astroliftAppMetricNames(appSlug: $appSlug, environmentName: $environmentName, limit: $limit) {
       ok
       error
       names

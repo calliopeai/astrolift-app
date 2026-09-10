@@ -37,6 +37,7 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import {
   type ObservabilityPanelReason,
+  type PanelEmptyMessage,
   panelEmptyState,
 } from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
@@ -264,6 +265,24 @@ interface SignalCardProps {
   lineColor: string;
 }
 
+// A request-path signal with no source at all reads exactly like a
+// healthy app with no traffic unless we say otherwise (#1708). The
+// backend labels each signal; this turns that label into the card's
+// empty state.
+const RED_NOT_CONFIGURED =
+  "Nothing feeds this signal: the app exposes no Prometheus metrics (set metrics.enabled on a workload) and this cluster's ingress controller has no metrics mapping.";
+
+function signalEmptyState(
+  signal: AstroliftAppGoldenSignal | undefined,
+  thing: string
+): PanelEmptyMessage {
+  return panelEmptyState(signal?.reason ?? "NO_DATA_YET", {
+    thing,
+    notConfigured: RED_NOT_CONFIGURED,
+    provider: "this cloud",
+  });
+}
+
 function SignalCard({ title, description, signal, loading, lineColor }: SignalCardProps) {
   const samples = signal?.samples ?? [];
   const unit = signal?.unit ?? "";
@@ -282,7 +301,10 @@ function SignalCard({ title, description, signal, loading, lineColor }: SignalCa
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !signal || !hasData ? (
-          <NoMetricsCallout />
+          <NoMetricsCallout
+            title={signalEmptyState(signal, title.toLowerCase()).title}
+            description={signalEmptyState(signal, title.toLowerCase()).description}
+          />
         ) : (
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
@@ -342,9 +364,7 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
   // p90 is intentionally exposed via the disclosure only — the chart
   // renders three lines so the SLO-typical p95 isn't visually crowded
   // out by a fourth nearby quantile (#640).
-  const promql = [p50?.promql, p95?.promql, p99?.promql, p90?.promql]
-    .filter(Boolean)
-    .join("\n\n");
+  const promql = [p50?.promql, p95?.promql, p99?.promql, p90?.promql].filter(Boolean).join("\n\n");
   const hasData = rows.length > 0;
 
   return (
@@ -361,7 +381,10 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !hasData ? (
-          <NoMetricsCallout />
+          <NoMetricsCallout
+            title={signalEmptyState(p95 ?? p50 ?? p99, "latency").title}
+            description={signalEmptyState(p95 ?? p50 ?? p99, "latency").description}
+          />
         ) : (
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
@@ -610,7 +633,7 @@ function PromQLDisclosure({ promql }: PromQLDisclosureProps) {
       <summary className="text-muted-foreground cursor-pointer text-xs select-none">
         Show PromQL
       </summary>
-      <pre className="bg-muted/40 mt-2 overflow-x-auto rounded border p-2 font-mono text-2xs whitespace-pre-wrap">
+      <pre className="bg-muted/40 text-2xs mt-2 overflow-x-auto rounded border p-2 font-mono whitespace-pre-wrap">
         {promql}
       </pre>
     </details>

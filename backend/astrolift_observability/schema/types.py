@@ -64,6 +64,19 @@ class AppGoldenSignal:
     unit: str
     """Display unit hint for the FE: ``"rps"``, ``"ratio"``,
     ``"seconds"``, ``"percent"``."""
+    reason: ObservabilityPanelReason = ObservabilityPanelReason.OK
+    """Why *this* signal is empty (#1708).
+
+    The envelope's ``reason`` speaks for the panel as a whole, which
+    hides the case the golden-signals group actually hits: saturation
+    populates from cAdvisor while traffic / errors / latency have no
+    source at all, so the group reads as half-broken rather than
+    unconfigured. ``NOT_CONFIGURED`` here means the RED queries are
+    structurally incapable of returning rows — the cluster's ingress
+    variant has no edge-metrics mapping and no workload declares
+    ``metrics.enabled`` — as distinct from ``NO_DATA_YET``, which means
+    a real source returned nothing for the window.
+    """
 
 
 @strawberry.type(name="AstroliftAppGoldenSignalsResult")
@@ -103,7 +116,9 @@ class StatusCodeBreakdown:
     """Per-status-code stacked time-series for one app/env.
 
     ``reason`` (#1111) discriminates the empty state: NOT_CONFIGURED
-    (no Prometheus endpoint), NO_DATA_YET (endpoint live, no traffic in
+    (no Prometheus endpoint, or no HTTP metric source for the app —
+    neither an edge-metrics mapping nor ``metrics.enabled`` on any
+    workload, #1708), NO_DATA_YET (a source exists, no traffic in
     window), ERROR (Prometheus errored), or OK. Golden-signals-family
     panel ⇒ ``NOT_SUPPORTED_BY_PROVIDER`` never applies.
     """

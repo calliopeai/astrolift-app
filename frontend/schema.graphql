@@ -820,6 +820,7 @@ type AstroliftAppGoldenSignal {
   samples: [AstroliftTimeSeriesPoint!]!
   promql: String!
   unit: String!
+  reason: AstroliftObservabilityPanelReason!
 }
 
 type AstroliftAppGoldenSignalsResult {

@@ -830,6 +830,7 @@ export type AstroliftAppGoldenSignal = {
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
   samples: Array<AstroliftTimeSeriesPoint>;
   unit: Scalars['String']['output'];
 };
