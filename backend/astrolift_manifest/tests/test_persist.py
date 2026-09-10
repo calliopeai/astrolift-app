@@ -389,3 +389,142 @@ deletion_policy = "retain"
     assert name == "DeprovisionManagedServiceWorkflow"
     assert workflow_input.delete_data is False
     assert workflow_input.force_destroy is False
+
+
+# ---------------------------------------------------------------------
+# A lost provision enqueue has to be retried (#1688)
+# ---------------------------------------------------------------------
+#
+# ``_enqueue_manifest_workflow`` swallows a start failure on purpose --
+# "desired state remains retryable" -- but nothing retried it. Enqueueing
+# happened only when the row was created or its manifest block changed,
+# so a first enqueue lost to a queue outage or a stopped worker was lost
+# for good: every later deploy re-reconciled, saw no change, and enqueued
+# nothing. The row kept backend_ref="" forever, no driver call was ever
+# attempted, and the app's binding secret stayed empty.
+
+
+_PG_MANIFEST = """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+name = "records"
+"""
+
+
+def _catalog(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "astrolift_services.managed_service_catalog.resolve_variant",
+        lambda **kwargs: SimpleNamespace(variant=kwargs.get("requested_variant") or "resolved-default"),
+    )
+    monkeypatch.setattr("astrolift_services.managed_service_catalog.validate_config", lambda *_: None)
+
+
+def _provision_names(started):
+    return [n for n, _i, _w in started if n == "ProvisionManagedServiceWorkflow"]
+
+
+def test_an_unprovisioned_service_is_re_enqueued_on_the_next_deploy(
+    monkeypatch, django_capture_on_commit_callbacks
+):
+    """The bug: the second deploy enqueued nothing, forever."""
+
+    _catalog(monkeypatch)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+    assert _provision_names(started) == ["ProvisionManagedServiceWorkflow"]
+
+    # Same manifest again, row still never provisioned.
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    assert _provision_names(started) == ["ProvisionManagedServiceWorkflow"]
+
+
+def test_a_provisioned_service_is_not_re_enqueued(monkeypatch, django_capture_on_commit_callbacks):
+    """Once it has a backend_ref there is nothing to retry, and
+    re-enqueueing would restart work on every deploy."""
+
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    ManagedService.objects.filter(registered_app=app).update(
+        backend_ref="postgres/records", status=ManagedService.Status.ACTIVE
+    )
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    assert _provision_names(started) == []
+
+
+def test_a_run_already_in_flight_is_not_restarted(monkeypatch, django_capture_on_commit_callbacks):
+    """start_workflow reuses the id under TERMINATE_IF_RUNNING, so
+    re-enqueueing a PROVISIONING row would kill and restart it on every
+    deploy."""
+
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    ManagedService.objects.filter(registered_app=app).update(status=ManagedService.Status.PROVISIONING)
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    assert _provision_names(started) == []
+
+
+def test_a_failed_provision_is_retried(monkeypatch, django_capture_on_commit_callbacks):
+    """The operator's normal loop is fix-and-push; the next deploy should
+    pick a failed service back up."""
+
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    ManagedService.objects.filter(registered_app=app).update(status=ManagedService.Status.FAILED)
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    assert _provision_names(started) == ["ProvisionManagedServiceWorkflow"]

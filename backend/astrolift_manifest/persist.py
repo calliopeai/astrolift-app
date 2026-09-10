@@ -272,6 +272,37 @@ def _enqueue_deprovision(row) -> None:
     )
 
 
+def _needs_provision_retry(row) -> bool:
+    """Has this row been declared but never actually provisioned?
+
+    ``_enqueue_manifest_workflow`` swallows a start failure on purpose --
+    "desired state remains retryable" -- but nothing retried it (#1688).
+    Enqueueing happened only when the row was created or its manifest
+    block changed, so a first enqueue lost to a queue outage, a stopped
+    worker or an unreachable Temporal was lost for good: every later
+    deploy re-reconciled, saw no change, and enqueued nothing. The row
+    kept ``backend_ref=""`` forever, no driver call was ever attempted,
+    and the app's binding secret stayed empty -- which reads as "the
+    platform ignored my manifest", because in effect it did.
+
+    ``PROVISIONING`` and ``DEPROVISIONING`` are excluded: a run is
+    already in flight, and re-enqueueing would terminate and restart it
+    on every deploy (``start_workflow`` reuses the id under
+    TERMINATE_IF_RUNNING). ``FAILED`` is included -- a failed provision
+    should be retried by the next deploy, which is the operator's normal
+    "fix it and push" loop.
+    """
+
+    from astrolift_services.models import ManagedService
+
+    if row.backend_ref:
+        return False
+    return row.status not in (
+        ManagedService.Status.PROVISIONING,
+        ManagedService.Status.DEPROVISIONING,
+    )
+
+
 def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]) -> PersistResult:
     """Reconcile manifest declarations into real lifecycle-owned rows.
 
@@ -376,6 +407,10 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                 row.save()
                 result.managed_services_updated += 1
                 _enqueue_update(row) if row.backend_ref else _enqueue_provision(row)
+            elif _needs_provision_retry(row):
+                # Unchanged, but never provisioned -- the enqueue that
+                # should have happened at create time never landed (#1688).
+                _enqueue_provision(row)
             continue
 
         project_key = (service.kind, name)
@@ -411,6 +446,9 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                         f"project managed service {name!r} already exists with different desired state; "
                         "shared consumers cannot overwrite it from an app manifest"
                     )
+                if _needs_provision_retry(row):
+                    # Same lost-enqueue gap as the app-scoped branch (#1688).
+                    _enqueue_provision(row)
             project_rows[project_key] = row
 
         attachment = ManagedServiceAttachment.objects.filter(
