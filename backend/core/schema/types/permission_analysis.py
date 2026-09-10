@@ -1,17 +1,36 @@
-"""Permission analysis and debugging types and queries.
+"""Permission analysis: why can this user do this, or why not.
 
-Provides tools to diagnose why a user can or can't perform an action,
-compare permissions between users, and list effective permissions.
+Answers against the permission system Astrolift actually authorizes on
+(#1730). Every resolver here used to be written against
+``django.contrib.auth`` ``Group`` / ``Permission``:
+
+    perm_obj = Permission.objects.filter(codename=permission).first()
+    matching_groups = org_groups.filter(permissions=perm_obj)
+    granted = len(matching_names) > 0
+
+Astrolift does not authorize on Django groups. It authorizes on
+``RoleBinding`` -> ``Role.permissions``, resolved by
+``astrolift_identity.permission_resolver.resolve`` walking ORG -> TEAM ->
+PROJECT -> APP. So the old answers were not merely stale, they were about
+a different question: ``permission`` was matched against
+``auth_permission.codename`` and never against the ``Permission`` StrEnum
+slugs (``team.read``, ``app.deploy``) the gates read, and ``granted`` came
+out of group membership -- able to report *denied* for a permission the
+caller demonstrably holds, and *granted* for one they do not.
+
+This is the built-in tool for answering "why was this denied", and the
+first thing an operator reaches for when RBAC misbehaves. Answering
+confidently from the wrong table is worse than not shipping it.
+
+The load-bearing property, asserted in the tests: ``granted`` is whatever
+``resolve()`` returns for the same tenant context, because it is computed
+by calling it. The diagnostic cannot disagree with the gate.
 """
 
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
-from django.contrib.contenttypes.models import ContentType
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -20,13 +39,22 @@ User = get_user_model()
 
 @strawberry.type
 class PermissionEntry:
-    """A single permission with its source (which group grants it)."""
+    """One permission slug the viewer holds, and what granted it."""
 
-    codename: str
-    name: str
-    app_label: str
-    model: str
-    granted_via_groups: list[str]
+    slug: str
+    """The catalog slug, e.g. ``team.read``."""
+
+    resource: str
+    """Left half of the slug — ``team`` for ``team.read``."""
+
+    action: str
+    """Right half of the slug — ``read`` for ``team.read``."""
+
+    granted_via: list[str]
+    """Every binding that carries it, as ``<role-slug>@<SCOPE>:<id>``.
+    More than one is normal: a permission held at both org and team scope
+    is listed twice, which is what an operator needs to see before
+    removing one of them."""
 
 
 @strawberry.type
@@ -54,8 +82,7 @@ class PermissionDiagnosis:
 class PermissionDiff:
     """A permission that differs between two users."""
 
-    codename: str
-    name: str
+    slug: str
     user_a_has: bool
     user_b_has: bool
 
@@ -72,38 +99,56 @@ class PermissionComparison:
     differences: list[PermissionDiff]
 
 
-def _get_user_effective_permissions(user: User) -> dict[str, list[str]]:
-    """Get all permissions a user has, mapped to the groups that grant them.
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
 
-    Returns dict of codename → [group_names].
+
+def _caller_org_id() -> int | None:
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant else None
+
+
+def _tenant_for(user, organization_id: int | None):
+    """The context the gate would see for ``user`` in this org.
+
+    The diagnosis is always asked inside one organization -- the caller's
+    -- so it answers for that one rather than picking some org the target
+    happens to belong to.
     """
-    if user.is_superuser:
-        # Superusers have all permissions
-        result = {}
-        for perm in Permission.objects.select_related("content_type").all():
-            result[perm.codename] = ["superuser"]
-        return result
+    from core.tenancy import TenantContext
 
-    # Get groups the user belongs to (scoped to their active org)
-    try:
-        org = user.profile.organization()
-        user_groups = user.groups.filter(memberships__organization=org)
-    except Exception:
-        user_groups = user.groups.all()
-
-    result = {}
-    for group in user_groups.prefetch_related("permissions", "permissions__content_type"):
-        for perm in group.permissions.all():
-            if perm.codename not in result:
-                result[perm.codename] = []
-            result[perm.codename].append(group.name)
-
-    return result
+    return TenantContext(organization_id=organization_id, actor_user_id=user.pk)
 
 
-def _get_user_permission_codenames(user: User) -> set[str]:
-    """Get flat set of permission codenames for a user."""
-    return set(_get_user_effective_permissions(user).keys())
+def _active_bindings(user, organization_id: int | None) -> list:
+    """The user's live bindings, confined to this org."""
+
+    if organization_id is None:
+        return []
+    from astrolift_identity.permission_resolver import _org_confined_bindings
+
+    return _org_confined_bindings(_tenant_for(user, organization_id))
+
+
+def _binding_label(binding) -> str:
+    return f"{binding.role.slug}@{binding.scope_kind}:{binding.scope_id}"
+
+
+def _held_slugs(user, organization_id: int | None) -> dict[str, list[str]]:
+    """Slug -> the bindings that carry it, for one user in one org."""
+
+    from core.permissions import Permission
+
+    if getattr(user, "is_superuser", False) and getattr(user, "is_active", True):
+        return {p.value: ["django superuser"] for p in Permission}
+    out: dict[str, list[str]] = {}
+    for binding in _active_bindings(user, organization_id):
+        for slug in binding.role.permissions or ():
+            out.setdefault(slug, []).append(_binding_label(binding))
+    return out
 
 
 def _require_self_or_superuser(info: Info, target_pk: int | str | None) -> None:
@@ -111,10 +156,8 @@ def _require_self_or_superuser(info: Info, target_pk: int | str | None) -> None:
 
     #537 (tenant-isolation sweep): the prior implementation accepted any
     ``user_id`` from an unauthenticated caller and returned that user's
-    full effective permission set, which is a cross-tenant role leak
-    (effective_permissions reveals which groups grant which permissions
-    in any org the target user belongs to). Gate on self-or-superuser at
-    every resolver entry.
+    full effective permission set, which is a cross-tenant role leak.
+    Gate on self-or-superuser at every resolver entry.
     """
     caller = info.context.user
     if not getattr(caller, "is_authenticated", False):
@@ -131,7 +174,7 @@ class PermissionAnalysisQuery:
     """Permission analysis and debugging queries."""
 
     @strawberry.field(
-        description="List all effective permissions for a user, with the groups that grant each one."
+        description="List all effective permissions for a user, with the role bindings that grant each one."
     )
     def effective_permissions(self, info: Info, user_id: strawberry.ID) -> list[PermissionEntry]:
         from core.schema.common import GlobalIDUtils
@@ -142,16 +185,16 @@ class PermissionAnalysisQuery:
         if not user:
             return []
 
-        perm_map = _get_user_effective_permissions(user)
-        entries = []
-        for perm in Permission.objects.select_related("content_type").filter(codename__in=perm_map.keys()):
+        held = _held_slugs(user, _caller_org_id())
+        entries: list[PermissionEntry] = []
+        for slug in sorted(held):
+            resource, _, action = slug.partition(".")
             entries.append(
                 PermissionEntry(
-                    codename=perm.codename,
-                    name=perm.name,
-                    app_label=perm.content_type.app_label,
-                    model=perm.content_type.model,
-                    granted_via_groups=perm_map.get(perm.codename, []),
+                    slug=slug,
+                    resource=resource,
+                    action=action,
+                    granted_via=held[slug],
                 )
             )
         return entries
@@ -159,7 +202,9 @@ class PermissionAnalysisQuery:
     @strawberry.field(description="Diagnose why a user can or can't perform a specific permission.")
     def permission_diagnose(
         self, info: Info, user_id: strawberry.ID, permission: str
-    ) -> Optional[PermissionDiagnosis]:
+    ) -> PermissionDiagnosis | None:
+        from astrolift_identity.permission_resolver import resolve
+        from core.permissions import Permission
         from core.schema.common import GlobalIDUtils
 
         pk = GlobalIDUtils.get_pk_flexible(user_id)
@@ -168,162 +213,104 @@ class PermissionAnalysisQuery:
         if not user:
             return None
 
-        steps = []
-        granted = False
+        steps: list[PermissionTraceStep] = []
 
-        # Step 1: Is user authenticated?
-        steps.append(
-            PermissionTraceStep(
-                check="is_authenticated",
-                result=user.is_authenticated,
-                detail=f"User {user.username} is {'' if user.is_authenticated else 'NOT '}authenticated",
-            )
-        )
+        def step(check: str, result: bool, detail: str) -> None:
+            steps.append(PermissionTraceStep(check=check, result=result, detail=detail))
 
-        if not user.is_authenticated:
+        def finish(granted: bool, is_superuser: bool = False) -> PermissionDiagnosis:
             return PermissionDiagnosis(
                 user_id=str(user.pk),
                 username=user.username,
                 permission=permission,
-                granted=False,
-                is_superuser=False,
+                granted=granted,
+                is_superuser=is_superuser,
                 steps=steps,
             )
 
-        # Step 2: Is user superuser?
-        steps.append(
-            PermissionTraceStep(
-                check="is_superuser",
-                result=user.is_superuser,
-                detail=f"User {user.username} is {'' if user.is_superuser else 'NOT '}a superuser",
-            )
+        is_active = bool(getattr(user, "is_active", True))
+        step("is_active", is_active, f"User {user.username} is {'' if is_active else 'NOT '}active")
+        if not is_active:
+            return finish(False)
+
+        is_superuser = bool(getattr(user, "is_superuser", False))
+        step(
+            "is_superuser",
+            is_superuser,
+            f"User {user.username} is {'' if is_superuser else 'NOT '}a Django superuser"
+            + (" — the resolver short-circuits and grants everything" if is_superuser else ""),
+        )
+        if is_superuser:
+            return finish(True, is_superuser=True)
+
+        # A slug nothing declares can never be granted, and is almost
+        # always a typo or a Django codename. Say which.
+        known = {p.value for p in Permission}
+        slug_known = permission in known
+        step(
+            "permission_is_declared",
+            slug_known,
+            f"{permission!r} is a declared Astrolift permission"
+            if slug_known
+            else (
+                f"{permission!r} is not in the Astrolift permission catalog. "
+                f"Slugs are <resource>.<action>, e.g. 'team.read' — a Django "
+                f"codename like 'view_team' is a different system and is never granted here."
+            ),
         )
 
-        if user.is_superuser:
-            return PermissionDiagnosis(
-                user_id=str(user.pk),
-                username=user.username,
-                permission=permission,
-                granted=True,
-                is_superuser=True,
-                steps=steps,
-            )
-
-        # Step 3: Check active organization
-        try:
-            org = user.profile.organization()
-            has_org = org is not None
-            steps.append(
-                PermissionTraceStep(
-                    check="has_active_organization",
-                    result=has_org,
-                    detail=f"Active organization: {org.name if org else 'None'}",
-                )
-            )
-        except Exception as e:
-            steps.append(
-                PermissionTraceStep(
-                    check="has_active_organization",
-                    result=False,
-                    detail=f"Error getting organization: {str(e)}",
-                )
-            )
-            return PermissionDiagnosis(
-                user_id=str(user.pk),
-                username=user.username,
-                permission=permission,
-                granted=False,
-                is_superuser=False,
-                steps=steps,
-            )
-
-        # Step 4: Check group memberships in the org
-        org_groups = user.groups.filter(memberships__organization=org)
-        group_names = list(org_groups.values_list("name", flat=True))
-        steps.append(
-            PermissionTraceStep(
-                check="org_group_memberships",
-                result=len(group_names) > 0,
-                detail=f'Groups in org "{org.name}": {", ".join(group_names) if group_names else "NONE"}',
-            )
+        org_id = _caller_org_id()
+        step(
+            "has_active_organization",
+            org_id is not None,
+            f"Active organization id: {org_id}"
+            if org_id is not None
+            else "No active organization in this request — every scope resolves empty",
         )
 
-        # Step 5: Check if any group has the permission
-        perm_obj = Permission.objects.filter(codename=permission).first()
-        if not perm_obj:
-            # Try codename format: app_label.codename
-            if "." in permission:
-                app_label, codename = permission.rsplit(".", 1)
-                perm_obj = Permission.objects.filter(
-                    codename=codename,
-                    content_type__app_label=app_label,
-                ).first()
-
-        if not perm_obj:
-            steps.append(
-                PermissionTraceStep(
-                    check="permission_exists",
-                    result=False,
-                    detail=f'Permission "{permission}" not found in database',
-                )
-            )
-            return PermissionDiagnosis(
-                user_id=str(user.pk),
-                username=user.username,
-                permission=permission,
-                granted=False,
-                is_superuser=False,
-                steps=steps,
-            )
-
-        steps.append(
-            PermissionTraceStep(
-                check="permission_exists",
-                result=True,
-                detail=f"Permission found: {perm_obj.content_type.app_label}.{perm_obj.codename} ({perm_obj.name})",
-            )
+        bindings = _active_bindings(user, org_id)
+        labels = [_binding_label(b) for b in bindings]
+        step(
+            "role_bindings_in_this_org",
+            bool(bindings),
+            ", ".join(labels) if labels else "NONE — this user holds no live role binding in this org",
         )
 
-        # Step 6: Which groups have this permission?
-        groups_with_perm = Group.objects.filter(permissions=perm_obj)
-        groups_with_perm_names = list(groups_with_perm.values_list("name", flat=True))
-        steps.append(
-            PermissionTraceStep(
-                check="groups_with_permission",
-                result=len(groups_with_perm_names) > 0,
-                detail=f'Groups that have "{permission}": {", ".join(groups_with_perm_names) if groups_with_perm_names else "NONE"}',
-            )
+        carriers = [_binding_label(b) for b in bindings if permission in (b.role.permissions or ())]
+        step(
+            "bindings_carrying_this_permission",
+            bool(carriers),
+            ", ".join(carriers) if carriers else f"No binding in this org carries {permission!r}",
         )
 
-        # Step 7: Does the user's org groups intersect with permission groups?
-        matching_groups = org_groups.filter(permissions=perm_obj)
-        matching_names = list(matching_groups.values_list("name", flat=True))
-        granted = len(matching_names) > 0
-        steps.append(
-            PermissionTraceStep(
-                check="user_org_groups_have_permission",
-                result=granted,
-                detail=f"User's org groups with this permission: {', '.join(matching_names) if matching_names else 'NONE — PERMISSION DENIED'}",
+        # The answer is the gate's own, not a re-derivation. A diagnostic
+        # that can disagree with the thing it explains is worse than none.
+        if not slug_known:
+            return finish(False)
+        granted, reason = resolve(_tenant_for(user, org_id), Permission(permission), None)
+        if not granted and carriers:
+            # The #1717 shape, and the one most worth naming: she does
+            # hold it, at a scope this check did not ask about. An
+            # unqualified check resolves against the tenant context, and
+            # with no team or project selected that is the org alone --
+            # so a TEAM-scoped binding cannot satisfy it. This is the
+            # answer to "I have the role, why am I denied".
+            reason = (
+                f"{reason}. Held at {', '.join(carriers)}, but this check was made at "
+                f"organization scope — an unqualified check resolves against the active "
+                f"tenant context, which selects no team or project here. A resolver that "
+                f"names its target passes that scope; a collection resolver gates on "
+                f"holding the permission at any scope and filters its rows."
             )
-        )
-
-        return PermissionDiagnosis(
-            user_id=str(user.pk),
-            username=user.username,
-            permission=permission,
-            granted=granted,
-            is_superuser=False,
-            steps=steps,
-        )
+        step("resolver_verdict", granted, reason)
+        return finish(granted)
 
     @strawberry.field(description="Compare effective permissions between two users.")
     def permission_compare(
         self, info: Info, user_id_a: strawberry.ID, user_id_b: strawberry.ID
-    ) -> Optional[PermissionComparison]:
+    ) -> PermissionComparison | None:
         # #537: compare is meaningful across two arbitrary users — only
-        # superusers may run it. (A regular user comparing themselves
-        # against themselves is a degenerate diagnosis call, not a real
-        # use case.)
+        # superusers may run it.
         caller = info.context.user
         if not getattr(caller, "is_authenticated", False):
             raise GraphQLError("Authentication required")
@@ -339,25 +326,17 @@ class PermissionAnalysisQuery:
         if not user_a or not user_b:
             return None
 
-        perms_a = _get_user_permission_codenames(user_a)
-        perms_b = _get_user_permission_codenames(user_b)
+        org_id = _caller_org_id()
+        perms_a = set(_held_slugs(user_a, org_id))
+        perms_b = set(_held_slugs(user_b, org_id))
 
         only_a = sorted(perms_a - perms_b)
         only_b = sorted(perms_b - perms_a)
         shared = sorted(perms_a & perms_b)
-
-        differences = []
-        for codename in sorted(perms_a.symmetric_difference(perms_b)):
-            perm = Permission.objects.filter(codename=codename).first()
-            if perm:
-                differences.append(
-                    PermissionDiff(
-                        codename=codename,
-                        name=perm.name,
-                        user_a_has=codename in perms_a,
-                        user_b_has=codename in perms_b,
-                    )
-                )
+        differences = [
+            PermissionDiff(slug=slug, user_a_has=slug in perms_a, user_b_has=slug in perms_b)
+            for slug in sorted(perms_a.symmetric_difference(perms_b))
+        ]
 
         return PermissionComparison(
             user_a_username=user_a.username,

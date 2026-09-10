@@ -5771,18 +5771,16 @@ type PermissionDiagnosis {
 }
 
 type PermissionDiff {
-  codename: String!
-  name: String!
+  slug: String!
   userAHas: Boolean!
   userBHas: Boolean!
 }
 
 type PermissionEntry {
-  codename: String!
-  name: String!
-  appLabel: String!
-  model: String!
-  grantedViaGroups: [String!]!
+  slug: String!
+  resource: String!
+  action: String!
+  grantedVia: [String!]!
 }
 
 type PermissionTraceStep {
@@ -5941,7 +5939,7 @@ input PushManifestToRepoInput {
 
 type Query {
   """
-  List all effective permissions for a user, with the groups that grant each one.
+  List all effective permissions for a user, with the role bindings that grant each one.
   """
   effectivePermissions(userId: ID!): [PermissionEntry!]!
 
