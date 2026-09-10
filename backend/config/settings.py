@@ -763,10 +763,12 @@ INTERNAL_IPS = [
 ]
 
 DEBUG_TOOLBAR_CONFIG = {
-    # Gate the toolbar on a dedicated env var instead of just DEBUG so prod
-    # installs (which keep DEBUG=True for error-page debugging) can still
-    # hide DJT — it leaks internal SQL / settings / cache details to anyone
-    # who can reach the page and adds noticeable per-request overhead.
+    # Gate the toolbar on a dedicated env var rather than on DEBUG: it leaks
+    # internal SQL / settings / cache details to anyone who can reach the
+    # page and adds noticeable per-request overhead, so an operator debugging
+    # a dev-configuration install still gets to decide. (Until #1732 the
+    # server configurations ran DEBUG=True, which is what made a dedicated
+    # gate load-bearing rather than a convenience.)
     "SHOW_TOOLBAR_CALLBACK": lambda request: env_bool("ASTROLIFT_ENABLE_DJT", False),
     # Allow test runs without removing debug_toolbar from INSTALLED_APPS
     "IS_RUNNING_TESTS": False,
@@ -976,21 +978,27 @@ IS_PROD = CONFIGURATION.lower() == "prd"
 IS_DEV = CONFIGURATION.lower() == "dev" or CONFIGURATION.lower() == "local"
 IS_LOCAL = CONFIGURATION.lower() in ("local", "localpg", "localverbose")
 
-if CONFIGURATION.lower() == "Prd".lower():
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
+# The server configurations (#1732). ``DEBUG`` was True on all four and
+# the password validators were emptied, which on a real install means
+# Django's technical 500 page -- full traceback, every frame's locals, and
+# the settings dump redacted only by name-matching -- is served to anyone
+# who can provoke an unhandled exception, and every request's SQL is
+# retained in ``connection.queries`` on a long-lived worker.
+#
+# This reverses a deliberate earlier choice (the DJT comment above still
+# describes prod as keeping DEBUG=True "for error-page debugging"). The
+# trade it made is not one a hosted install can keep: the traceback goes
+# to whoever provoked it, not to the operator.
+#
+# WhiteNoise serves collected static files from its own middleware
+# regardless of DEBUG, so this does not change static serving; ALLOWED_HOSTS
+# keeps its wildcard, so nothing that reaches the app today stops reaching
+# it. What changes is the error page, and that is the point.
+if CONFIGURATION.lower() in ("prd", "stg", "int"):
+    DEBUG = False
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Dev".lower():
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
-
-elif CONFIGURATION.lower() == "int":
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
-
-elif CONFIGURATION.lower() == "stg":
+    # The developer configuration keeps the technical error page.
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]

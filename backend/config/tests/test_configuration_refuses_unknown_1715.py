@@ -71,3 +71,55 @@ def test_declared_configurations_still_start(name):
     """The guard must not break the names that are actually in use."""
     result = _start_with(name)
     assert "not a configuration this application declares" not in result.stderr
+
+
+# ---------------------------------------------------------------------
+# The server configurations do not run with the developer's error page
+# (#1732)
+# ---------------------------------------------------------------------
+
+_PRINT_POSTURE = (
+    "import json, config.settings as s; "
+    "print(json.dumps({'debug': s.DEBUG, 'validators': len(s.AUTH_PASSWORD_VALIDATORS)}))"
+)
+
+
+def _posture(configuration: str) -> dict:
+    import json
+
+    result = subprocess.run(
+        [sys.executable, "-c", _PRINT_POSTURE],
+        cwd=BACKEND,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "DJANGO_CONFIGURATION": configuration,
+            "DJANGO_SETTINGS_MODULE": "config.settings",
+            "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.parametrize("name", ["prd", "stg", "int"])
+def test_a_server_configuration_does_not_run_with_debug(name):
+    """DEBUG=True serves Django's technical 500 page -- traceback, every
+    frame's locals, and the settings dump redacted only by name-matching --
+    to whoever provoked the exception."""
+    assert _posture(name)["debug"] is False
+
+
+@pytest.mark.parametrize("name", ["prd", "stg", "int"])
+def test_a_server_configuration_keeps_its_password_validators(name):
+    """The same block emptied AUTH_PASSWORD_VALIDATORS, so every password
+    rule the project declares was off on the configurations that need them."""
+    assert _posture(name)["validators"] > 0
+
+
+def test_the_developer_configuration_keeps_the_technical_error_page():
+    """The trade is right on a laptop and wrong on a server; this is the
+    laptop."""
+    assert _posture("dev")["debug"] is True
