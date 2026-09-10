@@ -494,19 +494,49 @@ def _candidate_manifest_paths(files: Mapping[str, Any]) -> list[str]:
     return sorted(set(out))
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class SkippedAgentManifest:
+    """A candidate the agent scan looked at and did not keep (#1697).
+
+    Only manifests that *do* declare an agent workload are reported. A
+    plain app manifest with no agent in it is not a near miss and saying
+    so would bury the one line that matters.
+    """
+
+    manifest_path: str
+    reason: str
+
+
 def _parse_agent_manifest(text: str | None) -> tuple[str, str, str] | None:
     """Parse one manifest body and return ``(name, slug, kind)`` when it is
     an agent manifest, else ``None``.
+
+    See :func:`_classify_agent_manifest` for the rule and why it holds.
+    """
+    kept, _ = _classify_agent_manifest(text)
+    return kept
+
+
+def _classify_agent_manifest(text: str | None) -> tuple[tuple[str, str, str] | None, str | None]:
+    """Classify one manifest body: ``(kept, skip_reason)``.
 
     A manifest qualifies as an agent when it has exactly one workload and
     that workload's ``kind == "agent"``. We deliberately require a *single*
     agent workload: an ``agents/<slug>/astrolift.toml`` describes one agent,
     and a root manifest with mixed workloads is an app (handled by the app
-    registration path), not an agent. Parse / validation errors return
-    ``None`` so the scan skips the file rather than failing the whole walk.
+    registration path), not an agent.
+
+    The rule stands; what changed is that a near miss now says so.
+    A repo whose root manifest declares ``web`` + ``refresh`` + an agent was
+    skipped silently, and registration reported "no agent manifests found"
+    -- true, and useless, because the one thing the operator needed to know
+    was that their agent *was* seen and why it did not count (#1697).
+
+    ``skip_reason`` is ``None`` for a manifest that is not a near miss:
+    unparseable, or simply an app with no agent workload in it.
     """
     if not isinstance(text, str) or not text.strip():
-        return None
+        return None, None
     # Local import keeps ``discover`` free of a hard parser dependency at
     # module import time (the heuristic half above has no such need).
     from astrolift_manifest.parser import ManifestError, parse_raw
@@ -514,12 +544,25 @@ def _parse_agent_manifest(text: str | None) -> tuple[str, str, str] | None:
     try:
         manifest = parse_raw(text)
     except ManifestError:
-        return None
+        return None, None
     agent_workloads = [w for w in manifest.workloads if w.kind == "agent"]
-    if len(agent_workloads) != 1 or len(manifest.workloads) != 1:
-        return None
+    if not agent_workloads:
+        return None, None
+    if len(agent_workloads) != 1:
+        return None, (
+            f"declares {len(agent_workloads)} agent workloads "
+            f"({', '.join(sorted(w.name for w in agent_workloads))}). An agent manifest describes "
+            "exactly one agent -- give each its own agents/<slug>/astrolift.toml"
+        )
+    if len(manifest.workloads) != 1:
+        others = [w.name for w in manifest.workloads if w.kind != "agent"]
+        return None, (
+            f"declares an agent workload ({agent_workloads[0].name}) alongside "
+            f"{len(others)} other workload(s) ({', '.join(sorted(others))}). An agent manifest "
+            "describes exactly one agent -- move it to agents/<slug>/astrolift.toml"
+        )
     workload = agent_workloads[0]
-    return manifest.name, workload.name, workload.kind
+    return (manifest.name, workload.name, workload.kind), None
 
 
 def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManifest]:
@@ -536,12 +579,25 @@ def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManife
     with no agent manifests returns ``[]`` (not an error) — the caller
     surfaces "no agents found" to the operator.
     """
+    found, _ = scan_agent_manifests_with_skips(files)
+    return found
+
+
+def scan_agent_manifests_with_skips(
+    files: Mapping[str, Any],
+) -> tuple[list[DiscoveredAgentManifest], list[SkippedAgentManifest]]:
+    """:func:`scan_agent_manifests`, plus the near misses and why (#1697)."""
     found: list[DiscoveredAgentManifest] = []
+    skipped: list[SkippedAgentManifest] = []
     federated = _federated_candidates(files)
     candidate_paths = sorted(federated) if federated is not None else _candidate_manifest_paths(files)
     for path in candidate_paths:
-        parsed = _parse_agent_manifest(files.get(path) if isinstance(files.get(path), str) else None)
+        parsed, skip_reason = _classify_agent_manifest(
+            files.get(path) if isinstance(files.get(path), str) else None
+        )
         if parsed is None:
+            if skip_reason:
+                skipped.append(SkippedAgentManifest(manifest_path=path, reason=skip_reason))
             continue
         name, slug, kind = parsed
         found.append(
@@ -554,7 +610,7 @@ def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManife
                 federation=(federated or {}).get(path, {}),
             )
         )
-    return found
+    return found, skipped
 
 
 # ---- app-manifest scan (#979) -----------------------------------------

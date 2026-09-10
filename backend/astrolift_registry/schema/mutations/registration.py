@@ -451,11 +451,19 @@ class RegistrationMutations:
                 field="manifestPaths",
             )
         if result.status == "no_agents":
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value,
+            message = (
                 "no agent or workflow manifests found in this repo "
                 "(looked for agents/*/astrolift.toml, a root astrolift.toml, "
-                "and workflows/**/*.toml)",
+                "and workflows/**/*.toml)"
+            )
+            if result.skipped:
+                # A manifest that declares an agent and was not kept is the
+                # answer to "why did it find nothing", and without it the
+                # operator has only the negative (#1697).
+                message += ". Skipped: " + "; ".join(result.skipped)
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                message,
                 field="sourceRepo",
             )
         if result.status != "ok":

@@ -48,7 +48,7 @@ from astrolift_manifest.discover import (
     AgentFederationError,
     DiscoveredAgentManifest,
     DiscoveredAppManifest,
-    scan_agent_manifests,
+    scan_agent_manifests_with_skips,
     scan_app_manifests,
 )
 from astrolift_manifest.normalize import NormalizationDefaults, manifest_hash, normalize
@@ -813,6 +813,9 @@ class RegisterAgentRepoResult:
     agents: list[RegisteredAgent] = dataclasses.field(default_factory=list)
     workflows: list[Any] = dataclasses.field(default_factory=list)
     error: str | None = None
+    skipped: list[str] = dataclasses.field(default_factory=list)
+    """Near misses: manifests that declare an agent workload and were not
+    kept, each already phrased as one operator-facing line (#1697)."""
 
 
 def _scan_repo_for_agents(
@@ -822,7 +825,7 @@ def _scan_repo_for_agents(
     ref: str,
     organization_id: int,
     tree: _TreeFn | None,
-) -> tuple[list[DiscoveredAgentManifest] | None, dict[str, str], str | None]:
+) -> tuple[list[DiscoveredAgentManifest] | None, dict[str, str], str | None, list[str]]:
     """Fetch ``source_repo`` at ``ref`` and run the agent-manifest scan.
 
     Resolves a usable ``SourceConnection`` for ``(organization_id,
@@ -855,10 +858,15 @@ def _scan_repo_for_agents(
             log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
             conn_error = str(exc) or exc.__class__.__name__
 
+    skipped: list[str] = []
     try:
-        discovered = scan_agent_manifests(files) if files else []
+        if files:
+            discovered, skips = scan_agent_manifests_with_skips(files)
+            skipped = [f"{row.manifest_path}: {row.reason}" for row in skips]
+        else:
+            discovered = []
     except AgentFederationError as exc:
-        return None, {}, str(exc)
+        return None, {}, str(exc), []
 
     # Fallback: when the per-org SourceConnection path yields no agent
     # manifests — no connection, a fetch error, or an empty/inaccessible tree
@@ -871,15 +879,20 @@ def _scan_repo_for_agents(
         pat_files, pat_error = _pat_fallback_tree(source_repo, ref)
         if pat_files:
             try:
-                pat_discovered = scan_agent_manifests(pat_files)
+                pat_discovered, pat_skips = scan_agent_manifests_with_skips(pat_files)
             except AgentFederationError as exc:
-                return None, {}, str(exc)
+                return None, {}, str(exc), []
             # Keep the fetched tree even when it contains only declarative
             # ``workflows/**/*.toml`` definitions.  The caller scans those
             # after this agent-specific discovery pass; discarding the tree
             # here made workflow-only config repos impossible through PAT
             # fallback.
-            return pat_discovered, pat_files, None
+            return (
+                pat_discovered,
+                pat_files,
+                None,
+                [f"{row.manifest_path}: {row.reason}" for row in pat_skips],
+            )
         conn_error = conn_error or pat_error
 
     if not discovered:
@@ -893,9 +906,9 @@ def _scan_repo_for_agents(
         # maps it to ``no_agents`` (unchanged). Only surface an error when the
         # fetch failed or there was nothing to fetch.
         if conn_error is not None:
-            return None, {}, conn_error
+            return None, {}, conn_error, []
 
-    return discovered, files, None
+    return discovered, files, None, skipped
 
 
 def _pat_fallback_tree(source_repo: str, ref: str) -> tuple[dict[str, str], str | None]:
@@ -931,7 +944,7 @@ def discover_agent_manifests(
     ``(source_repo, manifest_path)`` already exists, soft-deleted excluded),
     so the wizard can show which agents are new vs already onboarded.
     """
-    discovered, _files, error = _scan_repo_for_agents(
+    discovered, _files, error, _skipped = _scan_repo_for_agents(
         source_kind=source_kind,
         source_repo=source_repo,
         ref=ref,
@@ -1383,7 +1396,7 @@ def register_agent_repo(
     ``fetch_failed`` when the repo can't be fetched, ``error`` on an
     unexpected persist failure, else ``ok`` with the per-manifest outcome.
     """
-    discovered, files, error = _scan_repo_for_agents(
+    discovered, files, error, skipped = _scan_repo_for_agents(
         source_kind=source_kind,
         source_repo=source_repo,
         ref=ref,
@@ -1402,7 +1415,10 @@ def register_agent_repo(
     except ManifestError as exc:
         return RegisterAgentRepoResult(status="error", error=str(exc))
     if not discovered and not workflow_manifests:
-        return RegisterAgentRepoResult(status="no_agents")
+        # Carry the near misses. "No agent manifests found" is true and
+        # useless when the operator's agent *was* seen and skipped for a
+        # reason they can act on (#1697).
+        return RegisterAgentRepoResult(status="no_agents", skipped=skipped)
 
     # Subset registration (#933): keep only the requested manifests. Unknown
     # paths are silently dropped (a stale wizard selection shouldn't fail the
