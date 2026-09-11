@@ -993,6 +993,26 @@ def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(pe
         "resources": [],
     }
 
+    for tool, result_key in [("astrolift_list_tasks", "tasks"), ("astrolift_list_runtimes", "runtimes")]:
+        discovery = client.post(
+            "/api/mcp/v1/",
+            data=json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 5,
+                    "method": "tools/call",
+                    "params": {"name": tool, "arguments": {}},
+                }
+            ),
+            content_type="application/json",
+            HTTP_MCP_PROTOCOL_VERSION="2025-11-25",
+            HTTP_MCP_SESSION_ID=session_id,
+            **common,
+        )
+        assert discovery.status_code == 200
+        assert discovery.json()["result"]["isError"] is False
+        assert result_key in discovery.json()["result"]["structuredContent"]
+
     missing_session = client.post(
         "/api/mcp/v1/",
         data=json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/list"}),
