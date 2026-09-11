@@ -763,6 +763,12 @@ class ClustersMutation:
         if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         if oidc_changed:
+            from providers.k8s_native.logout import configured_logout_url
+
+            try:
+                configured_logout_url(input.oidc_auth_config)
+            except ValueError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="oidcAuthConfig")
             cluster.oidc_auth_config = input.oidc_auth_config
         if class_changing and had_gate and not _has_auth_gate(cluster.ingress_class, cluster):
             needs = "oidcAuthConfig" if cluster.ingress_class != "alb" else "albAuthConfig"
