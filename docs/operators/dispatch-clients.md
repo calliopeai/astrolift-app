@@ -54,6 +54,21 @@ and dispatcher endpoints are not included. Every page is scoped to the active
 organization and any team restriction on the token, including shared-agent
 read access. A cursor does not grant access to its originating tenant.
 
+Discovery reflects permissions held on an app, project, team or organization;
+every object operation checks its target. A selected context grants no extra
+authority. Workloads inherit their app; tasks use their recorded project first,
+then recorded team, then their live registered-agent app. Invalid recorded
+ownership never falls through to the definition. Tasks without usable ownership
+require organization authority, retaining access to historical runs for org
+operators. These are the same ownership rules used by GraphQL and VNC.
+
+Token permissions and team restrictions remain additional limits over role
+bindings. A secondary-team app share needs `viewer` access for reads and
+`deployer` or `owner` access for controls, plus the matching permission on that
+team. Read-only tokens and shares cannot dispatch or cancel tasks. Package
+resources follow the same agent boundary, and an ambiguous authorized agent slug
+cannot select a different workload.
+
 An overseer can discover agents, dispatch a task, retain its returned ID, poll
 or list its runs, inspect results, and cancel when required. It uses these
 ordinary scoped operations; hosting a chat UI does not grant additional

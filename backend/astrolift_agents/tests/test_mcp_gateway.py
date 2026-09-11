@@ -20,6 +20,8 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_WRITE,
     SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
+    reset_current_api_token,
+    set_current_api_token,
 )
 from astrolift_identity.models import ApiToken, Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
@@ -66,14 +68,18 @@ def _request(user, token, method: str, params=None, *, request_id=1, origin=""):
 
 
 def _call(org, user, token, method: str, params=None):
-    with tenant_context(
-        TenantContext(
-            organization_id=org.pk,
-            team_id=token.team_id,
-            actor_user_id=user.pk,
-        )
-    ):
-        response = mcp_gateway(_request(user, token, method, params))
+    marker = set_current_api_token(token)
+    try:
+        with tenant_context(
+            TenantContext(
+                organization_id=org.pk,
+                team_id=token.team_id,
+                actor_user_id=user.pk,
+            )
+        ):
+            response = mcp_gateway(_request(user, token, method, params))
+    finally:
+        reset_current_api_token(marker)
     return response, json.loads(response.content or b"{}")
 
 
