@@ -12,6 +12,7 @@ from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
+from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import (
     AgentRun,
     AppEnvironment,
@@ -1029,7 +1030,7 @@ class LifecycleQuery:
         return release_notes_to_type(rn) if rn else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_compare_deployments(
         self, info: Info, id_a: str, id_b: str
@@ -1310,7 +1311,7 @@ class LifecycleQuery:
         return page.map(_preview_with_cost)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_deployment_metrics(self, info: Info, window_days: int = 30) -> DeploymentMetricsType:
         """Aggregate rollout health for the last N days.
@@ -1332,10 +1333,14 @@ class LifecycleQuery:
         # (empty aggregate) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        visible_app_ids = visible_apps(
+            RegisteredApp.objects.filter(organization_id=org_id, deleted_at__isnull=True),
+            Permission.APP_READ,
+        ).values_list("id", flat=True)
         qs = Deployment.objects.filter(
             created_at__gte=since,
             deleted_at__isnull=True,
-            registered_app__organization_id=org_id,
+            registered_app_id__in=visible_app_ids,
         )
 
         in_flight_statuses = {
@@ -1414,7 +1419,7 @@ class LifecycleQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_app_health_summary(self, info: Info) -> list[AppHealthSummaryType]:
         """Per-app health rollup for the metrics dashboard.
@@ -1432,9 +1437,10 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         apps = list(
-            RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id).order_by("slug")[
-                :300
-            ]
+            visible_apps(
+                RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id),
+                Permission.APP_READ,
+            ).order_by("slug")[:300]
         )
         if not apps:
             return []
