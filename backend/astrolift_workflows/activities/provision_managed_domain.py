@@ -332,14 +332,18 @@ def _validate_ns_delegation_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         # The platform never handed out nameservers for this zone
         # (is_platform_managed_zone=False), so there is no delegation of ours
         # to verify — the caller owns the zone's NS records.
-        return {
+        result = {
             "passed": True,
             "reason": "no platform nameservers recorded; delegation check not applicable",
         }
+        _persist_delegation_check(domain, result)
+        return result
 
     observed, error = _observed_nameservers(zone)
     if observed is None:
-        return {"passed": True, "reason": f"delegation check skipped: {error}"}
+        result = {"passed": True, "reason": f"delegation check skipped: {error}"}
+        _persist_delegation_check(domain, result)
+        return result
 
     passed, reason = evaluate_ns_delegation(
         check=NsDelegationCheck(
@@ -348,7 +352,33 @@ def _validate_ns_delegation_sync(cluster_id: int, zone: str) -> dict[str, Any]:
             observed_nameservers=observed,
         )
     )
-    return {"passed": passed, "reason": reason}
+    result = {"passed": passed, "reason": reason}
+    _persist_delegation_check(domain, result, observed=sorted(observed), expected=sorted(expected))
+    return result
+
+
+def _persist_delegation_check(
+    domain: Any,
+    result: dict[str, Any],
+    *,
+    observed: list[str] | None = None,
+    expected: list[str] | None = None,
+) -> None:
+    """Persist the latest public-DNS finding so the UI can close the loop."""
+    if domain is None:
+        return
+    from django.utils import timezone
+
+    config = dict(domain.dns_config or {})
+    config["delegation_check"] = {
+        "passed": bool(result.get("passed")),
+        "reason": str(result.get("reason", "")),
+        "observed_nameservers": observed or [],
+        "expected_nameservers": expected or list(domain.provision_nameservers or []),
+        "checked_at": timezone.now().isoformat(),
+    }
+    domain.dns_config = config
+    domain.save(update_fields=["dns_config", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.managed_domain.validate_ns_delegation")
