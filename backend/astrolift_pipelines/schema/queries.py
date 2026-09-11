@@ -6,6 +6,7 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_graphql import PageType, keyset_page, search_q
+from astrolift_identity.scope_visibility import visible_apps
 from astrolift_pipelines.models import Pipeline, PipelineRun
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
@@ -14,8 +15,9 @@ from astrolift_pipelines.schema.types import (
     pipeline_to_type,
 )
 from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_run_app_scope
+from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, granted_scopes, require_permission
 from core.tenancy import get_current_tenant
 
 
@@ -38,6 +40,13 @@ def _pipelines_qs(*, search: str | None = None):
         organization_id=org_id,
         deleted_at__isnull=True,
     ).prefetch_related("triggers")
+    scopes = granted_scopes(tenant, Permission.APP_READ)
+    if not scopes.org:
+        visible_app_ids = visible_apps(
+            RegisteredApp.objects.filter(organization_id=org_id, deleted_at__isnull=True),
+            Permission.APP_READ,
+        ).values_list("id", flat=True)
+        qs = qs.filter(registered_app_id__in=visible_app_ids)
     if search:
         # ``registered_app`` is a nullable many-to-one, so OR-ing over
         # it widens the join without duplicating rows (which would
@@ -88,7 +97,7 @@ class PipelinesQuery:
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage."
     )
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_pipelines(self, info: Info, limit: int = 100) -> list[PipelineType]:
         """All pipelines for the current tenant, ordered by name."""
@@ -96,7 +105,7 @@ class PipelinesQuery:
         return [pipeline_to_type(p) for p in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_pipelines_page(
         self,
