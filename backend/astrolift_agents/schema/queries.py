@@ -567,7 +567,7 @@ class AgentsQuery:
         org_pk = tenant.organization_id if tenant else None
         row = (
             visible_agent_tasks(org_pk, Permission.APP_READ)
-            .filter(guid=guid)
+            .filter(guid=guid, organization_id=org_pk)
             .select_related(
                 "organization",
                 "project",
@@ -662,7 +662,7 @@ class AgentsQuery:
         # reads as empty rather than leaking task existence across tenants.
         task_pk = (
             visible_agent_tasks(org_pk, Permission.AGENT_READ)
-            .filter(guid=guid)
+            .filter(guid=guid, organization_id=org_pk)
             .values_list("pk", flat=True)
             .first()
         )
@@ -737,7 +737,7 @@ class AgentsQuery:
         def _resolve() -> tuple[Any, str, str, str] | None:
             row = (
                 visible_agent_tasks(org_pk, Permission.AGENT_READ)
-                .filter(guid=guid)
+                .filter(guid=guid, organization_id=org_pk)
                 .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
                 .first()
             )

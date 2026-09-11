@@ -1674,7 +1674,11 @@ class AgentsMutation:
         org_pk = tenant.organization_id if tenant else None
         guid = read_guid({"id": id}, "id")
         task = (
-            visible_agent_tasks(org_pk, Permission.AGENT_DISPATCH).filter(guid=guid).first() if guid else None
+            visible_agent_tasks(org_pk, Permission.AGENT_DISPATCH)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
+            if guid
+            else None
         )
         if task is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "task not found")
@@ -1731,7 +1735,9 @@ class AgentsMutation:
 
         guid = read_guid({"id": task_id}, "id")
         task = (
-            visible_agent_tasks(org_pk, Permission.AGENT_TASK_SEND_INPUT).filter(guid=guid).first()
+            visible_agent_tasks(org_pk, Permission.AGENT_TASK_SEND_INPUT)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
             if guid
             else None
         )

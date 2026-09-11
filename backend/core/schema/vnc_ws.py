@@ -197,7 +197,11 @@ def _check_vnc_permission(*, tenant_org_id, actor_user_id, task_guid) -> bool:
             return False
         # A scope-factory miss falls back to an explicit org gate. An org
         # role cannot override a narrower bearer-token row boundary.
-        return agent_tasks(tenant_org_id, Permission.AGENT_TASK_WATCH).filter(guid=guid).exists()
+        return (
+            agent_tasks(tenant_org_id, Permission.AGENT_TASK_WATCH)
+            .filter(guid=guid, organization_id=tenant_org_id)
+            .exists()
+        )
 
 
 @sync_to_async
