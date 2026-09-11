@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Confine explicit RBAC targets to their current, live ancestry in the active
+  organization (#1743). Selecting another team or project no longer supplies
+  authority over the target. Missing, deleted and foreign targets grant nothing;
+  foreign or deleted parent links cannot contribute permissions. Single and bulk
+  app viewer permissions follow the same ancestry, with a bounded query count.
 - Serialize PostgreSQL `migrate` commands across startup, installer bootstrap,
   and operator sessions before reading migration history. This prevents
   concurrent table creation while preserving normal Django command options
@@ -10,7 +15,6 @@
 - Expose paginated agent task discovery and the runtime catalog through MCP,
   including task placement and lifecycle timestamps. Reads require the same
   token scopes, RBAC and organization/team access as agent discovery (#1735).
-
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
   refuses every mutating path against a resource whose identity tags do not
