@@ -261,11 +261,6 @@ def test_manifest_fetch_and_build_use_recorded_commit(
     outcome = _resync_manifest_for_deploy_sync(dep.pk)
     assert outcome["status"] in ("applied", "in_sync"), outcome
     assert refs == [SHA]
-    # Resync owns the app's build settings; select the builder for this fixture.
-    app.refresh_from_db()
-    app.build_mode = "platform_build"
-    app.build_strategy = "dockerfile"
-    app.save()
     builds = []
 
     class Driver:
