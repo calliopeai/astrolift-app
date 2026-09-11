@@ -9,6 +9,9 @@
   ingress reconciliation preserves app-owned headers. See
   [central auth logout](docs/operators/central-auth-logout.md) for setup and
   the provider rollout requirements.
+- Expose paginated agent task discovery and the runtime catalog through MCP,
+  including task placement and lifecycle timestamps. Reads require the same
+  token scopes, RBAC and organization/team access as agent discovery (#1735).
 
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
