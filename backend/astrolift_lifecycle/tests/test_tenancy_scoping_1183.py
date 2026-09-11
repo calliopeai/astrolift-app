@@ -43,7 +43,7 @@ from astrolift_lifecycle.schema.mutations import (
 )
 from astrolift_lifecycle.schema.queries import LifecycleQuery
 from astrolift_registry.models import RegisteredApp, Workload
-from core.permissions import Permission
+from core.permissions import Permission, PermissionScope, ScopeKind
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
@@ -382,6 +382,69 @@ def test_app_health_summary_lists_caller_org_only(app, actor, fake_info, permiss
     slugs = {r.app_slug for r in rows}
     assert app.slug in slugs
     assert "sib-app" not in slugs, "health summary leaked another org's app"
+
+
+def test_app_health_summary_filters_to_an_app_scoped_grant(app, actor, fake_info, permission_resolver):
+    """A collection grant must narrow the rollup rows, not just open its gate."""
+    RegisteredApp.objects.create(
+        organization=app.organization,
+        team=app.team,
+        project=app.project,
+        name="Sibling",
+        slug="sibling-health-1183",
+        provisioning_status="ready",
+    )
+
+    permission_resolver.grant(
+        Permission.APP_READ,
+        scope=PermissionScope(kind=ScopeKind.APP, id=app.pk),
+    )
+    with _ctx(app.organization, actor):
+        rows = LifecycleQuery().astrolift_app_health_summary(fake_info)
+
+    assert {row.app_slug for row in rows} == {app.slug}
+
+
+def test_deployment_metrics_filters_to_an_app_scoped_grant(app, env, actor, fake_info, permission_resolver):
+    sibling = RegisteredApp.objects.create(
+        organization=app.organization,
+        team=app.team,
+        project=app.project,
+        name="Sibling metrics",
+        slug="sibling-metrics-1183",
+        provisioning_status="ready",
+    )
+    sibling_env = AppEnvironment.objects.create(
+        registered_app=sibling,
+        tenant_cluster=env.tenant_cluster,
+        name="prod",
+        url="https://sibling-metrics.example.com",
+    )
+    Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        trigger_kind="manual",
+        status="running",
+        image_tag="own",
+    )
+    Deployment.objects.create(
+        registered_app=sibling,
+        app_environment=sibling_env,
+        trigger_kind="manual",
+        status="failed",
+        image_tag="sibling",
+    )
+
+    permission_resolver.grant(
+        Permission.APP_READ,
+        scope=PermissionScope(kind=ScopeKind.APP, id=app.pk),
+    )
+    with _ctx(app.organization, actor):
+        metrics = LifecycleQuery().astrolift_deployment_metrics(fake_info, window_days=30)
+
+    assert metrics.total == 1
+    assert metrics.succeeded == 1
+    assert metrics.failed == 0
 
 
 def test_app_health_summary_marks_agent_registered_apps(app, actor, fake_info, permission_resolver):

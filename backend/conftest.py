@@ -161,11 +161,34 @@ def permission_resolver():
         return False, "no grant in test"
 
     from core.permissions import (
+        ALL_SCOPES,
+        GrantedScopes,
+        ScopeKind,
         get_granted_scopes_provider,
         get_permission_resolver,
         register_granted_scopes_provider,
-        scopes_from_resolver,
     )
+
+    def _scopes_provider(_tenant, permission):
+        """Mirror the resolver's explicit grants for any-scope collection tests."""
+        if grants.get((permission.value, None, None)) is True:
+            return ALL_SCOPES
+        ids = {ScopeKind.APP: set(), ScopeKind.PROJECT: set(), ScopeKind.TEAM: set()}
+        for (value, kind, scope_id), allowed in grants.items():
+            if value != permission.value or not allowed or kind is None:
+                continue
+            try:
+                scope_kind = ScopeKind(kind)
+            except ValueError:
+                continue
+            if scope_kind in ids and scope_id is not None:
+                ids[scope_kind].add(scope_id)
+        return GrantedScopes(
+            org=False,
+            team_ids=frozenset(ids[ScopeKind.TEAM]),
+            project_ids=frozenset(ids[ScopeKind.PROJECT]),
+            app_ids=frozenset(ids[ScopeKind.APP]),
+        )
 
     previous = get_permission_resolver()
     # ``any_scope=True`` gates read the granted-scopes provider, not the
@@ -173,7 +196,7 @@ def permission_resolver():
     # controls both halves of the gate.
     previous_provider = get_granted_scopes_provider()
     register_permission_resolver(_resolver)
-    register_granted_scopes_provider(scopes_from_resolver)
+    register_granted_scopes_provider(_scopes_provider)
     yield type("Resolver", (), {"grant": staticmethod(grant), "deny": staticmethod(deny)})
     register_permission_resolver(previous)
     register_granted_scopes_provider(previous_provider)
