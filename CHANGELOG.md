@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Apply scoped fleet/task permissions to MCP discovery, package resources,
+  dispatch and cancellation (#1747), including recorded task ownership,
+  action-specific sharing and token ceilings. Preserve authorization for
+  unrelated MCP tools and omit foreign organization metadata from projections.
 - Scope agent fleets, runs and controls to the caller's app/project/team grants
   (#1745), including live app shares and API token boundaries. Historical tasks
   without recorded team/project ownership inherit their live agent app, or stay
