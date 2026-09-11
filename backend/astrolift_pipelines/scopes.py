@@ -27,7 +27,7 @@ def pipeline_app_scope(field: str = "id"):
         guid = read_guid(args, field)
         org_id = _org_id()
         if not guid or org_id is None:
-            return None
+            return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
         from astrolift_pipelines.models import Pipeline
 
         app_id = (
@@ -35,7 +35,11 @@ def pipeline_app_scope(field: str = "id"):
             .values_list("registered_app__id", flat=True)
             .first()
         )
-        return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
+        return (
+            PermissionScope(kind=ScopeKind.APP, id=app_id)
+            if app_id
+            else PermissionScope(kind=ScopeKind.ORG, id=org_id)
+        )
 
     return _scope
 
@@ -47,7 +51,7 @@ def pipeline_run_app_scope(field: str = "run_id"):
         guid = read_guid(args, field)
         org_id = _org_id()
         if not guid or org_id is None:
-            return None
+            return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
         from astrolift_pipelines.models import PipelineRun
 
         app_id = (
@@ -55,6 +59,10 @@ def pipeline_run_app_scope(field: str = "run_id"):
             .values_list("pipeline__registered_app__id", flat=True)
             .first()
         )
-        return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
+        return (
+            PermissionScope(kind=ScopeKind.APP, id=app_id)
+            if app_id
+            else PermissionScope(kind=ScopeKind.ORG, id=org_id)
+        )
 
     return _scope

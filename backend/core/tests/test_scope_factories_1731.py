@@ -33,9 +33,9 @@ from astrolift_registry.scopes import (
     app_scope_by_slug,
     app_scope_by_workload_guid,
 )
-from core.permissions import ScopeKind
+from core.permissions import Permission, ScopeKind
 from core.scope_args import read_arg, read_guid
-from core.tests.utils.scope_world import ScopeWorld, as_tenant, make_cluster, make_user
+from core.tests.utils.scope_world import ScopeWorld, as_tenant, bind_role, make_cluster, make_user
 
 pytestmark = pytest.mark.django_db
 
@@ -152,19 +152,31 @@ def test_team_and_project_guids_resolve_to_their_own_scopes(world, reba):
 
 
 def test_an_agent_slug_resolves_to_its_owning_app(world, reba):
+    bind_role(
+        reba,
+        permissions=[Permission.AGENT_READ],
+        kind="APP",
+        scope_id=world.medops_app.pk,
+        slug="agent-scope",
+    )
     with as_tenant(world, reba):
         scope = agent_workload_app_scope("agent_slug")({"agent_slug": world.worker.slug})
     assert scope.kind == ScopeKind.APP
     assert scope.id == world.medops_app.id
 
 
-def test_an_agent_slug_that_matches_two_apps_resolves_to_nothing(world, reba):
+def test_an_agent_slug_that_matches_two_apps_requires_an_explicit_org_check(world, reba):
     """Workload slugs are unique per app, not per org. Picking whichever
     row came back first would hand one app's binding authority over
     another's workload."""
     Workload.objects.create(registered_app=world.platform_app, name="Worker", slug=world.worker.slug)
+    bind_role(
+        reba, permissions=[Permission.AGENT_READ], kind="ORG", scope_id=world.org.pk, slug="agent-scope-org"
+    )
     with as_tenant(world, reba):
-        assert agent_workload_app_scope("agent_slug")({"agent_slug": world.worker.slug}) is None
+        scope = agent_workload_app_scope("agent_slug")({"agent_slug": world.worker.slug})
+    assert scope.kind == ScopeKind.ORG
+    assert scope.id == world.org.pk
 
 
 # ---------------------------------------------------------------------

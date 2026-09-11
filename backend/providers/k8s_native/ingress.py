@@ -19,6 +19,8 @@ from typing import Any
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
 
+from .logout import LOGOUT_PATH, redirect_snippet
+
 SUPPORTED_VARIANTS = (
     "nginx_ingress",
     "gateway_api",
@@ -79,6 +81,9 @@ class OIDCAuthConfig:
     gateway_secret_header: str = "X-Astrolift-Gateway-Secret"
     """Header the shared secret is stamped on. Apps point their own
     proxy-secret setting at this name."""
+
+    logout_enabled: bool = False
+    """The central host has a configured browser logout flow (#1741)."""
 
 
 # The three annotation keys that route an nginx-family Ingress through
@@ -148,6 +153,8 @@ def platform_gateway_snippet(auth: OIDCAuthConfig, *, edge: dict | None = None) 
     edge = edge or {}
     secret_header = str(edge.get("gateway_secret_header") or "") or auth.gateway_secret_header
     lines: list[str] = []
+    if auth.logout_enabled:
+        lines.append(redirect_snippet(LOGOUT_PATH, f"https://{auth.auth_proxy_host}{LOGOUT_PATH}"))
     if auth.gateway_secret:
         lines.append(f'proxy_set_header {secret_header} "{auth.gateway_secret}";')
     for pair in edge.get("identity_headers") or []:

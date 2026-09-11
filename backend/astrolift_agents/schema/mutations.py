@@ -15,6 +15,7 @@ CLI operations without granting broad app mutation authority.
 from __future__ import annotations
 
 import hashlib
+from typing import cast
 
 import strawberry
 from django.db import IntegrityError, transaction
@@ -59,12 +60,20 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
-from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
+from astrolift_agents.scopes import (
+    agent_org_scope,
+    agent_task_scope,
+    agent_trigger_scope,
+    agent_workload_app_scope,
+)
 from astrolift_agents.services.agent_package import (
     AgentPackageError,
     normalize_environment_values,
     normalize_secret_references,
 )
+from astrolift_agents.visibility import agent_by_slug
+from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
+from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -75,6 +84,7 @@ from astrolift_registry.models import Workload
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
 JSON = strawberry.scalars.JSON
@@ -1603,7 +1613,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.launch")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope)
     @tenant_scoped()
     def launch_task(
         self,
@@ -1621,6 +1631,16 @@ class AgentsMutation:
         org, err = _resolve_org(org_id)
         if err is not None:
             return err
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        api_token = get_current_api_token()
+        if api_token is not None and (
+            org is None or api_token.organization_id != org.pk or api_token.team_id is not None
+        ):
+            return cast(
+                MutationResultType[LaunchTaskResult],
+                gql_failure(ErrorCode.PERMISSION_DENIED.value, "an org-scoped token is required"),
+            )
         brief = Brief.objects.filter(
             guid=str(brief_id), organization_id=org.pk, deleted_at__isnull=True
         ).first()
@@ -1639,7 +1659,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.cancel")
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id"))
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id", Permission.AGENT_DISPATCH))
     @tenant_scoped()
     def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
         """Cancel an AgentTask.
@@ -1652,7 +1672,14 @@ class AgentsMutation:
         """
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        task = AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
+        guid = read_guid({"id": id}, "id")
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_DISPATCH)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
+            if guid
+            else None
+        )
         if task is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "task not found")
         if task.status in AgentTask.TERMINAL_STATUSES:
@@ -1677,7 +1704,9 @@ class AgentsMutation:
         action="agents.task.send_input",
         target=lambda self, info, task_id, message: ("AgentTask", str(task_id)),
     )
-    @require_permission(Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id"))
+    @require_permission(
+        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+    )
     @tenant_scoped()
     def send_agent_task_input(
         self, info: Info, task_id: strawberry.ID, message: str
@@ -1704,9 +1733,14 @@ class AgentsMutation:
         if org_pk is None:
             return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
 
-        task = AgentTask.objects.filter(
-            guid=str(task_id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        guid = read_guid({"id": task_id}, "id")
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_TASK_SEND_INPUT)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
+            if guid
+            else None
+        )
         if task is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "task not found", field="taskId")
 
@@ -1737,7 +1771,10 @@ class AgentsMutation:
         action="agents.agent.dispatch",
         target=lambda self, info, input: ("workload", input.agent_slug),
     )
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_workload_app_scope("input.agent_slug"))
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_workload_app_scope("input.agent_slug", Permission.AGENT_DISPATCH),
+    )
     @tenant_scoped()
     def run_astrolift_agent(
         self, info: Info, input: RunAstroliftAgentInput
@@ -1772,6 +1809,19 @@ class AgentsMutation:
         if not slug:
             return gql_failure(ErrorCode.VALIDATION.value, "agentSlug is required", field="agentSlug")
 
+        workload = agent_by_slug(org_pk, slug, Permission.AGENT_DISPATCH)
+        if workload is None:
+            return cast(
+                MutationResultType[AgentTaskType],
+                gql_failure(
+                    ErrorCode.NOT_FOUND.value, "agent not found or slug is ambiguous", field="agentSlug"
+                ),
+            )
+
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        api_token = get_current_api_token()
+
         from astrolift_agents.services.agent_dispatch import (
             AgentDispatchError,
             dispatch_registered_agent,
@@ -1780,7 +1830,9 @@ class AgentsMutation:
         try:
             task = dispatch_registered_agent(
                 organization_id=org_pk,
+                team_id=api_token.team_id if api_token is not None else None,
                 agent_slug=slug,
+                workload_id=workload.pk,
                 actor=_dispatch_actor(info),
                 environment_spec_guid=(
                     str(input.environment_spec_id) if input.environment_spec_id is not None else ""
@@ -1907,7 +1959,9 @@ class AgentsMutation:
         return gql_success(payload)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def create_agent_trigger(
         self,
@@ -1949,16 +2003,7 @@ class AgentsMutation:
         if input_mapping is not None and not isinstance(input_mapping, dict):
             return AgentTriggerResult(ok=False, message="inputMapping must be an object")
 
-        workload = (
-            Workload.objects.filter(
-                slug=slug,
-                registered_app__organization_id=org_pk,
-                registered_app__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app", "registered_app__organization")
-            .first()
-        )
+        workload = agent_by_slug(org_pk, slug, Permission.APP_UPDATE)
         if workload is None or workload.kind != Workload.Kind.AGENT:
             return AgentTriggerResult(ok=False, message="agent not found")
 
@@ -1976,7 +2021,7 @@ class AgentsMutation:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_trigger_scope())
     @tenant_scoped()
     def unbind_agent_trigger(self, info: Info, slug: str) -> AgentTriggerResult:
         """Remove an agent trigger binding by webhook ``slug`` (#951).
@@ -2002,7 +2047,7 @@ class AgentsMutation:
         hook = WorkflowWebhook.objects.filter(
             slug=hook_slug,
             organization_id=org_pk,
-            agent_definition__isnull=False,
+            agent_definition__in=visible_agent_workloads(org_pk, Permission.APP_UPDATE),
         ).first()
         if hook is None:
             return AgentTriggerResult(ok=False, message="trigger not found")
@@ -2013,7 +2058,9 @@ class AgentsMutation:
         return AgentTriggerResult(ok=True, slug=hook.slug)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def scale_service_agent(self, info: Info, agent_slug: str, target_replicas: int) -> AgentScaleResult:
         """On-demand scale of a Service-family agent's Deployment (#1012).
@@ -2035,16 +2082,7 @@ class AgentsMutation:
             return AgentScaleResult(ok=False, message="target_replicas must be >= 0")
 
         slug = (agent_slug or "").strip()
-        workload = (
-            Workload.objects.filter(
-                slug=slug,
-                registered_app__organization_id=org_pk,
-                registered_app__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app")
-            .first()
-        )
+        workload = agent_by_slug(org_pk, slug, Permission.APP_UPDATE)
         if workload is None or workload.kind != Workload.Kind.AGENT:
             return AgentScaleResult(ok=False, message="agent not found")
         if workload.run_family != Workload.RunFamily.SERVICE:
@@ -2077,7 +2115,9 @@ class AgentsMutation:
         action="agents.agent.configure_run_spec",
         target=lambda self, info, agent_slug, input: ("workload", agent_slug),
     )
-    @require_permission(Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def update_agent_run_spec(
         self, info: Info, agent_slug: str, input: AgentRunSpecInput
@@ -2139,21 +2179,7 @@ class AgentsMutation:
         if not slug:
             return gql_failure(ErrorCode.VALIDATION.value, "agentSlug is required", field="agentSlug")
 
-        # Resolve the agent Workload org-scoped through its RegisteredApp —
-        # the same non-leaking lookup run_astrolift_agent uses. A foreign-org
-        # slug is not resolvable, so the surface never edits another tenant's
-        # agent (the @tenant_scoped decorator only asserts a tenant exists; it
-        # does NOT filter — this query is what enforces isolation).
-        workload = (
-            Workload.objects.filter(
-                slug=slug,
-                registered_app__organization_id=org_pk,
-                registered_app__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app")
-            .first()
-        )
+        workload = agent_by_slug(org_pk, slug, Permission.APP_UPDATE)
         if workload is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
         if workload.kind != Workload.Kind.AGENT:
@@ -2162,7 +2188,6 @@ class AgentsMutation:
                 f"workload {slug!r} is not an agent (kind={workload.kind})",
                 field="agentSlug",
             )
-
         # ---- Effective family/mode (supplied value, else stored) ---------
         eff_family = input.run_family.value if input.run_family is not None else workload.run_family
         eff_mode = input.run_mode.value if input.run_mode is not None else workload.run_mode

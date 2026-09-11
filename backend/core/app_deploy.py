@@ -1076,6 +1076,7 @@ def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     disagree.
     """
     from providers.k8s_native.ingress import OIDCAuthConfig
+    from providers.k8s_native.logout import configured_logout_url
 
     config = getattr(cluster, "oidc_auth_config", None) or {}
     if not all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host")):
@@ -1088,6 +1089,10 @@ def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     return OIDCAuthConfig(
         auth_proxy_host=config["auth_proxy_host"],
         gateway_secret=str(config.get("gateway_secret") or ""),
+        logout_enabled=(
+            getattr(cluster, "ingress_class", "") in {"nginx", "ingress-nginx"}
+            and bool(configured_logout_url(config))
+        ),
     )
 
 

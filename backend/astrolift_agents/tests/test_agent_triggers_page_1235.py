@@ -355,12 +355,14 @@ def test_no_tenant_context_is_refused_outright(permission_resolver, info, org):
             AgentsQuery().agent_triggers_page(info, org_id=str(org.guid), agent_slug=agent.slug)
 
 
-def test_builder_matches_nothing_for_a_foreign_org_pk(org, other_org):
+def test_builder_matches_nothing_for_a_foreign_org_pk(org, other_org, permission_resolver):
     """The deny-by-default half: even called directly with another org's pk,
     the builder resolves no agent and returns an empty queryset — never the
     foreign tenant's bindings."""
     mine = _agent(org)
     _hook(mine, org, "ours")
 
-    assert _agent_triggers_qs(other_org.id, agent_slug=mine.slug).count() == 0
-    assert _agent_triggers_qs(org.id, agent_slug=mine.slug).count() == 1
+    permission_resolver.grant(Permission.AGENT_READ)
+    with tenant_context(TenantContext(organization_id=org.pk)):
+        assert _agent_triggers_qs(other_org.id, agent_slug=mine.slug).count() == 0
+        assert _agent_triggers_qs(org.id, agent_slug=mine.slug).count() == 1
