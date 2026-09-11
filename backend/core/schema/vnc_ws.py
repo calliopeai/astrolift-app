@@ -137,18 +137,17 @@ def _resolve_vnc_task(*, task_guid: str, tenant_org_id) -> dict | None:
     needed to port-forward.
     """
     from astrolift_agents.models import AgentTask
+    from core.scope_args import read_guid
 
-    if not tenant_org_id:
+    guid = read_guid({"id": task_guid}, "id")
+    if not tenant_org_id or guid is None:
         return None
 
-    task = (
-        AgentTask.objects.filter(
-            guid=task_guid,
-            organization_id=tenant_org_id,
-            deleted_at__isnull=True,
-        )
-        .first()
-    )
+    task = AgentTask.objects.filter(
+        guid=guid,
+        organization_id=tenant_org_id,
+        deleted_at__isnull=True,
+    ).first()
     if task is None:
         return None
     if task.status != AgentTask.Status.RUNNING:
@@ -167,29 +166,38 @@ def _resolve_vnc_task(*, task_guid: str, tenant_org_id) -> dict | None:
 
 
 @sync_to_async
-def _check_vnc_permission(*, tenant_org_id, actor_user_id) -> bool:
+def _check_vnc_permission(*, tenant_org_id, actor_user_id, task_guid) -> bool:
     """Resolver-entry permission check — deny-by-default. Returns True
-    iff the resolved tenant + user holds ``agent_task.watch``."""
+    iff the resolved tenant + user can watch this task."""
+    from astrolift_agents.scopes import agent_task_scope
+    from astrolift_agents.visibility import agent_tasks
     from core.permissions import (
         Permission,
         PermissionDenied,
         check_permission,
     )
-    from core.tenancy import TenantContext, set_current_tenant
+    from core.scope_args import read_guid
+    from core.tenancy import TenantContext, tenant_context
 
-    if not tenant_org_id:
+    guid = read_guid({"id": task_guid}, "id")
+    if not tenant_org_id or guid is None:
         return False
-    set_current_tenant(
+    with tenant_context(
         TenantContext(
             organization_id=tenant_org_id,
             actor_user_id=actor_user_id,
         ),
-    )
-    try:
-        check_permission(Permission.AGENT_TASK_WATCH)
-    except PermissionDenied:
-        return False
-    return True
+    ):
+        try:
+            check_permission(
+                Permission.AGENT_TASK_WATCH,
+                scope=agent_task_scope("id", Permission.AGENT_TASK_WATCH)({"id": task_guid}),
+            )
+        except PermissionDenied:
+            return False
+        # A scope-factory miss falls back to an explicit org gate. An org
+        # role cannot override a narrower bearer-token row boundary.
+        return agent_tasks(tenant_org_id, Permission.AGENT_TASK_WATCH).filter(guid=guid).exists()
 
 
 @sync_to_async
@@ -253,10 +261,11 @@ async def vnc_ws_application(scope: dict, receive, send) -> None:
     org_id = getattr(tenant, "organization_id", None) if tenant else None
     actor_user_id = getattr(tenant, "actor_user_id", None) if tenant else None
 
-    # Deny-by-default permission gate before any task lookup.
+    # Check task authority before resolving its pod connection.
     if not await _check_vnc_permission(
         tenant_org_id=org_id,
         actor_user_id=actor_user_id,
+        task_guid=task_guid,
     ):
         await send({"type": "websocket.close", "code": 4403})
         return

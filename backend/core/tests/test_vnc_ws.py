@@ -153,7 +153,7 @@ def _patch_auth(
 
         return _T()
 
-    async def _perm(*, tenant_org_id, actor_user_id):
+    async def _perm(*, tenant_org_id, actor_user_id, task_guid):
         return perm_ok
 
     async def _task(*, task_guid, tenant_org_id):
@@ -320,16 +320,22 @@ def test_check_vnc_permission_grants_only_with_watch() -> None:
 
     org = _make_org("acme")
     user = _make_user("watcher@example.com")
+    task = _make_running_vnc_task(org)
 
     try:
         # No binding yet -> deny-by-default.
-        assert _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is False
+        assert (
+            _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id, task_guid=str(task.guid))
+            is False
+        )
 
         # Grant agent_task.watch in this org -> now allowed.
         _grant_watch(user, org)
-        assert _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is True
+        assert (
+            _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id, task_guid=str(task.guid))
+            is True
+        )
     finally:
-        # _check_vnc_permission sets the tenant contextvar; don't leak it.
         clear_current_tenant()
 
 
@@ -343,11 +349,23 @@ def test_check_vnc_permission_is_org_scoped() -> None:
     org_b = _make_org("org-b")
     user = _make_user("scoped@example.com")
     _grant_watch(user, org_a)
+    task_a = _make_running_vnc_task(org_a)
+    task_b = _make_running_vnc_task(org_b)
 
     try:
-        assert _check_vnc_permission.func(tenant_org_id=org_a.id, actor_user_id=user.id) is True
+        assert (
+            _check_vnc_permission.func(
+                tenant_org_id=org_a.id, actor_user_id=user.id, task_guid=str(task_a.guid)
+            )
+            is True
+        )
         # Same user, different org, no binding there -> denied.
-        assert _check_vnc_permission.func(tenant_org_id=org_b.id, actor_user_id=user.id) is False
+        assert (
+            _check_vnc_permission.func(
+                tenant_org_id=org_b.id, actor_user_id=user.id, task_guid=str(task_b.guid)
+            )
+            is False
+        )
     finally:
         clear_current_tenant()
 

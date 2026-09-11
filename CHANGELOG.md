@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Scope agent fleets, runs and controls to the caller's app/project/team grants
+  (#1745), including live app shares and API token boundaries. Historical tasks
+  without recorded team/project ownership inherit their live agent app, or stay
+  org-only when no usable owner exists. Gallery, VNC and framebuffer URLs require
+  the task's watch permission; bulk snapshot authorization avoids per-task queries.
 - Confine explicit RBAC targets to their current, live ancestry in the active
   organization (#1743). Selecting another team or project no longer supplies
   authority over the target. Missing, deleted and foreign targets grant nothing;

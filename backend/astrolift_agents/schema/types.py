@@ -564,12 +564,30 @@ def _agent_task_failure_message(failure) -> str | None:
     return str(failure)
 
 
-def agent_task_to_type(t) -> AgentTaskType:
+def agent_tasks_to_types(tasks) -> list[AgentTaskType]:
+    from astrolift_agents.visibility import watchable_task_ids
+
+    rows = list(tasks)
+    watchable = watchable_task_ids(rows)
+    return [agent_task_to_type(task, can_watch=task.pk in watchable) for task in rows]
+
+
+def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
+    if can_watch is None:
+        from astrolift_agents.visibility import watchable_task_ids
+
+        can_watch = t.pk in watchable_task_ids([t])
+    definition = t.agent_definition
+    if definition is not None and definition.registered_app.organization_id != t.organization_id:
+        definition = None
+    project = t.project
+    if project is not None and project.organization_id != t.organization_id:
+        project = None
     return AgentTaskType(
         id=GUID(str(t.guid)),
-        agent_slug=(t.agent_definition.slug if t.agent_definition_id is not None else ""),
-        agent_name=(t.agent_definition.name if t.agent_definition_id is not None else ""),
-        project_slug=(t.project.slug if t.project_id is not None else ""),
+        agent_slug=definition.slug if definition is not None else "",
+        agent_name=definition.name if definition is not None else "",
+        project_slug=project.slug if project is not None else "",
         status=t.status,
         callback_url=t.callback_url or "",
         result=t.result,
@@ -581,8 +599,8 @@ def agent_task_to_type(t) -> AgentTaskType:
         started_at=t.started_at,
         finished_at=t.ended_at,
         vnc_enabled=t.vnc_enabled,
-        vnc_url=t.vnc_url or "",
-        snapshot_url=_resolve_snapshot_url(t),
+        vnc_url=(t.vnc_url or "") if can_watch else "",
+        snapshot_url=_resolve_snapshot_url(t) if can_watch else None,
         pod_name=t.pod_name or "",
         namespace=t.namespace or "",
         dispatcher=_agent_task_dispatcher_to_type(t.dispatcher),

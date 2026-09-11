@@ -129,7 +129,7 @@ def test_snapshot_url_present_for_running_vnc_task_with_frame(org, local_blob):
     task.save(update_fields=["snapshot_key"])
     _write_frame(local_blob, task)
 
-    out = agent_task_to_type(task)
+    out = agent_task_to_type(task, can_watch=True)
     assert out.snapshot_url is not None
     # LocalFs returns a file:// URL pointing at the exact snapshot key.
     assert out.snapshot_url.startswith("file://")
@@ -145,7 +145,7 @@ def test_snapshot_url_none_when_no_frame_uploaded_yet(org, local_blob):
     task.snapshot_key = snapshot_blob_key(str(task.guid))
     task.save(update_fields=["snapshot_key"])
 
-    out = agent_task_to_type(task)
+    out = agent_task_to_type(task, can_watch=True)
     assert out.snapshot_url is None
 
 
@@ -157,7 +157,7 @@ def test_snapshot_url_none_for_non_vnc_task(org, local_blob):
         status=AgentTask.Status.RUNNING,
         vnc_enabled=False,
     )
-    out = agent_task_to_type(task)
+    out = agent_task_to_type(task, can_watch=True)
     assert out.snapshot_url is None
 
 
@@ -175,7 +175,7 @@ def test_snapshot_url_none_for_non_running_vnc_task(org, local_blob):
     task.save(update_fields=["snapshot_key"])
     _write_frame(local_blob, task)  # frame exists, but task isn't RUNNING
 
-    out = agent_task_to_type(task)
+    out = agent_task_to_type(task, can_watch=True)
     assert out.snapshot_url is None
 
 
@@ -186,7 +186,7 @@ def test_snapshot_url_none_when_no_blob_store_configured(org, monkeypatch):
     monkeypatch.delenv("PIPELINE_ARTIFACT_LOCAL_PATH", raising=False)
     task = _running_vnc_task(org, snapshot_key="snapshots/g/latest.jpg")
 
-    out = agent_task_to_type(task)
+    out = agent_task_to_type(task, can_watch=True)
     assert out.snapshot_url is None
 
 
