@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Serialize PostgreSQL `migrate` commands across startup, installer bootstrap,
+  and operator sessions before reading migration history. This prevents
+  concurrent table creation while preserving normal Django command options
+  and releasing the database lock after failure (#1739;
+  calliopeai/calliope-installer#304).
+
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
   refuses every mutating path against a resource whose identity tags do not
