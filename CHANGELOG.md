@@ -2,23 +2,12 @@
 
 ## Unreleased
 
-- Apply scoped fleet/task permissions to MCP discovery, package resources,
-  dispatch and cancellation (#1747), including recorded task ownership,
-  action-specific sharing and token ceilings. Preserve authorization for
-  unrelated MCP tools and omit foreign organization metadata from projections.
-- Scope agent fleets, runs and controls to the caller's app/project/team grants
-  (#1745), including live app shares and API token boundaries. Historical tasks
-  without recorded team/project ownership inherit their live agent app, or stay
-  org-only when no usable owner exists. Gallery, VNC and framebuffer URLs require
-  the task's watch permission; bulk snapshot authorization avoids per-task queries.
-- Confine explicit RBAC targets to their current, live ancestry in the active
-  organization (#1743). Selecting another team or project no longer supplies
-  authority over the target. Missing, deleted and foreign targets grant nothing;
-  foreign or deleted parent links cannot contribute permissions. Single and bulk
-  app viewer permissions follow the same ancestry, with a bounded query count.
-- Expose paginated agent task discovery and the runtime catalog through MCP,
-  including task placement and lifecycle timestamps. Reads require the same
-  token scopes, RBAC and organization/team access as agent discovery (#1735).
+- `startDeployment` accepts an omitted image tag for platform builds and apps
+  using manifest images. Platform builds resolve the deploy branch (or the new
+  `sourceRef` input) to a commit and use its SHA as the default image tag before
+  approval or scheduling. Immediate and approved workflows receive the recorded
+  commit, and manifest resync fetches it. CI-pushed apps still require a tag;
+  source lookup failures leave existing deployments untouched (#1737).
 
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446

@@ -29,7 +29,11 @@ within 5-10 seconds of the push.
 ### Trigger via the CLI
 
 ```bash
-astro deploy --app <slug> --cluster <cluster-slug>
+astro app deploy <slug> --env production --image-tag v1.2.3 --wait
+# Platform builds: resolve the configured deploy branch and build its commit.
+astro app deploy <slug> --env production --wait
+# Override the source with a branch, tag, or commit.
+astro app deploy <slug> --env production --ref release/v2 --wait
 ```
 
 Add `--wait` to block until the deploy reaches Running or Failed and
@@ -39,16 +43,43 @@ exit with code 1 on failure.
 
 ```graphql
 mutation {
-  deployApp(appSlug: "<slug>", clusterSlug: "<cluster>") {
+  startDeployment(input: {
+    appSlug: "<slug>"
+    environmentName: "production"
+    sourceRef: "release/v2"
+  }) {
     ok
-    deployment {
+    data {
       id
       status
+      imageTag
+      commitSha
+      branch
     }
-    errors { field messages }
+    errors { code field message }
   }
 }
 ```
+
+The app's build mode controls `imageTag`:
+
+| Build mode | Image tag behavior |
+|---|---|
+| `ci_pushed` | Required; use a tag already published by CI. |
+| `platform_build` | Optional. Without a tag, the API resolves the source to a full commit SHA and uses that SHA as the image tag. Requires an active source connection and a build strategy. |
+| `none` | Optional when container images are declared with `image_ref` in the saved manifest. No image override is supplied. |
+
+`sourceRef` resolves a branch, tag, or commit through the organization's stored
+source connection. Omit it to use the configured deploy branch for an untagged
+platform build. Existing `commitSha` and `branch` metadata still work; do not
+combine `sourceRef` with `commitSha`. An explicit image tag remains unchanged.
+
+Resolution happens before creating a deployment or superseding in-flight work.
+Approval retains the recorded commit even if the branch moves while waiting.
+Both immediate and approved workflows build that commit, and the pre-deploy
+manifest resync requests it. Resync retains its existing draft-conflict and
+fetch-failure behavior: it reports the outcome and may use the saved manifest.
+This pins the source revision, not every mutable app setting.
 
 ---
 

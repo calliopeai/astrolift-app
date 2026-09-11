@@ -9720,6 +9720,7 @@ export type StartDeploymentInput = {
   imageDigest: InputMaybe<Scalars['String']['input']>;
   imageTag: Scalars['String']['input'];
   prNumber: InputMaybe<Scalars['Int']['input']>;
+  sourceRef: InputMaybe<Scalars['String']['input']>;
   strategy: InputMaybe<Scalars['String']['input']>;
   triggerKind: Scalars['String']['input'];
   workloadSlug: InputMaybe<Scalars['String']['input']>;

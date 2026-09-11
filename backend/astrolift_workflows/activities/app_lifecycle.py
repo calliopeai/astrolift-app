@@ -314,7 +314,7 @@ def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
 
     deployment = Deployment.objects.select_related("registered_app").get(pk=deployment_id)
     app = deployment.registered_app
-    result = resync_app_manifest_from_repo(app)
+    result = resync_app_manifest_from_repo(app, ref=deployment.commit_sha)
 
     # Record the outcome on the deployment (#1553). Without this the only
     # trace of a refused resync is a worker log line, so a deploy that

@@ -396,6 +396,7 @@ def resync_app_manifest_from_repo(
     app: RegisteredApp,
     *,
     fetch: _FetchFn | None = None,
+    ref: str = "",
 ) -> ResyncResult:
     """Re-fetch + reconcile ``app``'s manifest, and leave an audit trail.
 
@@ -409,7 +410,7 @@ def resync_app_manifest_from_repo(
     Emission never affects the result: an events-backend failure must not
     turn a successful resync into a failed one.
     """
-    result = _resync_app_manifest_from_repo(app, fetch=fetch)
+    result = _resync_app_manifest_from_repo(app, fetch=fetch, ref=ref)
     if result.status != "in_sync":
         try:
             Event.emit(
@@ -419,6 +420,7 @@ def resync_app_manifest_from_repo(
                     "source_repo": app.source_repo,
                     "manifest_path": app.manifest_path,
                     "branch": app.deploy_branch or app.default_branch or "main",
+                    "ref": ref or app.deploy_branch or app.default_branch or "main",
                     "error": result.error or "",
                 },
                 resource_kind="registered_app",
@@ -458,6 +460,7 @@ def _resync_app_manifest_from_repo(
     app: RegisteredApp,
     *,
     fetch: _FetchFn | None = None,
+    ref: str = "",
 ) -> ResyncResult:
     """Re-fetch + reconcile ``app``'s manifest from its source repo.
 
@@ -488,7 +491,7 @@ def _resync_app_manifest_from_repo(
             ),
         )
 
-    deploy_branch = app.deploy_branch or app.default_branch or "main"
+    deploy_branch = ref or app.deploy_branch or app.default_branch or "main"
     manifest_path = app.manifest_path or "astrolift.toml"
 
     try:

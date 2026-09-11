@@ -6730,7 +6730,8 @@ type SoftdeletepayloadMutationResult {
 input StartDeploymentInput {
   appSlug: String!
   environmentName: String!
-  imageTag: String!
+  imageTag: String! = ""
+  sourceRef: String = null
   imageDigest: String = null
   workloadSlug: String = null
   triggerKind: String! = "manual"
