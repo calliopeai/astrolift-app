@@ -23,6 +23,8 @@ from typing import Any
 
 from _sdk.cluster import BootstrapComponent
 
+from .logout import central_logout_snippet
+
 # Name of the Secret the oauth2-proxy release reads its credentials from.
 # The recipe references it rather than carrying the values: ``helm_values``
 # is returned to operators over GraphQL, and ``oidc_auth_config`` holds
@@ -149,6 +151,11 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
 
     extra_args.update(proxy_extra_args(config))
 
+    annotations = {"cert-manager.io/cluster-issuer": "letsencrypt-prod"}
+    logout_snippet = central_logout_snippet(config)
+    if logout_snippet:
+        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = logout_snippet
+
     return BootstrapComponent(
         key="oauth2-proxy",
         title="oauth2-proxy (central auth host)",
@@ -180,9 +187,7 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
             "ingress": {
                 "enabled": True,
                 "className": "nginx",
-                "annotations": {
-                    "cert-manager.io/cluster-issuer": "letsencrypt-prod",
-                },
+                "annotations": annotations,
                 "hosts": [auth_proxy_host] if auth_proxy_host else [],
                 "tls": (
                     [{"secretName": CENTRAL_AUTH_TLS_SECRET_NAME, "hosts": [auth_proxy_host]}]

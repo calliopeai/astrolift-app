@@ -90,3 +90,23 @@ def test_managed_subdomain_ingress_follows_the_app_subdomain():
     assert hosts == [
         "hello-v2.apps.example.net"
     ], f"the operator-set subdomain must be the rendered host, got {hosts}"
+
+
+def test_managed_nginx_deploy_includes_configured_logout():
+    deployment, manifest, md, cluster = _scenario()
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = {
+        "auth_proxy_host": "auth.apps.example.net",
+        "discovery_url": "https://idp.example.com",
+        "client_id": "central-client",
+        "logout_url": "https://idp.example.com/logout",
+    }
+    out = _render_managed_subdomain_ingress(
+        deployment, manifest, namespace="acme-hello-web", managed_domain=md, cluster=cluster
+    )
+    annotations = out[0]["metadata"]["annotations"]
+    assert (
+        'return 302 "https://auth.apps.example.net/auth/logout"'
+        in annotations["nginx.ingress.kubernetes.io/configuration-snippet"]
+    )
+    assert annotations["nginx.ingress.kubernetes.io/auth-url"].endswith("/oauth2/auth")

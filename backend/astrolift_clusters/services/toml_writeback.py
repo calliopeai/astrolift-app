@@ -255,6 +255,8 @@ def oidc_auth_section_from_db(
         return None
     section: dict[str, str] = {"kind": "oidc"}
     section.update(values)
+    if config.get("logout_url"):
+        section["logout_url"] = str(config["logout_url"])
     return section
 
 

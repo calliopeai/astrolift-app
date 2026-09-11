@@ -82,6 +82,58 @@
       ]
     },
     {
+      "description": "Discover agent runs, lifecycle and runtime placement, newest first, with pagination.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_slug": {
+            "type": "string"
+          },
+          "cursor": {
+            "description": "next_cursor from the preceding page.",
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project_slug": {
+            "type": "string"
+          },
+          "status": {
+            "description": "Filter by task lifecycle status, e.g. running.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_tasks",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "List selectable agent runtimes and their configured container images.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_runtimes",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
       "description": "Dispatch one registered Task-family agent from its immutable package.",
       "inputSchema": {
         "additionalProperties": false,

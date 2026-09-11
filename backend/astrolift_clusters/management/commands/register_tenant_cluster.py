@@ -524,6 +524,17 @@ class Command(BaseCommand):
             if _proxy_args:
                 oidc_auth_config["proxy_extra_args"] = _proxy_args
 
+            # Startup must not erase the logout URL set by an operator.
+            _logout_url = _env("ASTROLIFT_CLUSTER_OIDC_LOGOUT_URL") or _existing_oidc.get("logout_url")
+            if _logout_url:
+                from providers.k8s_native.logout import configured_logout_url
+
+                oidc_auth_config["logout_url"] = _logout_url
+                try:
+                    configured_logout_url(oidc_auth_config)
+                except ValueError as exc:
+                    raise CommandError(str(exc)) from exc
+
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
             auto_discover = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS")
