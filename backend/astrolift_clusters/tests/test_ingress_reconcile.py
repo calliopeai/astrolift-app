@@ -554,6 +554,33 @@ def test_reconcile_keeps_an_apps_own_snippet(org, team, cluster, domain, install
     assert "X-Astrolift-Gateway-Secret" in snippet
 
 
+def test_reconcile_adds_and_removes_logout_without_losing_app_headers(
+    org, team, cluster, domain, install_driver
+):
+    _nginx_cluster(cluster, gateway_secret="s3cret", logout_url="https://idp.example.com/logout")
+    app = _make_app(org, team, "logout-app")
+    app.manifest_normalized = {"edge": {"identity_headers": [["email", "X-App-Email"]]}}
+    app.save(update_fields=["manifest_normalized"])
+    _bind_env(app, cluster, domain=domain)
+    item = _FakeIngressItem("logout-web", {_SNIPPET_KEY: _APP_SNIPPET})
+    client = _RecordingK8sClient(ingresses_by_ns={f"{org.slug}-logout-app": [item]})
+    install_driver(_RecordingDriver(client))
+
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 1
+    snippet = client.patch_calls[-1]["patch"]["metadata"]["annotations"][_SNIPPET_KEY]
+    assert 'return 302 "https://auth.example.com/auth/logout"' in snippet
+    assert "X-App-Email" in snippet and "x-qsr-proxy-secret" in snippet
+
+    item.metadata.annotations[_SNIPPET_KEY] = snippet
+    cluster.oidc_auth_config = {**cluster.oidc_auth_config, "logout_url": ""}
+    cluster.save(update_fields=["oidc_auth_config"])
+    assert reconcile_cluster_ingresses(cluster)["reconciled"] == 1
+    removed = client.patch_calls[-1]["patch"]["metadata"]["annotations"][_SNIPPET_KEY]
+    assert "auth/logout" not in removed
+    assert "X-App-Email" in removed and "x-qsr-proxy-secret" in removed
+    assert "X-Astrolift-Gateway-Secret" in removed
+
+
 def test_reconcile_with_auth_off_keeps_an_apps_own_snippet(org, team, cluster, domain, install_driver):
     """Turning the gate off removes the platform's block, not the app's."""
 

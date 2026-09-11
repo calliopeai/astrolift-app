@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add configured browser logout for managed nginx app hosts (#1741, #1727).
+  `/auth/logout` clears the central proxy session before redirecting to the
+  declared provider logout URL, with a public signed-out landing on the auth
+  host. Configuration survives re-registration and GitOps write-back, and
+  ingress reconciliation preserves app-owned headers. See
+  [central auth logout](docs/operators/central-auth-logout.md) for setup and
+  the provider rollout requirements.
 - Confine explicit RBAC targets to their current, live ancestry in the active
   organization (#1743). Selecting another team or project no longer supplies
   authority over the target. Missing, deleted and foreign targets grant nothing;
