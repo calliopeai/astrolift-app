@@ -97,14 +97,17 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     existing = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
     if existing is not None:
+        config = dict(existing.dns_config or {})
+        config["provision_cluster_id"] = cluster_id
         existing.provision_state = ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value
         existing.provision_nameservers = nameservers
-        existing.save(update_fields=["provision_state", "provision_nameservers", "updated_at", "version"])
+        existing.dns_config = config
+        existing.save(update_fields=["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"])
     else:
         ManagedDomain.objects.create(
             zone=zone,
             dns_driver=plugin_slug,
-            dns_config={},
+            dns_config={"provision_cluster_id": cluster_id},
             is_wildcard_managed=True,
             default_for=ManagedDomain.DefaultFor.NONE,
             provision_state=ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value,

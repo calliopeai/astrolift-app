@@ -75,6 +75,16 @@ export const SOFT_DELETE_MANAGED_DOMAIN = gql`
   }
 `;
 
+export const REVALIDATE_MANAGED_DOMAIN = gql`
+  mutation RevalidateManagedDomain($clusterId: GUID!, $zone: String!) {
+    revalidateManagedDomain(clusterId: $clusterId, zone: $zone) {
+      ok
+      errors { code message field }
+      data { zone signaled message }
+    }
+  }
+`;
+
 // Tenant-scoped count of active TenantCluster rows in the caller's
 // org. Used by the /apps/new wizard to gate Step 1 — if it's zero,
 // we refuse to walk the operator into a wizard whose deploy can't
@@ -372,6 +382,8 @@ export const LIST_MANAGED_DOMAINS = gql`
       provisionState
       provisionNameservers
       provisionValidationRecords
+      delegationCheck
+      provisionClusterId
     }
   }
 `;
