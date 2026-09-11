@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add configured browser logout for managed nginx app hosts (#1741, #1727).
+  `/auth/logout` clears the central proxy session before redirecting to the
+  declared provider logout URL, with a public signed-out landing on the auth
+  host. Configuration survives re-registration and GitOps write-back, and
+  ingress reconciliation preserves app-owned headers. See
+  [central auth logout](docs/operators/central-auth-logout.md) for setup and
+  the provider rollout requirements.
+
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
   refuses every mutating path against a resource whose identity tags do not
