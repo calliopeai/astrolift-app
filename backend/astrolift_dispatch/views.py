@@ -229,6 +229,63 @@ def heartbeat(request: HttpRequest) -> JsonResponse:
 
 
 # ---------------------------------------------------------------------------
+# Fleet and runtime read surface
+# ---------------------------------------------------------------------------
+
+
+@require_http_methods(["GET"])
+@_require_dispatcher
+def list_fleet(request: HttpRequest) -> JsonResponse:
+    """List this dispatcher's organization's agent task fleet.
+
+    The dispatcher credential is organization-scoped, so this is safe for
+    CLI and overseer clients that use a dispatch service token.  By default
+    only non-terminal tasks are returned; ``include_terminal=1`` includes
+    recent terminal rows as well.  Secrets, prompts, and task results are
+    deliberately excluded from this operational view.
+    """
+    from astrolift_agents.models import AgentTask
+
+    tasks = AgentTask.objects.filter(
+        organization=request.dispatcher.organization,
+        deleted_at__isnull=True,
+    )
+    if request.GET.get("include_terminal") not in {"1", "true", "yes"}:
+        tasks = tasks.filter(status__in=AgentTask.NON_TERMINAL_STATUSES)
+    tasks = tasks.select_related("agent_definition", "environment_spec", "dispatcher").order_by(
+        "-updated_at"
+    )[:200]
+
+    return JsonResponse(
+        {
+            "agents": [
+                {
+                    "task_id": str(task.guid),
+                    "status": task.status,
+                    "agent_slug": task.agent_definition.slug if task.agent_definition_id else None,
+                    "runtime": task.environment_spec.runtime if task.environment_spec_id else "",
+                    "dispatcher_id": str(task.dispatcher.guid) if task.dispatcher_id else None,
+                    "external_id": task.external_id,
+                    "started_at": task.started_at.isoformat() if task.started_at else None,
+                    "ended_at": task.ended_at.isoformat() if task.ended_at else None,
+                    "vnc_url": task.vnc_url or None,
+                }
+                for task in tasks
+            ]
+        }
+    )
+
+
+@require_http_methods(["GET"])
+@_require_dispatcher
+def list_runtimes(request: HttpRequest) -> JsonResponse:
+    """List the install-wide runtime catalog available to agent tasks."""
+    from astrolift_agents.runtime_catalog import catalog_entries
+
+    return JsonResponse({"runtimes": catalog_entries()})
+
+
+# ---------------------------------------------------------------------------
 # Task polling
 # ---------------------------------------------------------------------------
 
