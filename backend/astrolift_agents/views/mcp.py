@@ -201,29 +201,27 @@ def _get_agent(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     return _serialize_agent(matches[0], include_package=True)
 
 
-def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+def _task_rows():
     from django.db.models import Q
 
     from astrolift_agents.models import AgentTask
 
-    tasks = AgentTask.objects.select_related("agent_definition").filter(
-        guid=str(args.get("task_id") or ""),
+    tasks = AgentTask.objects.select_related("agent_definition", "dispatcher").filter(
         organization_id=_org_id(),
         deleted_at__isnull=True,
     )
-    team_id = _team_id()
-    if team_id is not None:
-        tasks = tasks.filter(
-            Q(agent_definition__registered_app__team_id=team_id)
-            | Q(
-                agent_definition__registered_app__team_accesses__team_id=team_id,
-                agent_definition__registered_app__team_accesses__deleted_at__isnull=True,
-            )
-        )
-    task = tasks.distinct().first()
-    if task is None:
-        raise McpCallError("task not found", code="not_found")
-    return {
+    visible_agents = _agent_rows(_org_id()).values("pk")
+    visible = Q(agent_definition__in=visible_agents)
+    if _team_id() is None:
+        # Orphaned history remains available to org-wide readers. A team
+        # token needs a live agent relationship to establish its access.
+        visible |= Q(agent_definition__isnull=True)
+    return tasks.filter(visible)
+
+
+def _serialize_task(task, *, include_result: bool = True) -> dict[str, Any]:
+    dispatcher = task.dispatcher
+    data = {
         "id": str(task.guid),
         "agent_slug": task.agent_definition.slug if task.agent_definition_id else "",
         "status": task.status,
@@ -232,12 +230,74 @@ def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
         "pod_name": task.pod_name,
         "namespace": task.namespace,
         "created_at": _iso(task.created_at),
+        "updated_at": _iso(task.updated_at),
         "queued_at": _iso(task.queued_at),
+        "provisioning_at": _iso(task.provisioning_at),
         "started_at": _iso(task.started_at),
         "ended_at": _iso(task.ended_at),
-        "result": task.result,
-        "failure": task.failure,
+        "dispatcher": {
+            "id": str(dispatcher.guid),
+            "name": dispatcher.name,
+            "backend": dispatcher.backend,
+            "cloud": dispatcher.cloud,
+            "region": dispatcher.region,
+            "status": dispatcher.status,
+            "last_heartbeat_at": _iso(dispatcher.last_heartbeat_at),
+        }
+        if dispatcher and dispatcher.deleted_at is None
+        else None,
     }
+    if include_result:
+        data.update(result=task.result, failure=task.failure)
+    return data
+
+
+def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    task = _task_rows().filter(guid=_public_id(args.get("task_id"), "task_id")).first()
+    if task is None:
+        raise McpCallError("task not found", code="not_found")
+    return _serialize_task(task)
+
+
+def _list_tasks(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from django.core.exceptions import ValidationError
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_graphql import keyset_page
+
+    tasks = _task_rows()
+    status = args.get("status")
+    if status:
+        if status not in AgentTask.Status.values:
+            raise McpCallError("unknown task status", code="invalid_arguments")
+        tasks = tasks.filter(status=status)
+    if args.get("agent_slug"):
+        tasks = tasks.filter(agent_definition__slug=args["agent_slug"])
+    if args.get("project_slug"):
+        tasks = tasks.filter(agent_definition__registered_app__project__slug=args["project_slug"])
+    scope = json.dumps(
+        {key: args.get(key) for key in ("status", "agent_slug", "project_slug")}, sort_keys=True
+    )
+    try:
+        page = keyset_page(
+            tasks,
+            cursor=args.get("cursor"),
+            limit=args.get("limit"),
+            with_total=False,
+            cursor_scope=f"mcp.agent_tasks:{scope}",
+        )
+    except (ValidationError, ValueError) as exc:
+        raise McpCallError("invalid task cursor", code="invalid_arguments") from exc
+    return {
+        "tasks": [_serialize_task(task, include_result=False) for task in page.rows],
+        "next_cursor": page.next_cursor,
+    }
+
+
+def _list_runtimes(_request: HttpRequest, _args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_agents.runtime_catalog import catalog_entries
+
+    return {"runtimes": catalog_entries()}
 
 
 def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -817,6 +877,8 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
+    "astrolift_list_tasks": _list_tasks,
+    "astrolift_list_runtimes": _list_runtimes,
     "astrolift_run_agent": _run_agent,
     "astrolift_cancel_task": _cancel_task,
     "astrolift_sync_agent_repo": _sync_agent_repo,
