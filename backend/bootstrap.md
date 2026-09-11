@@ -71,6 +71,16 @@ make schema       # Export GraphQL SDL
 make shell        # Shell into Django container
 ```
 
+### Concurrent migrations
+
+`manage.py migrate` serializes PostgreSQL invocations with a database-scoped
+session advisory lock, including web startup and the installer's bootstrap task.
+The lock covers Django's migration planning, execution, and post-migrate hooks;
+it releases when the command finishes or fails. Normal Django options, including
+`--database`, still apply. Non-PostgreSQL databases use Django's usual behavior.
+Both callers must run an application image containing this command (#1739;
+calliopeai/calliope-installer#304).
+
 ## Conventions
 
 - **Models**: Inherit from `Tracking` (audit) or `BaseCoreModel` (named entities with guid/slug)

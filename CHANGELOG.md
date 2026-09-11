@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Serialize PostgreSQL `migrate` commands across startup, installer bootstrap,
+  and operator sessions before reading migration history. This prevents
+  concurrent table creation while preserving normal Django command options
+  and releasing the database lock after failure (#1739;
+  calliopeai/calliope-installer#304).
 - Expose paginated agent task discovery and the runtime catalog through MCP,
   including task placement and lifecycle timestamps. Reads require the same
   token scopes, RBAC and organization/team access as agent discovery (#1735).
