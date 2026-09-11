@@ -63,6 +63,7 @@ from astrolift_agents.schema.types import (
     agent_secret_bundle_to_type,
     agent_secret_status_to_type,
     agent_task_to_type,
+    agent_tasks_to_types,
     agent_trigger_to_type,
     brief_to_type,
     dispatcher_to_type,
@@ -70,7 +71,9 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
-from astrolift_agents.scopes import agent_task_scope
+from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
+from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
+from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -269,19 +272,10 @@ def _agent_run_rollup(workload_pks: list[int]) -> dict[int, dict]:
 def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
     """Base queryset of the caller-org's ``kind: agent`` workloads.
 
-    Scoped to ``org_pk`` via the workload's app organization (Workload
-    has no org FK of its own). ``project_slug`` further narrows to one
-    project. Soft-deleted workloads (and rows under a soft-deleted app)
-    are excluded; ordered newest-first for a stable list.
+    Permission and token/share filters precede the optional project
+    filter, ordering and result cap. Deleted workloads/apps are excluded.
     """
-    from astrolift_registry.models import Workload
-
-    qs = Workload.objects.filter(
-        kind=Workload.Kind.AGENT,
-        registered_app__organization_id=org_pk,
-        registered_app__deleted_at__isnull=True,
-        deleted_at__isnull=True,
-    ).select_related("registered_app", "registered_app__project")
+    qs = visible_agent_workloads(org_pk).select_related("registered_app", "registered_app__project")
     if project_slug:
         qs = qs.filter(registered_app__project__slug=project_slug)
     return qs.order_by("-created_at")
@@ -304,9 +298,10 @@ def _agent_triggers_qs(org_pk: int, *, agent_slug: str, search: str | None = Non
     """
     from astrolift_agents.models.workflow_trigger import WorkflowWebhook
 
-    workload = _agent_workload_qs(org_pk).filter(slug=agent_slug).first()
-    if workload is None:
+    matches = list(_agent_workload_qs(org_pk).filter(slug=agent_slug)[:2])
+    if len(matches) != 1:
         return WorkflowWebhook.objects.none()
+    workload = matches[0]
     qs = WorkflowWebhook.objects.filter(
         agent_definition=workload,
         organization_id=org_pk,
@@ -467,7 +462,7 @@ class AgentsQuery:
         return [org_skill_repo_to_type(r) for r in qs]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_tasks(
         self,
@@ -488,10 +483,13 @@ class AgentsQuery:
         yields an empty list rather than an error.
         """
         org_pk = _caller_org_id(info, org_id)
-        qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+        qs = visible_agent_tasks(org_pk, Permission.AGENT_READ)
         if status:
             qs = qs.filter(status=status)
         if workload_id:
+            workload_guid = _valid_guid(workload_id)
+            if workload_guid is None:
+                return []
             # Resolve the workload inside the caller's org (its app's
             # organization must match) so a foreign-org GUID can't be
             # used to filter — and so a no-match returns [] instead of
@@ -500,7 +498,7 @@ class AgentsQuery:
 
             wl = (
                 Workload.objects.filter(
-                    guid=str(workload_id),
+                    guid=workload_guid,
                     registered_app__organization_id=org_pk,
                     deleted_at__isnull=True,
                 )
@@ -520,10 +518,10 @@ class AgentsQuery:
             "dispatcher",
             "dispatcher__tenant_cluster",
         ).order_by("-created_at")[:200]
-        return [agent_task_to_type(t) for t in qs]
+        return agent_tasks_to_types(qs)
 
     @strawberry.field
-    @require_permission(Permission.AGENT_TASK_WATCH)
+    @require_permission(Permission.AGENT_TASK_WATCH, any_scope=True)
     @tenant_scoped()
     def agent_gallery(self, info: Info, org_id: strawberry.ID) -> list[AgentTaskType]:
         """The org's *watchable* agent tasks — the VNC theatre roster.
@@ -539,8 +537,8 @@ class AgentsQuery:
         """
         org_pk = _caller_org_id(info, org_id)
         qs = (
-            AgentTask.objects.filter(
-                organization_id=org_pk,
+            visible_agent_tasks(org_pk, Permission.AGENT_TASK_WATCH)
+            .filter(
                 status=AgentTask.Status.RUNNING,
                 vnc_enabled=True,
                 deleted_at__isnull=True,
@@ -555,10 +553,10 @@ class AgentsQuery:
             )
             .order_by("-started_at", "-created_at")[:200]
         )
-        return [agent_task_to_type(t) for t in qs]
+        return agent_tasks_to_types(qs)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=agent_task_scope("id"))
+    @require_permission(Permission.APP_READ, scope=agent_task_scope("id", Permission.APP_READ))
     @tenant_scoped()
     def agent_task(self, info: Info, id: strawberry.ID) -> AgentTaskType | None:
         """One AgentTask by GUID, scoped to the caller's org."""
@@ -568,7 +566,8 @@ class AgentsQuery:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         row = (
-            AgentTask.objects.filter(guid=guid, organization_id=org_pk, deleted_at__isnull=True)
+            visible_agent_tasks(org_pk, Permission.APP_READ)
+            .filter(guid=guid, organization_id=org_pk)
             .select_related(
                 "organization",
                 "project",
@@ -581,7 +580,7 @@ class AgentsQuery:
         return agent_task_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_task_transitions_since(
         self,
@@ -615,7 +614,7 @@ class AgentsQuery:
         """
         org_pk = _caller_org_id(info, org_id)
         capped = max(1, min(limit, _AGENT_TRANSITIONS_CAP))
-        qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+        qs = visible_agent_tasks(org_pk, Permission.AGENT_READ)
         if since is not None:
             qs = qs.filter(updated_at__gt=since)
         qs = qs.select_related(
@@ -625,10 +624,10 @@ class AgentsQuery:
             "dispatcher",
             "dispatcher__tenant_cluster",
         ).order_by("updated_at")[:capped]
-        return [agent_task_to_type(t) for t in qs]
+        return agent_tasks_to_types(qs)
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
     @tenant_scoped()
     def agent_task_interactions(
         self,
@@ -662,11 +661,8 @@ class AgentsQuery:
         # Resolve the task inside the caller's org so a foreign-org task id
         # reads as empty rather than leaking task existence across tenants.
         task_pk = (
-            AgentTask.objects.filter(
-                guid=guid,
-                organization_id=org_pk,
-                deleted_at__isnull=True,
-            )
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(guid=guid, organization_id=org_pk)
             .values_list("pk", flat=True)
             .first()
         )
@@ -695,8 +691,7 @@ class AgentsQuery:
         ``stream_app_logs(follow=False)`` — and returns up to ``tail``
         of the most recent message lines.
 
-        Gated on ``app.read_logs`` (the log-specific permission, same as
-        the live-tail subscription) rather than plain ``app.read``.
+        Requires ``agent.read`` at the task's effective ownership scope.
 
         Returns ``[]`` — never a 500 — for every empty case: the task
         doesn't exist for the tenant, the task's dispatcher has no
@@ -741,7 +736,8 @@ class AgentsQuery:
         # needs, or None when there is no readable pod to target.
         def _resolve() -> tuple[Any, str, str, str] | None:
             row = (
-                AgentTask.objects.filter(guid=guid, organization_id=org_pk, deleted_at__isnull=True)
+                visible_agent_tasks(org_pk, Permission.AGENT_READ)
+                .filter(guid=guid, organization_id=org_pk)
                 .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
                 .first()
             )
@@ -986,7 +982,7 @@ class AgentsQuery:
     # ----------------------------------------------------------------
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_workloads(
         self, info: Info, org_id: strawberry.ID, project_slug: str | None = None
@@ -1007,7 +1003,7 @@ class AgentsQuery:
         return _agent_list_rows(info, org_id, project_slug)
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_fleet(self, info: Info, org_id: strawberry.ID) -> list[AgentListItemType]:
         """Org-wide agent fleet — every ``kind: agent`` workload across
@@ -1020,7 +1016,7 @@ class AgentsQuery:
         return _agent_list_rows(info, org_id, project_slug=None)
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("slug"))
     @tenant_scoped()
     def agent(self, info: Info, org_id: strawberry.ID, slug: str) -> AgentDetailType | None:
         """One agent's full read bundle by slug (spec 38 Phase 4).
@@ -1038,8 +1034,8 @@ class AgentsQuery:
         through the app's organization. A slug that belongs to another
         org — or doesn't exist — resolves to ``null`` (not an error and
         not another tenant's agent) so the surface doesn't leak existence
-        across tenants. The slug is unique only *within* an org, so the
-        org filter is what makes the lookup unambiguous.
+        across tenants. Slugs are unique per app; a slug matching more
+        than one authorized agent resolves to ``null``.
 
         No N+1: the workload is loaded with ``select_related('brief',
         'registered_app')`` and ``prefetch_related(
@@ -1049,14 +1045,13 @@ class AgentsQuery:
         carries.
         """
         org_pk = _caller_org_id(info, org_id)
-        w = (
+        matches = list(
             _agent_workload_qs(org_pk)
             .filter(slug=slug)
             .select_related("brief", "registered_app")
-            .prefetch_related("agent_skill_refs__skill__tool_defs", "containers")
-            .first()
+            .prefetch_related("agent_skill_refs__skill__tool_defs", "containers")[:2]
         )
-        return agent_detail_to_type(w) if w is not None else None
+        return agent_detail_to_type(matches[0]) if len(matches) == 1 else None
 
     @strawberry.field(
         deprecation_reason=(
@@ -1064,7 +1059,7 @@ class AgentsQuery:
             "Use agentTriggersPage instead."
         )
     )
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"))
     @tenant_scoped()
     def agent_triggers(self, info: Info, org_id: strawberry.ID, agent_slug: str) -> list[AgentTriggerType]:
         """Inbound trigger webhooks bound to one agent (spec 33, PR-6 / #951).
@@ -1082,7 +1077,7 @@ class AgentsQuery:
         return [agent_trigger_to_type(h) for h in hooks]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"))
     @tenant_scoped()
     def agent_triggers_page(
         self,
@@ -1170,7 +1165,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_live_status(
         self,
@@ -1202,7 +1197,10 @@ class AgentsQuery:
         org_pk = _caller_org_id(info, org_id)
         qs = _agent_workload_qs(org_pk, project_slug=project_slug)
         if workload_id:
-            qs = qs.filter(guid=str(workload_id))
+            workload_guid = _valid_guid(workload_id)
+            if workload_guid is None:
+                return []
+            qs = qs.filter(guid=workload_guid)
         workloads = list(qs[:_AGENT_LIST_CAP])
         rollup = _agent_run_rollup([w.pk for w in workloads])
         now = timezone.now()

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Scope agent fleets, runs and controls to the caller's app/project/team grants
+  (#1745), including live app shares and API token boundaries. Historical tasks
+  without recorded team/project ownership inherit their live agent app, or stay
+  org-only when no usable owner exists. Gallery, VNC and framebuffer URLs require
+  the task's watch permission; bulk snapshot authorization avoids per-task queries.
 - Add configured browser logout for managed nginx app hosts (#1741, #1727).
   `/auth/logout` clears the central proxy session before redirecting to the
   declared provider logout URL, with a public signed-out landing on the auth
