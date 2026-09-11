@@ -538,6 +538,8 @@ def _agent_task_dispatcher_to_type(d) -> AgentTaskDispatcherType | None:
     if d is None:
         return None
     cluster = d.tenant_cluster
+    if cluster is not None and cluster.organization_id not in {None, d.organization_id}:
+        cluster = None
     return AgentTaskDispatcherType(
         id=GUID(str(d.guid)),
         name=d.name or "",
@@ -583,6 +585,9 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
     project = t.project
     if project is not None and project.organization_id != t.organization_id:
         project = None
+    dispatcher = t.dispatcher
+    if dispatcher is not None and dispatcher.organization_id != t.organization_id:
+        dispatcher = None
     return AgentTaskType(
         id=GUID(str(t.guid)),
         agent_slug=definition.slug if definition is not None else "",
@@ -603,7 +608,7 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         snapshot_url=_resolve_snapshot_url(t) if can_watch else None,
         pod_name=t.pod_name or "",
         namespace=t.namespace or "",
-        dispatcher=_agent_task_dispatcher_to_type(t.dispatcher),
+        dispatcher=_agent_task_dispatcher_to_type(dispatcher),
     )
 
 

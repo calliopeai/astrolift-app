@@ -498,3 +498,34 @@ def test_snapshot_projection_rejects_a_task_outside_the_active_org(fleet, monkey
     with tenant(fleet):
         assert agent_task_to_type(task).snapshot_url is None
     assert not minted
+
+
+@pytest.mark.parametrize("placement", ["foreign-dispatcher", "foreign-cluster", "platform-cluster"])
+def test_task_projection_confines_placement_metadata(fleet, placement):
+    from astrolift_agents.models import DispatcherInstance
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+
+    bind(fleet, "APP")
+    foreign = ScopeWorld("1745-placement")
+    plugin = ProviderPlugin.objects.create(slug="1745-placement", name="Placement")
+    cluster = TenantCluster.objects.create(
+        organization=None if placement == "platform-cluster" else foreign.org,
+        provider_plugin=plugin,
+        name="Placement",
+        slug="1745-placement",
+    )
+    dispatcher = DispatcherInstance.objects.create(
+        organization=foreign.org if placement == "foreign-dispatcher" else fleet.world.org,
+        name="Placement",
+        slug="1745-placement",
+        tenant_cluster=cluster,
+    )
+    AgentTask.objects.filter(pk=fleet.tasks[0].pk).update(dispatcher=dispatcher)
+    with tenant(fleet):
+        row = AgentsQuery().agent_task(fleet.info, id=str(fleet.tasks[0].guid))
+    if placement == "foreign-dispatcher":
+        assert row.dispatcher is None
+    else:
+        assert str(row.dispatcher.id) == str(dispatcher.guid)
+        assert row.dispatcher.cluster_name == (cluster.name if placement == "platform-cluster" else "")
+        assert row.dispatcher.cluster_id == (str(cluster.guid) if placement == "platform-cluster" else None)
