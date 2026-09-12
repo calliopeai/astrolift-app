@@ -93,6 +93,10 @@ PLATFORM_API_URL = env_str("PLATFORM_API_URL", FRONTEND_URL)
 # while this is empty; operators must explicitly provision a bootstrap token
 # before onboarding a Dispatch Service.
 DISPATCHER_BOOTSTRAP_TOKEN = env_str("DISPATCHER_BOOTSTRAP_TOKEN", "")
+# Deliberately disabled until we establish a customer-cloud command boundary.
+# Keep the endpoint behind an explicit opt-in so a deployment cannot start
+# accepting controller-originated agent instructions by accident.
+DISPATCH_TASK_INPUT_ENABLED = env_bool("ASTROLIFT_DISPATCH_TASK_INPUT_ENABLED", False)
 API_SYSTEM_USER = env_str("API_SYSTEM_USER", "system")
 API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_automatic_system_operations")
 
