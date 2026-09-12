@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+dnspython = ">=2.6,<3"   # custom-domain DNS probe (astrolift_workflows/activities/custom_domain.py), #1768
 async-timeout = "*"
 psycopg2-binary = "*"
 redis = "*"
