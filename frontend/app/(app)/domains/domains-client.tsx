@@ -46,6 +46,10 @@ import {
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import type {
+  RevalidateManagedDomainMutation,
+  RevalidateManagedDomainMutationVariables,
+} from "@/graphql/__generated__/operations";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 interface Resp {
@@ -114,7 +118,10 @@ export function DomainsClient() {
     refetchQueries: [{ query: LIST_MANAGED_DOMAINS }],
     awaitRefetchQueries: true,
   });
-  const [revalidate, { loading: revalidating }] = useMutation(REVALIDATE_MANAGED_DOMAIN, {
+  const [revalidate, { loading: revalidating }] = useMutation<
+    RevalidateManagedDomainMutation,
+    RevalidateManagedDomainMutationVariables
+  >(REVALIDATE_MANAGED_DOMAIN, {
     refetchQueries: [{ query: LIST_MANAGED_DOMAINS }],
   });
 
