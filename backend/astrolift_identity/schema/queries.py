@@ -407,15 +407,16 @@ class IdentityQuery:
         the active tenant. Requiring a tenant context here creates a
         chicken-and-egg: you need the org to get the org.
 
-        Superusers see all orgs. Regular users see only orgs they are
-        active members of.
+        Session-authenticated superusers see all orgs. Regular users see
+        only their active memberships. API tokens narrow either result to
+        their issuing organization.
         """
         request = info.context.request
         user = getattr(request, "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             return []
         if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
-            orgs = Organization.objects.filter(deleted_at__isnull=True).order_by("name")[:100]
+            orgs = Organization.objects.filter(deleted_at__isnull=True)
         else:
             from astrolift_identity.models import Member
 
@@ -424,10 +425,11 @@ class IdentityQuery:
                 .values_list("scope_id", flat=True)
                 .distinct()
             )
-            orgs = Organization.objects.filter(pk__in=member_org_ids, deleted_at__isnull=True).order_by(
-                "name"
-            )[:100]
-        return [organization_to_type(o) for o in orgs]
+            orgs = Organization.objects.filter(pk__in=member_org_ids, deleted_at__isnull=True)
+        api_token = getattr(request, "_api_token", None)
+        if api_token is not None:
+            orgs = orgs.filter(pk=api_token.organization_id)
+        return [organization_to_type(o) for o in orgs.order_by("name")[:100]]
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage."

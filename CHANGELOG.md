@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- API-token organization discovery lists only the token's issuing organization.
+  HTTP requests and terminal WebSocket handshakes reject a conflicting selected
+  organization before resolving a target. Matching selections and clients without
+  an explicit organization continue to use the token's organization (#1791).
+
 - Remove duplicate managed-domain operation imports after concurrent revalidation
   fixes merged, restoring the production frontend build.
 
