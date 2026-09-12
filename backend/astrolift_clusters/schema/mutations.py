@@ -1457,8 +1457,7 @@ class ClustersMutation:
                     " issuance on the next activity slot."
                     if signaled
                     else (
-                        "A new provisioning run was started and will re-check"
-                        " public DNS delegation."
+                        "A new provisioning run was started and will re-check" " public DNS delegation."
                         if restarted
                         else "Temporal is disabled or the workflow was not found; no signal sent."
                     )

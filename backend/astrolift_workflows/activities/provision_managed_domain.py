@@ -102,7 +102,9 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         existing.provision_state = ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value
         existing.provision_nameservers = nameservers
         existing.dns_config = config
-        existing.save(update_fields=["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"])
+        existing.save(
+            update_fields=["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"]
+        )
     else:
         ManagedDomain.objects.create(
             zone=zone,

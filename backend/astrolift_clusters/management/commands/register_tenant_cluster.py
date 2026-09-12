@@ -75,8 +75,6 @@ include the call unconditionally.
 
 from __future__ import annotations
 
-import json
-import logging
 import os
 from typing import Any
 
@@ -85,9 +83,6 @@ from django.core.management.base import BaseCommand, CommandError
 from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
-from astrolift_observability.prom_client import is_cluster_internal_endpoint
-
-logger = logging.getLogger(__name__)
 
 _VALID_AUTH = {"kubeconfig", "exec_plugin", "service_account_token"}
 
@@ -102,29 +97,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _json_env(name: str) -> dict[str, Any] | None:
-    """A JSON object from the environment, or None.
-
-    Malformed JSON is a startup-time misconfiguration, and this command
-    runs on every container start -- refusing here would take the control
-    plane down over a stray comma. Warn and fall back to what the row
-    already carries, which is what the caller does with None.
-    """
-
-    raw = _env(name)
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        logger.warning("%s is not valid JSON; ignoring it", name)
-        return None
-    if not isinstance(parsed, dict):
-        logger.warning("%s must be a JSON object, got %s; ignoring it", name, type(parsed).__name__)
-        return None
-    return parsed
 
 
 def _discover_aws(cluster_name: str, region: str) -> dict[str, Any]:
@@ -323,19 +295,6 @@ class Command(BaseCommand):
         parser.add_argument("--ca-cert", default=None)
         parser.add_argument("--ingress-class", default=None)
         parser.add_argument(
-            "--prometheus-endpoint",
-            default=None,
-            help=(
-                "Base URL of the cluster's Prometheus, as the control plane must reach it "
-                "(default: ASTROLIFT_CLUSTER_PROMETHEUS_ENDPOINT). Written to "
-                "provider_config['prometheus_endpoint'], which every metrics panel reads. "
-                "The control plane queries it over HTTP from outside the cluster, so a "
-                "Service ClusterIP or *.svc name will not resolve -- front it with an "
-                "internal load balancer. Absent leaves whatever the row has, including the "
-                "pod IP the capability probe discovers."
-            ),
-        )
-        parser.add_argument(
             "--ingress-mode",
             default=None,
             choices=[m.value for m in IngressMode],
@@ -357,15 +316,6 @@ class Command(BaseCommand):
             "--aws-cluster-name",
             default=None,
             help="EKS cluster name to describe (default: --slug or EKS_CLUSTER_NAME)",
-        )
-        parser.add_argument(
-            "--iam-permissions-boundary-arn",
-            default=None,
-            help=(
-                "IAM permissions boundary every role this cluster mints must carry "
-                "(default: ASTROLIFT_CLUSTER_IAM_PERMISSIONS_BOUNDARY_ARN). Required in "
-                "pull-mode installs whose installer boundary denies CreateRole without it."
-            ),
         )
         parser.add_argument(
             "--auto-discover-azure",
@@ -489,51 +439,6 @@ class Command(BaseCommand):
                 "upstream_connector": _env("ASTROLIFT_CLUSTER_OIDC_UPSTREAM_CONNECTOR") or "google",
                 "auth_proxy_host": _oidc_auth_proxy_host,
             }
-            # This dict REPLACES oidc_auth_config wholesale, so a key the
-            # environment does not carry is not merely left unset -- it is
-            # deleted on the next container start. Two keys are owned by the
-            # operator rather than by the environment, and both have to be
-            # carried forward or declaring the OIDC vars silently destroys
-            # them:
-            #
-            # ``gateway_secret`` (#1726) -- lose it and every gated app starts
-            # refusing traffic it can no longer prove came through the gate.
-            #
-            # ``proxy_extra_args`` (#1716) -- the operator's provider flags,
-            # e.g. ``insecure-oidc-allow-unverified-email`` for a federation
-            # whose upstream cannot assert the claim. Lose it and every
-            # federated login 500s at the callback again.
-            #
-            # Environment wins where it declares one, so an install can move
-            # either to the declarative path without re-issuing a secret or
-            # re-deriving flags that are already deployed and working.
-            _existing_oidc: dict = {}
-            _existing_row = TenantCluster.all_objects.filter(slug=slug).first()
-            if _existing_row is not None:
-                _existing_oidc = _existing_row.oidc_auth_config or {}
-
-            _oidc_gateway_secret = _env("ASTROLIFT_CLUSTER_OIDC_GATEWAY_SECRET") or _existing_oidc.get(
-                "gateway_secret", ""
-            )
-            if _oidc_gateway_secret:
-                oidc_auth_config["gateway_secret"] = _oidc_gateway_secret
-
-            _proxy_args = _json_env("ASTROLIFT_CLUSTER_OIDC_PROXY_EXTRA_ARGS") or _existing_oidc.get(
-                "proxy_extra_args"
-            )
-            if _proxy_args:
-                oidc_auth_config["proxy_extra_args"] = _proxy_args
-
-            # Startup must not erase the logout URL set by an operator.
-            _logout_url = _env("ASTROLIFT_CLUSTER_OIDC_LOGOUT_URL") or _existing_oidc.get("logout_url")
-            if _logout_url:
-                from providers.k8s_native.logout import configured_logout_url
-
-                oidc_auth_config["logout_url"] = _logout_url
-                try:
-                    configured_logout_url(oidc_auth_config)
-                except ValueError as exc:
-                    raise CommandError(str(exc)) from exc
 
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
@@ -716,56 +621,6 @@ class Command(BaseCommand):
             org = Organization.objects.filter(slug=org_slug).first()
             if org is None:
                 raise CommandError(f"organization {org_slug!r} not found")
-
-        # The boundary the cloud requires every role this cluster mints to
-        # carry (#1681). #1679 added ``IRSAConfig.permissions_boundary_arn``,
-        # read from ``provider_config["iam_permissions_boundary_arn"]`` --
-        # and nothing ever wrote that key, so the fix was correct, tested
-        # and inert on every install. In pull mode the installer runs under
-        # a boundary whose DenyRoleCreationWithoutThisBoundary statement
-        # refuses any CreateRole that does not attach the same boundary, so
-        # both roles Astrolift mints per app (IRSA + kaniko build) are denied
-        # until the cluster knows which one to attach.
-        _boundary = opts.get("iam_permissions_boundary_arn") or _env(
-            "ASTROLIFT_CLUSTER_IAM_PERMISSIONS_BOUNDARY_ARN"
-        )
-        if _boundary:
-            provider_config["iam_permissions_boundary_arn"] = _boundary
-
-        # The endpoint every metrics panel reads (#1711). Until now the only
-        # write paths were the registration UI and the capability probe's
-        # pod-IP discovery, which re-resolves to nothing when the Prometheus
-        # pod is rescheduled -- an install with a stable internal load
-        # balancer in front of Prometheus had no supported way to say so.
-        _prometheus_endpoint = (
-            opts.get("prometheus_endpoint") or _env("ASTROLIFT_CLUSTER_PROMETHEUS_ENDPOINT") or ""
-        ).strip()
-        if _prometheus_endpoint:
-            provider_config["prometheus_endpoint"] = _prometheus_endpoint
-            if is_cluster_internal_endpoint(_prometheus_endpoint):
-                # Not an error: a control plane deployed into the same
-                # cluster reaches this fine. Said out loud because for the
-                # deployment shape this command usually runs in it does not,
-                # and the failure it produces reads as "Prometheus is down".
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"prometheus_endpoint {_prometheus_endpoint!r} is a cluster-internal "
-                        "address. Unless the control plane runs inside this cluster it cannot "
-                        "reach it; front Prometheus with an internal load balancer."
-                    )
-                )
-
-        # Merge over what the row already carries rather than replacing it.
-        # ``provider_config`` is assigned wholesale, and it is ``{}`` on any
-        # run that does not auto-discover -- so a re-register with discovery
-        # off deleted every discovered value (account id, OIDC provider arn,
-        # ECR registry) and took managed services and workload identity with
-        # them. Same rule #1616 settled for oidc_auth_config: clearing live
-        # config should take a deliberate act, not a partially-configured
-        # re-run that happens on every container start.
-        _existing_row_pc = TenantCluster.all_objects.filter(slug=slug).first()
-        if _existing_row_pc is not None:
-            provider_config = {**(_existing_row_pc.provider_config or {}), **provider_config}
 
         # Upsert. all_objects to bypass soft-delete filtering so an
         # accidentally-deleted row gets restored rather than duplicated.
