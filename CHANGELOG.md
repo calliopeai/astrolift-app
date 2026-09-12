@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep multiple terminal sessions responsive by waking exec-stream readers on
+  their event loop instead of parking shared executor threads. Cancelling a
+  reader no longer consumes output meant for its replacement (#1783).
+
 - Remove duplicate managed-domain operation imports after concurrent revalidation
   fixes merged, restoring the production frontend build.
 
