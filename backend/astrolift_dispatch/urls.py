@@ -15,7 +15,6 @@ from astrolift_dispatch.views import (
     list_runtimes,
     list_tasks,
     register,
-    send_task_input,
     update_task_status,
 )
 
@@ -30,7 +29,6 @@ urlpatterns = [
     # Task management
     path("api/dispatch/v1/tasks/", list_tasks, name="dispatch-tasks"),
     path("api/dispatch/v1/tasks/<str:task_id>/status/", update_task_status, name="dispatch-task-status"),
-    path("api/dispatch/v1/tasks/<str:task_id>/input/", send_task_input, name="dispatch-task-input"),
     # Thread-mode agent checkin + callback
     path("api/dispatch/v1/agents/<str:task_id>/checkin/", agent_checkin, name="agent-checkin"),
     path("api/dispatch/v1/agents/<str:task_id>/callback/", agent_callback, name="agent-callback"),
