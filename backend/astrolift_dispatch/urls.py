@@ -11,9 +11,9 @@ from astrolift_dispatch.views import (
     heartbeat,
     ingest_task_logs,
     ingest_task_meter,
-    send_task_input,
     list_tasks,
     register,
+    send_task_input,
     update_task_status,
 )
 

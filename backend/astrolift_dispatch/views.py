@@ -248,11 +248,20 @@ def send_task_input(request: HttpRequest, task_id: str) -> JsonResponse:
     if task is None:
         return JsonResponse({"error": "task not found"}, status=404)
     from astrolift_agents.services.agent_task_input import AgentTaskInputError, queue_agent_task_input
+
     try:
         queued = queue_agent_task_input(task=task, message=body["message"], author_label="Dispatch overseer")
     except AgentTaskInputError as exc:
         return JsonResponse({"error": exc.message, "code": exc.code}, status=400)
-    return JsonResponse({"id": str(queued.guid), "task_id": task_id, "message": queued.body, "created_at": queued.created_at.isoformat()}, status=202)
+    return JsonResponse(
+        {
+            "id": str(queued.guid),
+            "task_id": task_id,
+            "message": queued.body,
+            "created_at": queued.created_at.isoformat(),
+        },
+        status=202,
+    )
 
 
 # ---------------------------------------------------------------------------
