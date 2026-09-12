@@ -152,6 +152,10 @@ class ManagedDomainType:
     provision_state: str
     provision_nameservers: JSON
     provision_validation_records: JSON
+    # Latest public-DNS delegation finding. Kept in dns_config so old rows
+    # remain migration-free while operators can see why activation is gated.
+    delegation_check: JSON
+    provision_cluster_id: str | None
 
 
 # ---- Certificate picker (#858) ------------------------------------
@@ -306,6 +310,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
 
 
 def domain_to_type(domain) -> ManagedDomainType:
+    delegation_check = (domain.dns_config or {}).get("delegation_check", {})
     return ManagedDomainType(
         id=GUID(str(domain.guid)),
         zone=domain.zone,
@@ -317,6 +322,12 @@ def domain_to_type(domain) -> ManagedDomainType:
         provision_state=domain.provision_state,
         provision_nameservers=domain.provision_nameservers or [],
         provision_validation_records=domain.provision_validation_records or [],
+        delegation_check=delegation_check,
+        provision_cluster_id=(
+            str((domain.dns_config or {}).get("provision_cluster_id"))
+            if (domain.dns_config or {}).get("provision_cluster_id")
+            else None
+        ),
     )
 
 

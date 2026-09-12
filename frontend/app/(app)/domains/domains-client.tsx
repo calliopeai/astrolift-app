@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { CopyIcon, GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, GlobeIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import {
 import {
   CREATE_MANAGED_DOMAIN,
   LIST_MANAGED_DOMAINS,
+  REVALIDATE_MANAGED_DOMAIN,
   SOFT_DELETE_MANAGED_DOMAIN,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
@@ -113,6 +114,22 @@ export function DomainsClient() {
     refetchQueries: [{ query: LIST_MANAGED_DOMAINS }],
     awaitRefetchQueries: true,
   });
+  const [revalidate, { loading: revalidating }] = useMutation(REVALIDATE_MANAGED_DOMAIN, {
+    refetchQueries: [{ query: LIST_MANAGED_DOMAINS }],
+  });
+
+  async function handleRevalidate(d: AstroliftManagedDomain) {
+    if (!d.provisionClusterId) {
+      toast.error("No provisioning cluster is recorded for this domain");
+      return;
+    }
+    const result = await revalidate({
+      variables: { clusterId: d.provisionClusterId, zone: d.zone },
+    });
+    const payload = result.data?.revalidateManagedDomain;
+    if (payload?.ok) toast.success(payload.data?.message ?? `Revalidation started for ${d.zone}`);
+    else toast.error(payload?.errors?.[0]?.message ?? "Unable to start revalidation");
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -249,6 +266,16 @@ export function DomainsClient() {
                       {fmt.formatDate(d.createdAt)}
                     </TableCell>
                     <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void handleRevalidate(d)}
+                        disabled={revalidating || !d.provisionClusterId}
+                        title="Revalidate public DNS delegation"
+                      >
+                        <RefreshCwIcon className="size-4" />
+                        <span className="sr-only">Revalidate DNS</span>
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"

@@ -1430,6 +1430,24 @@ class ClustersMutation:
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "revalidate")
+        restarted = False
+        if not signaled:
+            # A failed NS gate closes the original run, so a signal cannot
+            # reach it. Starting the same idempotent workflow again gives the
+            # operator's DNS change a real feedback path without requiring a
+            # second domain row or manual cleanup.
+            restarted = start_workflow(
+                "ProvisionManagedDomainWorkflow",
+                args=[
+                    ProvisionManagedDomainInput(
+                        cluster_id=cluster.pk,
+                        zone=zone,
+                        is_platform_managed_zone=True,
+                        actor=_actor_from_request(info),
+                    )
+                ],
+                workflow_id=workflow_id,
+            ).enqueued
         return gql_success(
             RevalidateManagedDomainPayload(
                 zone=zone,
@@ -1438,7 +1456,11 @@ class ClustersMutation:
                     "Revalidation signal sent — the workflow will check cert"
                     " issuance on the next activity slot."
                     if signaled
-                    else "Temporal is disabled or the workflow was not found; no signal sent."
+                    else (
+                        "A new provisioning run was started and will re-check" " public DNS delegation."
+                        if restarted
+                        else "Temporal is disabled or the workflow was not found; no signal sent."
+                    )
                 ),
             )
         )

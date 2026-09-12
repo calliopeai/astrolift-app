@@ -251,7 +251,7 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
                 },
                 status=400,
             )
-        body["image_tags"] = {name: raw_tags["*"] for name in image_workloads}
+        body["image_tags"] = dict.fromkeys(image_workloads, raw_tags["*"])
 
     # If there's no declared workload list (missing or unparseable manifest),
     # relax the workload-tag validation so CI can still deliver (the deploy

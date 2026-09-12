@@ -291,7 +291,7 @@ def reconcile_runs() -> dict[str, int]:
     / ``running`` transitions written; ``unchanged`` no-ops (steady state);
     ``skipped`` rows with no resolvable cluster; ``errors`` rows whose Job
     status couldn't be read (unreachable / missing / unsupported driver)."""
-    summary: dict[str, int] = {"evaluated": 0, **{k: 0 for k in _OUTCOMES}}
+    summary: dict[str, int] = {"evaluated": 0, **dict.fromkeys(_OUTCOMES, 0)}
 
     for run in _nonterminal_scheduled_runs():
         summary["evaluated"] += 1
