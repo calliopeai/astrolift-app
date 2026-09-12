@@ -2357,10 +2357,12 @@ export type AstroliftLogoutAllSessionsPayloadMutationResult = {
 export type AstroliftManagedDomain = {
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
+  delegationCheck: Scalars['JSON']['output'];
   dnsDriver: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
+  provisionClusterId?: Maybe<Scalars['String']['output']>;
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];

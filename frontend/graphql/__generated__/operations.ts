@@ -2357,10 +2357,12 @@ export type AstroliftLogoutAllSessionsPayloadMutationResult = {
 export type AstroliftManagedDomain = {
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
+  delegationCheck: Scalars['JSON']['output'];
   dnsDriver: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
+  provisionClusterId?: Maybe<Scalars['String']['output']>;
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];
@@ -10660,6 +10662,14 @@ export type SoftDeleteManagedDomainMutationVariables = Exact<{
 
 export type SoftDeleteManagedDomainMutation = { softDeleteManagedDomain: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, deleted: boolean } | null } };
 
+export type RevalidateManagedDomainMutationVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+  zone: Scalars['String']['input'];
+}>;
+
+
+export type RevalidateManagedDomainMutation = { revalidateManagedDomain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { zone: string, signaled: boolean, message: string } | null } };
+
 export type ClusterCountQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -10733,7 +10743,7 @@ export type RefreshClusterManagementMutation = { refreshClusterManagement: { ok:
 export type ListManagedDomainsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: Record<string, unknown>, provisionValidationRecords: Record<string, unknown> }> };
+export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: Record<string, unknown>, provisionValidationRecords: Record<string, unknown>, delegationCheck: Record<string, unknown>, provisionClusterId?: string | null }> };
 
 export type ClusterHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
