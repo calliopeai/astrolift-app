@@ -50,10 +50,6 @@ import type {
 } from "@/graphql/__generated__/operations";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import type {
-  RevalidateManagedDomainMutation,
-  RevalidateManagedDomainMutationVariables,
-} from "@/graphql/__generated__/operations";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 interface Resp {
