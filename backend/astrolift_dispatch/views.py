@@ -274,6 +274,18 @@ def send_task_input(request: HttpRequest, task_id: str) -> JsonResponse:
 # ---------------------------------------------------------------------------
 
 
+def _read_scope(request: HttpRequest):
+    kind = request.GET.get("scope", "organization")
+    if kind not in {"organization", "dispatcher"}:
+        return None
+    return {
+        "version": 1,
+        "kind": kind,
+        "organization_id": str(request.dispatcher.organization.guid),
+        "dispatcher_id": str(request.dispatcher.guid),
+    }
+
+
 @require_http_methods(["GET"])
 @_require_dispatcher
 def list_fleet(request: HttpRequest) -> JsonResponse:
@@ -283,22 +295,34 @@ def list_fleet(request: HttpRequest) -> JsonResponse:
     CLI and overseer clients that use a dispatch service token.  By default
     only non-terminal tasks are returned; ``include_terminal=1`` includes
     recent terminal rows as well.  Secrets, prompts, and task results are
-    deliberately excluded from this operational view.
+    deliberately excluded from this operational view. ``scope=dispatcher``
+    restricts rows to the authenticated dispatcher for deployment-bound clients.
     """
     from astrolift_agents.models import AgentTask
 
+    scope = _read_scope(request)
+    if scope is None:
+        return JsonResponse({"error": "invalid scope"}, status=400)
+    if request.dispatcher.organization.deleted_at is not None:
+        return JsonResponse({"error": "unauthorized"}, status=401)
     tasks = AgentTask.objects.filter(
         organization=request.dispatcher.organization,
         deleted_at__isnull=True,
     )
+    if scope["kind"] == "dispatcher":
+        tasks = tasks.filter(dispatcher=request.dispatcher)
     if request.GET.get("include_terminal") not in {"1", "true", "yes"}:
         tasks = tasks.filter(status__in=AgentTask.NON_TERMINAL_STATUSES)
-    tasks = tasks.select_related("agent_definition", "environment_spec", "dispatcher").order_by(
-        "-updated_at"
-    )[:200]
+    tasks = list(
+        tasks.select_related("agent_definition", "environment_spec", "dispatcher").order_by(
+            "-updated_at", "pk"
+        )[:201]
+    )
 
     return JsonResponse(
         {
+            "scope": scope,
+            "has_more": len(tasks) > 200,
             "agents": [
                 {
                     "task_id": str(task.guid),
@@ -311,8 +335,8 @@ def list_fleet(request: HttpRequest) -> JsonResponse:
                     "ended_at": task.ended_at.isoformat() if task.ended_at else None,
                     "vnc_url": task.vnc_url or None,
                 }
-                for task in tasks
-            ]
+                for task in tasks[:200]
+            ],
         }
     )
 
@@ -323,7 +347,12 @@ def list_runtimes(request: HttpRequest) -> JsonResponse:
     """List the install-wide runtime catalog available to agent tasks."""
     from astrolift_agents.runtime_catalog import catalog_entries
 
-    return JsonResponse({"runtimes": catalog_entries()})
+    scope = _read_scope(request)
+    if scope is None:
+        return JsonResponse({"error": "invalid scope"}, status=400)
+    if request.dispatcher.organization.deleted_at is not None:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    return JsonResponse({"scope": scope, "runtimes": catalog_entries()})
 
 
 # ---------------------------------------------------------------------------
