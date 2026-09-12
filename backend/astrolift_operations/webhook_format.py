@@ -44,6 +44,13 @@ def adapt_payload(*, format: str, envelope: dict[str, Any]) -> dict[str, Any]:
         return _adapt_slack(envelope)
     if format == DISCORD:
         return _adapt_discord(envelope)
+    from astrolift_operations.zentinelle_bridge import is_zentinelle_envelope
+
+    if is_zentinelle_envelope(envelope.get("event_type", ""), envelope.get("payload")):
+        # Zentinelle's collector validates the locked envelope at the top
+        # level, so an ``AUDIT.*`` event posts its inner envelope, not the
+        # Astrolift wrapper around it.
+        return dict(envelope["payload"])
     return dict(envelope)
 
 

@@ -58,3 +58,9 @@ def write_audit_entry(entry: AuditEntry) -> None:
             "failed to persist audit entry",
             extra={"action": entry.action, "decision": entry.decision},
         )
+        return
+    # Zentinelle evidence rides on the persisted row: a mapped, allowed audit
+    # action is re-emitted as an ``AUDIT.*`` event for webhook fan-out.
+    from astrolift_operations.zentinelle_bridge import bridge_audit_entry
+
+    bridge_audit_entry(entry)
