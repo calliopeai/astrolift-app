@@ -44,6 +44,10 @@ import {
   REVALIDATE_MANAGED_DOMAIN,
   SOFT_DELETE_MANAGED_DOMAIN,
 } from "@/graphql/clusters/clusters.queries";
+import type {
+  RevalidateManagedDomainMutation,
+  RevalidateManagedDomainMutationVariables,
+} from "@/graphql/__generated__/operations";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import type {
@@ -82,7 +86,7 @@ export function DomainsClient() {
   // workflow creates the zone; poll until every domain settles so the
   // operator sees them without refreshing.
   const provisioning = (data?.astroliftManagedDomains ?? []).some(
-    (d) => d.provisionState !== "mark_active",
+    (d) => d.provisionState !== "mark_active"
   );
   React.useEffect(() => {
     if (provisioning) startPolling(10_000);
@@ -228,7 +232,10 @@ export function DomainsClient() {
                   >
                     <TableCell className="font-mono">{d.zone}</TableCell>
                     <TableCell>
-                      <Badge className={provisionBadge(d.provisionState).className} variant="secondary">
+                      <Badge
+                        className={provisionBadge(d.provisionState).className}
+                        variant="secondary"
+                      >
                         {provisionBadge(d.provisionState).label}
                       </Badge>
                     </TableCell>
@@ -246,7 +253,7 @@ export function DomainsClient() {
                             aria-label={`Copy nameservers for ${d.zone}`}
                             onClick={async () => {
                               await navigator.clipboard.writeText(
-                                d.provisionNameservers.join("\n"),
+                                d.provisionNameservers.join("\n")
                               );
                               toast.success("Nameservers copied");
                             }}

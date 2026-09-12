@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Type managed-domain revalidation with the generated GraphQL operation so the
+  domain console passes the production frontend build.
+
 - Dispatch fleet and runtime reads return their token-authenticated organization
   and dispatcher identity. `scope=dispatcher` filters fleet tasks to that
   dispatcher, allowing Client Cove to bind a connection to one deployment.
