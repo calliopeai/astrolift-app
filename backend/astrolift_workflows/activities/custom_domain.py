@@ -54,11 +54,25 @@ def _resolve_authoritative_records(
     except Exception as exc:  # noqa: BLE001
         return [], f"dnspython unavailable: {exc}"
 
-    # Step 1: find the apex's authoritative nameservers.
-    try:
-        ns_answer = dns.resolver.resolve(apex, "NS", lifetime=5.0)
-    except Exception as exc:  # noqa: BLE001
-        return [], (f"NS lookup for {apex!r} failed: {type(exc).__name__}: {exc}")
+    # Step 1: find the closest authoritative zone. A hostname can be
+    # nested below a plain subdomain (for example
+    # ``api.apps.example.com`` while the delegated zone is
+    # ``example.com``), and querying the hostname's immediate parent for
+    # NS records returns NoAnswer in that case. Walk up one label at a
+    # time until an NS RRset is found.
+    candidate = apex.strip(".").lower()
+    ns_answer = None
+    last_error: Exception | None = None
+    while candidate and "." in candidate:
+        try:
+            ns_answer = dns.resolver.resolve(candidate, "NS", lifetime=5.0)
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            candidate = candidate.split(".", 1)[1]
+    if ns_answer is None:
+        detail = f"{type(last_error).__name__}: {last_error}" if last_error else "no NS answer"
+        return [], f"NS lookup for {apex!r} failed: {detail}"
     nameservers: list[str] = []
     for rdata in ns_answer:
         host = str(rdata.target).rstrip(".")
