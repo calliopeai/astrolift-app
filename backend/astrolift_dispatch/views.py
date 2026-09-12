@@ -10,7 +10,6 @@ Endpoints:
     POST /api/dispatch/v1/tasks/<id>/status/            — update task status
     POST /api/dispatch/v1/tasks/<id>/logs/              — stream log lines (#51)
     POST /api/dispatch/v1/tasks/<id>/meter/             — report metering data (#56)
-    POST /api/dispatch/v1/tasks/<id>/input/             — queue operator input
 """
 
 from __future__ import annotations
@@ -227,46 +226,6 @@ def heartbeat(request: HttpRequest) -> JsonResponse:
     dispatcher.save(update_fields=update_fields)
 
     return JsonResponse({"ok": True, "status": dispatcher.status})
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-@_require_dispatcher
-def send_task_input(request: HttpRequest, task_id: str) -> JsonResponse:
-    """Queue an overseer message for a running task in this dispatcher's org."""
-    from django.conf import settings
-
-    if not getattr(settings, "DISPATCH_TASK_INPUT_ENABLED", False):
-        logger.warning("dispatch.task_input refused: task input is disabled")
-        return JsonResponse({"error": "dispatch task input is disabled"}, status=503)
-    try:
-        body = json.loads(request.body or b"{}")
-    except (json.JSONDecodeError, ValueError):
-        return JsonResponse({"error": "invalid JSON"}, status=400)
-    if not isinstance(body, dict) or not isinstance(body.get("message"), str):
-        return JsonResponse({"error": "message is required"}, status=400)
-    task = AgentTask.objects.filter(
-        guid=task_id,
-        organization=request.dispatcher.organization,
-        deleted_at__isnull=True,
-    ).first()
-    if task is None:
-        return JsonResponse({"error": "task not found"}, status=404)
-    from astrolift_agents.services.agent_task_input import AgentTaskInputError, queue_agent_task_input
-
-    try:
-        queued = queue_agent_task_input(task=task, message=body["message"], author_label="Dispatch overseer")
-    except AgentTaskInputError as exc:
-        return JsonResponse({"error": exc.message, "code": exc.code}, status=400)
-    return JsonResponse(
-        {
-            "id": str(queued.guid),
-            "task_id": task_id,
-            "message": queued.body,
-            "created_at": queued.created_at.isoformat(),
-        },
-        status=202,
-    )
 
 
 # ---------------------------------------------------------------------------
