@@ -11,10 +11,10 @@ import {
   RadioTowerIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import Link from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -25,7 +25,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   LIST_AGENT_ENVIRONMENT_SPECS,
   LIST_AGENT_FLEET,
+  LIST_AGENT_FLEET_PAGE,
   LIST_AGENT_TASKS,
+  LIST_AGENT_TASKS_PAGE,
 } from "@/graphql/agents/agents.queries";
 import type {
   AstroliftAgentEnvironmentSpec,
@@ -39,9 +41,75 @@ import { FleetMapClient } from "./map/fleet-map-client";
 type FleetData = { agentFleet: AstroliftAgentListItem[] };
 type TaskData = { agentTasks: AstroliftAgentTask[] };
 type RuntimeData = { agentEnvironmentSpecs: AstroliftAgentEnvironmentSpec[] };
+type FleetPageData = {
+  agentFleetPage: {
+    items: AstroliftAgentListItem[];
+    nextCursor: string | null;
+    totalCount: number | null;
+  };
+};
+type TaskPageData = {
+  agentTasksPage: {
+    items: AstroliftAgentTask[];
+    nextCursor: string | null;
+    totalCount: number | null;
+  };
+};
 
 const ACTIVE = new Set(["queued", "provisioning", "running"]);
 const FAILING = new Set(["failed", "timed_out"]);
+
+const AGENT_COLUMNS: Column<AstroliftAgentListItem>[] = [
+  { id: "agent", header: "Agent", cell: (row) => <span className="font-medium">{row.name}</span> },
+  {
+    id: "project",
+    header: "Project",
+    cell: (row) => (
+      <span className="text-muted-foreground font-mono text-xs">{row.projectSlug || "—"}</span>
+    ),
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: (row) => (
+      <Badge variant={row.runningCount > 0 ? "default" : "outline"}>
+        {row.runningCount > 0 ? `${row.runningCount} running` : "Idle"}
+      </Badge>
+    ),
+  },
+];
+
+const TASK_COLUMNS: Column<AstroliftAgentTask>[] = [
+  {
+    id: "agent",
+    header: "Agent",
+    cell: (row) => (
+      <span className="font-medium">{row.agentName || row.agentSlug || "Agent task"}</span>
+    ),
+  },
+  {
+    id: "project",
+    header: "Project",
+    cell: (row) => (
+      <span className="text-muted-foreground font-mono text-xs">{row.projectSlug || "—"}</span>
+    ),
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: (row) => (
+      <Badge variant={statusTone(row.status)} className="capitalize">
+        {row.status.replace(/_/g, " ")}
+      </Badge>
+    ),
+  },
+  {
+    id: "created",
+    header: "Created",
+    cell: (row) => <span className="text-muted-foreground text-xs">{age(row.createdAt)}</span>,
+    align: "right",
+  },
+];
 
 function age(iso: string | null): string {
   if (!iso) return "—";
@@ -81,6 +149,23 @@ export function FleetOverviewClient() {
     variables: { orgId },
     skip: !orgId,
     fetchPolicy: "cache-and-network",
+  });
+  const agentTable = useCursorTable<AstroliftAgentListItem>({
+    query: LIST_AGENT_FLEET_PAGE,
+    variables: { orgId },
+    extract: (data) => (data as FleetPageData | undefined)?.agentFleetPage,
+    searchVariable: "search",
+    urlKey: "fleet-agent",
+    skip: !orgId,
+  });
+  const taskTable = useCursorTable<AstroliftAgentTask>({
+    query: LIST_AGENT_TASKS_PAGE,
+    variables: { orgId, status: null, workloadId: null },
+    extract: (data) => (data as TaskPageData | undefined)?.agentTasksPage,
+    searchVariable: "search",
+    urlKey: "fleet-task",
+    skip: !orgId,
+    pollInterval: 10000,
   });
 
   const agents = fleet.data?.agentFleet ?? [];
@@ -160,46 +245,22 @@ export function FleetOverviewClient() {
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
         <Section title="Recent activity" description="The latest task transitions from Dispatch.">
-          <Card>
-            <CardContent className="p-0">
-              {loading && rows.length === 0 ? (
-                <div className="space-y-3 p-5">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : rows.length === 0 ? (
-                <EmptyState
-                  icon={<Clock3Icon className="size-5" />}
-                  title="No task activity yet"
-                  description="Tasks dispatched through this organization will appear here."
-                  actionHref="/agents?tab=dispatch"
-                  actionLabel="Open dispatch"
-                />
-              ) : (
-                <ul className="divide-y">
-                  {rows.slice(0, 10).map((task) => (
-                    <li key={task.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                      <div className="min-w-0">
-                        <Link
-                          href={`/agents/runs/${encodeURIComponent(task.id)}`}
-                          className="truncate font-medium hover:underline"
-                        >
-                          {task.agentName || task.agentSlug || "Agent task"}
-                        </Link>
-                        <p className="text-muted-foreground truncate font-mono text-xs">
-                          {task.projectSlug || "unassigned"} · {age(task.createdAt)}
-                        </p>
-                      </div>
-                      <Badge variant={statusTone(task.status)} className="shrink-0 capitalize">
-                        {task.status.replace(/_/g, " ")}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <DataTable
+            label="Recent agent activity"
+            controller={taskTable}
+            columns={TASK_COLUMNS}
+            getRowId={(row) => row.id}
+            rowHref={(row) => `/agents/runs/${encodeURIComponent(row.id)}`}
+            searchPlaceholder="Search tasks"
+            empty={{
+              icon: <Clock3Icon className="size-5" />,
+              title: "No task activity yet",
+              description: "Tasks dispatched through this organization will appear here.",
+              actionHref: "/agents?tab=dispatch",
+              actionLabel: "Open dispatch",
+            }}
+            emptyFiltered={{ title: "No matching tasks", description: "Try a different search." }}
+          />
         </Section>
 
         <Section
@@ -256,40 +317,22 @@ export function FleetOverviewClient() {
         title="Agent roster"
         description="Registered agents and the runtime work they are carrying now."
       >
-        <Card>
-          <CardContent className="p-0">
-            {agents.length === 0 ? (
-              <EmptyState
-                icon={<BotIcon className="size-5" />}
-                title="No agents registered"
-                description="Register an agent repository before dispatching work."
-                actionHref="/agents?tab=registry"
-                actionLabel="Open agent registry"
-              />
-            ) : (
-              <ul className="grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-                {agents.slice(0, 12).map((agent) => (
-                  <li key={agent.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/agents/${encodeURIComponent(agent.slug)}`}
-                        className="truncate font-medium hover:underline"
-                      >
-                        {agent.name}
-                      </Link>
-                      <p className="text-muted-foreground truncate font-mono text-xs">
-                        {agent.projectSlug}/{agent.slug}
-                      </p>
-                    </div>
-                    <Badge variant={agent.runningCount > 0 ? "default" : "outline"}>
-                      {agent.runningCount > 0 ? `${agent.runningCount} running` : "Idle"}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <DataTable
+          label="Agent roster"
+          controller={agentTable}
+          columns={AGENT_COLUMNS}
+          getRowId={(row) => row.id}
+          rowHref={(row) => `/agents/${encodeURIComponent(row.slug)}`}
+          searchPlaceholder="Search agents"
+          empty={{
+            icon: <BotIcon className="size-5" />,
+            title: "No agents registered",
+            description: "Register an agent repository before dispatching work.",
+            actionHref: "/agents?tab=registry",
+            actionLabel: "Open agent registry",
+          }}
+          emptyFiltered={{ title: "No matching agents", description: "Try a different search." }}
+        />
       </Section>
     </PageShell>
   );
