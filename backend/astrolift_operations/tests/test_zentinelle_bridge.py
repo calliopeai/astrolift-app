@@ -47,6 +47,9 @@ def _entry(**overrides) -> AuditEntry:
 
 def test_mapping_covers_catalog_and_ignores_the_rest():
     assert event_type_for_action("app.deploy") is ZentinelleEventType.APP_DEPLOY
+    # `astro app deploy` and the UI approve flow audit as deployment.*, not app.deploy.
+    assert event_type_for_action("deployment.start") is ZentinelleEventType.APP_DEPLOY
+    assert event_type_for_action("deployment.approve") is ZentinelleEventType.APP_DEPLOY
     assert event_type_for_action("role_binding.grant") is ZentinelleEventType.ROLE_BINDING_GRANT
     assert event_type_for_action("app.secret.reveal") is ZentinelleEventType.SECRET_VIEWED
     assert event_type_for_action("agents.task.launch") is None
