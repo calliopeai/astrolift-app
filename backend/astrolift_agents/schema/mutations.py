@@ -1944,7 +1944,7 @@ class AgentsMutation:
             return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
 
         from astrolift_agents.models import AgentBox
-        from astrolift_agents.services.agent_box import destroy_agent_box
+        from astrolift_agents.services.agent_box import AgentBoxError, destroy_agent_box
 
         box = (
             AgentBox.objects.filter(slug=slug, organization_id=org_pk).select_related("organization").first()
@@ -1953,7 +1953,10 @@ class AgentsMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "agent box not found", field="slug")
 
         payload = agent_box_to_type(box)
-        destroy_agent_box(box, by=_box_owner(info))
+        try:
+            destroy_agent_box(box, by=_box_owner(info))
+        except AgentBoxError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
         payload.status = box.status
         payload.ended_at = box.ended_at
         return gql_success(payload)

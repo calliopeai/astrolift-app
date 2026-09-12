@@ -1138,6 +1138,44 @@ def test_destroy_kills_the_pod_and_soft_deletes_the_row(
     assert deleted_kinds == {"Job", "Secret"}
 
 
+@pytest.mark.parametrize("raises", [True, False], ids=["provider-exception", "provider-rejection"])
+def test_destroy_failure_keeps_the_box_visible_and_can_be_retried(
+    permission_resolver, info, org, with_tenant_org, cluster, monkeypatch, raises
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    box = _box(org, status=AgentBox.Status.RUNNING, external_id="agent-box-retry")
+    delete = cluster.driver.delete_manifests
+
+    def fail_delete(*args, **kwargs):
+        if raises:
+            raise RuntimeError("provider refused teardown")
+        return _ApplyResult(ok=False, detail="provider refused teardown")
+
+    monkeypatch.setattr(cluster.driver, "delete_manifests", fail_delete)
+    with with_tenant_org(org):
+        result = AgentsMutation().destroy_agent_box(info, slug=box.slug)
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert "provider refused teardown" in result.errors[0].message
+    box.refresh_from_db()
+    assert AgentBox.objects.filter(pk=box.pk).exists()
+    assert box.deleted_at is None
+    assert box.ended_at is None
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert "provider refused teardown" in box.last_error
+
+    monkeypatch.setattr(cluster.driver, "delete_manifests", delete)
+    with with_tenant_org(org):
+        retried = AgentsMutation().destroy_agent_box(info, slug=box.slug)
+
+    assert retried.ok is True, retried.errors
+    box.refresh_from_db()
+    assert box.deleted_at is not None
+    assert box.status == AgentBox.Status.STOPPED.value
+    assert not AgentBox.objects.filter(pk=box.pk).exists()
+
+
 def test_destroy_is_denied_without_the_dispatch_grant(
     permission_resolver, info, org, with_tenant_org, cluster
 ):
