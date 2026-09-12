@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Dispatch fleet and runtime reads return their token-authenticated organization
+  and dispatcher identity. `scope=dispatcher` filters fleet tasks to that
+  dispatcher, allowing Client Cove to bind a connection to one deployment.
+  Existing organization-wide reads remain the default. Fleet responses report
+  truncation with `has_more`; deleted organizations cannot use these reads.
+
 - `startDeployment` accepts an omitted image tag for platform builds and apps
   using manifest images. Platform builds resolve the deploy branch (or the new
   `sourceRef` input) to a commit and use its SHA as the default image tag before
