@@ -234,6 +234,11 @@ def heartbeat(request: HttpRequest) -> JsonResponse:
 @_require_dispatcher
 def send_task_input(request: HttpRequest, task_id: str) -> JsonResponse:
     """Queue an overseer message for a running task in this dispatcher's org."""
+    from django.conf import settings
+
+    if not getattr(settings, "DISPATCH_TASK_INPUT_ENABLED", False):
+        logger.warning("dispatch.task_input refused: task input is disabled")
+        return JsonResponse({"error": "dispatch task input is disabled"}, status=503)
     try:
         body = json.loads(request.body or b"{}")
     except (json.JSONDecodeError, ValueError):
