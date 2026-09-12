@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove duplicate managed-domain operation imports after concurrent revalidation
+  fixes merged, restoring the production frontend build.
+
 - Type managed-domain revalidation with the generated GraphQL operation so the
   domain console passes the production frontend build.
 
