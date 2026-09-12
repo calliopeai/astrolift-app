@@ -61,6 +61,10 @@ def _compatibility_brief(workload, environment_spec):
             "run_family": workload.run_family,
             "timeout_seconds": int(workload.tool_timeout_seconds or 300),
         },
+        # A compatibility brief freezes prose + image only. There is no source
+        # to slice (the workload was registered without a brief), so it must
+        # never claim a payload bundle the spawner then fails to find (#1762).
+        payload_required=False,
     )
     canonical = json.dumps(
         {"organization": str(app.organization.guid), "package": package},
