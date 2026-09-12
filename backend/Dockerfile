@@ -22,6 +22,9 @@ RUN pipenv requirements --dev > requirements.txt && pip install -r requirements.
 # part of this change; install it explicitly so collectstatic + the
 # WhiteNoiseMiddleware import work even before the lock catches up.
 RUN pip install --no-cache-dir whitenoise
+# dnspython: the custom-domain DNS probe imports dns.resolver (#1768); same posture as whitenoise above
+# until Pipfile.lock is regenerated wholesale.
+RUN pip install --no-cache-dir "dnspython>=2.6,<3"
 
 # pynacl: same story — declared in Pipfile (#383) for the libsodium
 # sealed-box used by the GitHub CI-secrets push, but the lock isn't
