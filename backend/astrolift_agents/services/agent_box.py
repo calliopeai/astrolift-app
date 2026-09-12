@@ -388,7 +388,9 @@ def _delete_box_objects(cluster, namespace: str, job_name: str) -> None:
             "metadata": {"name": box_secret_name(job_name), "namespace": namespace},
         },
     ]
-    result = driver.delete_manifests(ctx.slug, namespace, refs)
+    # Job deletion without a propagation policy may orphan its running pod.
+    # Keep the Job until Kubernetes has deleted its dependents.
+    result = driver.delete_manifests(ctx.slug, namespace, refs, propagation_policy="Foreground")
     if result is not None and not getattr(result, "ok", True):
         detail = result.summary() if hasattr(result, "summary") else "delete failed"
         raise AgentBoxError(str(detail))

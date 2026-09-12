@@ -102,6 +102,7 @@ class _FakeDriver:
     def __init__(self, *, apply_ok=True, job_conditions=None, job_missing=False, job_status=None):
         self.applied: list[list[dict]] = []
         self.deleted: list[list[dict]] = []
+        self.delete_policies: list[str | None] = []
         self.namespaces: list[str] = []
         self._apply_ok = apply_ok
         self._job_conditions = job_conditions or []
@@ -115,8 +116,9 @@ class _FakeDriver:
         self.applied.append([dict(m) for m in manifests])
         return _ApplyResult(ok=self._apply_ok)
 
-    def delete_manifests(self, cluster_slug, namespace, refs):
+    def delete_manifests(self, cluster_slug, namespace, refs, *, propagation_policy=None):
         self.deleted.append([dict(r) for r in refs])
+        self.delete_policies.append(propagation_policy)
         return _ApplyResult(ok=True)
 
     def get_workload_status(self, cluster_slug, namespace, kind, name):
@@ -480,6 +482,7 @@ def test_the_reaper_settles_a_box_whose_pod_has_gone(org, cluster, monkeypatch):
     assert box.ended_at is not None
     deleted_kinds = {ref["kind"] for batch in cluster.driver.deleted for ref in batch}
     assert deleted_kinds == {"Job", "Secret"}
+    assert cluster.driver.delete_policies == ["Foreground"]
 
 
 def test_the_reaper_leaves_a_box_it_cannot_observe_alone(org, cluster):
