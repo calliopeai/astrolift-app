@@ -88,6 +88,43 @@ async def mark_app_provisioning(registered_app_id: int) -> None:
     await sync_to_async(_mark_app_provisioning_sync)(registered_app_id)
 
 
+def _mark_app_failed_sync(registered_app_id: int, reason: str) -> None:
+    from astrolift_registry.models import RegisteredApp
+
+    app = RegisteredApp.all_objects.get(pk=registered_app_id)
+    if app.provisioning_status == RegisteredApp.ProvisioningStatus.FAILED.value:
+        return
+    app.transition_provisioning(RegisteredApp.ProvisioningStatus.FAILED, reason=reason)
+
+
+@activity.defn(name="astrolift.app.mark_failed")
+async def mark_app_failed(registered_app_id: int, reason: str) -> None:
+    """Record why a provision died, so the app stops looking like it is working.
+
+    Nothing reached ``FAILED`` before #1677 and nothing ever wrote
+    ``provisioning_error``, so an app whose provision had died twenty minutes
+    ago rendered exactly like one still in flight -- and the only way to find
+    the cause was the worker's cloud logs, which a tenant does not have.
+
+    Deliberately tolerant: this runs on the failure path, and an exception here
+    would replace a useful error with a confusing one. A transition that is no
+    longer legal (a teardown raced in) is swallowed after logging, because the
+    provisioning failure is still the thing worth reporting.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    try:
+        await sync_to_async(_mark_app_failed_sync)(registered_app_id, reason)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "could not mark app %s failed: %s",
+            registered_app_id,
+            exc,
+            extra={"registered_app_id": registered_app_id},
+        )
+
+
 def _mark_app_ready_sync(registered_app_id: int) -> None:
     from astrolift_registry.models import RegisteredApp
 
@@ -277,7 +314,7 @@ def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
 
     deployment = Deployment.objects.select_related("registered_app").get(pk=deployment_id)
     app = deployment.registered_app
-    result = resync_app_manifest_from_repo(app)
+    result = resync_app_manifest_from_repo(app, ref=deployment.commit_sha)
 
     # Record the outcome on the deployment (#1553). Without this the only
     # trace of a refused resync is a worker log line, so a deploy that
@@ -991,7 +1028,15 @@ def _render_app_ingresses_and_tls(
                     # them and no per-app registration is involved.
                     oidc_auth = oidc_auth_for_cluster(cluster)
                     if oidc_auth is not None:
-                        managed_annotations.update(nginx_auth_annotations(oidc_auth))
+                        from core.ingress_reconcile import _edge_config
+
+                        managed_annotations.update(
+                            # The app's declared edge mapping rides in the
+                            # platform's own fenced block (#1733), so a
+                            # redeploy reproduces the identity headers its
+                            # backend reads instead of losing them.
+                            nginx_auth_annotations(oidc_auth, edge=_edge_config(d.registered_app)),
+                        )
                     if ingress_paused:
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'

@@ -109,9 +109,10 @@ def test_default_schedules_complete():
     monitor; #1602 added the held log-retention application; #1550 added the app-doctor DNS probe;
     #1602 step 6 added the held observability *eviction* tick -- distinct from
     the retention application above, which sets a window rather than deleting
-    past it.
+    past it. #1710 added the app-doctor cronjob-run probe, so a failed
+    scheduled run is visible in the product instead of only in kubectl.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 25
+    assert len(DEFAULT_SCHEDULES) == 26
 
 
 def test_default_schedules_include_all_kinds():

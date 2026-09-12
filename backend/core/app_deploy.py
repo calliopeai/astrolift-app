@@ -980,7 +980,10 @@ def render_resources_for_deployment(
             )
 
     log.info(
-        "render_resources_for_deployment: app=%s env=%s md_id=%s cluster_id=%s "
+        # ``md_id`` read as "managed service id" to more than one person
+        # triaging #1688; it is the env's managed *domain*, and null is the
+        # ordinary state for an app that never claimed one.
+        "render_resources_for_deployment: app=%s env=%s managed_domain_id=%s cluster_id=%s "
         "base+ingress=%d ingress=%d kinds=%s",
         app.slug,
         getattr(env, "name", None),
@@ -1073,11 +1076,24 @@ def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     disagree.
     """
     from providers.k8s_native.ingress import OIDCAuthConfig
+    from providers.k8s_native.logout import configured_logout_url
 
     config = getattr(cluster, "oidc_auth_config", None) or {}
     if not all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host")):
         return None
-    return OIDCAuthConfig(auth_proxy_host=config["auth_proxy_host"])
+    # gateway_secret is deliberately NOT part of the completeness test above.
+    # Those three keys decide whether the cluster has a gate at all; the secret
+    # only decides whether the gate stamps proof it was crossed. Requiring it
+    # would take the gate off every app on a cluster that has not set one yet,
+    # turning an incremental hardening into an outage (#1726).
+    return OIDCAuthConfig(
+        auth_proxy_host=config["auth_proxy_host"],
+        gateway_secret=str(config.get("gateway_secret") or ""),
+        logout_enabled=(
+            getattr(cluster, "ingress_class", "") in {"nginx", "ingress-nginx"}
+            and bool(configured_logout_url(config))
+        ),
+    )
 
 
 # --- Custom-domain edge auth state (#1621) -----------------------------

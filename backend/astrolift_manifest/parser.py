@@ -8,6 +8,7 @@ surface a useful message ("workloads[0].kind must be one of …").
 
 from __future__ import annotations
 
+import re
 import tomllib
 from typing import Any
 
@@ -15,6 +16,7 @@ from astrolift_manifest.security_volumes import parse_volume
 from astrolift_manifest.types import (
     BriefRef,
     ContainerManifest,
+    EdgeIdentityConfig,
     ManagedServiceManifest,
     RawManifest,
     SkillRef,
@@ -61,6 +63,69 @@ _VALID_WORKLOAD_KINDS = {
 }
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
+
+# Mirrors ``astrolift_registry.models.Workload.RunMode`` (#1680). Kept as a
+# literal rather than imported so this parser stays free of Django models --
+# ``test_run_mode_matches_the_model`` asserts the two agree.
+_VALID_RUN_MODES = {"once", "loop", "schedule", "trigger", "persistent"}
+
+# Every key ``_parse_workload`` reads. Unknown keys are refused rather than
+# dropped (#1680): the sibling ``_parse_managed_service`` has always been
+# strict, and the asymmetry is what let a manifest declare ``run_mode`` --
+# a field that did not exist -- and parse clean, so the operator learned
+# nothing until the workload did not behave. A manifest is a contract.
+_WORKLOAD_KEYS = frozenset(
+    {
+        "concurrency",
+        "concurrency_policy",
+        "containers",
+        "cpu_limit",
+        "cpu_request",
+        "faas_architecture",
+        "faas_build_command",
+        "faas_handler",
+        "faas_memory_mb",
+        "faas_output_dir",
+        "faas_package_type",
+        "faas_public",
+        "faas_runtime",
+        "faas_timeout_seconds",
+        "fs_group",
+        "hpa_max",
+        "hpa_min",
+        "hpa_target_cpu_pct",
+        "is_public",
+        "kind",
+        "max_concurrent_activities",
+        "max_concurrent_workflows",
+        "max_retries",
+        "max_scale",
+        "memory_limit",
+        "memory_request",
+        "metrics",
+        "min_scale",
+        "name",
+        "replicas",
+        "result_ttl_hours",
+        "run_cron_expression",
+        "run_family",
+        "run_mode",
+        "schedule",
+        "security",
+        "static_build_command",
+        "static_index",
+        "static_output_dir",
+        "static_spa",
+        "storage_class",
+        "storage_size",
+        "task_queue",
+        "temporal_namespace",
+        "timeout_seconds",
+        "tool_timeout_seconds",
+        "volumes",
+        "workflow_type",
+    }
+)
 _VALID_AGENT_RUN_FAMILY = {"task", "service"}
 
 
@@ -158,6 +223,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     # ``brief=None`` / ``skills=()`` and round-trips unchanged.
     brief = _parse_brief(data.get("brief"), "brief")
     skills = _parse_skills(data.get("skills", []), "skills")
+    edge = _parse_edge(data.get("edge"), "edge")
 
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
@@ -172,7 +238,94 @@ def parse_raw(toml_text: str) -> RawManifest:
         managed_services=managed,
         brief=brief,
         skills=skills,
+        edge=edge,
         raw=data,
+    )
+
+
+# The gate identities an app may ask to have forwarded, and the
+# oauth2-proxy response header each one arrives on. Restricted to what the
+# gate actually sets (``OIDCAuthConfig.response_headers``): a mapping for a
+# header the gate never sends would render config that silently forwards
+# nothing (#1733).
+_EDGE_IDENTITIES = {
+    "user": "X-Auth-Request-User",
+    "email": "X-Auth-Request-Email",
+    "access_token": "X-Auth-Request-Access-Token",
+}
+
+# RFC 7230 token: what a header name may contain. Anything else would be
+# injected verbatim into the ingress controller's config.
+_HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
+
+_EDGE_KEYS = frozenset({"gateway_secret_header", "identity_headers"})
+
+
+def _valid_header_name(value: str, path: str) -> str:
+    text = str(value).strip()
+    if not text or not _HEADER_NAME_RE.match(text):
+        raise ManifestError(
+            f"{text!r} is not a valid HTTP header name",
+            path=path,
+        )
+    return text
+
+
+def _parse_edge(value: Any, path: str) -> EdgeIdentityConfig | None:
+    """Parse the optional top-level ``[edge]`` block (#1733).
+
+    Absent → ``None``, which renders exactly what the platform rendered
+    before this existed.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ManifestError("edge must be a table", path=path)
+    unknown = sorted(set(value) - _EDGE_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown edge key(s): {', '.join(unknown)}; valid keys are " f"{', '.join(sorted(_EDGE_KEYS))}",
+            path=path,
+        )
+
+    secret_header = ""
+    if value.get("gateway_secret_header") is not None:
+        secret_header = _valid_header_name(
+            value["gateway_secret_header"],
+            f"{path}.gateway_secret_header",
+        )
+
+    raw_headers = value.get("identity_headers") or {}
+    if not isinstance(raw_headers, dict):
+        raise ManifestError(
+            "edge.identity_headers must be a table of identity = header-name",
+            path=f"{path}.identity_headers",
+        )
+    pairs: list[tuple[str, str]] = []
+    for identity in sorted(raw_headers):
+        if identity not in _EDGE_IDENTITIES:
+            raise ManifestError(
+                f"unknown edge identity {identity!r}; the gate forwards "
+                f"{', '.join(sorted(_EDGE_IDENTITIES))}",
+                path=f"{path}.identity_headers",
+            )
+        pairs.append(
+            (
+                identity,
+                _valid_header_name(
+                    raw_headers[identity],
+                    f"{path}.identity_headers.{identity}",
+                ),
+            )
+        )
+    if not secret_header and not pairs:
+        raise ManifestError(
+            "edge declares nothing; set gateway_secret_header, identity_headers, or drop the block",
+            path=path,
+        )
+    return EdgeIdentityConfig(
+        gateway_secret_header=secret_header,
+        identity_headers=tuple(pairs),
     )
 
 
@@ -356,6 +509,12 @@ def _parse_local_skill_table(entry: dict, entry_path: str) -> SkillRef:
 
 
 def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
+    unknown = sorted(set(d) - _WORKLOAD_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown workload field(s): {', '.join(unknown)}",
+            path=path,
+        )
     kind = _require_str(d, "kind", f"{path}.kind")
     if kind not in _VALID_WORKLOAD_KINDS:
         raise ManifestError(
@@ -436,6 +595,46 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
             path=f"{path}.run_family",
         )
 
+    # Agent trigger mode (#1680), bound to kind the way `schedule` is bound
+    # to cronjob: declaring it on a workload that can never dispatch is a
+    # mistake worth naming, not a value to carry.
+    run_mode = str(d.get("run_mode", "") or "").strip().lower()
+    run_cron_expression = str(d.get("run_cron_expression", "") or "").strip()
+    if run_mode or run_cron_expression:
+        if kind != "agent":
+            raise ManifestError(
+                "run_mode / run_cron_expression apply to agent workloads only, " f"got kind={kind!r}",
+                path=f"{path}.run_mode",
+            )
+        if run_mode and run_mode not in _VALID_RUN_MODES:
+            raise ManifestError(
+                f"run_mode must be one of {sorted(_VALID_RUN_MODES)}, got {run_mode!r}",
+                path=f"{path}.run_mode",
+            )
+    if run_mode == "schedule" and not run_cron_expression:
+        raise ManifestError(
+            "run_mode = \"schedule\" requires a 'run_cron_expression'",
+            path=f"{path}.run_cron_expression",
+        )
+    if run_cron_expression and run_mode not in ("", "schedule"):
+        raise ManifestError(
+            f'run_cron_expression is only read for run_mode = "schedule", got {run_mode!r}',
+            path=f"{path}.run_cron_expression",
+        )
+    if run_cron_expression:
+        # The platform's own validator, so a manifest cannot declare a
+        # schedule the scheduler will later refuse. Pure-python and
+        # model-free, so importing it keeps this parser Django-free.
+        from astrolift_registry.cron import CronValidationError, validate_cron_expression
+
+        try:
+            run_cron_expression = validate_cron_expression(run_cron_expression)
+        except CronValidationError as exc:
+            raise ManifestError(
+                f"run_cron_expression is not a valid cron expression: {exc}",
+                path=f"{path}.run_cron_expression",
+            ) from exc
+
     # Static-site (#1010). A static_site serves built assets from object
     # storage + a CDN — it has no container/pod, so declaring containers is
     # a mistake (they would be silently ignored). ``static_output_dir`` is
@@ -505,6 +704,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     )
 
     volumes = _parse_volumes(d.get("volumes", []), path)
+    fs_group = _parse_fs_group(d, path)
 
     return WorkloadManifest(
         name=name,
@@ -525,6 +725,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         hpa_target_cpu_pct=int(d.get("hpa_target_cpu_pct", 80)),
         storage_class=d.get("storage_class"),
         storage_size=d.get("storage_size"),
+        fs_group=fs_group,
         containers=containers,
         volumes=volumes,
         # Agent dispatch tuning (#795). Only meaningful when
@@ -535,6 +736,8 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         tool_timeout_seconds=int(d.get("tool_timeout_seconds", 300)),
         result_ttl_hours=int(d.get("result_ttl_hours", 72)),
         run_family=run_family,
+        run_mode=run_mode,
+        run_cron_expression=run_cron_expression,
         # Temporal worker config (#796). Required pair validated above for
         # ``kind == "workflow"``; other kinds carry the empty/default
         # values and ignore them. Read unconditionally so a manifest that
@@ -569,7 +772,41 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     )
 
 
+# Every key ``_parse_container`` reads. Strict for the same reason
+# ``_WORKLOAD_KEYS`` is (#1680) -- a container block that silently drops
+# what it does not recognise teaches the operator nothing until the pod
+# runs without it.
+_CONTAINER_KEYS = frozenset(
+    {
+        "args",
+        "build_context",
+        "command",
+        "concurrency_policy",
+        "cpu_limit",
+        "cpu_request",
+        "dockerfile",
+        "dockerfile_path",
+        "env",
+        "healthcheck",
+        "image_ref",
+        "is_primary",
+        "memory_limit",
+        "memory_request",
+        "name",
+        "port",
+        "schedule",
+    }
+)
+
+
 def _parse_container(d: dict[str, Any], path: str) -> ContainerManifest:
+    unknown = sorted(set(d) - _CONTAINER_KEYS)
+    if unknown:
+        raise ManifestError(
+            f"unknown container field(s): {', '.join(unknown)}",
+            path=path,
+        )
+
     name = _require_str(d, "name", f"{path}.name")
     healthcheck = d.get("healthcheck", {}) or {}
     hk = str(healthcheck.get("kind", "none"))
@@ -706,6 +943,32 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_size=None,
         containers=(container,),
     )
+
+
+def _parse_fs_group(d: dict, path: str) -> int | None:
+    """Explicit ``fs_group`` on the workload, else ``run_as_user`` from its
+    ``[workloads.<name>.security]`` block.
+
+    Only the one key is read from ``security`` -- the rest of that block
+    (``run_as_non_root``, capabilities, ...) is parsed by
+    ``security_volumes.parse_security_context`` but not yet rendered, and
+    reading it here would imply a coverage this renderer does not have.
+
+    Returning ``None`` means "no explicit intent"; the renderer applies the
+    platform default, and only for workloads that mount a pvc.
+    """
+    raw = d.get("fs_group")
+    if raw is None:
+        sec = d.get("security")
+        if isinstance(sec, dict):
+            raw = sec.get("run_as_user")
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ManifestError(f"fs_group must be an int (GID), got {raw!r}", path=f"{path}.fs_group")
+    if raw < 0:
+        raise ManifestError("fs_group must be non-negative", path=f"{path}.fs_group")
+    return raw
 
 
 def _parse_volumes(raw_list: list, workload_path: str) -> tuple[dict, ...]:

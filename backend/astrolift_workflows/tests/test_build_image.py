@@ -81,7 +81,7 @@ def test_resolve_source_url_empty_without_repo():
 pytestmark = pytest.mark.django_db
 
 
-def _make_deployment(build_strategy="dockerfile", image_tag="sha-abc"):
+def _make_deployment(build_strategy="dockerfile", image_tag="sha-abc", build_mode="platform_build"):
     import uuid
 
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
@@ -116,6 +116,7 @@ def _make_deployment(build_strategy="dockerfile", image_tag="sha-abc"):
         provisioning_status="ready",
         subdomain=f"app-{suffix}",
         source_repo="calliopeai/astrolift-sample-web",
+        build_mode=build_mode,
         build_strategy=build_strategy,
     )
     env = AppEnvironment.objects.create(
@@ -261,6 +262,117 @@ def test_build_image_sync_raises_on_build_failure(monkeypatch):
         _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
 
 
+# --- what a failed build leaves behind (#1686) ------------------------
+#
+# ``aborted_reason`` keeps a single line by design, so the build pod's
+# output has to be persisted somewhere it will not be truncated away.
+
+
+def _fail_build_with(monkeypatch, deployment, errors):
+    from providers._sdk.build import BuildResult
+
+    class FailingDriver:
+        def build(self, spec, repo, tag):
+            return BuildResult(
+                success=False,
+                image_uri=f"{repo}:{tag}",
+                digest="",
+                duration_seconds=1.0,
+                errors=list(errors),
+            )
+
+    prepared = _PreparedBuild(
+        driver=FailingDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+    with pytest.raises(RuntimeError):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+    deployment.refresh_from_db()
+    return deployment
+
+
+def test_a_failed_build_persists_the_pod_output_on_the_deploy(monkeypatch):
+    deployment = _make_deployment()
+    _fail_build_with(
+        monkeypatch,
+        deployment,
+        [
+            "Job has reached the specified backoff limit",
+            "build pod logs (last 100 lines):\nfatal: could not read Username for 'https://github.com'",
+        ],
+    )
+
+    assert "backoff limit" in deployment.build_error
+    assert "could not read Username" in deployment.build_error
+
+
+def test_the_raised_error_stays_one_line(monkeypatch):
+    """The workflow keeps only the first line for ``aborted_reason``, so a
+    multi-line message there would drop the condition, not the logs."""
+
+    deployment = _make_deployment()
+    from providers._sdk.build import BuildResult
+
+    class FailingDriver:
+        def build(self, spec, repo, tag):
+            return BuildResult(
+                success=False,
+                image_uri=f"{repo}:{tag}",
+                digest="",
+                duration_seconds=1.0,
+                errors=["Job has reached the specified backoff limit", "logs:\nline one\nline two"],
+            )
+
+    prepared = _PreparedBuild(
+        driver=FailingDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert "\n" not in str(excinfo.value)
+    assert "backoff limit" in str(excinfo.value)
+
+
+def test_a_successful_build_leaves_build_error_empty(monkeypatch):
+    from providers._sdk.build import BuildResult
+
+    deployment = _make_deployment(image_tag="sha-abc")
+
+    class OkDriver:
+        def build(self, spec, repo, tag):
+            return BuildResult(
+                success=True,
+                image_uri=f"{repo}:{tag}",
+                digest="sha256:" + "a" * 64,
+                duration_seconds=1.0,
+                errors=[],
+            )
+
+    prepared = _PreparedBuild(
+        driver=OkDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    deployment.refresh_from_db()
+    assert deployment.build_error == ""
+
+
 # ---------------------------------------------------------------------------
 # _fetch_app_build_strategy_sync
 # ---------------------------------------------------------------------------
@@ -271,5 +383,126 @@ def test_fetch_app_build_strategy_returns_correct_value():
     assert _fetch_app_build_strategy_sync(deployment.registered_app_id) == "nixpacks"
 
 
+# --- both build axes have to agree (#1687) ----------------------------
+#
+# ``build_mode`` decides whether the platform builds at all;
+# ``build_strategy`` only decides which builder it uses when it does.
+# The deploy workflow read the strategy alone, so an app moved to
+# ``ci_pushed`` kept running a full platform build on every deploy --
+# ``platform_build`` registration persists a dockerfile strategy, and a
+# mode-only change never cleared it.
+
+
+@pytest.mark.parametrize("mode", ["ci_pushed", "none"])
+def test_a_non_building_mode_resolves_to_off(mode):
+    deployment = _make_deployment(build_strategy="dockerfile", build_mode=mode)
+    assert _fetch_app_build_strategy_sync(deployment.registered_app_id) == "off"
+
+
+def test_platform_build_keeps_its_chosen_builder():
+    deployment = _make_deployment(build_strategy="buildpacks", build_mode="platform_build")
+    assert _fetch_app_build_strategy_sync(deployment.registered_app_id) == "buildpacks"
+
+
+def test_platform_build_with_no_strategy_is_off():
+    deployment = _make_deployment(build_strategy="off", build_mode="platform_build")
+    assert _fetch_app_build_strategy_sync(deployment.registered_app_id) == "off"
+
+
+def test_the_activity_and_the_builder_agree_on_the_answer(monkeypatch):
+    """The workflow branch is not the only guard: an activity invoked
+    directly for a ci_pushed app must not build either."""
+
+    deployment = _make_deployment(build_strategy="dockerfile", build_mode="ci_pushed")
+
+    def _no_driver(*args, **kwargs):
+        raise AssertionError("no build may be prepared for a ci_pushed app")
+
+    monkeypatch.setattr(build_image_mod, "_prepare_build", _no_driver)
+
+    result = _build_image_sync(
+        BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha="")
+    )
+    assert result == {"ok": True, "image_ref": "sha-abc", "stub": True}
+
+
 def test_fetch_app_build_strategy_returns_off_for_missing_app():
     assert _fetch_app_build_strategy_sync(999_999_999) == "off"
+
+
+# --- clone credential for a private repo (#1685) ----------------------
+#
+# The build pod got a bare clone URL and no credential, so kaniko could
+# not clone any private repo and the pod died immediately. The install
+# already holds a GitHub App that can mint an installation token; the
+# build path simply never asked for one.
+
+
+def _connection(app, kind="github_app_install"):
+    from astrolift_scm.models import SourceConnection
+    from core.secrets import encrypt_at_rest
+
+    encrypted = encrypt_at_rest(b"pem-or-pat")
+    return SourceConnection.objects.create(
+        organization=app.organization,
+        kind=kind,
+        account_login="acme",
+        installation_id="987" if kind == "github_app_install" else "",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+
+def test_the_clone_credential_is_the_github_documented_pair(monkeypatch):
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    _connection(app)
+    monkeypatch.setattr("astrolift_scm.providers.github._token", lambda _c: "ghs_minted")
+
+    assert build_image_mod._clone_credential(app) == ("x-access-token", "ghs_minted")
+
+
+def test_no_connection_means_an_anonymous_clone(monkeypatch):
+    """A public repo must keep cloning exactly as it did."""
+
+    deployment = _make_deployment()
+    assert build_image_mod._clone_credential(deployment.registered_app) == ("", "")
+
+
+def test_a_token_that_cannot_be_minted_does_not_fail_the_build(monkeypatch):
+    """Better a clone error in the pod logs than a build that never
+    starts because the credential lookup raised."""
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    _connection(app)
+
+    def _boom(_c):
+        raise RuntimeError("app not installed on this repo")
+
+    monkeypatch.setattr("astrolift_scm.providers.github._token", _boom)
+
+    assert build_image_mod._clone_credential(app) == ("", "")
+
+
+def test_an_app_with_no_source_repo_needs_no_credential():
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.source_repo = ""
+    app.save(update_fields=["source_repo"])
+
+    assert build_image_mod._clone_credential(app) == ("", "")
+
+
+def test_a_non_github_host_keeps_the_anonymous_clone(monkeypatch):
+    """Only the GitHub token path is wired; guessing at another host's
+    credential shape would be worse than the clone error."""
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.source_kind = "gitlab"
+    app.save(update_fields=["source_kind"])
+    _connection(app, kind="gitlab_pat")
+
+    assert build_image_mod._clone_credential(app) == ("", "")

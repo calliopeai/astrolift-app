@@ -197,6 +197,16 @@ class Deployment(BaseCoreModel):
     manifest_resync_status = models.CharField(max_length=32, blank=True, default="")
     manifest_resync_error = models.TextField(blank=True, default="")
 
+    # Why the image build failed, including the build pod's own output
+    # (#1686). The Job condition alone says "Job has reached the specified
+    # backoff limit" for every possible cause -- a repo it cannot clone, a
+    # Dockerfile step that exits non-zero, a push it cannot authenticate --
+    # and on a private-endpoint cluster the operator cannot go and read the
+    # pod either. ``aborted_reason`` deliberately keeps one line, so the
+    # tail lives here instead of being truncated away. Empty unless a
+    # platform build failed on this deploy.
+    build_error = models.TextField(blank=True, default="")
+
     started_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)

@@ -18,6 +18,7 @@ from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
     app_env_to_type,
 )
+from astrolift_lifecycle.scopes import environment_app_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -28,7 +29,7 @@ from core.tenancy import get_current_tenant
 class EnvironmentMutations:
     @strawberry.field
     @mutation_audit(action="environment.pause")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
     @tenant_scoped()
     def pause_environment(
         self, info: Info, input: EnvironmentByIdInput
@@ -59,7 +60,7 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.resume")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
     @tenant_scoped()
     def resume_environment(
         self, info: Info, input: EnvironmentByIdInput
@@ -85,7 +86,7 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.pause_ingress")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
     @tenant_scoped()
     def pause_app_ingress(
         self, info: Info, input: EnvironmentByIdInput
@@ -120,7 +121,7 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.resume_ingress")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
     @tenant_scoped()
     def resume_app_ingress(
         self, info: Info, input: EnvironmentByIdInput

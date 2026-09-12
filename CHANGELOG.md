@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `startDeployment` accepts an omitted image tag for platform builds and apps
+  using manifest images. Platform builds resolve the deploy branch (or the new
+  `sourceRef` input) to a commit and use its SHA as the default image tag before
+  approval or scheduling. Immediate and approved workflows receive the recorded
+  commit, and manifest resync fetches it. CI-pushed apps still require a tag;
+  source lookup failures leave existing deployments untouched (#1737).
+
 - Close #1365 with explicit, separately authorized adoption of an existing
   Azure resource. The fail-closed ownership contract shipped in #1443 / #1446
   refuses every mutating path against a resource whose identity tags do not

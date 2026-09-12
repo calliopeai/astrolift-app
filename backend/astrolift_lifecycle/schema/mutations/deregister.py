@@ -16,6 +16,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     DeregisterAppPayload,
 )
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_workflows.client import (
     signal_workflow,
     start_workflow,
@@ -43,7 +44,7 @@ class DeregisterMutations:
     @strawberry.field
     @mutation_audit(action="app.deregister")
     @requires_elevation(action_label="app.deregister")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def deregister_astrolift_app(
         self,

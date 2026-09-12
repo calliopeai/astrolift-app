@@ -54,13 +54,19 @@ interface DoctorResp {
 }
 
 /** Human labels for the service's check keys. */
+// Falls back to the raw key, which is why three checks added since this map
+// was written have been rendering as `cronjob_runs` and `registry_repo`.
 const CHECK_LABELS: Record<string, string> = {
   manifest: "Manifest",
   autowire: "Repo wiring",
   registry_repo: "Container registry",
   push_role: "Push role",
   dns: "DNS",
+  identity: "Pod identity",
+  image: "Image pinning",
   deployments: "Deployments",
+  cronjob_runs: "Scheduled runs",
+  managed_services: "Managed services",
 };
 
 /**

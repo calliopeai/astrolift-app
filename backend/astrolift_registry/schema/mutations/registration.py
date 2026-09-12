@@ -14,6 +14,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
+from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations.helpers import (
@@ -51,7 +52,7 @@ from core.tenancy import get_current_tenant
 class RegistrationMutations:
     @strawberry.field
     @mutation_audit(action="app.create")
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.APP_CREATE, scope=project_scope_by_guid("input.project_id"))
     @tenant_scoped()
     def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
         # Org-scope the project lookup to the caller's tenant. Everything
@@ -364,7 +365,7 @@ class RegistrationMutations:
         action="app.register_agent_repo",
         target=lambda self, info, input: ("repo", input.source_repo),
     )
-    @require_permission(Permission.AGENT_CREATE)
+    @require_permission(Permission.AGENT_CREATE, scope=project_scope_by_guid("input.project_id"))
     @tenant_scoped()
     def register_agent_repo(
         self, info: Info, input: RegisterAgentRepoInput
@@ -450,11 +451,19 @@ class RegistrationMutations:
                 field="manifestPaths",
             )
         if result.status == "no_agents":
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value,
+            message = (
                 "no agent or workflow manifests found in this repo "
                 "(looked for agents/*/astrolift.toml, a root astrolift.toml, "
-                "and workflows/**/*.toml)",
+                "and workflows/**/*.toml)"
+            )
+            if result.skipped:
+                # A manifest that declares an agent and was not kept is the
+                # answer to "why did it find nothing", and without it the
+                # operator has only the negative (#1697).
+                message += ". Skipped: " + "; ".join(result.skipped)
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                message,
                 field="sourceRepo",
             )
         if result.status != "ok":
@@ -482,7 +491,7 @@ class RegistrationMutations:
         action="app.register_app_repo",
         target=lambda self, info, input: ("repo", input.source_repo),
     )
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.APP_CREATE, scope=project_scope_by_guid("input.project_id"))
     @tenant_scoped()
     def register_app_repo(
         self, info: Info, input: RegisterAppRepoInput

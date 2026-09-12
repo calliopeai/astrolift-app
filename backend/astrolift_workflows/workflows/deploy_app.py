@@ -144,10 +144,14 @@ class DeployAppWorkflow:
                 mark_deploying, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )
 
-            # Build step (#865, #867): when build_strategy != "off" the platform
-            # builds the container image from source before deploying. The
+            # Build step (#865, #867): the platform builds the container image
+            # from source before deploying when the app asks it to. The
             # fetch_app_build_strategy activity keeps Django imports out of this
-            # sandbox. We use the first workload's image_tag from the input as
+            # sandbox and answers with the *effective* strategy -- both build
+            # axes, resolved (#1687). Branching on the raw build_strategy here
+            # meant an app moved to ci_pushed kept building on every deploy,
+            # because platform_build registration leaves a dockerfile strategy
+            # behind and a mode-only change never cleared it. We use the first workload's image_tag from the input as
             # the target tag; when multiple workloads are present the first tag
             # is used as the build output and all workloads share it — this is
             # intentional for v1 (one build per deploy).

@@ -295,7 +295,16 @@ class UnregisterTenantClusterInput:
 class CreateManagedDomainInput:
     zone: str
     dns_driver: str
-    default_for: str = "none"  # tenant_apps | preview_envs | both | none
+    # tenant_apps | preview_envs | both | none.
+    #
+    # Defaults to ``tenant_apps``, not ``none`` (#1689). Only
+    # ``tenant_apps`` and ``both`` are matched by
+    # ``resolve_managed_domain``, so a domain registered through the UI
+    # without touching this field was accepted, listed, and never used
+    # by anything -- and the apps that should have been on it came up
+    # with no hostname. Registering a domain and meaning "do not use it"
+    # is the rarer intent, and it is still one field away.
+    default_for: str = "tenant_apps"
     is_wildcard_managed: bool = False
     dns_config: JSON | None = None
     organization_scoped: bool = True
@@ -754,6 +763,12 @@ class ClustersMutation:
         if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         if oidc_changed:
+            from providers.k8s_native.logout import configured_logout_url
+
+            try:
+                configured_logout_url(input.oidc_auth_config)
+            except ValueError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="oidcAuthConfig")
             cluster.oidc_auth_config = input.oidc_auth_config
         if class_changing and had_gate and not _has_auth_gate(cluster.ingress_class, cluster):
             needs = "oidcAuthConfig" if cluster.ingress_class != "alb" else "albAuthConfig"

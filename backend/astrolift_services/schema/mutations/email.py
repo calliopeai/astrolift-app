@@ -32,6 +32,7 @@ from astrolift_services.schema.types import (
     EmailTemplateType,
     ManagedServiceTestEmailResultType,
 )
+from astrolift_services.scopes import managed_service_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
@@ -53,7 +54,11 @@ class EmailServiceMutations:
             else None
         ),
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def send_managed_service_test_email(
         self,
@@ -230,7 +235,11 @@ class EmailServiceMutations:
             else None
         ),
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def add_email_suppression_entry(
         self,
@@ -356,7 +365,11 @@ class EmailServiceMutations:
             else None
         ),
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def remove_email_suppression_entry(
         self,
@@ -457,7 +470,11 @@ class EmailServiceMutations:
         action="managed_service.email.template.create",
         extras=lambda result: {"name": result.data.name} if result.ok and result.data is not None else None,
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def create_email_template(
         self,
@@ -583,7 +600,11 @@ class EmailServiceMutations:
         action="managed_service.email.template.update",
         extras=lambda result: {"name": result.data.name} if result.ok and result.data is not None else None,
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def update_email_template(
         self,
@@ -704,7 +725,11 @@ class EmailServiceMutations:
             else None
         ),
     )
-    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE,
+        Permission.MANAGED_SERVICE_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+    )
     @tenant_scoped()
     def delete_email_template(
         self,

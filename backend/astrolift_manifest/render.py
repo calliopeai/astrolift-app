@@ -230,7 +230,8 @@ def render_manifests(
             )
         elif w.kind == "statefulset":
             # StatefulSet + headless Service for stable DNS per pod.
-            # VolumeClaimTemplates are added when storage_size is set.
+            # VolumeClaimTemplates are added when the workload declares a
+            # size, via storage_size or a [[workloads.volumes]] pvc entry.
             sts, headless_svc = _render_statefulset(
                 w,
                 namespace=namespace,
@@ -731,8 +732,26 @@ def _render_container(
         spec["command"] = list(c.command)
     if c.args:
         spec["args"] = list(c.args)
-    if c.env:
-        spec["env"] = [{"name": name, "value": value} for name, value in c.env]
+    # The commit the container is running, from the tag the platform deploys
+    # (#1709). The tag IS the commit SHA, and nothing put it anywhere the
+    # process could read it -- so an app had no way to report its own version
+    # and the only answer available was the tag on the workload.
+    #
+    # That distinction matters for confirming a rollout: the tag can be right
+    # while the pod is stale (a StatefulSet whose pod never rolled, for
+    # instance), so the honest check is what the running container says about
+    # itself, not what the spec says about it.
+    #
+    # Injected before the manifest's own env so an app that already sets either
+    # name keeps its value -- later entries win in the list this builds, and
+    # this is a default, not an override.
+    version_env = [
+        {"name": key, "value": image_tag}
+        for key in ("ASTROLIFT_COMMIT", "GIT_SHA")
+        if image_tag and key not in {name for name, _ in c.env}
+    ]
+    if c.env or version_env:
+        spec["env"] = version_env + [{"name": name, "value": value} for name, value in c.env]
     if env_from_secret_refs:
         # Auto-inject every operator-authored SecretBundle + the
         # synthesized managed-service bindings Secret. Later refs
@@ -904,6 +923,24 @@ def _render_function(
     }
 
 
+# Pod ``securityContext.fsGroup`` applied to a workload that mounts a pvc
+# when neither ``fs_group`` nor ``security.run_as_user`` says otherwise
+# (#1722).
+#
+# A PVC arrives root-owned. A container running as any non-root uid cannot
+# write to it, which surfaces as the app dying on its own data directory.
+# fsGroup fixes that for EVERY image without the app declaring its uid,
+# because the kubelet both chowns the volume to this GID with g+rwx and adds
+# the GID to the container's supplementary groups -- so the write succeeds
+# whatever uid the image runs as. That property is what lets this be a
+# default instead of required configuration.
+#
+# Emitted only for workloads that actually mount a pvc: an unmounted
+# workload gains nothing from it, and a blanket fsGroup would relabel
+# every other volume kind a pod carries.
+DEFAULT_PVC_FS_GROUP = 1000
+
+
 def _render_statefulset(
     w: WorkloadManifest,
     *,
@@ -920,8 +957,9 @@ def _render_statefulset(
     Service (``clusterIP: None``) gives each pod a stable DNS name:
     ``<pod-name>.<svc-name>.<namespace>.svc.cluster.local``.
 
-    When ``storage_size`` is set, a ``volumeClaimTemplate`` is emitted
-    so each pod gets its own persistent volume.
+    When the workload declares a size -- via ``storage_size`` or a
+    ``[[workloads.volumes]]`` pvc entry -- a ``volumeClaimTemplate`` is
+    emitted so each pod gets its own persistent volume.
     """
     selector = {
         "astrolift.dev/workload": w.name,
@@ -938,15 +976,38 @@ def _render_statefulset(
     )
 
     volume_claim_templates: list[dict[str, Any]] = []
-    if w.storage_size:
+    # The claim is described in either of two places and they have to agree.
+    # ``storage_size`` is the original top-level key; ``[[workloads.volumes]]``
+    # is the declaration operators actually write, and it carries the size the
+    # same way it carries mount_path. Gating on storage_size alone meant a
+    # workload that declared a pvc volume and nothing else rendered no claim
+    # and no mount at all, while still being scheduled as a StatefulSet with
+    # the app's data path pointing at an unmounted directory -- a silent
+    # data-loss shape, and the app either crashes on the missing mount or
+    # writes to the pod's ephemeral FS.
+    pvc_volume = (
+        next(
+            (v for v in w.volumes if v.get("kind", "pvc") == "pvc"),
+            None,
+        )
+        or {}
+    )
+    storage_size = w.storage_size or pvc_volume.get("size") or ""
+    if storage_size:
         claim_name = f"{w.name}-data"
+        # Claim name stays derived from the workload name rather than the
+        # declaration's ``name``: a StatefulSet's volumeClaimTemplates are
+        # immutable and its PVCs are named <claim>-<pod>, so renaming here
+        # would orphan the volumes of every already-deployed workload.
+        access_mode = pvc_volume.get("access_mode") or "ReadWriteOnce"
+        storage_class = w.storage_class or pvc_volume.get("storage_class") or ""
         volume_claim_templates.append(
             {
                 "metadata": {"name": claim_name},
                 "spec": {
-                    "accessModes": ["ReadWriteOnce"],
-                    "resources": {"requests": {"storage": w.storage_size}},
-                    **({"storageClassName": w.storage_class} if w.storage_class else {}),
+                    "accessModes": [access_mode],
+                    "resources": {"requests": {"storage": storage_size}},
+                    **({"storageClassName": storage_class} if storage_class else {}),
                 },
             }
         )
@@ -955,14 +1016,14 @@ def _render_statefulset(
         # writes land on the pod's ephemeral FS and don't survive a restart
         # (#989). Mount path comes from the workload's pvc volume declaration
         # ([[workloads.volumes]] mount_path), defaulting to /data.
-        mount_path = next(
-            (v.get("mount_path") for v in w.volumes if v.get("kind", "pvc") == "pvc" and v.get("mount_path")),
-            "/data",
-        )
+        mount_path = pvc_volume.get("mount_path") or "/data"
         primary = _primary_container(w)
         for container in pod_spec.get("containers", []):
             if primary is not None and container["name"] == primary.name:
                 container.setdefault("volumeMounts", []).append({"name": claim_name, "mountPath": mount_path})
+        # Make the claim writable by the container regardless of its uid.
+        fs_group = w.fs_group if w.fs_group is not None else DEFAULT_PVC_FS_GROUP
+        pod_spec.setdefault("securityContext", {})["fsGroup"] = fs_group
 
     sts: dict[str, Any] = {
         "apiVersion": "apps/v1",

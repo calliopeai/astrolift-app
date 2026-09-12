@@ -46,9 +46,65 @@ MINIMAL_STATES = [
 
 @pytest.fixture
 def org(db):
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
     from astrolift_identity.models import Organization
 
-    return Organization.objects.create(name="Stage Org", slug="stage-org-test")
+    organization = Organization.objects.create(name="Stage Org", slug="stage-org-test")
+    # Agent dispatch resolves the org's managed cluster (#1704). Without one
+    # an org cannot run an agent at all, by any path, so a fixture without
+    # one is not a useful stand-in for an install.
+    plugin = ProviderPlugin(
+        name="K8s",
+        slug="k8s-stage",
+        plugin_version="0.0.1",
+        capabilities_manifest={},
+        config_schema={},
+    )
+    ProviderPlugin.objects.bulk_create([plugin])
+    TenantCluster.objects.create(
+        organization=organization,
+        name="agents",
+        slug="agents-stage",
+        provider_plugin=ProviderPlugin.objects.get(slug="k8s-stage"),
+        provider_config={},
+        endpoint="https://k8s.invalid",
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+    )
+    return organization
+
+
+class _FakeSpawner:
+    """Stands in for the K8s Job backend.
+
+    ``status`` reports the job as still running: these tests drive terminal
+    state through callbacks and explicit transitions, and a spawner that
+    reported "succeeded" would settle every task behind their backs.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def spawn(self, task):
+        from astrolift_dispatch.spawners.base import SpawnResult
+
+        return SpawnResult(external_id=f"job-{task.pk}", ok=True)
+
+    def status(self, external_id):
+        from astrolift_dispatch.spawners.base import TaskStatus
+
+        return TaskStatus(running=True)
+
+    def stop(self, external_id):
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _fake_spawner(monkeypatch):
+    from astrolift_dispatch.spawners import registry
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: _FakeSpawner())
 
 
 @pytest.fixture
@@ -619,12 +675,14 @@ def test_mark_workflow_run_invalid_status_raises(run):
 
 
 @pytest.mark.django_db
-def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, definition):
-    """With no ACTIVE dispatcher registered, the dispatch still creates the
-    AgentRun history row (left PENDING) and links it to the stage execution
-    — the workflow's timeout governs the wait, and a push-mode callback can
-    still advance the run. Dispatch must not hard-fail on a missing
-    dispatcher (registration may be in flight)."""
+def test_dispatch_without_a_dispatcher_spawns_through_the_direct_path(run, definition):
+    """Nothing on an install registers a DispatcherInstance -- the endpoint
+    exists for a Dispatch Service to register itself, and no component runs
+    one -- so requiring it meant every workflow stage hung in ``running``
+    forever while ``astro agent dispatch`` worked fine (#1704). With none
+    registered the stage spawns the way direct dispatch always has: the
+    k8s_job backend against the org's managed cluster."""
+    from astrolift_agents.models import AgentTask
     from astrolift_lifecycle.models import AgentRun
 
     stage = _stage(definition, 0)
@@ -633,7 +691,7 @@ def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, 
     agent_run_id = _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {"trigger": "manual"})
 
     agent_run = AgentRun.objects.get(pk=int(agent_run_id))
-    assert agent_run.status == AgentRun.Status.PENDING
+    assert agent_run.status == AgentRun.Status.RUNNING
     assert agent_run.workload_id == stage.agent_definition_id
     assert agent_run.input["stage_id"] == str(stage.pk)
     assert agent_run.input["skill_refs"] == ["lint", "review"]
@@ -642,14 +700,41 @@ def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, 
     execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
     assert execution.agent_run_id == agent_run.pk
 
-    from astrolift_agents.models import AgentTask
-
     task = AgentTask.objects.get(agent_run=agent_run)
+    assert task.status == AgentTask.Status.RUNNING
+    assert task.external_id
+    assert task.dispatcher_id is None
     assert task.team_id == stage.agent_definition.registered_app.team_id
     assert task.project_id == stage.agent_definition.registered_app.project_id
     assert task.dispatch_input == {"trigger": "manual"}
     assert task.brief.context["output_key"] == "review_result"
     assert "Review the trigger and return structured JSON." in task.brief.manifest_snapshot["system_prompt"]
+
+
+@pytest.mark.django_db
+def test_a_stage_with_no_dispatch_target_fails_the_run_with_the_reason(run, definition):
+    """The old behaviour left the AgentRun PENDING on the theory that a
+    dispatcher registration might be in flight. On an install where none is
+    ever registered that read as the run hanging forever, with the only
+    trace a WARNING in the worker log. A stage that cannot dispatch settles
+    FAILED and carries why."""
+    from astrolift_agents.models import AgentTask
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_lifecycle.models import AgentRun
+
+    TenantCluster.objects.all().delete()
+    stage = _stage(definition, 0)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+
+    with pytest.raises(RuntimeError, match="no dispatch target"):
+        _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {})
+
+    agent_run = AgentRun.objects.get(workload=stage.agent_definition)
+    assert agent_run.status == AgentRun.Status.FAILED
+    assert agent_run.output["dispatch_error"]
+    task = AgentTask.objects.get(agent_run=agent_run)
+    assert task.status == AgentTask.Status.FAILED
+    assert "no dispatch target" in task.failure["message"]
 
 
 @pytest.mark.django_db
@@ -762,8 +847,9 @@ def test_poll_and_outcome_preserve_callback_result(run, definition):
     from astrolift_lifecycle.models import AgentRun
 
     agent_run, task = _dispatch_agent_stage(run, definition, 0)
-    task.transition_to(AgentTask.Status.PROVISIONING)
-    task.transition_to(AgentTask.Status.RUNNING)
+    # The dispatch spawned, so the task is already RUNNING.
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
     task.result = {"output": {"findings": ["EMR-123"], "classification": "bug"}}
     task.save(update_fields=["result", "updated_at", "version"])
     task.transition_to(AgentTask.Status.COMPLETED)

@@ -63,6 +63,7 @@ from astrolift_workflows.workflows.run_status_reconcile_tick import (
 )
 from astrolift_workflows.workflows.scheduled import (
     ApplyObservabilityRetentionWorkflow,
+    ProbeAppCronjobRunsWorkflow,
     ProbeAppDnsWorkflow,
     CapturePlatformCostSnapshotWorkflow,
     CaptureQuotaUsageSnapshotWorkflow,
@@ -129,6 +130,7 @@ __all__ = [
     "NamespaceProvisionWorkflow",
     "OnboardAppWorkflow",
     "ApplyObservabilityRetentionWorkflow",
+    "ProbeAppCronjobRunsWorkflow",
     "ProbeAppDnsWorkflow",
     "CommandRunWorkflow",
     "DeliverWebhookWorkflow",

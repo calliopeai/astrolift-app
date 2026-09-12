@@ -742,7 +742,7 @@ function SaturationKPIBar({
   if (!instant?.available) {
     return (
       <PrometheusUnavailableCard
-        isNoEndpoint={instant?.reason === "no_endpoint"}
+        reason={instant?.reason ?? null}
         settingsHref={`/clusters/${slug}/settings`}
       />
     );
@@ -828,11 +828,9 @@ function SparklineGrid({
   }
 
   if (!range?.available) {
-    const reason = range?.reason ?? instantReason;
-    const isNoEndpoint = reason === "no_endpoint";
     return (
       <PrometheusUnavailableCard
-        isNoEndpoint={isNoEndpoint}
+        reason={range?.reason ?? instantReason}
         settingsHref={`/clusters/${slug}/settings`}
       />
     );
@@ -849,20 +847,34 @@ function SparklineGrid({
 
 // ─── Prometheus unavailable card ─────────────────────────────────────
 function PrometheusUnavailableCard({
-  isNoEndpoint,
+  reason,
   settingsHref,
 }: {
-  isNoEndpoint: boolean;
+  reason: string | null;
   settingsHref: string;
 }) {
+  const isNoEndpoint = reason === "no_endpoint";
+  // The control plane queries Prometheus over HTTP from outside the
+  // cluster, so a ClusterIP or *.svc name is not routable however
+  // healthy Prometheus is. Naming that ends an investigation that
+  // otherwise finishes at a Prometheus with nothing wrong with it (#1711).
+  const isClusterInternal = reason === "cluster_internal_endpoint";
   const Icon = isNoEndpoint ? RefreshCwIcon : WifiOffIcon;
-  const title = isNoEndpoint ? "No Prometheus endpoint" : "Prometheus unreachable";
+  const title = isNoEndpoint
+    ? "No Prometheus endpoint"
+    : isClusterInternal
+      ? "Prometheus endpoint is cluster-internal"
+      : "Prometheus unreachable";
   const body = isNoEndpoint
     ? "The control plane hasn't discovered a Prometheus endpoint for this cluster yet."
-    : "The control plane can't reach the Prometheus endpoint stored for this cluster.";
+    : isClusterInternal
+      ? "The stored endpoint is an in-cluster address. The control plane queries Prometheus over HTTP from outside the cluster, where a Service ClusterIP doesn't resolve."
+      : "The control plane can't reach the Prometheus endpoint stored for this cluster.";
   const hint = isNoEndpoint
     ? "Go to Settings and run Refresh cluster management to auto-discover the endpoint, or set prometheus_endpoint in provider_config."
-    : "Verify the endpoint is accessible from the control plane on port 9090 and that firewall rules allow inbound traffic from the ECS task security group.";
+    : isClusterInternal
+      ? "Put an internal load balancer in front of Prometheus and set prometheus_endpoint to that address."
+      : "Verify the endpoint is accessible from the control plane on port 9090 and that firewall rules allow inbound traffic from the ECS task security group.";
 
   return (
     <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">

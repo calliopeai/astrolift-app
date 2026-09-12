@@ -21,6 +21,7 @@ from astrolift_lifecycle.schema.types import (
     EnvironmentSettingType,
     env_setting_to_type,
 )
+from astrolift_lifecycle.scopes import environment_app_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -35,7 +36,7 @@ class EnvironmentSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.env.setting.set")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=environment_app_scope("input.environment_id"))
     @tenant_scoped()
     def set_environment_setting(
         self,
@@ -78,7 +79,7 @@ class EnvironmentSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.env.setting.clear")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=environment_app_scope("input.environment_id"))
     @tenant_scoped()
     def clear_environment_setting(
         self,

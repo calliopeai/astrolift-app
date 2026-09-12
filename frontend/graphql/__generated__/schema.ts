@@ -830,6 +830,7 @@ export type AstroliftAppGoldenSignal = {
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
   samples: Array<AstroliftTimeSeriesPoint>;
   unit: Scalars['String']['output'];
 };
@@ -1683,6 +1684,7 @@ export type AstroliftDeployment = {
   approvedBy: Array<AstroliftDeploymentApprover>;
   awaitingApprovers: Array<AstroliftDeploymentApprover>;
   branch: Scalars['String']['output'];
+  buildError: Scalars['String']['output'];
   ciActorKind: Scalars['String']['output'];
   ciProvider: Scalars['String']['output'];
   ciRunUrl: Scalars['String']['output'];
@@ -7374,18 +7376,16 @@ export type PermissionDiagnosis = {
 };
 
 export type PermissionDiff = {
-  codename: Scalars['String']['output'];
-  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
   userAHas: Scalars['Boolean']['output'];
   userBHas: Scalars['Boolean']['output'];
 };
 
 export type PermissionEntry = {
-  appLabel: Scalars['String']['output'];
-  codename: Scalars['String']['output'];
-  grantedViaGroups: Array<Scalars['String']['output']>;
-  model: Scalars['String']['output'];
-  name: Scalars['String']['output'];
+  action: Scalars['String']['output'];
+  grantedVia: Array<Scalars['String']['output']>;
+  resource: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
 };
 
 export type PermissionTraceStep = {
@@ -7789,7 +7789,7 @@ export type Query = {
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
   dispatchers: Array<AstroliftDispatcherInstance>;
-  /** List all effective permissions for a user, with the groups that grant each one. */
+  /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
   exportWorkflowManifest: WorkflowManifestExportType;
   formDefinition?: Maybe<AstroliftFormDefinition>;
@@ -9720,6 +9720,7 @@ export type StartDeploymentInput = {
   imageDigest: InputMaybe<Scalars['String']['input']>;
   imageTag: Scalars['String']['input'];
   prNumber: InputMaybe<Scalars['Int']['input']>;
+  sourceRef: InputMaybe<Scalars['String']['input']>;
   strategy: InputMaybe<Scalars['String']['input']>;
   triggerKind: Scalars['String']['input'];
   workloadSlug: InputMaybe<Scalars['String']['input']>;

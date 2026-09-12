@@ -73,6 +73,11 @@ class ScheduleKind(StrEnum):
     """Every 30 min — refresh the app doctor's cached hostname-resolution
     answers so the panel reads instantly (#1550)."""
 
+    PROBE_APP_CRONJOB_RUNS = "probe_app_cronjob_runs"
+    """Every 30 min — refresh the app doctor's cached cronjob-run answers so a
+    failed scheduled run is visible in the product rather than only in
+    kubectl, before the Job's TTL reaps the evidence (#1710)."""
+
     APPLY_OBSERVABILITY_RETENTION = "apply_observability_retention"
     """Daily — set each org's configured log retention on its CloudWatch log
     groups (#1602). A policy, not a delete: AWS ages the data out."""
@@ -361,6 +366,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
         interval_seconds=30 * 60,
         schedule_id=schedule_id_for(kind=ScheduleKind.PROBE_APP_DNS),
         description="Refresh cached hostname resolution for the app doctor",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.PROBE_APP_CRONJOB_RUNS,
+        workflow_name="ProbeAppCronjobRunsWorkflow",
+        interval_seconds=30 * 60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.PROBE_APP_CRONJOB_RUNS),
+        description="Refresh cached cronjob-run outcomes for the app doctor",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.APPLY_OBSERVABILITY_RETENTION,

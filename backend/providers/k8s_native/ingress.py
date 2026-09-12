@@ -19,6 +19,8 @@ from typing import Any
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
 
+from .logout import LOGOUT_PATH, redirect_snippet
+
 SUPPORTED_VARIANTS = (
     "nginx_ingress",
     "gateway_api",
@@ -64,6 +66,25 @@ class OIDCAuthConfig:
     The Ingress controller passes them upstream so the app can see
     the authenticated identity."""
 
+    gateway_secret: str = ""
+    """Shared secret stamped on every request the gate lets through (#1726).
+
+    Without it the gate is only an edge check: nothing distinguishes a request
+    that came through the auth host from anything else that can reach the app's
+    Service port in-cluster. A careful app refuses everyone on that basis; a
+    careless one trusts identity headers any pod could forge.
+
+    Empty omits the header rather than stamping a blank one, which would read
+    as "the gate vouched for this" to an app testing presence rather than
+    value."""
+
+    gateway_secret_header: str = "X-Astrolift-Gateway-Secret"
+    """Header the shared secret is stamped on. Apps point their own
+    proxy-secret setting at this name."""
+
+    logout_enabled: bool = False
+    """The central host has a configured browser logout flow (#1741)."""
+
 
 # The three annotation keys that route an nginx-family Ingress through
 # the central auth host. ``core.ingress_reconcile`` patches exactly
@@ -73,10 +94,126 @@ NGINX_AUTH_ANNOTATION_KEYS = (
     "nginx.ingress.kubernetes.io/auth-url",
     "nginx.ingress.kubernetes.io/auth-signin",
     "nginx.ingress.kubernetes.io/auth-response-headers",
+    # The gateway-secret snippet is part of the gate, so the live patcher owns
+    # it too: a reconcile that refreshed the auth-* keys but left a stale
+    # snippet would have the app comparing against a secret the gate no longer
+    # sends, and every request would fail closed.
+    "nginx.ingress.kubernetes.io/configuration-snippet",
 )
 
 
-def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
+# The platform's contribution to ``configuration-snippet`` is fenced by
+# these markers so it can be replaced, or removed, without touching
+# anything else in the same annotation (#1726).
+#
+# The key is not the platform's to own outright. An app can have its own
+# reason to need snippet content -- one live app derives per-request
+# identity headers its backend requires -- and the first shape of this
+# feature rendered the whole key, so a reconcile deleted that content and
+# the app started refusing every request. Fencing makes the platform's
+# block identifiable, so composing is possible and clobbering is not.
+PLATFORM_SNIPPET_BEGIN = "# BEGIN astrolift managed gateway headers"
+PLATFORM_SNIPPET_END = "# END astrolift managed gateway headers"
+
+
+# Which oauth2-proxy response header each declarable identity arrives on.
+# Mirrors ``astrolift_manifest.parser._EDGE_IDENTITIES``; the manifest
+# parser refuses anything outside it, so a name reaching here is known.
+_EDGE_IDENTITY_SOURCES = {
+    "user": "X-Auth-Request-User",
+    "email": "X-Auth-Request-Email",
+    "access_token": "X-Auth-Request-Access-Token",
+}
+
+
+def _nginx_variable(header: str) -> str:
+    """The ``$upstream_http_*`` variable an auth-response header lands on."""
+    return "$upstream_http_" + header.lower().replace("-", "_")
+
+
+def platform_gateway_snippet(auth: OIDCAuthConfig, *, edge: dict | None = None) -> str:
+    """The fenced snippet block the platform contributes, or ``""``.
+
+    Stamps proof-of-passage on the proxied request. ``proxy_set_header``
+    runs after ``auth_request``, so this lands on requests the gate
+    admitted and on nothing else -- a request that never passed the gate
+    never reaches this block.
+
+    The header is set unconditionally rather than copied from the client,
+    which is what makes it unforgeable from outside: whatever a caller
+    sends under this name is overwritten before the app sees it.
+
+    ``edge`` is the app's ``[edge]`` manifest block (#1733), already
+    normalized: an app whose backend reads the gate's identity under names
+    it chose declares the mapping and the platform renders it here, inside
+    the same fence, instead of the operator applying it to the live
+    Ingress by hand where nothing recreates or records it.
+    """
+
+    edge = edge or {}
+    secret_header = str(edge.get("gateway_secret_header") or "") or auth.gateway_secret_header
+    lines: list[str] = []
+    if auth.logout_enabled:
+        lines.append(redirect_snippet(LOGOUT_PATH, f"https://{auth.auth_proxy_host}{LOGOUT_PATH}"))
+    if auth.gateway_secret:
+        lines.append(f'proxy_set_header {secret_header} "{auth.gateway_secret}";')
+    for pair in edge.get("identity_headers") or []:
+        try:
+            identity, header = pair
+        except (TypeError, ValueError):
+            continue
+        source = _EDGE_IDENTITY_SOURCES.get(str(identity))
+        if not source or not header:
+            continue
+        # A local variable per identity, named for the target header, so
+        # two apps on one controller cannot collide and re-rendering is
+        # byte-stable.
+        var = "$astrolift_edge_" + str(identity)
+        lines.append(f"auth_request_set {var} {_nginx_variable(source)};")
+        lines.append(f"proxy_set_header {header} {var};")
+    if not lines:
+        return ""
+    body = "\n".join(lines)
+    return f"{PLATFORM_SNIPPET_BEGIN}\n{body}\n{PLATFORM_SNIPPET_END}"
+
+
+def strip_platform_snippet(existing: str) -> str:
+    """``existing`` with any previously-rendered platform block removed."""
+
+    text = existing or ""
+    while True:
+        start = text.find(PLATFORM_SNIPPET_BEGIN)
+        if start == -1:
+            return text.strip("\n")
+        end = text.find(PLATFORM_SNIPPET_END, start)
+        if end == -1:
+            # An unterminated marker means someone edited inside the
+            # fence. Drop from the marker to the end rather than guess
+            # where the platform's content stopped.
+            return text[:start].strip("\n")
+        text = text[:start] + text[end + len(PLATFORM_SNIPPET_END) :]
+
+
+def compose_configuration_snippet(existing: str, block: str) -> str | None:
+    """Merge the platform's ``block`` into ``existing``, keeping the rest.
+
+    Returns ``None`` when nothing is left to write, which the callers
+    turn into a delete of the annotation -- so removing the gateway
+    secret from a cluster whose apps contribute nothing of their own
+    still clears the key, while an app that does contribute keeps it.
+    """
+
+    foreign = strip_platform_snippet(existing)
+    parts = [p for p in (foreign, block) if p]
+    return "\n".join(parts) + "\n" if parts else None
+
+
+def nginx_auth_annotations(
+    auth: OIDCAuthConfig,
+    *,
+    existing_snippet: str = "",
+    edge: dict | None = None,
+) -> dict[str, str]:
     """Annotations pointing an nginx-family Ingress at the central auth
     host.
 
@@ -88,7 +225,7 @@ def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
     the gate is how an app ends up authenticated on one render path and
     public on another.
     """
-    return {
+    annotations = {
         "nginx.ingress.kubernetes.io/auth-url": f"https://{auth.auth_proxy_host}/oauth2/auth",
         # rd must be the FULL app URL: the auth host lives on its own
         # hostname, so a path-only rd lands the user on the auth host
@@ -100,6 +237,13 @@ def nginx_auth_annotations(auth: OIDCAuthConfig) -> dict[str, str]:
         ),
         "nginx.ingress.kubernetes.io/auth-response-headers": ",".join(auth.response_headers),
     }
+    snippet = compose_configuration_snippet(
+        existing_snippet,
+        platform_gateway_snippet(auth, edge=edge),
+    )
+    if snippet is not None:
+        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = snippet
+    return annotations
 
 
 @dataclass(frozen=True)

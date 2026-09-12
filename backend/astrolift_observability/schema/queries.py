@@ -26,6 +26,7 @@ with a doc link.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import logging
 from collections import defaultdict
@@ -60,7 +61,9 @@ from astrolift_observability.schema.types import (
 from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models.managed_service import ManagedService
+from astrolift_services.scopes import managed_service_scope_by_guid
 from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -104,6 +107,59 @@ def _samples_from_pairs(pairs: list[tuple[float, float]]) -> list[TimeSeriesPoin
     ]
 
 
+# The RED half of the golden-signals group. Saturation is excluded: it
+# comes from cAdvisor / kube-state-metrics, which every cluster scrapes.
+_HTTP_SIGNAL_KINDS = frozenset(
+    {
+        GoldenSignalKind.TRAFFIC,
+        GoldenSignalKind.ERRORS,
+        GoldenSignalKind.LATENCY_P50,
+        GoldenSignalKind.LATENCY_P90,
+        GoldenSignalKind.LATENCY_P95,
+        GoldenSignalKind.LATENCY_P99,
+    }
+)
+
+
+def _app_declares_metrics(app: Any) -> bool:
+    """Whether any workload in the app's manifest exposes Prometheus metrics.
+
+    ``metrics.enabled`` (#1226) is what puts ``http_requests_total`` in
+    front of a scraper; with it unset on every workload the app-metric
+    RED queries select a series that cannot exist. Read from
+    ``RegisteredApp.manifest_normalized`` — the persisted normalization
+    of the last applied manifest — so this costs no extra query.
+
+    Deliberately app-wide rather than per-workload: over-reporting
+    "instrumented" only leaves the pre-#1708 empty panel, while
+    under-reporting would tell an operator a configured signal is
+    unconfigured.
+    """
+    workloads = (app.manifest_normalized or {}).get("workloads") or []
+    return any(bool(w.get("metrics_enabled")) for w in workloads if isinstance(w, dict))
+
+
+def _signal_reason(sig: AppGoldenSignal, *, red_source: bool) -> ObservabilityPanelReason:
+    """Label one golden signal's empty state (#1708)."""
+    if sig.samples:
+        return ObservabilityPanelReason.OK
+    if sig.name in _HTTP_SIGNAL_KINDS and not red_source:
+        return ObservabilityPanelReason.NOT_CONFIGURED
+    return ObservabilityPanelReason.NO_DATA_YET
+
+
+def _red_source_configured(*, app: Any, edge: Any, cloudwatch: bool = False) -> bool:
+    """Whether *any* source can answer the RED queries for this app.
+
+    Three exist: the cluster's ingress variant when it has an
+    edge-metrics mapping (#1224), the app's own instrumentation, and —
+    for golden signals only — the ALB/CloudWatch fallback on AWS
+    clusters. None of the three means an empty panel says "no source",
+    not "no traffic" (#1708).
+    """
+    return edge is not None or cloudwatch or _app_declares_metrics(app)
+
+
 def _backfill_from_cloudwatch(
     *,
     out: list[AppGoldenSignal],
@@ -114,12 +170,17 @@ def _backfill_from_cloudwatch(
     end_unix: int,
     step: int,
     seconds: int,
-) -> list[AppGoldenSignal]:
+) -> tuple[list[AppGoldenSignal], bool]:
     """Replace empty HTTP-kind signals with CloudWatch ALB data.
 
     Called only when Prometheus has no HTTP series (uninstrumented apps).
     Falls back silently on any error or non-AWS cluster — the original
     empty-series list is returned unchanged in those cases.
+
+    Returns the (possibly patched) signals and whether CloudWatch is a
+    *source* for this app — the dispatch reached the ALB — which is
+    true even when it reported no traffic in the window, and is what
+    separates NO_DATA_YET from NOT_CONFIGURED for the caller (#1708).
     """
     from astrolift_lifecycle.models.app_environment import AppEnvironment
 
@@ -134,7 +195,7 @@ def _backfill_from_cloudwatch(
     )
     if env is None or env.tenant_cluster_id is None:
         log.warning("cloudwatch fallback: no env/cluster for app=%s", app.slug)
-        return out
+        return out, False
 
     cluster = env.tenant_cluster
     plugin_slug = (
@@ -147,7 +208,7 @@ def _backfill_from_cloudwatch(
         plugin_slug or "(none)",
     )
     if plugin_slug != "aws":
-        return out
+        return out, False
 
     try:
         from core.cluster_management import (  # noqa: PLC0415
@@ -163,7 +224,7 @@ def _backfill_from_cloudwatch(
         )
     except Exception as exc:
         log.warning("cloudwatch fallback: dispatch failed app=%s err=%s", app.slug, exc)
-        return out
+        return out, False
 
     has_data = any(bool(v) for v in cw_data.values())
     log.warning(
@@ -173,7 +234,7 @@ def _backfill_from_cloudwatch(
         {k: len(v) for k, v in cw_data.items()},
     )
     if not has_data:
-        return out
+        return out, True
 
     # Map CloudWatch key → GoldenSignalKind enum (for sig.name comparison)
     _CW_KIND_MAP: dict[str, GoldenSignalKind] = {
@@ -215,7 +276,7 @@ def _backfill_from_cloudwatch(
             )
         else:
             patched.append(sig)
-    return patched
+    return patched, True
 
 
 def _classify_status_code(code: str) -> str:
@@ -314,7 +375,7 @@ def _instant_resource_gauge(
 @strawberry.type
 class GoldenSignalsQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_golden_signals(
         self,
@@ -349,7 +410,7 @@ class GoldenSignalsQuery:
                 deleted_at__isnull=True,
             )
             .select_related("organization")
-            .only("id", "slug", "k8s_namespace", "organization__slug")
+            .only("id", "slug", "k8s_namespace", "manifest_normalized", "organization__slug")
             .first()
         )
         if app is None:
@@ -487,20 +548,13 @@ class GoldenSignalsQuery:
         #
         # If ALL three HTTP signal kinds came back empty from Prometheus,
         # try CloudWatch and backfill whichever signals it can supply.
-        _HTTP_KINDS = {
-            GoldenSignalKind.TRAFFIC,
-            GoldenSignalKind.ERRORS,
-            GoldenSignalKind.LATENCY_P50,
-            GoldenSignalKind.LATENCY_P90,
-            GoldenSignalKind.LATENCY_P95,
-            GoldenSignalKind.LATENCY_P99,
-        }
-        signals_by_kind = {s.name: s for s in out}
+        signals_by_kind = {sig.name: sig for sig in out}
         http_all_empty = all(
-            not signals_by_kind[k.value].samples for k in _HTTP_KINDS if k.value in signals_by_kind
+            not signals_by_kind[k].samples for k in _HTTP_SIGNAL_KINDS if k in signals_by_kind
         )
+        cloudwatch_source = False
         if http_all_empty:
-            out = _backfill_from_cloudwatch(
+            out, cloudwatch_source = _backfill_from_cloudwatch(
                 out=out,
                 app=app,
                 environment_name=environment_name,
@@ -511,14 +565,28 @@ class GoldenSignalsQuery:
                 seconds=seconds,
             )
 
+        # Per-signal reason (#1708). An empty RED panel has two very
+        # different causes and the panel used to render both as "no data
+        # for this window", which reads as "the app has no traffic".
+        # With no edge mapping, no app instrumentation and no ALB
+        # fallback there is nothing for the query to select — say so.
+        red_source = _red_source_configured(app=app, edge=edge, cloudwatch=cloudwatch_source)
+        out = [
+            dataclasses.replace(
+                sig,
+                reason=_signal_reason(sig, red_source=red_source),
+            )
+            for sig in out
+        ]
+
         # Endpoint is live and every query succeeded; if no signal
         # carries a sample the app just isn't emitting metrics yet.
-        has_data = any(s.samples for s in out)
+        has_data = any(sig.samples for sig in out)
         reason = ObservabilityPanelReason.OK if has_data else ObservabilityPanelReason.NO_DATA_YET
         return AppGoldenSignalsResult(reason=reason, signals=out)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_status_code_breakdown(
         self,
@@ -537,9 +605,10 @@ class GoldenSignalsQuery:
         every workload up.
 
         ``reason`` (#1111) makes the empty state explicit: NOT_CONFIGURED
-        (no Prometheus endpoint), NO_DATA_YET (endpoint live, no traffic
-        in window), ERROR (Prometheus errored), or OK. ``null`` is
-        reserved for "no such app for this tenant"."""
+        (no Prometheus endpoint, or no HTTP metric source for the app —
+        #1708), NO_DATA_YET (a source exists, no traffic in window),
+        ERROR (Prometheus errored), or OK. ``null`` is reserved for
+        "no such app for this tenant"."""
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
         tenant = get_current_tenant()
         app = (
@@ -548,7 +617,7 @@ class GoldenSignalsQuery:
                 organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
-            .only("id", "slug", "k8s_namespace", "organization__slug")
+            .only("id", "slug", "k8s_namespace", "manifest_normalized", "organization__slug")
             .select_related("organization")
             .first()
         )
@@ -632,7 +701,17 @@ class GoldenSignalsQuery:
                 )
             )
 
-        reason = ObservabilityPanelReason.OK if series_out else ObservabilityPanelReason.NO_DATA_YET
+        # Same two-cause empty state as the RED signals (#1708): with
+        # no edge mapping and no app instrumentation this query selects
+        # a series that cannot exist, which is NOT_CONFIGURED rather
+        # than "no traffic in the window". There is no CloudWatch
+        # fallback on this panel.
+        if series_out:
+            reason = ObservabilityPanelReason.OK
+        elif _red_source_configured(app=app, edge=edge):
+            reason = ObservabilityPanelReason.NO_DATA_YET
+        else:
+            reason = ObservabilityPanelReason.NOT_CONFIGURED
         return StatusCodeBreakdown(
             reason=reason,
             range_seconds=seconds,
@@ -654,7 +733,7 @@ class GoldenSignalsQuery:
     # cadence under sustained load.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_workload_resource_usage(
         self,
@@ -758,7 +837,7 @@ class GoldenSignalsQuery:
     # arbitrary HTTP fetcher.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_url_health(
         self,
@@ -817,7 +896,7 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_url_probe_history(
         self,
@@ -906,7 +985,7 @@ class GoldenSignalsQuery:
     )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
     @tenant_scoped()
     def astrolift_app_managed_service_metrics(
         self,
@@ -1021,7 +1100,7 @@ class GoldenSignalsQuery:
     # "how often it restarts" and the live resource consumption).
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_pod_resource_usage(
         self,
@@ -1068,17 +1147,22 @@ class GoldenSignalsQuery:
         start_unix = end_unix - seconds
         step = prom_queries.pick_step_seconds(seconds)
 
+        # cAdvisor carries no app label, so these have to be namespace-scoped
+        # or they match nothing (#1703).
+        pod_namespace = namespace_for_app(app)
         cpu_plan = prom_queries.build_pod_cpu_usage_query(
             app_slug=app.slug,
             environment_name=environment_name,
             pod_name=pod_name,
             range_seconds=seconds,
+            namespace=pod_namespace,
         )
         mem_plan = prom_queries.build_pod_memory_usage_query(
             app_slug=app.slug,
             environment_name=environment_name,
             pod_name=pod_name,
             range_seconds=seconds,
+            namespace=pod_namespace,
         )
 
         try:
@@ -1174,7 +1258,7 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_metric_names(
         self,
@@ -1264,7 +1348,7 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_execute_promql(
         self,
@@ -1352,7 +1436,7 @@ class GoldenSignalsQuery:
         return ExecutePromqlResult(ok=True, error="", series=series)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_traces(
         self,
@@ -1425,7 +1509,7 @@ class GoldenSignalsQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_trace_spans(
         self,
@@ -1481,7 +1565,7 @@ class GoldenSignalsQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_endpoint_metrics(
         self,

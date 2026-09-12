@@ -429,19 +429,27 @@ def build_pod_cpu_usage_query(
     environment_name: str | None,
     pod_name: str,
     range_seconds: int,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Per-pod CPU usage in cores over time (#713).
 
-    ``sum(rate(container_cpu_usage_seconds_total{app=...,pod="..."}[<w>]))``
+    ``sum(rate(container_cpu_usage_seconds_total{namespace=...,pod="..."}[<w>]))``
 
     Narrowed by the pod's name (cAdvisor exposes ``pod`` as a label on
     every container metric). The result is a per-pod sparkline that
     sums across containers in the pod — same shape as the app-level
     saturation but with one extra label matcher.
+
+    Scoped by ``namespace``, not ``app`` (#1703). cAdvisor series carry
+    namespace / pod / container and no user-defined ``app`` label, so an
+    ``app=`` matcher selects nothing and the panel returns empty for
+    every pod that ever existed. The app-level saturation queries above
+    already pass a namespace for the same reason.
     """
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
+        namespace=namespace,
     )
     labels["pod"] = sanitize_label_value(pod_name)
     rate_window = pick_rate_window(range_seconds)
@@ -456,16 +464,19 @@ def build_pod_memory_usage_query(
     environment_name: str | None,
     pod_name: str,
     range_seconds: int,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Per-pod memory working-set bytes over time (#713).
 
-    ``sum(container_memory_working_set_bytes{app=...,pod="..."})``
+    ``sum(container_memory_working_set_bytes{namespace=...,pod="..."})``
 
-    Gauge (no rate). Same per-pod narrowing as the CPU query above.
+    Gauge (no rate). Same per-pod narrowing, and the same namespace
+    scoping as the CPU query above (#1703).
     """
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
+        namespace=namespace,
     )
     labels["pod"] = sanitize_label_value(pod_name)
     rate_window = pick_rate_window(range_seconds)

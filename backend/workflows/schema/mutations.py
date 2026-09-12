@@ -16,6 +16,11 @@ from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
 from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
+from workflows.scopes import (
+    definition_scope_by_slug,
+    instance_scope_by_id,
+    workflow_scope_by_slug,
+)
 
 
 @strawberry.type
@@ -156,7 +161,7 @@ def _unique_clone_slug(base_slug, org):
 @strawberry.type
 class Mutation:
     @strawberry.mutation(description="Start a workflow for an object.")
-    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
     @tenant_scoped()
     def start_workflow(
         self,
@@ -223,7 +228,7 @@ class Mutation:
             "WorkflowRun mirror rows and enqueues the stage executor."
         )
     )
-    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
     @tenant_scoped()
     def run_workflow_definition(
         self,
@@ -307,7 +312,7 @@ class Mutation:
         )
 
     @strawberry.mutation(description="Transition a workflow instance to a new state.")
-    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=instance_scope_by_id("instance_id"))
     @tenant_scoped()
     def transition_workflow(
         self,
@@ -432,7 +437,7 @@ class Mutation:
         return MutationResult.success()
 
     @strawberry.mutation(description="Update an org-owned workflow definition (globals are read-only).")
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_slug("slug"))
     @tenant_scoped()
     def update_workflow_definition(
         self,
@@ -522,7 +527,7 @@ class Mutation:
         return MutationResult.success()
 
     @strawberry.mutation(description="Soft-delete an org-owned workflow definition by slug.")
-    @require_permission(Permission.WORKFLOW_DELETE)
+    @require_permission(Permission.WORKFLOW_DELETE, scope=definition_scope_by_slug("slug"))
     @tenant_scoped()
     def delete_workflow_definition(
         self,
@@ -614,7 +619,7 @@ class Mutation:
             "after the definition's last stage."
         )
     )
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_slug("workflow_slug"))
     @tenant_scoped()
     def create_workflow_stage(
         self,
@@ -807,7 +812,7 @@ class Mutation:
             "on collision; global stages copy with agent_definition cleared."
         )
     )
-    @require_permission(Permission.WORKFLOW_CREATE)
+    @require_permission(Permission.WORKFLOW_CREATE, scope=definition_scope_by_slug("slug"))
     @tenant_scoped()
     def clone_workflow_definition(
         self,

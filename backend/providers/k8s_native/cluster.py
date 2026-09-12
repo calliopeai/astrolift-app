@@ -442,18 +442,64 @@ class K8sNativeClusterDriver(ClusterDriver):
                         timed_out=False,
                     )
             time.sleep(min(15, max(1, timeout // 20)))
+        stalled, stall_message = self._diagnose_stall(cluster, namespace, kind, name)
         return RolloutResult(
             success=False,
             kind=kind,
             name=name,
             namespace=namespace,
             message=(
-                last_status.conditions[-1].get("message", "")
-                if last_status and last_status.conditions
-                else "rollout timed out"
+                stall_message
+                or (
+                    last_status.conditions[-1].get("message", "")
+                    if last_status and last_status.conditions
+                    else "rollout timed out"
+                )
             ),
             timed_out=True,
+            stalled=stalled,
         )
+
+    def _diagnose_stall(self, cluster: str, namespace: str, kind: str, name: str) -> tuple[bool, str]:
+        """Say why a StatefulSet rollout could not finish (#1724).
+
+        ``RollingUpdate`` will not advance past a pod that never becomes Ready.
+        A workload that crashes on startup therefore keeps its old pod on the
+        previous revision indefinitely while the StatefulSet already carries the
+        new template -- so a fix can be applied and inert at the same time, and
+        every deploy after it reports a bare "rollout timed out" that says
+        nothing about the change being stuck one revision away.
+
+        ``currentRevision != updateRevision`` is the whole signal: the
+        StatefulSet has accepted a new template and no pod has moved to it.
+
+        Best-effort. Any failure to read the cluster degrades to
+        ``(False, "")`` and the caller keeps its original message -- a
+        diagnosis is not worth failing a deploy path over.
+        """
+        if kind.lower() != "statefulset":
+            return False, ""
+        try:
+            obj = self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+            status = (obj or {}).get("status") or {}
+            current = status.get("currentRevision")
+            update = status.get("updateRevision")
+            if not current or not update or current == update:
+                return False, ""
+            ready = status.get("readyReplicas") or 0
+            return True, (
+                f"{kind}/{name}: the new template is applied but cannot roll out. "
+                f"Pods are still on revision {current}; the StatefulSet wants {update}. "
+                f"RollingUpdate will not replace a pod that never becomes Ready "
+                f"({ready} ready), so this will not resolve on its own -- every further "
+                f"deploy will apply cleanly and time out the same way. Fix the workload, "
+                f"or delete the pod to force it onto the new revision."
+            )
+        except Exception:
+            # Diagnosis must never fail the caller: this runs on a path that is
+            # already failing, and a broken diagnosis turning a timeout into an
+            # exception would be worse than no diagnosis at all.
+            return False, ""
 
     # ---- exec / port-forward --------------------------------------
 
@@ -687,6 +733,26 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # without a ServiceMonitor the exporter runs but
                             # nothing scrapes it and the RED panels stay empty.
                             "serviceMonitor": {"enabled": True},
+                        },
+                        # Header buffers sized for a cookie-bearing auth gate
+                        # (#1725). Every app behind the central auth host
+                        # carries a session cookie, and nginx copies the whole
+                        # Cookie header into the auth_request subrequest. The
+                        # chart defaults (large_client_header_buffers 4 8k,
+                        # proxy_buffer_size 4k) reject a Cookie header past
+                        # 8KB, and nginx reports that as an auth subrequest
+                        # failure -- which surfaces to the user as a bare 502
+                        # / 500 from the edge, with nothing logged by
+                        # oauth2-proxy because the subrequest never reached
+                        # it. A browser accumulates well past 8KB: an
+                        # oauth2-proxy session split across _0/_1 alongside
+                        # the AWSELBAuthSessionCookie pair a cluster leaves
+                        # behind when it migrates off ALB auth is already
+                        # ~16KB, so the ceiling is reached in normal use
+                        # rather than by abuse.
+                        "config": {
+                            "large-client-header-buffers": "4 32k",
+                            "proxy-buffer-size": "16k",
                         },
                     },
                 },
@@ -942,6 +1008,51 @@ class K8sNativeClusterDriver(ClusterDriver):
         ]
 
     # ---- Cluster health (#68 slice 1) -----------------------------
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def read_job_pod_logs(
+        self,
+        cluster: str,
+        namespace: str,
+        job_name: str,
+        *,
+        tail_lines: int = 100,
+    ) -> str:
+        """Tail of the logs from the pods a Job ran, newest attempt last.
+
+        A failed Job reports only "Job has reached the specified backoff
+        limit"; what actually went wrong is in the pod (#1686). Slug-keyed
+        rather than auth-keyed because the build driver holds a slug, and
+        because this is the same read path ``get_workload_status`` uses.
+
+        Best-effort by contract: a diagnostic must never turn a failure
+        into a different failure, so every error here degrades to a note
+        in the returned text.
+        """
+
+        try:
+            client = self._k8s(cluster)
+        except Exception as exc:
+            return f"(could not reach the cluster to read build logs: {exc})"
+
+        try:
+            pods = client.list_namespaced_pod(namespace=namespace, label_selector=f"job-name={job_name}")
+            names = [p.metadata.name for p in getattr(pods, "items", []) or []]
+        except Exception as exc:
+            return f"(could not list build pods: {exc})"
+        if not names:
+            return "(no build pods found — the Job may have been garbage-collected)"
+
+        chunks: list[str] = []
+        for pod_name in sorted(names):
+            try:
+                text = client.read_namespaced_pod_log(namespace=namespace, name=pod_name, tail_lines=tail_lines)
+            except Exception as exc:
+                chunks.append(f"--- {pod_name}: could not read logs: {exc}")
+                continue
+            body = (text or "").strip()
+            chunks.append(f"--- {pod_name}\n{body}" if body else f"--- {pod_name}: (no output)")
+        return "\n".join(chunks)
 
     @driver_op(cloud="k8s_native", driver="cluster")
     def list_pod_phase_summary(

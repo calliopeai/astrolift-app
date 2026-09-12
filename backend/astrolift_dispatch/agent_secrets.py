@@ -156,6 +156,77 @@ def project_managed_service_env_vars(spec) -> dict[str, str]:
     return values
 
 
+def app_managed_service_bindings(workload) -> list[Any]:
+    """The app's managed-service bindings an agent workload inherits (#1700).
+
+    An agent declared in the same repo as an app could not reach that app's
+    database or bucket: agent Jobs are spawned into the per-org agents
+    namespace with a per-task Secret, and a Kubernetes Secret is
+    namespace-scoped, so the ``astrolift-bindings-<slug>`` Secret the app's
+    own workloads mount cannot be referenced from there at all. The values
+    ride the per-task Secret instead -- the same mechanism the
+    project-scoped attachments above already use.
+
+    **Only when the app has exactly one live environment.** Choosing
+    between ``production`` and ``staging`` on an agent's behalf is picking
+    which database it gets, and there is nothing in an agent workload that
+    says which. An ambiguous app inherits nothing and says so.
+    """
+    app = getattr(workload, "registered_app", None)
+    if app is None or not getattr(app, "pk", None):
+        return []
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models import ManagedService
+
+    environments = list(
+        AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).values_list("pk", "name")[
+            :2
+        ]
+    )
+    if len(environments) != 1:
+        if environments:
+            log.warning(
+                "agent_secrets: app %s has %d environments; agent workload %s inherits no "
+                "bindings because nothing says which environment it belongs to",
+                getattr(app, "slug", "?"),
+                len(environments),
+                getattr(workload, "slug", "?"),
+            )
+        return []
+    env_pk = environments[0][0]
+    rows: list[Any] = []
+    services = ManagedService.objects.filter(
+        registered_app=app,
+        app_environment_id=env_pk,
+        deleted_at__isnull=True,
+        status="active",
+    ).order_by("kind", "name", "pk")
+    for service in services:
+        rows.extend(service.bindings.filter(deleted_at__isnull=True).order_by("env_key"))
+    return rows
+
+
+def app_managed_service_secret_refs(workload) -> list[dict[str, str]]:
+    """The secret half of :func:`app_managed_service_bindings`."""
+    refs: dict[str, dict[str, str]] = {}
+    for binding in app_managed_service_bindings(workload):
+        if binding.is_secret and valid_agent_env_var(binding.env_key):
+            refs[binding.env_key] = {
+                "env_var": binding.env_key,
+                "uri": binding.env_value_ref,
+            }
+    return list(refs.values())
+
+
+def app_managed_service_env_vars(workload) -> dict[str, str]:
+    """The plain-value half of :func:`app_managed_service_bindings`."""
+    values: dict[str, str] = {}
+    for binding in app_managed_service_bindings(workload):
+        if not binding.is_secret and valid_agent_env_var(binding.env_key):
+            values[binding.env_key] = binding.env_value_ref
+    return values
+
+
 def agent_bundle_refs(spec, *, environment: str = "default"):
     """Active bundle attachments for one environment, in precedence order.
 
@@ -321,12 +392,20 @@ def secret_env_entries(secret_name: str, refs: list[dict[str, str]]) -> list[dic
     ]
 
 
-def agent_container_env(spec, secret_name: str) -> list[dict]:
+def agent_container_env(spec, secret_name: str, *, workload=None) -> list[dict]:
     """Full container ``env`` for an agent task from its spec: plain env
     vars first, then the ``secretKeyRef`` entries (so a secret ref wins if
-    it collides with a plain env var of the same name)."""
+    it collides with a plain env var of the same name).
+
+    ``workload`` is the agent's own Workload, when it has one. An agent
+    that belongs to an app inherits that app's managed-service bindings
+    (#1700); they sit lowest in precedence, so the environment spec and its
+    own refs still override on a collision.
+    """
+    app_env_vars = env_var_entries(app_managed_service_env_vars(workload)) if workload else []
+    app_refs = app_managed_service_secret_refs(workload) if workload else []
     if spec is None:
-        return []
+        return app_env_vars + secret_env_entries(secret_name, app_refs)
     refs = effective_secret_refs(spec)
     bundle_refs: list[dict[str, str]] = []
     for attachment in agent_bundle_refs(spec):
@@ -336,8 +415,10 @@ def agent_container_env(spec, secret_name: str) -> list[dict]:
             if valid_agent_env_var(env_var):
                 bundle_refs.append({"env_var": env_var, "uri": attachment.secret_bundle.backend_ref})
     entries = (
-        env_var_entries(project_managed_service_env_vars(spec))
+        app_env_vars
+        + env_var_entries(project_managed_service_env_vars(spec))
         + env_var_entries(getattr(spec, "env_vars", None))
+        + secret_env_entries(secret_name, app_refs)
         + secret_env_entries(secret_name, bundle_refs)
         + secret_env_entries(secret_name, refs)
     )
@@ -390,18 +471,25 @@ def resolve_task_secret_manifest(
     secret_name: str,
     namespace: str,
     task_guid: str,
+    workload=None,
 ) -> dict | None:
     """Preflight + materialize a spec's secret refs into a K8s Secret manifest.
 
-    Returns the Secret manifest, or ``None`` when the spec declares no
-    refs. Preflights *all* refs first, collecting every missing/empty one,
-    and raises :class:`AgentSecretResolutionError` listing them so the
-    spawn fails with one readable message instead of the pod later
-    crash-looping on an unresolvable ``secretKeyRef``.
+    Returns the Secret manifest, or ``None`` when there is nothing to
+    materialize. Preflights *all* refs first, collecting every
+    missing/empty one, and raises :class:`AgentSecretResolutionError`
+    listing them so the spawn fails with one readable message instead of
+    the pod later crash-looping on an unresolvable ``secretKeyRef``.
+
+    ``workload`` is the agent's own Workload, when it has one: an agent
+    that belongs to an app carries that app's managed-service secrets into
+    the same per-task Secret (#1700), because the app's own binding Secret
+    lives in another namespace and cannot be mounted from here.
     """
     refs = effective_secret_refs(spec)
     bundle_refs = agent_bundle_refs(spec)
-    if not refs and not bundle_refs:
+    app_refs = app_managed_service_secret_refs(workload) if workload is not None else []
+    if not refs and not bundle_refs and not app_refs:
         return None
 
     spec_slug = str(getattr(spec, "slug", "") or "?")
@@ -410,7 +498,7 @@ def resolve_task_secret_manifest(
     except Exception as exc:  # noqa: BLE001 — no secrets driver ⇒ every ref unresolvable
         raise AgentSecretResolutionError(
             spec_slug,
-            [f"{r['env_var']} ({r['uri']})" for r in refs]
+            [f"{r['env_var']} ({r['uri']})" for r in app_refs + refs]
             + [f"bundle:{r.secret_bundle.slug}" for r in bundle_refs],
             reason=str(exc),
         ) from exc
@@ -448,7 +536,8 @@ def resolve_task_secret_manifest(
 
             bundle.last_key_enum_at = timezone.now()
             bundle.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
-    for ref in refs:
+    # App bindings first, so a spec's own ref still wins on a collision.
+    for ref in app_refs + refs:
         uri, env_var = ref["uri"], ref["env_var"]
         if not valid_agent_env_var(env_var):
             missing.append(f"{env_var} ({uri}; invalid or dispatcher-owned env var name)")

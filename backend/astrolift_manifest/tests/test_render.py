@@ -313,7 +313,9 @@ def test_env_pairs_render_as_name_value():
     w = _deployment_workload(containers=(_container(env=(("DATABASE_URL", "postgres://x"),)),))
     out = _render((w,))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [{"name": "DATABASE_URL", "value": "postgres://x"}]
+    # The platform also injects the commit (#1709); this asserts the manifest's
+    # own pair survives rendering, which is what the test is about.
+    assert {"name": "DATABASE_URL", "value": "postgres://x"} in container["env"]
 
 
 def test_command_and_args_render_as_lists():
@@ -470,12 +472,17 @@ def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
     # Dispatch env vars are injected ahead of the manifest-authored env,
     # so an explicit operator override (later entry) wins under k8s.
     container = dep["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [
-        {"name": "ASTROLIFT_WORKLOAD_KIND", "value": "agent"},
-        {"name": "ASTROLIFT_MAX_RETRIES", "value": "8"},
-        {"name": "ASTROLIFT_TOOL_TIMEOUT", "value": "120"},
-        {"name": "MY_FLAG", "value": "1"},
-    ]
+    # The ordering contract, stated as ordering rather than as an exact list so
+    # the platform's own injections (#1709) do not read as a violation of it.
+    names = [e["name"] for e in container["env"]]
+    assert names.index("ASTROLIFT_WORKLOAD_KIND") < names.index("MY_FLAG")
+    assert names.index("ASTROLIFT_MAX_RETRIES") < names.index("MY_FLAG")
+    assert names.index("ASTROLIFT_TOOL_TIMEOUT") < names.index("MY_FLAG")
+    by_name = {e["name"]: e["value"] for e in container["env"]}
+    assert by_name["ASTROLIFT_WORKLOAD_KIND"] == "agent"
+    assert by_name["ASTROLIFT_MAX_RETRIES"] == "8"
+    assert by_name["ASTROLIFT_TOOL_TIMEOUT"] == "120"
+    assert by_name["MY_FLAG"] == "1"
 
     # HPA targets the agent's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
@@ -613,7 +620,7 @@ def test_env_from_preserves_inline_env():
         env_from_secret_refs=["app-shared"],
     )
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [{"name": "FOO", "value": "bar"}]
+    assert {"name": "FOO", "value": "bar"} in container["env"]
     assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
 
 
@@ -765,12 +772,16 @@ def test_workflow_worker_renders_deployment_service_hpa_with_annotation_and_env(
     # so an explicit operator override (later entry) wins under k8s.
     # The poller concurrency caps are not rendered as K8s output.
     container = dep["spec"]["template"]["spec"]["containers"][0]
-    assert container["env"] == [
-        {"name": "ASTROLIFT_WORKFLOW_TYPE", "value": "ApprovalWorkflow"},
-        {"name": "ASTROLIFT_TASK_QUEUE", "value": "approvals"},
-        {"name": "TEMPORAL_NAMESPACE", "value": "prod"},
-        {"name": "MY_FLAG", "value": "1"},
-    ]
+    # Ordering contract, stated as ordering rather than as an exact list so the
+    # platform's own injections (#1709) do not read as a violation of it.
+    names = [e["name"] for e in container["env"]]
+    for injected in ("ASTROLIFT_WORKFLOW_TYPE", "ASTROLIFT_TASK_QUEUE", "TEMPORAL_NAMESPACE"):
+        assert names.index(injected) < names.index("MY_FLAG")
+    by_name = {e["name"]: e["value"] for e in container["env"]}
+    assert by_name["ASTROLIFT_WORKFLOW_TYPE"] == "ApprovalWorkflow"
+    assert by_name["ASTROLIFT_TASK_QUEUE"] == "approvals"
+    assert by_name["TEMPORAL_NAMESPACE"] == "prod"
+    assert by_name["MY_FLAG"] == "1"
 
     # HPA targets the worker's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
@@ -882,6 +893,178 @@ def test_statefulset_storage_size_defaults_mount_path():
     sts = next(r for r in out if r["kind"] == "StatefulSet")
     mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     assert mounts == [{"name": "db-data", "mountPath": "/data"}]
+
+
+def test_statefulset_volume_declaration_alone_emits_claim():
+    # Regression: a workload that declares [[workloads.volumes]] and no
+    # top-level storage_size rendered NO claim and NO mount, while still being
+    # scheduled as a StatefulSet -- the app came up with its data path pointing
+    # at an unmounted directory. Every pre-existing test set storage_size AND
+    # volumes together, so the declaration-only path was never covered.
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=3000),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"]
+    assert len(vct) == 1
+    assert vct[0]["metadata"]["name"] == "web-data"
+    assert vct[0]["spec"]["resources"]["requests"]["storage"] == "5Gi"
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mounts == [{"name": "web-data", "mountPath": "/app/data"}]
+
+
+def test_statefulset_volume_declaration_honours_access_mode_and_class():
+    w = WorkloadManifest(
+        name="shared",
+        kind="statefulset",
+        replicas=1,
+        volumes=(
+            {
+                "name": "data",
+                "kind": "pvc",
+                "mount_path": "/data",
+                "size": "20Gi",
+                "access_mode": "ReadWriteMany",
+                "storage_class": "efs-sc",
+            },
+        ),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/shared",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    spec = sts["spec"]["volumeClaimTemplates"][0]["spec"]
+    assert spec["accessModes"] == ["ReadWriteMany"]
+    assert spec["storageClassName"] == "efs-sc"
+
+
+def test_statefulset_storage_size_still_wins_over_declaration():
+    # Back-compat: the top-level key keeps its meaning for workloads that
+    # already set it, and the claim name stays <workload>-data so an existing
+    # StatefulSet's PVCs are never orphaned by a rename.
+    w = WorkloadManifest(
+        name="legacy",
+        kind="statefulset",
+        replicas=1,
+        storage_size="10Gi",
+        storage_class="gp3",
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/srv", "size": "5Gi"},),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/legacy",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"][0]
+    assert vct["metadata"]["name"] == "legacy-data"
+    assert vct["spec"]["resources"]["requests"]["storage"] == "10Gi"
+    assert vct["spec"]["storageClassName"] == "gp3"
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mounts == [{"name": "legacy-data", "mountPath": "/srv"}]
+
+
+def test_statefulset_pvc_gets_default_fsgroup():
+    # A PVC arrives root-owned, so a container running as a non-root uid
+    # cannot write to it and dies on its own data directory. fsGroup is added
+    # to the container's supplementary groups, so one default works for every
+    # image without the app declaring the uid it runs as.
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=3000),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["spec"]["template"]["spec"]["securityContext"]["fsGroup"] == 1000
+
+
+def test_statefulset_explicit_fs_group_wins():
+    w = WorkloadManifest(
+        name="web",
+        kind="statefulset",
+        replicas=1,
+        fs_group=2000,
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/app/data", "size": "5Gi"},),
+        containers=(_container("web", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/web",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["spec"]["template"]["spec"]["securityContext"]["fsGroup"] == 2000
+
+
+def test_statefulset_without_pvc_gets_no_fsgroup():
+    # fsGroup relabels every volume the pod carries, so a workload that
+    # mounts no claim must not acquire one just by being a StatefulSet.
+    w = WorkloadManifest(
+        name="plain",
+        kind="statefulset",
+        replicas=1,
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/plain",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert "fsGroup" not in (sts["spec"]["template"]["spec"].get("securityContext") or {})
+
+
+def test_statefulset_non_pvc_volume_emits_no_claim():
+    # An emptyDir declaration is not persistent storage; it must not conjure a
+    # PVC. Guards the new lookup against matching any volume kind.
+    w = WorkloadManifest(
+        name="scratch",
+        kind="statefulset",
+        replicas=1,
+        volumes=({"name": "tmp", "kind": "empty_dir", "mount_path": "/tmp/work"},),
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/scratch",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert "volumeClaimTemplates" not in sts["spec"]
 
 
 def test_function_renders_knative_service():

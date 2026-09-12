@@ -50,6 +50,17 @@ class WorkloadManifest:
     # parsing the TOML. Kept as dicts (not VolumeDecl) so this module
     # stays independent of security_volumes.py.
     volumes: tuple[dict, ...] = ()
+    # Pod-level ``securityContext.fsGroup`` for workloads that mount a
+    # persistent volume (#1722). A PVC mounts root-owned, so a container
+    # running as any non-root uid cannot write to it. Setting fsGroup makes
+    # the kubelet chown the volume to that GID with g+rwx AND adds the GID
+    # to the container's supplementary groups -- which is why a single
+    # platform default works for every image regardless of the uid it runs
+    # as, rather than each app having to declare its own.
+    # From ``[[workloads]] fs_group``, else the workload's
+    # ``[workloads.<name>.security] run_as_user``, else the platform
+    # default. Only emitted when the workload actually mounts a pvc.
+    fs_group: int | None = None
     # Agent dispatch tuning (#795). Only meaningful when
     # ``kind == "agent"`` — the renderer injects ``max_retries`` /
     # ``tool_timeout_seconds`` as the ``ASTROLIFT_MAX_RETRIES`` /
@@ -67,6 +78,22 @@ class WorkloadManifest:
     # ``service``-family agent is a long-running Deployment (+Service/HPA).
     # Only meaningful when ``kind == "agent"``.
     run_family: str = "task"
+    # Agent trigger mode (#1680). Mirrors ``astrolift_registry`` RunMode:
+    # ``once`` (dispatched on demand), ``loop``, ``schedule`` (with
+    # ``run_cron_expression``), ``trigger`` (fired by a webhook or a
+    # workflow stage) and ``persistent``. Only meaningful when
+    # ``kind == "agent"``.
+    #
+    # The model has had these since #795; the manifest had neither, so an
+    # agent's trigger mode could be set only through the registration API
+    # and never declared in the repo that defines the agent -- which is
+    # the reverse of what spec 42 §5 specifies, and left the declarative
+    # path stopping short of a feature the platform already supports.
+    #
+    # Empty means "not declared", which the registration path reads as
+    # "leave whatever the model default or an operator already set".
+    run_mode: str = ""
+    run_cron_expression: str = ""
     # Temporal worker config (#796). Only meaningful when
     # ``kind == "workflow"`` — the renderer stamps a
     # ``astrolift.dev/workload-kind: workflow`` pod annotation and injects
@@ -224,6 +251,35 @@ class SkillRef:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class EdgeIdentityConfig:
+    """How an app wants the gateway's identity presented to it (#1733).
+
+    The central auth gate stamps a shared secret and forwards
+    oauth2-proxy's ``X-Auth-Request-*`` headers. An app whose backend
+    reads those under names it chose -- one live app does -- had no way to
+    say so: the config existed only as a hand-applied ``kubectl annotate``
+    on the live Ingress, which nothing recreates, records or reviews.
+
+    This is deliberately a *mapping*, not a raw nginx snippet. A snippet
+    is an escape hatch into the ingress controller's config language: it
+    ties the app to nginx and hands it a sharp edge, and ingress-nginx has
+    been narrowing ``allow-snippet-annotations`` for CVE reasons. A rename
+    map covers the observed case and stays portable across ingress
+    classes.
+    """
+
+    gateway_secret_header: str = ""
+    """Header name the gate's shared secret is stamped on for this app.
+    Empty keeps the platform default. The *value* is never declared here
+    -- it comes from the cluster's auth config."""
+
+    identity_headers: tuple[tuple[str, str], ...] = ()
+    """``(identity, header_name)`` pairs: which gate identity to forward,
+    and the header name this app reads it under. Ordered and tuple-typed
+    so the rendered snippet is byte-stable across deploys."""
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class RawManifest:
     name: str
     workloads: tuple[WorkloadManifest, ...] = ()
@@ -235,6 +291,9 @@ class RawManifest:
     # ``None`` for non-agent manifests that declare neither.
     brief: BriefRef | None = None
     skills: tuple[SkillRef, ...] = ()
+    # Optional ``[edge]`` block (#1733). App-level, not per workload: the
+    # managed-subdomain render puts every hostname on one Ingress.
+    edge: EdgeIdentityConfig | None = None
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 

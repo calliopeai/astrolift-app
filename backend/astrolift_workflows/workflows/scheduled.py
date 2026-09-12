@@ -32,6 +32,7 @@ with workflow.unsafe.imports_passed_through():
         gc_stale_previews,
         poll_scheduled_job_runs,
         apply_observability_retention,
+    probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
     prune_audit_log,
         prune_stale_sessions,
@@ -140,6 +141,23 @@ class ProbeAppDnsWorkflow:
             start_to_close_timeout=_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"dns probe changed for {n} app(s)")
+
+
+@workflow.defn(name="ProbeAppCronjobRunsWorkflow")
+class ProbeAppCronjobRunsWorkflow:
+    """Refresh the app doctor's cached cronjob-run answers (#1710).
+
+    Read-only against the cluster and idempotent -- it lists Jobs and
+    writes what it found -- so it ships active rather than held.
+    """
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            probe_app_cronjob_runs_activity,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"cronjob probe changed for {n} app(s)")
 
 
 @workflow.defn(name="ApplyObservabilityRetentionWorkflow")

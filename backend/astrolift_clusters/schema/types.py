@@ -243,7 +243,7 @@ class ProviderPluginType:
 # anyone who can read it can mint a session. alb_auth_config needs no
 # equivalent -- its keys (user_pool_arn, user_pool_client_id,
 # user_pool_domain) are identifiers, not credentials.
-_OIDC_PUBLIC_KEYS = ("discovery_url", "client_id", "upstream_connector", "auth_proxy_host")
+_OIDC_PUBLIC_KEYS = ("discovery_url", "client_id", "upstream_connector", "auth_proxy_host", "logout_url")
 
 
 def redact_oidc_auth_config(config: dict | None) -> dict | None:

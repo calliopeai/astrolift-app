@@ -820,6 +820,7 @@ type AstroliftAppGoldenSignal {
   samples: [AstroliftTimeSeriesPoint!]!
   promql: String!
   unit: String!
+  reason: AstroliftObservabilityPanelReason!
 }
 
 type AstroliftAppGoldenSignalsResult {
@@ -1691,6 +1692,7 @@ type AstroliftDeployment {
   awaitingApprovers: [AstroliftDeploymentApprover!]!
   manifestResyncStatus: String!
   manifestResyncError: String!
+  buildError: String!
   startedAt: DateTime
   succeededAt: DateTime
   failedAt: DateTime
@@ -4567,7 +4569,7 @@ input CreateInvitationInput {
 input CreateManagedDomainInput {
   zone: String!
   dnsDriver: String!
-  defaultFor: String! = "none"
+  defaultFor: String! = "tenant_apps"
   isWildcardManaged: Boolean! = false
   dnsConfig: JSON = null
   organizationScoped: Boolean! = true
@@ -5770,18 +5772,16 @@ type PermissionDiagnosis {
 }
 
 type PermissionDiff {
-  codename: String!
-  name: String!
+  slug: String!
   userAHas: Boolean!
   userBHas: Boolean!
 }
 
 type PermissionEntry {
-  codename: String!
-  name: String!
-  appLabel: String!
-  model: String!
-  grantedViaGroups: [String!]!
+  slug: String!
+  resource: String!
+  action: String!
+  grantedVia: [String!]!
 }
 
 type PermissionTraceStep {
@@ -5940,7 +5940,7 @@ input PushManifestToRepoInput {
 
 type Query {
   """
-  List all effective permissions for a user, with the groups that grant each one.
+  List all effective permissions for a user, with the role bindings that grant each one.
   """
   effectivePermissions(userId: ID!): [PermissionEntry!]!
 
@@ -6730,7 +6730,8 @@ type SoftdeletepayloadMutationResult {
 input StartDeploymentInput {
   appSlug: String!
   environmentName: String!
-  imageTag: String!
+  imageTag: String! = ""
+  sourceRef: String = null
   imageDigest: String = null
   workloadSlug: String = null
   triggerKind: String! = "manual"

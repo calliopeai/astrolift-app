@@ -51,6 +51,20 @@ from core.tenancy import get_current_tenant
 log = logging.getLogger(__name__)
 
 
+def _unreachable_reason(endpoint: str) -> str:
+    """Why the control plane could not reach ``endpoint``.
+
+    A connection error against an in-cluster Service address is not
+    "Prometheus is down" — the control plane queries Prometheus over
+    HTTP and a ClusterIP is not routable from outside the cluster.
+    Saying which of the two it is saves the operator an investigation
+    that ends at a healthy Prometheus (#1711).
+    """
+    from astrolift_observability.prom_client import is_cluster_internal_endpoint
+
+    return "cluster_internal_endpoint" if is_cluster_internal_endpoint(endpoint) else "unreachable"
+
+
 def _primary_app_namespace(cluster) -> str:
     """Alphabetically-first app namespace bound to *cluster*, or
     ``astrolift-system`` when the cluster hosts no managed apps yet.
@@ -767,7 +781,7 @@ class ClustersQuery:
             )
             return ClusterPrometheusMetricsType(
                 available=False,
-                reason="unreachable",
+                reason=_unreachable_reason(endpoint),
                 node_count=None,
                 pod_running_ratio=None,
                 cpu_utilization=None,
@@ -970,7 +984,7 @@ class ClustersQuery:
             )
             return ClusterPrometheusRangeMetricsType(
                 available=False,
-                reason="unreachable",
+                reason=_unreachable_reason(endpoint),
                 range_seconds=range_seconds,
                 step_seconds=step_seconds,
                 series=[],

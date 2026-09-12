@@ -73,7 +73,13 @@ import re
 # so independently registered monorepo members cannot overwrite one another.
 # Agent source webhooks separately enforce source-SHA freshness because
 # Actions cancellation is cooperative and does not order webhook deliveries.
-TEMPLATE_VERSION = 6
+# v7 (#1697): the agent validator required the selected manifest to declare
+# exactly ONE workload in total, while the template is selected because the
+# app HAS an agent workload. An app+agent repo therefore always failed its
+# own CI -- the workflow contradicted the reason it was written -- and the
+# only way through was to split the agent into agents/<slug>/astrolift.toml.
+# It now requires at least one agent workload and says what it found.
+TEMPLATE_VERSION = 7
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

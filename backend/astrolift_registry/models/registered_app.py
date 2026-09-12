@@ -270,6 +270,13 @@ class RegisteredApp(NamedBaseCoreModel):
     # ``parse_failed`` an inline manifest was unusable; ``fetch_failed`` /
     # ``diverged`` came back from the repo fetch; ``no_source`` there was
     # nothing to bootstrap from. Empty means the app predates the field.
+    #
+    # Current state, not a registration audit record (#1692). A later
+    # resync that applies clears a failure back to ``applied``: the
+    # banner tells the operator what still needs attention, and an app
+    # whose manifest has since been fixed and whose workloads exist was
+    # otherwise told forever that it had neither. The registration
+    # attempt itself stays in the audit log.
     manifest_bootstrap_status = models.CharField(max_length=32, blank=True, default="")
     manifest_bootstrap_error = models.TextField(blank=True, default="")
 
@@ -366,6 +373,25 @@ class RegisteredApp(NamedBaseCoreModel):
         ),
     )
 
+    # Cached cronjob-run probe for the app doctor (#1710). Same pattern and
+    # the same reason as ``dns_probe``: a failed CronJob run left no trace in
+    # the product -- app health was the ``web`` Deployment, and the cronjob is
+    # a different workload of the same app -- so the only way to learn about
+    # one was kubectl, by which time the pod was reaped and the Job's events
+    # had aged out.
+    #
+    # Shape: {"probed_at": iso8601, "failed": ["job-name", ...], "total": int,
+    #         "error"?: str, "skipped"?: bool}
+    # Absent means never probed, which the doctor reports as unknown, not pass.
+    cronjob_probe = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Cached cronjob-run probe for the app doctor. Written by the "
+            "scheduled prober; read by the doctor with its age."
+        ),
+    )
+
     network_policy = models.JSONField(
         default=dict,
         blank=True,
@@ -459,6 +485,28 @@ class RegisteredApp(NamedBaseCoreModel):
         return (self.source_kind or "").strip() != RegisteredApp.SourceKind.DIRECT_UPLOAD.value
 
     @property
+    def effective_build_strategy(self) -> str:
+        """Which builder this deploy should invoke, or ``"off"`` for none.
+
+        The two build axes have to agree and only one was ever read
+        (#1687): ``DeployAppWorkflow`` branched on ``build_strategy !=
+        "off"`` alone, so an app moved to ``ci_pushed`` kept running a
+        full platform build on every deploy -- ``platform_build``
+        registration persists a ``dockerfile`` strategy, and a mode-only
+        change always lands in that state.
+
+        ``build_mode`` decides *whether* the platform builds;
+        ``build_strategy`` only decides *which* builder it uses when it
+        does. Deriving the answer from both, here, is what stops the two
+        drifting apart again -- and it needs no migration, because an
+        inconsistent pair already stored resolves correctly on read.
+        """
+
+        if (self.build_mode or "").strip() != RegisteredApp.BuildMode.PLATFORM_BUILD.value:
+            return RegisteredApp.BuildStrategy.OFF.value
+        return (self.build_strategy or "").strip() or RegisteredApp.BuildStrategy.OFF.value
+
+    @property
     def security_policy_resolved(self) -> dict:
         """Return the supply-chain policy with platform defaults filled in.
 
@@ -481,7 +529,9 @@ class RegisteredApp(NamedBaseCoreModel):
             "block_on_high_cve_threshold": policy.get("block_on_high_cve_threshold"),
         }
 
-    def transition_provisioning(self, new_status: RegisteredApp.ProvisioningStatus) -> None:
+    def transition_provisioning(
+        self, new_status: RegisteredApp.ProvisioningStatus, *, reason: str = ""
+    ) -> None:
         current = RegisteredApp.ProvisioningStatus(self.provisioning_status)
         # Idempotent: re-marking the current state is a no-op, not an error.
         # Without this, a deregister re-fired to recover an app stuck at
@@ -498,4 +548,11 @@ class RegisteredApp(NamedBaseCoreModel):
         self.provisioning_status = new_status.value
         if new_status is RegisteredApp.ProvisioningStatus.READY:
             self.provisioning_error = ""
+        elif new_status is RegisteredApp.ProvisioningStatus.FAILED:
+            # The whole point of the FAILED state. Until #1677 nothing ever
+            # reached it and nothing ever wrote this field, so a provision that
+            # died looked identical to one still running -- for as long as
+            # anyone cared to wait. Truncated because a driver traceback can
+            # be long and this is rendered inline by the CLI and the UI.
+            self.provisioning_error = reason[:2000]
         self.save(update_fields=["provisioning_status", "provisioning_error", "updated_at", "version"])

@@ -40,6 +40,7 @@ from astrolift_scm.ci_templates import (
     TEMPLATE_VERSION,
     content_hash,
     git_blob_sha,
+    parse_stamp,
     stamp_workflow,
 )
 from astrolift_scm.models import SourceConnection
@@ -174,7 +175,17 @@ def _apply_blocks(template: str, flags: dict[str, bool]) -> str:
 
 
 def _is_agent_app(app: RegisteredApp) -> bool:
-    """Whether this RegisteredApp represents a first-class agent package."""
+    """Whether this RegisteredApp *is* an agent package.
+
+    Having an agent workload is not enough. The agent template it selects
+    validates the app's manifest with the agent-discovery rule -- exactly
+    one workload, of kind ``agent`` -- so an app whose manifest declares
+    ``web`` + ``refresh`` + an agent got the agent workflow and then failed
+    every run on "selected manifest must declare exactly one agent
+    workload" (#1697). The two have to agree, and discovery's rule is the
+    one with a reason behind it: an agent manifest describes one agent, and
+    a mixed manifest is an app that happens to contain one.
+    """
     explicit = getattr(app, "is_agent", None)
     if explicit is not None:
         return bool(explicit)
@@ -182,9 +193,67 @@ def _is_agent_app(app: RegisteredApp) -> bool:
     if workloads is None or not getattr(app, "pk", None):
         return False
     try:
-        return workloads.filter(kind="agent", deleted_at__isnull=True).exists()
+        live = workloads.filter(deleted_at__isnull=True)
+        return live.filter(kind="agent").exists() and not live.exclude(kind="agent").exists()
     except (AttributeError, TypeError, ValueError):
         return False
+
+
+def _superseded_workflow_path(app: RegisteredApp) -> str:
+    """The managed workflow path this app no longer uses.
+
+    An app changes shape -- an agent workload is added to an app, or split
+    out of one -- and its managed workflow moves between
+    ``astrolift-ci.yml`` and ``astrolift-agent-<slug>.yml``. The file at
+    the old path keeps running on every push and keeps failing, because it
+    validates a manifest that no longer matches it (#1697).
+    """
+    if _is_agent_app(app):
+        return WORKFLOW_PATH
+    return f".github/workflows/astrolift-agent-{app.slug}.yml"
+
+
+def _remove_superseded_workflow(connection, app: RegisteredApp, *, branch: str) -> str | None:
+    """Delete the app's other managed workflow file when we wrote it.
+
+    Only deletes a file carrying the platform's stamp: an operator's own
+    workflow that happens to sit at that path is theirs. Never raises --
+    a failed cleanup must not fail the sync that just succeeded; the stale
+    file is a nuisance, the sync is the point.
+    """
+    path = _superseded_workflow_path(app)
+    try:
+        existing = fetch_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=path,
+            ref=branch,
+        )
+    except ProviderError:
+        return None
+    if existing is None or parse_stamp(existing).version is None:
+        # No stamp: the operator authored whatever is there. Not ours to
+        # delete, however inconvenient it is.
+        return None
+    from astrolift_scm.providers.github import delete_github_file
+
+    try:
+        deleted = delete_github_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=path,
+            branch=branch,
+            commit_message=f"chore(astrolift): remove superseded CI workflow for {app.slug}",
+        )
+    except Exception:  # noqa: BLE001 -- cleanup is best-effort by design
+        logger.warning(
+            "workflow_sync: could not remove superseded workflow %s for app %s",
+            path,
+            app.slug,
+            exc_info=True,
+        )
+        return None
+    return path if deleted else None
 
 
 def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
@@ -242,10 +311,15 @@ def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
         "          if not path.is_file():\n"
         "              raise SystemExit(f'agent manifest not found: {path}')\n"
         "          data = tomllib.loads(path.read_text(encoding='utf-8'))\n"
-        "          agents = [row for row in data.get('workloads', []) if row.get('kind') == 'agent']\n"
-        "          if len(agents) != 1 or len(data.get('workloads', [])) != 1:\n"
-        "              raise SystemExit('selected manifest must declare exactly one agent workload')\n"
-        "          print(f\"validated agent package: {path} ({agents[0].get('name', '?')})\")\n"
+        "          workloads = data.get('workloads', [])\n"
+        "          agents = [row for row in workloads if row.get('kind') == 'agent']\n"
+        "          if not agents:\n"
+        "              raise SystemExit(\n"
+        "                  f'selected manifest declares no agent workload '\n"
+        "                  f'({len(workloads)} workload(s) found)'\n"
+        "              )\n"
+        "          names = ', '.join(str(row.get('name', '?')) for row in agents)\n"
+        "          print(f'validated agent package: {path} ({names})')\n"
         "          PY\n"
         "\n"
         "      - name: Package delivery contract\n"
@@ -1385,6 +1459,11 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
             rendered_size=rendered_size,
             error=f"{exc.code}: {exc.message}",
         )
+
+    # The workflow this app used to use, if it changed shape. Left in
+    # place it keeps running on every push and keeps failing, because it
+    # validates a manifest that no longer matches it (#1697).
+    _remove_superseded_workflow(connection, app, branch=deploy_branch)
 
     return WorkflowSyncResult(
         status="created" if existing is None else "updated",

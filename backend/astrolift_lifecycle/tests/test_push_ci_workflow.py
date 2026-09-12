@@ -214,6 +214,10 @@ def test_creates_workflow_file_when_missing(
         if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
             # First call: fetch_file looking for existing — 404 means missing.
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
+        if method == "GET" and "/contents/.github/workflows/astrolift-agent-" in url:
+            # The superseded-workflow cleanup (#1697) looks for the app's
+            # other managed path; this repo has no such file.
+            return "error", _http_error(404, b'{"message":"Not Found"}', url)
         if method == "GET" and "/branches/main/protection" in url:
             return "error", _http_error(404, b'{"message":"Branch not protected"}', url)
         if method == "PUT" and "/contents/.github/workflows/astrolift-ci.yml" in url:
@@ -290,6 +294,10 @@ def test_a_file_astrolift_did_not_write_is_not_overwritten(
             if accept == "application/vnd.github.raw":
                 return "response", drift_body  # fetch_file path
             return "response", json.dumps({"sha": "oldblob"}).encode()
+        if method == "GET" and "/contents/.github/workflows/astrolift-agent-" in url:
+            # The superseded-workflow cleanup (#1697) looks for the app's
+            # other managed path; this repo has no such file.
+            return "error", _http_error(404, b'{"message":"Not Found"}', url)
         if method == "GET" and "/branches/main/protection" in url:
             return "error", _http_error(404, b"", url)
         # Side-branch creation: read the deploy branch tip, then create the ref.
@@ -396,6 +404,10 @@ def test_protected_branch_opens_pull_request(
         ):
             return "error", _http_error(404, b"", url)
         # Protection probe: 200 → branch is protected.
+        if method == "GET" and "/contents/.github/workflows/astrolift-agent-" in url:
+            # The superseded-workflow cleanup (#1697) looks for the app's
+            # other managed path; this repo has no such file.
+            return "error", _http_error(404, b'{"message":"Not Found"}', url)
         if method == "GET" and "/branches/main/protection" in url:
             return "response", json.dumps({"enabled": True}).encode()
         # Head SHA lookup for the deploy branch.

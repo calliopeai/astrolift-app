@@ -44,6 +44,21 @@ class K8sJobSpawner(ContainerSpawner):
         if workload is None:
             return SpawnResult(external_id="", ok=False, error="task has no agent_definition")
 
+        # Refuse before anything is created, rather than spawning a Job
+        # that cannot run the command it was given (#1698).
+        if not _resolve_base_image(workload, getattr(task, "environment_spec", None)):
+            return SpawnResult(
+                external_id="",
+                ok=False,
+                error=(
+                    f"agent {workload.slug!r} has no runnable image: its environment spec pins "
+                    f"no image tag, names no known runtime, and its primary container declares "
+                    f"no image. Pin one with "
+                    f"`astro agent env-spec upsert --image-tag <ref>`, set a runtime on the "
+                    f"spec, or give the container an image in astrolift.toml."
+                ),
+            )
+
         job_name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
         # Mark the in-process cleanup plan before any ancillary resolution.
         # A credential/backend failure before manifests are applied must not
@@ -114,6 +129,9 @@ class K8sJobSpawner(ContainerSpawner):
                 secret_name=task_secret_name(job_name),
                 namespace=self._namespace,
                 task_guid=str(task.guid),
+                # An agent that belongs to an app inherits that app's
+                # managed-service bindings through this Secret (#1700).
+                workload=workload,
             )
         except AgentSecretResolutionError as exc:
             logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
@@ -470,7 +488,16 @@ def _resolve_base_image(workload, spec) -> str:
       2. The spec's ``runtime`` short-name resolved through the public
          runtime catalog (``docker.io/calliopeai/astrolift-agent-<name>``).
       3. The workload's primary container image.
-      4. A distroless placeholder when the workload has no container.
+
+    Returns ``""`` when none of them resolve, and the caller refuses the
+    dispatch (#1698). This used to fall back to ``gcr.io/distroless/base``
+    -- an image with no interpreter -- so a workload whose command the
+    operator supplied spawned a Job that died in seconds with
+    ``exec: "python": executable file not found in $PATH``. The task was
+    marked failed with nothing pointing at the missing image, and the
+    logs the CLI could reach were empty because the container never
+    started. A placeholder base image is never a useful default for a
+    workload whose command comes from somewhere else.
 
     The ``-vnc`` watchable variant is applied by the caller on top of this
     base, never here.
@@ -488,7 +515,7 @@ def _resolve_base_image(workload, spec) -> str:
     primary_container = workload.containers.filter(is_primary=True).first() if workload else None
     if primary_container and primary_container.image_ref:
         return primary_container.image_ref
-    return "gcr.io/distroless/base"
+    return ""
 
 
 def _dedupe_job_container_env(job_manifest: dict) -> None:
@@ -577,7 +604,13 @@ def _render_agent_job(
     # keys are collapsed by the authoritative dedupe in K8sJobSpawner.spawn,
     # which runs after the Brief also prepends env (SSA rejects duplicate env
     # keys, so the dedupe must see every source).
-    container_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
+    container_env = list(model_env or []) + agent_container_env(
+        spec,
+        task_secret_name(job_name),
+        # An agent that belongs to an app reads that app's managed-service
+        # bindings; they sit lowest in precedence (#1700).
+        workload=workload,
+    )
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.

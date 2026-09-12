@@ -211,6 +211,59 @@ def ensure_elasticache_subnet_group(
     return name
 
 
+class PortNotAdmitted(RuntimeError):
+    """An operator-pinned security group does not admit the engine's port."""
+
+
+def assert_port_admitted(*, security_group_ids: list[str], port: int, ec2) -> None:
+    """Refuse to provision behind a group that cannot carry the traffic.
+
+    Only for groups the operator pinned: those are not ours to edit, and
+    a database nothing can reach is worse than a refusal. The failure it
+    replaces is a client that hangs for its full connect timeout, which
+    reads exactly like a serverless cluster resuming from zero (#1702).
+
+    Best-effort on the read itself: if the describe fails we do not know
+    the answer, and blocking provisioning on a permissions gap in a
+    diagnostic would be its own bug.
+    """
+
+    if not security_group_ids:
+        return
+    try:
+        groups = ec2.describe_security_groups(GroupIds=list(security_group_ids)).get("SecurityGroups", [])
+    except Exception:
+        log.warning(
+            "could not read pinned security groups %s to check port %s; continuing",
+            security_group_ids,
+            port,
+            exc_info=True,
+        )
+        return
+
+    for group in groups:
+        for rule in group.get("IpPermissions", []) or []:
+            protocol = str(rule.get("IpProtocol", ""))
+            if protocol not in ("tcp", "-1"):
+                continue
+            if protocol == "-1":
+                return
+            start = rule.get("FromPort")
+            end = rule.get("ToPort")
+            if start is None or end is None:
+                continue
+            if int(start) <= port <= int(end):
+                return
+
+    raise PortNotAdmitted(
+        f"security group(s) {', '.join(security_group_ids)} do not admit tcp/{port}, "
+        f"so this service would be provisioned unreachable. Add an inbound tcp/{port} "
+        f"rule from the same sources the existing rules use, then retry. "
+        f"(These groups are pinned via provider_config.db_security_group_ids, so the "
+        f"platform will not edit them.)"
+    )
+
+
 def ensure_db_networking(
     cluster,
     *,
@@ -230,6 +283,19 @@ def ensure_db_networking(
     pc = cluster.provider_config or {}
     group_key = "cache_subnet_group" if service == "elasticache" else "db_subnet_group"
     if pc.get(group_key) and pc.get("db_security_group_ids"):
+        # Fully pinned: the operator supplied both, so the platform
+        # creates nothing. It still has to check that the group admits
+        # the engine's port (#1702) -- an operator-pinned group is not
+        # ours to edit, but provisioning a database nothing can reach is
+        # worse than refusing, because the symptom is a client that hangs
+        # for its full connect timeout and is indistinguishable from a
+        # serverless cluster resuming from zero.
+        ec2, _rds, _ec, _eks = clients or _clients(region, credential=credential)
+        assert_port_admitted(
+            security_group_ids=list(pc["db_security_group_ids"]),
+            port=port,
+            ec2=ec2,
+        )
         return str(pc[group_key]), list(pc["db_security_group_ids"])
 
     ec2, rds, elasticache, eks = clients or _clients(region, credential=credential)
@@ -240,17 +306,27 @@ def ensure_db_networking(
         eks=eks,
     )
     sg_name = f"astrolift-{cluster.slug}-db"[:255]
-    sg_id = (
-        str(pc["db_security_group_ids"][0])
-        if pc.get("db_security_group_ids")
-        else ensure_security_group(
+    if pc.get("db_security_group_ids"):
+        # Same rule as the fully-pinned branch above: check, never edit.
+        sg_id = str(pc["db_security_group_ids"][0])
+        assert_port_admitted(
+            security_group_ids=list(pc["db_security_group_ids"]),
+            port=port,
+            ec2=ec2,
+        )
+    else:
+        # The platform's own group is shared across engines by name, so a
+        # cluster that provisioned Postgres first already has this group
+        # with 5432 on it. Authorizing is idempotent and additive, so the
+        # MySQL rule lands on the same group rather than needing a second
+        # one (#1702).
+        sg_id = ensure_security_group(
             vpc_id=vpc_id,
             vpc_cidr=vpc_cidr,
             port=port,
             name=sg_name,
             ec2=ec2,
         )
-    )
     grp_name = str(pc.get(group_key, f"astrolift-{cluster.slug}-db"))[:255]
     if service == "elasticache":
         ensure_elasticache_subnet_group(

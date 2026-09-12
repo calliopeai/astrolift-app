@@ -48,6 +48,11 @@ def normalize(
         "workloads": [_workload_dict(w) for w in workloads],
         "managed_services": [_msvc_dict(m) for m in raw.managed_services],
     }
+    # Only when declared: an app that has no ``[edge]`` block keeps the
+    # exact serialized shape (and therefore the same manifest hash) it had
+    # before the block existed, so nothing re-deploys on the upgrade alone.
+    if raw.edge is not None:
+        serialized["edge"] = _edge_dict(raw.edge)
     return NormalizedManifest(
         name=raw.name,
         workloads=workloads,
@@ -55,6 +60,15 @@ def normalize(
         defaults_applied=tuple(applied),
         serialized=serialized,
     )
+
+
+def _edge_dict(edge: Any) -> dict[str, Any]:
+    return {
+        "gateway_secret_header": edge.gateway_secret_header,
+        # A list of pairs, not a mapping: the render walks them in order
+        # and JSON object ordering is not something to lean on.
+        "identity_headers": [[identity, header] for identity, header in edge.identity_headers],
+    }
 
 
 def manifest_hash(serialized: dict[str, Any]) -> str:
@@ -167,6 +181,17 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "hpa_target_cpu_pct": w.hpa_target_cpu_pct,
         "storage_class": w.storage_class,
         "storage_size": w.storage_size,
+        # Volume declarations and fs_group participate in the hash (#1722).
+        # Without them a deploy whose only change is a [[workloads.volumes]]
+        # entry or an fs_group hashes identically to the previous one and
+        # collapses to a no-op, so the claim the operator just asked for is
+        # never rendered. Volumes are sorted by name so key order in the TOML
+        # cannot change the hash.
+        "volumes": sorted(
+            ({str(k): v for k, v in vol.items()} for vol in w.volumes),
+            key=lambda vol: str(vol.get("name", "")),
+        ),
+        "fs_group": w.fs_group,
         # Agent dispatch tuning (#795) participates in the manifest hash
         # so a change to e.g. ``max_retries`` is detected as a real change
         # rather than collapsing to a silent no-op deploy. Only meaningful

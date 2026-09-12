@@ -51,6 +51,26 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "permission": Permission.AGENT_READ,
         "inputSchema": _schema({"task_id": {"type": "string"}}, required=("task_id",)),
     },
+    "astrolift_list_tasks": {
+        "description": "Discover agent runs, lifecycle and runtime placement, newest first, with pagination.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.AGENT_READ,
+        "inputSchema": _schema(
+            {
+                "status": {"type": "string", "description": "Filter by task lifecycle status, e.g. running."},
+                "agent_slug": {"type": "string"},
+                "project_slug": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                "cursor": {"type": "string", "description": "next_cursor from the preceding page."},
+            }
+        ),
+    },
+    "astrolift_list_runtimes": {
+        "description": "List selectable agent runtimes and their configured container images.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.AGENT_READ,
+        "inputSchema": _schema({}),
+    },
     "astrolift_run_agent": {
         "description": "Dispatch one registered Task-family agent from its immutable package.",
         "scope": SCOPE_MCP_DISPATCH,

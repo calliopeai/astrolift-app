@@ -150,14 +150,56 @@ def permission_resolver():
         key = (permission.value, scope.kind.value if scope else None, scope.id if scope else None)
         if key in grants:
             return grants[key], "test grant" if grants[key] else "test deny"
+        # An unscoped ``grant(perm)`` means "the caller holds this
+        # permission", so it answers a scoped check too (#1717 threaded
+        # ``scope=`` through resolvers these tests reach unscoped).
+        # ``deny(perm, scope=...)`` still wins, because the exact key is
+        # consulted first.
+        unscoped = (permission.value, None, None)
+        if scope is not None and unscoped in grants:
+            return grants[unscoped], "test grant" if grants[unscoped] else "test deny"
         return False, "no grant in test"
 
-    from core.permissions import get_permission_resolver
+    from core.permissions import (
+        ALL_SCOPES,
+        GrantedScopes,
+        ScopeKind,
+        get_granted_scopes_provider,
+        get_permission_resolver,
+        register_granted_scopes_provider,
+    )
+
+    def _scopes_provider(_tenant, permission):
+        """Mirror the resolver's explicit grants for any-scope collection tests."""
+        if grants.get((permission.value, None, None)) is True:
+            return ALL_SCOPES
+        ids = {ScopeKind.APP: set(), ScopeKind.PROJECT: set(), ScopeKind.TEAM: set()}
+        for (value, kind, scope_id), allowed in grants.items():
+            if value != permission.value or not allowed or kind is None:
+                continue
+            try:
+                scope_kind = ScopeKind(kind)
+            except ValueError:
+                continue
+            if scope_kind in ids and scope_id is not None:
+                ids[scope_kind].add(scope_id)
+        return GrantedScopes(
+            org=False,
+            team_ids=frozenset(ids[ScopeKind.TEAM]),
+            project_ids=frozenset(ids[ScopeKind.PROJECT]),
+            app_ids=frozenset(ids[ScopeKind.APP]),
+        )
 
     previous = get_permission_resolver()
+    # ``any_scope=True`` gates read the granted-scopes provider, not the
+    # resolver. Point it back at this stub so one ``grant()`` still
+    # controls both halves of the gate.
+    previous_provider = get_granted_scopes_provider()
     register_permission_resolver(_resolver)
+    register_granted_scopes_provider(_scopes_provider)
     yield type("Resolver", (), {"grant": staticmethod(grant), "deny": staticmethod(deny)})
     register_permission_resolver(previous)
+    register_granted_scopes_provider(previous_provider)
 
 
 @pytest.fixture

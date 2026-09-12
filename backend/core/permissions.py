@@ -16,6 +16,7 @@ See ``specs/03-multi-org-rbac.md`` §4.
 
 from __future__ import annotations
 
+import contextvars
 import enum
 import functools
 from collections.abc import Callable, Iterable
@@ -369,6 +370,90 @@ def get_permission_resolver() -> PermissionResolver:
     return _resolver
 
 
+@dataclass(frozen=True, slots=True)
+class GrantedScopes:
+    """Where in the active org a caller holds one permission.
+
+    :func:`check_permission` answers "may the caller do X *here*", which
+    needs a *here*. A collection resolver has no *here* -- finding out
+    which rows exist is the whole request -- and asking anyway collapses
+    the candidate scopes to the org alone (#1717), so a TEAM-scoped
+    grant can never satisfy a teams list and only an org-wide binding
+    works.
+
+    This is the dual: the scopes a permission is held *at*, so a list can
+    gate on "held anywhere" and then narrow its rows to the scopes that
+    actually cover them. ``org=True`` means the grant covers the whole
+    org and the per-kind sets carry no further information.
+    """
+
+    org: bool
+    team_ids: frozenset[int]
+    project_ids: frozenset[int]
+    app_ids: frozenset[int]
+
+    def __bool__(self) -> bool:
+        return self.org or bool(self.team_ids) or bool(self.project_ids) or bool(self.app_ids)
+
+
+NO_SCOPES = GrantedScopes(org=False, team_ids=frozenset(), project_ids=frozenset(), app_ids=frozenset())
+ALL_SCOPES = GrantedScopes(org=True, team_ids=frozenset(), project_ids=frozenset(), app_ids=frozenset())
+
+# A granted-scopes provider answers the dual of the resolver question:
+# not "may the caller act here" but "where may the caller act". It backs
+# every ``any_scope=True`` gate and the row filters that pair with one.
+GrantedScopesProvider = Callable[[TenantContext, Permission], GrantedScopes]
+
+
+def scopes_from_resolver(tenant: TenantContext, permission: Permission) -> GrantedScopes:
+    """Fallback provider: ask the scoped resolver with no scope.
+
+    Reproduces exactly what an unscoped ``check_permission`` would have
+    concluded, so an install (or a test) that plugs in only a resolver
+    keeps its existing behaviour rather than silently losing rows.
+    Public so a test swapping the resolver can pair it with this and
+    keep the two plug-points answering from one place.
+    """
+
+    granted, _reason = _resolver(tenant, permission, None)
+    return ALL_SCOPES if granted else NO_SCOPES
+
+
+_scopes_provider: GrantedScopesProvider = scopes_from_resolver
+
+
+def register_granted_scopes_provider(provider: GrantedScopesProvider) -> None:
+    global _scopes_provider
+    _scopes_provider = provider
+
+
+def get_granted_scopes_provider() -> GrantedScopesProvider:
+    return _scopes_provider
+
+
+# An ``any_scope=True`` resolver asks this question twice: once at the
+# gate, once again when it narrows its rows to the same scopes. The
+# answer cannot change in between, so the decorator opens a memo for the
+# duration of the call and both reads land on one lookup. Outside a
+# gated call the var is ``None`` and every read hits the provider.
+_scopes_memo: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "astrolift_granted_scopes_memo", default=None
+)
+
+
+def granted_scopes(tenant: TenantContext | None, permission: Permission) -> GrantedScopes:
+    """Every scope in the active org where the caller holds ``permission``."""
+
+    tenant = tenant or TenantContext()
+    memo = _scopes_memo.get()
+    if memo is None:
+        return _scopes_provider(tenant, permission)
+    key = (tenant.actor_user_id, tenant.organization_id, permission)
+    if key not in memo:
+        memo[key] = _scopes_provider(tenant, permission)
+    return memo[key]
+
+
 def check_permission(
     permission: Permission,
     *,
@@ -392,22 +477,60 @@ def check_permission(
         raise PermissionDenied(permission, scope, reason)
 
 
+def check_permission_any_scope(permission: Permission) -> None:
+    """Gate a collection resolver on holding ``permission`` at any scope.
+
+    Weaker than :func:`check_permission` by construction: it accepts a
+    binding on any team / project / app in the active org, not just an
+    org-wide one. That is only safe when the resolver then narrows its
+    rows to the scopes the caller's bindings actually cover -- see
+    ``astrolift_identity.permission_resolver.granted_scopes``. Never use
+    it to gate a resolver that reads or mutates one named object; that
+    one has a scope, so pass it via ``scope=``.
+    """
+
+    tenant = get_current_tenant() or TenantContext()
+    from astrolift_identity.api_tokens import (
+        get_current_api_token,
+        token_scope_allows_permission,
+    )
+
+    api_token = get_current_api_token()
+    if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
+        raise PermissionDenied(permission, None, "api token scope does not allow this permission")
+    if not granted_scopes(tenant, permission):
+        raise PermissionDenied(permission, None, "no grant for this permission at any scope")
+
+
 # ---- Decorator -------------------------------------------------------
 
 
 def require_permission(
     *permissions: Permission,
-    scope: Callable[[Any], PermissionScope | None] | None = None,
+    scope: Callable[[dict[str, Any]], PermissionScope | None] | None = None,
+    any_scope: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Resolver-entry permission gate.
 
     Usage on a Strawberry field resolver::
 
         @require_permission(Permission.APP_DEPLOY,
-                            scope=lambda root, info, app_id: app_scope(app_id))
-        def deploy_app(self, info, app_id: GUID): ...
+                            scope=app_scope_by_slug("app_slug"))
+        def deploy_app(self, info, app_slug: str): ...
+
+    ``scope`` receives the resolver's arguments already bound to its
+    signature and defaults applied, so it can read them by name whether
+    the caller passed them positionally or by keyword. Returning ``None``
+    falls back to the plain tenant-context check.
 
     Multiple permissions in one call require *all* (logical AND).
+
+    ``any_scope=True`` switches the gate to "holds this permission at
+    any scope in the active org" -- the only correct gate for a
+    collection resolver, which has no single target to check against.
+    It is deliberately weaker than the scoped check, so a resolver using
+    it MUST filter its rows down to the caller's granted scopes; see
+    ``check_permission_any_scope``. Mutually exclusive with ``scope``.
 
     The check raises :class:`PermissionDenied`; mutation wrappers
     (``@mutation_audit``) translate that into the ``MutationResult``
@@ -416,13 +539,29 @@ def require_permission(
 
     if not permissions:
         raise TypeError("require_permission needs at least one Permission")
+    if any_scope and scope is not None:
+        raise TypeError("require_permission takes scope= or any_scope=, not both")
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         import inspect
 
+        signature = inspect.signature(fn)
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            target_scope = scope(*args, **kwargs) if scope else None
+            if any_scope:
+                token = _scopes_memo.set({})
+                try:
+                    for perm in permissions:
+                        check_permission_any_scope(perm)
+                    return fn(*args, **kwargs)
+                finally:
+                    _scopes_memo.reset(token)
+            target_scope = None
+            if scope is not None:
+                bound = signature.bind(*args, **kwargs)
+                bound.apply_defaults()
+                target_scope = scope(bound.arguments)
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
             return fn(*args, **kwargs)
@@ -430,7 +569,7 @@ def require_permission(
         # Strawberry resolver introspection follows __wrapped__ but
         # also reads __signature__ when present; set both so the
         # wrapper looks identical to the wrapped resolver.
-        wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
+        wrapper.__signature__ = signature  # type: ignore[attr-defined]
         wrapper.__astrolift_permissions__ = tuple(permissions)
         return wrapper
 

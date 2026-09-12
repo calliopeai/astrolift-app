@@ -438,16 +438,21 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     # sections env_names is empty; fall back to a single "production"
     # environment so the provisioning activities (provision_registry_repo,
     # provision_namespace) have a cluster binding to work with.
-    org_slug = (
-        getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
-    ).lower()
     # Resolve the managed domain: org default → platform fallback → None.
     # Used both for the URL string and to bind the FK on AppEnvironment
     # so the deploy pipeline emits an Ingress for the platform hostname.
     from astrolift_clusters.models import resolve_managed_domain
 
     _managed_domain = resolve_managed_domain(app.organization, for_preview=False)
-    base_zone: str = getattr(_managed_domain, "zone", None) or org_slug
+    # No domain, no URL (#1689). This used to fall back to the org slug,
+    # which is not a DNS zone: the env came up claiming
+    # ``https://<app>.<org-slug>``, an address that can never resolve,
+    # while the same ``None`` left ``managed_domain`` unbound so the
+    # render emitted no Ingress at all. The app read as deployed and
+    # healthy and was unreachable, and nothing anywhere said why. An
+    # empty URL is the honest answer and is already what the model
+    # allows; the app surfaces the missing binding instead.
+    base_zone: str = getattr(_managed_domain, "zone", None) or ""
     created_any = False
     effective_env_names = list(env_names) if env_names else []
     for service in manifest_services:
@@ -468,7 +473,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=env_name,
-                url=f"https://{app.subdomain or app.slug}.{base_zone}",
+                url=(f"https://{app.subdomain or app.slug}.{base_zone}" if base_zone else ""),
                 managed_domain=_managed_domain,
                 required_approvals=0,
             )

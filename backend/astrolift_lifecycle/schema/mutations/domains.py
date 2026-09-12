@@ -34,7 +34,9 @@ from astrolift_lifecycle.schema.types import (
     AppDomainType,
     app_domain_to_type,
 )
+from astrolift_lifecycle.scopes import custom_domain_app_scope
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -47,7 +49,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.add")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def add_app_domain(
         self,
@@ -152,7 +154,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.add_wildcard")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def add_wildcard_domain(
         self,
@@ -293,7 +295,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.remove")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
     @tenant_scoped()
     def remove_app_domain(
         self,
@@ -323,7 +325,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.recheck")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
     @tenant_scoped()
     def recheck_domain_validation(
         self,
@@ -358,7 +360,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.upload_certificate")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
     @tenant_scoped()
     def upload_custom_domain_certificate(
         self,
@@ -432,7 +434,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.redirects_updated")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.domain_id"))
     @tenant_scoped()
     def set_domain_redirects(
         self,
@@ -536,7 +538,7 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.path_routes_updated")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.domain_id"))
     @tenant_scoped()
     def set_domain_path_routes(
         self,

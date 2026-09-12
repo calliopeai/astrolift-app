@@ -24,6 +24,7 @@ def dispatch_registered_agent(
     organization_id: int,
     team_id: int | None = None,
     agent_slug: str,
+    workload_id: int | None = None,
     actor,
     environment_spec_guid: str = "",
     trigger_payload: dict[str, Any] | None = None,
@@ -60,6 +61,10 @@ def dispatch_registered_agent(
         .select_related("registered_app")
         .order_by("pk")
     )
+    if workload_id is not None:
+        # The GraphQL adapter has already resolved one authorized match.
+        # Keep that identity when another app has the same workload slug.
+        workloads = workloads.filter(pk=workload_id)
     if team_id is not None:
         workloads = workloads.filter(
             Q(registered_app__team_id=team_id)

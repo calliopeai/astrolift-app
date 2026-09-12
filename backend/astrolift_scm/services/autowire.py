@@ -168,7 +168,8 @@ def _step_webhook(app: RegisteredApp) -> tuple[str, str]:
         return ERROR, _msg(exc)
     if result.status in ("created", "refreshed", "app_delivers"):
         return OK, ""
-    # no_connection / not_installed / fetch_failed — nothing delivers pushes.
+    # no_connection / not_installed / no_public_url / fetch_failed — nothing
+    # delivers pushes, so the step is an error however cleanly it returned.
     return ERROR, result.error or f"webhook install returned {result.status!r}"
 
 

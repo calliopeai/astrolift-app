@@ -21,7 +21,42 @@ to the "metrics not yet flowing" empty state.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from astrolift_operations import prometheus_client
+
+# Kubernetes-internal DNS suffixes and loopback. A Service ClusterIP and
+# the names that resolve to one exist only inside the cluster's network
+# namespace, so a control plane running outside the cluster cannot reach
+# them however healthy Prometheus is (#1711). A control plane running
+# *inside* the cluster can, which is why this only ever explains a
+# failure and never blocks a write.
+_CLUSTER_INTERNAL_SUFFIXES = (".svc", ".svc.cluster.local", ".cluster.local")
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
+
+
+def is_cluster_internal_endpoint(endpoint: str) -> bool:
+    """Whether ``endpoint`` names an address only reachable from inside
+    the cluster.
+
+    The natural first attempt at wiring Prometheus is the in-cluster
+    Service DNS name, and from a control plane deployed outside the
+    cluster it fails with a connection error indistinguishable from
+    "Prometheus is down". Callers use this to say which one it is.
+
+    Pod IPs are deliberately *not* flagged: on EKS they are real VPC ENI
+    addresses and route fine from the control plane, which is exactly
+    what the capability probe discovers.
+    """
+    if not endpoint:
+        return False
+    host = urlsplit(endpoint if "//" in endpoint else f"//{endpoint}").hostname or ""
+    host = host.strip().rstrip(".").lower()
+    if not host:
+        return False
+    if host in _LOOPBACK_HOSTS:
+        return True
+    return host.endswith(_CLUSTER_INTERNAL_SUFFIXES)
 
 
 def resolve_prometheus_endpoint(

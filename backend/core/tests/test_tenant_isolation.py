@@ -290,7 +290,7 @@ class TestPermissionAnalysisAccessControl:
     def test_effective_permissions_blocks_cross_user(self, two_tenants):
         target_pk = str(two_tenants.b.user.pk)
         result = schema.execute_sync(
-            "query($id: ID!) { effectivePermissions(userId: $id) { codename } }",
+            "query($id: ID!) { effectivePermissions(userId: $id) { slug } }",
             variable_values={"id": target_pk},
             context_value=_ctx(two_tenants.a.user),
         )
@@ -299,7 +299,7 @@ class TestPermissionAnalysisAccessControl:
     def test_effective_permissions_allows_self(self, two_tenants):
         own_pk = str(two_tenants.a.user.pk)
         result = schema.execute_sync(
-            "query($id: ID!) { effectivePermissions(userId: $id) { codename } }",
+            "query($id: ID!) { effectivePermissions(userId: $id) { slug } }",
             variable_values={"id": own_pk},
             context_value=_ctx(two_tenants.a.user),
         )

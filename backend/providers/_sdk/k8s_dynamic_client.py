@@ -684,6 +684,17 @@ class KubernetesDynamicClient:
         core_v1 = self._client_module.CoreV1Api(self._api_client)
         return core_v1.list_namespaced_pod(namespace, **kwargs)
 
+    def read_namespaced_pod_log(self, *, namespace: str, name: str, **kwargs: Any) -> str:
+        """Proxy to ``CoreV1Api.read_namespaced_pod_log``.
+
+        Accepts the same ``container`` / ``tail_lines`` / ``previous``
+        kwargs the official client supports. Returns the log text; the
+        caller decides what to do with a pod that has none yet.
+        """
+        self._refresh_token()
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        return core_v1.read_namespaced_pod_log(name, namespace, **kwargs)
+
     def list_namespaced_event(self, *, namespace: str, **kwargs: Any) -> Any:
         """Proxy to ``CoreV1Api.list_namespaced_event`` for event queries."""
         self._refresh_token()

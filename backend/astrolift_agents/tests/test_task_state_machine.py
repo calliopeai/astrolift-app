@@ -182,7 +182,7 @@ def test_graphql_type_exposes_vnc_fields_when_running(org):
     task.transition_to(AgentTask.Status.PROVISIONING)
     task.transition_to(AgentTask.Status.RUNNING)
 
-    gql = agent_task_to_type(task)
+    gql = agent_task_to_type(task, can_watch=True)
     assert gql.vnc_enabled is True
     assert gql.vnc_url == f"/app/vnc/{task.guid}"
 

@@ -463,7 +463,7 @@ def _record_approval_vote_and_maybe_start(
                 registered_app_id=app.pk,
                 app_environment_id=env.pk,
                 deployment_id=deployment.pk,
-                image_tags={"app": deployment.image_tag},
+                image_tags={"app": deployment.image_tag} if deployment.image_tag else {},
                 trigger_kind=deployment.trigger_kind,
                 actor=actor,
                 commit_sha=deployment.commit_sha,

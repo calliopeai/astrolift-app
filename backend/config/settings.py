@@ -19,6 +19,7 @@ import sentry_sdk
 # patch https://stackoverflow.com/questions/70382084/import-error-force-text-from-django-utils-encoding
 from corsheaders.defaults import default_headers
 from django.core.cache import DEFAULT_CACHE_ALIAS
+from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
 from django.utils.encoding import force_str
 from dotenv import load_dotenv
@@ -762,10 +763,12 @@ INTERNAL_IPS = [
 ]
 
 DEBUG_TOOLBAR_CONFIG = {
-    # Gate the toolbar on a dedicated env var instead of just DEBUG so prod
-    # installs (which keep DEBUG=True for error-page debugging) can still
-    # hide DJT — it leaks internal SQL / settings / cache details to anyone
-    # who can reach the page and adds noticeable per-request overhead.
+    # Gate the toolbar on a dedicated env var rather than on DEBUG: it leaks
+    # internal SQL / settings / cache details to anyone who can reach the
+    # page and adds noticeable per-request overhead, so an operator debugging
+    # a dev-configuration install still gets to decide. (Until #1732 the
+    # server configurations ran DEBUG=True, which is what made a dedicated
+    # gate load-bearing rather than a convenience.)
     "SHOW_TOOLBAR_CALLBACK": lambda request: env_bool("ASTROLIFT_ENABLE_DJT", False),
     # Allow test runs without removing debug_toolbar from INSTALLED_APPS
     "IS_RUNNING_TESTS": False,
@@ -938,6 +941,16 @@ LOGGING = build_logging_config(
 )
 
 # ================ DEV
+# Every configuration name the branching below actually handles. Kept beside
+# the read so a new branch and this set are edited together -- the failure mode
+# it guards is a name that matches nothing and falls through (#1715).
+# "prod" is deliberately absent: the Sentry match above accepts it, but no
+# branch below configures it, so it falls through exactly like an invented
+# name -- and IS_PROD tests for "prd", so it would also have produced a
+# production deployment with IS_PROD False. Refusing it is the honest answer;
+# adding it as an alias would be a behaviour change, not a guard.
+_KNOWN_CONFIGURATIONS = frozenset({"dev", "prd", "int", "stg", "tests", "local", "localpg", "localverbose"})
+
 CONFIGURATION = env_str("DJANGO_CONFIGURATION", "Dev")
 logger.warning(f"DJANGO_CONFIGURATION: {CONFIGURATION}")
 
@@ -965,21 +978,27 @@ IS_PROD = CONFIGURATION.lower() == "prd"
 IS_DEV = CONFIGURATION.lower() == "dev" or CONFIGURATION.lower() == "local"
 IS_LOCAL = CONFIGURATION.lower() in ("local", "localpg", "localverbose")
 
-if CONFIGURATION.lower() == "Prd".lower():
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
+# The server configurations (#1732). ``DEBUG`` was True on all four and
+# the password validators were emptied, which on a real install means
+# Django's technical 500 page -- full traceback, every frame's locals, and
+# the settings dump redacted only by name-matching -- is served to anyone
+# who can provoke an unhandled exception, and every request's SQL is
+# retained in ``connection.queries`` on a long-lived worker.
+#
+# This reverses a deliberate earlier choice (the DJT comment above still
+# describes prod as keeping DEBUG=True "for error-page debugging"). The
+# trade it made is not one a hosted install can keep: the traceback goes
+# to whoever provoked it, not to the operator.
+#
+# WhiteNoise serves collected static files from its own middleware
+# regardless of DEBUG, so this does not change static serving; ALLOWED_HOSTS
+# keeps its wildcard, so nothing that reaches the app today stops reaching
+# it. What changes is the error page, and that is the point.
+if CONFIGURATION.lower() in ("prd", "stg", "int"):
+    DEBUG = False
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Dev".lower():
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
-
-elif CONFIGURATION.lower() == "int":
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
-
-elif CONFIGURATION.lower() == "stg":
+    # The developer configuration keeps the technical error page.
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
@@ -1028,17 +1047,50 @@ elif CONFIGURATION.lower() == "LocalVerbose".lower():
         destination=LOG_DESTINATION,
     )
 else:
-    DEBUG = True
-    SECRET_KEY = "not-a-secret"
-    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
-    CACHES = {
-        DEFAULT_CACHE_ALIAS: {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
-        },
-        "memory_cache": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
-        },
-    }
+    # Refuse to start rather than fall back (#1715).
+    #
+    # This branch used to hand any unrecognised name an in-memory SQLite and
+    # a hardcoded SECRET_KEY. A deployment that invented a configuration name
+    # ("Production", which is not a name this application declares) therefore
+    # came up, served its login page and passed its load balancer health check
+    # while every write went to a database inside one task: two tasks disagreed
+    # with each other, a restart was a factory reset, and migrations ran against
+    # a schema thrown away when the process exited. Every POSTGRES_* variable
+    # was present and correct the whole time.
+    #
+    # Nothing about that is detectable from outside the process, which is what
+    # makes silence the wrong default: a typo in one environment variable is a
+    # data-loss bug that looks like a healthy install.
+    raise ImproperlyConfigured(
+        f"DJANGO_CONFIGURATION={CONFIGURATION!r} is not a configuration this "
+        f"application declares. Valid values: {', '.join(sorted(_KNOWN_CONFIGURATIONS))}. "
+        f"Refusing to start -- the previous behaviour was to fall back to an "
+        f"in-memory SQLite database, which serves traffic and loses every write."
+    )
+
+# A non-dev configuration has no legitimate reason to run on SQLite (#1715).
+# Belt to the braces above: this catches the case where the engine is selected
+# by some path other than the name check -- a missing POSTGRES_HOST, a settings
+# import order change -- and turns it into a refusal instead of silent data
+# loss. Tests declare sqlite deliberately and are excluded by name.
+if not IS_DEV and not IS_LOCAL and CONFIGURATION.lower() != "tests":
+    # ``POSTGRES_ENGINE`` unset reads as None, and the membership test
+    # below raised TypeError on it -- an unhandled crash from the guard
+    # written to turn this exact situation into a readable refusal.
+    _engine = str(DATABASES[DEFAULT_DB_ALIAS].get("ENGINE") or "")
+    if not _engine:
+        raise ImproperlyConfigured(
+            f"DJANGO_CONFIGURATION={CONFIGURATION!r} has no database engine configured. "
+            f"A server configuration cannot run without one. Set POSTGRES_ENGINE and the "
+            f"rest of the POSTGRES_* variables."
+        )
+    if "sqlite" in _engine:
+        raise ImproperlyConfigured(
+            f"DJANGO_CONFIGURATION={CONFIGURATION!r} resolved to {_engine}. "
+            f"A non-development configuration must not run on SQLite: it serves "
+            f"traffic normally and loses every write on restart. Check the "
+            f"POSTGRES_* variables."
+        )
 
 logger.warning(f"Settings Version - End: {VERSION}")
 logger.warning(f"DATABASE: {DATABASES[DEFAULT_DB_ALIAS]['ENGINE']}")

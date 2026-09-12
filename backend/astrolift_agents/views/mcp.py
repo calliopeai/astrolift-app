@@ -32,13 +32,20 @@ from astrolift_agents.mcp_contract import (
     SERVER_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
 )
+from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
 from astrolift_identity.api_tokens import (
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_READ,
     SCOPE_MCP_WRITE,
     has_scope,
 )
-from core.permissions import Permission, PermissionDenied, check_permission
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    check_permission,
+    check_permission_any_scope,
+)
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -60,6 +67,14 @@ def _reject_nonfinite_json(value: str):
 
 
 _TOOL_META = MCP_TOOL_META
+_FLEET_COLLECTIONS = {"astrolift_list_agents", "astrolift_list_tasks", "astrolift_list_runtimes"}
+_FLEET_OBJECT_SCOPES = {
+    "astrolift_get_agent": agent_workload_app_scope("agent_slug"),
+    "astrolift_get_task": agent_task_scope("task_id"),
+    "astrolift_run_agent": agent_workload_app_scope("agent_slug", Permission.AGENT_DISPATCH),
+    "astrolift_cancel_task": agent_task_scope("task_id", Permission.AGENT_DISPATCH),
+}
+_FLEET_TOOLS = _FLEET_COLLECTIONS | _FLEET_OBJECT_SCOPES.keys()
 
 
 def _token(request: HttpRequest):
@@ -69,24 +84,35 @@ def _token(request: HttpRequest):
     return token
 
 
-def _authorize(request: HttpRequest, scopes: str | tuple[str, ...], *permissions: Permission) -> None:
+def _authorize(
+    request: HttpRequest,
+    scopes: str | tuple[str, ...],
+    *permissions: Permission,
+    permission_scope: PermissionScope | None = None,
+    any_scope: bool = False,
+) -> None:
     token = _token(request)
+    if token.organization_id != _org_id():
+        raise McpCallError("API token does not belong to the active organization", code="permission_denied")
     required_scopes = (scopes,) if isinstance(scopes, str) else scopes
     for scope in required_scopes:
         if not has_scope(token, scope):
             raise McpCallError(f"API token is missing scope {scope!r}", code="permission_denied")
     for permission in permissions:
         try:
-            check_permission(permission)
+            if any_scope:
+                check_permission_any_scope(permission)
+            else:
+                check_permission(permission, scope=permission_scope)
         except PermissionDenied as exc:
             raise McpCallError(exc.reason, code="permission_denied") from exc
 
 
-def _may(request: HttpRequest, meta: dict[str, Any]) -> bool:
+def _may(request: HttpRequest, meta: dict[str, Any], *, any_scope=False) -> bool:
     try:
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
         scopes = (meta["scope"], *meta.get("additional_scopes", ()))
-        _authorize(request, scopes, *(p for p in permissions if p is not None))
+        _authorize(request, scopes, *(p for p in permissions if p is not None), any_scope=any_scope)
     except McpCallError:
         return False
     return True
@@ -118,25 +144,9 @@ def _public_id(value: Any, field: str) -> str:
 
 
 def _agent_rows(org_id: int, *, project_slug: str = ""):
-    from django.db.models import Q
+    from astrolift_agents.visibility import agent_workloads
 
-    from astrolift_registry.models import Workload
-
-    rows = Workload.objects.filter(
-        kind=Workload.Kind.AGENT,
-        registered_app__organization_id=org_id,
-        registered_app__deleted_at__isnull=True,
-        deleted_at__isnull=True,
-    ).select_related("registered_app", "registered_app__project", "brief")
-    team_id = _team_id()
-    if team_id is not None:
-        rows = rows.filter(
-            Q(registered_app__team_id=team_id)
-            | Q(
-                registered_app__team_accesses__team_id=team_id,
-                registered_app__team_accesses__deleted_at__isnull=True,
-            )
-        ).distinct()
+    rows = agent_workloads(org_id).select_related("registered_app", "registered_app__project", "brief")
     if project_slug:
         rows = rows.filter(registered_app__project__slug=project_slug)
     return rows.order_by("slug")
@@ -145,12 +155,17 @@ def _agent_rows(org_id: int, *, project_slug: str = ""):
 def _serialize_agent(workload, *, include_package: bool) -> dict[str, Any]:
     app = workload.registered_app
     brief = workload.brief
+    if brief is not None and brief.organization_id != app.organization_id:
+        brief = None
+    project = app.project
+    if project is not None and project.organization_id != app.organization_id:
+        project = None
     snapshot = brief.manifest_snapshot if brief and isinstance(brief.manifest_snapshot, dict) else {}
     data: dict[str, Any] = {
         "id": str(workload.guid),
         "name": workload.name,
         "slug": workload.slug,
-        "project_slug": app.project.slug if app.project_id else "",
+        "project_slug": project.slug if project else "",
         "source": {
             "kind": app.source_kind,
             "repo": app.source_repo,
@@ -201,50 +216,114 @@ def _get_agent(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     return _serialize_agent(matches[0], include_package=True)
 
 
-def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
-    from django.db.models import Q
+def _task_rows(permission=Permission.AGENT_READ):
+    from astrolift_agents.visibility import agent_tasks
 
-    from astrolift_agents.models import AgentTask
+    return agent_tasks(_org_id(), permission).select_related("dispatcher")
 
-    tasks = AgentTask.objects.select_related("agent_definition").filter(
-        guid=str(args.get("task_id") or ""),
-        organization_id=_org_id(),
-        deleted_at__isnull=True,
-    )
-    team_id = _team_id()
-    if team_id is not None:
-        tasks = tasks.filter(
-            Q(agent_definition__registered_app__team_id=team_id)
-            | Q(
-                agent_definition__registered_app__team_accesses__team_id=team_id,
-                agent_definition__registered_app__team_accesses__deleted_at__isnull=True,
-            )
-        )
-    task = tasks.distinct().first()
-    if task is None:
-        raise McpCallError("task not found", code="not_found")
-    return {
+
+def _serialize_task(task, *, include_result: bool = True) -> dict[str, Any]:
+    dispatcher = task.dispatcher
+    if dispatcher is not None and dispatcher.organization_id != task.organization_id:
+        dispatcher = None
+    definition = task.agent_definition
+    if definition is not None and definition.registered_app.organization_id != task.organization_id:
+        definition = None
+    data = {
         "id": str(task.guid),
-        "agent_slug": task.agent_definition.slug if task.agent_definition_id else "",
+        "agent_slug": definition.slug if definition else "",
         "status": task.status,
         "timeout_seconds": task.timeout_seconds,
         "external_id": task.external_id,
         "pod_name": task.pod_name,
         "namespace": task.namespace,
         "created_at": _iso(task.created_at),
+        "updated_at": _iso(task.updated_at),
         "queued_at": _iso(task.queued_at),
+        "provisioning_at": _iso(task.provisioning_at),
         "started_at": _iso(task.started_at),
         "ended_at": _iso(task.ended_at),
-        "result": task.result,
-        "failure": task.failure,
+        "dispatcher": {
+            "id": str(dispatcher.guid),
+            "name": dispatcher.name,
+            "backend": dispatcher.backend,
+            "cloud": dispatcher.cloud,
+            "region": dispatcher.region,
+            "status": dispatcher.status,
+            "last_heartbeat_at": _iso(dispatcher.last_heartbeat_at),
+        }
+        if dispatcher and dispatcher.deleted_at is None
+        else None,
     }
+    if include_result:
+        data.update(result=task.result, failure=task.failure)
+    return data
+
+
+def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    task = _task_rows().filter(guid=_public_id(args.get("task_id"), "task_id")).first()
+    if task is None:
+        raise McpCallError("task not found", code="not_found")
+    return _serialize_task(task)
+
+
+def _list_tasks(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from django.core.exceptions import ValidationError
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_graphql import KeysetPage, keyset_page
+
+    tasks = _task_rows()
+    status = args.get("status")
+    if status:
+        if status not in AgentTask.Status.values:
+            raise McpCallError("unknown task status", code="invalid_arguments")
+        tasks = tasks.filter(status=status)
+    if args.get("agent_slug"):
+        tasks = tasks.filter(agent_definition__slug=args["agent_slug"])
+    if args.get("project_slug"):
+        tasks = tasks.filter(agent_definition__registered_app__project__slug=args["project_slug"])
+    scope = json.dumps(
+        {key: args.get(key) for key in ("status", "agent_slug", "project_slug")}, sort_keys=True
+    )
+    try:
+        page: KeysetPage[AgentTask] = keyset_page(
+            tasks,
+            cursor=args.get("cursor"),
+            limit=args.get("limit"),
+            with_total=False,
+            cursor_scope=f"mcp.agent_tasks:{scope}",
+        )
+    except (ValidationError, ValueError) as exc:
+        raise McpCallError("invalid task cursor", code="invalid_arguments") from exc
+    return {
+        "tasks": [_serialize_task(task, include_result=False) for task in page.rows],
+        "next_cursor": page.next_cursor,
+    }
+
+
+def _list_runtimes(_request: HttpRequest, _args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_agents.runtime_catalog import catalog_entries
+
+    return {"runtimes": catalog_entries()}
 
 
 def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     from astrolift_agents.services.agent_dispatch import AgentDispatchError, dispatch_registered_agent
+    from astrolift_agents.visibility import workload_rows
     from astrolift_workflows.inputs import Actor
 
     token = _token(request)
+    slug = str(args.get("agent_slug") or "").strip()
+    matches = list(
+        workload_rows(_org_id(), Permission.AGENT_DISPATCH).filter(
+            slug=slug, registered_app__organization_id=_org_id()
+        )[:2]
+    )
+    if not matches:
+        raise McpCallError("agent not found", code="not_found")
+    if len(matches) > 1:
+        raise McpCallError("agent slug is ambiguous", code="conflict")
     actor = Actor(
         kind="api_token",
         user_id=token.user_id,
@@ -254,8 +333,9 @@ def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     try:
         task = dispatch_registered_agent(
             organization_id=_org_id(),
-            team_id=_team_id(),
-            agent_slug=str(args.get("agent_slug") or ""),
+            team_id=token.team_id,
+            agent_slug=slug,
+            workload_id=matches[0].pk,
             actor=actor,
             environment_spec_guid=str(args.get("environment_spec_id") or ""),
             trigger_payload=args.get("trigger_payload") or None,
@@ -268,32 +348,10 @@ def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _cancel_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
-    from django.db.models import Q
-
-    from astrolift_agents.models import AgentTask
-    from astrolift_registry.models import AppTeamAccess
     from astrolift_workflows.activities.agent_stage import _cancel_agent_task_sync
 
-    task_id = str(args.get("task_id") or "")
-    tasks = AgentTask.objects.filter(
-        guid=task_id,
-        organization_id=_org_id(),
-        deleted_at__isnull=True,
-    )
-    team_id = _team_id()
-    if team_id is not None:
-        tasks = tasks.filter(
-            Q(agent_definition__registered_app__team_id=team_id)
-            | Q(
-                agent_definition__registered_app__team_accesses__team_id=team_id,
-                agent_definition__registered_app__team_accesses__deleted_at__isnull=True,
-                agent_definition__registered_app__team_accesses__access_level__in=(
-                    AppTeamAccess.AccessLevel.DEPLOYER.value,
-                    AppTeamAccess.AccessLevel.OWNER.value,
-                ),
-            )
-        )
-    task = tasks.distinct().first()
+    task_id = _public_id(args.get("task_id"), "task_id")
+    task = _task_rows(Permission.AGENT_DISPATCH).filter(guid=task_id, organization_id=_org_id()).first()
     if task is None:
         raise McpCallError("task not found", code="not_found")
     result = _cancel_agent_task_sync(task_id)
@@ -817,6 +875,8 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
+    "astrolift_list_tasks": _list_tasks,
+    "astrolift_list_runtimes": _list_runtimes,
     "astrolift_run_agent": _run_agent,
     "astrolift_cancel_task": _cancel_task,
     "astrolift_sync_agent_repo": _sync_agent_repo,
@@ -860,7 +920,7 @@ def _audit(request: HttpRequest, name: str, *, decision: str, duration_ms: int, 
 def _tool_list(request: HttpRequest) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name, meta in _TOOL_META.items():
-        if not _may(request, meta):
+        if not _may(request, meta, any_scope=name in _FLEET_TOOLS):
             continue
         out.append(
             {
@@ -932,7 +992,14 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
         _validate_tool_arguments(meta, args)
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
         scopes = (meta["scope"], *meta.get("additional_scopes", ()))
-        _authorize(request, scopes, *(p for p in permissions if p is not None))
+        scope_factory = _FLEET_OBJECT_SCOPES.get(name)
+        _authorize(
+            request,
+            scopes,
+            *(p for p in permissions if p is not None),
+            permission_scope=scope_factory(args) if scope_factory is not None else None,
+            any_scope=name in _FLEET_COLLECTIONS,
+        )
         payload = handler(request, args)
     except Exception as exc:
         decision = "DENY" if isinstance(exc, McpCallError) else "UNKNOWN"
@@ -1168,7 +1235,7 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
             )
     if method == "resources/list":
         try:
-            _authorize(request, SCOPE_MCP_READ, Permission.AGENT_READ)
+            _authorize(request, SCOPE_MCP_READ, Permission.AGENT_READ, any_scope=True)
         except McpCallError as exc:
             return _rpc_error(request_id, -32001, str(exc), protocol=protocol)
         resources = [
@@ -1181,15 +1248,20 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
         ]
         return _rpc_result(request_id, {"resources": resources}, protocol=protocol)
     if method == "resources/read":
-        try:
-            _authorize(request, SCOPE_MCP_READ, Permission.AGENT_READ)
-        except McpCallError as exc:
-            return _rpc_error(request_id, -32001, str(exc), protocol=protocol)
         uri = str(params.get("uri") or "") if isinstance(params, dict) else ""
         prefix, suffix = "astrolift://agents/", "/package"
         if not uri.startswith(prefix) or not uri.endswith(suffix):
             return _rpc_error(request_id, -32002, "resource not found", protocol=protocol)
         slug = uri[len(prefix) : -len(suffix)]
+        try:
+            _authorize(
+                request,
+                SCOPE_MCP_READ,
+                Permission.AGENT_READ,
+                permission_scope=agent_workload_app_scope("agent_slug")({"agent_slug": slug}),
+            )
+        except McpCallError as exc:
+            return _rpc_error(request_id, -32001, str(exc), protocol=protocol)
         try:
             payload = _get_agent(request, {"agent_slug": slug})
         except McpCallError as exc:

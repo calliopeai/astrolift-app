@@ -166,9 +166,21 @@ def _manifest_json(
     tell them apart in their GitHub-Apps list. GitHub will append a
     further suffix if the name already exists in the namespace.
 
-    Permissions stay minimal: read repo contents/metadata, write PR
-    comments + check runs. We don't ask for workflow scope or admin
-    scope. Operator can broaden later by editing the App on GitHub.
+    Permissions are what autowire uses, not a minimal set (#1713).
+
+    This deliberately reverses an earlier decision to "stay minimal" and let
+    the operator broaden later. The narrow set read as good practice but made
+    the App unable to do any of the things autowire exists to do -- commit the
+    CI workflow, push Actions secrets, trigger runs, install the webhook -- and
+    the failure surfaced as a 403 from GitHub, which reads like the operator
+    misconfigured something rather than the manifest having asked for the wrong
+    set. "Broaden later" is not a fallback an operator can act on when nothing
+    tells them which permission is missing.
+
+    Minimal remains the right instinct; the mistake was measuring it against
+    the API surface rather than against what the product then does with the
+    App. Each grant below is tied to one autowire step, and anything no step
+    uses stays out.
     """
     base = _app_base_url(request)
     # Manifest-completion redirect — fires once when the App is first
@@ -208,11 +220,35 @@ def _manifest_json(
         "setup_on_update": True,
         "request_oauth_on_install": True,
         "public": False,
+        # Every permission autowire actually uses (#1713). The manifest asked
+        # for four and autowire needs seven, so an operator who followed the
+        # product's own App-creation flow got an App that could not do any of
+        # the things autowire exists to do -- and the failure surfaced as a 403
+        # from GitHub, which reads like their misconfiguration rather than the
+        # manifest asking for the wrong set.
+        #
+        # Each of these is load-bearing for one step:
+        #   contents: write        commit the CI workflow file
+        #   workflows: write       GitHub refuses a push touching .github/workflows
+        #                          without it, even with contents: write
+        #   secrets: write         push Actions secrets
+        #   actions: write         trigger and read workflow runs
+        #   repository_hooks: write  install the source webhook -- the key the
+        #                            SCM layer names in its own 403 message
+        #
+        # A widened manifest only affects Apps created from it after this
+        # change. An App already installed keeps the permissions it was granted
+        # until an org admin accepts the new set, so this does not repair an
+        # existing install on its own -- see the note in the issue.
         "default_permissions": {
-            "contents": "read",
+            "actions": "write",
+            "checks": "write",
+            "contents": "write",
             "metadata": "read",
             "pull_requests": "write",
-            "checks": "write",
+            "repository_hooks": "write",
+            "secrets": "write",
+            "workflows": "write",
         },
         "default_events": ["push", "pull_request"],
     }

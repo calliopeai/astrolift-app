@@ -25,6 +25,7 @@ from astrolift_lifecycle.models import AppEnvironment
 from astrolift_observability.schema.types import AppLogLine, AppLogPage
 from astrolift_operations import observability_retention
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from core import cluster_log_query
 from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
@@ -181,7 +182,7 @@ def _ns_to_iso(ts: str) -> str:
 @strawberry.type
 class LogHistoryQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS)
+    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
     @tenant_scoped()
     def astrolift_app_logs(
         self,

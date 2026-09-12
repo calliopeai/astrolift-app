@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import dataclasses
 import secrets
+import urllib.parse
 
 from django.conf import settings as django_settings
 from django.db import transaction
@@ -71,6 +72,11 @@ class InstallSourceWebhookResult:
     * ``no_connection``: no active SourceConnection in the app's org
       for the app's source kind. The resolver maps this to a clean
       PRECONDITION so the FE can prompt to connect.
+    * ``no_public_url``: this install's ``PLATFORM_API_URL`` is unset,
+      relative, or loopback, so the hook would be registered against an
+      address the source host can never reach. A precondition failure --
+      registering it anyway is how an install ends up reporting a wired
+      webhook that never delivers (#1693).
     * ``fetch_failed``: the host rejected the call (auth, network,
       generic 5xx). ``error`` carries the host's message.
 
@@ -163,6 +169,44 @@ _RECEIVER_PATH_FOR_KIND: dict[str, str] = {
 }
 
 
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})
+
+
+def receiver_url_is_deliverable(url: str) -> bool:
+    """Can a source host on the public internet POST to ``url``?
+
+    ``PLATFORM_API_URL`` falls back to ``FRONTEND_URL``, which falls back
+    to ``http://localhost:3000`` -- right for local dev, and silently
+    wrong on a deployed install that forgot to set either (#1693). The
+    hook registers, the host accepts the URL, and nothing is ever
+    delivered: a push never triggers a deploy while every step of
+    autowire reports success.
+    """
+
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    return parsed.hostname.lower() not in _LOOPBACK_HOSTS
+
+
+def _app_delivery_url(connection: SourceConnection) -> str:
+    """Where a github_app_install connection's deliveries actually land.
+
+    The App posts to the webhook URL baked into its manifest at creation
+    time, keyed by the connection guid -- not to the per-app receiver
+    path. Reporting the per-app path for this status is what made an
+    operator read a localhost URL as the address in use (#1693).
+    """
+
+    base = (getattr(django_settings, "APP_BASE_URL", "") or "").rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/app/auth1/scm/github/webhook/{connection.guid}/"
+
+
 def _receiver_url(app: RegisteredApp) -> str:
     base = (getattr(django_settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     path_template = _RECEIVER_PATH_FOR_KIND.get(app.source_kind, "")
@@ -218,6 +262,19 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
         )
 
     target_url = _receiver_url(app)
+    # A github_app_install connection never uses this URL: the App's own
+    # org-level webhook carries the delivery, addressed at APP_BASE_URL.
+    # Guarding it here would refuse an install that is already wired.
+    if connection.kind != "github_app_install" and not receiver_url_is_deliverable(target_url):
+        return InstallSourceWebhookResult(
+            status="no_public_url",
+            receiver_url=target_url,
+            error=(
+                f"this install's public API URL is {target_url or 'unset'}, which "
+                f"{app.source_kind} cannot deliver to. Set PLATFORM_API_URL (or "
+                f"FRONTEND_URL) to the address this install is served at, then retry."
+            ),
+        )
     secret = secrets.token_urlsafe(32)
 
     try:
@@ -270,7 +327,7 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
             return InstallSourceWebhookResult(
                 status="app_delivers",
                 hook_id="",
-                receiver_url=target_url,
+                receiver_url=_app_delivery_url(connection),
             )
         if exc.code == "APP_NOT_INSTALLED":
             # github_app_install but the App is NOT on this repo: nothing

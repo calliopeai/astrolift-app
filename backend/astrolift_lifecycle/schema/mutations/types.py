@@ -16,7 +16,8 @@ from astrolift_lifecycle.schema.types import (
 class StartDeploymentInput:
     app_slug: str
     environment_name: str
-    image_tag: str
+    image_tag: str = ""
+    source_ref: str | None = None
     image_digest: str | None = None
     workload_slug: str | None = None
     trigger_kind: str = "manual"

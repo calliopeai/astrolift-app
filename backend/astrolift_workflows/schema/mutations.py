@@ -37,6 +37,12 @@ from core.permissions import (
 )
 from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
+from workflows.scopes import (
+    definition_scope_by_slug,
+    definition_scope_by_stage_guid,
+    workflow_scope_by_guid,
+    workflow_scope_by_slug,
+)
 
 JSON = strawberry.scalars.JSON
 
@@ -320,7 +326,7 @@ class WorkflowsMutation:
         return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
 
     @strawberry.mutation(description="Update a configured Workflow (bindings / inputs / trigger / enabled).")
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=workflow_scope_by_slug("slug"))
     @tenant_scoped()
     def update_workflow(
         self,
@@ -390,7 +396,7 @@ class WorkflowsMutation:
         return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
 
     @strawberry.mutation(description="Soft-delete a configured Workflow and tear down its schedule.")
-    @require_permission(Permission.WORKFLOW_DELETE)
+    @require_permission(Permission.WORKFLOW_DELETE, scope=workflow_scope_by_slug("slug"))
     @tenant_scoped()
     def delete_workflow(self, info: Info, slug: str, org_id: strawberry.ID | None = None) -> MutationResult:
         from django.utils import timezone
@@ -416,7 +422,7 @@ class WorkflowsMutation:
     # ── run mapping (spec 40 §3) ────────────────────────────────────────
 
     @strawberry.mutation(description="Run a configured Workflow now via Temporal (spec 40 §3).")
-    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_guid("workflow_id"))
     @tenant_scoped()
     def run_workflow(
         self,
@@ -503,7 +509,7 @@ class WorkflowsMutation:
     # ── stage update / delete / reorder (spec 40 §6; #966 built create) ──
 
     @strawberry.mutation(description="Update a stage's fields on a writable definition (spec 40 §6).")
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_stage_guid("stage_guid"))
     @tenant_scoped()
     def update_workflow_stage(
         self,
@@ -596,7 +602,7 @@ class WorkflowsMutation:
         return MutationResult.success()
 
     @strawberry.mutation(description="Soft-delete a stage from a writable definition (spec 40 §6).")
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_stage_guid("stage_guid"))
     @tenant_scoped()
     def delete_workflow_stage(self, info: Info, stage_guid: strawberry.ID) -> MutationResult:
         from django.utils import timezone
@@ -624,7 +630,7 @@ class WorkflowsMutation:
     @strawberry.mutation(
         description="Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order."
     )
-    @require_permission(Permission.WORKFLOW_UPDATE)
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_slug("definition_slug"))
     @tenant_scoped()
     def reorder_workflow_stages(
         self, info: Info, definition_slug: str, stage_guids: list[strawberry.ID]

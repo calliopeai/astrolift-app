@@ -24,6 +24,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     RunJobOncePayload,
 )
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -56,7 +57,9 @@ class RecoveryMutations:
         ),
     )
     @requires_elevation(action_label="app.force_redeploy")
-    @require_permission(Permission.APP_DEPLOY, Permission.APP_UPDATE)
+    @require_permission(
+        Permission.APP_DEPLOY, Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug")
+    )
     @tenant_scoped()
     def force_astrolift_redeploy(
         self,
@@ -157,7 +160,7 @@ class RecoveryMutations:
 
     @strawberry.field
     @mutation_audit(action="app.job.run_once")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def run_astrolift_job_once(
         self,
@@ -266,7 +269,9 @@ class RecoveryMutations:
             else None
         ),
     )
-    @require_permission(Permission.APP_UPDATE, Permission.APP_CREATE)
+    @require_permission(
+        Permission.APP_UPDATE, Permission.APP_CREATE, scope=app_scope_by_slug("input.app_slug")
+    )
     @tenant_scoped()
     def rerun_astrolift_onboarding(
         self,

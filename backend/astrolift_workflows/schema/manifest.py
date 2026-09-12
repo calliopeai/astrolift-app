@@ -36,6 +36,7 @@ from workflows.manifest import (
     parse_workflow_manifest,
 )
 from workflows.models import WorkflowDefinition
+from workflows.scopes import definition_scope_by_slug
 
 
 @strawberry.type
@@ -146,7 +147,7 @@ class WorkflowManifestQuery:
         return _preview_type(parsed)
 
     @strawberry.field
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, scope=definition_scope_by_slug("definition_slug"))
     @tenant_scoped()
     def export_workflow_manifest(self, info: Info, definition_slug: str) -> WorkflowManifestExportType:
         """Emit the canonical TOML for a visible workflow definition.
