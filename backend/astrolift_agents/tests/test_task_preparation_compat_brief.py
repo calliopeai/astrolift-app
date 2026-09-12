@@ -76,6 +76,8 @@ def test_compatibility_brief_never_requires_a_payload_bundle(raw_agent):
 
     # The spawner-side injection is the call that raised before the fix.
     manifest = inject_brief_into_job_spec(_job_manifest(), task)
-    env = {e["name"]: e.get("value", "") for e in manifest["spec"]["template"]["spec"]["containers"][0]["env"]}
+    env = {
+        e["name"]: e.get("value", "") for e in manifest["spec"]["template"]["spec"]["containers"][0]["env"]
+    }
     assert env["AGENT_PROMPT"].startswith("Begin your task now")
     assert '"task":"smoke"' in env["AGENT_PROMPT"]
