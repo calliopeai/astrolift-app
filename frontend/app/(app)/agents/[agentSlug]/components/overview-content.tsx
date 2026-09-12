@@ -205,6 +205,36 @@ export function OverviewContent({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Runtime health
+            <Badge variant={detail?.imageRef ? "default" : "outline"} className="ml-auto gap-1.5">
+              <StatusDot status={detail?.imageRef ? "ok" : "muted"} />
+              {detail?.imageRef ? "Configured" : "Not configured"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+          <SummaryTile
+            icon={<WrenchIcon className="size-4" />}
+            label="Image"
+            value={detail?.imageRef || "No image selected"}
+            muted={!detail?.imageRef}
+          />
+          <SummaryTile
+            icon={<ActivityIcon className="size-4" />}
+            label="Run mode"
+            value={`${titleCase(agent.runFamily)} · ${titleCase(agent.runMode)}`}
+          />
+          <SummaryTile
+            icon={<StatusDot status={active ? "pending" : "muted"} />}
+            label="Liveness"
+            value={active ? `${liveRunning} task${liveRunning === 1 ? "" : "s"} running` : "Idle"}
+          />
+        </CardContent>
+      </Card>
+
       {/* Recent runs rollup + latest executions. */}
       <Card>
         <CardHeader>
