@@ -105,7 +105,9 @@ with no project; it cannot reach into a different project packet.
 
 Temporal remains authoritative for execution state. The worker registers
 `astro-workflow_run_reconcile` every 60 seconds to repair the database mirrors
-and their configured workflow instances. Each tick checks up to 40 active or
+and their configured workflow instances. It is included in the default active
+allowlist; installations overriding `ASTROLIFT_ACTIVE_SCHEDULES` must include
+`workflow_run_reconcile` to enable it. Each tick checks up to 40 active or
 open-stage runs and audits up to 10 terminal mirrors. Independent rotating
 cursors with fixed cycle bounds prevent old history or continuous new arrivals
 from starving active runs.

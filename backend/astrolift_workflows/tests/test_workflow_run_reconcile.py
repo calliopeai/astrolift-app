@@ -250,11 +250,13 @@ async def test_blank_identity_is_skipped(temporal_env, monkeypatch):
 
 
 def test_reconciler_is_registered_for_worker_and_periodic_schedule():
+    from astrolift_workflows.schedule_boot import resolve_active_kinds
     from astrolift_workflows.worker import ACTIVITIES, WORKFLOWS
 
     schedule = get_schedule(kind=ScheduleKind.WORKFLOW_RUN_RECONCILE)
     assert schedule.workflow_name == "WorkflowRunReconcileTickWorkflow"
     assert schedule.interval_seconds == 60
+    assert ScheduleKind.WORKFLOW_RUN_RECONCILE in resolve_active_kinds(None)
     assert WorkflowRunReconcileTickWorkflow in WORKFLOWS
     assert reconcile.reconcile_workflow_runs_tick in ACTIVITIES
 
