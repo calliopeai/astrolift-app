@@ -182,6 +182,74 @@ def bridge_audit_entry(entry: AuditEntry) -> bool:
         return False
 
 
+def emit_agent_task_transition(task: Any, status: str) -> None:
+    """Emit durable execution evidence for model state transitions.
+
+    Task transitions happen in workers, outside GraphQL mutation audit hooks,
+    so they need an explicit bridge call. Failures are isolated from the task
+    state machine; the audit row and task status remain authoritative.
+    """
+    try:
+        from core.events import Event
+        from core.fields import uuid7
+
+        definition = getattr(task, "agent_definition", None)
+        agent_slug = getattr(definition, "slug", None) or "unknown"
+        base = {
+            "task_id": str(task.guid),
+            "agent_slug": agent_slug,
+            "status": status,
+            "dispatcher": getattr(task, "dispatcher", None) or "astrolift",
+        }
+        event_type = {
+            "completed": _T.AGENT_TASK_COMPLETED,
+            "failed": _T.AGENT_TASK_FAILED,
+        }.get(status, _T.AGENT_TASK_LAUNCHED)
+        events = [(event_type, base)]
+        if status == "completed":
+            result = task.result if isinstance(task.result, dict) else {}
+            usage = result.get("usage") if isinstance(result.get("usage"), dict) else result
+            events.append(
+                (
+                    _T.AGENT_MODEL_SPEND,
+                    {
+                        "task_id": str(task.guid),
+                        "provider": usage.get("provider") or "unknown",
+                        "model_id": usage.get("model_id") or usage.get("model") or "unknown",
+                        "input_tokens": int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0),
+                        "output_tokens": int(
+                            usage.get("output_tokens") or usage.get("completion_tokens") or 0
+                        ),
+                        "estimated_usd": usage.get("estimated_usd", usage.get("cost_usd", 0)),
+                    },
+                )
+            )
+        for kind, payload in events:
+            validate_payload(event_type=kind, payload=payload)
+            event_id = str(uuid7())
+            envelope = dataclasses.asdict(
+                ZentinelleEnvelope(
+                    payload_version=PAYLOAD_VERSION,
+                    event_type=kind.value,
+                    event_id=event_id,
+                    org_id=int(task.organization_id),
+                    actor_user_id=None,
+                    occurred_at_unix=int(time.time()),
+                    payload=payload,
+                    idempotency_key=idempotency_key_for(org_id=int(task.organization_id), event_id=event_id),
+                )
+            )
+            Event.emit(
+                kind.value,
+                envelope,
+                resource_kind="agent_task",
+                resource_id=str(task.guid),
+                organization_id=int(task.organization_id),
+            )
+    except Exception:  # noqa: BLE001 - telemetry cannot break execution
+        log.warning("agent task evidence bridge failed", exc_info=True)
+
+
 def is_zentinelle_envelope(event_type: str, payload: Any) -> bool:
     """Does an emitted event carry a ready-to-post Zentinelle envelope?"""
     return (
