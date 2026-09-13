@@ -184,6 +184,9 @@ class ScheduleKind(StrEnum):
     each minute is needless load; 5 min is well inside the self-heal
     window for an image/manifest drift."""
 
+    WORKFLOW_RUN_RECONCILE = "workflow_run_reconcile"
+    """Every 60 s, reconcile up to 50 definition runs against exact Temporal executions."""
+
     RUN_STATUS_RECONCILE = "run_status_reconcile"
     """Every 60 s — reconcile non-terminal ScheduledJobRun + TaskRun rows
     against their k8s Job status, writing back status / started / ended /
@@ -481,6 +484,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.ALERT_EVAL,
         ),
         description="Evaluate active AlertRules; fire/resolve AlertEvents",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.WORKFLOW_RUN_RECONCILE,
+        workflow_name="WorkflowRunReconcileTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.WORKFLOW_RUN_RECONCILE),
+        description="Reconcile exact Temporal definition executions and their configured run records",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.RUN_STATUS_RECONCILE,

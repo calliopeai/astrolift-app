@@ -100,3 +100,33 @@ interactive edits reject missing/invisible children, cross-project references,
 cycles, and nesting deeper than eight levels. A project definition may invoke
 another definition in the same project or a reusable org/global definition
 with no project; it cannot reach into a different project packet.
+
+## Execution status reconciliation
+
+Temporal remains authoritative for execution state. The worker registers
+`astro-workflow_run_reconcile` every 60 seconds to repair the database mirrors
+and their configured workflow instances. Each tick checks up to 40 active or
+open-stage runs and audits up to 10 terminal mirrors. Independent rotating
+cursors with fixed cycle bounds prevent old history or continuous new arrivals
+from starving active runs.
+
+Every lookup pins both Temporal workflow ID and execution run ID. The response
+must match both IDs and the definition workflow type. The database write also
+rechecks organization, identity, and version under a row lock. A missing run ID,
+unavailable/expired Temporal history, or concurrent database change leaves the
+record unchanged for a later sweep. `CONTINUED_AS_NEW` is not inferred to mean
+completion. Terminal observations require Temporal's actual close timestamp.
+
+An authoritative observation repairs an incorrectly terminal configured record
+as well as an unfinished one. Abnormal closure settles pending/running stage
+records while preserving completed stage output. These are execution records;
+independently dispatched AgentTask containers still require their own confirmed
+cleanup, tracked in #1797.
+
+The tick returns `evaluated`, `repaired`, `unchanged`, `skipped`, and `errors` in
+Temporal and logs the same counters. Individual RPCs have a three-second timeout,
+concurrency is capped at ten, and the sweep has a 40-second deadline inside a
+50-second activity with one attempt. A later scheduled tick retries unresolved
+records. Database writes use PostgreSQL lock/statement timeouts. Disabling the
+Temporal runtime also disables reconciliation. This introduces no data migration
+or GraphQL contract change.
