@@ -285,6 +285,12 @@ class AgentTask(BaseCoreModel):
             task.save(update_fields=fields)
             for field in fields:
                 setattr(self, field, getattr(task, field))
+        try:
+            from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
+
+            emit_agent_task_transition(self, new_status)
+        except Exception:  # noqa: BLE001 - evidence must never block a task
+            pass
 
     def __str__(self) -> str:
         return f"AgentTask {self.guid} ({self.status})"

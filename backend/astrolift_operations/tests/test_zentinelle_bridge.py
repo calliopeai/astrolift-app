@@ -7,6 +7,8 @@ subscription delivered nothing. These tests pin the join.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from astrolift_identity.models import Organization
@@ -121,3 +123,37 @@ def test_generic_format_posts_the_inner_envelope():
     plain = {"event_type": "deployment.succeeded", "payload": {"hello": "world"}}
     assert adapt_payload(format="generic", envelope=plain) == plain
     assert not is_zentinelle_envelope("deployment.succeeded", plain["payload"])
+
+
+@pytest.mark.django_db
+def test_agent_task_terminal_emits_lifecycle_and_spend_events():
+    from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
+
+    org = Organization.objects.create(name="Agent Events", slug="agent-events")
+    task = SimpleNamespace(
+        guid="01TASK",
+        organization_id=org.pk,
+        agent_definition=SimpleNamespace(slug="support-agent"),
+        dispatcher="dispatcher-a",
+        result={
+            "usage": {
+                "provider": "openai",
+                "model": "gpt-5",
+                "prompt_tokens": 12,
+                "completion_tokens": 8,
+                "cost_usd": 0.004,
+            }
+        },
+    )
+    seen = []
+    register_event_subscriber(seen.append)
+    try:
+        emit_agent_task_transition(task, "completed")
+    finally:
+        unregister_event_subscriber(seen.append)
+    assert [event.event_type for event in seen] == [
+        "AUDIT.agent.task.completed",
+        "AUDIT.agent.model_spend",
+    ]
+    assert seen[1].payload["payload"]["output_tokens"] == 8
+    assert seen[1].payload["idempotency_key"].startswith(f"zentinelle-{org.pk}-")
