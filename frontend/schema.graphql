@@ -292,6 +292,12 @@ type AstroliftAgentListItem {
   scaleDownCron: String!
 }
 
+type AstroliftAgentListItemPage {
+  items: [AstroliftAgentListItem!]!
+  nextCursor: String
+  totalCount: Int
+}
+
 type AstroliftAgentLiveStatus {
   workloadId: GUID!
   workloadSlug: String!
@@ -496,6 +502,12 @@ type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTask
+}
+
+type AstroliftAgentTaskPage {
+  items: [AstroliftAgentTask!]!
+  nextCursor: String
+  totalCount: Int
 }
 
 type AstroliftAgentTrigger {
@@ -6187,6 +6199,8 @@ type Query {
   agentEnvironmentSpecSecretBundleAttachments(slug: String!): [AstroliftAgentSecretBundleAttachment!]!
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
+  agentFleetPage(orgId: ID!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentListItemPage!
+  agentTasksPage(orgId: ID!, status: String = null, workloadId: ID = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTaskPage!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail
   agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]! @deprecated(reason: "Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead.")
   agentTriggersPage(orgId: ID!, agentSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTriggerPage!

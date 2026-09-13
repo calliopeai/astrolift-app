@@ -22,12 +22,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
+import { Textarea } from "@/components/ui/textarea";
+import { RUN_AGENT, SEND_AGENT_TASK_INPUT } from "@/graphql/agents/agents.mutations";
 import { GET_AGENT_DETAIL, LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
-import type {
-  AstroliftAgentDetail,
-  AstroliftAgentListItem,
-} from "@/graphql/agents/agents.types";
+import type { AstroliftAgentDetail, AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { formatRelativeAge } from "@/lib/format";
 
 interface AgentTask {
@@ -91,14 +89,11 @@ export function OverviewContent({
   agent: AstroliftAgentListItem;
   orgId: string;
 }) {
-  const { data: detailData, loading: detailLoading } = useQuery<AgentDetailResp>(
-    GET_AGENT_DETAIL,
-    {
-      variables: { orgId, slug: agent.slug },
-      skip: !orgId,
-      fetchPolicy: "cache-and-network",
-    }
-  );
+  const { data: detailData, loading: detailLoading } = useQuery<AgentDetailResp>(GET_AGENT_DETAIL, {
+    variables: { orgId, slug: agent.slug },
+    skip: !orgId,
+    fetchPolicy: "cache-and-network",
+  });
   const { data: tasksData, refetch } = useQuery<AgentTasksResp>(LIST_AGENT_TASKS, {
     variables: { orgId, status: null, workloadId: agent.id },
     skip: !orgId,
@@ -107,6 +102,7 @@ export function OverviewContent({
   });
 
   const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
+  const [sendInput, { loading: sendingInput }] = useMutation(SEND_AGENT_TASK_INPUT);
 
   const detail = detailData?.agent ?? null;
   const skills = React.useMemo(() => detail?.skills ?? [], [detail]);
@@ -146,6 +142,7 @@ export function OverviewContent({
 
   const liveRunning = Math.max(agent.runningCount, counts.active);
   const active = liveRunning > 0;
+  const runningTask = rows.find((task) => task.status === "running") ?? null;
 
   async function handleDispatch() {
     try {
@@ -208,6 +205,36 @@ export function OverviewContent({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Runtime health
+            <Badge variant={detail?.imageRef ? "default" : "outline"} className="ml-auto gap-1.5">
+              <StatusDot status={detail?.imageRef ? "ok" : "muted"} />
+              {detail?.imageRef ? "Configured" : "Not configured"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+          <SummaryTile
+            icon={<WrenchIcon className="size-4" />}
+            label="Image"
+            value={detail?.imageRef || "No image selected"}
+            muted={!detail?.imageRef}
+          />
+          <SummaryTile
+            icon={<ActivityIcon className="size-4" />}
+            label="Run mode"
+            value={`${titleCase(agent.runFamily)} · ${titleCase(agent.runMode)}`}
+          />
+          <SummaryTile
+            icon={<StatusDot status={active ? "pending" : "muted"} />}
+            label="Liveness"
+            value={active ? `${liveRunning} task${liveRunning === 1 ? "" : "s"} running` : "Idle"}
+          />
+        </CardContent>
+      </Card>
+
       {/* Recent runs rollup + latest executions. */}
       <Card>
         <CardHeader>
@@ -264,6 +291,8 @@ export function OverviewContent({
         </CardContent>
       </Card>
 
+      <OverseerChat taskId={runningTask?.id ?? null} sendInput={sendInput} sending={sendingInput} />
+
       {/* Capability summary — brief + skills/tools at a glance, deep detail on Build. */}
       <Card>
         <CardHeader>
@@ -302,6 +331,83 @@ export function OverviewContent({
   );
 }
 
+function OverseerChat({
+  taskId,
+  sendInput,
+  sending,
+}: {
+  taskId: string | null;
+  sendInput: (options: { variables: { taskId: string; message: string } }) => Promise<unknown>;
+  sending: boolean;
+}) {
+  const [message, setMessage] = React.useState("");
+  const [sent, setSent] = React.useState<string[]>([]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const value = message.trim();
+    if (!taskId || !value || sending) return;
+    try {
+      const response = (await sendInput({ variables: { taskId, message: value } })) as {
+        data?: { sendAgentTaskInput?: { ok: boolean; errors?: { message: string }[] } };
+      };
+      const result = response.data?.sendAgentTaskInput;
+      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Message was not queued");
+      setSent((prior) => [...prior, value]);
+      setMessage("");
+      toast.success("Message queued for the next agent turn");
+    } catch (error) {
+      toast.error("Could not reach the overseer", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ActivityIcon className="size-4" /> Overseer chat
+          <Badge variant={taskId ? "default" : "outline"} className="ml-auto">
+            {taskId ? "Connected to running task" : "Available when running"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {sent.length > 0 && (
+          <div className="mb-3 space-y-2">
+            {sent.map((entry, index) => (
+              <div key={`${entry}-${index}`} className="bg-muted/40 rounded-md px-3 py-2 text-sm">
+                {entry}
+              </div>
+            ))}
+          </div>
+        )}
+        <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <Textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder={
+              taskId
+                ? "Send a follow-up to the running agent…"
+                : "Start a run to enable overseer chat"
+            }
+            disabled={!taskId || sending}
+            rows={2}
+            aria-label="Overseer message"
+          />
+          <Button type="submit" disabled={!taskId || !message.trim() || sending}>
+            {sending ? <Loader2Icon className="size-4 animate-spin" /> : "Send"}
+          </Button>
+        </form>
+        <p className="text-muted-foreground mt-2 text-xs">
+          Messages are queued and delivered at the agent’s next turn boundary.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SummaryTile({
   icon,
   label,
@@ -317,7 +423,7 @@ function SummaryTile({
     <div className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3">
       <span className="text-muted-foreground">{icon}</span>
       <div className="flex flex-col">
-        <span className="text-muted-foreground text-xs uppercase tracking-wide">{label}</span>
+        <span className="text-muted-foreground text-xs tracking-wide uppercase">{label}</span>
         <span className={muted ? "text-muted-foreground text-sm" : "text-sm font-medium"}>
           {value}
         </span>

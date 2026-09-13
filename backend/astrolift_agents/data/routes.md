@@ -126,7 +126,7 @@ direct URL show `—`.
 | `/environments/[id]` | page | — |  |
 | `/events` | page | nav |  |
 | `/events/[id]` | page | — |  |
-| `/fleet` | redirect → `/fleet/map` | — | thin server alias |
+| `/fleet` | page | nav |  |
 | `/fleet/map` | page | nav |  |
 | `/forms` | flagged | — | off via `/forms` in lib/route-flags.ts |
 | `/forms/[slug]` | flagged | — | off via `/forms` in lib/route-flags.ts |

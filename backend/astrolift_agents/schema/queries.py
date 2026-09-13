@@ -40,12 +40,14 @@ from astrolift_agents.schema.types import (
     AgentDetailType,
     AgentEnvironmentSpecType,
     AgentInteractionType,
+    AgentListItemPageType,
     AgentListItemType,
     AgentLiveStatusType,
     AgentRuntimeType,
     AgentSecretBundleAttachmentType,
     AgentSecretBundleType,
     AgentSecretStatusType,
+    AgentTaskPageType,
     AgentTaskType,
     AgentTriggerType,
     BriefType,
@@ -321,6 +323,11 @@ def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None
     """
     org_pk = _caller_org_id(info, org_id)
     workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
+    return _agent_list_rows_for_workloads(workloads)
+
+
+def _agent_list_rows_for_workloads(workloads) -> list[AgentListItemType]:
+    workloads = list(workloads)
     rollup = _agent_run_rollup([w.pk for w in workloads])
     rows: list[AgentListItemType] = []
     for w in workloads:
@@ -1014,6 +1021,81 @@ class AgentsQuery:
         doesn't have to special-case a null ``project_slug`` argument.
         """
         return _agent_list_rows(info, org_id, project_slug=None)
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_fleet_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> AgentListItemPageType:
+        """Cursor-paginated organization-wide agent fleet."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = _agent_workload_qs(org_pk)
+        if search:
+            qs = qs.filter(search_q(search, "slug", "name"))
+        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-fleet:{org_pk}")
+        return AgentListItemPageType(
+            items=_agent_list_rows_for_workloads(page.rows),
+            next_cursor=page.next_cursor,
+            total_count=page.total_count,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_tasks_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        status: str | None = None,
+        workload_id: strawberry.ID | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> AgentTaskPageType:
+        """Cursor-paginated task history for the organization."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = visible_agent_tasks(org_pk, Permission.AGENT_READ)
+        if status:
+            qs = qs.filter(status=status)
+        if workload_id:
+            workload_guid = _valid_guid(workload_id)
+            if workload_guid is None:
+                return AgentTaskPageType(items=[], total_count=0)
+            from astrolift_registry.models import Workload
+
+            wl = (
+                Workload.objects.filter(
+                    guid=workload_guid,
+                    registered_app__organization_id=org_pk,
+                    deleted_at__isnull=True,
+                )
+                .values_list("pk", flat=True)
+                .first()
+            )
+            if wl is None:
+                return AgentTaskPageType(items=[], total_count=0)
+            qs = qs.filter(agent_definition_id=wl)
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search, "status", "agent_definition__slug", "agent_definition__name", "project__slug"
+                )
+            )
+        qs = qs.select_related(
+            "organization", "project", "agent_definition", "dispatcher", "dispatcher__tenant_cluster"
+        )
+        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-tasks:{org_pk}")
+        return AgentTaskPageType(
+            items=agent_tasks_to_types(page.rows),
+            next_cursor=page.next_cursor,
+            total_count=page.total_count,
+        )
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("slug"))

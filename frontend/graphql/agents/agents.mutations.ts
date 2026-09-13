@@ -175,6 +175,28 @@ export const RUN_AGENT = gql`
   }
 `;
 
+/** Queue a follow-up message for a running task. The runner consumes it at a
+ * turn boundary; this is durable steering, not an unsafe direct pod channel. */
+export const SEND_AGENT_TASK_INPUT = gql`
+  mutation SendAgentTaskInput($taskId: ID!, $message: String!) {
+    sendAgentTaskInput(taskId: $taskId, message: $message) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        message
+        author
+        createdAt
+        deliveredAt
+      }
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Register-agent-repo wizard (PR-8). `registerAgentRepo` registers EVERY agent
 // manifest discovered in the repo as an agent Workload under its own
@@ -680,4 +702,3 @@ export const DESTROY_AGENT_BOX = gql`
     }
   }
 `;
-

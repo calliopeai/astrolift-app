@@ -690,6 +690,20 @@ class AgentListItemType:
     scale_down_cron: str = ""
 
 
+@strawberry.type(name="AstroliftAgentListItemPage")
+class AgentListItemPageType:
+    items: list[AgentListItemType]
+    next_cursor: str | None = strawberry.field(default=None)
+    total_count: int | None = strawberry.field(default=None)
+
+
+@strawberry.type(name="AstroliftAgentTaskPage")
+class AgentTaskPageType:
+    items: list[AgentTaskType]
+    next_cursor: str | None = strawberry.field(default=None)
+    total_count: int | None = strawberry.field(default=None)
+
+
 @strawberry.type(name="AstroliftAgentSkill")
 class AgentSkillType:
     """One Skill attached to an agent, with its ToolDefs nested (spec 38
