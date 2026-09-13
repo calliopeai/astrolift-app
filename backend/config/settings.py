@@ -265,7 +265,8 @@ if USE_S3:
     AWS_ACCESS_KEY_ID = env_str("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = env_str("AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env_str("AWS_STORAGE_BUCKET_NAME")
-    AWS_S3_ENDPOINT_URL = env_str("AWS_S3_ENDPOINT_URL", "")  # MinIO: http://minio-local:9000
+    # Leave the endpoint unset for AWS S3; an empty string is invalid to boto3.
+    AWS_S3_ENDPOINT_URL = env_str("AWS_S3_ENDPOINT_URL") or None  # MinIO: http://minio-local:9000
     AWS_S3_CUSTOM_DOMAIN = env_str("AWS_S3_CUSTOM_DOMAIN", "")
     if not AWS_S3_CUSTOM_DOMAIN:
         if AWS_S3_ENDPOINT_URL:
