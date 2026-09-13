@@ -684,7 +684,7 @@ def _dispatch_agent_for_stage_sync(
             agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
             return str(agent_run.pk)
 
-        spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+        spawner = get_spawner(backend, cluster=cluster, namespace=namespace, task=task)
         try:
             result = spawner.spawn(task)
         except Exception as exc:  # noqa: BLE001 — fail this attempt; workflow policy may retry
@@ -807,6 +807,7 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         backend,
         cluster=cluster,
         namespace=namespace,
+        task=task,
     )
     try:
         status = spawner.status(task.external_id)

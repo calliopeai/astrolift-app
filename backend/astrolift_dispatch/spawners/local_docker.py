@@ -18,6 +18,28 @@ logger = logging.getLogger(__name__)
 class LocalDockerSpawner(ContainerSpawner):
     """Spawn agent tasks via local Docker (for dev/test without a cluster)."""
 
+    def __init__(self, *, connection: dict | None = None, expected_daemon_id: str | None = None):
+        self.connection = connection
+        self.expected_daemon_id = expected_daemon_id
+
+    def _run(self, args: list[str], *, timeout: int = 5):
+        from astrolift_dispatch.spawners.docker_connection import run_docker
+
+        if self.connection is not None:
+            return run_docker(self.connection, args, timeout=timeout)
+        try:
+            return subprocess.run(["docker", *args], capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Docker command timed out") from None
+
+    def _verify_daemon(self) -> None:
+        if self.expected_daemon_id is not None:
+            result = self._run(["info", "--format", "{{.ID}}"])
+            if result.returncode or not result.stdout.strip():
+                raise RuntimeError("Cannot verify the Docker daemon for this task")
+            if result.stdout.strip() != self.expected_daemon_id:
+                raise RuntimeError("Task belongs to a different Docker daemon")
+
     def spawn(self, task: AgentTask) -> SpawnResult:
         from astrolift_dispatch.brief_injector import brief_env_vars
         from astrolift_dispatch.snapshot_injector import snapshot_env_vars
@@ -41,9 +63,9 @@ class LocalDockerSpawner(ContainerSpawner):
             env_args += ["-e", f"{ev['name']}={ev['value']}"]
 
         try:
+            self._verify_daemon()
             cmd = (
                 [
-                    "docker",
                     "run",
                     "-d",
                     "--name",
@@ -54,7 +76,7 @@ class LocalDockerSpawner(ContainerSpawner):
                 + env_args
                 + [image]
             )
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = self._run(cmd, timeout=30)
             if result.returncode != 0:
                 return SpawnResult(external_id=container_name, ok=False, error=result.stderr)
             container_id = result.stdout.strip()
@@ -64,40 +86,40 @@ class LocalDockerSpawner(ContainerSpawner):
             return SpawnResult(external_id=container_name, ok=False, error=str(exc))
 
     def status(self, external_id: str) -> TaskStatus:
-        try:
-            result = subprocess.run(
-                ["docker", "inspect", "--format", "{{.State.Status}} {{.State.ExitCode}}", external_id],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode != 0:
+        self._verify_daemon()
+        result = self._run(
+            ["inspect", "--format", "{{.State.Status}} {{.State.ExitCode}}", external_id],
+            timeout=10,
+        )
+        if result.returncode != 0:
+            if self._is_missing(result, external_id):
                 return TaskStatus(failed=True, error_message="container not found")
-            parts = result.stdout.strip().split()
-            state = parts[0] if parts else "unknown"
-            exit_code = int(parts[1]) if len(parts) > 1 else None
-            return TaskStatus(
-                running=state == "running",
-                succeeded=state == "exited" and exit_code == 0,
-                failed=state == "exited" and exit_code != 0,
-                exit_code=exit_code,
-            )
-        except Exception as exc:
-            return TaskStatus(failed=True, error_message=str(exc))
+            raise RuntimeError("Cannot inspect the Docker container")
+        try:
+            state, code = result.stdout.strip().split()
+            exit_code = int(code)
+            if state not in {"created", "restarting", "running", "removing", "paused", "exited", "dead"}:
+                raise ValueError
+        except ValueError:
+            raise RuntimeError("Docker returned an invalid container status") from None
+        return TaskStatus(
+            running=state == "running",
+            succeeded=state == "exited" and exit_code == 0,
+            failed=state == "exited" and exit_code != 0,
+            exit_code=exit_code,
+        )
 
     def stop(self, external_id: str, *, expected_task_guid: str | None = None) -> None:
+        self._verify_daemon()
         delete_id = external_id
         if expected_task_guid is not None:
-            inspected = subprocess.run(
+            inspected = self._run(
                 [
-                    "docker",
                     "inspect",
                     "--format",
                     '{{.Id}} {{ index .Config.Labels "astrolift.dev/task-id" }}',
                     external_id,
                 ],
-                capture_output=True,
-                text=True,
                 timeout=5,
             )
             if inspected.returncode:
@@ -109,10 +131,8 @@ class LocalDockerSpawner(ContainerSpawner):
                 raise RuntimeError("Docker container belongs to a different agent task")
             delete_id = fields[0]
         try:
-            result = subprocess.run(
-                ["docker", "rm", "-f", delete_id],
-                capture_output=True,
-                text=True,
+            result = self._run(
+                ["rm", "-f", delete_id],
                 timeout=30,
             )
         except Exception as exc:  # noqa: BLE001
@@ -130,10 +150,9 @@ class LocalDockerSpawner(ContainerSpawner):
         )
 
     def confirm_stopped(self, external_id: str) -> bool:
-        result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.Id}}", external_id],
-            capture_output=True,
-            text=True,
+        self._verify_daemon()
+        result = self._run(
+            ["inspect", "--format", "{{.Id}}", external_id],
             timeout=5,
         )
         if result.returncode == 0:

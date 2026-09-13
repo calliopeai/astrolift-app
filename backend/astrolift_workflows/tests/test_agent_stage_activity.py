@@ -358,6 +358,38 @@ def test_poll_running_then_success_walks_to_completed(org, env_spec, cluster, pa
     assert fake.cleaned_secret_ids == ["agent-task-run"]
 
 
+@pytest.mark.parametrize("unavailable", ["placement", "status"])
+def test_poll_unavailable_target_keeps_task_alive_until_observation_recovers(
+    org, env_spec, cluster, patch_spawner, monkeypatch, unavailable
+):
+    fake = patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-transient"),
+            status_sequence=[TaskStatus(running=True), TaskStatus(succeeded=True, exit_code=0)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+    agent_stage._poll_agent_task_sync(task_pk)
+    before = AgentTask.objects.get(pk=task_pk)
+
+    def unreachable(*args, **kwargs):
+        raise RuntimeError("Cannot reach saved Docker connection")
+
+    with monkeypatch.context() as patch:
+        if unavailable == "placement":
+            patch.setattr(agent_stage, "_placement_for_task", unreachable)
+        else:
+            patch.setattr(fake, "status", unreachable)
+        result = agent_stage._poll_agent_task_sync(task_pk)
+        after = AgentTask.objects.get(pk=task_pk)
+        assert result == {"status": AgentTask.Status.RUNNING, "terminal": False}
+        assert after.version == before.version and after.ended_at is None
+        assert fake.cleaned_secret_ids == []
+    assert agent_stage._poll_agent_task_sync(task_pk)["terminal"]
+    assert AgentTask.objects.get(pk=task_pk).status == AgentTask.Status.COMPLETED
+
+
 def test_poll_fast_success_from_provisioning_steps_through_running(org, env_spec, cluster, patch_spawner):
     """Container finished before we ever saw it running: success observed
     while still PROVISIONING must still reach COMPLETED (via RUNNING)."""
