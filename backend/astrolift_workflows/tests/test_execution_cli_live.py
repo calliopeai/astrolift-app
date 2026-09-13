@@ -21,6 +21,7 @@ from astrolift_workflows.tests.test_workflow_stage_activities import (  # noqa: 
     run,
 )
 from core.permissions import Permission
+from workflows.models import WorkflowStageExecution
 
 CLI = os.environ.get("ASTROLIFT_TEST_CLI")
 pytestmark = [
@@ -63,6 +64,25 @@ async def test_cli_observes_controls_and_cleans_exact_execution_over_authenticat
         return issued.plaintext, str(owned_execution.organization.guid)
 
     token, organization = await authenticate()
+
+    @sync_to_async
+    def record_stages(execution, count):
+        gate = owned_execution.workflow_definition.stages.get(order=1)
+        return [
+            str(row.guid)
+            for row in WorkflowStageExecution.objects.bulk_create(
+                [
+                    WorkflowStageExecution(
+                        workflow_run=execution,
+                        stage=gate,
+                        status="completed",
+                        attempt_number=index + 1,
+                        output={"human_gate": {"decision": "approved", "note": f"Review {index + 1}"}},
+                    )
+                    for index in range(count)
+                ]
+            )
+        ]
 
     async def get_client():
         return temporal_env.client
@@ -109,6 +129,7 @@ async def test_cli_observes_controls_and_cleans_exact_execution_over_authenticat
         await sync_to_async(owned_execution.save)(update_fields=["run_id", "updated_at", "version"])
         neighbor = None
         try:
+            expected_stages = await record_stages(owned_execution, 105)
             row = await invoke("execution", owned_execution.pk)
             assert row["guid"] == str(owned_execution.guid)
             assert row["organizationGuid"] == organization
@@ -128,6 +149,22 @@ async def test_cli_observes_controls_and_cleans_exact_execution_over_authenticat
                 workflow_id=neighbor.id,
                 run_id=neighbor.first_execution_run_id,
                 workflow_definition_id=owned_execution.workflow_definition_id,
+            )
+            await record_stages(other, 1)
+            history = await invoke(
+                "execution-stages",
+                owned_execution.pk,
+                "--workflow-id",
+                owned_execution.workflow_id,
+                "--run-id",
+                owned_execution.run_id,
+            )
+            assert history["execution"]["status"] == "completed"
+            assert len(history["stages"]) == 105
+            assert {stage["guid"] for stage in history["stages"]} == set(expected_stages)
+            assert all(stage["humanGateState"] == "approved" for stage in history["stages"])
+            await invoke(
+                "execution-stages", owned_execution.pk, "--run-id", other.run_id, expect_success=False
             )
             ack = await invoke("execution-stop", owned_execution.pk, "--yes")
             assert ack["requested"] and ack["execution"]["status"] == "completed"

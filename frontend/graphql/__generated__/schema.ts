@@ -7849,6 +7849,8 @@ export type Query = {
   workflowDefinitionsPage: WorkflowDefinitionSummaryPage;
   /** One owned execution by the WorkflowRun ID returned on dispatch or its GUID. */
   workflowExecution?: Maybe<WorkflowExecution>;
+  /** Recorded stage history of an exact owned execution, newest first. */
+  workflowExecutionStages?: Maybe<WorkflowExecutionStages>;
   /** Get a workflow instance by ID. */
   workflowInstance?: Maybe<WorkflowInstanceType>;
   /** List workflow instances for a specific object. */
@@ -9200,6 +9202,13 @@ export type QueryWorkflowExecutionArgs = {
 };
 
 
+export type QueryWorkflowExecutionStagesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  executionId: Scalars['ID']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryWorkflowInstanceArgs = {
   id: Scalars['ID']['input'];
 };
@@ -10231,6 +10240,15 @@ export type WorkflowExecutionControlResult = {
   requested: Scalars['Boolean']['output'];
 };
 
+export type WorkflowExecutionStages = {
+  executionGuid: Scalars['String']['output'];
+  organizationGuid: Scalars['String']['output'];
+  recordId: Scalars['String']['output'];
+  stages: WorkflowStageExecutionTypePage;
+  temporalRunId?: Maybe<Scalars['String']['output']>;
+  temporalWorkflowId: Scalars['String']['output'];
+};
+
 export type WorkflowInstanceType = {
   availableTransitions: Array<AvailableTransition>;
   completedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -10315,6 +10333,15 @@ export type WorkflowStageExecutionType = {
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated list. */
+export type WorkflowStageExecutionTypePage = {
+  items: Array<WorkflowStageExecutionType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type WorkflowStageType = {

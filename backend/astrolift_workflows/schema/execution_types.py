@@ -4,7 +4,9 @@ from datetime import datetime
 
 import strawberry
 
+from astrolift_graphql import PageType
 from core.schema.common import MutationResult
+from workflows.schema.types import WorkflowStageExecutionType
 
 
 @strawberry.type(name="WorkflowExecution")
@@ -28,3 +30,13 @@ class WorkflowExecutionType:
 class WorkflowExecutionControlResult(MutationResult):
     requested: bool = False
     execution: WorkflowExecutionType | None = None
+
+
+@strawberry.type
+class WorkflowExecutionStages:
+    execution_guid: str
+    record_id: str
+    organization_guid: str
+    temporal_workflow_id: str
+    temporal_run_id: str | None
+    stages: PageType[WorkflowStageExecutionType]

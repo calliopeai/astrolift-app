@@ -6212,6 +6212,9 @@ type Query {
   previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
 
+  """Recorded stage history of an exact owned execution, newest first."""
+  workflowExecutionStages(executionId: ID!, limit: Int! = 100, after: String = null): WorkflowExecutionStages
+
   """
   One owned execution by the WorkflowRun ID returned on dispatch or its GUID.
   """
@@ -7218,6 +7221,15 @@ type WorkflowExecutionControlResult {
   execution: WorkflowExecution
 }
 
+type WorkflowExecutionStages {
+  executionGuid: String!
+  recordId: String!
+  organizationGuid: String!
+  temporalWorkflowId: String!
+  temporalRunId: String
+  stages: WorkflowStageExecutionTypePage!
+}
+
 type WorkflowInstanceType {
   currentState: String!
   startedAt: DateTime!
@@ -7302,6 +7314,17 @@ type WorkflowStageExecutionType {
   childWorkflowRunGuid: String
   childWorkflowDefinitionSlug: String
   childWorkflowStatus: String
+}
+
+"""One page of a cursor-paginated list."""
+type WorkflowStageExecutionTypePage {
+  items: [WorkflowStageExecutionType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type WorkflowStageType {

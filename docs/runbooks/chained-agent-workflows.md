@@ -184,6 +184,22 @@ return the authoritative observation without rewriting the database. Missing
 identity or unavailable history retains recorded state with an explicit error.
 Clients must not interpret that unverified state as fresh proof of completion.
 
+`workflowExecutionStages(executionId: ID!, limit: Int! = 100, after: String)`
+uses the same organization/project read permission and exact record lookup.
+It returns the execution GUID, record ID, organization GUID, both Temporal IDs,
+and a `stages { items, nextCursor, totalCount }` page. `totalCount` is `null`;
+pages default to 100 rows and cap at 200. Follow `nextCursor`
+until null. The cursor belongs to this organization and Temporal incarnation;
+invalid or mismatched cursors fail instead of restarting the list.
+
+Stage attempts are ordered by creation time and GUID, newest first. New attempts
+stay ahead of an existing cursor; a refresh starts a new inspection. Each item
+includes approval state/note, attempt number, errors, and linked agent/child runs.
+Soft-deleted execution rows are excluded, but deleted stage definitions retain
+their historical metadata. Reading these recorded rows does not contact Temporal
+and is not evidence of live execution status. Clients must match the execution
+identity on every page and keep closure/cleanup observation separate.
+
 `taskCleanup` reports `not_requested`, `pending`, `failed`, `completed`, or
 `not_required`, plus `remaining`, `errors`, and `retryable`. Execution closure
 and resource deletion are separate facts. A terminal execution with pending or

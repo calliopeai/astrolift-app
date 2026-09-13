@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Read every recorded stage attempt of an exact workflow execution through a
+  paginated API with organization and project permissions. Approval history,
+  errors, and linked runs remain readable without Temporal; scoped cursors
+  prevent an inspection from switching executions (#1804).
+
 - Expose exact workflow execution reads, cancellation, termination, and cleanup
   retries for both configured workflows and direct definition runs. Reads accept
   the dispatch record ID or GUID, enforce its organization and project permissions,

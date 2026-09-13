@@ -79,6 +79,50 @@ def observe_execution(run) -> tuple[dict | None, str]:
     return {"status": status, "closed_at": closed_at}, ""
 
 
+def execution_stages(run, *, limit: int = 100, after: str | None = None) -> dict:
+    from astrolift_graphql import keyset_page
+    from astrolift_graphql.pagination import decode_cursor
+    from workflows.models import WorkflowStageExecution
+
+    # Descending creation order keeps newly appended attempts ahead of an
+    # existing cursor; an active run cannot extend a walk indefinitely.
+    scope = f"execution-stages:{run.organization_id}:{run.guid}:{run.workflow_id}:{run.run_id}"
+    if after is not None:
+        decoded = decode_cursor(after, arity=3) if len(after) <= 4096 else None
+        if not decoded or decoded[0] != scope:
+            raise ValueError("Stage cursor does not belong to this execution; start a new inspection")
+        try:
+            stamp = datetime.fromisoformat(decoded[1])
+            if stamp.utcoffset() is None:
+                raise ValueError("missing timezone")
+            UUID(decoded[2])
+        except (ValueError, TypeError) as exc:
+            raise ValueError("Stage cursor is invalid; start a new inspection") from exc
+    page = keyset_page(
+        WorkflowStageExecution.objects.filter(
+            deleted_at__isnull=True,
+            workflow_run_id=run.pk,
+            workflow_run__organization_id=run.organization_id,
+            workflow_run__workflow_id=run.workflow_id,
+            workflow_run__run_id=run.run_id,
+            workflow_run__deleted_at__isnull=True,
+        ).select_related("stage", "agent_run", "child_workflow_run__workflow_definition"),
+        cursor=after,
+        limit=limit,
+        default_limit=100,
+        cursor_scope=scope,
+        with_total=False,
+    )
+    return {
+        "execution_guid": str(run.guid),
+        "record_id": str(run.pk),
+        "organization_guid": str(run.organization.guid),
+        "temporal_workflow_id": run.workflow_id,
+        "temporal_run_id": run.run_id or None,
+        "stages": page.map(lambda row: row),
+    }
+
+
 def execution_state(run, *, observation: tuple[dict | None, str] | None = None) -> dict:
     from astrolift_agents.services.workflow_task_cleanup import unfinished_tasks
 
