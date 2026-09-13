@@ -30,7 +30,8 @@ class LocalDockerSpawner(ContainerSpawner):
         if getattr(task, "vnc_enabled", False):
             image = _vnc_image(image)
 
-        container_name = f"agent-task-{str(task.guid)[:12]}"
+        # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
+        container_name = f"agent-task-{str(task.guid).replace('-', '')}"
 
         # Brief identity + (for VNC tasks) the snapshot PUT URL env vars.
         env_vars = brief_env_vars(task) + snapshot_env_vars(task)

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Use complete task GUIDs for Kubernetes Job and local Docker container names,
+  preventing parallel tasks created in the same millisecond from sharing a
+  resource. Existing tasks continue using their saved external IDs (#1799).
+
 - Remove duplicate managed-domain operation imports after concurrent revalidation
   fixes merged, restoring the production frontend build.
 

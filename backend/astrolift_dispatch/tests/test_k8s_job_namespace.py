@@ -334,3 +334,25 @@ def test_agent_existing_claim_is_referenced_but_never_deleted(monkeypatch):
     assert result.ok, result.error
     assert [item["kind"] for item in driver.applied] == ["Job"]
     assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
+
+
+def test_distinct_tasks_created_in_same_millisecond_get_distinct_jobs(monkeypatch):
+    import astrolift_dispatch.brief_injector as brief_injector
+    import astrolift_dispatch.snapshot_injector as snapshot_injector
+    import core.cluster_management as cm
+
+    driver = _RecordingDriver()
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx())
+    monkeypatch.setattr(brief_injector, "inject_brief_into_job_spec", lambda m, t: m)
+    monkeypatch.setattr(snapshot_injector, "inject_snapshot_into_job_spec", lambda m, t: m)
+    first, second = _Task(), _Task()
+    first.guid = "019f2065-6789-7001-8000-000000000001"
+    second.guid = "019f2065-6789-7002-8000-000000000002"
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-concurrent")
+    a, b, retry = spawner.spawn(first), spawner.spawn(second), spawner.spawn(first)
+    assert a.ok and b.ok and retry.ok
+    assert retry.external_id == a.external_id
+    assert len(a.external_id) <= 63
+    assert a.external_id != b.external_id
+    assert len({m["metadata"]["name"] for m in driver.applied if m["kind"] == "Job"}) == 2

@@ -1,7 +1,7 @@
 """K8s Job spawn backend for agent task dispatch (#49).
 
 Spawns agent workloads as batch/v1 Jobs in the target cluster.
-One Job per AgentTask. Job name: ``agent-task-<task_guid_prefix>``.
+One Job per AgentTask. Job name: ``agent-task-<complete_task_guid_hex>``.
 
 The pod uses the Workload's image + the Brief env vars injected by
 brief_injector.inject_brief_into_job_spec().
@@ -59,7 +59,8 @@ class K8sJobSpawner(ContainerSpawner):
                 ),
             )
 
-        job_name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
+        # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
+        job_name = f"agent-task-{str(task.guid).replace('-', '')}"
         # Mark the in-process cleanup plan before any ancillary resolution.
         # A credential/backend failure before manifests are applied must not
         # fall through to a database lookup that can mask the original error
