@@ -1107,36 +1107,56 @@ def _mark_workflow_run_sync(
     result: dict | None,
     failure: dict | None,
 ) -> None:
-    """Move the WorkflowRun mirror row to a terminal status and clear the
-    ``current_stage_execution`` pointer."""
+    """Settle the run, open stage records, and its exact configured instance."""
+    from django.db import transaction
     from django.utils import timezone
 
     from astrolift_operations.models import WorkflowRun
+    from workflows.models import WorkflowStageExecution
+    from workflows.run_status import synchronize_workflow_instances
 
     valid = {c[0] for c in WorkflowRun.Status.choices}
     if status not in valid:
         raise ValueError(f"invalid workflow run status {status!r}")
+    # Fan-out children share their parent's stage store, not its lifecycle.
+    # Only the parent executor can decide that the whole run has finished.
+    if ":fanout:" in str(workflow_run_id):
+        return
 
-    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
-    run.status = status
-    if result is not None:
-        run.result = result
-    if failure is not None:
-        run.failure = failure
-    if status != WorkflowRun.Status.RUNNING:
-        run.ended_at = timezone.now()
-        run.current_stage_execution = None
-    run.save(
-        update_fields=[
-            "status",
-            "result",
-            "failure",
-            "ended_at",
-            "current_stage_execution",
-            "updated_at",
-            "version",
-        ]
-    )
+    with transaction.atomic():
+        run = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(workflow_run_id))
+        if run.status != WorkflowRun.Status.RUNNING and run.ended_at is not None:
+            synchronize_workflow_instances(run)
+            return
+        run.status = status
+        if result is not None:
+            run.result = result
+        if failure is not None:
+            run.failure = failure
+        if status != WorkflowRun.Status.RUNNING:
+            run.ended_at = timezone.now()
+            run.current_stage_execution = None
+        run.save(
+            update_fields=[
+                "status",
+                "result",
+                "failure",
+                "ended_at",
+                "current_stage_execution",
+                "updated_at",
+                "version",
+            ]
+        )
+        if status in {"cancelled", "terminated", "timed_out", "failed"}:
+            for execution in WorkflowStageExecution.objects.select_for_update().filter(
+                workflow_run=run,
+                status__in=["pending", "running"],
+                deleted_at__isnull=True,
+            ):
+                execution.status = "failed" if status == "failed" else "cancelled"
+                execution.ended_at = run.ended_at
+                execution.save(update_fields=["status", "ended_at", "updated_at", "version"])
+        synchronize_workflow_instances(run)
 
 
 # ---------------------------------------------------------------------------

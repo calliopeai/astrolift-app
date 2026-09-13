@@ -1189,3 +1189,106 @@ def test_gate_notification_failure_does_not_break_stage_creation(run, definition
 
     execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
     assert execution.status == "running"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled", "terminated", "timed_out"])
+def test_terminal_run_updates_only_its_exact_configured_instance(run, org, status):
+    from astrolift_identity.models import Organization
+    from workflows.models import WorkflowInstance
+
+    run.run_id = "exact-incarnation"
+    run.save(update_fields=["run_id"])
+    own = WorkflowInstance.objects.create(
+        organization=org,
+        current_state="running",
+        temporal_workflow_id=run.workflow_id,
+        temporal_run_id=run.run_id,
+    )
+    different_run = WorkflowInstance.objects.create(
+        organization=org,
+        current_state="running",
+        temporal_workflow_id=run.workflow_id,
+        temporal_run_id="another-incarnation",
+    )
+    different_org = WorkflowInstance.objects.create(
+        organization=Organization.objects.create(name="Other", slug="other-terminal-org"),
+        current_state="running",
+        temporal_workflow_id=run.workflow_id,
+        temporal_run_id=run.run_id,
+    )
+    _mark_workflow_run_sync(str(run.pk), status, None, None)
+    own.refresh_from_db()
+    assert own.current_state == status
+    assert own.completed_at is not None
+    for other in (different_run, different_org):
+        other.refresh_from_db()
+        assert other.current_state == "running"
+        assert other.completed_at is None
+
+
+@pytest.mark.django_db
+def test_cancelled_run_closes_gate_without_rewriting_completed_stages(run, definition):
+    from django.utils import timezone
+
+    completed = WorkflowStageExecution.objects.create(
+        workflow_run=run,
+        stage=_stage(definition, 0),
+        status="completed",
+        ended_at=timezone.now(),
+        output={"keep": "answer"},
+    )
+    gate_id = _create_stage_execution_sync(str(run.pk), str(_stage(definition, 1).pk), 1)
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    gate = WorkflowStageExecution.objects.get(pk=gate_id)
+    assert gate.status == "cancelled"
+    assert gate.ended_at is not None
+    completed.refresh_from_db()
+    assert completed.status == "completed"
+    assert completed.output == {"keep": "answer"}
+
+
+@pytest.mark.django_db
+def test_fanout_child_cannot_finalize_parent_run(run):
+    _mark_workflow_run_sync(f"{run.pk}:fanout:0:1", "completed", {"child": "answer"}, None)
+    run.refresh_from_db()
+    assert run.status == "running"
+    assert run.ended_at is None
+    assert run.result is None
+
+
+@pytest.mark.django_db
+def test_configured_instance_created_after_executor_finishes_starts_terminal(run, org, definition):
+    from workflows.models import Workflow, WorkflowInstance
+
+    run.run_id = "fast-execution"
+    run.save(update_fields=["run_id"])
+    _mark_workflow_run_sync(str(run.pk), "completed", {"answer": "done"}, None)
+    run.refresh_from_db()
+    configured = Workflow.objects.create(
+        organization=org,
+        definition=definition,
+        name="Fast",
+        slug="fast-completion",
+    )
+    instance = WorkflowInstance.start(
+        configured_workflow=configured,
+        temporal_workflow_id=run.workflow_id,
+        temporal_run_id=run.run_id,
+    )
+    assert instance.current_state == "completed"
+    assert instance.completed_at == run.ended_at
+
+
+@pytest.mark.django_db
+def test_terminal_finalization_retry_preserves_outcome_and_timestamp(run):
+    _mark_workflow_run_sync(str(run.pk), "completed", {"answer": "keep"}, None)
+    run.refresh_from_db()
+    ended_at, version = run.ended_at, run.version
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, {"message": "late delivery"})
+    run.refresh_from_db()
+    assert run.status == "completed"
+    assert run.result == {"answer": "keep"}
+    assert run.failure is None
+    assert run.ended_at == ended_at
+    assert run.version == version

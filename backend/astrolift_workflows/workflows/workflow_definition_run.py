@@ -48,6 +48,7 @@ can be unit-tested without a Temporal environment, mirroring the
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 from datetime import timedelta
 from typing import Any
@@ -272,6 +273,13 @@ class WorkflowDefinitionRunWorkflow:
         run_id = input.workflow_run_id
         try:
             result = await self._execute(input)
+        except asyncio.CancelledError:
+            # Already-closed histories contain no finalization command on
+            # cancellation. Preserve their replay while new cancellations
+            # durably settle the mirrors before Temporal closes the run.
+            if workflow.patched("workflow-cancellation-finalization-v1"):
+                await self._finalize(run_id, "cancelled", None, {"message": "cancelled by request"})
+            raise
         except _WorkflowAbort as abort:
             await self._finalize(run_id, RUN_FAILED, None, {"message": abort.message})
             return WorkflowResult(ok=False, message=abort.message, data=abort.data)

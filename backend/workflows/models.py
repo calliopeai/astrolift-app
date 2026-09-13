@@ -261,7 +261,7 @@ class WorkflowInstance(Tracking):
         ``workflow`` + ``obj``) is unchanged.
         """
         if configured_workflow is not None:
-            return cls.objects.create(
+            instance = cls.objects.create(
                 configured_workflow=configured_workflow,
                 organization_id=configured_workflow.organization_id,
                 # Keep the legacy mirror FK pointed at the shape for back-compat
@@ -273,6 +273,20 @@ class WorkflowInstance(Tracking):
                 created_by=user,
                 updated_by=user,
             )
+            # A short workflow may settle before this configured-run row is
+            # created. Catch that race using the exact execution mirror.
+            from astrolift_operations.models import WorkflowRun
+            from workflows.run_status import synchronize_workflow_instances
+
+            run = WorkflowRun.objects.filter(
+                organization_id=instance.organization_id,
+                workflow_id=temporal_workflow_id,
+                run_id=temporal_run_id or "",
+            ).first()
+            if run is not None:
+                synchronize_workflow_instances(run)
+                instance.refresh_from_db()
+            return instance
 
         initial_state = workflow.get_initial_state()
         if not initial_state:
