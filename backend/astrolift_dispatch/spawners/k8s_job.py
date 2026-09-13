@@ -285,7 +285,7 @@ class K8sJobSpawner(ContainerSpawner):
         except Exception as exc:
             return TaskStatus(failed=True, error_message=str(exc))
 
-    def stop(self, external_id: str) -> None:
+    def stop(self, external_id: str, *, expected_task_guid: str | None = None) -> None:
         """Delete the K8s Job (and its pod) for a running task, plus the
         per-task secret Secret if one was materialized (#1173).
 
@@ -313,7 +313,27 @@ class K8sJobSpawner(ContainerSpawner):
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
-            result = driver.delete_manifests(ctx.slug, self._namespace, refs)
+            if expected_task_guid is not None:
+                from _sdk.cluster import ClusterDriver
+
+                if (
+                    type(driver).get_manifest is ClusterDriver.get_manifest
+                    or type(driver).list_manifests is ClusterDriver.list_manifests
+                ):
+                    raise RuntimeError("Cluster driver cannot verify task resource ownership and deletion")
+                job = driver.get_manifest(ctx.slug, self._namespace, "Job", external_id)
+                if job is not None:
+                    metadata = job.get("metadata") or {}
+                    if (metadata.get("labels") or {}).get("astrolift.dev/task-id") != expected_task_guid:
+                        raise RuntimeError("Job belongs to a different agent task")
+                    if not metadata.get("uid"):
+                        raise RuntimeError("Job has no verifiable Kubernetes identity")
+                    refs[0]["metadata"].update(uid=metadata["uid"])
+                else:
+                    # Do not race a missing read with deletion of a newly
+                    # created Job under the same name without a UID precondition.
+                    refs = refs[1:]
+            result = driver.delete_manifests(ctx.slug, self._namespace, refs, propagation_policy="Foreground")
             if result is not None and not getattr(result, "ok", True):
                 detail = result.summary() if hasattr(result, "summary") else "delete failed"
                 raise RuntimeError(str(detail))
@@ -362,6 +382,37 @@ class K8sJobSpawner(ContainerSpawner):
                 raise RuntimeError(
                     f"Job {external_id} was deleted but filesystem cleanup failed: {exc}",
                 ) from exc
+
+    def confirm_stopped(self, external_id: str) -> bool:
+        from _sdk.cluster import ClusterDriver
+
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+        driver = _driver_for_cluster(self._cluster)
+        if (
+            type(driver).get_manifest is ClusterDriver.get_manifest
+            or type(driver).list_manifests is ClusterDriver.list_manifests
+        ):
+            raise RuntimeError("Cluster driver cannot confirm task resource deletion")
+        ctx = _context_for_cluster(self._cluster)
+        if driver.get_manifest(ctx.slug, self._namespace, "Job", external_id) is not None:
+            return False
+        pods = driver.list_manifests(ctx.slug, self._namespace, "Pod")
+        if not isinstance(pods, list):
+            raise RuntimeError("Cluster did not return a valid pod listing")
+        for pod in pods:
+            meta = pod.get("metadata") or {}
+            labels = meta.get("labels") or {}
+            if (
+                labels.get("job-name") == external_id
+                or labels.get("batch.kubernetes.io/job-name") == external_id
+                or any(
+                    ref.get("kind") == "Job" and ref.get("name") == external_id
+                    for ref in meta.get("ownerReferences", [])
+                )
+            ):
+                return False
+        return True
 
     def cleanup_task_secret(self, external_id: str) -> None:
         """Delete only the plaintext-bearing per-task Secret.

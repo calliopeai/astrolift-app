@@ -37,6 +37,9 @@ class _RecordingDriver:
         self.fail_apply = fail_apply
         self.deleted: list[dict] = []
         self.applied: list[dict] = []
+        self.live_job = None
+        self.pods = []
+        self.propagation_policy = None
 
     def ensure_namespace(self, cluster, name, labels, annotations):
         self.calls.append(f"ensure_namespace:{name}")
@@ -53,10 +56,17 @@ class _RecordingDriver:
     def persistent_volume_claim_exists(self, _cluster, _namespace, _name):
         return True
 
-    def delete_manifests(self, cluster, namespace, manifests):
+    def delete_manifests(self, cluster, namespace, manifests, *, propagation_policy=None):
+        self.propagation_policy = propagation_policy
         self.calls.append(f"delete_manifests:{namespace}")
         self.deleted.extend(manifests)
         return _DeleteResult()
+
+    def get_manifest(self, cluster, namespace, kind, name):
+        return self.live_job
+
+    def list_manifests(self, cluster, namespace, kind):
+        return self.pods
 
 
 class _Ctx:
@@ -356,3 +366,71 @@ def test_distinct_tasks_created_in_same_millisecond_get_distinct_jobs(monkeypatc
     assert len(a.external_id) <= 63
     assert a.external_id != b.external_id
     assert len({m["metadata"]["name"] for m in driver.applied if m["kind"] == "Job"}) == 2
+
+
+def test_owned_stop_uses_uid_precondition_and_waits_for_dependents(monkeypatch):
+    import core.cluster_management as cm
+
+    driver = _RecordingDriver()
+    driver.live_job = {
+        "metadata": {
+            "uid": "original-job-uid",
+            "labels": {"astrolift.dev/task-id": _Task.guid},
+        }
+    }
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: _Ctx())
+    monkeypatch.setattr("astrolift_dispatch.spawners.k8s_job._task_for_external_id", lambda external_id: None)
+    spawner = K8sJobSpawner(cluster=object(), namespace="agents")
+    spawner.stop("owned-job", expected_task_guid=_Task.guid)
+    assert driver.propagation_policy == "Foreground"
+    assert driver.deleted[0]["metadata"]["uid"] == "original-job-uid"
+    assert not spawner.confirm_stopped("owned-job")
+    driver.live_job = None
+    driver.pods = [{"metadata": {"ownerReferences": [{"kind": "Job", "name": "owned-job"}]}}]
+    assert not spawner.confirm_stopped("owned-job")
+    driver.pods = []
+    assert spawner.confirm_stopped("owned-job")
+
+
+def test_owned_stop_refuses_another_tasks_job(monkeypatch):
+    import pytest
+
+    import core.cluster_management as cm
+
+    driver = _RecordingDriver()
+    driver.live_job = {"metadata": {"uid": "foreign", "labels": {"astrolift.dev/task-id": "another-task"}}}
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: _Ctx())
+    with pytest.raises(RuntimeError, match="different agent task"):
+        K8sJobSpawner(cluster=object(), namespace="agents").stop("owned-job", expected_task_guid=_Task.guid)
+    assert driver.deleted == []
+
+
+def test_owned_stop_does_not_delete_unobserved_job_by_name(monkeypatch):
+    import core.cluster_management as cm
+
+    driver = _RecordingDriver()
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: _Ctx())
+    monkeypatch.setattr("astrolift_dispatch.spawners.k8s_job._task_for_external_id", lambda external_id: None)
+    K8sJobSpawner(cluster=object(), namespace="agents").stop("missing-job", expected_task_guid=_Task.guid)
+    assert [ref["kind"] for ref in driver.deleted] == ["Secret"]
+
+
+def test_owned_stop_refuses_driver_without_real_resource_reads(monkeypatch):
+    import pytest
+    from _sdk.cluster import ClusterDriver
+
+    import core.cluster_management as cm
+
+    class UnsupportedDriver(_RecordingDriver):
+        get_manifest = ClusterDriver.get_manifest
+        list_manifests = ClusterDriver.list_manifests
+
+    driver = UnsupportedDriver()
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: _Ctx())
+    with pytest.raises(RuntimeError, match="cannot verify"):
+        K8sJobSpawner(cluster=object(), namespace="agents").stop("owned-job", expected_task_guid=_Task.guid)
+    assert driver.deleted == []

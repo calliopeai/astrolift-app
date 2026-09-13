@@ -57,10 +57,13 @@ class _FakeSpawner:
             return self._status_sequence.pop(0)
         return self._status_sequence[0]
 
-    def stop(self, external_id: str) -> None:
+    def stop(self, external_id: str, **kwargs) -> None:
         self.stopped_ids.append(external_id)
         if self._stop_error is not None:
             raise self._stop_error
+
+    def confirm_stopped(self, external_id):
+        return True
 
     def cleanup_task_secret(self, external_id: str) -> None:
         self.cleaned_secret_ids.append(external_id)

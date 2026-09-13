@@ -55,7 +55,7 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, is_cancelled_exception
 
 from astrolift_workflows.inputs import WorkflowDefinitionRunInput, WorkflowResult
 
@@ -120,6 +120,19 @@ _DB_RETRY = RetryPolicy(
 # — never bare asyncio.sleep, which the sandbox forbids.
 _AGENT_POLL_INTERVAL = timedelta(seconds=30)
 _GATE_POLL_INTERVAL = timedelta(seconds=30)
+
+
+def _parent_cancelled(exc: BaseException) -> bool:
+    # Activity/child handles wrap cancellation in ordinary exceptions. Only
+    # propagate a requested parent cancellation; a separately cancelled child
+    # still follows its stage's failure policy. Old histories retain retries.
+    task = asyncio.current_task()
+    return bool(
+        is_cancelled_exception(exc)
+        and task is not None
+        and task.cancelling()
+        and workflow.patched("workflow-stage-cancellation-propagation-v1")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +297,9 @@ class WorkflowDefinitionRunWorkflow:
             await self._finalize(run_id, RUN_FAILED, None, {"message": abort.message})
             return WorkflowResult(ok=False, message=abort.message, data=abort.data)
         except Exception as exc:  # noqa: BLE001 — record then re-raise for Temporal
+            if _parent_cancelled(exc):
+                await self._finalize(run_id, "cancelled", None, {"message": "cancelled by request"})
+                raise asyncio.CancelledError() from exc
             await self._finalize(run_id, RUN_FAILED, None, {"message": f"unhandled: {exc}"})
             raise
 
@@ -520,7 +536,9 @@ class WorkflowDefinitionRunWorkflow:
                     retry_policy=_DB_RETRY,
                 )
                 run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
-            except ActivityError:
+            except ActivityError as exc:
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
                 run_status = "failed"
 
             decision = decide_after_agent_run(run_status, on_failure, attempt)
@@ -623,7 +641,9 @@ class WorkflowDefinitionRunWorkflow:
                     retry_policy=_DB_RETRY,
                 )
                 run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
-            except ActivityError:
+            except ActivityError as exc:
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
                 # The dispatch activity itself failed (e.g. spawn error).
                 run_status = "failed"
 
@@ -784,6 +804,8 @@ class WorkflowDefinitionRunWorkflow:
                 if run_status == "failed":
                     failure_message = getattr(result, "message", "nested workflow failed")
             except Exception as exc:  # noqa: BLE001 — policy handles child failure/timeout
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
                 run_status = "failed"
                 failure_message = str(exc) or "nested workflow failed"
 
@@ -1021,6 +1043,8 @@ class WorkflowDefinitionRunWorkflow:
                 if exec_id:
                     execution_ids.append(str(exec_id))
             except Exception as exc:  # noqa: BLE001 — one child failing is data, not fatal
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
                 workflow.logger.warning("fan-out child failed: %s", exc)
         return execution_ids
 
@@ -1064,6 +1088,8 @@ class WorkflowDefinitionRunWorkflow:
                 if exec_id:
                     execution_ids.append(str(exec_id))
             except Exception as exc:  # noqa: BLE001 — one child failure is data
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
                 workflow.logger.warning("fan-out child failed: %s", exc)
         return execution_ids
 

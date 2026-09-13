@@ -96,8 +96,11 @@ class _FakeSpawner:
 
         return TaskStatus(running=True)
 
-    def stop(self, external_id):
+    def stop(self, external_id, **kwargs):
         return None
+
+    def confirm_stopped(self, external_id):
+        return True
 
 
 @pytest.fixture(autouse=True)
@@ -1292,3 +1295,470 @@ def test_terminal_finalization_retry_preserves_outcome_and_timestamp(run):
     assert run.failure is None
     assert run.ended_at == ended_at
     assert run.version == version
+
+
+@pytest.mark.django_db
+def test_cancelled_workflow_stops_only_its_owned_agent_task(run, definition, monkeypatch):
+    from astrolift_agents.models import AgentTask
+    from astrolift_dispatch.spawners import registry
+    from astrolift_lifecycle.models import AgentRun
+
+    _, own_task = _dispatch_agent_stage(run, definition, 0)
+    neighbor = WorkflowRun.objects.create(
+        organization=run.organization,
+        workflow_kind=run.workflow_kind,
+        workflow_id=run.workflow_id,
+        run_id="neighbor-incarnation",
+    )
+    _, other_task = _dispatch_agent_stage(neighbor, definition, 0)
+    stopped = []
+
+    class StopSpawner(_FakeSpawner):
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: StopSpawner())
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+
+    own_task.refresh_from_db()
+    other_task.refresh_from_db()
+    assert stopped == [own_task.external_id]
+    assert own_task.status == AgentTask.Status.CANCELLED
+    assert other_task.status == AgentTask.Status.RUNNING
+    assert AgentRun.objects.get(pk=own_task.agent_run_id).status == AgentRun.Status.CANCELLED
+
+
+@pytest.mark.django_db
+def test_workflow_cleanup_failure_is_visible_and_retryable(run, definition, monkeypatch):
+    from astrolift_agents.models import AgentTask
+    from astrolift_dispatch.spawners import registry
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    stopped = []
+    fail = True
+
+    class StopSpawner(_FakeSpawner):
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+            if fail:
+                raise RuntimeError("delete denied")
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: StopSpawner())
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, {"message": "cancelled by request"})
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+    assert run.failure["task_cleanup"]["status"] == "failed"
+    assert run.failure["message"] == "cancelled by request"
+    closed_at = run.ended_at
+
+    fail = False
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert stopped == [task.external_id, task.external_id]
+    assert task.status == AgentTask.Status.CANCELLED
+    assert run.failure["task_cleanup"]["status"] == "completed"
+    assert run.ended_at == closed_at
+
+
+@pytest.mark.django_db
+def test_closed_workflow_refuses_delayed_agent_dispatch(run, definition):
+    from astrolift_agents.models import AgentTask
+
+    stage = _stage(definition, 0)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    before = AgentTask.objects.count()
+    with pytest.raises(RuntimeError, match="closed|terminal|cancelled"):
+        _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {})
+    assert AgentTask.objects.count() == before
+
+
+@pytest.mark.django_db
+def test_stage_task_stop_uses_the_backend_that_spawned_it(run, definition, monkeypatch):
+    from astrolift_agents.models import DispatcherInstance
+    from astrolift_dispatch.spawners import registry
+    from astrolift_workflows.activities.agent_stage import _cancel_agent_task_sync
+
+    monkeypatch.setattr("astrolift_agents.services.task_target.docker_daemon_id", lambda: "test-daemon")
+    DispatcherInstance.objects.create(
+        organization=run.organization,
+        name="Local workflow dispatcher",
+        slug="local-workflow-dispatcher",
+        endpoint="http://localhost:9000",
+        cloud=DispatcherInstance.Cloud.LOCAL,
+        backend=DispatcherInstance.Backend.LOCAL_DOCKER,
+        status=DispatcherInstance.Status.ACTIVE,
+    )
+    calls = []
+
+    def spawner(backend, *, cluster=None, namespace="default"):
+        calls.append(backend)
+        return _FakeSpawner()
+
+    monkeypatch.setattr(registry, "get_spawner", spawner)
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    assert calls == ["local_docker"]
+    result = _cancel_agent_task_sync(str(task.guid))
+    assert result["ok"]
+    assert calls == ["local_docker", "local_docker"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("violation", ["foreign_org", "shared_agent_run", "unknown_target"])
+def test_workflow_cleanup_refuses_unproven_ownership(run, definition, monkeypatch, violation):
+    from astrolift_dispatch.spawners import registry
+    from astrolift_identity.models import Organization
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    if violation == "foreign_org":
+        task.organization = Organization.objects.create(name="Foreign", slug="foreign-cleanup")
+        task.save(update_fields=["organization", "updated_at", "version"])
+    elif violation == "shared_agent_run":
+        neighbor = WorkflowRun.objects.create(
+            organization=run.organization,
+            workflow_kind=run.workflow_kind,
+            workflow_id="other-workflow",
+            run_id="other-execution",
+        )
+        WorkflowStageExecution.objects.create(
+            workflow_run=neighbor,
+            stage=_stage(definition, 0),
+            agent_run_id=task.agent_run_id,
+            slug="ambiguous-agent-run",
+            status="running",
+        )
+    else:
+        task.dispatch_target = {}
+        task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    version = task.version
+    stopped = []
+
+    class StopSpawner(_FakeSpawner):
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: StopSpawner())
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert stopped == []
+    assert task.status == "running"
+    assert task.version == version
+    assert run.failure["task_cleanup"]["status"] == "failed"
+    assert run.failure["task_cleanup"]["remaining"] == 1
+
+
+@pytest.mark.django_db
+def test_cleanup_uses_saved_cluster_and_namespace(run, definition, monkeypatch):
+    from astrolift_dispatch.spawners import registry
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    target = dict(task.dispatch_target)
+    task.namespace = "changed-default"
+    task.save(update_fields=["namespace", "updated_at", "version"])
+    observed = []
+
+    def spawner(backend, *, cluster=None, namespace="default"):
+        observed.append((backend, str(cluster.guid), namespace))
+        return _FakeSpawner()
+
+    monkeypatch.setattr(registry, "get_spawner", spawner)
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.agent_stage._resolve_managed_cluster",
+        lambda organization: pytest.fail("cleanup tried the current default cluster"),
+    )
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    assert observed == [("k8s_job", target["cluster_guid"], target["namespace"])]
+    task.refresh_from_db()
+    assert task.status == "cancelled"
+
+
+@pytest.mark.django_db
+def test_cleanup_refuses_replaced_cluster_endpoint(run, definition):
+    from astrolift_clusters.models import TenantCluster
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    TenantCluster.objects.filter(guid=task.dispatch_target["cluster_guid"]).update(
+        endpoint="https://replacement.invalid"
+    )
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert task.status == "running"
+    assert "endpoint changed" in run.failure["task_cleanup"]["errors"][0]["message"]
+
+
+@pytest.mark.django_db
+def test_cleanup_recovers_resource_created_before_external_id_was_saved(run, definition, monkeypatch):
+    from astrolift_dispatch.spawners import registry
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    task.external_id = ""
+    task.status = "provisioning"
+    task.save(update_fields=["external_id", "status", "updated_at", "version"])
+    stopped = []
+
+    class StopSpawner(_FakeSpawner):
+        def stop(self, external_id, **kwargs):
+            stopped.append((external_id, kwargs["expected_task_guid"]))
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: StopSpawner())
+    _mark_workflow_run_sync(str(run.pk), "terminated", None, None)
+    task.refresh_from_db()
+    assert stopped == [(task.dispatch_target["planned_external_id"], str(task.guid))]
+    assert task.status == "cancelled"
+
+
+@pytest.mark.django_db
+def test_cleanup_waits_for_confirmed_deletion(run, definition, monkeypatch):
+    from astrolift_dispatch.spawners import registry
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    deleted = False
+
+    class DeletingSpawner(_FakeSpawner):
+        def confirm_stopped(self, external_id):
+            return deleted
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: DeletingSpawner())
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert task.status == "running"
+    assert run.failure["task_cleanup"]["status"] == "pending"
+    assert run.failure["task_cleanup"]["remaining"] == 1
+    deleted = True
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert task.status == "cancelled"
+    assert run.failure["task_cleanup"]["status"] == "completed"
+
+
+@pytest.mark.django_db
+def test_cleanup_rotates_past_failed_tasks_and_preserves_completed_resources(run, definition, monkeypatch):
+    from django.utils import timezone
+
+    from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
+    from astrolift_dispatch.spawners import registry
+
+    tasks = [_dispatch_agent_stage(run, definition, 0)[1] for _ in range(3)]
+    tasks[2].transition_to("completed")
+    run.status, run.ended_at = "cancelled", timezone.now()
+    run.save(update_fields=["status", "ended_at", "updated_at", "version"])
+    stopped = []
+    failing = True
+
+    class StopSpawner(_FakeSpawner):
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+            if failing and external_id == tasks[0].external_id:
+                raise RuntimeError("delete denied")
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: StopSpawner())
+    cleanup_workflow_tasks(run.pk, limit=1)
+    cleanup_workflow_tasks(run.pk, limit=1)
+    assert stopped == [tasks[0].external_id, tasks[1].external_id]
+    failing = False
+    cleanup_workflow_tasks(run.pk, limit=1)
+    run.refresh_from_db()
+    assert stopped == [tasks[0].external_id, tasks[1].external_id, tasks[0].external_id]
+    assert run.failure["task_cleanup"]["status"] == "completed"
+    tasks[2].refresh_from_db()
+    assert tasks[2].status == "completed"
+
+
+@pytest.mark.django_db
+def test_cleanup_refuses_replacement_docker_daemon(run, definition, monkeypatch):
+    from astrolift_dispatch.spawners import registry
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    task.dispatch_target.update(backend="local_docker", docker_daemon_id="original-daemon")
+    task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    monkeypatch.setattr("astrolift_agents.services.task_target.docker_daemon_id", lambda: "replacement")
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: pytest.fail("wrong daemon contacted"))
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert task.status == "running"
+    assert "different Docker daemon" in run.failure["task_cleanup"]["errors"][0]["message"]
+
+
+@pytest.mark.django_db
+def test_closed_workflow_refuses_delayed_stage_creation(run, definition):
+    _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+    with pytest.raises(RuntimeError, match="closed workflow"):
+        _create_stage_execution_sync(str(run.pk), str(_stage(definition, 0).pk), 1)
+    assert not WorkflowStageExecution.objects.filter(workflow_run=run).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_cancellation_during_dispatch_waits_for_durable_spawn_identity(run, definition, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from django.db import close_old_connections
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
+    from astrolift_dispatch.spawners import registry
+
+    entered, release = Event(), Event()
+    stopped = []
+
+    class BlockingSpawner(_FakeSpawner):
+        def spawn(self, task):
+            entered.set()
+            assert release.wait(15), "test did not release the dispatch"
+            return super().spawn(task)
+
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: BlockingSpawner())
+    stage = _stage(definition, 0)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+
+    def dispatch():
+        close_old_connections()
+        try:
+            return _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {})
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(dispatch)
+        try:
+            assert entered.wait(10)
+            task = AgentTask.objects.get(agent_run__stage_executions__pk=execution_id)
+            assert task.dispatch_target["planned_external_id"]
+            _mark_workflow_run_sync(str(run.pk), "cancelled", None, None)
+            run.refresh_from_db()
+            task.refresh_from_db()
+            assert run.failure["task_cleanup"]["status"] == "pending"
+            assert task.status == "provisioning"
+            assert stopped == []
+        finally:
+            release.set()
+        future.result(timeout=10)
+    cleanup_workflow_tasks(run.pk)
+    task.refresh_from_db()
+    run.refresh_from_db()
+    assert stopped == [task.external_id]
+    assert task.status == "cancelled"
+    assert run.failure["task_cleanup"]["status"] == "completed"
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("action", ["cancel", "terminate"])
+async def test_temporal_closure_during_dispatch_cleans_up_after_spawn(
+    run, definition, monkeypatch, temporal_env, action
+):
+    import asyncio
+    from threading import Event
+
+    from asgiref.sync import sync_to_async
+    from temporalio.client import WorkflowFailureError
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
+    from astrolift_dispatch.spawners import registry
+    from astrolift_workflows.activities.workflow_run_reconcile import reconcile_workflow_runs
+    from astrolift_workflows.activities.workflow_stage_activities import (
+        create_stage_execution,
+        dispatch_agent_for_stage,
+        get_workflow_stages,
+        mark_workflow_run,
+        poll_agent_run_status,
+        update_stage_execution,
+    )
+    from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
+    from astrolift_workflows.workflows.workflow_definition_run import WorkflowDefinitionRunWorkflow
+    from core.testing.temporal import temporal_worker
+
+    entered, release = Event(), Event()
+    stopped = []
+
+    class BlockingSpawner(_FakeSpawner):
+        def spawn(self, task):
+            entered.set()
+            assert release.wait(20), "test did not release the dispatch"
+            return super().spawn(task)
+
+        def stop(self, external_id, **kwargs):
+            stopped.append(external_id)
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *a, **kw: BlockingSpawner())
+
+    async def client():
+        return temporal_env.client
+
+    monkeypatch.setattr("astrolift_workflows.client._get_client_async", client)
+    monkeypatch.setattr("astrolift_workflows.client._temporal_enabled", lambda: True)
+
+    @sync_to_async
+    def task_state():
+        task = AgentTask.objects.get(agent_run__stage_executions__workflow_run_id=run.pk)
+        return task.pk, task.status, task.external_id
+
+    async with temporal_worker(
+        temporal_env,
+        workflows=[WorkflowDefinitionRunWorkflow],
+        activities=[
+            get_workflow_stages,
+            create_stage_execution,
+            dispatch_agent_for_stage,
+            mark_workflow_run,
+            poll_agent_run_status,
+            update_stage_execution,
+        ],
+    ):
+        handle = await temporal_env.client.start_workflow(
+            WorkflowDefinitionRunWorkflow.run,
+            WorkflowDefinitionRunInput(
+                workflow_definition_slug=definition.slug,
+                workflow_definition_id=str(definition.pk),
+                workflow_run_id=str(run.pk),
+                trigger_payload={},
+                actor=Actor(kind="system"),
+            ),
+            id=run.workflow_id,
+            task_queue="astrolift-test",
+        )
+        try:
+            assert await asyncio.to_thread(entered.wait, 10)
+            await sync_to_async(run.refresh_from_db)()
+            run.run_id = handle.first_execution_run_id
+            await sync_to_async(run.save)(update_fields=["run_id", "updated_at", "version"])
+            await getattr(handle, action)()
+            with pytest.raises(WorkflowFailureError):
+                await asyncio.wait_for(handle.result(), 10)
+            assert (await handle.describe()).status.name == (
+                "CANCELED" if action == "cancel" else "TERMINATED"
+            )
+            assert stopped == []
+            if action == "cancel":
+                await sync_to_async(run.refresh_from_db)()
+                assert run.failure["task_cleanup"]["status"] == "pending"
+        finally:
+            release.set()
+        for _ in range(100):
+            _, status, external_id = await task_state()
+            if status == "running":
+                break
+            await asyncio.sleep(0.02)
+        else:
+            pytest.fail("The guarded dispatch did not finish after being released")
+        if action == "terminate":
+            summary = await reconcile_workflow_runs()
+            assert summary.errors == 0
+            assert summary.repaired == 1
+        else:
+            await sync_to_async(cleanup_workflow_tasks)(run.pk)
+        _, status, _ = await task_state()
+        assert status == "cancelled"
+        assert stopped == [external_id]
+        await sync_to_async(run.refresh_from_db)()
+        assert run.failure["task_cleanup"]["status"] == "completed"

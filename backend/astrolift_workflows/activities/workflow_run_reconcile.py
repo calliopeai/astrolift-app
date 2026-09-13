@@ -48,6 +48,7 @@ def _next_batch() -> list[RunIdentity]:
     from django.core.cache import cache
     from django.db.models import Exists, OuterRef, Q
 
+    from astrolift_agents.services.workflow_task_cleanup import unfinished_tasks
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStageExecution
 
@@ -59,7 +60,10 @@ def _next_batch() -> list[RunIdentity]:
             )
         )
     )
-    attention = Q(status="running") | Q(ended_at__isnull=True) | Q(open_stages=True)
+    candidates = candidates.alias(unfinished_tasks=Exists(unfinished_tasks(OuterRef("pk"))))
+    attention = (
+        Q(status="running") | Q(ended_at__isnull=True) | Q(open_stages=True) | Q(unfinished_tasks=True)
+    )
     state = cache.get(_CURSOR_KEY) or {}
     fields = ("pk", "organization_id", "workflow_id", "run_id", "version")
     rows = []
@@ -84,6 +88,25 @@ def _next_batch() -> list[RunIdentity]:
 
 
 def _apply_observation(identity: RunIdentity, status: str, closed_at: datetime | None) -> bool | None:
+    from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
+
+    changed = _apply_run_records(identity, status, closed_at)
+    if changed is not None and status != "running":
+        cleaned = cleanup_workflow_tasks(
+            identity.pk,
+            limit=1,
+            expected_owner={
+                "pk": identity.pk,
+                "organization_id": identity.organization_id,
+                "workflow_id": identity.workflow_id,
+                "run_id": identity.run_id,
+            },
+        )
+        return cleaned or changed
+    return changed
+
+
+def _apply_run_records(identity: RunIdentity, status: str, closed_at: datetime | None) -> bool | None:
     from django.db import connection, transaction
     from django.db.models import F
     from django.utils import timezone

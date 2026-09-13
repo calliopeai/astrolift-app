@@ -107,8 +107,8 @@ Temporal remains authoritative for execution state. The worker registers
 `astro-workflow_run_reconcile` every 60 seconds to repair the database mirrors
 and their configured workflow instances. It is included in the default active
 allowlist; installations overriding `ASTROLIFT_ACTIVE_SCHEDULES` must include
-`workflow_run_reconcile` to enable it. Each tick checks up to 40 active or
-open-stage runs and audits up to 10 terminal mirrors. Independent rotating
+`workflow_run_reconcile` to enable it. Each tick checks up to 40 active,
+open-stage, or pending-cleanup runs and audits up to 10 terminal mirrors. Independent rotating
 cursors with fixed cycle bounds prevent old history or continuous new arrivals
 from starving active runs.
 
@@ -121,14 +121,48 @@ completion. Terminal observations require Temporal's actual close timestamp.
 
 An authoritative observation repairs an incorrectly terminal configured record
 as well as an unfinished one. Abnormal closure settles pending/running stage
-records while preserving completed stage output. These are execution records;
-independently dispatched AgentTask containers still require their own confirmed
-cleanup, tracked in #1797.
+records while preserving completed stage output. After a confirmed terminal
+observation it also retries cleanup for one explicitly owned AgentTask. A
+normal workflow finalizer attempts up to five tasks; a rotating task cursor
+prevents a persistently failing deletion from starving the rest.
 
 The tick returns `evaluated`, `repaired`, `unchanged`, `skipped`, and `errors` in
 Temporal and logs the same counters. Individual RPCs have a three-second timeout,
 concurrency is capped at ten, and the sweep has a 40-second deadline inside a
 50-second activity with one attempt. A later scheduled tick retries unresolved
 records. Database writes use PostgreSQL lock/statement timeouts. Disabling the
-Temporal runtime also disables reconciliation. This introduces no data migration
-or GraphQL contract change.
+Temporal runtime also disables reconciliation.
+
+## Agent task cleanup
+
+Before external creation, each new task saves its backend, namespace, cluster
+GUID and endpoint, or Docker daemon identity, plus its deterministic resource
+name in `dispatch_target` (migration `astrolift_agents.0024`). Spawn and Stop
+share a PostgreSQL session advisory lock across worker processes. An in-flight
+spawn returns pending cleanup; a later sweep uses the saved resource name even
+if the worker died before saving the spawn response. Delayed activities cannot
+open a new stage or task on a closed workflow.
+
+Cleanup requires the exact workflow run and organization, an explicit
+stage-to-AgentRun-to-AgentTask link, and exclusive ownership of that AgentRun.
+It never selects tasks through workload names or pod prefixes. A missing or
+changed saved target is reported as an error instead of using the current
+default cluster or Docker daemon. Legacy tasks without a saved target require
+placement recovery before automatic cleanup.
+
+Kubernetes deletion verifies the task label, uses the Job UID as a precondition,
+and requests foreground deletion. Completion requires absence of both the Job
+and its dependent pods. Docker deletion verifies the task label, removes the
+container by immutable ID, and confirms absence on the original daemon. An
+unavailable provider remains an error. Completed tasks retain their resources
+for the existing log-retention policy; failed or cancelled tasks can still have
+resource cleanup retried without changing their original outcome.
+
+The run's existing `failure.task_cleanup` JSON contains `status` (`pending`,
+`failed`, or `completed`), `remaining`, and up to 20 task-specific errors. This
+does not overwrite the workflow's terminal status, original failure message, or
+close time. A workflow can be cancelled while resource deletion is pending;
+operators must check cleanup status before treating Stop as fully settled.
+The task receives its own completed cleanup receipt only after confirmed
+deletion. No GraphQL contract changes are required for these existing JSON
+fields.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Clean up explicitly owned agent tasks after a workflow closes, preserving
+  their original cluster, namespace, or Docker daemon across retries. Stop
+  confirms resource deletion before settling the task and exposes pending or
+  failed cleanup for later reconciliation. Cancellation during dispatch no
+  longer starts another stage attempt; older Temporal histories still replay
+  (#1797).
+
 - Use complete task GUIDs for Kubernetes Job and local Docker container names,
   preventing parallel tasks created in the same millisecond from sharing a
   resource. Existing tasks continue using their saved external IDs (#1799).

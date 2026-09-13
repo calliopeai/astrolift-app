@@ -46,6 +46,10 @@ class ContainerSpawner:
         """Return the current status of a spawned container."""
         raise NotImplementedError
 
-    def stop(self, external_id: str) -> None:
+    def stop(self, external_id: str, *, expected_task_guid: str | None = None) -> None:
         """Stop and clean up a running container."""
+        raise NotImplementedError
+
+    def confirm_stopped(self, external_id: str) -> bool:
+        """Return true only after the task's resource and live dependents are absent."""
         raise NotImplementedError

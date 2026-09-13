@@ -86,3 +86,12 @@ async def test_pre_finalization_cancellation_history_still_replays():
     raw = (Path(__file__).parent / "fixtures" / "legacy-cancelled-workflow.json").read_text()
     history = WorkflowHistory.from_json("cancel-gate-regression", raw)
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
+
+
+async def test_pre_propagation_dispatch_cancellation_history_still_replays():
+    # Captured from 6ac6c5bb before the propagation fix, with real activities
+    # against PostgreSQL. Cancellation incorrectly launched a second dispatch;
+    # replay must preserve those commands without scheduling new work.
+    raw = (Path(__file__).parent / "fixtures" / "legacy-cancelled-dispatch.json").read_text()
+    history = WorkflowHistory.from_json("legacy-cancelled-dispatch", raw)
+    await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
