@@ -33,5 +33,5 @@ def test_support_client_mints_short_lived_scoped_assertion(settings):
     )
     assert claims["email"] == _User.email
     assert claims["org"] == _Org.slug
-    assert claims["sub"] == str(_User.pk)
+    assert claims["sub"] == _User.email
     assert set(claims) >= {"exp", "iat", "jti", "sub", "email", "org"}
