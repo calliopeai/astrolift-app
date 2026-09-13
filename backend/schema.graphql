@@ -292,7 +292,6 @@ type AstroliftAgentListItem {
   scaleDownCron: String!
 }
 
-"""One page of a cursor-paginated list."""
 type AstroliftAgentListItemPage {
   items: [AstroliftAgentListItem!]!
   nextCursor: String
@@ -475,13 +474,6 @@ type AstroliftAgentTask {
   dispatcher: AstroliftAgentTaskDispatcher
 }
 
-"""One page of a cursor-paginated list."""
-type AstroliftAgentTaskPage {
-  items: [AstroliftAgentTask!]!
-  nextCursor: String
-  totalCount: Int
-}
-
 type AstroliftAgentTaskDispatcher {
   id: GUID!
   name: String!
@@ -510,6 +502,12 @@ type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTask
+}
+
+type AstroliftAgentTaskPage {
+  items: [AstroliftAgentTask!]!
+  nextCursor: String
+  totalCount: Int
 }
 
 type AstroliftAgentTrigger {
@@ -6187,7 +6185,6 @@ type Query {
   brief(id: ID!): AstroliftBrief
   orgSkillRepos(orgId: ID!): [AstroliftOrgSkillRepo!]!
   agentTasks(orgId: ID!, status: String = null, workloadId: ID = null): [AstroliftAgentTask!]!
-  agentTasksPage(orgId: ID!, status: String = null, workloadId: ID = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTaskPage!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
@@ -6203,6 +6200,7 @@ type Query {
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agentFleetPage(orgId: ID!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentListItemPage!
+  agentTasksPage(orgId: ID!, status: String = null, workloadId: ID = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTaskPage!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail
   agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]! @deprecated(reason: "Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead.")
   agentTriggersPage(orgId: ID!, agentSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTriggerPage!

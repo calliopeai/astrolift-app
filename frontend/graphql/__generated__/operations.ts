@@ -316,7 +316,6 @@ export type AstroliftAgentListItem = {
   sourceUrl: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
 export type AstroliftAgentListItemPage = {
   items: Array<AstroliftAgentListItem>;
   nextCursor?: Maybe<Scalars['String']['output']>;
@@ -527,7 +526,6 @@ export type AstroliftAgentTaskMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
 export type AstroliftAgentTaskPage = {
   items: Array<AstroliftAgentTask>;
   nextCursor?: Maybe<Scalars['String']['output']>;
