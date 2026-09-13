@@ -195,11 +195,13 @@ def emit_agent_task_transition(task: Any, status: str) -> None:
 
         definition = getattr(task, "agent_definition", None)
         agent_slug = getattr(definition, "slug", None) or "unknown"
+        dispatcher = getattr(task, "dispatcher", None)
+        dispatcher_id = getattr(dispatcher, "guid", None) or getattr(dispatcher, "name", None)
         base = {
             "task_id": str(task.guid),
             "agent_slug": agent_slug,
             "status": status,
-            "dispatcher": getattr(task, "dispatcher", None) or "astrolift",
+            "dispatcher": str(dispatcher_id or dispatcher or "astrolift"),
         }
         event_type = {
             "completed": _T.AGENT_TASK_COMPLETED,
@@ -239,13 +241,17 @@ def emit_agent_task_transition(task: Any, status: str) -> None:
                     idempotency_key=idempotency_key_for(org_id=int(task.organization_id), event_id=event_id),
                 )
             )
-            Event.emit(
-                kind.value,
-                envelope,
-                resource_kind="agent_task",
-                resource_id=str(task.guid),
-                organization_id=int(task.organization_id),
-            )
+            # Keep a failed event insert inside a savepoint. Event emission is
+            # best-effort, but a broken inner transaction must not poison the
+            # task transition or the request that triggered it.
+            with transaction.atomic():
+                Event.emit(
+                    kind.value,
+                    envelope,
+                    resource_kind="agent_task",
+                    resource_id=str(task.guid),
+                    organization_id=int(task.organization_id),
+                )
     except Exception:  # noqa: BLE001 - telemetry cannot break execution
         log.warning("agent task evidence bridge failed", exc_info=True)
 
