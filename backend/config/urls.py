@@ -36,6 +36,14 @@ strawberry_view = CoreStrawberryView.as_view(schema=schema)
 strawberry_auth_view = CoreStrawberryView.as_view(schema=schema_auth)
 
 
+def support_tickets_view(request):
+    # Keep the support module import lazy so the default-off feature does not
+    # add upstream integration imports during ordinary URL setup.
+    from core.views_client_cove_support import support_tickets
+
+    return support_tickets(request)
+
+
 def trigger_error(request):
     return 1 / 0
 
@@ -155,6 +163,7 @@ urlpatterns = [
     # prefix. Scoped-Bearer-key auth, same shape as the runner/dispatch
     # REST surfaces above.
     *clusters_api_urls,       # /api/clusters/v1/<guid>/heartbeat/
+    path("api/support/v1/tickets/", support_tickets_view, name="support-tickets"),
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),
