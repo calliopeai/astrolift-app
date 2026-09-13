@@ -122,9 +122,9 @@ async def _signal(workflow_id: str, signal_name: str, *args: Any) -> None:
 
 
 @async_to_sync
-async def _terminate(workflow_id: str, reason: str) -> None:
+async def _terminate(workflow_id: str, reason: str, *, run_id: str | None = None) -> None:
     client = await _get_client_async()
-    handle = client.get_workflow_handle(workflow_id)
+    handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
     await handle.terminate(reason=reason)
 
 
@@ -162,13 +162,15 @@ def signal_workflow(workflow_id: str, signal_name: str, *args: Any) -> bool:
         return False
 
 
-def terminate_workflow(workflow_id: str, reason: str) -> bool:
+def terminate_workflow(workflow_id: str, reason: str, *, run_id: str | None = None) -> bool:
     """Best-effort terminate. Returns False when disabled or not found."""
+    if run_id is not None and not run_id.strip():
+        return False
     if not _temporal_enabled():
         logger.info("temporal disabled; would-have-terminated %s", workflow_id)
         return False
     try:
-        _terminate(workflow_id, reason)
+        _terminate(workflow_id, reason, **({"run_id": run_id} if run_id is not None else {}))
         return True
     except Exception:
         logger.exception("temporal terminate failed: id=%s", workflow_id)
@@ -365,10 +367,10 @@ def list_workflow_instances(
 
 
 @async_to_sync
-async def _describe_instance_async(workflow_id: str) -> dict[str, Any] | None:
+async def _describe_instance_async(workflow_id: str, *, run_id: str | None = None) -> dict[str, Any] | None:
     client = await _get_client_async()
     try:
-        handle = client.get_workflow_handle(workflow_id)
+        handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
         desc = await handle.describe()
     except Exception as exc:  # noqa: BLE001
         logger.warning("temporal describe failed for %s: %s", workflow_id, exc)
@@ -388,11 +390,13 @@ async def _describe_instance_async(workflow_id: str) -> dict[str, Any] | None:
     }
 
 
-def describe_workflow_instance(workflow_id: str) -> dict[str, Any] | None:
+def describe_workflow_instance(workflow_id: str, *, run_id: str | None = None) -> dict[str, Any] | None:
     """Single-instance summary for the drill-down sheet (#437)."""
+    if run_id is not None and not run_id.strip():
+        return None
     if not _temporal_enabled():
         return None
-    return _describe_instance_async(workflow_id)
+    return _describe_instance_async(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
 
 
 @async_to_sync
@@ -492,21 +496,23 @@ def workflow_history(workflow_id: str, *, limit: int = 200) -> list[dict[str, An
 
 
 @async_to_sync
-async def _cancel_async(workflow_id: str) -> None:
+async def _cancel_async(workflow_id: str, *, run_id: str | None = None) -> None:
     client = await _get_client_async()
-    handle = client.get_workflow_handle(workflow_id)
+    handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
     await handle.cancel()
 
 
-def cancel_workflow(workflow_id: str) -> bool:
+def cancel_workflow(workflow_id: str, *, run_id: str | None = None) -> bool:
     """Cooperative cancel — sends Temporal's CancelRequested signal so
     the workflow can run cleanup before exiting. Returns False when
     Temporal is disabled or the handle is missing."""
+    if run_id is not None and not run_id.strip():
+        return False
     if not _temporal_enabled():
         logger.info("temporal disabled; would-have-cancelled %s", workflow_id)
         return False
     try:
-        _cancel_async(workflow_id)
+        _cancel_async(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
         return True
     except Exception:
         logger.exception("temporal cancel failed: id=%s", workflow_id)
