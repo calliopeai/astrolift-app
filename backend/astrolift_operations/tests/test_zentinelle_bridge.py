@@ -125,6 +125,7 @@ def test_generic_format_posts_the_inner_envelope():
     assert not is_zentinelle_envelope("deployment.succeeded", plain["payload"])
 
 
+@pytest.mark.django_db
 def test_agent_task_terminal_emits_lifecycle_and_spend_events():
     from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
 
