@@ -263,7 +263,9 @@ REQUIRED_PAYLOAD_KEYS: dict[ZentinelleEventType, frozenset[str]] = {
     ZentinelleEventType.AGENT_ENV_SPEC_CHANGED: frozenset({"env_spec_slug", "fields_changed"}),
     ZentinelleEventType.AGENT_WORKFLOW_STAGE_CHANGED: frozenset({"workflow_run_id", "stage_id", "status"}),
     ZentinelleEventType.AGENT_WORKFLOW_GATE_DECIDED: frozenset({"workflow_run_id", "stage_id", "decision"}),
-    ZentinelleEventType.AGENT_MODEL_SPEND: frozenset({"task_id", "provider", "model_id", "input_tokens", "output_tokens", "estimated_usd"}),
+    ZentinelleEventType.AGENT_MODEL_SPEND: frozenset(
+        {"task_id", "provider", "model_id", "input_tokens", "output_tokens", "estimated_usd"}
+    ),
 }
 
 
