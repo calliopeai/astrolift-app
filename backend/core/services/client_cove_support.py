@@ -23,7 +23,9 @@ def _assertion(*, user, organization) -> str:
         {
             "iss": "astrolift",
             "aud": "client-cove-support",
-            "sub": str(user.pk),
+            # Email is the stable cross-product subject; local Django PKs
+            # differ between the Astrolift and Client Cove databases.
+            "sub": user.email,
             "email": user.email,
             "org": organization.slug,
             "iat": int(now.timestamp()),
