@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Expose exact workflow execution reads, cancellation, termination, and cleanup
+  retries for both configured workflows and direct definition runs. Reads accept
+  the dispatch record ID or GUID, enforce its organization and project permissions,
+  and report Temporal closure separately from resource cleanup. Controls pin both
+  Temporal IDs and refuse unverified executions (#1801).
+
 - Clean up explicitly owned agent tasks after a workflow closes, preserving
   their original cluster, namespace, or Docker daemon across retries. Stop
   confirms resource deletion before settling the task and exposes pending or

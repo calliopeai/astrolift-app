@@ -166,3 +166,40 @@ operators must check cleanup status before treating Stop as fully settled.
 The task receives its own completed cleanup receipt only after confirmed
 deletion. No GraphQL contract changes are required for these existing JSON
 fields.
+
+## Exact execution observation and control
+
+`workflowExecution(executionId: ID!)` accepts the numeric `WorkflowRun` ID
+returned by dispatch or that record's GUID. It supports configured workflows
+and direct definition runs without scanning a recent-run list. A configured
+`WorkflowInstance` primary key is a different identifier. The query requires
+`workflow.read` in the owning definition's project (or organization for a
+template); deleted, foreign-organization, and non-definition runs are absent.
+
+The response includes `guid`, `recordId`, `organizationGuid`, `definitionSlug`,
+both Temporal IDs, `status`, `isTerminal`, times, the original `failure`,
+`taskCleanup`, and `observationError`. Temporal observations must match both
+IDs and workflow type; closure also requires an actual close timestamp. Reads
+return the authoritative observation without rewriting the database. Missing
+identity or unavailable history retains recorded state with an explicit error.
+Clients must not interpret that unverified state as fresh proof of completion.
+
+`taskCleanup` reports `not_requested`, `pending`, `failed`, `completed`, or
+`not_required`, plus `remaining`, `errors`, and `retryable`. Execution closure
+and resource deletion are separate facts. A terminal execution with pending or
+failed cleanup must remain visible to operators until cleanup is resolved.
+
+`controlWorkflowExecution(executionId:, workflowId:, runId:, action:, reason:)`
+requires `workflow.trigger` in the same scope. Callers must supply both original
+Temporal IDs; `action` is `cancel`, `terminate`, or `cleanup`. Termination requires
+a nonblank reason. Controls first describe the exact execution, then recheck the
+database identity and version under a lock. A closed execution acknowledges a
+repeated Stop without selecting a newer incarnation of the same workflow ID.
+
+Cleanup requires authoritative closure and attempts one explicitly owned task
+through the reconciliation path described above. Provider failures are durable
+and remain retryable. The mutation's `ok` / `requested` acknowledge acceptance;
+its `execution` payload reports current closure and cleanup independently. A
+response with pending cleanup must not be displayed as fully stopped. Exact
+Temporal reads and controls bound connection establishment to five seconds and
+the individual RPC to three seconds; unavailable services never imply success.

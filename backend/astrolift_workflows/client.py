@@ -22,11 +22,13 @@ each call site is that the Temporal client is expensive to construct
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import logging
 import threading
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from asgiref.sync import async_to_sync
@@ -123,9 +125,15 @@ async def _signal(workflow_id: str, signal_name: str, *args: Any) -> None:
 
 @async_to_sync
 async def _terminate(workflow_id: str, reason: str, *, run_id: str | None = None) -> None:
-    client = await _get_client_async()
+    client = (
+        await asyncio.wait_for(_get_client_async(), timeout=5)
+        if run_id is not None
+        else await _get_client_async()
+    )
     handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
-    await handle.terminate(reason=reason)
+    await handle.terminate(
+        reason=reason, **({"rpc_timeout": timedelta(seconds=3)} if run_id is not None else {})
+    )
 
 
 def start_workflow(
@@ -368,10 +376,14 @@ def list_workflow_instances(
 
 @async_to_sync
 async def _describe_instance_async(workflow_id: str, *, run_id: str | None = None) -> dict[str, Any] | None:
-    client = await _get_client_async()
     try:
+        client = (
+            await asyncio.wait_for(_get_client_async(), timeout=5)
+            if run_id is not None
+            else await _get_client_async()
+        )
         handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
-        desc = await handle.describe()
+        desc = await handle.describe(**({"rpc_timeout": timedelta(seconds=3)} if run_id is not None else {}))
     except Exception as exc:  # noqa: BLE001
         logger.warning("temporal describe failed for %s: %s", workflow_id, exc)
         return None
@@ -497,9 +509,13 @@ def workflow_history(workflow_id: str, *, limit: int = 200) -> list[dict[str, An
 
 @async_to_sync
 async def _cancel_async(workflow_id: str, *, run_id: str | None = None) -> None:
-    client = await _get_client_async()
+    client = (
+        await asyncio.wait_for(_get_client_async(), timeout=5)
+        if run_id is not None
+        else await _get_client_async()
+    )
     handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
-    await handle.cancel()
+    await handle.cancel(**({"rpc_timeout": timedelta(seconds=3)} if run_id is not None else {}))
 
 
 def cancel_workflow(workflow_id: str, *, run_id: str | None = None) -> bool:

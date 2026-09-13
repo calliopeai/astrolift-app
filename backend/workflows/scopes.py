@@ -24,6 +24,17 @@ def _org_id() -> int | None:
     return tenant.organization_id if tenant else None
 
 
+def execution_scope_by_id(field: str = "execution_id"):
+    def _scope(args: dict[str, Any]) -> PermissionScope | None:
+        from astrolift_workflows.execution_controls import find_execution
+
+        run = find_execution(_org_id(), str(read_arg(args, field) or ""))
+        project_id = run.workflow_definition.project_id if run and run.workflow_definition_id else None
+        return PermissionScope(kind=ScopeKind.PROJECT, id=project_id) if project_id else None
+
+    return _scope
+
+
 def _project_scope(model_label: str, project_path: str, **lookup: Any) -> PermissionScope | None:
     org_id = _org_id()
     if org_id is None:

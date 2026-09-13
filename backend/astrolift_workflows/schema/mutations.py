@@ -24,6 +24,7 @@ from astrolift_workflows.client import (
     signal_workflow,
     terminate_workflow,
 )
+from astrolift_workflows.schema.execution_types import WorkflowExecutionControlResult, WorkflowExecutionType
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
     workflow_to_type,
@@ -40,6 +41,7 @@ from core.tenancy import get_current_tenant
 from workflows.scopes import (
     definition_scope_by_slug,
     definition_scope_by_stage_guid,
+    execution_scope_by_id,
     workflow_scope_by_guid,
     workflow_scope_by_slug,
 )
@@ -271,6 +273,37 @@ class WorkflowsMutation:
     forms paths stay on the #966 ``workflows.schema`` surface (reused); this
     class owns tier-2 Workflows, the run mapping, and the stage
     update/delete/reorder #966 did not build."""
+
+    @strawberry.mutation(description="Cancel, terminate, or retry cleanup for an exact owned execution.")
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=execution_scope_by_id())
+    @tenant_scoped()
+    def control_workflow_execution(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        workflow_id: str,
+        run_id: str,
+        action: str,
+        reason: str = "",
+    ) -> WorkflowExecutionControlResult:
+        from astrolift_workflows.execution_controls import control_execution, find_execution
+
+        run = find_execution(_caller_org_pk(), str(execution_id))
+        if run is None:
+            return WorkflowExecutionControlResult(
+                ok=False, errors=[ValidationError(field="executionId", messages=["Execution not found"])]
+            )
+        try:
+            state = control_execution(
+                run, workflow_id=workflow_id, run_id=run_id, action=action, reason=reason
+            )
+        except ValueError as exc:
+            return WorkflowExecutionControlResult(
+                ok=False, errors=[ValidationError(field="executionId", messages=[str(exc)])]
+            )
+        return WorkflowExecutionControlResult(
+            ok=True, requested=True, execution=WorkflowExecutionType(**state)
+        )
 
     # ── tier-2 Workflow CRUD ────────────────────────────────────────────
 
