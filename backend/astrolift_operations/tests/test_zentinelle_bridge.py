@@ -129,9 +129,10 @@ def test_generic_format_posts_the_inner_envelope():
 def test_agent_task_terminal_emits_lifecycle_and_spend_events():
     from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
 
+    org = Organization.objects.create(name="Agent Events", slug="agent-events")
     task = SimpleNamespace(
         guid="01TASK",
-        organization_id=34,
+        organization_id=org.pk,
         agent_definition=SimpleNamespace(slug="support-agent"),
         dispatcher="dispatcher-a",
         result={
@@ -155,4 +156,4 @@ def test_agent_task_terminal_emits_lifecycle_and_spend_events():
         "AUDIT.agent.model_spend",
     ]
     assert seen[1].payload["payload"]["output_tokens"] == 8
-    assert seen[1].payload["idempotency_key"].startswith("zentinelle-34-")
+    assert seen[1].payload["idempotency_key"].startswith(f"zentinelle-{org.pk}-")
