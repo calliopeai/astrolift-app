@@ -71,6 +71,14 @@ ACTION_EVENT_TYPES: dict[str, ZentinelleEventType] = {
     "org.update": _T.ORG_SETTINGS_UPDATED,
     "observability.retention_hold.place": _T.OBSERVABILITY_PROFILE_UPDATED,
     "observability.retention_hold.release": _T.OBSERVABILITY_PROFILE_UPDATED,
+    "agents.task.launch": _T.AGENT_TASK_LAUNCHED,
+    "agents.agent.dispatch": _T.AGENT_DISPATCHED,
+    "agents.env_spec.create": _T.AGENT_ENV_SPEC_CHANGED,
+    "agents.env_spec.update": _T.AGENT_ENV_SPEC_CHANGED,
+    "agents.env_spec.delete": _T.AGENT_ENV_SPEC_CHANGED,
+    "workflow.stage.changed": _T.AGENT_WORKFLOW_STAGE_CHANGED,
+    "workflow.gate.decided": _T.AGENT_WORKFLOW_GATE_DECIDED,
+    "agents.model_spend": _T.AGENT_MODEL_SPEND,
 }
 
 
@@ -105,6 +113,18 @@ def build_payload(entry: AuditEntry, event_type: ZentinelleEventType) -> dict[st
         "subject_user_id": extra.get("subject_user_id") or (str(target) if kind.lower() == "user" else None),
         "invited_by_user_id": extra.get("invited_by_user_id") or entry.actor_user_id,
         "fields_changed": extra.get("fields_changed") or [],
+        "task_id": extra.get("task_id") or (str(target) if "task" in kind.lower() else None),
+        "agent_slug": extra.get("agent_slug") or extra.get("workload_slug"),
+        "status": extra.get("status") or entry.action.rsplit(".", 1)[-1],
+        "dispatcher": extra.get("dispatcher") or "astrolift",
+        "env_spec_slug": extra.get("env_spec_slug") or extra.get("slug"),
+        "workflow_run_id": extra.get("workflow_run_id"),
+        "stage_id": extra.get("stage_id") or extra.get("stage_slug"),
+        "provider": extra.get("provider"),
+        "model_id": extra.get("model_id") or extra.get("model"),
+        "input_tokens": extra.get("input_tokens", 0),
+        "output_tokens": extra.get("output_tokens", 0),
+        "estimated_usd": extra.get("estimated_usd", 0),
     }
     for key in REQUIRED_PAYLOAD_KEYS[event_type]:
         payload.setdefault(key, known.get(key))

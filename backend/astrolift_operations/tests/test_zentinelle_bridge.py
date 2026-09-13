@@ -52,7 +52,9 @@ def test_mapping_covers_catalog_and_ignores_the_rest():
     assert event_type_for_action("deployment.approve") is ZentinelleEventType.APP_DEPLOY
     assert event_type_for_action("role_binding.grant") is ZentinelleEventType.ROLE_BINDING_GRANT
     assert event_type_for_action("app.secret.reveal") is ZentinelleEventType.SECRET_VIEWED
-    assert event_type_for_action("agents.task.launch") is None
+    assert event_type_for_action("agents.task.launch") is ZentinelleEventType.AGENT_TASK_LAUNCHED
+    assert event_type_for_action("agents.agent.dispatch") is ZentinelleEventType.AGENT_DISPATCHED
+    assert event_type_for_action("agents.env_spec.update") is ZentinelleEventType.AGENT_ENV_SPEC_CHANGED
     assert event_type_for_action("session.heartbeat") is None
 
 
@@ -76,7 +78,7 @@ def test_envelope_is_the_locked_wire_shape():
     [
         {"decision": "DENY"},
         {"organization_id": None},
-        {"action": "agents.task.launch"},
+        {"action": "session.heartbeat"},
     ],
 )
 def test_non_evidence_entries_build_nothing(overrides):
