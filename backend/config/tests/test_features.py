@@ -15,14 +15,15 @@ from config.features import (
 
 
 def test_default_features_enabled():
-    """All features default to True so omitting envvars yields a
-    fully-functional platform."""
+    """Core features default on; integrations with external write paths opt in."""
     with patch.dict(os.environ, {}, clear=False):
         for f in Feature:
             os.environ.pop(f.value.upper().replace("FEATURE_", "").replace("FEATURE", ""), None)
-        # Just check the defaults map is consistent
         for f in Feature:
+            if f is Feature.SUPPORT:
+                continue
             assert is_enabled(f) is True
+        assert is_enabled(Feature.SUPPORT) is False
 
 
 def test_explicit_disable():

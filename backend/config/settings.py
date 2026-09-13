@@ -458,6 +458,13 @@ ASTROLIFT_TEMPORAL_ENABLED = env_bool("ASTROLIFT_TEMPORAL_ENABLED", True)
 # returns a PRECONDITION envelope; cluster adoption is not gated.
 ASTROLIFT_DEPLOY_PIPELINE_ENABLED = env_bool("FEATURE_DEPLOY_PIPELINE", True)
 
+# Client Cove support integration. The module is default-off; deployments must
+# opt in only after configuring an authenticated upstream and completing the
+# entitlement-to-case smoke test.
+ASTROLIFT_SUPPORT_ENABLED = env_bool("FEATURE_SUPPORT", False)
+CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("/")
+CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
+
 CONSTANCE_CONFIG = {
     "TIME_ZONE": (TIME_ZONE, "System timezone"),
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
@@ -487,6 +494,11 @@ CONSTANCE_CONFIG = {
         "mutations short-circuit with a PRECONDITION envelope so operators can pause rollouts "
         "without a redeploy. Cluster adoption (bringClusterIntoManagement) is not gated. "
         "Seeded from the FEATURE_DEPLOY_PIPELINE env var (default True).",
+    ),
+    "SUPPORT_ENABLED": (
+        ASTROLIFT_SUPPORT_ENABLED,
+        "Enable the Client Cove support case module. Default off until the "
+        "authenticated entitlement contract and production smoke test are complete.",
     ),
     "WEBHOOK_SECRET_ROTATION_GRACE_SECONDS": (
         3600,
