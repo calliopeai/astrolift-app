@@ -163,14 +163,14 @@ urlpatterns = [
     # touching the request body.
     *scm_webhook_urls,
     # Pipeline webhooks + runner API + Dispatch Service API
-    *pipeline_webhook_urls,   # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
-    *dispatch_api_urls,       # /api/dispatch/v1/*
+    *pipeline_webhook_urls,  # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
+    *dispatch_api_urls,  # /api/dispatch/v1/*
     # In-cluster keep-alive agent heartbeat ingest (#808). Mounted at
     # the project root so the agent's wire URL —
     # /api/clusters/v1/<guid>/heartbeat/ — resolves without the /app/
     # prefix. Scoped-Bearer-key auth, same shape as the runner/dispatch
     # REST surfaces above.
-    *clusters_api_urls,       # /api/clusters/v1/<guid>/heartbeat/
+    *clusters_api_urls,  # /api/clusters/v1/<guid>/heartbeat/
     path("api/support/v1/tickets/", support_tickets_view, name="support-tickets"),
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),

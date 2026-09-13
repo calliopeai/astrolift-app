@@ -26,12 +26,15 @@ def support_tickets(request):
         body = json.loads(request.body or b"{}")
         if not isinstance(body, dict):
             raise ValueError
-        return JsonResponse(client.create_ticket(
-            product=str(body.get("product", "")),
-            deployment_id=str(body.get("deployment_id", "")),
-            title=str(body.get("title", "")),
-            body=str(body.get("body", "")),
-        ), status=201)
+        return JsonResponse(
+            client.create_ticket(
+                product=str(body.get("product", "")),
+                deployment_id=str(body.get("deployment_id", "")),
+                title=str(body.get("title", "")),
+                body=str(body.get("body", "")),
+            ),
+            status=201,
+        )
     except (ValueError, json.JSONDecodeError):
         return JsonResponse({"error": "invalid support request"}, status=400)
     except RuntimeError:
