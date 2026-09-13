@@ -4,6 +4,29 @@ The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/3.2/topics/http/urls/
 """
 
+from django.conf import settings
+from django.conf.urls import include
+from django.contrib import admin
+from django.urls import path, re_path
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import RedirectView
+from django_ratelimit.decorators import ratelimit
+
+from astrolift_agents.urls import urlpatterns as agents_api_urls
+from astrolift_clusters.urls import urlpatterns as clusters_api_urls
+from astrolift_dispatch.urls import urlpatterns as dispatch_api_urls
+from astrolift_identity.urls import (
+    api_urlpatterns as identity_api_urls,
+)
+from astrolift_identity.urls import (
+    app_urlpatterns as identity_app_urls,
+)
+from astrolift_identity.urls import (
+    scim_api_urlpatterns as identity_scim_urls,
+)
+from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
+from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
+from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from auth1.forms import AuthAdminForm
 from auth1.sessions import Auth1SessionWorkflow
 from core import views
@@ -11,24 +34,7 @@ from core.schema.views import CoreStrawberryView
 from core.utils.debug import autologin
 from core.utils.logger_helper import gql_logger
 from core.views_well_known import apple_app_site_association, assetlinks_json
-from django_ratelimit.decorators import ratelimit
-from django.conf import settings
-from django.conf.urls import include
-from django.contrib import admin
-from django.urls import path, re_path
-from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import RedirectView
-from astrolift_identity.urls import (
-    api_urlpatterns as identity_api_urls,
-    app_urlpatterns as identity_app_urls,
-    scim_api_urlpatterns as identity_scim_urls,
-)
-from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
-from astrolift_agents.urls import urlpatterns as agents_api_urls
-from astrolift_clusters.urls import urlpatterns as clusters_api_urls
-from astrolift_dispatch.urls import urlpatterns as dispatch_api_urls
-from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
-from astrolift_scm.urls import urlpatterns as scm_webhook_urls
+
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
