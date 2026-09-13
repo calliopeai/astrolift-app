@@ -4,6 +4,8 @@ The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/3.2/topics/http/urls/
 """
 
+import os
+
 from django.conf import settings
 from django.conf.urls import include
 from django.contrib import admin
@@ -174,8 +176,6 @@ urlpatterns = [
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),
 ]
-
-import os
 
 # DJT URLs are gated by the same env var as the toolbar callback in
 # settings.DEBUG_TOOLBAR_CONFIG. Keeping DEBUG=True in prod is useful for
