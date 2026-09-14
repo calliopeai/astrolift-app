@@ -75,8 +75,7 @@ scim_api_urlpatterns = [
 
 # Auth1 session-cookie-protected approval surface. Mounted under the
 # ``/app/`` prefix (BASE_URL) by config.urls so the login_required
-# middleware redirects unauth'd users to /auth/login like every other
-# operator page.
+# middleware redirects unauth'd users to the configured auth1 login entry.
 app_urlpatterns = [
     path(
         "cli/auth/device/<str:session_guid>/",

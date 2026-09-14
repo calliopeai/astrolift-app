@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -380,8 +381,10 @@ def test_approval_page_requires_auth():
     client = Client()
     row, sid = device_flow.create_session()
     r = client.get(f"/app/cli/auth/device/{sid}/")
-    # @login_required redirects to LOGIN_URL
-    assert r.status_code in (302, 301)
+    assert r.status_code == 302
+    login = urlsplit(r["Location"])
+    assert login.path == "/app/auth1/login"
+    assert parse_qs(login.query)["next"] == [f"/app/cli/auth/device/{sid}/"]
 
 
 def test_approval_page_renders_for_authed_user():
