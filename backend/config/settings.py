@@ -100,7 +100,7 @@ API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_
 SECRET_KEY = env_str("DJANGO_SECRET_KEY", "not-a-secret")
 ROOT_URLCONF = env_str("DJANGO_ROOT_URLCONF", "config.urls")
 BASE_URL = env_str("DJANGO_BASE_URL", "app/")
-LOGIN_URL = env_str("DJANGO_LOGIN_URL", f"/{BASE_URL.strip('/')}/auth1/login")
+LOGIN_URL = env_str("DJANGO_LOGIN_URL", "/auth/login")
 LOGIN_REDIRECT_URL = env_str("DJANGO_LOGIN_REDIRECT_URL", f"/{BASE_URL}admin/")
 SWITCHED_FROM_USER = "switched_from_user"
 

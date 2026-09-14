@@ -383,7 +383,7 @@ def test_approval_page_requires_auth():
     r = client.get(f"/app/cli/auth/device/{sid}/")
     assert r.status_code == 302
     login = urlsplit(r["Location"])
-    assert login.path == "/app/auth1/login"
+    assert login.path == "/auth/login"
     assert parse_qs(login.query)["next"] == [f"/app/cli/auth/device/{sid}/"]
 
 
