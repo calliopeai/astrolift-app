@@ -708,7 +708,12 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Source repositories": {"fields": ("RESTRICT_SOURCE_REPOS_TO_ORG",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
+    "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
     "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
+    "Log exports": {
+        "fields": ("APP_LOG_EXPORT_MAX_LINES", "APP_LOG_EXPORT_TTL_SECONDS"),
+        "collapse": False,
+    },
     "Admin screens": {
         "fields": (
             "ADMIN_COST_ENABLED",
