@@ -29,7 +29,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
-from django.test import Client, RequestFactory
+from django.test import Client, RequestFactory, override_settings
 from django.utils import timezone
 
 from astrolift_identity import device_flow
@@ -300,6 +300,13 @@ def test_view_start_returns_session_envelope():
     assert body["login_url"].endswith(f"/cli/auth/device/{body['session_id']}/")
     assert body["expires_in_seconds"] > 0
     assert body["poll_interval_seconds"] == device_flow.POLL_INTERVAL_SECONDS
+
+
+@override_settings(APP_BASE_URL="", FRONTEND_URL="http://frontend.test:3000")
+def test_view_start_opens_device_approval_on_frontend_origin():
+    client = Client()
+    body = _post_json(client, "/api/cli/v1/auth/start", {}).json()
+    assert body["login_url"] == (f"http://frontend.test:3000/app/cli/auth/device/{body['session_id']}/")
 
 
 def test_view_start_persists_client_metadata():
