@@ -174,7 +174,7 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_MCP_READ in scopes and permission == "agent.read":
         return True
-    if SCOPE_MCP_DISPATCH in scopes and permission == "agent.dispatch":
+    if SCOPE_MCP_DISPATCH in scopes and permission in {"agent.dispatch", "agent_task.send_input"}:
         return True
     if SCOPE_MCP_WRITE in scopes and permission in {"agent.create", "agent.update"}:
         return True
