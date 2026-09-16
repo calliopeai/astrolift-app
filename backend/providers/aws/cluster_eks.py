@@ -2269,6 +2269,8 @@ class EKSClusterDriver(ClusterDriver):
         ``bedrock:InvokeModel`` + ``bedrock:InvokeModelWithResponseStream``
         (``Resource "*"`` by default, narrowable via
         ``provider_config["bedrock_model_arns"]``). Returns the role ARN.
+        New roles carry ``provider_config["iam_permissions_boundary_arn"]``
+        when configured, matching ordinary workload identities.
 
         Operator override: when ``provider_config["agent_model_role_arn"]``
         is set the driver uses that ARN verbatim and mints nothing — for
@@ -2334,20 +2336,27 @@ class EKSClusterDriver(ClusterDriver):
             ],
         }
 
+        create_kwargs: dict[str, Any] = {
+            "RoleName": role_name,
+            "AssumeRolePolicyDocument": json.dumps(trust_policy),
+            # ASCII-only Description — IAM rejects non-Latin-1 (#1026).
+            "Description": (
+                f"Astrolift managed-model (Bedrock) role for "
+                f"{namespace}:{service_account} on {self._config.cluster_name}"
+            ),
+            # Tag like every platform-minted role so the orphan scan
+            # (#995) can reap it if a teardown is interrupted.
+            "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+        }
+        # Pull-mode installs require every minted role to carry this boundary.
+        # Omit it when unset: IAM rejects an empty PermissionsBoundary.
+        boundary = str(provider_config.get("iam_permissions_boundary_arn") or "").strip()
+        if boundary:
+            create_kwargs["PermissionsBoundary"] = boundary
+
         iam = self._iam_client()
         try:
-            response = iam.create_role(
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(trust_policy),
-                # ASCII-only Description — IAM rejects non-Latin-1 (#1026).
-                Description=(
-                    f"Astrolift managed-model (Bedrock) role for "
-                    f"{namespace}:{service_account} on {self._config.cluster_name}"
-                ),
-                # Tag like every platform-minted role so the orphan scan
-                # (#995) can reap it if a teardown is interrupted.
-                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
-            )
+            response = iam.create_role(**create_kwargs)
             role_arn = response["Role"]["Arn"]
         except iam.exceptions.EntityAlreadyExistsException:
             # Idempotent: the role exists — reconcile its trust (the OIDC
