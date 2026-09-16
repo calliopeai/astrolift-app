@@ -45,6 +45,7 @@ from astrolift_agents.schema.types import (
     AgentSecretRevealType,
     AgentSecretStatusType,
     AgentTaskInputMessageType,
+    AgentTaskInputReplyType,
     AgentTaskType,
     OrgSkillRepoType,
     SkillType,
@@ -1698,6 +1699,60 @@ class AgentsMutation:
                 f"task could not be cancelled: {cancelled['error']} (current status: {task.status})",
             )
         return gql_success(None)
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.task.reply_input",
+        target=lambda self, info, task_id, request_sequence, response: ("AgentTask", str(task_id)),
+    )
+    @require_permission(
+        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+    )
+    @tenant_scoped()
+    def reply_agent_task_input(
+        self, info: Info, task_id: strawberry.ID, request_sequence: int, response: JSON
+    ) -> MutationResultType[AgentTaskInputReplyType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        guid = read_guid({"id": task_id}, "id")
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_TASK_SEND_INPUT)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
+            if guid
+            else None
+        )
+        if task is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "task not found", field="taskId")
+
+        from astrolift_agents.services.agent_task_requests import TaskInputRequestError, reply_to_request
+
+        author, label = _input_author(info)
+        try:
+            reply = reply_to_request(
+                task=task,
+                sequence=request_sequence,
+                response=response,
+                author=author,
+                author_label=label,
+            )
+        except TaskInputRequestError as exc:
+            code = {
+                404: ErrorCode.NOT_FOUND.value,
+                409: ErrorCode.PRECONDITION.value,
+            }.get(exc.status, ErrorCode.VALIDATION.value)
+            return gql_failure(code, str(exc))
+        return gql_success(
+            AgentTaskInputReplyType(
+                id=GUID(str(reply.guid)),
+                request_sequence=reply.request_event.sequence,
+                response=reply.response,
+                author_label=reply.author_label,
+                created_at=reply.created_at,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(
