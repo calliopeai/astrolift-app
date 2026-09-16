@@ -124,6 +124,16 @@ class AgentTaskEventType:
     kind: str
     text: str
     created_at: dt.datetime
+    request: JSON | None = None
+
+
+@strawberry.type(name="AstroliftAgentTaskInputReply")
+class AgentTaskInputReplyType:
+    id: GUID
+    request_sequence: int
+    response: JSON
+    author_label: str
+    created_at: dt.datetime
 
 
 @strawberry.type(name="AstroliftAgentTask")

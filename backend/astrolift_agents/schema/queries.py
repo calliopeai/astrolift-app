@@ -731,6 +731,7 @@ class AgentsQuery:
                 kind=row.kind,
                 text=row.text,
                 created_at=row.created_at,
+                request=row.request,
             )
             for row in rows
         ]

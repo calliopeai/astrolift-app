@@ -21,9 +21,13 @@ class AgentTaskEvent(BaseCoreModel):
     message_id = models.CharField(max_length=64)
     kind = models.CharField(max_length=32, choices=Kind.choices)
     text = models.TextField(blank=True, default="")
+    request = models.JSONField(null=True, blank=True)
 
     class Meta:
         ordering = ["sequence"]
+        indexes = [
+            models.Index(fields=["agent_task", "turn_id", "message_id"], name="agent_event_message_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=["agent_task", "sequence"], name="agent_event_task_sequence_uniq"),
         ]

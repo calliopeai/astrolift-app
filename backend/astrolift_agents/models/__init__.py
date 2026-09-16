@@ -8,6 +8,7 @@ from astrolift_agents.models.agent_secret_binding import (
 from astrolift_agents.models.agent_task import AgentTask, resolve_agent_task_for_run
 from astrolift_agents.models.agent_task_event import AgentTaskEvent
 from astrolift_agents.models.agent_task_input import AgentTaskInputMessage
+from astrolift_agents.models.agent_task_input_reply import AgentTaskInputReply
 from astrolift_agents.models.brief import Brief
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
 from astrolift_agents.models.org_skill_repo import OrgSkillRepo
@@ -33,6 +34,7 @@ __all__ = [
     "AgentTask",
     "AgentTaskEvent",
     "AgentTaskInputMessage",
+    "AgentTaskInputReply",
     "Brief",
     "BriefSkillRef",
     "DispatcherInstance",

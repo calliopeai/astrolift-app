@@ -39,6 +39,7 @@ from astrolift_agents.services.agent_task_events import (
     prepare_task_events,
     validate_task_events,
 )
+from astrolift_agents.services.agent_task_requests import TaskInputRequestError, callback_input_response
 
 logger = logging.getLogger(__name__)
 
@@ -631,6 +632,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             )
 
     finding_index: int | None = None
+    input_response = None
 
     with transaction.atomic():
         query = AgentTask.objects.select_for_update().filter(guid=task_id, deleted_at__isnull=True)
@@ -652,8 +654,16 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 
         try:
             prepared_events = prepare_task_events(task, events or [])
+            if "input_request" in body:
+                if new_status not in {None, "running"} or input_intent is not None:
+                    raise TaskInputRequestError(
+                        "input_request cannot accompany terminal status or input_intent"
+                    )
+                input_response = callback_input_response(task, body["input_request"])
         except TaskEventError as exc:
             return JsonResponse({"error": str(exc), "event_sequence": task.event_sequence}, status=exc.status)
+        except TaskInputRequestError as exc:
+            return JsonResponse({"error": str(exc)}, status=exc.status)
 
         if finding is not None:
             if task.status != AgentTask.Status.RUNNING:
@@ -735,6 +745,9 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     payload = {"ok": True, "continue": task.status == AgentTask.Status.RUNNING}
     if events is not None:
         payload["event_sequence"] = task.event_sequence
+        payload["input_protocol_version"] = 1
+    if "input_request" in body:
+        payload["input_response"] = input_response
     payload.update(_steering_input_payload(task, input_intent))
     return JsonResponse(payload)
 
