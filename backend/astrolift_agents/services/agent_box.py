@@ -220,6 +220,8 @@ def resolve_box_image(box) -> str:
     """Image for a box, through the same resolution the Job spawner uses."""
     from astrolift_dispatch.spawners.k8s_job import _resolve_base_image
 
+    if box.environment_spec_id is None and box.image:
+        return box.image
     return _resolve_base_image(box.agent_definition, box.environment_spec)
 
 
@@ -890,6 +892,9 @@ def _get_or_create_box(
     if not box.is_live:
         box.environment_spec = spec
         box.agent_definition = agent
+        # The frozen image is also the input for image-only boxes. Clear a
+        # prior spawn's value when ensure instead asks to resolve a recipe.
+        box.image = image
         if name:
             box.name = name
         if idle_timeout_seconds is not None:
@@ -898,6 +903,7 @@ def _get_or_create_box(
             update_fields=[
                 "environment_spec",
                 "agent_definition",
+                "image",
                 "name",
                 "idle_timeout_seconds",
                 "updated_at",
