@@ -416,6 +416,7 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert token_scope_allows_permission(token, Permission.APP_CREATE)
     assert token_scope_allows_permission(token, Permission.APP_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
+    assert token_scope_allows_permission(token, Permission.AGENT_TASK_SEND_INPUT)
     assert token_scope_allows_permission(token, Permission.AGENT_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
