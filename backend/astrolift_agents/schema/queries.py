@@ -29,6 +29,7 @@ from astrolift_agents.models import (
     AgentInteraction,
     AgentSecretBundleRef,
     AgentTask,
+    AgentTaskEvent,
     Brief,
     DispatcherInstance,
     OrgSkillRepo,
@@ -47,6 +48,7 @@ from astrolift_agents.schema.types import (
     AgentSecretBundleAttachmentType,
     AgentSecretBundleType,
     AgentSecretStatusType,
+    AgentTaskEventType,
     AgentTaskPageType,
     AgentTaskType,
     AgentTriggerType,
@@ -681,6 +683,57 @@ class AgentsQuery:
             qs = qs.filter(occurred_at__gt=since)
         qs = qs.order_by("occurred_at")[:capped]
         return [agent_interaction_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
+    @tenant_scoped()
+    def agent_task_events(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        task_id: strawberry.ID,
+        after: int = 0,
+        limit: int = 100,
+    ) -> list[AgentTaskEventType]:
+        org_pk = _caller_org_id(info, org_id)
+        guid = _valid_guid(task_id)
+        if guid is None:
+            return []
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(
+                guid=guid,
+                organization_id=org_pk,
+            )
+            .first()
+        )
+        if task is None:
+            return []
+        if after < 0 or after > task.event_sequence:
+            raise GraphQLError("Invalid task event cursor")
+        rows = list(
+            AgentTaskEvent.objects.filter(
+                organization_id=org_pk,
+                agent_task=task,
+                sequence__gt=after,
+                sequence__lte=task.event_sequence,
+            ).order_by("sequence")[: max(1, min(limit, 100))]
+        )
+        if (not rows and after < task.event_sequence) or any(
+            row.sequence != after + index + 1 for index, row in enumerate(rows)
+        ):
+            raise GraphQLError("Task event history is incomplete; refresh the session history")
+        return [
+            AgentTaskEventType(
+                sequence=row.sequence,
+                turn_id=row.turn_id,
+                message_id=row.message_id,
+                kind=row.kind,
+                text=row.text,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_task_scope("id"))

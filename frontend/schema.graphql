@@ -460,6 +460,7 @@ type AstroliftAgentTask {
   callbackUrl: String!
   result: JSON
   failureMessage: String
+  eventSequence: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
   queuedAt: DateTime
@@ -482,6 +483,15 @@ type AstroliftAgentTaskDispatcher {
   region: String!
   clusterId: GUID
   clusterName: String!
+}
+
+type AstroliftAgentTaskEvent {
+  sequence: Int!
+  turnId: String!
+  messageId: String!
+  kind: String!
+  text: String!
+  createdAt: DateTime!
 }
 
 type AstroliftAgentTaskInputMessage {
@@ -6189,6 +6199,7 @@ type Query {
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
+  agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!

@@ -479,6 +479,7 @@ export type AstroliftAgentTask = {
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   dispatcher?: Maybe<AstroliftAgentTaskDispatcher>;
+  eventSequence: Scalars['Int']['output'];
   failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
@@ -504,6 +505,15 @@ export type AstroliftAgentTaskDispatcher = {
   name: Scalars['String']['output'];
   region: Scalars['String']['output'];
   slug: Scalars['String']['output'];
+};
+
+export type AstroliftAgentTaskEvent = {
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  messageId: Scalars['String']['output'];
+  sequence: Scalars['Int']['output'];
+  text: Scalars['String']['output'];
+  turnId: Scalars['String']['output'];
 };
 
 export type AstroliftAgentTaskInputMessage = {
@@ -7572,6 +7582,7 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
@@ -7944,6 +7955,14 @@ export type QueryAgentSecretBundlesArgs = {
 
 export type QueryAgentTaskArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskEventsArgs = {
+  after?: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
 };
 
 
