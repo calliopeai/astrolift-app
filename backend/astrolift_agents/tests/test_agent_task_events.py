@@ -109,6 +109,7 @@ def test_gap_rejects_entire_callback_including_findings(task):
         [event(turn="../bad")],
         [event(text={})],
         [event(text="\ud800")],
+        [event(text="before\x00after")],
         [event() | {"extra": 1}],
         [event(i + 1) for i in range(65)],
     ],

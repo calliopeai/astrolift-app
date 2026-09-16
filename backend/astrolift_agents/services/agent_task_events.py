@@ -37,6 +37,8 @@ def validate_task_events(value):
         text = event["text"]
         if not isinstance(text, str):
             raise TaskEventError("event text must be a string")
+        if "\x00" in text:
+            raise TaskEventError("event text cannot contain NUL characters")
         try:
             size = len(text.encode("utf-8"))
         except UnicodeEncodeError as exc:

@@ -44,7 +44,7 @@ when they need to retry a lost acknowledgement.
 
 Turn and message identifiers contain 1–64 ASCII letters, digits, underscores,
 dots, colons or hyphens and start with a letter or digit. All five fields are
-required. `text` is UTF-8, at most 16 KiB per event. A callback contains at most
+required. `text` is UTF-8 without NUL characters, at most 16 KiB per event. A callback contains at most
 64 events and remains subject to the existing 2 MiB callback-body limit. Each
 task accepts at most 100,000 events and 16 MiB of event text. Capacity overflow
 is explicit (413 for text capacity); it never silently drops history. Empty
