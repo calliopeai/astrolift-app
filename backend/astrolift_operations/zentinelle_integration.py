@@ -92,6 +92,16 @@ class ZentinelleEventType(StrEnum):
     """Bookend event — Zentinelle's evidence chain shows the
     report generation itself."""
 
+    # Agent execution and workflow evidence (MITRE ATLAS / agent GRC)
+    AGENT_TASK_LAUNCHED = "AUDIT.agent.task.launched"
+    AGENT_TASK_COMPLETED = "AUDIT.agent.task.completed"
+    AGENT_TASK_FAILED = "AUDIT.agent.task.failed"
+    AGENT_DISPATCHED = "AUDIT.agent.dispatched"
+    AGENT_ENV_SPEC_CHANGED = "AUDIT.agent.env_spec.changed"
+    AGENT_WORKFLOW_STAGE_CHANGED = "AUDIT.agent.workflow.stage_changed"
+    AGENT_WORKFLOW_GATE_DECIDED = "AUDIT.agent.workflow.gate_decided"
+    AGENT_MODEL_SPEND = "AUDIT.agent.model_spend"
+
 
 # Event types that Zentinelle's default subscription template
 # subscribes to. Operator can override but starting set is
@@ -246,6 +256,16 @@ REQUIRED_PAYLOAD_KEYS: dict[ZentinelleEventType, frozenset[str]] = {
             "overall_verdict",
         }
     ),
+    ZentinelleEventType.AGENT_TASK_LAUNCHED: frozenset({"task_id", "agent_slug", "status"}),
+    ZentinelleEventType.AGENT_TASK_COMPLETED: frozenset({"task_id", "agent_slug", "status"}),
+    ZentinelleEventType.AGENT_TASK_FAILED: frozenset({"task_id", "agent_slug", "status"}),
+    ZentinelleEventType.AGENT_DISPATCHED: frozenset({"task_id", "agent_slug", "dispatcher"}),
+    ZentinelleEventType.AGENT_ENV_SPEC_CHANGED: frozenset({"env_spec_slug", "fields_changed"}),
+    ZentinelleEventType.AGENT_WORKFLOW_STAGE_CHANGED: frozenset({"workflow_run_id", "stage_id", "status"}),
+    ZentinelleEventType.AGENT_WORKFLOW_GATE_DECIDED: frozenset({"workflow_run_id", "stage_id", "decision"}),
+    ZentinelleEventType.AGENT_MODEL_SPEND: frozenset(
+        {"task_id", "provider", "model_id", "input_tokens", "output_tokens", "estimated_usd"}
+    ),
 }
 
 
@@ -363,6 +383,14 @@ _FRAMEWORK_RELEVANCE: dict[ZentinelleEventType, frozenset[str]] = {
     ZentinelleEventType.OBSERVABILITY_PROFILE_UPDATED: frozenset({"soc2"}),
     ZentinelleEventType.RESIDENCY_POLICY_UPDATED: frozenset({"hipaa"}),
     ZentinelleEventType.COMPLIANCE_REPORT_GENERATED: frozenset({"soc2", "hipaa", "iso27001"}),
+    ZentinelleEventType.AGENT_TASK_LAUNCHED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_TASK_COMPLETED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_TASK_FAILED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_DISPATCHED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_ENV_SPEC_CHANGED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_WORKFLOW_STAGE_CHANGED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_WORKFLOW_GATE_DECIDED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_MODEL_SPEND: frozenset({"soc2", "iso27001", "mitre_atlas"}),
 }
 
 

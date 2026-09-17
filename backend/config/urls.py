@@ -4,6 +4,31 @@ The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/3.2/topics/http/urls/
 """
 
+import os
+
+from django.conf import settings
+from django.conf.urls import include
+from django.contrib import admin
+from django.urls import path, re_path
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import RedirectView
+from django_ratelimit.decorators import ratelimit
+
+from astrolift_agents.urls import urlpatterns as agents_api_urls
+from astrolift_clusters.urls import urlpatterns as clusters_api_urls
+from astrolift_dispatch.urls import urlpatterns as dispatch_api_urls
+from astrolift_identity.urls import (
+    api_urlpatterns as identity_api_urls,
+)
+from astrolift_identity.urls import (
+    app_urlpatterns as identity_app_urls,
+)
+from astrolift_identity.urls import (
+    scim_api_urlpatterns as identity_scim_urls,
+)
+from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
+from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
+from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from auth1.forms import AuthAdminForm
 from auth1.sessions import Auth1SessionWorkflow
 from core import views
@@ -11,29 +36,20 @@ from core.schema.views import CoreStrawberryView
 from core.utils.debug import autologin
 from core.utils.logger_helper import gql_logger
 from core.views_well_known import apple_app_site_association, assetlinks_json
-from django_ratelimit.decorators import ratelimit
-from django.conf import settings
-from django.conf.urls import include
-from django.contrib import admin
-from django.urls import path, re_path
-from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import RedirectView
-from astrolift_identity.urls import (
-    api_urlpatterns as identity_api_urls,
-    app_urlpatterns as identity_app_urls,
-    scim_api_urlpatterns as identity_scim_urls,
-)
-from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
-from astrolift_agents.urls import urlpatterns as agents_api_urls
-from astrolift_clusters.urls import urlpatterns as clusters_api_urls
-from astrolift_dispatch.urls import urlpatterns as dispatch_api_urls
-from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
-from astrolift_scm.urls import urlpatterns as scm_webhook_urls
+
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
 strawberry_view = CoreStrawberryView.as_view(schema=schema)
 strawberry_auth_view = CoreStrawberryView.as_view(schema=schema_auth)
+
+
+def support_tickets_view(request):
+    # Keep the support module import lazy so the default-off feature does not
+    # add upstream integration imports during ordinary URL setup.
+    from core.views_client_cove_support import support_tickets
+
+    return support_tickets(request)
 
 
 def trigger_error(request):
@@ -147,20 +163,19 @@ urlpatterns = [
     # touching the request body.
     *scm_webhook_urls,
     # Pipeline webhooks + runner API + Dispatch Service API
-    *pipeline_webhook_urls,   # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
-    *dispatch_api_urls,       # /api/dispatch/v1/*
+    *pipeline_webhook_urls,  # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
+    *dispatch_api_urls,  # /api/dispatch/v1/*
     # In-cluster keep-alive agent heartbeat ingest (#808). Mounted at
     # the project root so the agent's wire URL —
     # /api/clusters/v1/<guid>/heartbeat/ — resolves without the /app/
     # prefix. Scoped-Bearer-key auth, same shape as the runner/dispatch
     # REST surfaces above.
-    *clusters_api_urls,       # /api/clusters/v1/<guid>/heartbeat/
+    *clusters_api_urls,  # /api/clusters/v1/<guid>/heartbeat/
+    path("api/support/v1/tickets/", support_tickets_view, name="support-tickets"),
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),
 ]
-
-import os
 
 # DJT URLs are gated by the same env var as the toolbar callback in
 # settings.DEBUG_TOOLBAR_CONFIG. Keeping DEBUG=True in prod is useful for

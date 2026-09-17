@@ -90,12 +90,22 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
     from astrolift_clusters.models import ManagedDomain
 
     cluster, dns_driver = _get_cluster_and_dns_driver(cluster_id)
-    result = dns_driver.provision_zone(zone)
-    zone_id: str = result.get("zone_id", "")
-    nameservers: list = result.get("nameservers", [])
+    existing = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    # Revalidation may restart a completed Temporal run. Reuse the zone
+    # already recorded on the row; calling provision_zone again creates a
+    # second hosted zone and changes the nameserver delegation underneath
+    # the operator. This also makes retries idempotent for every provider.
+    existing_config = dict(existing.dns_config or {}) if existing is not None else {}
+    existing_zone_id = str(existing_config.get("zone_id", ""))
+    if existing is not None and existing_zone_id:
+        zone_id = existing_zone_id
+        nameservers = list(existing.provision_nameservers or [])
+    else:
+        result = dns_driver.provision_zone(zone)
+        zone_id = result.get("zone_id", "")
+        nameservers = result.get("nameservers", [])
 
     plugin_slug = cluster.provider_plugin.slug
-    existing = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
     if existing is not None:
         config = dict(existing.dns_config or {})
         config["provision_cluster_id"] = cluster_id

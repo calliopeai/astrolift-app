@@ -229,11 +229,38 @@ class TemporalWorkflowsMutation:
         signal_name = (signal_name or "").strip()
         if not signal_name:
             return _failure("signal_name", "signal_name is required")
+        if signal_name in _EXECUTION_SIGNALS and isinstance(payload, dict):
+            resolved = _resolve_execution_id(payload.get("execution_id"))
+            if resolved is None:
+                return _failure(
+                    "payload",
+                    "execution_id does not name a stage execution; pass the executionId "
+                    "or guid from workflowStageExecutions",
+                )
+            payload = {**payload, "execution_id": resolved}
         args: list = [payload] if payload is not None else []
         delivered = signal_workflow(workflow_id, signal_name, *args)
         if not delivered:
             return _failure("signal_name", "signal could not be delivered")
         return MutationResult.success()
+
+
+# Signals the run workflow keys on a stage execution. The workflow stores the
+# decision under ``str(execution.pk)`` (what ``executionId`` exposes), so a
+# signal carrying the execution's ``guid`` was accepted by Temporal and then
+# ignored forever (#1786). Resolve either spelling here and refuse the rest.
+_EXECUTION_SIGNALS = frozenset({"human_gate_decision", "escalation_cleared"})
+
+
+def _resolve_execution_id(raw: object) -> str | None:
+    from workflows.models import WorkflowStageExecution
+
+    value = str(raw or "").strip()
+    if not value:
+        return None
+    rows = WorkflowStageExecution.objects
+    row = rows.filter(pk=int(value)).first() if value.isdigit() else rows.filter(guid=value).first()
+    return str(row.pk) if row is not None else None
 
 
 @strawberry.type

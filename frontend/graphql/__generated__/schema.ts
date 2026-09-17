@@ -316,6 +316,12 @@ export type AstroliftAgentListItem = {
   sourceUrl: Scalars['String']['output'];
 };
 
+export type AstroliftAgentListItemPage = {
+  items: Array<AstroliftAgentListItem>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftAgentLiveStatus = {
   appSlug: Scalars['String']['output'];
   deploymentReady?: Maybe<Scalars['Boolean']['output']>;
@@ -473,6 +479,7 @@ export type AstroliftAgentTask = {
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   dispatcher?: Maybe<AstroliftAgentTaskDispatcher>;
+  eventSequence: Scalars['Int']['output'];
   failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
@@ -500,6 +507,16 @@ export type AstroliftAgentTaskDispatcher = {
   slug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentTaskEvent = {
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  messageId: Scalars['String']['output'];
+  request?: Maybe<Scalars['JSON']['output']>;
+  sequence: Scalars['Int']['output'];
+  text: Scalars['String']['output'];
+  turnId: Scalars['String']['output'];
+};
+
 export type AstroliftAgentTaskInputMessage = {
   author: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -514,10 +531,30 @@ export type AstroliftAgentTaskInputMessageMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentTaskInputReply = {
+  authorLabel: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  requestSequence: Scalars['Int']['output'];
+  response: Scalars['JSON']['output'];
+};
+
+export type AstroliftAgentTaskInputReplyMutationResult = {
+  data?: Maybe<AstroliftAgentTaskInputReply>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentTaskMutationResult = {
   data?: Maybe<AstroliftAgentTask>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentTaskPage = {
+  items: Array<AstroliftAgentTask>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftAgentTrigger = {
@@ -5342,6 +5379,7 @@ export type Mutation = {
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
   reorderWorkflowStages: MutationResult;
+  replyAgentTaskInput: AstroliftAgentTaskInputReplyMutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
@@ -6549,6 +6587,13 @@ export type MutationReorderWorkflowStagesArgs = {
 };
 
 
+export type MutationReplyAgentTaskInputArgs = {
+  requestSequence: Scalars['Int']['input'];
+  response: Scalars['JSON']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+
 export type MutationReprovisionManagedServiceArgs = {
   input: ReprovisionManagedServiceInput;
 };
@@ -7554,15 +7599,18 @@ export type Query = {
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentFleet: Array<AstroliftAgentListItem>;
+  agentFleetPage: AstroliftAgentListItemPage;
   agentGallery: Array<AstroliftAgentTask>;
   agentLiveStatus: Array<AstroliftAgentLiveStatus>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
+  agentTasksPage: AstroliftAgentTaskPage;
   /** @deprecated Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead. */
   agentTriggers: Array<AstroliftAgentTrigger>;
   agentTriggersPage: AstroliftAgentTriggerPage;
@@ -7903,6 +7951,14 @@ export type QueryAgentFleetArgs = {
 };
 
 
+export type QueryAgentFleetPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAgentGalleryArgs = {
   orgId: Scalars['ID']['input'];
 };
@@ -7922,6 +7978,14 @@ export type QueryAgentSecretBundlesArgs = {
 
 export type QueryAgentTaskArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskEventsArgs = {
+  after?: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
 };
 
 
@@ -7948,6 +8012,16 @@ export type QueryAgentTaskTransitionsSinceArgs = {
 
 export type QueryAgentTasksArgs = {
   orgId: Scalars['ID']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+  workloadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryAgentTasksPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   workloadId?: InputMaybe<Scalars['ID']['input']>;
 };

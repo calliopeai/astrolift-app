@@ -265,7 +265,8 @@ if USE_S3:
     AWS_ACCESS_KEY_ID = env_str("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = env_str("AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env_str("AWS_STORAGE_BUCKET_NAME")
-    AWS_S3_ENDPOINT_URL = env_str("AWS_S3_ENDPOINT_URL", "")  # MinIO: http://minio-local:9000
+    # Leave the endpoint unset for AWS S3; an empty string is invalid to boto3.
+    AWS_S3_ENDPOINT_URL = env_str("AWS_S3_ENDPOINT_URL") or None  # MinIO: http://minio-local:9000
     AWS_S3_CUSTOM_DOMAIN = env_str("AWS_S3_CUSTOM_DOMAIN", "")
     if not AWS_S3_CUSTOM_DOMAIN:
         if AWS_S3_ENDPOINT_URL:
@@ -458,6 +459,13 @@ ASTROLIFT_TEMPORAL_ENABLED = env_bool("ASTROLIFT_TEMPORAL_ENABLED", True)
 # returns a PRECONDITION envelope; cluster adoption is not gated.
 ASTROLIFT_DEPLOY_PIPELINE_ENABLED = env_bool("FEATURE_DEPLOY_PIPELINE", True)
 
+# Client Cove support integration. The module is default-off; deployments must
+# opt in only after configuring an authenticated upstream and completing the
+# entitlement-to-case smoke test.
+ASTROLIFT_SUPPORT_ENABLED = env_bool("FEATURE_SUPPORT", False)
+CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("/")
+CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
+
 CONSTANCE_CONFIG = {
     "TIME_ZONE": (TIME_ZONE, "System timezone"),
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
@@ -487,6 +495,11 @@ CONSTANCE_CONFIG = {
         "mutations short-circuit with a PRECONDITION envelope so operators can pause rollouts "
         "without a redeploy. Cluster adoption (bringClusterIntoManagement) is not gated. "
         "Seeded from the FEATURE_DEPLOY_PIPELINE env var (default True).",
+    ),
+    "SUPPORT_ENABLED": (
+        ASTROLIFT_SUPPORT_ENABLED,
+        "Enable the Client Cove support case module. Default off until the "
+        "authenticated entitlement contract and production smoke test are complete.",
     ),
     "WEBHOOK_SECRET_ROTATION_GRACE_SECONDS": (
         3600,
@@ -695,7 +708,12 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Source repositories": {"fields": ("RESTRICT_SOURCE_REPOS_TO_ORG",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
+    "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
     "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
+    "Log exports": {
+        "fields": ("APP_LOG_EXPORT_MAX_LINES", "APP_LOG_EXPORT_TTL_SECONDS"),
+        "collapse": False,
+    },
     "Admin screens": {
         "fields": (
             "ADMIN_COST_ENABLED",
