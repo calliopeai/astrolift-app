@@ -335,13 +335,14 @@ def start_agent_box(box) -> None:
     log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
 
 
-def stop_agent_box(box, *, status: str | None = None, reason: str = "") -> None:
+def stop_agent_box(
+    box, *, status: str | None = None, reason: str = "", require_teardown: bool = False
+) -> None:
     """Delete the box's cluster objects and settle the row.
 
-    Cluster teardown is best-effort on purpose: a box whose cluster is
-    unreachable must still be removable from the platform, otherwise an
-    operator is stuck with a row they cannot clear. The failure is recorded
-    on the row rather than raised.
+    Observing a settled workload records its terminal state even when cluster
+    cleanup fails, preserving the cleanup error on the row. Explicit destruction
+    requires teardown to succeed so a failed stop remains visible and retryable.
 
     ``reason`` is the box's own cause of death, when the caller observed
     one (#131). It leads ``last_error`` because it is what an operator is
@@ -361,6 +362,10 @@ def stop_agent_box(box, *, status: str | None = None, reason: str = "") -> None:
         except Exception as exc:  # noqa: BLE001
             error = f"cluster teardown did not complete: {exc}"
             log.warning("agent_box: %s for box %s", error, box.slug)
+            if require_teardown:
+                box.last_error = error[:LAST_ERROR_MAX_CHARS]
+                box.save(update_fields=["last_error", "updated_at", "version"])
+                raise AgentBoxError(error) from exc
 
     box.status = target
     box.ended_at = timezone.now()
@@ -385,7 +390,9 @@ def _delete_box_objects(cluster, namespace: str, job_name: str) -> None:
             "metadata": {"name": box_secret_name(job_name), "namespace": namespace},
         },
     ]
-    result = driver.delete_manifests(ctx.slug, namespace, refs)
+    # Job deletion without a propagation policy may orphan its running pod.
+    # Keep the Job until Kubernetes has deleted its dependents.
+    result = driver.delete_manifests(ctx.slug, namespace, refs, propagation_policy="Foreground")
     if result is not None and not getattr(result, "ok", True):
         detail = result.summary() if hasattr(result, "summary") else "delete failed"
         raise AgentBoxError(str(detail))
@@ -791,10 +798,7 @@ def ensure_agent_box(
             # they configured into something that holds a node.
             raise AgentBoxEnsureError(
                 "validation",
-                (
-                    f"agent {agent.slug} is run mode {agent.run_mode}; "
-                    "only a persistent agent can back a box"
-                ),
+                (f"agent {agent.slug} is run mode {agent.run_mode}; only a persistent agent can back a box"),
                 "agentSlug",
             )
 
@@ -925,5 +929,5 @@ def destroy_agent_box(box, *, by=None) -> None:
     because a soft-deleted row that leaves a pod running is a node nobody is
     watching any more.
     """
-    stop_agent_box(box)
+    stop_agent_box(box, require_teardown=True)
     box.soft_delete(by=by)
