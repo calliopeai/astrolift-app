@@ -292,6 +292,12 @@ type AstroliftAgentListItem {
   scaleDownCron: String!
 }
 
+type AstroliftAgentListItemPage {
+  items: [AstroliftAgentListItem!]!
+  nextCursor: String
+  totalCount: Int
+}
+
 type AstroliftAgentLiveStatus {
   workloadId: GUID!
   workloadSlug: String!
@@ -454,6 +460,7 @@ type AstroliftAgentTask {
   callbackUrl: String!
   result: JSON
   failureMessage: String
+  eventSequence: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
   queuedAt: DateTime
@@ -478,6 +485,16 @@ type AstroliftAgentTaskDispatcher {
   clusterName: String!
 }
 
+type AstroliftAgentTaskEvent {
+  sequence: Int!
+  turnId: String!
+  messageId: String!
+  kind: String!
+  text: String!
+  createdAt: DateTime!
+  request: JSON
+}
+
 type AstroliftAgentTaskInputMessage {
   id: GUID!
   message: String!
@@ -492,10 +509,30 @@ type AstroliftAgentTaskInputMessageMutationResult {
   data: AstroliftAgentTaskInputMessage
 }
 
+type AstroliftAgentTaskInputReply {
+  id: GUID!
+  requestSequence: Int!
+  response: JSON!
+  authorLabel: String!
+  createdAt: DateTime!
+}
+
+type AstroliftAgentTaskInputReplyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentTaskInputReply
+}
+
 type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTask
+}
+
+type AstroliftAgentTaskPage {
+  items: [AstroliftAgentTask!]!
+  nextCursor: String
+  totalCount: Int
 }
 
 type AstroliftAgentTrigger {
@@ -5548,6 +5585,7 @@ type Mutation {
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
+  replyAgentTaskInput(taskId: ID!, requestSequence: Int!, response: JSON!): AstroliftAgentTaskInputReplyMutationResult!
   sendAgentTaskInput(taskId: ID!, message: String!): AstroliftAgentTaskInputMessageMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
   ensureAgentBox(input: EnsureAgentBoxInput!, orgId: ID!): AstroliftAgentBoxMutationResult!
@@ -6177,6 +6215,7 @@ type Query {
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
+  agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!
@@ -6187,6 +6226,8 @@ type Query {
   agentEnvironmentSpecSecretBundleAttachments(slug: String!): [AstroliftAgentSecretBundleAttachment!]!
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
+  agentFleetPage(orgId: ID!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentListItemPage!
+  agentTasksPage(orgId: ID!, status: String = null, workloadId: ID = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTaskPage!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail
   agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]! @deprecated(reason: "Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead.")
   agentTriggersPage(orgId: ID!, agentSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTriggerPage!

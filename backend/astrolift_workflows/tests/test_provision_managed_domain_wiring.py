@@ -45,6 +45,9 @@ class _FakeDns:
     def ensure_record(self, **kwargs):
         return None
 
+    def provision_zone(self, zone):
+        raise AssertionError("an existing managed zone must be reused")
+
     def revoke_cert(self, zone, cert_id):
         self.revoked.append(cert_id)
 
@@ -97,6 +100,28 @@ def test_reissue_keeps_the_same_san_scope(monkeypatch, cluster, org):
 
     assert fake.revoked == ["old-cert"]
     assert fake.cert_calls[0]["sans"] == [_ZONE, f"*.{_ZONE}", f"*.pr.{_ZONE}"]
+
+
+@pytest.mark.django_db
+def test_provision_reuses_recorded_zone_instead_of_creating_another(monkeypatch, cluster, org):
+    """Restarting revalidation must preserve the operator's delegation."""
+    domain = _managed_domain(
+        org,
+        dns_config={"zone_id": "Z-existing"},
+        provision_nameservers=list(_PLATFORM_NS),
+    )
+    fake = _FakeDns()
+    monkeypatch.setattr(
+        provision_managed_domain,
+        "_get_cluster_and_dns_driver",
+        lambda cluster_id: (cluster, fake),
+    )
+
+    result = provision_managed_domain._provision_dns_zone_sync(cluster.pk, _ZONE)
+
+    assert result == {"zone_id": "Z-existing", "nameservers": _PLATFORM_NS}
+    domain.refresh_from_db()
+    assert domain.dns_config["zone_id"] == "Z-existing"
 
 
 # ---- NS delegation gate ---------------------------------------------------

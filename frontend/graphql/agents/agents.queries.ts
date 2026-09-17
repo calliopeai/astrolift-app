@@ -302,6 +302,72 @@ export const LIST_AGENT_FLEET = gql`
   }
 `;
 
+export const LIST_AGENT_FLEET_PAGE = gql`
+  query ListAgentFleetPage($orgId: ID!, $search: String, $limit: Int!, $after: String) {
+    agentFleetPage(orgId: $orgId, search: $search, limit: $limit, after: $after) {
+      items {
+        id
+        name
+        slug
+        appSlug
+        projectSlug
+        sourceRepo
+        sourceUrl
+        runFamily
+        runMode
+        runPaused
+        runCronExpression
+        lastRunStatus
+        lastRunAt
+        runningCount
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+export const LIST_AGENT_TASKS_PAGE = gql`
+  query ListAgentTasksPage(
+    $orgId: ID!
+    $status: String
+    $workloadId: ID
+    $search: String
+    $limit: Int!
+    $after: String
+  ) {
+    agentTasksPage(
+      orgId: $orgId
+      status: $status
+      workloadId: $workloadId
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        id
+        agentSlug
+        agentName
+        projectSlug
+        status
+        callbackUrl
+        result
+        failureMessage
+        createdAt
+        startedAt
+        finishedAt
+        vncEnabled
+        vncUrl
+        snapshotUrl
+        podName
+        namespace
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 // Per-agent detail join (spec 38 Phase 4). `agent(orgId, slug)` resolves a
 // single registered agent and bundles the read-side joins the fleet list can't:
 // the assembled `brief`, the ordered `skills` (each with its nested `toolDefs`),
@@ -473,4 +539,3 @@ export const LIST_AGENT_BOXES = gql`
     }
   }
 `;
-

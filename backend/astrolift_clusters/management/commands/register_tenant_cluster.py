@@ -779,7 +779,6 @@ class Command(BaseCommand):
             "ca_cert": ca_cert,
             "auth_config": auth_config,
             "provider_config": provider_config,
-            "alb_auth_config": alb_auth_config,
             "is_active": True,
             "deleted_at": None,
             "deleted_by": None,
@@ -792,6 +791,13 @@ class Command(BaseCommand):
         # partially-configured re-run.
         if oidc_auth_config is not None:
             defaults["oidc_auth_config"] = oidc_auth_config
+        # Same rule for the Cognito gate (#1773): the control plane re-runs
+        # this command on every container start, and a task definition without
+        # the three ASTROLIFT_CLUSTER_ALB_AUTH_* vars was nulling an
+        # operator-set config, so every app deployed afterwards rendered an
+        # Ingress without the authenticate action.
+        if alb_auth_config is not None:
+            defaults["alb_auth_config"] = alb_auth_config
         # Only when passed. Defaulting it here would re-group load balancers
         # that are already serving traffic the next time anyone re-registers
         # a cluster, which is the operator decision the model docstring

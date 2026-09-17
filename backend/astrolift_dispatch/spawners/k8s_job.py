@@ -312,7 +312,10 @@ class K8sJobSpawner(ContainerSpawner):
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
-            result = driver.delete_manifests(ctx.slug, self._namespace, refs)
+            # The Kubernetes Job API can orphan dependents when no policy is
+            # supplied. Stop must terminate the pod, including a tool that is
+            # still running after the runner's callback credential is revoked.
+            result = driver.delete_manifests(ctx.slug, self._namespace, refs, propagation_policy="Foreground")
             if result is not None and not getattr(result, "ok", True):
                 detail = result.summary() if hasattr(result, "summary") else "delete failed"
                 raise RuntimeError(str(detail))

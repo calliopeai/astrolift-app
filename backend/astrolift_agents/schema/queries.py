@@ -29,6 +29,7 @@ from astrolift_agents.models import (
     AgentInteraction,
     AgentSecretBundleRef,
     AgentTask,
+    AgentTaskEvent,
     Brief,
     DispatcherInstance,
     OrgSkillRepo,
@@ -40,12 +41,15 @@ from astrolift_agents.schema.types import (
     AgentDetailType,
     AgentEnvironmentSpecType,
     AgentInteractionType,
+    AgentListItemPageType,
     AgentListItemType,
     AgentLiveStatusType,
     AgentRuntimeType,
     AgentSecretBundleAttachmentType,
     AgentSecretBundleType,
     AgentSecretStatusType,
+    AgentTaskEventType,
+    AgentTaskPageType,
     AgentTaskType,
     AgentTriggerType,
     BriefType,
@@ -321,6 +325,11 @@ def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None
     """
     org_pk = _caller_org_id(info, org_id)
     workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
+    return _agent_list_rows_for_workloads(workloads)
+
+
+def _agent_list_rows_for_workloads(workloads) -> list[AgentListItemType]:
+    workloads = list(workloads)
     rollup = _agent_run_rollup([w.pk for w in workloads])
     rows: list[AgentListItemType] = []
     for w in workloads:
@@ -676,6 +685,58 @@ class AgentsQuery:
         return [agent_interaction_to_type(r) for r in qs]
 
     @strawberry.field
+    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
+    @tenant_scoped()
+    def agent_task_events(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        task_id: strawberry.ID,
+        after: int = 0,
+        limit: int = 100,
+    ) -> list[AgentTaskEventType]:
+        org_pk = _caller_org_id(info, org_id)
+        guid = _valid_guid(task_id)
+        if guid is None:
+            return []
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(
+                guid=guid,
+                organization_id=org_pk,
+            )
+            .first()
+        )
+        if task is None:
+            return []
+        if after < 0 or after > task.event_sequence:
+            raise GraphQLError("Invalid task event cursor")
+        rows = list(
+            AgentTaskEvent.objects.filter(
+                organization_id=org_pk,
+                agent_task=task,
+                sequence__gt=after,
+                sequence__lte=task.event_sequence,
+            ).order_by("sequence")[: max(1, min(limit, 100))]
+        )
+        if (not rows and after < task.event_sequence) or any(
+            row.sequence != after + index + 1 for index, row in enumerate(rows)
+        ):
+            raise GraphQLError("Task event history is incomplete; refresh the session history")
+        return [
+            AgentTaskEventType(
+                sequence=row.sequence,
+                turn_id=row.turn_id,
+                message_id=row.message_id,
+                kind=row.kind,
+                text=row.text,
+                created_at=row.created_at,
+                request=row.request,
+            )
+            for row in rows
+        ]
+
+    @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_task_scope("id"))
     @tenant_scoped()
     def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
@@ -1014,6 +1075,81 @@ class AgentsQuery:
         doesn't have to special-case a null ``project_slug`` argument.
         """
         return _agent_list_rows(info, org_id, project_slug=None)
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_fleet_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> AgentListItemPageType:
+        """Cursor-paginated organization-wide agent fleet."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = _agent_workload_qs(org_pk)
+        if search:
+            qs = qs.filter(search_q(search, "slug", "name"))
+        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-fleet:{org_pk}")
+        return AgentListItemPageType(
+            items=_agent_list_rows_for_workloads(page.rows),
+            next_cursor=page.next_cursor,
+            total_count=page.total_count,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_tasks_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        status: str | None = None,
+        workload_id: strawberry.ID | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> AgentTaskPageType:
+        """Cursor-paginated task history for the organization."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = visible_agent_tasks(org_pk, Permission.AGENT_READ)
+        if status:
+            qs = qs.filter(status=status)
+        if workload_id:
+            workload_guid = _valid_guid(workload_id)
+            if workload_guid is None:
+                return AgentTaskPageType(items=[], total_count=0)
+            from astrolift_registry.models import Workload
+
+            wl = (
+                Workload.objects.filter(
+                    guid=workload_guid,
+                    registered_app__organization_id=org_pk,
+                    deleted_at__isnull=True,
+                )
+                .values_list("pk", flat=True)
+                .first()
+            )
+            if wl is None:
+                return AgentTaskPageType(items=[], total_count=0)
+            qs = qs.filter(agent_definition_id=wl)
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search, "status", "agent_definition__slug", "agent_definition__name", "project__slug"
+                )
+            )
+        qs = qs.select_related(
+            "organization", "project", "agent_definition", "dispatcher", "dispatcher__tenant_cluster"
+        )
+        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-tasks:{org_pk}")
+        return AgentTaskPageType(
+            items=agent_tasks_to_types(page.rows),
+            next_cursor=page.next_cursor,
+            total_count=page.total_count,
+        )
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("slug"))

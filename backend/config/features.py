@@ -46,6 +46,9 @@ class Feature(StrEnum):
     # — its workflow is fully implemented end-to-end.
     DEPLOY_PIPELINE = "deploy_pipeline"
     AGENTS = "agents"
+    # Client Cove support/case integration. Deliberately off until the
+    # authenticated entitlement contract is configured and verified.
+    SUPPORT = "support"
 
 
 # Feature -> environment variable -> default
@@ -56,6 +59,7 @@ FEATURE_DEFAULTS = {
     Feature.FILE_UPLOADS: ("FEATURE_FILE_UPLOADS", True),
     Feature.DEPLOY_PIPELINE: ("FEATURE_DEPLOY_PIPELINE", True),
     Feature.AGENTS: ("FEATURE_AGENTS", True),
+    Feature.SUPPORT: ("FEATURE_SUPPORT", False),
 }
 
 # Feature -> Django apps that belong to it

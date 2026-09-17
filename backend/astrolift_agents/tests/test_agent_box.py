@@ -251,6 +251,57 @@ def _env_of(job):
     return {e["name"]: e for e in _container_of(job)["env"]}
 
 
+@pytest.mark.parametrize("with_agent", [False, True])
+def test_explicit_image_reaches_the_box_job_and_survives_restart(org, cluster, with_agent):
+    from astrolift_registry.models import Container
+
+    image = "docker.io/calliopeai/astrolift-agent-claude-code:explicit"
+    agent = _persistent_agent(org) if with_agent else None
+    if agent:
+        Container.objects.create(workload=agent, name="app", is_primary=True, image_ref="agent-default:old")
+    kwargs = {"organization": org, "image": image, "agent_slug": agent.slug if agent else ""}
+    first = box_service.ensure_agent_box(**kwargs)
+    first.refresh_from_db()
+    assert first.image == image
+    assert first.environment_spec_id is None
+    assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == image
+    applied = len(cluster.driver.applied)
+    assert box_service.ensure_agent_box(**kwargs).pk == first.pk
+    assert len(cluster.driver.applied) == applied
+
+    box_service.stop_agent_box(first)
+    restarted = box_service.ensure_agent_box(**kwargs)
+    assert restarted.pk == first.pk
+    assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == image
+
+
+def test_agent_box_restart_without_override_uses_current_workload_image(org, cluster):
+    from astrolift_registry.models import Container
+
+    agent = _persistent_agent(org)
+    container = Container.objects.create(
+        workload=agent, name="app", is_primary=True, image_ref="agent-default:old"
+    )
+    first = box_service.ensure_agent_box(organization=org, agent_slug=agent.slug)
+    box_service.stop_agent_box(first)
+    container.image_ref = "agent-default:new"
+    container.save(update_fields=["image_ref", "updated_at", "version"])
+    restarted = box_service.ensure_agent_box(organization=org, agent_slug=agent.slug)
+    assert restarted.pk == first.pk
+    assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == "agent-default:new"
+
+
+def test_spec_box_restart_uses_current_spec_image(org, cluster):
+    spec = _spec(org, image="agent-spec:old")
+    first = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    box_service.stop_agent_box(first)
+    spec.image_tag = "agent-spec:new"
+    spec.save(update_fields=["image_tag", "updated_at", "version"])
+    restarted = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    assert restarted.pk == first.pk
+    assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == "agent-spec:new"
+
+
 # ---------------------------------------------------------------------------
 # The pod spec holds the container open
 # ---------------------------------------------------------------------------

@@ -33,6 +33,13 @@ from astrolift_agents.models import (
     DispatcherInstance,
     record_interaction,
 )
+from astrolift_agents.services.agent_task_events import (
+    TaskEventError,
+    commit_task_events,
+    prepare_task_events,
+    validate_task_events,
+)
+from astrolift_agents.services.agent_task_requests import TaskInputRequestError, callback_input_response
 
 logger = logging.getLogger(__name__)
 
@@ -548,7 +555,7 @@ def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
 def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     """Heartbeat and result callback from thread-mode agents.
 
-    Body: {status, result?, partial?, error?, continue?, input_intent?}
+    Body: {status, result?, partial?, error?, continue?, input_intent?, events?}
 
     A terminal ``status`` of "completed"/"failed" records the outcome and
     transitions the task. ``running`` (or an omitted status) is a heartbeat;
@@ -609,6 +616,10 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     input_intent = body.get("input_intent")
     if input_intent not in {None, "peek", "consume"}:
         return JsonResponse({"error": f"invalid input_intent: {input_intent!r}"}, status=400)
+    try:
+        events = validate_task_events(body["events"]) if "events" in body else None
+    except TaskEventError as exc:
+        return JsonResponse({"error": str(exc)}, status=exc.status)
     finding = body.get("finding")
     if finding is not None:
         if not isinstance(finding, dict):
@@ -621,6 +632,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             )
 
     finding_index: int | None = None
+    input_response = None
 
     with transaction.atomic():
         query = AgentTask.objects.select_for_update().filter(guid=task_id, deleted_at__isnull=True)
@@ -639,6 +651,19 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             # operator cancellation may wait on the row lock and find the
             # token revoked. Do not let that stale callback mutate the task.
             return JsonResponse({"error": "task not found or callback token expired"}, status=404)
+
+        try:
+            prepared_events = prepare_task_events(task, events or [])
+            if "input_request" in body:
+                if new_status not in {None, "running"} or input_intent is not None:
+                    raise TaskInputRequestError(
+                        "input_request cannot accompany terminal status or input_intent"
+                    )
+                input_response = callback_input_response(task, body["input_request"])
+        except TaskEventError as exc:
+            return JsonResponse({"error": str(exc), "event_sequence": task.event_sequence}, status=exc.status)
+        except TaskInputRequestError as exc:
+            return JsonResponse({"error": str(exc)}, status=exc.status)
 
         if finding is not None:
             if task.status != AgentTask.Status.RUNNING:
@@ -700,7 +725,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
             task.transition_to(target)
 
-    # Heartbeat (any non-terminal status) is a no-op acknowledgement.
+        commit_task_events(task, prepared_events)
 
     record_interaction(
         task,
@@ -718,6 +743,11 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     )
 
     payload = {"ok": True, "continue": task.status == AgentTask.Status.RUNNING}
+    if events is not None:
+        payload["event_sequence"] = task.event_sequence
+        payload["input_protocol_version"] = 1
+    if "input_request" in body:
+        payload["input_response"] = input_response
     payload.update(_steering_input_payload(task, input_intent))
     return JsonResponse(payload)
 

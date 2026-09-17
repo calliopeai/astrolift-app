@@ -111,6 +111,8 @@ class AgentTask(BaseCoreModel):
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
     failure = models.JSONField(null=True, blank=True)
+    event_sequence = models.PositiveIntegerField(default=0)
+    event_bytes = models.PositiveIntegerField(default=0)
     # Per-dispatch ad-hoc input frozen at task creation (#930). Carries the
     # ``runAstroliftAgent`` ad-hoc ``trigger_payload`` and the trigger-bound
     # dispatch's ``input_mapping``-shaped webhook payload. Surfaced to the
@@ -285,6 +287,12 @@ class AgentTask(BaseCoreModel):
             task.save(update_fields=fields)
             for field in fields:
                 setattr(self, field, getattr(task, field))
+        try:
+            from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
+
+            emit_agent_task_transition(self, new_status)
+        except Exception:  # noqa: BLE001 - evidence must never block a task
+            pass
 
     def __str__(self) -> str:
         return f"AgentTask {self.guid} ({self.status})"

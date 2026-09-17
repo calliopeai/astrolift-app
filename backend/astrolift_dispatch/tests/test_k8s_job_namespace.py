@@ -36,6 +36,7 @@ class _RecordingDriver:
         self.calls: list[str] = []
         self.fail_apply = fail_apply
         self.deleted: list[dict] = []
+        self.deletion_policies: list[str | None] = []
         self.applied: list[dict] = []
 
     def ensure_namespace(self, cluster, name, labels, annotations):
@@ -53,9 +54,10 @@ class _RecordingDriver:
     def persistent_volume_claim_exists(self, _cluster, _namespace, _name):
         return True
 
-    def delete_manifests(self, cluster, namespace, manifests):
+    def delete_manifests(self, cluster, namespace, manifests, *, propagation_policy=None):
         self.calls.append(f"delete_manifests:{namespace}")
         self.deleted.extend(manifests)
+        self.deletion_policies.append(propagation_policy)
         return _DeleteResult()
 
 
@@ -207,6 +209,38 @@ def test_stop_kills_job_before_attachment_recovery(monkeypatch):
         raise AssertionError("stop should surface attachment recovery failure")
 
     assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
+    assert driver.deletion_policies == ["Foreground"]
+
+
+def test_stop_requests_cascading_deletion_of_exact_job_dependents(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.k8s_job._task_for_external_id", lambda _external_id: None
+    )
+
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+    spawner.stop("agent-task-waiting-input")
+
+    assert driver.deletion_policies == ["Foreground"]
+    assert driver.deleted == [
+        {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {"name": "agent-task-waiting-input", "namespace": "astrolift-agents-steadymd"},
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": "agent-task-waiting-input-secrets",
+                "namespace": "astrolift-agents-steadymd",
+            },
+        },
+    ]
 
 
 def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monkeypatch):

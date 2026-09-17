@@ -7,6 +7,8 @@ subscription delivered nothing. These tests pin the join.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from astrolift_identity.models import Organization
@@ -52,7 +54,9 @@ def test_mapping_covers_catalog_and_ignores_the_rest():
     assert event_type_for_action("deployment.approve") is ZentinelleEventType.APP_DEPLOY
     assert event_type_for_action("role_binding.grant") is ZentinelleEventType.ROLE_BINDING_GRANT
     assert event_type_for_action("app.secret.reveal") is ZentinelleEventType.SECRET_VIEWED
-    assert event_type_for_action("agents.task.launch") is None
+    assert event_type_for_action("agents.task.launch") is ZentinelleEventType.AGENT_TASK_LAUNCHED
+    assert event_type_for_action("agents.agent.dispatch") is ZentinelleEventType.AGENT_DISPATCHED
+    assert event_type_for_action("agents.env_spec.update") is ZentinelleEventType.AGENT_ENV_SPEC_CHANGED
     assert event_type_for_action("session.heartbeat") is None
 
 
@@ -76,7 +80,7 @@ def test_envelope_is_the_locked_wire_shape():
     [
         {"decision": "DENY"},
         {"organization_id": None},
-        {"action": "agents.task.launch"},
+        {"action": "session.heartbeat"},
     ],
 )
 def test_non_evidence_entries_build_nothing(overrides):
@@ -119,3 +123,37 @@ def test_generic_format_posts_the_inner_envelope():
     plain = {"event_type": "deployment.succeeded", "payload": {"hello": "world"}}
     assert adapt_payload(format="generic", envelope=plain) == plain
     assert not is_zentinelle_envelope("deployment.succeeded", plain["payload"])
+
+
+@pytest.mark.django_db
+def test_agent_task_terminal_emits_lifecycle_and_spend_events():
+    from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
+
+    org = Organization.objects.create(name="Agent Events", slug="agent-events")
+    task = SimpleNamespace(
+        guid="01TASK",
+        organization_id=org.pk,
+        agent_definition=SimpleNamespace(slug="support-agent"),
+        dispatcher="dispatcher-a",
+        result={
+            "usage": {
+                "provider": "openai",
+                "model": "gpt-5",
+                "prompt_tokens": 12,
+                "completion_tokens": 8,
+                "cost_usd": 0.004,
+            }
+        },
+    )
+    seen = []
+    register_event_subscriber(seen.append)
+    try:
+        emit_agent_task_transition(task, "completed")
+    finally:
+        unregister_event_subscriber(seen.append)
+    assert [event.event_type for event in seen] == [
+        "AUDIT.agent.task.completed",
+        "AUDIT.agent.model_spend",
+    ]
+    assert seen[1].payload["payload"]["output_tokens"] == 8
+    assert seen[1].payload["idempotency_key"].startswith(f"zentinelle-{org.pk}-")
