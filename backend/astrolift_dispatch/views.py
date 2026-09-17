@@ -402,6 +402,8 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
             return JsonResponse({"error": "task not found"}, status=404)
 
         target = status_map[new_status]
+        if task.cancel_requested_at and task.status not in AgentTask.TERMINAL_STATUSES:
+            return JsonResponse({"error": "task cancellation is pending", "continue": False}, status=409)
         if task.status in AgentTask.TERMINAL_STATUSES:
             if task.status != target:
                 return JsonResponse(
@@ -651,6 +653,9 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             # operator cancellation may wait on the row lock and find the
             # token revoked. Do not let that stale callback mutate the task.
             return JsonResponse({"error": "task not found or callback token expired"}, status=404)
+
+        if task.cancel_requested_at and task.status not in AgentTask.TERMINAL_STATUSES:
+            return JsonResponse({"error": "task cancellation is pending", "continue": False}, status=409)
 
         try:
             prepared_events = prepare_task_events(task, events or [])
