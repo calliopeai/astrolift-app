@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -30,7 +31,8 @@ class LocalDockerSpawner(ContainerSpawner):
         if getattr(task, "vnc_enabled", False):
             image = _vnc_image(image)
 
-        container_name = f"agent-task-{str(task.guid)[:12]}"
+        # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
+        container_name = f"agent-task-{str(task.guid).replace('-', '')}"
 
         # Brief identity + (for VNC tasks) the snapshot PUT URL env vars.
         env_vars = brief_env_vars(task) + snapshot_env_vars(task)
@@ -39,7 +41,19 @@ class LocalDockerSpawner(ContainerSpawner):
             env_args += ["-e", f"{ev['name']}={ev['value']}"]
 
         try:
-            cmd = ["docker", "run", "-d", "--name", container_name] + env_args + [image]
+            cmd = (
+                [
+                    "docker",
+                    "run",
+                    "-d",
+                    "--name",
+                    container_name,
+                    "--label",
+                    f"astrolift.dev/task-id={task.guid}",
+                ]
+                + env_args
+                + [image]
+            )
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 return SpawnResult(external_id=container_name, ok=False, error=result.stderr)
@@ -71,10 +85,32 @@ class LocalDockerSpawner(ContainerSpawner):
         except Exception as exc:
             return TaskStatus(failed=True, error_message=str(exc))
 
-    def stop(self, external_id: str) -> None:
+    def stop(self, external_id: str, *, expected_task_guid: str | None = None) -> None:
+        delete_id = external_id
+        if expected_task_guid is not None:
+            inspected = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    '{{.Id}} {{ index .Config.Labels "astrolift.dev/task-id" }}',
+                    external_id,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if inspected.returncode:
+                if self._is_missing(inspected, external_id):
+                    return
+                raise RuntimeError("Cannot verify ownership of the Docker container")
+            fields = inspected.stdout.strip().split()
+            if len(fields) != 2 or fields[1] != expected_task_guid:
+                raise RuntimeError("Docker container belongs to a different agent task")
+            delete_id = fields[0]
         try:
             result = subprocess.run(
-                ["docker", "rm", "-f", external_id],
+                ["docker", "rm", "-f", delete_id],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -83,3 +119,25 @@ class LocalDockerSpawner(ContainerSpawner):
             raise RuntimeError(f"local container deletion failed: {exc}") from exc
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "local container deletion failed")
+
+    @staticmethod
+    def _is_missing(result, external_id: str) -> bool:
+        return bool(
+            re.fullmatch(
+                rf"(?:Error:|Error response from daemon:) No such (?:object|container): {re.escape(external_id)}",
+                result.stderr.strip(),
+            )
+        )
+
+    def confirm_stopped(self, external_id: str) -> bool:
+        result = subprocess.run(
+            ["docker", "inspect", "--format", "{{.Id}}", external_id],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return False
+        if self._is_missing(result, external_id):
+            return True
+        raise RuntimeError("Cannot confirm Docker container deletion")

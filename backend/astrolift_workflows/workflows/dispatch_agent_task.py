@@ -40,11 +40,8 @@ with workflow.unsafe.imports_passed_through():
 # heartbeat — not a short start-to-close — be what detects a wedged worker.
 _DISPATCH_TIMEOUT = timedelta(hours=24)
 _HEARTBEAT_TIMEOUT = timedelta(minutes=2)
-# Do NOT auto-retry the whole dispatch: a single attempt either drives the
-# task to terminal or records a terminal FAILED on the task itself (the
-# spawn helper flips the task to FAILED on a spawn error). Re-running would
-# re-spawn a fresh container for an already-terminal task. One attempt.
-_NO_RETRY = RetryPolicy(maximum_attempts=1)
+# A replacement worker resumes the persisted task and external container.
+_RETRY = RetryPolicy(initial_interval=timedelta(seconds=1), maximum_interval=timedelta(seconds=30))
 
 
 @workflow.defn(name="DispatchAgentTaskWorkflow")
@@ -56,8 +53,9 @@ class DispatchAgentTaskWorkflow:
                 dispatch_agent_task,
                 input.agent_task_id,
                 start_to_close_timeout=_DISPATCH_TIMEOUT,
+                schedule_to_close_timeout=_DISPATCH_TIMEOUT,
                 heartbeat_timeout=_HEARTBEAT_TIMEOUT,
-                retry_policy=_NO_RETRY,
+                retry_policy=_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface as a clean result
             return WorkflowResult(

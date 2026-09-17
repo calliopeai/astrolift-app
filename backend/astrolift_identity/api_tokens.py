@@ -25,6 +25,7 @@ import datetime as dt
 import hashlib
 import secrets
 from collections.abc import Iterable
+from uuid import UUID
 
 from django.utils import timezone
 
@@ -135,6 +136,16 @@ def reset_current_api_token(token: contextvars.Token) -> None:
 
 def get_current_api_token():
     return _current_api_token.get()
+
+
+def token_matches_organization(token, organization_guid: str) -> bool:
+    if not organization_guid:
+        return True
+    try:
+        expected = UUID(organization_guid)
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return expected == token.organization.guid
 
 
 def token_scope_allows_permission(token, permission: str) -> bool:

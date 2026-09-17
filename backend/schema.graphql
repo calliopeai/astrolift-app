@@ -5647,6 +5647,9 @@ type Mutation {
   """
   importWorkflowManifest(toml: String!, preview: Boolean! = true, orgId: ID = null): ImportWorkflowManifestResult!
 
+  """Cancel, terminate, or retry cleanup for an exact owned execution."""
+  controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!
+
   """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
   createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
 
@@ -6249,6 +6252,14 @@ type Query {
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
   previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
+
+  """Recorded stage history of an exact owned execution, newest first."""
+  workflowExecutionStages(executionId: ID!, limit: Int! = 100, after: String = null): WorkflowExecutionStages
+
+  """
+  One owned execution by the WorkflowRun ID returned on dispatch or its GUID.
+  """
+  workflowExecution(executionId: ID!): WorkflowExecution
 
   """List the org's configured Workflows (tier 2)."""
   workflows(orgId: ID = null): [ConfiguredWorkflow!]! @deprecated(reason: "Unbounded — returns every Workflow the org owns in one response. Use workflowsPage.")
@@ -7228,6 +7239,38 @@ type WorkflowDefinitionType {
   workflowStages: [WorkflowStageType!]!
 }
 
+type WorkflowExecution {
+  guid: String!
+  recordId: String!
+  organizationGuid: String!
+  definitionSlug: String!
+  status: String!
+  temporalWorkflowId: String!
+  temporalRunId: String
+  startedAt: DateTime
+  endedAt: DateTime
+  isTerminal: Boolean!
+  failure: JSON
+  taskCleanup: JSON!
+  observationError: String!
+}
+
+type WorkflowExecutionControlResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  requested: Boolean!
+  execution: WorkflowExecution
+}
+
+type WorkflowExecutionStages {
+  executionGuid: String!
+  recordId: String!
+  organizationGuid: String!
+  temporalWorkflowId: String!
+  temporalRunId: String
+  stages: WorkflowStageExecutionTypePage!
+}
+
 type WorkflowInstanceType {
   currentState: String!
   startedAt: DateTime!
@@ -7312,6 +7355,17 @@ type WorkflowStageExecutionType {
   childWorkflowRunGuid: String
   childWorkflowDefinitionSlug: String
   childWorkflowStatus: String
+}
+
+"""One page of a cursor-paginated list."""
+type WorkflowStageExecutionTypePage {
+  items: [WorkflowStageExecutionType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type WorkflowStageType {

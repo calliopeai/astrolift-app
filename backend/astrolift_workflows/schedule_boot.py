@@ -88,6 +88,8 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # with per-run try/except; an unreachable cluster or torn-down Job
         # leaves the row as-is, and terminal rows are never re-touched.
         ScheduleKind.RUN_STATUS_RECONCILE,
+        # Exact Temporal reads repair stale execution mirrors without starting new work.
+        ScheduleKind.WORKFLOW_RUN_RECONCILE,
         # DNS probing ships active (#1550). Read-only against the network and
         # idempotent: it resolves names and records what it found. Held, the
         # app doctor's DNS check reads "not probed yet" forever, which is the

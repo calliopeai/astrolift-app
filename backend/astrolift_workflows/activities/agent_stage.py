@@ -36,8 +36,10 @@ the canonical :func:`astrolift_dispatch.spawners.registry.get_spawner`
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from _sdk.k8s_naming import AGENT_NAMESPACE_PREFIX, agent_namespace
 from django.utils import timezone
@@ -94,7 +96,7 @@ def _resolve_managed_cluster(organization: Any) -> Any:
     return resolve_agent_cluster(organization)
 
 
-def _create_agent_task_sync(params: dict[str, Any]) -> int:
+def _create_agent_task_sync(params: dict[str, Any], *, task_guid: UUID | None = None) -> int:
     """Create the AgentTask (DRAFT), assemble + link a Brief, advance to QUEUED.
 
     Returns the AgentTask pk for the spawn/poll helpers.
@@ -128,6 +130,11 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
     if organization is None:
         raise RuntimeError(f"organization {org_slug!r} not found")
 
+    if task_guid is not None:
+        existing = AgentTask.objects.filter(guid=task_guid, organization=organization).first()
+        if existing is not None and existing.status != AgentTask.Status.DRAFT:
+            return existing.pk
+
     # Skill lookup: an org-scoped skill wins over a global one of the same
     # slug; both are matched in a single query and disambiguated below.
     skill: Skill | None = None
@@ -157,15 +164,23 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
         if env_spec is None:
             raise RuntimeError(f"environment spec {env_spec_slug!r} not found for org {org_slug!r}")
 
-    task = AgentTask.objects.create(
-        organization=organization,
-        environment_spec=env_spec,
-        status=AgentTask.Status.DRAFT,
-        timeout_seconds=timeout_seconds,
+    defaults = {
+        "organization": organization,
+        "environment_spec": env_spec,
+        "status": AgentTask.Status.DRAFT,
+        "timeout_seconds": timeout_seconds,
         # Freeze VNC eligibility from the spec so the task stays
         # self-describing if the spec is later edited or deleted.
-        vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
-    )
+        "vnc_enabled": bool(env_spec and env_spec.vnc_enabled),
+    }
+    if task_guid is None:
+        task = AgentTask.objects.create(**defaults)
+    else:
+        task, _ = AgentTask.objects.get_or_create(guid=task_guid, defaults=defaults)
+        if task.organization_id != organization.pk:
+            raise RuntimeError("Agent stage identity belongs to a different organization")
+        if task.status != AgentTask.Status.DRAFT:
+            return task.pk
 
     # Context folded into the Brief / dispatch handshake. ``output_key`` is
     # carried so a downstream stage can locate this stage's result.
@@ -216,6 +231,13 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
 
 
 def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
+    from astrolift_agents.services.task_target import task_control_lock
+
+    with task_control_lock(task_pk):
+        return _spawn_agent_task_locked(task_pk)
+
+
+def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
     """Advance QUEUED -> PROVISIONING and spawn the job via the dispatch system.
 
     Returns ``{"external_id": str, "ok": bool, "error": str}`` from the
@@ -227,15 +249,27 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
 
     task = AgentTask.objects.select_related("organization", "agent_definition", "brief").get(pk=task_pk)
 
+    if task.status in _TERMINAL_STATUSES:
+        return {"external_id": task.external_id, "ok": False, "error": ""}
+    if task.external_id and task.status in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}:
+        return {"external_id": task.external_id, "ok": True, "error": ""}
+
     organization = task.organization
     namespace = _agent_namespace(organization.slug)
+    backend = "k8s_job"
     try:
-        cluster = _resolve_managed_cluster(organization)
+        if task.dispatch_target:
+            from astrolift_agents.services.task_target import resolve_task_target
+
+            backend, cluster, namespace = resolve_task_target(task)
+        else:
+            cluster = _resolve_managed_cluster(organization)
     except Exception as exc:  # noqa: BLE001 — a queued task must settle visibly
         return _settle_spawn_failure(task.pk, f"cluster resolution failed: {exc}")
 
     try:
-        task.transition_to(AgentTask.Status.PROVISIONING)
+        if task.status not in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}:
+            task.transition_to(AgentTask.Status.PROVISIONING)
     except ValueError:
         # Cancellation can win before the activity reaches the spawn call.
         # Do not turn that expected race into a failed Temporal activity.
@@ -246,9 +280,22 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
             "error": f"task became {task.status} before its job was created",
         }
 
-    spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
+    from astrolift_agents.services.task_target import freeze_task_target
+
+    backend, cluster, namespace = freeze_task_target(
+        task, backend=backend, cluster=cluster, namespace=namespace
+    )
+    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+    # The process can die after Kubernetes accepts the Job but before the
+    # external id is saved. Adopt it before rendering a replacement token.
+    # A failed read is retryable; it must not revoke a live Job's credential.
+    recover = getattr(spawner, "recover", None)
+    result = recover(task) if recover is not None else None
+    if result is None and task.status == AgentTask.Status.RUNNING:
+        return _settle_spawn_failure(task.pk, "running agent task has no recoverable Job")
     try:
-        result = spawner.spawn(task)
+        if result is None:
+            result = spawner.spawn(task)
     except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
         return _settle_spawn_failure(task.pk, f"spawn raised {type(exc).__name__}: {exc}")
 
@@ -326,6 +373,18 @@ def _settle_spawn_failure(
         }
 
 
+def _placement_for_task(task):
+    if getattr(task, "dispatch_target", None):
+        from astrolift_agents.services.task_target import resolve_task_target
+
+        return resolve_task_target(task)
+    return (
+        "k8s_job",
+        _resolve_managed_cluster(task.organization),
+        task.namespace or _agent_namespace(task.organization.slug),
+    )
+
+
 def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
     """Reconcile the spawned container's status onto the AgentTask, once.
 
@@ -357,9 +416,8 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
     if started is not None and (timezone.now() - started).total_seconds() >= timeout_seconds:
         if task.external_id:
             try:
-                cluster = _resolve_managed_cluster(task.organization)
-                namespace = task.namespace or _agent_namespace(task.organization.slug)
-                get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
+                backend, cluster, namespace = _placement_for_task(task)
+                get_spawner(backend, cluster=cluster, namespace=namespace).stop(task.external_id)
             except Exception:  # noqa: BLE001 — K8s deadline remains the backstop
                 log.warning("agent timeout: container stop failed for task %s", task.guid, exc_info=True)
         task.failure = {"message": f"agent exceeded its {timeout_seconds}s timeout"}
@@ -372,9 +430,8 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         # lost worker / stuck provisioning row cannot spin forever.
         return {"status": task.status, "terminal": False}
 
-    cluster = _resolve_managed_cluster(task.organization)
-    namespace = task.namespace or _agent_namespace(task.organization.slug)
-    spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
+    backend, cluster, namespace = _placement_for_task(task)
+    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
 
     status = spawner.status(task.external_id)
 
@@ -412,7 +469,7 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
     # instead of failing. Only the reasons that never self-heal are fatal;
     # transient startup states (ContainerCreating, a first-attempt
     # ErrImagePull) fall through and get another poll.
-    fatal = _fatal_pod_wait_reason(cluster, namespace, str(task.guid))
+    fatal = _fatal_pod_wait_reason(cluster, namespace, str(task.guid)) if backend == "k8s_job" else None
     if fatal:
         if task.failure is None:
             task.failure = {"message": f"container never started: {fatal}"}
@@ -438,9 +495,8 @@ def _cleanup_terminal_task_secret(task: Any, *, spawner: Any | None = None) -> N
         if spawner is None:
             from astrolift_dispatch.spawners.registry import get_spawner
 
-            cluster = _resolve_managed_cluster(task.organization)
-            namespace = task.namespace or _agent_namespace(task.organization.slug)
-            spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
+            backend, cluster, namespace = _placement_for_task(task)
+            spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
         cleanup = getattr(spawner, "cleanup_task_secret", None)
         if callable(cleanup):
             cleanup(task.external_id)
@@ -560,7 +616,21 @@ def _capture_cancel_signal(task, *, ok: bool, from_status: str) -> None:
         )
 
 
-def _cancel_agent_task_sync(task_guid: str) -> dict[str, Any]:
+def _cancel_agent_task_sync(task_guid: str, *, owner: dict | None = None) -> dict[str, Any]:
+    from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
+
+    task = AgentTask.objects.filter(guid=task_guid).first()
+    if task is None:
+        return {"ok": False, "status": "not_found", "error": "task not found"}
+    try:
+        with task_control_lock(task.pk):
+            return _cancel_agent_task_locked(task_guid, owner=owner)
+    except TaskControlBusy as exc:
+        return {"ok": False, "status": task.status, "error": str(exc), "pending": True}
+
+
+def _cancel_agent_task_locked(task_guid: str, *, owner: dict | None = None) -> dict[str, Any]:
     """Stop the container and move the task to CANCELLED only on success.
 
     DRAFT / QUEUED / PROVISIONING / RUNNING tasks are cancellable; anything else
@@ -585,21 +655,48 @@ def _cancel_agent_task_sync(task_guid: str) -> dict[str, Any]:
             log.warning("cancel_agent_stage: task %s not found", task_guid)
             return {"ok": False, "status": "not_found", "error": "task not found"}
 
+        if owner is not None:
+            from astrolift_agents.services.workflow_task_cleanup import validate_task_owner
+
+            error = validate_task_owner(task, owner)
+            if error:
+                return {"ok": False, "status": task.status, "error": error}
+
         cancellable = {
             AgentTask.Status.DRAFT,
             AgentTask.Status.QUEUED,
             AgentTask.Status.PROVISIONING,
             AgentTask.Status.RUNNING,
         }
-        if task.status not in cancellable:
+        if task.status not in cancellable and owner is None:
             return {"ok": False, "status": task.status, "error": "task is already terminal"}
 
         from_status = task.status
-        if task.external_id:
+        external_id = task.external_id
+        if task.dispatch_target and not external_id:
+            external_id = (task.dispatch_target or {}).get("planned_external_id", "")
+        if owner is not None and not task.dispatch_target and task.status not in {"draft", "queued"}:
+            return {"ok": False, "status": task.status, "error": "Task has no saved dispatch target"}
+        if external_id:
             try:
-                cluster = _resolve_managed_cluster(task.organization)
-                namespace = task.namespace or _agent_namespace(task.organization.slug)
-                get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
+                if task.dispatch_target:
+                    from astrolift_agents.services.task_target import spawner_for_task
+
+                    spawner = spawner_for_task(task)
+                    spawner.stop(external_id, expected_task_guid=str(task.guid))
+                    if not spawner.confirm_stopped(external_id):
+                        return {
+                            "ok": False,
+                            "status": task.status,
+                            "error": "Container deletion is still in progress",
+                            "pending": True,
+                        }
+                elif owner is not None:
+                    raise RuntimeError("Task has no saved dispatch target")
+                else:
+                    cluster = _resolve_managed_cluster(task.organization)
+                    namespace = task.namespace or _agent_namespace(task.organization.slug)
+                    get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(external_id)
             except Exception as exc:  # noqa: BLE001 — report a failed hard stop truthfully
                 _capture_cancel_signal(task, ok=False, from_status=from_status)
                 log.warning(
@@ -610,7 +707,21 @@ def _cancel_agent_task_sync(task_guid: str) -> dict[str, Any]:
                 return {"ok": False, "status": task.status, "error": str(exc) or "container stop failed"}
 
         _capture_cancel_signal(task, ok=True, from_status=from_status)
-        task.transition_to(AgentTask.Status.CANCELLED)
+        if task.status in cancellable:
+            task.transition_to(AgentTask.Status.CANCELLED)
+        if owner is not None:
+            task.failure = {**(task.failure or {}), "task_cleanup": {"status": "completed"}}
+            task.save(update_fields=["failure", "updated_at", "version"])
+            if task.agent_run_id:
+                from django.utils import timezone
+
+                from astrolift_lifecycle.models import AgentRun
+
+                agent_run = AgentRun.objects.select_for_update().get(pk=task.agent_run_id)
+                if agent_run.status in {AgentRun.Status.PENDING, AgentRun.Status.RUNNING}:
+                    agent_run.status = AgentRun.Status.CANCELLED
+                    agent_run.ended_at = timezone.now()
+                    agent_run.save(update_fields=["status", "ended_at", "updated_at", "version"])
         return {"ok": True, "status": task.status, "error": ""}
 
 
@@ -637,16 +748,22 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
 
     The activity creates + queues an AgentTask, spawns the container, then
     polls until the task is terminal, heartbeating each cycle so Temporal can
-    detect a stuck worker. On Temporal cancellation the in-flight task is
-    cancelled best-effort before the CancelledError propagates.
+    detect a stuck worker. Worker shutdown preserves the task for retry;
+    workflow cancellation still stops the in-flight task.
     """
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    task_pk = await sync_to_async(_create_agent_task_sync)(params)
-
+    info = activity.info()
+    task_guid = uuid5(
+        NAMESPACE_URL,
+        json.dumps(
+            ["astrolift-agent-stage", info.workflow_namespace, info.workflow_run_id, info.activity_id]
+        ),
+    )
     try:
-        spawn = await sync_to_async(_spawn_agent_task_sync)(task_pk)
+        task_pk = await sync_to_async(_create_agent_task_sync)(params, task_guid=task_guid)
+        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk)
 
         if spawn["ok"]:
             # Poll until terminal, heartbeating each cycle.
@@ -657,10 +774,10 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
                     break
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
-        # Temporal asked the activity to stop — tear the task down before
-        # re-raising so the workflow records a clean cancellation.
-        task = await sync_to_async(_load_task_outcome_sync)(task_pk)
-        await sync_to_async(_cancel_agent_task_sync)(task["task_guid"])
+        details = activity.cancellation_details()
+        if activity.is_worker_shutdown() and not (details is not None and details.cancel_requested):
+            raise
+        await sync_to_async(_cancel_agent_task_sync)(str(task_guid))
         raise
 
     outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
@@ -702,14 +819,14 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
       then ``_poll_agent_task_sync`` until terminal, heartbeating each cycle.
 
     Returns the task's terminal outcome payload (same shape as
-    :func:`execute_agent_stage`). On Temporal cancellation the in-flight task
-    is torn down best-effort before the CancelledError propagates.
+    :func:`execute_agent_stage`). Worker shutdown preserves the task for retry;
+    workflow cancellation still stops the in-flight task.
     """
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
     try:
-        spawn = await sync_to_async(_spawn_agent_task_sync)(task_pk)
+        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk)
 
         if spawn["ok"]:
             while True:
@@ -719,6 +836,9 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
                     break
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
+        details = activity.cancellation_details()
+        if activity.is_worker_shutdown() and not (details is not None and details.cancel_requested):
+            raise
         outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
         await sync_to_async(_cancel_agent_task_sync)(outcome["task_guid"])
         raise

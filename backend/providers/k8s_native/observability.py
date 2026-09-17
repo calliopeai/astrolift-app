@@ -32,9 +32,9 @@ import base64
 import contextlib
 import json
 import logging
-import queue
 import tempfile
 import threading
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol
@@ -715,13 +715,51 @@ def default_log_backend() -> LogBackend:
 # `kubectl exec -it` equivalent: a bidirectional streaming session over
 # the apiserver exec channel. The kubernetes WSClient is blocking, so a
 # daemon drain thread pumps stdout/stderr into thread-safe queues and the
-# async methods bridge back to the event loop via run_in_executor. This
+# async readers wait on event-loop notifications without occupying workers. This
 # is the leaf the exec WS relay drives (core.schema.exec_ws →
 # core.cluster_exec.K8sExecBackend); see that module for the frame protocol.
 
 # kubernetes exec channels: 0=stdin 1=stdout 2=stderr 3=error(status) 4=resize.
 _EXEC_ERROR_CHANNEL = 3
 _EXEC_RESIZE_CHANNEL = 4
+
+
+class _ExecQueue:
+    """Thread producer, async consumers; cancellation never consumes a chunk.
+
+    Sessions are constructed in an executor before an event loop is available,
+    so data can arrive before the first reader. Keep the data under a lock and
+    use loop events only to wake readers. Idle streams need no executor thread.
+    """
+
+    def __init__(self) -> None:
+        self._items: deque[Any] = deque()
+        self._lock = threading.Lock()
+        self._waiters: set[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = set()
+
+    def put(self, value: Any) -> None:
+        with self._lock:
+            self._items.append(value)
+            waiters = tuple(self._waiters)
+        for loop, event in waiters:
+            with contextlib.suppress(RuntimeError):  # Reader's loop may have closed.
+                loop.call_soon_threadsafe(event.set)
+
+    async def get(self) -> Any:
+        event = asyncio.Event()
+        waiter = (asyncio.get_running_loop(), event)
+        with self._lock:
+            self._waiters.add(waiter)
+        try:
+            while True:
+                with self._lock:
+                    if self._items:
+                        return self._items.popleft()
+                    event.clear()
+                await event.wait()
+        finally:
+            with self._lock:
+                self._waiters.discard(waiter)
 
 
 class InteractiveExecSession:
@@ -733,9 +771,9 @@ class InteractiveExecSession:
 
     def __init__(self, resp: Any) -> None:
         self._resp = resp
-        self._stdout_q: queue.Queue = queue.Queue()
-        self._stderr_q: queue.Queue = queue.Queue()
-        self._exit_q: queue.Queue = queue.Queue()
+        self._stdout_q = _ExecQueue()
+        self._stderr_q = _ExecQueue()
+        self._exit_q = _ExecQueue()
         self._closed = threading.Event()
         self._drain = threading.Thread(target=self._drain_loop, daemon=True)
         self._drain.start()
@@ -779,17 +817,14 @@ class InteractiveExecSession:
             return 1
         return 0
 
-    async def _aget(self, q: queue.Queue) -> Any:
-        return await asyncio.get_running_loop().run_in_executor(None, q.get)
-
     async def read_stdout(self) -> str:
-        data = await self._aget(self._stdout_q)
+        data = await self._stdout_q.get()
         if data is None:
             raise StopAsyncIteration
         return data
 
     async def read_stderr(self) -> str:
-        data = await self._aget(self._stderr_q)
+        data = await self._stderr_q.get()
         if data is None:
             raise StopAsyncIteration
         return data
@@ -812,7 +847,7 @@ class InteractiveExecSession:
         return None
 
     async def wait_exit(self) -> int:
-        return int(await self._aget(self._exit_q))
+        return int(await self._exit_q.get())
 
     async def close(self) -> None:
         self._closed.set()

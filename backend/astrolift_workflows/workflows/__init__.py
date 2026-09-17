@@ -20,16 +20,18 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
 )
 from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
 from astrolift_workflows.workflows.cert_expiry_tick import CertExpiryTickWorkflow
-from astrolift_workflows.workflows.observability_retention_tick import (
-    ObservabilityRetentionTickWorkflow,
-)
 from astrolift_workflows.workflows.ci_workflow_resync_tick import (
     CiWorkflowResyncTickWorkflow,
+)
+from astrolift_workflows.workflows.command_run import (
+    CommandRunWorkflow,
+    RunScheduledJobWorkflow,
 )
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
 from astrolift_workflows.workflows.decommission_cluster import (
     DecommissionClusterWorkflow,
 )
+from astrolift_workflows.workflows.deliver_webhook import DeliverWebhookWorkflow
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.deprovision_managed_domain import (
     DeprovisionManagedDomainWorkflow,
@@ -47,7 +49,12 @@ from astrolift_workflows.workflows.install_cluster_prereqs import (
     InstallClusterPrereqsWorkflow,
 )
 from astrolift_workflows.workflows.migrate_app import MigrateAppWorkflow
+from astrolift_workflows.workflows.observability_retention_tick import (
+    ObservabilityRetentionTickWorkflow,
+)
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
+from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
+from astrolift_workflows.workflows.pipeline_schedule import PipelineScheduleWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
 from astrolift_workflows.workflows.provision_managed_domain import (
     ProvisionManagedDomainWorkflow,
@@ -63,14 +70,14 @@ from astrolift_workflows.workflows.run_status_reconcile_tick import (
 )
 from astrolift_workflows.workflows.scheduled import (
     ApplyObservabilityRetentionWorkflow,
-    ProbeAppCronjobRunsWorkflow,
-    ProbeAppDnsWorkflow,
     CapturePlatformCostSnapshotWorkflow,
     CaptureQuotaUsageSnapshotWorkflow,
     DriftDetectionWorkflow,
     ExpirePendingApprovalDeploymentsWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
+    ProbeAppCronjobRunsWorkflow,
+    ProbeAppDnsWorkflow,
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
@@ -92,14 +99,8 @@ from astrolift_workflows.workflows.validate_custom_domain import (
 from astrolift_workflows.workflows.workflow_definition_run import (
     WorkflowDefinitionRunWorkflow,
 )
+from astrolift_workflows.workflows.workflow_run_reconcile_tick import WorkflowRunReconcileTickWorkflow
 
-from astrolift_workflows.workflows.command_run import (
-    CommandRunWorkflow,
-    RunScheduledJobWorkflow,
-)
-from astrolift_workflows.workflows.deliver_webhook import DeliverWebhookWorkflow
-from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
-from astrolift_workflows.workflows.pipeline_schedule import PipelineScheduleWorkflow
 __all__ = [
     "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",
@@ -150,6 +151,7 @@ __all__ = [
     "RollbackDeploymentWorkflow",
     "RotateSecretBundleWorkflow",
     "RunStatusReconcileTickWorkflow",
+    "WorkflowRunReconcileTickWorkflow",
     "SecretBundleScheduledRefreshWorkflow",
     "SyncAppDomainWorkflow",
     "SyncDevEnvironmentFilesWorkflow",
