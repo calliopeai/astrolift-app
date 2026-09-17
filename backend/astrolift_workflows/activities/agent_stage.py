@@ -36,8 +36,10 @@ the canonical :func:`astrolift_dispatch.spawners.registry.get_spawner`
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from _sdk.k8s_naming import AGENT_NAMESPACE_PREFIX, agent_namespace
 from django.utils import timezone
@@ -94,7 +96,7 @@ def _resolve_managed_cluster(organization: Any) -> Any:
     return resolve_agent_cluster(organization)
 
 
-def _create_agent_task_sync(params: dict[str, Any]) -> int:
+def _create_agent_task_sync(params: dict[str, Any], *, task_guid: UUID | None = None) -> int:
     """Create the AgentTask (DRAFT), assemble + link a Brief, advance to QUEUED.
 
     Returns the AgentTask pk for the spawn/poll helpers.
@@ -128,6 +130,11 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
     if organization is None:
         raise RuntimeError(f"organization {org_slug!r} not found")
 
+    if task_guid is not None:
+        existing = AgentTask.objects.filter(guid=task_guid, organization=organization).first()
+        if existing is not None and existing.status != AgentTask.Status.DRAFT:
+            return existing.pk
+
     # Skill lookup: an org-scoped skill wins over a global one of the same
     # slug; both are matched in a single query and disambiguated below.
     skill: Skill | None = None
@@ -157,15 +164,23 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
         if env_spec is None:
             raise RuntimeError(f"environment spec {env_spec_slug!r} not found for org {org_slug!r}")
 
-    task = AgentTask.objects.create(
-        organization=organization,
-        environment_spec=env_spec,
-        status=AgentTask.Status.DRAFT,
-        timeout_seconds=timeout_seconds,
+    defaults = {
+        "organization": organization,
+        "environment_spec": env_spec,
+        "status": AgentTask.Status.DRAFT,
+        "timeout_seconds": timeout_seconds,
         # Freeze VNC eligibility from the spec so the task stays
         # self-describing if the spec is later edited or deleted.
-        vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
-    )
+        "vnc_enabled": bool(env_spec and env_spec.vnc_enabled),
+    }
+    if task_guid is None:
+        task = AgentTask.objects.create(**defaults)
+    else:
+        task, _ = AgentTask.objects.get_or_create(guid=task_guid, defaults=defaults)
+        if task.organization_id != organization.pk:
+            raise RuntimeError("Agent stage identity belongs to a different organization")
+        if task.status != AgentTask.Status.DRAFT:
+            return task.pk
 
     # Context folded into the Brief / dispatch handshake. ``output_key`` is
     # carried so a downstream stage can locate this stage's result.
@@ -216,6 +231,21 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
 
 
 def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
+    from django.db import connection
+
+    # Serialize overlapping activity attempts without rolling back credentials
+    # that must be durable before the external Job is created.
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_try_advisory_lock(hashtextextended(%s, 0))", [f"agent-spawn:{task_pk}"])
+        if not cursor.fetchone()[0]:
+            raise RuntimeError("Another activity attempt is still spawning this agent task")
+        try:
+            return _spawn_agent_task_locked(task_pk)
+        finally:
+            cursor.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [f"agent-spawn:{task_pk}"])
+
+
+def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
     """Advance QUEUED -> PROVISIONING and spawn the job via the dispatch system.
 
     Returns ``{"external_id": str, "ok": bool, "error": str}`` from the
@@ -227,6 +257,11 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
 
     task = AgentTask.objects.select_related("organization", "agent_definition", "brief").get(pk=task_pk)
 
+    if task.status in _TERMINAL_STATUSES:
+        return {"external_id": task.external_id, "ok": False, "error": ""}
+    if task.external_id and task.status in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}:
+        return {"external_id": task.external_id, "ok": True, "error": ""}
+
     organization = task.organization
     namespace = _agent_namespace(organization.slug)
     try:
@@ -235,7 +270,8 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
         return _settle_spawn_failure(task.pk, f"cluster resolution failed: {exc}")
 
     try:
-        task.transition_to(AgentTask.Status.PROVISIONING)
+        if task.status not in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}:
+            task.transition_to(AgentTask.Status.PROVISIONING)
     except ValueError:
         # Cancellation can win before the activity reaches the spawn call.
         # Do not turn that expected race into a failed Temporal activity.
@@ -247,8 +283,16 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
         }
 
     spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
+    # The process can die after Kubernetes accepts the Job but before the
+    # external id is saved. Adopt it before rendering a replacement token.
+    # A failed read is retryable; it must not revoke a live Job's credential.
+    recover = getattr(spawner, "recover", None)
+    result = recover(task) if recover is not None else None
+    if result is None and task.status == AgentTask.Status.RUNNING:
+        return _settle_spawn_failure(task.pk, "running agent task has no recoverable Job")
     try:
-        result = spawner.spawn(task)
+        if result is None:
+            result = spawner.spawn(task)
     except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
         return _settle_spawn_failure(task.pk, f"spawn raised {type(exc).__name__}: {exc}")
 
@@ -637,15 +681,21 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
 
     The activity creates + queues an AgentTask, spawns the container, then
     polls until the task is terminal, heartbeating each cycle so Temporal can
-    detect a stuck worker. On Temporal cancellation the in-flight task is
-    cancelled best-effort before the CancelledError propagates.
+    detect a stuck worker. Worker shutdown preserves the task for retry;
+    workflow cancellation still stops the in-flight task.
     """
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    task_pk = await sync_to_async(_create_agent_task_sync)(params)
-
+    info = activity.info()
+    task_guid = uuid5(
+        NAMESPACE_URL,
+        json.dumps(
+            ["astrolift-agent-stage", info.workflow_namespace, info.workflow_run_id, info.activity_id]
+        ),
+    )
     try:
+        task_pk = await sync_to_async(_create_agent_task_sync)(params, task_guid=task_guid)
         spawn = await sync_to_async(_spawn_agent_task_sync)(task_pk)
 
         if spawn["ok"]:
@@ -657,10 +707,10 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
                     break
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
-        # Temporal asked the activity to stop — tear the task down before
-        # re-raising so the workflow records a clean cancellation.
-        task = await sync_to_async(_load_task_outcome_sync)(task_pk)
-        await sync_to_async(_cancel_agent_task_sync)(task["task_guid"])
+        details = activity.cancellation_details()
+        if activity.is_worker_shutdown() and not (details is not None and details.cancel_requested):
+            raise
+        await sync_to_async(_cancel_agent_task_sync)(str(task_guid))
         raise
 
     outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
@@ -702,8 +752,8 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
       then ``_poll_agent_task_sync`` until terminal, heartbeating each cycle.
 
     Returns the task's terminal outcome payload (same shape as
-    :func:`execute_agent_stage`). On Temporal cancellation the in-flight task
-    is torn down best-effort before the CancelledError propagates.
+    :func:`execute_agent_stage`). Worker shutdown preserves the task for retry;
+    workflow cancellation still stops the in-flight task.
     """
     from asgiref.sync import sync_to_async
 
@@ -719,6 +769,9 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
                     break
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
+        details = activity.cancellation_details()
+        if activity.is_worker_shutdown() and not (details is not None and details.cancel_requested):
+            raise
         outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
         await sync_to_async(_cancel_agent_task_sync)(outcome["task_guid"])
         raise

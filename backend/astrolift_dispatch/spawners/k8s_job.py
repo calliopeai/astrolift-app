@@ -34,6 +34,38 @@ class K8sJobSpawner(ContainerSpawner):
         self._namespace = namespace
         self._spawn_cleanup_refs: dict[str, list[dict]] = {}
 
+    def recover(self, task: AgentTask) -> SpawnResult | None:
+        """Adopt an already-created task Job without rotating its credential."""
+        import hashlib
+
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+        job_name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
+        driver = _driver_for_cluster(self._cluster)
+        ctx = _context_for_cluster(self._cluster)
+        manifest = driver.get_manifest(ctx.slug, self._namespace, "Job", job_name)
+        if manifest is None:
+            return None
+        metadata = manifest.get("metadata", {})
+        if metadata.get("labels", {}).get("astrolift.dev/task-id") != str(task.guid):
+            return SpawnResult(external_id="", ok=False, error="Existing agent Job belongs to another task")
+        if metadata.get("deletionTimestamp"):
+            return SpawnResult(external_id=job_name, ok=False, error="Existing agent Job is being deleted")
+        containers = manifest.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
+        keys = [
+            item.get("value", "")
+            for container in containers
+            for item in container.get("env", [])
+            if item.get("name") == "ASTROLIFT_CLUSTER_KEY"
+        ]
+        if not any(
+            key and hashlib.sha256(key.encode()).hexdigest() == task.callback_token_hash for key in keys
+        ):
+            return SpawnResult(
+                external_id=job_name, ok=False, error="Existing agent Job has no matching callback credential"
+            )
+        return SpawnResult(external_id=job_name)
+
     def spawn(self, task: AgentTask) -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec
