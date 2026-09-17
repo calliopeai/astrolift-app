@@ -1344,3 +1344,75 @@ def test_the_list_shows_live_boxes_and_can_include_the_settled_ones(
 
     assert [b.slug for b in live] == ["warm-box"]
     assert {b.slug for b in everything} == {"warm-box", "cold-box"}
+
+
+def test_managed_model_box_receives_identity_and_provider_environment(org, cluster, monkeypatch):
+    from astrolift_dispatch.agent_model import ManagedModelWiring
+
+    spec = _spec(org, env_vars={"AWS_REGION": "spec-region"})
+    spec.managed_model = True
+    spec.save(update_fields=["managed_model"])
+    box = _box(org, environment_spec=spec)
+    calls = []
+    account = {
+        "apiVersion": "v1",
+        "kind": "ServiceAccount",
+        "metadata": {"name": "agent-model", "namespace": box_service.box_namespace(box)},
+    }
+
+    def resolve(**kwargs):
+        calls.append(kwargs)
+        return ManagedModelWiring(
+            env=[
+                {"name": "CLAUDE_CODE_USE_BEDROCK", "value": "1"},
+                {"name": "AWS_REGION", "value": "provider-region"},
+            ],
+            service_account="agent-model",
+            service_account_manifest=account,
+        )
+
+    monkeypatch.setattr("astrolift_dispatch.agent_model.resolve_managed_model_wiring", resolve)
+    box_service.start_agent_box(box)
+    assert len(calls) == 1
+    assert calls[0]["namespace"] == box_service.box_namespace(box)
+    manifests = cluster.driver.applied[0]
+    assert manifests[0] == account
+    job = _job_of(manifests)
+    assert job["spec"]["template"]["spec"]["serviceAccountName"] == "agent-model"
+    env = {entry["name"]: entry.get("value") for entry in _container_of(job)["env"]}
+    assert env["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert env["AWS_REGION"] == "spec-region"
+    box_service.stop_agent_box(box)
+    assert cluster.driver.deleted
+    assert all(ref["kind"] != "ServiceAccount" for batch in cluster.driver.deleted for ref in batch)
+
+
+def test_managed_model_failure_does_not_create_an_uncredentialed_box(org, cluster, monkeypatch):
+    from astrolift_dispatch.agent_model import ManagedModelError
+
+    spec = _spec(org)
+    spec.managed_model = True
+    spec.save(update_fields=["managed_model"])
+    box = _box(org, environment_spec=spec)
+
+    def fail(**kwargs):
+        raise ManagedModelError("managed model: identity is unavailable")
+
+    monkeypatch.setattr("astrolift_dispatch.agent_model.resolve_managed_model_wiring", fail)
+    with pytest.raises(box_service.AgentBoxError, match="identity is unavailable"):
+        box_service.start_agent_box(box)
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.FAILED
+    assert "identity is unavailable" in box.last_error
+    assert cluster.driver.applied == []
+    assert cluster.driver.namespaces == []
+
+
+def test_subscription_box_does_not_request_a_managed_model_identity(org, cluster, monkeypatch):
+    def unexpected(**kwargs):
+        raise AssertionError("subscription boxes must not acquire managed-model identity")
+
+    monkeypatch.setattr("astrolift_dispatch.agent_model.resolve_managed_model_wiring", unexpected)
+    box_service.start_agent_box(_box(org, environment_spec=_spec(org)))
+    job = _job_of(cluster.driver.applied[0])
+    assert "serviceAccountName" not in job["spec"]["template"]["spec"]

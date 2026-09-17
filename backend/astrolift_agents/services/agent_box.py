@@ -150,16 +150,17 @@ def render_agent_box_job(
     namespace: str,
     job_name: str,
     secret_env_names: list[str] | None = None,
+    model_service_account: str = "",
+    model_env: list[dict] | None = None,
 ) -> dict:
     """The Job manifest for a box, built around ``container_spec()``.
 
     The container — its command, its args, ``stdin``/``tty``, its working
-    directory — comes from ``_sdk.agent_session`` verbatim. The only thing
-    added here is env the SDK has no way to know about: the resolved secret
-    packet, which arrives as ``secretKeyRef`` entries pointing at the per-box
-    Secret rather than as values in the pod spec.
+    directory — comes from ``_sdk.agent_session`` verbatim. Provider defaults,
+    spec environment and resolved secret references come from the control plane;
+    secret values remain in the per-box Secret, not in the pod spec.
 
-    Precedence is spec env, then secret refs, then the platform's own
+    Precedence is managed-model defaults, spec env, secret refs, then the platform's own
     identity env last, so nothing an operator writes into an env spec can
     shadow the variables the box needs to describe itself.
     """
@@ -178,6 +179,7 @@ def render_agent_box_job(
 
     live_refs = [{"env_var": name, "uri": ""} for name in sorted(secret_env_names or [])]
     container["env"] = _merge_env(
+        model_env or [],
         agent_container_env(spec, secret_name),
         secret_env_entries(secret_name, live_refs),
         container["env"],
@@ -205,6 +207,7 @@ def render_agent_box_job(
                 "spec": {
                     "restartPolicy": "Never",
                     "containers": [container],
+                    **({"serviceAccountName": model_service_account} if model_service_account else {}),
                 },
             },
         },
@@ -274,6 +277,16 @@ def start_agent_box(box) -> None:
         _fail(box, str(exc))
         raise AgentBoxError(str(exc)) from exc
 
+    model_wiring = None
+    if box.environment_spec is not None and box.environment_spec.managed_model:
+        from astrolift_dispatch.agent_model import ManagedModelError, resolve_managed_model_wiring
+
+        try:
+            model_wiring = resolve_managed_model_wiring(cluster=cluster, namespace=namespace)
+        except ManagedModelError as exc:
+            _fail(box, str(exc))
+            raise AgentBoxError(str(exc)) from exc
+
     secret_env_names = sorted((secret_manifest or {}).get("stringData") or {})
     job = render_agent_box_job(
         box=box,
@@ -281,6 +294,8 @@ def start_agent_box(box) -> None:
         namespace=namespace,
         job_name=job_name,
         secret_env_names=secret_env_names,
+        model_service_account=model_wiring.service_account if model_wiring else "",
+        model_env=model_wiring.env if model_wiring else None,
     )
 
     try:
@@ -294,7 +309,11 @@ def start_agent_box(box) -> None:
                 {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
                 {},
             )
-        manifests = ([secret_manifest] if secret_manifest else []) + [job]
+        manifests = (
+            ([model_wiring.service_account_manifest] if model_wiring else [])
+            + ([secret_manifest] if secret_manifest else [])
+            + [job]
+        )
         result = driver.apply_manifests(ctx.slug, namespace, manifests)
     except Exception as exc:  # noqa: BLE001 — one failure mode for the caller
         _fail(box, f"applying the box manifests failed: {exc}")
