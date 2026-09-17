@@ -96,6 +96,16 @@ def _resolve_user_from_sessionid(session_key: str):
         return AnonymousUser(), {}
 
 
+def _header_from_scope(scope_or_request: Any, name: str) -> str:
+    if hasattr(scope_or_request, "headers"):
+        return scope_or_request.headers.get(name) or ""
+    if isinstance(scope_or_request, dict):
+        for key, value in scope_or_request.get("headers", []):
+            if key.lower() == name.encode("ascii"):
+                return value.decode("latin-1")
+    return ""
+
+
 def _bearer_from_scope(scope_or_request: Any) -> str:
     """Pull a plaintext ``Authorization: Bearer <token>`` value out of an
     ASGI scope or Starlette request. Empty string when absent.
@@ -103,34 +113,30 @@ def _bearer_from_scope(scope_or_request: Any) -> str:
     CLI clients (``astro exec``) authenticate the WS handshake with the
     same ``alft_`` API token they use for GraphQL rather than a browser
     session cookie, so the exec/VNC relays accept either credential."""
-    raw = ""
-    if hasattr(scope_or_request, "headers"):
-        try:
-            raw = scope_or_request.headers.get("authorization") or ""
-        except Exception:
-            raw = ""
-    elif isinstance(scope_or_request, dict):
-        for name, value in scope_or_request.get("headers", []):
-            if name.lower() == b"authorization":
-                raw = value.decode("latin-1")
-                break
+    raw = _header_from_scope(scope_or_request, "authorization")
     if raw[:7].lower() == "bearer ":
         return raw[7:].strip()
     return ""
 
 
 @sync_to_async
-def _resolve_user_and_tenant_from_bearer(token: str):
+def _resolve_user_and_tenant_from_bearer(token: str, organization_guid: str = ""):
     """Resolve ``(user, TenantContext)`` from an ``alft_`` API token.
 
     Mirrors ``ApiTokenMiddleware`` for the WS path: the token's user +
     organization become the authenticated, tenant-scoped identity.
     Returns ``(AnonymousUser, None)`` for a missing/invalid/revoked
-    token so the relay closes with the right code."""
+    token so the relay closes with the right code. A conflicting selected
+    organization returns the authenticated user with no tenant, so the
+    relay rejects the target instead of retargeting the credential."""
     if not token:
         return AnonymousUser(), None
     try:
-        from astrolift_identity.api_tokens import touch_token, verify_token
+        from astrolift_identity.api_tokens import (
+            token_matches_organization,
+            touch_token,
+            verify_token,
+        )
         from core.tenancy import TenantContext
 
         row = verify_token(token)
@@ -139,6 +145,8 @@ def _resolve_user_and_tenant_from_bearer(token: str):
         user = row.user
         if user is None or not getattr(user, "is_active", True):
             return AnonymousUser(), None
+        if not token_matches_organization(row, organization_guid):
+            return user, None
         try:
             touch_token(row)
         except Exception:  # noqa: BLE001

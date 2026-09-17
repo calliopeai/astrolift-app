@@ -426,6 +426,7 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
 
     from core.schema.ws_auth import (
         _bearer_from_scope,
+        _header_from_scope,
         _parse_cookies,
         _resolve_tenant_for_user,
         _resolve_user_and_tenant_from_bearer,
@@ -438,7 +439,12 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     bearer = _bearer_from_scope(scope)
     tenant = None
     if bearer:
-        user, tenant = await _resolve_user_and_tenant_from_bearer(bearer)
+        user, tenant = await _resolve_user_and_tenant_from_bearer(
+            bearer, _header_from_scope(scope, "x-astrolift-organization")
+        )
+        if getattr(user, "is_authenticated", False) and tenant is None:
+            await send({"type": "websocket.close", "code": 4403})
+            return
     else:
         cookies = _parse_cookies(scope)
         session_key = cookies.get("sessionid", "")

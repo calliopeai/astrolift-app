@@ -6,7 +6,10 @@ session, or token claims, and stashes the result on the contextvar in
 ``core.tenancy``. The default ORM managers read it from there to scope
 queries.
 
-Resolution order (first match wins):
+API tokens remain scoped to their issuing organization. A conflicting
+``X-Astrolift-Organization`` header is rejected before resolving the tenant.
+
+For session-authenticated requests, resolution order is (first match wins):
 
 1. ``X-Astrolift-Organization`` header (resolved by GUID).
 2. ``request.session["organization_id"]`` (set by login flows).
@@ -24,6 +27,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
 from core.tenancy import (
@@ -50,7 +54,16 @@ def _resolve_int(meta: dict[str, Any], key: str) -> int | None:
 class TenantContextMiddleware(MiddlewareMixin):
     """Populate ``core.tenancy._current`` for the duration of the request."""
 
-    def process_request(self, request) -> None:
+    def process_request(self, request):
+        from astrolift_identity.api_tokens import token_matches_organization
+
+        api_token = getattr(request, "_api_token", None)
+        if api_token is not None and not token_matches_organization(
+            api_token, request.META.get(ORG_HEADER, "")
+        ):
+            message = "Selected organization does not match the API token's organization."
+            return JsonResponse({"detail": message, "errors": [{"message": message}]}, status=403)
+
         organization_id = self._resolve_organization_id(request)
         team_id = self._resolve_team_id(request)
         project_id = self._resolve_project_id(request)

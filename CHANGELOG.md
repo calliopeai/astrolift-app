@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- API-token organization discovery lists only the token's issuing organization.
+  HTTP requests and terminal WebSocket handshakes reject a conflicting selected
+  organization before resolving a target. Matching selections and clients without
+  an explicit organization continue to use the token's organization (#1791).
+
+- Keep multiple terminal sessions responsive by waking exec-stream readers on
+  their event loop instead of parking shared executor threads. Cancelling a
+  reader no longer consumes output meant for its replacement (#1783).
+
 - Return an error when explicit agent-box destruction cannot delete its cluster
   objects. The box retains its status and remains visible with the teardown
   error, so the operator can retry instead of losing track of a running pod
