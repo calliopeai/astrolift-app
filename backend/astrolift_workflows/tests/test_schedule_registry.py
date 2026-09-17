@@ -111,8 +111,9 @@ def test_default_schedules_complete():
     the retention application above, which sets a window rather than deleting
     past it. #1710 added the app-doctor cronjob-run probe, so a failed
     scheduled run is visible in the product instead of only in kubectl.
+    #1797 adds the exact Temporal execution reconciliation sweep.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 26
+    assert len(DEFAULT_SCHEDULES) == 27
 
 
 def test_default_schedules_include_all_kinds():

@@ -333,26 +333,30 @@ def _create_stage_execution_sync(
 ) -> str:
     """Create a RUNNING ``WorkflowStageExecution`` and point the run's
     ``current_stage_execution`` at it. Returns the execution pk as str."""
+    from django.db import transaction
     from django.utils import timezone
 
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
-    stage = WorkflowStage.objects.get(pk=int(stage_id))
+    with transaction.atomic():
+        run = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(workflow_run_id))
+        if run.status != "running" or run.ended_at is not None:
+            raise RuntimeError("Cannot open a stage on a closed workflow")
+        stage = WorkflowStage.objects.get(pk=int(stage_id))
 
-    attempt = max(1, int(attempt_number))
-    execution = WorkflowStageExecution.objects.create(
-        slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-a{attempt}"),
-        workflow_run=run,
-        stage=stage,
-        status=WorkflowStageExecution.Status.RUNNING,
-        attempt_number=attempt,
-        started_at=timezone.now(),
-    )
+        attempt = max(1, int(attempt_number))
+        execution = WorkflowStageExecution.objects.create(
+            slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-a{attempt}"),
+            workflow_run=run,
+            stage=stage,
+            status=WorkflowStageExecution.Status.RUNNING,
+            attempt_number=attempt,
+            started_at=timezone.now(),
+        )
 
-    run.current_stage_execution = execution
-    run.save(update_fields=["current_stage_execution", "updated_at", "version"])
+        run.current_stage_execution = execution
+        run.save(update_fields=["current_stage_execution", "updated_at", "version"])
 
     # A human gate opening RUNNING is the moment reviewers are notified, and
     # this activity is the only durable hook at that moment. Capture a pending
@@ -531,6 +535,15 @@ def _dispatch_agent_for_stage_sync(
             .select_related("workflow_run")
             .get(pk=int(execution_id))
         )
+        # A durable dispatch activity can arrive after its parent has closed.
+        if (
+            execution.is_terminal
+            or execution.workflow_run.status != "running"
+            or execution.workflow_run.ended_at is not None
+        ):
+            raise RuntimeError(f"stage execution {execution_id} belongs to a closed workflow or stage")
+        if execution.stage_id != stage.pk:
+            raise RuntimeError(f"stage execution {execution_id} does not belong to stage {stage_id}")
         agent_run = (
             AgentRun.objects.filter(pk=execution.agent_run_id).first()
             if execution.agent_run_id is not None
@@ -570,132 +583,150 @@ def _dispatch_agent_for_stage_sync(
                 dispatch_input=trigger_payload or None,
             )
 
-    if task.status in AgentTask.TERMINAL_STATUSES or task.status == AgentTask.Status.RUNNING:
-        return str(agent_run.pk)
-    from astrolift_agents.services.task_preparation import (
-        prepare_agent_task,
-        settle_preparation_failure,
+    from astrolift_agents.services.task_target import (
+        freeze_task_target,
+        resolve_task_target,
+        task_control_lock,
     )
 
-    if task.status == AgentTask.Status.DRAFT:
+    with task_control_lock(task.pk):
+        task.refresh_from_db()
+        execution.refresh_from_db()
+        run.refresh_from_db()
+        if execution.is_terminal or run.status != "running" or run.ended_at is not None:
+            raise RuntimeError(f"stage execution {execution_id} belongs to a closed workflow or stage")
+        if task.status in AgentTask.TERMINAL_STATUSES or task.status == AgentTask.Status.RUNNING:
+            return str(agent_run.pk)
+        from astrolift_agents.services.task_preparation import (
+            prepare_agent_task,
+            settle_preparation_failure,
+        )
+
+        if task.status == AgentTask.Status.DRAFT:
+            try:
+                prepare_agent_task(
+                    task,
+                    context={
+                        "trigger": "workflow",
+                        "workflow_stage_id": str(stage.pk),
+                        "workflow_stage_order": stage.order,
+                    },
+                    skill_refs=skill_refs,
+                    prompt=prompt,
+                    output_key=output_key,
+                )
+            except Exception as exc:  # noqa: BLE001
+                settle_preparation_failure(task, exc)
+                agent_run.status = AgentRun.Status.FAILED
+                agent_run.ended_at = timezone.now()
+                agent_run.output = {"package_error": str(exc)}
+                agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+                raise RuntimeError(f"agent package preparation failed for stage {stage_id}: {exc}") from exc
+            task.transition_to(AgentTask.Status.QUEUED)
+
+        dispatcher = _resolve_dispatcher_sync(organization_id)
         try:
-            prepare_agent_task(
-                task,
-                context={
-                    "trigger": "workflow",
-                    "workflow_stage_id": str(stage.pk),
-                    "workflow_stage_order": stage.order,
-                },
-                skill_refs=skill_refs,
-                prompt=prompt,
-                output_key=output_key,
-            )
-        except Exception as exc:  # noqa: BLE001
-            settle_preparation_failure(task, exc)
+            if task.dispatch_target:
+                backend, cluster, namespace = resolve_task_target(task)
+            else:
+                backend, cluster = _dispatch_target_sync(run.organization, dispatcher)
+        except Exception as exc:  # noqa: BLE001 — a stage that cannot dispatch must settle visibly
+            # This used to leave the AgentRun PENDING and return, on the
+            # theory that a dispatcher registration might be in flight. On an
+            # install where none is ever registered that read as the run
+            # hanging in ``running`` forever, with the only trace a WARNING in
+            # the worker log (#1704). A stage that cannot dispatch fails the
+            # run with the reason attached.
+            task.failure = {"message": f"no dispatch target: {exc}"}
+            task.save(update_fields=["failure", "updated_at", "version"])
+            task.transition_to(AgentTask.Status.FAILED)
             agent_run.status = AgentRun.Status.FAILED
             agent_run.ended_at = timezone.now()
-            agent_run.output = {"package_error": str(exc)}
+            agent_run.output = {"dispatch_error": str(exc)}
             agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
-            raise RuntimeError(f"agent package preparation failed for stage {stage_id}: {exc}") from exc
-        task.transition_to(AgentTask.Status.QUEUED)
+            raise RuntimeError(f"no dispatch target for stage {stage_id}: {exc}") from exc
+        if dispatcher is None:
+            log.info(
+                "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; "
+                "spawning through the direct path (backend=%s cluster=%s)",
+                organization_id,
+                backend,
+                getattr(cluster, "slug", None),
+            )
 
-    dispatcher = _resolve_dispatcher_sync(organization_id)
-    try:
-        backend, cluster = _dispatch_target_sync(run.organization, dispatcher)
-    except Exception as exc:  # noqa: BLE001 — a stage that cannot dispatch must settle visibly
-        # This used to leave the AgentRun PENDING and return, on the
-        # theory that a dispatcher registration might be in flight. On an
-        # install where none is ever registered that read as the run
-        # hanging in ``running`` forever, with the only trace a WARNING in
-        # the worker log (#1704). A stage that cannot dispatch fails the
-        # run with the reason attached.
-        task.failure = {"message": f"no dispatch target: {exc}"}
-        task.save(update_fields=["failure", "updated_at", "version"])
-        task.transition_to(AgentTask.Status.FAILED)
-        agent_run.status = AgentRun.Status.FAILED
-        agent_run.ended_at = timezone.now()
-        agent_run.output = {"dispatch_error": str(exc)}
-        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
-        raise RuntimeError(f"no dispatch target for stage {stage_id}: {exc}") from exc
-    if dispatcher is None:
-        log.info(
-            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; "
-            "spawning through the direct path (backend=%s cluster=%s)",
-            organization_id,
-            backend,
-            getattr(cluster, "slug", None),
+        if task.status == AgentTask.Status.QUEUED:
+            task.transition_to(AgentTask.Status.PROVISIONING)
+        elif task.status != AgentTask.Status.PROVISIONING:
+            raise RuntimeError(f"agent task {task.guid} cannot resume dispatch from {task.status}")
+
+        # Spawn into the per-org agent namespace (the same one execute_agent_stage
+        # uses) and freeze it on the task. Previously this path took the spawner's
+        # "default" namespace while the log resolver read the per-org namespace, so
+        # agentTaskLogs always came back empty for stage-dispatched agents (#891).
+        from astrolift_workflows.activities.agent_stage import _agent_namespace
+
+        namespace = task.dispatch_target.get("namespace") or _agent_namespace(run.organization.slug)
+        backend, cluster, namespace = freeze_task_target(
+            task, backend=backend, cluster=cluster, namespace=namespace
+        )
+        task.dispatcher = dispatcher
+        task.namespace = namespace
+        task.save(update_fields=["dispatcher", "namespace", "updated_at", "version"])
+
+        # A prior attempt may have persisted the external id before losing its
+        # activity response. Resume the state transition without spawning again.
+        if task.external_id:
+            task.pod_name = task.pod_name or task.external_id
+            task.save(update_fields=["pod_name", "updated_at", "version"])
+            task.transition_to(AgentTask.Status.RUNNING)
+            agent_run.status = AgentRun.Status.RUNNING
+            agent_run.k8s_pod_name = task.external_id
+            agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
+            return str(agent_run.pk)
+
+        spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+        try:
+            result = spawner.spawn(task)
+        except Exception as exc:  # noqa: BLE001 — fail this attempt; workflow policy may retry
+            task.failure = {"message": f"spawn raised: {exc}"}
+            task.save(update_fields=["failure", "updated_at", "version"])
+            task.transition_to(AgentTask.Status.FAILED)
+            agent_run.status = AgentRun.Status.FAILED
+            agent_run.ended_at = timezone.now()
+            agent_run.output = {"spawn_error": str(exc)}
+            agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+            raise RuntimeError(
+                f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {exc}"
+            ) from exc
+        task.external_id = result.external_id
+        task.namespace = namespace
+        task.pod_name = result.external_id
+        task.save(
+            update_fields=[
+                "external_id",
+                "dispatcher",
+                "namespace",
+                "pod_name",
+                "updated_at",
+                "version",
+            ]
         )
 
-    if task.status == AgentTask.Status.QUEUED:
-        task.transition_to(AgentTask.Status.PROVISIONING)
-    elif task.status != AgentTask.Status.PROVISIONING:
-        raise RuntimeError(f"agent task {task.guid} cannot resume dispatch from {task.status}")
+        if not result.ok:
+            task.transition_to(AgentTask.Status.FAILED)
+            agent_run.status = AgentRun.Status.FAILED
+            agent_run.ended_at = timezone.now()
+            agent_run.output = {"spawn_error": result.error}
+            agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+            raise RuntimeError(
+                f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {result.error}"
+            )
 
-    # Spawn into the per-org agent namespace (the same one execute_agent_stage
-    # uses) and freeze it on the task. Previously this path took the spawner's
-    # "default" namespace while the log resolver read the per-org namespace, so
-    # agentTaskLogs always came back empty for stage-dispatched agents (#891).
-    from astrolift_workflows.activities.agent_stage import _agent_namespace
-
-    namespace = _agent_namespace(run.organization.slug)
-    task.dispatcher = dispatcher
-    task.namespace = namespace
-    task.save(update_fields=["dispatcher", "namespace", "updated_at", "version"])
-
-    # A prior attempt may have persisted the external id before losing its
-    # activity response. Resume the state transition without spawning again.
-    if task.external_id:
-        task.pod_name = task.pod_name or task.external_id
-        task.save(update_fields=["pod_name", "updated_at", "version"])
         task.transition_to(AgentTask.Status.RUNNING)
         agent_run.status = AgentRun.Status.RUNNING
-        agent_run.k8s_pod_name = task.external_id
+        agent_run.k8s_pod_name = result.external_id
         agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
         return str(agent_run.pk)
-
-    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
-    try:
-        result = spawner.spawn(task)
-    except Exception as exc:  # noqa: BLE001 — fail this attempt; workflow policy may retry
-        task.failure = {"message": f"spawn raised: {exc}"}
-        task.save(update_fields=["failure", "updated_at", "version"])
-        task.transition_to(AgentTask.Status.FAILED)
-        agent_run.status = AgentRun.Status.FAILED
-        agent_run.ended_at = timezone.now()
-        agent_run.output = {"spawn_error": str(exc)}
-        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
-        raise RuntimeError(
-            f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {exc}"
-        ) from exc
-    task.external_id = result.external_id
-    task.namespace = namespace
-    task.pod_name = result.external_id
-    task.save(
-        update_fields=[
-            "external_id",
-            "dispatcher",
-            "namespace",
-            "pod_name",
-            "updated_at",
-            "version",
-        ]
-    )
-
-    if not result.ok:
-        task.transition_to(AgentTask.Status.FAILED)
-        agent_run.status = AgentRun.Status.FAILED
-        agent_run.ended_at = timezone.now()
-        agent_run.output = {"spawn_error": result.error}
-        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
-        raise RuntimeError(
-            f"spawn failed for stage {stage_id} via {_dispatch_label(dispatcher, backend)}: {result.error}"
-        )
-
-    task.transition_to(AgentTask.Status.RUNNING)
-    agent_run.status = AgentRun.Status.RUNNING
-    agent_run.k8s_pod_name = result.external_id
-    agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
-    return str(agent_run.pk)
 
 
 def _poll_agent_run_status_sync(agent_run_id: str) -> str:
@@ -763,7 +794,12 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
 
         namespace = _agent_namespace(task.organization.slug)
     try:
-        backend, cluster = _dispatch_target_sync(task.organization, dispatcher)
+        if task.dispatch_target:
+            from astrolift_agents.services.task_target import resolve_task_target
+
+            backend, cluster, namespace = resolve_task_target(task)
+        else:
+            backend, cluster = _dispatch_target_sync(task.organization, dispatcher)
     except Exception as exc:  # noqa: BLE001 — treat as a transient poll failure
         log.warning("poll_agent_run_status: no dispatch target for %s: %s", agent_run_id, exc)
         return agent_run.status
@@ -1107,36 +1143,69 @@ def _mark_workflow_run_sync(
     result: dict | None,
     failure: dict | None,
 ) -> None:
-    """Move the WorkflowRun mirror row to a terminal status and clear the
-    ``current_stage_execution`` pointer."""
+    from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
+
+    _finalize_workflow_run_records(workflow_run_id, status, result, failure)
+    if ":fanout:" not in str(workflow_run_id):
+        cleanup_workflow_tasks(_parent_run_pk(workflow_run_id))
+
+
+def _finalize_workflow_run_records(
+    workflow_run_id: str,
+    status: str,
+    result: dict | None,
+    failure: dict | None,
+) -> None:
+    """Settle the run, open stage records, and its exact configured instance."""
+    from django.db import transaction
     from django.utils import timezone
 
     from astrolift_operations.models import WorkflowRun
+    from workflows.models import WorkflowStageExecution
+    from workflows.run_status import synchronize_workflow_instances
 
     valid = {c[0] for c in WorkflowRun.Status.choices}
     if status not in valid:
         raise ValueError(f"invalid workflow run status {status!r}")
+    # Fan-out children share their parent's stage store, not its lifecycle.
+    # Only the parent executor can decide that the whole run has finished.
+    if ":fanout:" in str(workflow_run_id):
+        return
 
-    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
-    run.status = status
-    if result is not None:
-        run.result = result
-    if failure is not None:
-        run.failure = failure
-    if status != WorkflowRun.Status.RUNNING:
-        run.ended_at = timezone.now()
-        run.current_stage_execution = None
-    run.save(
-        update_fields=[
-            "status",
-            "result",
-            "failure",
-            "ended_at",
-            "current_stage_execution",
-            "updated_at",
-            "version",
-        ]
-    )
+    with transaction.atomic():
+        run = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(workflow_run_id))
+        if run.status != WorkflowRun.Status.RUNNING and run.ended_at is not None:
+            synchronize_workflow_instances(run)
+            return
+        run.status = status
+        if result is not None:
+            run.result = result
+        if failure is not None:
+            run.failure = failure
+        if status != WorkflowRun.Status.RUNNING:
+            run.ended_at = timezone.now()
+            run.current_stage_execution = None
+        run.save(
+            update_fields=[
+                "status",
+                "result",
+                "failure",
+                "ended_at",
+                "current_stage_execution",
+                "updated_at",
+                "version",
+            ]
+        )
+        if status in {"cancelled", "terminated", "timed_out", "failed"}:
+            for execution in WorkflowStageExecution.objects.select_for_update().filter(
+                workflow_run=run,
+                status__in=["pending", "running"],
+                deleted_at__isnull=True,
+            ):
+                execution.status = "failed" if status == "failed" else "cancelled"
+                execution.ended_at = run.ended_at
+                execution.save(update_fields=["status", "ended_at", "updated_at", "version"])
+        synchronize_workflow_instances(run)
 
 
 # ---------------------------------------------------------------------------
@@ -1231,7 +1300,7 @@ async def dispatch_agent_for_stage(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_dispatch_agent_for_stage_sync)(
+    return await sync_to_async(_dispatch_agent_for_stage_sync, thread_sensitive=False)(
         stage_id,
         execution_id,
         trigger_payload,

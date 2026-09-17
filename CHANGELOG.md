@@ -17,6 +17,28 @@
   (#1780). Delete Jobs with foreground propagation so their running pods are
   removed instead of orphaned.
 
+- Read every recorded stage attempt of an exact workflow execution through a
+  paginated API with organization and project permissions. Approval history,
+  errors, and linked runs remain readable without Temporal; scoped cursors
+  prevent an inspection from switching executions (#1804).
+
+- Expose exact workflow execution reads, cancellation, termination, and cleanup
+  retries for both configured workflows and direct definition runs. Reads accept
+  the dispatch record ID or GUID, enforce its organization and project permissions,
+  and report Temporal closure separately from resource cleanup. Controls pin both
+  Temporal IDs and refuse unverified executions (#1801).
+
+- Clean up explicitly owned agent tasks after a workflow closes, preserving
+  their original cluster, namespace, or Docker daemon across retries. Stop
+  confirms resource deletion before settling the task and exposes pending or
+  failed cleanup for later reconciliation. Cancellation during dispatch no
+  longer starts another stage attempt; older Temporal histories still replay
+  (#1797).
+
+- Use complete task GUIDs for Kubernetes Job and local Docker container names,
+  preventing parallel tasks created in the same millisecond from sharing a
+  resource. Existing tasks continue using their saved external IDs (#1799).
+
 - Remove duplicate managed-domain operation imports after concurrent revalidation
   fixes merged, restoring the production frontend build.
 

@@ -16,6 +16,7 @@ from astrolift_workflows.client import (
     list_workflow_instances,
     workflow_history,
 )
+from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
 from astrolift_workflows.schema.types import (
     WorkflowInstanceDetailType,
     WorkflowInstancePageType,
@@ -39,6 +40,7 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
     definition_scope_by_slug,
+    execution_scope_by_id,
     workflow_scope_by_guid,
     workflow_scope_by_slug,
 )
@@ -329,6 +331,32 @@ class WorkflowsQuery:
     ``WORKFLOW_READ``-gated + ``@tenant_scoped`` and applies the caller's
     org filter in the body (#1042 — the decorator only asserts a context
     exists; the org match is the actual scoping)."""
+
+    @strawberry.field(description="Recorded stage history of an exact owned execution, newest first.")
+    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @tenant_scoped()
+    def workflow_execution_stages(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        limit: int = 100,
+        after: str | None = None,
+    ) -> WorkflowExecutionStages | None:
+        from astrolift_workflows.execution_controls import execution_stages, find_execution
+
+        run = find_execution(_caller_org_pk(), str(execution_id))
+        return WorkflowExecutionStages(**execution_stages(run, limit=limit, after=after)) if run else None
+
+    @strawberry.field(
+        description="One owned execution by the WorkflowRun ID returned on dispatch or its GUID."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @tenant_scoped()
+    def workflow_execution(self, info: Info, execution_id: strawberry.ID) -> WorkflowExecutionType | None:
+        from astrolift_workflows.execution_controls import execution_state, find_execution
+
+        run = find_execution(_caller_org_pk(), str(execution_id))
+        return WorkflowExecutionType(**execution_state(run)) if run is not None else None
 
     @strawberry.field(
         description="List the org's configured Workflows (tier 2).",

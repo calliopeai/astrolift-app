@@ -40,13 +40,13 @@ class StageRecoveryWorkflow:
 @pytest.mark.django_db
 @pytest.mark.parametrize("existing", ["owned", "foreign", "deleting", "wrong_token", "unreadable"])
 @pytest.mark.parametrize("status", [AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING])
-def test_interrupted_spawn_adopts_only_its_authenticated_job(org, monkeypatch, existing, status):
+def test_interrupted_spawn_adopts_only_its_authenticated_job(org, cluster, monkeypatch, existing, status):
     from core import cluster_management
 
     token = "disposable-test-callback"
     digest = hashlib.sha256(token.encode()).hexdigest()
     task = AgentTask.objects.create(organization=org, status=status, callback_token_hash=digest)
-    name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
+    name = f"agent-task-{str(task.guid).replace('-', '')}"
     manifest = {
         "metadata": {"labels": {"astrolift.dev/task-id": str(task.guid)}},
         "spec": {
@@ -71,7 +71,7 @@ def test_interrupted_spawn_adopts_only_its_authenticated_job(org, monkeypatch, e
 
     spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-test")
     monkeypatch.setattr(registry, "get_spawner", lambda *args, **kwargs: spawner)
-    monkeypatch.setattr(agent_stage, "_resolve_managed_cluster", lambda org: object())
+    monkeypatch.setattr(agent_stage, "_resolve_managed_cluster", lambda org: cluster)
     monkeypatch.setattr(cluster_management, "_context_for_cluster", lambda _: SimpleNamespace(slug="test"))
     monkeypatch.setattr(
         cluster_management, "_driver_for_cluster", lambda _: SimpleNamespace(get_manifest=read_job)
@@ -98,7 +98,7 @@ def test_interrupted_spawn_adopts_only_its_authenticated_job(org, monkeypatch, e
 @pytest.mark.django_db(transaction=True)
 def test_overlapping_spawn_attempt_retries_without_mutating_task(org):
     task = AgentTask.objects.create(organization=org, status=AgentTask.Status.QUEUED)
-    key = f"agent-spawn:{task.pk}"
+    key = -(1 << 62) + task.pk
 
     def competing_attempt():
         try:
@@ -107,13 +107,13 @@ def test_overlapping_spawn_attempt_retries_without_mutating_task(org):
             connection.close()
 
     with connection.cursor() as cursor:
-        cursor.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", [key])
+        cursor.execute("SELECT pg_advisory_lock(%s)", [key])
         try:
             with ThreadPoolExecutor(max_workers=1) as executor:
-                with pytest.raises(RuntimeError, match="Another activity attempt"):
+                with pytest.raises(RuntimeError, match="Task dispatch or control"):
                     executor.submit(competing_attempt).result(timeout=5)
         finally:
-            cursor.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [key])
+            cursor.execute("SELECT pg_advisory_unlock(%s)", [key])
     task.refresh_from_db()
     assert task.status == AgentTask.Status.QUEUED
     assert not task.external_id
@@ -124,7 +124,7 @@ def test_overlapping_spawn_attempt_retries_without_mutating_task(org):
 @pytest.mark.parametrize("operator_stop", [False, True])
 @pytest.mark.parametrize("kind", ["registered", "stage"])
 async def test_worker_replacement_keeps_task_and_container(
-    temporal_env, org, monkeypatch, operator_stop, kind
+    temporal_env, org, cluster, monkeypatch, operator_stop, kind
 ):
     polling = threading.Event()
     completed = threading.Event()
@@ -143,14 +143,17 @@ async def test_worker_replacement_keeps_task_and_container(
             polling.set()
             return TaskStatus(running=not completed.is_set(), succeeded=completed.is_set())
 
-        def stop(self, external_id):
+        def stop(self, external_id, **kwargs):
             stopped.append(external_id)
+
+        def confirm_stopped(self, external_id):
+            return external_id in stopped
 
         def cleanup_task_secret(self, external_id):
             pass
 
     monkeypatch.setattr(registry, "get_spawner", lambda *args, **kwargs: Spawner())
-    monkeypatch.setattr(agent_stage, "_resolve_managed_cluster", lambda org: object())
+    monkeypatch.setattr(agent_stage, "_resolve_managed_cluster", lambda org: cluster)
     monkeypatch.setattr(agent_stage, "_fatal_pod_wait_reason", lambda *args: "")
     monkeypatch.setattr(agent_stage, "_POLL_INTERVAL_SECONDS", 0.05)
     if kind == "registered":

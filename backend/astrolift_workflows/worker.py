@@ -127,6 +127,7 @@ from astrolift_workflows.activities import (
     reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     reconcile_runs_tick,
+    reconcile_workflow_runs_tick,
     record_cluster_bootstrap_run,
     record_human_gate_decision,
     record_nested_workflow_start,
@@ -238,6 +239,7 @@ from astrolift_workflows.workflows import (
     UptimeProbeTickWorkflow,
     ValidateCustomDomainWorkflow,
     WorkflowDefinitionRunWorkflow,
+    WorkflowRunReconcileTickWorkflow,
 )
 
 WORKFLOWS = (
@@ -290,6 +292,7 @@ WORKFLOWS = (
     RollbackDeploymentWorkflow,
     RotateSecretBundleWorkflow,
     RunStatusReconcileTickWorkflow,
+    WorkflowRunReconcileTickWorkflow,
     SecretBundleScheduledRefreshWorkflow,
     SyncAppDomainWorkflow,
     SyncDevEnvironmentFilesWorkflow,
@@ -433,6 +436,7 @@ ACTIVITIES = (
     reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     reconcile_runs_tick,
+    reconcile_workflow_runs_tick,
     record_cluster_bootstrap_run,
     record_human_gate_decision,
     record_nested_workflow_start,

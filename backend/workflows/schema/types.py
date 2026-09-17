@@ -123,8 +123,8 @@ class WorkflowStageExecutionType:
 
         * ``pending`` — the gate is open and no decision has been recorded.
           This describes the STAGE, so a caller rendering "waiting on
-          approval" should also check the run's own state: a run cancelled
-          or terminated while a gate was open leaves the gate row open.
+          approval" should also check the run's own state: legacy runs can
+          retain open rows until their execution records are reconciled.
         * ``approved`` / ``rejected`` — the recorded decision. A gate that
           runs out its timeout is recorded as ``rejected`` with
           ``human_gate_note`` ``"gate timed out"``.

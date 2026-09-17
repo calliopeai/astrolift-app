@@ -359,7 +359,10 @@ def test_spawn_applies_secret_then_job_with_resolved_values(monkeypatch):
 
     env = {e["name"]: e for e in job["spec"]["template"]["spec"]["containers"][0]["env"]}
     assert env["LOG_LEVEL"]["value"] == "debug"
-    assert env["GITHUB_TOKEN"]["valueFrom"]["secretKeyRef"]["name"] == "agent-task-abc123450000-secrets"
+    assert (
+        env["GITHUB_TOKEN"]["valueFrom"]["secretKeyRef"]["name"]
+        == "agent-task-abc12345000000000000000000000000-secrets"
+    )
     # The Job manifest never carries the plaintext value.
     assert "ghp_secret" not in str(job)
 

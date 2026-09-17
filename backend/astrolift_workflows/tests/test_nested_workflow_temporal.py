@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from temporalio import activity
+from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowFailureError
+from temporalio.exceptions import CancelledError
 
 from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
 from astrolift_workflows.workflows.workflow_definition_run import (
@@ -11,7 +16,8 @@ from core.testing.temporal import temporal_worker
 
 
 @pytest.mark.asyncio
-async def test_nested_definition_executes_as_linked_temporal_child(temporal_env):
+@pytest.mark.parametrize("action", ["complete", "cancel_parent", "cancel_child"])
+async def test_nested_definition_executes_as_linked_temporal_child(temporal_env, action):
     calls: dict[str, list] = {
         "plans": [],
         "children": [],
@@ -32,7 +38,7 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env)
                         "stage_id": "101",
                         "order": 0,
                         "kind": "workflow",
-                        "on_failure": "fail",
+                        "on_failure": "skip",
                         "timeout_seconds": 300,
                         "fan_out_count": None,
                         "skill_refs": [],
@@ -54,7 +60,7 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env)
                 {
                     "stage_id": "201",
                     "order": 0,
-                    "kind": "checkpoint",
+                    "kind": "checkpoint" if action == "complete" else "human_gate",
                     "on_failure": "fail",
                     "timeout_seconds": 300,
                     "fan_out_count": None,
@@ -117,7 +123,7 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env)
         workflows=[WorkflowDefinitionRunWorkflow],
         activities=activities,
     ):
-        result = await temporal_env.client.execute_workflow(
+        handle = await temporal_env.client.start_workflow(
             WorkflowDefinitionRunWorkflow.run,
             WorkflowDefinitionRunInput(
                 workflow_definition_slug="outer",
@@ -129,8 +135,39 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env)
             id="nested-workflow-test",
             task_queue="astrolift-test",
         )
+        if action != "complete":
+            for _ in range(200):
+                if calls["starts"]:
+                    child = temporal_env.client.get_workflow_handle(
+                        "WorkflowDefinitionRunWorkflow-200", run_id=calls["starts"][0][1]
+                    )
+                    history = await child.fetch_history()
+                    if any(
+                        event.event_type == EventType.EVENT_TYPE_TIMER_STARTED for event in history.events
+                    ):
+                        break
+                await asyncio.sleep(0.02)
+            else:
+                pytest.fail("The child did not reach its human gate")
+            await (handle if action == "cancel_parent" else child).cancel()
+        if action == "cancel_parent":
+            with pytest.raises(WorkflowFailureError) as error:
+                await asyncio.wait_for(handle.result(), 10)
+            assert isinstance(error.value.cause, CancelledError)
+            assert [(row[0], row[1]) for row in calls["finalized"] if row[0] == "100"] == [
+                ("100", "cancelled")
+            ]
+            assert len(calls["children"]) == 1
+            assert calls["updates"] == []
+            return
+        result = await asyncio.wait_for(handle.result(), 10)
 
     assert result.ok is True
+    if action == "cancel_child":
+        assert calls["updates"][-1][1] == "skipped"
+        assert calls["finalized"][-1][0:2] == ("100", "completed")
+        assert len(calls["children"]) == 1
+        return
     assert result.data["final_output"]["issue"] == "EMR-1"
     assert calls["children"] == [("100", "execution-100-101-1", "20")]
     assert calls["starts"][0][0] == "200"

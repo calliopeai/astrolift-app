@@ -193,6 +193,7 @@ from astrolift_workflows.activities.static_site import (
 )
 from astrolift_workflows.activities.supply_chain_gate import evaluate_supply_chain_gate
 from astrolift_workflows.activities.uptime import probe_uptime_tick
+from astrolift_workflows.activities.workflow_run_reconcile import reconcile_workflow_runs_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
     create_nested_workflow_run,
@@ -335,6 +336,7 @@ __all__ = [
     "reconcile_agent_deployments",
     "reconcile_cluster_capabilities",
     "reconcile_runs_tick",
+    "reconcile_workflow_runs_tick",
     "record_cluster_bootstrap_run",
     "record_human_gate_decision",
     "record_nested_workflow_start",
