@@ -10,9 +10,12 @@ a shell script proves it was written, not that it works.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 import time
+from pathlib import Path
 
 import pytest
 
@@ -20,6 +23,8 @@ from _sdk.agent_session import (
     DEFAULT_IDLE_TIMEOUT_SECONDS,
     NEVER,
     SESSION_NAME,
+    TERMINAL_REGISTRY,
+    TERMINAL_REGISTRY_ENV,
     SessionSpec,
     attach_argv,
     container_spec,
@@ -84,7 +89,16 @@ def test_env_reaches_the_container_sorted():
     manifest diff reflects a real change rather than dict ordering."""
     container = container_spec(SessionSpec(image="agent:1", env={"B": "2", "A": "1"}))
 
-    assert container["env"] == [{"name": "A", "value": "1"}, {"name": "B", "value": "2"}]
+    assert container["env"] == [
+        {"name": "A", "value": "1"},
+        {"name": TERMINAL_REGISTRY_ENV, "value": TERMINAL_REGISTRY},
+        {"name": "B", "value": "2"},
+    ]
+
+
+def test_operator_env_cannot_redirect_terminal_accounting():
+    container = container_spec(SessionSpec(image="agent:1", env={TERMINAL_REGISTRY_ENV: "/elsewhere"}))
+    assert container["env"] == [{"name": TERMINAL_REGISTRY_ENV, "value": TERMINAL_REGISTRY}]
 
 
 def test_attach_reuses_the_session_rather_than_racing_it():
@@ -107,6 +121,15 @@ def _run_script(spec: SessionSpec, socket: str) -> subprocess.Popen:
 
 def _tmux(socket: str, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["tmux", "-L", socket, *args], capture_output=True, text=True, check=False)
+
+
+@pytest.fixture(autouse=True)
+def terminal_registry(monkeypatch):
+    # Unix socket paths are bounded; pytest's nested temp path can exceed it.
+    with tempfile.TemporaryDirectory(prefix="astrobox-", dir="/tmp") as directory:
+        registry = Path(directory) / "terminals"
+        monkeypatch.setenv(TERMINAL_REGISTRY_ENV, str(registry))
+        yield registry
 
 
 @pytest.fixture
@@ -200,3 +223,97 @@ def test_a_busy_detached_session_is_not_reaped(socket_name):
     finally:
         if proc.poll() is None:
             proc.kill()
+
+
+def _wait_for_session(socket):
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if _tmux(socket, "has-session", "-t", SESSION_NAME).returncode == 0:
+            return
+        time.sleep(0.1)
+    pytest.fail("keep-alive never created the session")
+
+
+def _register_private_terminal(socket, registry, command="sleep 300"):
+    private = socket + "-private"
+    result = _tmux(private, "new-session", "-d", "-s", "transferred", command)
+    assert result.returncode == 0, result.stderr
+    _tmux(private, "set-option", "-g", "remain-on-exit", "on")
+    target = _tmux(private, "display-message", "-p", "#{socket_path}").stdout.strip()
+    (registry / "private.sock").symlink_to(target)
+    return private
+
+
+@tmux_required
+def test_registered_output_survives_default_shell_exit_then_reaps_when_idle(socket_name, terminal_registry):
+    proc = _run_script(SessionSpec(image="x", idle_timeout_seconds=3), socket_name)
+    private = socket_name + "-private"
+    try:
+        _wait_for_session(socket_name)
+        _register_private_terminal(socket_name, terminal_registry, "sh -c 'while :; do echo working; sleep 1; done'")
+        _tmux(socket_name, "kill-session", "-t", SESSION_NAME)
+        with pytest.raises(subprocess.TimeoutExpired):
+            proc.wait(timeout=8)
+        # Stop producing output without ending the pane; idleness must still reap.
+        _tmux(private, "respawn-pane", "-k", "-t", "=transferred:", "sleep 300")
+        assert proc.wait(timeout=15) == 0
+        assert _tmux(private, "has-session").returncode != 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        _tmux(private, "kill-server")
+
+
+@tmux_required
+def test_attached_registered_terminal_survives_without_output(socket_name, terminal_registry):
+    proc = _run_script(SessionSpec(image="x", idle_timeout_seconds=3), socket_name)
+    private = socket_name + "-private"
+    client = None
+    try:
+        _wait_for_session(socket_name)
+        _register_private_terminal(socket_name, terminal_registry)
+        client = subprocess.Popen(
+            ["tmux", "-L", private, "-C", "attach-session", "-t", "=transferred:"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            env={**os.environ, "TERM": "xterm"},
+        )
+        deadline = time.monotonic() + 5
+        while not _tmux(private, "list-clients").stdout.strip():
+            assert client.poll() is None
+            assert time.monotonic() < deadline
+            time.sleep(0.1)
+        with pytest.raises(subprocess.TimeoutExpired):
+            proc.wait(timeout=8)
+        client.terminate()
+        client.wait(timeout=5)
+        assert proc.wait(timeout=15) == 0
+    finally:
+        if client and client.poll() is None:
+            client.kill()
+            client.wait(timeout=5)
+        if proc.poll() is None:
+            proc.kill()
+        _tmux(private, "kill-server")
+
+
+@tmux_required
+def test_dead_panes_and_stale_registrations_do_not_retain_box(socket_name, terminal_registry):
+    proc = _run_script(SessionSpec(image="x", idle_timeout_seconds=NEVER), socket_name)
+    private = socket_name + "-private"
+    try:
+        _wait_for_session(socket_name)
+        _register_private_terminal(socket_name, terminal_registry)
+        (terminal_registry / "stale.sock").symlink_to("/tmp/astrobox-missing-socket")
+        _tmux(private, "respawn-pane", "-k", "-t", "=transferred:", "true")
+        deadline = time.monotonic() + 5
+        while _tmux(private, "list-panes", "-F", "#{pane_dead}").stdout.strip() != "1":
+            assert time.monotonic() < deadline
+            time.sleep(0.1)
+        _tmux(socket_name, "kill-session", "-t", SESSION_NAME)
+        assert proc.wait(timeout=15) == 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        _tmux(private, "kill-server")

@@ -370,7 +370,10 @@ def test_the_platforms_own_env_cannot_be_shadowed_by_a_spec(org):
     The box's identity env is how anything inside the pod knows which box it
     is; letting operator config overwrite it would be a quiet lie.
     """
-    spec = _spec(org, env_vars={"ASTROLIFT_AGENT_BOX": "0", "MY_VAR": "keep"})
+    spec = _spec(
+        org,
+        env_vars={"ASTROLIFT_AGENT_BOX": "0", "ASTROLIFT_AGENT_TMUX_REGISTRY": "/wrong", "MY_VAR": "keep"},
+    )
     box = _box(org, environment_spec=spec)
     job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
     env = _env_of(job)
@@ -378,6 +381,7 @@ def test_the_platforms_own_env_cannot_be_shadowed_by_a_spec(org):
     assert env["ASTROLIFT_AGENT_BOX"]["value"] == "1"
     assert env["ASTROLIFT_AGENT_BOX_GUID"]["value"] == str(box.guid)
     assert env["MY_VAR"]["value"] == "keep"
+    assert env["ASTROLIFT_AGENT_TMUX_REGISTRY"]["value"] == "/tmp/astrolift-agent-terminals"
 
 
 def test_the_namespace_is_bounded_for_a_maximum_length_org_slug():
@@ -399,7 +403,7 @@ def test_the_namespace_is_bounded_for_a_maximum_length_org_slug():
 
 
 @tmux_required
-def test_the_rendered_pod_reaps_itself_when_idle(org):
+def test_the_rendered_pod_reaps_itself_when_idle(org, monkeypatch, tmp_path):
     """Run the manifest's own entrypoint and watch it end.
 
     Not a re-test of the SDK: the script here is pulled out of the Job the
@@ -410,6 +414,7 @@ def test_the_rendered_pod_reaps_itself_when_idle(org):
     job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-idle")
     script = _container_of(job)["args"][0]
 
+    monkeypatch.setenv("ASTROLIFT_AGENT_TMUX_REGISTRY", str(tmp_path / "terminals"))
     socket = "astrobox-render-idle"
     proc = subprocess.Popen(
         ["/bin/sh", "-c", script.replace("tmux ", f"tmux -L {socket} ")],
@@ -433,12 +438,13 @@ def test_the_rendered_pod_reaps_itself_when_idle(org):
 
 
 @tmux_required
-def test_a_never_reap_box_stays_up(org):
+def test_a_never_reap_box_stays_up(org, monkeypatch, tmp_path):
     """The explicit opt-out has to survive the same render path."""
     box = _box(org, idle_timeout_seconds=0, environment_spec=_spec(org))
     job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-never")
     script = _container_of(job)["args"][0]
 
+    monkeypatch.setenv("ASTROLIFT_AGENT_TMUX_REGISTRY", str(tmp_path / "terminals"))
     socket = "astrobox-render-never"
     proc = subprocess.Popen(
         ["/bin/sh", "-c", script.replace("tmux ", f"tmux -L {socket} ")],
