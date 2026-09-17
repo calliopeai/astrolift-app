@@ -40,6 +40,10 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
 #: outlive a long detached run should have to say so.
 NEVER = 0
 
+# Exec sessions inherit container env, not exports made later by PID 1.
+TERMINAL_REGISTRY_ENV = "ASTROLIFT_AGENT_TMUX_REGISTRY"
+TERMINAL_REGISTRY = "/tmp/astrolift-agent-terminals"
+
 
 @dataclass(frozen=True)
 class SessionSpec:
@@ -63,46 +67,45 @@ class SessionSpec:
 
 
 def keepalive_script(spec: SessionSpec) -> str:
-    """The container's PID 1: start the tmux server, then outlive it deliberately.
+    """Keep the box while its default or registered terminals are in use.
 
-    Three properties, and each is the reason for a line that would otherwise
-    look redundant.
-
-    *The pod dies when the session dies.* ``has-session`` is the loop condition,
-    so exiting the shell inside tmux ends the pod rather than leaving an empty
-    container billing a node until something else notices.
-
-    *Idleness is not "nobody is attached".* Reaping on attachment alone would
-    kill an agent that is working while its operator is at lunch, which is the
-    exact failure tmux was introduced to prevent. A box is idle only when no
-    client is attached *and* tmux has seen no pane activity for the timeout, so
-    a detached-but-busy agent keeps its pod.
-
-    *Activity is read from tmux, not guessed.* ``window_activity`` is a unix
-    timestamp tmux advances on pane output, so the check survives a restart of
-    the loop and needs no bookkeeping of its own. It is deliberately not
-    ``session_activity``, which sounds like the right field and is not: that one
-    does not move when a detached session produces output, so reaping on it
-    killed a working agent within one timeout. The maximum across windows is
-    taken because a box may hold several and only one need be busy.
+    A terminal owner registers its private tmux socket with a symlink named
+    ``*.sock`` in TERMINAL_REGISTRY_ENV before launching. Only live panes count;
+    retained transcripts and stale registrations cannot keep a box alive.
+    Activity comes from tmux output timestamps and attached clients, never
+    from a heartbeat that would disguise an idle agent as busy.
     """
     name = spec.session_name
     timeout = spec.idle_timeout_seconds
     return f"""set -eu
+TERMINAL_REGISTRY="${{{TERMINAL_REGISTRY_ENV}:-{TERMINAL_REGISTRY}}}"
+(umask 077; mkdir -p "$TERMINAL_REGISTRY")
 tmux new-session -d -s {name} -c {spec.working_dir} {spec.shell}
-tmux set-option -t {name} status off
+tmux set-option -t ={name}: status off
 IDLE_TIMEOUT={timeout}
-while tmux has-session -t {name} 2>/dev/null; do
-  if [ "$IDLE_TIMEOUT" -gt 0 ]; then
-    clients=$(tmux list-clients -t {name} 2>/dev/null | wc -l)
-    if [ "$clients" -eq 0 ]; then
-      last=$(tmux list-windows -t {name} -F '#{{window_activity}}' 2>/dev/null | sort -n | tail -1)
-      last=${{last:-0}}
-      now=$(date +%s)
-      if [ "$last" -gt 0 ] && [ $((now - last)) -ge "$IDLE_TIMEOUT" ]; then
-        tmux kill-session -t {name} 2>/dev/null || true
-        break
-      fi
+while :; do
+  activity=$(
+    {{
+      tmux list-panes -s -t ={name}: -F '#{{pane_dead}} #{{session_attached}} #{{window_activity}}' 2>/dev/null || true
+      for socket in "$TERMINAL_REGISTRY"/*.sock; do
+        [ -S "$socket" ] || continue
+        tmux -S "$socket" list-panes -a -F \\
+          '#{{pane_dead}} #{{session_attached}} #{{window_activity}}' 2>/dev/null || true
+      done
+    }} | awk '$1 == 0 && NF == 3 {{ live++; attached += $2; if ($3 > last) last = $3 }}
+      END {{ printf "%d %d %.0f", live, attached, last }}'
+  )
+  set -- $activity
+  [ "$1" -gt 0 ] || break
+  if [ "$IDLE_TIMEOUT" -gt 0 ] && [ "$2" -eq 0 ]; then
+    now=$(date +%s)
+    if [ "$3" -gt 0 ] && [ $((now - $3)) -ge "$IDLE_TIMEOUT" ]; then
+      tmux kill-session -t ={name}: 2>/dev/null || true
+      for socket in "$TERMINAL_REGISTRY"/*.sock; do
+        [ -S "$socket" ] || continue
+        tmux -S "$socket" kill-server 2>/dev/null || true
+      done
+      break
     fi
   fi
   sleep {POLL_SECONDS}
@@ -130,7 +133,9 @@ def container_spec(spec: SessionSpec) -> dict[str, object]:
         "workingDir": spec.working_dir,
         "stdin": True,
         "tty": True,
-        "env": [{"name": k, "value": v} for k, v in sorted(spec.env.items())],
+        "env": [
+            {"name": k, "value": v} for k, v in sorted({**spec.env, TERMINAL_REGISTRY_ENV: TERMINAL_REGISTRY}.items())
+        ],
     }
 
 
