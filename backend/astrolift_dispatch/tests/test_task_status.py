@@ -178,3 +178,24 @@ def test_running_callback_cannot_resurrect_cancelled_task(org, dispatcher, raw_k
     assert resp.status_code == 409
     task.refresh_from_db()
     assert task.status == AgentTask.Status.CANCELLED
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("endpoint", [STATUS, "/api/dispatch/v1/agents/{}/callback/"])
+def test_pending_operator_stop_rejects_late_producer_failure(org, dispatcher, raw_key, endpoint):
+    from django.utils import timezone
+
+    task = _make_task(org, dispatcher, vnc_enabled=False, status=AgentTask.Status.RUNNING)
+    task.cancel_requested_at = timezone.now()
+    task.save(update_fields=["cancel_requested_at"])
+    response = Client().post(
+        endpoint.format(task.guid),
+        data=json.dumps({"status": "failed", "error": "killed", "error_message": "killed"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert response.status_code == 409
+    assert response.json()["continue"] is False
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+    assert task.failure is None

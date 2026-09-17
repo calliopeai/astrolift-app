@@ -251,6 +251,9 @@ def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
 
     if task.status in _TERMINAL_STATUSES:
         return {"external_id": task.external_id, "ok": False, "error": ""}
+    if task.cancel_requested_at:
+        # A replacement worker must reconcile the durable Stop, never respawn.
+        return {"external_id": task.external_id, "ok": True, "error": ""}
     if task.external_id and task.status in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}:
         return {"external_id": task.external_id, "ok": True, "error": ""}
 
@@ -386,6 +389,18 @@ def _placement_for_task(task):
 
 
 def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
+    from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
+
+    try:
+        with task_control_lock(task_pk):
+            return _poll_agent_task_locked(task_pk)
+    except TaskControlBusy:
+        task = AgentTask.objects.get(pk=task_pk)
+        return {"status": task.status, "terminal": task.status in _TERMINAL_STATUSES}
+
+
+def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     """Reconcile the spawned container's status onto the AgentTask, once.
 
     Reads the live container status from the dispatch backend and walks the
@@ -406,6 +421,10 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
     if task.status in _TERMINAL_STATUSES:
         _cleanup_terminal_task_secret(task)
         return {"status": task.status, "terminal": True}
+
+    if task.cancel_requested_at:
+        result = _cancel_agent_task_locked(str(task.guid))
+        return {"status": result["status"], "terminal": result["status"] in _TERMINAL_STATUSES}
 
     # The Job also carries activeDeadlineSeconds, but enforce the same limit
     # control-plane-side so the AgentTask reaches TIMED_OUT promptly and the
@@ -625,6 +644,27 @@ def _cancel_agent_task_sync(task_guid: str, *, owner: dict | None = None) -> dic
         return {"ok": False, "status": "not_found", "error": "task not found"}
     try:
         with task_control_lock(task.pk):
+            # Commit intent before the external delete. A crash or asynchronous
+            # Kubernetes deletion must be recoverable by the next status poll.
+            from django.db import transaction
+
+            with transaction.atomic():
+                current = AgentTask.objects.select_for_update().get(pk=task.pk)
+                if owner is not None:
+                    from astrolift_agents.services.workflow_task_cleanup import validate_task_owner
+
+                    error = validate_task_owner(current, owner)
+                    if error:
+                        return {"ok": False, "status": current.status, "error": error}
+                    if not current.dispatch_target and current.status not in {"draft", "queued"}:
+                        return {
+                            "ok": False,
+                            "status": current.status,
+                            "error": "Task has no saved dispatch target",
+                        }
+                if current.status not in _TERMINAL_STATUSES and not current.cancel_requested_at:
+                    current.cancel_requested_at = timezone.now()
+                    current.save(update_fields=["cancel_requested_at", "updated_at", "version"])
             return _cancel_agent_task_locked(task_guid, owner=owner)
     except TaskControlBusy as exc:
         return {"ok": False, "status": task.status, "error": str(exc), "pending": True}

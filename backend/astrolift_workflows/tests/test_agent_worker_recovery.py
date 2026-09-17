@@ -214,3 +214,111 @@ async def test_worker_replacement_keeps_task_and_container(
         assert result["task_guid"] == str(task.guid)
     assert spawned == [task.pk]
     assert not stopped
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_pending_stop_survives_poll_and_worker_replacement(org, cluster, monkeypatch, interrupted):
+    from astrolift_agents.services.task_target import freeze_task_target
+
+    task = AgentTask.objects.create(
+        organization=org,
+        status=AgentTask.Status.RUNNING,
+        external_id="pending-delete-job",
+        callback_token_hash="live-callback",
+    )
+    freeze_task_target(task, backend="k8s_job", cluster=cluster, namespace="owned-test")
+    deleted = threading.Event()
+    stop_calls = []
+
+    class WorkerLost(BaseException):
+        pass
+
+    class Spawner:
+        def stop(self, external_id, **kwargs):
+            assert external_id == task.external_id
+            assert kwargs["expected_task_guid"] == str(task.guid)
+            stop_calls.append(external_id)
+            if interrupted and len(stop_calls) == 1:
+                raise WorkerLost()
+
+        def confirm_stopped(self, external_id):
+            return deleted.is_set()
+
+        def status(self, external_id):
+            # This is the deployed race: the Job is gone before foreground pod
+            # deletion has settled. A normal status poll reports it as failed.
+            return TaskStatus(failed=True, error_message="Job no longer exists")
+
+        def cleanup_task_secret(self, external_id):
+            pass
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *args, **kwargs: Spawner())
+    if interrupted:
+        with pytest.raises(WorkerLost):
+            agent_stage._cancel_agent_task_sync(str(task.guid))
+    else:
+        assert agent_stage._cancel_agent_task_sync(str(task.guid))["pending"]
+    # A fresh ORM object and spawner represent another worker's poll.
+    pending = agent_stage._poll_agent_task_sync(task.pk)
+    assert pending == {"status": "running", "terminal": False}
+    task.refresh_from_db()
+    assert task.failure is None
+    assert task.callback_token_hash == "live-callback"
+    deleted.set()
+    assert agent_stage._poll_agent_task_sync(task.pk) == {"status": "cancelled", "terminal": True}
+    task.refresh_from_db()
+    assert not task.callback_token_hash
+    assert task.failure is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_status_poll_cannot_observe_half_finished_stop(org, cluster, monkeypatch):
+    from astrolift_agents.services.task_target import freeze_task_target
+
+    task = AgentTask.objects.create(organization=org, status="running", external_id="owned-job")
+    freeze_task_target(task, backend="k8s_job", cluster=cluster, namespace="owned-test")
+    entered = threading.Event()
+    release = threading.Event()
+
+    class Spawner:
+        def stop(self, external_id, **kwargs):
+            entered.set()
+            assert release.wait(5)
+
+        def confirm_stopped(self, external_id):
+            return True
+
+        def status(self, external_id):
+            pytest.fail("poll must not inspect resources while Stop holds the control lock")
+
+    monkeypatch.setattr(registry, "get_spawner", lambda *args, **kwargs: Spawner())
+
+    def stop_in_other_connection():
+        try:
+            return agent_stage._cancel_agent_task_sync(str(task.guid))
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        stopped = executor.submit(stop_in_other_connection)
+        try:
+            assert entered.wait(5)
+            assert agent_stage._poll_agent_task_sync(task.pk) == {"status": "running", "terminal": False}
+        finally:
+            release.set()
+        assert stopped.result(timeout=5)["status"] == "cancelled"
+
+
+@pytest.mark.django_db
+def test_recovered_stop_before_spawn_never_launches_a_container(org, monkeypatch):
+    from django.utils import timezone
+
+    task = AgentTask.objects.create(
+        organization=org,
+        status=AgentTask.Status.QUEUED,
+        cancel_requested_at=timezone.now(),
+    )
+    monkeypatch.setattr(registry, "get_spawner", lambda *args, **kwargs: pytest.fail("must not spawn"))
+    assert agent_stage._spawn_agent_task_sync(task.pk)["ok"]
+    assert agent_stage._poll_agent_task_sync(task.pk) == {"status": "cancelled", "terminal": True}

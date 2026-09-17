@@ -128,6 +128,8 @@ class AgentTask(BaseCoreModel):
     provisioning_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
+    # Durable operator intent; settlement waits for confirmed container deletion.
+    cancel_requested_at = models.DateTimeField(null=True, blank=True)
     # Redis key for live status/heartbeat/progress/token data.
     telemetry_key = models.CharField(max_length=512, blank=True, default="")
     # Environment recipe this task launched from.  Nullable so a task
@@ -254,6 +256,8 @@ class AgentTask(BaseCoreModel):
             task = type(self).all_objects.select_for_update().get(pk=self.pk)
             current = task.status
             allowed = self._TRANSITIONS.get(current, set())
+            if task.cancel_requested_at and new_status != self.Status.CANCELLED:
+                raise ValueError(f"AgentTask({self.pk}) is awaiting cancellation")
             if new_status not in allowed:
                 raise ValueError(f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}")
             now = timezone.now()
