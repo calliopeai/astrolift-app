@@ -69,24 +69,27 @@ async def test_workflow_survives_wait_then_expires_after_answer(temporal_env, ag
             id=queue,
             task_queue=queue,
         )
-        result = asyncio.create_task(handle.result())
-        try:
-            await asyncio.sleep(3)
-            assert not result.done(), "waiting for input spent the stage runtime budget"
-            await sync_to_async(task.refresh_from_db)()
-            assert task.status == "running"
-            await sync_to_async(reply_to_request)(
-                task=task, sequence=request.sequence, response={"decision": "allow"}
-            )
-            assert await asyncio.wait_for(asyncio.shield(result), 15) in {"failed", "timed_out"}
-            await sync_to_async(task.refresh_from_db)()
-            assert task.status == "timed_out"
-            assert task.failure == {"message": "agent exceeded its 2s timeout"}
-            await Replayer(workflows=[InputWaitWorkflow]).replay_workflow(await handle.fetch_history())
-        finally:
-            if not result.done():
-                await handle.cancel()
-                await asyncio.gather(result, return_exceptions=True)
+        # Database event timestamps use real time. Keep Temporal on the same
+        # clock while observing a human wait, including in CI time-skipping servers.
+        with temporal_env.auto_time_skipping_disabled():
+            result = asyncio.create_task(handle.result())
+            try:
+                await asyncio.sleep(3)
+                assert not result.done(), "waiting for input spent the stage runtime budget"
+                await sync_to_async(task.refresh_from_db)()
+                assert task.status == "running"
+                await sync_to_async(reply_to_request)(
+                    task=task, sequence=request.sequence, response={"decision": "allow"}
+                )
+                assert await asyncio.wait_for(asyncio.shield(result), 15) in {"failed", "timed_out"}
+                await sync_to_async(task.refresh_from_db)()
+                assert task.status == "timed_out"
+                assert task.failure == {"message": "agent exceeded its 2s timeout"}
+                await Replayer(workflows=[InputWaitWorkflow]).replay_workflow(await handle.fetch_history())
+            finally:
+                if not result.done():
+                    await handle.cancel()
+                    await asyncio.gather(result, return_exceptions=True)
 
 
 @workflow.defn(name="InputWaitWorkflow", sandboxed=False)
