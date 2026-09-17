@@ -164,6 +164,9 @@ async def test_worker_replacement_keeps_task_and_container(
             workflows=[DispatchAgentTaskWorkflow, StageRecoveryWorkflow],
             activities=[agent_stage.dispatch_agent_task, agent_stage.execute_agent_stage],
             max_heartbeat_throttle_interval=timedelta(milliseconds=50),
+            # Require the replacement to replay durable history. The Java test
+            # server can strand a sticky workflow task at the stopped worker.
+            max_cached_workflows=0,
         )
 
     async with worker():
