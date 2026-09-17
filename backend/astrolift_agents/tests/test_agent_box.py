@@ -102,6 +102,7 @@ class _FakeDriver:
     def __init__(self, *, apply_ok=True, job_conditions=None, job_missing=False, job_status=None):
         self.applied: list[list[dict]] = []
         self.deleted: list[list[dict]] = []
+        self.delete_policies: list[str | None] = []
         self.namespaces: list[str] = []
         self._apply_ok = apply_ok
         self._job_conditions = job_conditions or []
@@ -115,8 +116,9 @@ class _FakeDriver:
         self.applied.append([dict(m) for m in manifests])
         return _ApplyResult(ok=self._apply_ok)
 
-    def delete_manifests(self, cluster_slug, namespace, refs):
+    def delete_manifests(self, cluster_slug, namespace, refs, *, propagation_policy=None):
         self.deleted.append([dict(r) for r in refs])
+        self.delete_policies.append(propagation_policy)
         return _ApplyResult(ok=True)
 
     def get_workload_status(self, cluster_slug, namespace, kind, name):
@@ -531,6 +533,7 @@ def test_the_reaper_settles_a_box_whose_pod_has_gone(org, cluster, monkeypatch):
     assert box.ended_at is not None
     deleted_kinds = {ref["kind"] for batch in cluster.driver.deleted for ref in batch}
     assert deleted_kinds == {"Job", "Secret"}
+    assert cluster.driver.delete_policies == ["Foreground"]
 
 
 def test_the_reaper_leaves_a_box_it_cannot_observe_alone(org, cluster):
@@ -1187,6 +1190,44 @@ def test_destroy_kills_the_pod_and_soft_deletes_the_row(
     assert row.status == AgentBox.Status.STOPPED.value
     deleted_kinds = {ref["kind"] for batch in cluster.driver.deleted for ref in batch}
     assert deleted_kinds == {"Job", "Secret"}
+
+
+@pytest.mark.parametrize("raises", [True, False], ids=["provider-exception", "provider-rejection"])
+def test_destroy_failure_keeps_the_box_visible_and_can_be_retried(
+    permission_resolver, info, org, with_tenant_org, cluster, monkeypatch, raises
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    box = _box(org, status=AgentBox.Status.RUNNING, external_id="agent-box-retry")
+    delete = cluster.driver.delete_manifests
+
+    def fail_delete(*args, **kwargs):
+        if raises:
+            raise RuntimeError("provider refused teardown")
+        return _ApplyResult(ok=False, detail="provider refused teardown")
+
+    monkeypatch.setattr(cluster.driver, "delete_manifests", fail_delete)
+    with with_tenant_org(org):
+        result = AgentsMutation().destroy_agent_box(info, slug=box.slug)
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert "provider refused teardown" in result.errors[0].message
+    box.refresh_from_db()
+    assert AgentBox.objects.filter(pk=box.pk).exists()
+    assert box.deleted_at is None
+    assert box.ended_at is None
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert "provider refused teardown" in box.last_error
+
+    monkeypatch.setattr(cluster.driver, "delete_manifests", delete)
+    with with_tenant_org(org):
+        retried = AgentsMutation().destroy_agent_box(info, slug=box.slug)
+
+    assert retried.ok is True, retried.errors
+    box.refresh_from_db()
+    assert box.deleted_at is not None
+    assert box.status == AgentBox.Status.STOPPED.value
+    assert not AgentBox.objects.filter(pk=box.pk).exists()
 
 
 def test_destroy_is_denied_without_the_dispatch_grant(
