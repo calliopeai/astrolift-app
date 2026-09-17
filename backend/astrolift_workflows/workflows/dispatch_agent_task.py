@@ -52,8 +52,12 @@ class DispatchAgentTaskWorkflow:
             outcome = await workflow.execute_activity(
                 dispatch_agent_task,
                 input.agent_task_id,
-                start_to_close_timeout=_DISPATCH_TIMEOUT,
-                schedule_to_close_timeout=_DISPATCH_TIMEOUT,
+                start_to_close_timeout=(
+                    timedelta(days=8) if workflow.patched("agent-input-wait-budget") else _DISPATCH_TIMEOUT
+                ),
+                schedule_to_close_timeout=(
+                    timedelta(days=8) if workflow.patched("agent-input-wait-budget") else _DISPATCH_TIMEOUT
+                ),
                 heartbeat_timeout=_HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )

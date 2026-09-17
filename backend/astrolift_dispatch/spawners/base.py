@@ -42,6 +42,10 @@ class ContainerSpawner:
         """
         raise NotImplementedError
 
+    def reserve_input_wait(self, task: AgentTask, seconds: int) -> None:
+        """Reserve a bounded human wait allowance before acknowledging a question."""
+        raise NotImplementedError("Dispatch backend cannot reserve an input-wait deadline")
+
     def status(self, external_id: str) -> TaskStatus:
         """Return the current status of a spawned container."""
         raise NotImplementedError

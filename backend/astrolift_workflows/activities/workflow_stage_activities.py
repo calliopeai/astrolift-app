@@ -1308,6 +1308,35 @@ async def dispatch_agent_for_stage(
     )
 
 
+def _poll_agent_run_progress_sync(agent_run_id: str) -> dict:
+    from astrolift_agents.models import resolve_agent_task_for_run
+    from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
+    from astrolift_agents.services.task_timeout import task_input_wait_seconds
+    from astrolift_lifecycle.models import AgentRun
+    from astrolift_workflows.activities.agent_stage import _expire_agent_task
+
+    run = AgentRun.objects.get(pk=int(agent_run_id))
+    task = resolve_agent_task_for_run(run)
+    if task is not None and task.dispatch_target:
+        try:
+            with task_control_lock(task.pk):
+                _expire_agent_task(task.pk)
+        except TaskControlBusy:
+            pass
+    status = _poll_agent_run_status_sync(agent_run_id)
+    if task is not None:
+        task.refresh_from_db()
+    return {"status": status, "input_wait_seconds": task_input_wait_seconds(task) if task else 0.0}
+
+
+@activity.defn(name="astrolift.workflow_stage.poll_agent_run_progress")
+async def poll_agent_run_progress(agent_run_id: str) -> dict:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_poll_agent_run_progress_sync)(agent_run_id)
+
+
 @activity.defn(name="astrolift.workflow_stage.poll_agent_run_status")
 async def poll_agent_run_status(agent_run_id: str) -> str:
     """Return the current AgentRun status, reconciling the dispatched task."""
