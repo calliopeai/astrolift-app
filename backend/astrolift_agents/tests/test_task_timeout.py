@@ -158,7 +158,19 @@ def test_expired_task_cannot_gain_allowance_by_late_question(task, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "condition", ["valid", "retry", "foreign", "missing", "deleted", "finished", "no_version", "conflict"]
+    "condition",
+    [
+        "valid",
+        "retry",
+        "foreign",
+        "missing",
+        "deleted",
+        "finished",
+        "no_version",
+        "conflict",
+        "wrong_name",
+        "wrong_namespace",
+    ],
 )
 def test_kubernetes_wait_reservation_preserves_job_and_uses_identity_preconditions(
     task, monkeypatch, condition
@@ -194,6 +206,10 @@ def test_kubernetes_wait_reservation_preserves_job_and_uses_identity_preconditio
         job["status"]["conditions"] = [{"type": "Failed", "status": "True"}]
     elif condition == "no_version":
         del job["metadata"]["resourceVersion"]
+    elif condition == "wrong_name":
+        job["metadata"]["name"] = "another-job"
+    elif condition == "wrong_namespace":
+        job["metadata"]["namespace"] = "another-namespace"
     driver = Mock()
     driver.get_manifest.return_value = None if condition == "missing" else job
     driver.apply_manifests.return_value = SimpleNamespace(ok=condition != "conflict")

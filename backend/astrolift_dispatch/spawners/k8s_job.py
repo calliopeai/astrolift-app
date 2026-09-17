@@ -82,6 +82,8 @@ class K8sJobSpawner(ContainerSpawner):
         metadata = job.get("metadata") or {}
         if (
             (metadata.get("labels") or {}).get("astrolift.dev/task-id") != str(task.guid)
+            or metadata.get("name") != name
+            or metadata.get("namespace") != self._namespace
             or not metadata.get("uid")
             or not metadata.get("resourceVersion")
             or metadata.get("deletionTimestamp")
