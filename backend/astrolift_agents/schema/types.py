@@ -116,6 +116,26 @@ class AgentTaskDispatcherType:
     cluster_name: str
 
 
+@strawberry.type(name="AstroliftAgentTaskEvent")
+class AgentTaskEventType:
+    sequence: int
+    turn_id: str
+    message_id: str
+    kind: str
+    text: str
+    created_at: dt.datetime
+    request: JSON | None = None
+
+
+@strawberry.type(name="AstroliftAgentTaskInputReply")
+class AgentTaskInputReplyType:
+    id: GUID
+    request_sequence: int
+    response: JSON
+    author_label: str
+    created_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
@@ -133,6 +153,7 @@ class AgentTaskType:
     # logs (the pod was never created), so ``agentTaskLogs`` is empty and this
     # is the only signal.
     failure_message: str | None
+    event_sequence: int
     created_at: dt.datetime
     # Lifecycle cursor for the fleet map (#1091): ``transition_to`` bumps
     # ``updated_at`` on every state change, so it is the incremental cursor
@@ -597,6 +618,7 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         callback_url=t.callback_url or "",
         result=t.result,
         failure_message=_agent_task_failure_message(t.failure),
+        event_sequence=t.event_sequence,
         created_at=t.created_at,
         updated_at=t.updated_at,
         queued_at=t.queued_at,
@@ -688,6 +710,20 @@ class AgentListItemType:
     scheduled_scale_to: int | None = None
     scale_up_cron: str = ""
     scale_down_cron: str = ""
+
+
+@strawberry.type(name="AstroliftAgentListItemPage")
+class AgentListItemPageType:
+    items: list[AgentListItemType]
+    next_cursor: str | None = strawberry.field(default=None)
+    total_count: int | None = strawberry.field(default=None)
+
+
+@strawberry.type(name="AstroliftAgentTaskPage")
+class AgentTaskPageType:
+    items: list[AgentTaskType]
+    next_cursor: str | None = strawberry.field(default=None)
+    total_count: int | None = strawberry.field(default=None)
 
 
 @strawberry.type(name="AstroliftAgentSkill")

@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { FleetOverviewClient } from "./fleet-overview-client";
 
-// /fleet is a section, not a destination — land on the fleet map (#1091).
 export default function FleetPage() {
-  redirect("/fleet/map");
+  return <FleetOverviewClient />;
 }

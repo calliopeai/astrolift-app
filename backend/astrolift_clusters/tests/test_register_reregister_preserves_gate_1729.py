@@ -9,7 +9,8 @@ it, with no audit event, because a management command emits none.
 
 Two fixes in this same function already establish the rule: ``oidc_auth_config``
 (#1616) and ``ingress_mode`` (#1537) are both written only when the run actually
-supplied one. ``ingress_class`` is the third field of that shape.
+supplied one. ``ingress_class`` is the third field of that shape, and
+``alb_auth_config`` (#1773) the fourth.
 """
 
 from __future__ import annotations
@@ -75,3 +76,31 @@ def test_an_explicit_class_still_wins_on_rerun(aws_plugin):
 
     cluster.refresh_from_db()
     assert cluster.ingress_class == "traefik"
+
+
+def test_rerunning_does_not_null_an_operator_set_cognito_config(aws_plugin):
+    """#1773: the webservice re-registers on every boot; without the three
+    ASTROLIFT_CLUSTER_ALB_AUTH_* vars it wrote alb_auth_config=None and every
+    later deploy rendered an Ingress without the Cognito authenticate action."""
+    _register()
+    cluster = TenantCluster.all_objects.get(slug=SLUG)
+    cluster.alb_auth_config = {
+        "user_pool_arn": "arn:aws:cognito-idp:us-west-2:1:userpool/x",
+        "user_pool_client_id": "client",
+        "user_pool_domain": "acme",
+    }
+    cluster.save(update_fields=["alb_auth_config"])
+    _register()  # what every deploy does
+    cluster.refresh_from_db()
+    assert cluster.alb_auth_config["user_pool_domain"] == "acme", "re-register nulled the Cognito gate"
+
+
+def test_an_explicit_cognito_config_still_applies_on_rerun(aws_plugin, monkeypatch):
+    _register()
+    monkeypatch.setenv(
+        "ASTROLIFT_CLUSTER_ALB_AUTH_USER_POOL_ARN", "arn:aws:cognito-idp:us-west-2:1:userpool/y"
+    )
+    monkeypatch.setenv("ASTROLIFT_CLUSTER_ALB_AUTH_CLIENT_ID", "client2")
+    monkeypatch.setenv("ASTROLIFT_CLUSTER_ALB_AUTH_DOMAIN", "beta")
+    _register()
+    assert TenantCluster.all_objects.get(slug=SLUG).alb_auth_config["user_pool_domain"] == "beta"

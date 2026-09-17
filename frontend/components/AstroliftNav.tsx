@@ -161,7 +161,12 @@ const buildSection: { label: string; items: NavItem[] } = {
   label: "Build",
   items: [
     { label: "Build", href: "/build", icon: <HammerIcon />, permission: "cluster.register" },
-    { label: "Pipelines", href: "/pipelines", icon: <GitBranchIcon />, permission: "pipeline.read" },
+    {
+      label: "Pipelines",
+      href: "/pipelines",
+      icon: <GitBranchIcon />,
+      permission: "pipeline.read",
+    },
     {
       label: "Workflow Definitions",
       href: "/workflows",
@@ -274,7 +279,10 @@ const modules: ModuleEntry[] = [
     moduleKey: "agents",
     icon: <BotIcon />,
     href: "/agents",
-    items: [{ label: "Fleet Map", href: "/fleet/map", icon: <NetworkIcon /> }],
+    items: [
+      { label: "Fleet Overview", href: "/fleet", icon: <LayoutDashboardIcon /> },
+      { label: "Fleet Map", href: "/fleet/map", icon: <NetworkIcon /> },
+    ],
   },
   {
     label: "Workflows",
@@ -405,35 +413,33 @@ export function AstroliftNav() {
   // permission-filtered — visibility is the containing module's `canView`
   // (spec 36 §1.3); in-page guards handle the rest.
   const renderItems = (items: NavItem[]) =>
-    items
-      .map((item) => {
-        const active =
-          pathname === item.href ||
-          (item.href !== "/" && pathname.startsWith(item.href + "/"));
+    items.map((item) => {
+      const active =
+        pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
 
-        // External destinations (e.g. the Django admin) live outside the
-        // Next app, so a plain <a> in the same tab is correct — <Link> would
-        // attempt to client-route and 404.
-        const linkEl = item.external ? (
-          <a href={item.href} data-onboarding-tour={item.tourTarget}>
-            {item.icon}
-            <span>{item.label}</span>
-          </a>
-        ) : (
-          <Link href={item.href} data-onboarding-tour={item.tourTarget}>
-            {item.icon}
-            <span>{item.label}</span>
-          </Link>
-        );
+      // External destinations (e.g. the Django admin) live outside the
+      // Next app, so a plain <a> in the same tab is correct — <Link> would
+      // attempt to client-route and 404.
+      const linkEl = item.external ? (
+        <a href={item.href} data-onboarding-tour={item.tourTarget}>
+          {item.icon}
+          <span>{item.label}</span>
+        </a>
+      ) : (
+        <Link href={item.href} data-onboarding-tour={item.tourTarget}>
+          {item.icon}
+          <span>{item.label}</span>
+        </Link>
+      );
 
-        return (
-          <SidebarMenuItem key={item.href}>
-            <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-              {linkEl}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      });
+      return (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+            {linkEl}
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      );
+    });
 
   return (
     // overflow-x-hidden prevents horizontal wobble when sidebar items are
@@ -443,16 +449,14 @@ export function AstroliftNav() {
         // Top-level gate: Dashboard (no key) always shows; every other module
         // shows iff the server says `canView`. While `me.modules` is loading
         // we render so the sidebar doesn't shrink-and-grow on refresh.
-        const visible =
-          mod.moduleKey === undefined || modulesLoading || canView(mod.moduleKey);
+        const visible = mod.moduleKey === undefined || modulesLoading || canView(mod.moduleKey);
         if (!visible) return null;
 
         // Flat module (Dashboard / Apps / Agents / Workflows) — a landing
         // link, optionally with an indented child sub-nav (Apps →
         // Deployments/Approvals, Workflows → Jobs/Tasks/Functions).
         if (mod.href) {
-          const active =
-            pathname === mod.href || pathname.startsWith(mod.href + "/");
+          const active = pathname === mod.href || pathname.startsWith(mod.href + "/");
           return (
             <SidebarGroup key={mod.label}>
               <SidebarMenu>
@@ -507,14 +511,14 @@ export function AstroliftNav() {
             <SidebarGroup>
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="group/section hover:text-sidebar-foreground flex w-full items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-widest">{mod.label}</span>
+                  <span className="text-xs font-bold tracking-widest uppercase">{mod.label}</span>
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
               <CollapsibleContent>
                 {renderedGroups.map(({ group, items }) => (
                   <div key={group.label}>
-                    <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-widest">
+                    <p className="text-muted-foreground/60 text-2xs px-2 pt-2 pb-1 font-semibold tracking-widest uppercase">
                       {group.label}
                     </p>
                     <SidebarMenu>{items}</SidebarMenu>

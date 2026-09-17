@@ -164,6 +164,38 @@ def test_ensure_identity_grants_bedrock_invoke(iam_client):
     assert stmt["Resource"] == "*"
 
 
+def test_ensure_identity_attaches_required_boundary_and_preserves_it_on_retry(iam_client):
+    boundary = iam_client.create_policy(
+        PolicyName="installer-boundary",
+        PolicyDocument=json.dumps(
+            {"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "bedrock:*", "Resource": "*"}]}
+        ),
+    )["Policy"]["Arn"]
+    driver = _driver(iam_client)
+    model_arns = [f"arn:aws:bedrock:us-west-2:{_ACCOUNT}:inference-profile/test-model"]
+    config = {"iam_permissions_boundary_arn": boundary, "bedrock_model_arns": model_arns}
+    for _ in range(2):
+        arn = driver.ensure_agent_model_identity(
+            namespace="ns", service_account="astrolift-agent-model", provider_config=config
+        )
+        role_name = arn.rsplit("/", 1)[-1]
+        role = iam_client.get_role(RoleName=role_name)["Role"]
+        assert role["PermissionsBoundary"]["PermissionsBoundaryArn"] == boundary
+        policy = _as_doc(iam_client.get_role_policy(RoleName=role_name, PolicyName="bedrock-invoke")["PolicyDocument"])
+        assert policy["Statement"][0]["Resource"] == model_arns
+
+
+@pytest.mark.parametrize("boundary", [None, "", "   "])
+def test_ensure_identity_without_boundary_omits_empty_iam_parameter(iam_client, boundary):
+    arn = _driver(iam_client).ensure_agent_model_identity(
+        namespace="ns",
+        service_account="astrolift-agent-model",
+        provider_config={"iam_permissions_boundary_arn": boundary},
+    )
+    role = iam_client.get_role(RoleName=arn.rsplit("/", 1)[-1])["Role"]
+    assert "PermissionsBoundary" not in role
+
+
 def test_ensure_identity_idempotent(iam_client):
     driver = _driver(iam_client)
     a = driver.ensure_agent_model_identity(namespace="ns", service_account="astrolift-agent-model", provider_config={})
