@@ -66,6 +66,46 @@ class K8sJobSpawner(ContainerSpawner):
             )
         return SpawnResult(external_id=job_name)
 
+    def reserve_input_wait(self, task: AgentTask, seconds: int) -> None:
+        from copy import deepcopy
+
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+        driver = _driver_for_cluster(self._cluster)
+        ctx = _context_for_cluster(self._cluster)
+        name = task.external_id or task.dispatch_target.get("planned_external_id")
+        if not name:
+            raise RuntimeError("Task has no verifiable Job identity")
+        job = driver.get_manifest(ctx.slug, self._namespace, "Job", name)
+        if not job:
+            raise RuntimeError("Agent Job is missing")
+        metadata = job.get("metadata") or {}
+        if (
+            (metadata.get("labels") or {}).get("astrolift.dev/task-id") != str(task.guid)
+            or not metadata.get("uid")
+            or not metadata.get("resourceVersion")
+            or metadata.get("deletionTimestamp")
+        ):
+            raise RuntimeError("Agent Job identity cannot be verified")
+        if any(
+            condition.get("status") == "True" and condition.get("type") in {"Complete", "Failed"}
+            for condition in (job.get("status") or {}).get("conditions", [])
+        ):
+            raise RuntimeError("Agent Job has already ended")
+        deadline = max(1, int(task.timeout_seconds or 300)) + seconds
+        if job.get("spec", {}).get("activeDeadlineSeconds") == deadline:
+            return
+        manifest = deepcopy(job)
+        manifest.pop("status", None)
+        manifest["metadata"].pop("managedFields", None)
+        manifest["spec"]["activeDeadlineSeconds"] = deadline
+        # Retain UID/resourceVersion and the entire current spec. A deletion or
+        # concurrent mutation must conflict, never create a replacement Job or
+        # strip fields owned by the platform's existing SSA field manager.
+        result = driver.apply_manifests(ctx.slug, self._namespace, [manifest])
+        if not result.ok:
+            raise RuntimeError("Could not reserve the agent Job input-wait deadline")
+
     def spawn(self, task: AgentTask) -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec

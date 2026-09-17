@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Preserve native agent questions and tool approvals while an operator answers:
+  human wait time has a separate, cumulative 24-hour allowance instead of spending
+  the execution timeout. Answers resume the remaining budget, workflow stages use
+  the same persisted clock, and Kubernetes reserves the allowance on the existing
+  Job before acknowledging a question. Expired task cleanup retries until the
+  exact container is gone (#1840).
+
 - API-token organization discovery lists only the token's issuing organization.
   HTTP requests and terminal WebSocket handshakes reject a conflicting selected
   organization before resolving a target. Matching selections and clients without

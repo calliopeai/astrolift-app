@@ -657,6 +657,12 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
         if task.cancel_requested_at and task.status not in AgentTask.TERMINAL_STATUSES:
             return JsonResponse({"error": "task cancellation is pending", "continue": False}, status=409)
 
+        from astrolift_agents.services.task_timeout import task_timeout_reason
+
+        if task.dispatch_target and task.status not in AgentTask.TERMINAL_STATUSES:
+            if reason := task_timeout_reason(task):
+                return JsonResponse({"error": reason, "continue": False}, status=409)
+
         try:
             prepared_events = prepare_task_events(task, events or [])
             if "input_request" in body:
@@ -730,6 +736,16 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
             task.transition_to(target)
 
+        from astrolift_agents.services.task_timeout import reserve_input_wait
+
+        try:
+            reserve_input_wait(task, prepared_events)
+        except Exception:
+            # Roll back findings/results too. A failed reservation is retryable
+            # and must not acknowledge a question whose pod is about to expire.
+            transaction.set_rollback(True)
+            logger.warning("Could not reserve input wait for task %s", task.guid, exc_info=True)
+            return JsonResponse({"error": "Could not reserve input wait; retry the callback"}, status=503)
         commit_task_events(task, prepared_events)
 
     record_interaction(

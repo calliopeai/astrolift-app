@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 class LocalDockerSpawner(ContainerSpawner):
     """Spawn agent tasks via local Docker (for dev/test without a cluster)."""
 
+    def reserve_input_wait(self, task: AgentTask, seconds: int) -> None:
+        # Docker has no separate Job deadline. The durable controller clock
+        # governs both running time and human wait time on this backend.
+        return None
+
     def spawn(self, task: AgentTask) -> SpawnResult:
         from astrolift_dispatch.brief_injector import brief_env_vars
         from astrolift_dispatch.snapshot_injector import snapshot_env_vars

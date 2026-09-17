@@ -68,6 +68,7 @@ with workflow.unsafe.imports_passed_through():
         get_workflow_stages,
         load_agent_run_outcome,
         mark_workflow_run,
+        poll_agent_run_progress,
         poll_agent_run_status,
         record_human_gate_decision,
         record_nested_workflow_start,
@@ -733,17 +734,28 @@ class WorkflowDefinitionRunWorkflow:
         """
         deadline = workflow.now() + timedelta(seconds=timeout_seconds)
         while True:
-            status = await workflow.execute_activity(
-                poll_agent_run_status,
-                agent_run_id,
-                start_to_close_timeout=_DB_TIMEOUT,
-                retry_policy=_DB_RETRY,
-            )
+            if workflow.patched("agent-stage-input-wait-budget"):
+                progress = await workflow.execute_activity(
+                    poll_agent_run_progress,
+                    agent_run_id,
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                status = progress["status"]
+                effective_deadline = deadline + timedelta(seconds=min(86400, progress["input_wait_seconds"]))
+            else:
+                status = await workflow.execute_activity(
+                    poll_agent_run_status,
+                    agent_run_id,
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                effective_deadline = deadline
             if status in ("succeeded", "failed", "cancelled"):
                 return status
-            if workflow.now() >= deadline:
+            if workflow.now() >= effective_deadline:
                 return "timed_out"
-            remaining = deadline - workflow.now()
+            remaining = effective_deadline - workflow.now()
             await workflow.sleep(min(_AGENT_POLL_INTERVAL, remaining))
 
     async def _run_nested_workflow(

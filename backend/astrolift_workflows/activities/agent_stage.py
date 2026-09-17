@@ -400,6 +400,42 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         return {"status": task.status, "terminal": task.status in _TERMINAL_STATUSES}
 
 
+def _expire_agent_task(task_pk):
+    from django.db import transaction
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.task_timeout import task_timeout_reason
+    from astrolift_dispatch.spawners.registry import get_spawner
+
+    # Callback admission and expiry share the task lock: a question committed
+    # before expiry pauses the clock; a callback after expiry cannot revive it.
+    with transaction.atomic():
+        task = AgentTask.objects.select_for_update().select_related("organization").get(pk=task_pk)
+        if task.status in _TERMINAL_STATUSES:
+            return {"status": task.status, "terminal": True}
+        if task.cancel_requested_at:
+            return None
+        reason = task_timeout_reason(task)
+        if reason is None:
+            return None
+        task.failure = {"message": reason}
+        task.save(update_fields=["failure", "updated_at", "version"])
+        if task.external_id:
+            try:
+                backend, cluster, namespace = _placement_for_task(task)
+                spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+                spawner.stop(task.external_id, expected_task_guid=str(task.guid))
+                if not spawner.confirm_stopped(task.external_id):
+                    return {"status": task.status, "terminal": False}
+            except Exception:
+                log.warning("agent timeout: container stop failed for task %s", task.guid, exc_info=True)
+                # Keep reconciling until the extended-deadline container is
+                # actually gone; a failed deletion is not a settled timeout.
+                return {"status": task.status, "terminal": False}
+        _advance_to_terminal(task, AgentTask.Status.TIMED_OUT)
+        return {"status": task.status, "terminal": True}
+
+
 def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     """Reconcile the spawned container's status onto the AgentTask, once.
 
@@ -426,23 +462,9 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
         result = _cancel_agent_task_locked(str(task.guid))
         return {"status": result["status"], "terminal": result["status"] in _TERMINAL_STATUSES}
 
-    # The Job also carries activeDeadlineSeconds, but enforce the same limit
-    # control-plane-side so the AgentTask reaches TIMED_OUT promptly and the
-    # per-task Secret is removed with the Job. Use provisioning_at because the
-    # deadline begins when dispatch creates the Job, including pod scheduling.
-    started = task.provisioning_at or task.started_at or task.queued_at
-    timeout_seconds = max(1, int(task.timeout_seconds or 300))
-    if started is not None and (timezone.now() - started).total_seconds() >= timeout_seconds:
-        if task.external_id:
-            try:
-                backend, cluster, namespace = _placement_for_task(task)
-                get_spawner(backend, cluster=cluster, namespace=namespace).stop(task.external_id)
-            except Exception:  # noqa: BLE001 — K8s deadline remains the backstop
-                log.warning("agent timeout: container stop failed for task %s", task.guid, exc_info=True)
-        task.failure = {"message": f"agent exceeded its {timeout_seconds}s timeout"}
-        task.save(update_fields=["failure", "updated_at", "version"])
-        _advance_to_terminal(task, AgentTask.Status.TIMED_OUT)
-        return {"status": task.status, "terminal": True}
+    expired = _expire_agent_task(task.pk)
+    if expired is not None:
+        return expired
 
     if not task.external_id:
         # Spawn may still be in flight. The deadline check above guarantees a

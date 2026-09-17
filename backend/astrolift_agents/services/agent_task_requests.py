@@ -183,6 +183,11 @@ def reply_to_request(*, task, sequence, response, author=None, author_label=""):
         return previous
     if task.status != AgentTask.Status.RUNNING:
         raise TaskInputRequestError("task is not accepting input", 409)
+    if task.dispatch_target:
+        from astrolift_agents.services.task_timeout import task_timeout_reason
+
+        if reason := task_timeout_reason(task):
+            raise TaskInputRequestError(reason, 409)
     if AgentTaskEvent.objects.filter(
         agent_task=task,
         turn_id=event.turn_id,

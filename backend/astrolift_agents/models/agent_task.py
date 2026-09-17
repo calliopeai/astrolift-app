@@ -110,6 +110,8 @@ class AgentTask(BaseCoreModel):
     # into the pod.  The plaintext is minted at spawn and never persisted.
     callback_token_hash = models.CharField(max_length=64, blank=True, default="")
     timeout_seconds = models.IntegerField(default=300)
+    # Granted only after the native backend reserves a bounded input-wait deadline.
+    input_wait_budget_seconds = models.PositiveIntegerField(default=0)
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
     failure = models.JSONField(null=True, blank=True)

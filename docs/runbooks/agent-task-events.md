@@ -136,3 +136,44 @@ delivery and deduplication remain the runner's responsibility.
 This change supplies controller ingestion and replay. Runner emission,
 CLI/API client integration, native rendering and deployed end-to-end
 acceptance must be connected before claiming live conversation support.
+
+
+## Execution time and human waiting
+
+For native tasks with a persisted dispatch target, `timeout_seconds` counts
+provisioning and execution time. A typed question or approval pauses that clock
+until the first accepted reply or matching `input_resolved`, whichever arrives
+first. Plain legacy attention events and queued steering messages do not pause
+execution. Server event/reply timestamps drive the calculation across worker
+replacement and client reconnection. Overlapping waits count once, and repeated
+questions share one cumulative 86,400-second human wait allowance.
+
+Before acknowledging the first typed request, the controller reserves a
+Kubernetes deadline of `timeout_seconds + 86400` on the exact existing Job. It
+checks the task label, UID, resource version, and terminal/deletion state. Failed
+reservation returns 503 and rolls back the entire callback so the runner can
+retry its unchanged batch. A successful external reservation followed by a lost
+database commit is safe to retry; the saved task allowance only advances after
+reservation succeeds. Docker has no separate Job deadline and uses the same
+controller clock. Externally managed dispatchers without a frozen native target
+retain their own timeout policy.
+
+Accepting an answer immediately resumes the execution clock; a runner cannot
+extend its allowance by withholding `input_resolved`. Exhausted budgets reject
+new input and tell callbacks to stop. The reconciler stops the exact resource
+and keeps retrying failed/unconfirmed deletion before publishing `timed_out`.
+Kubernetes retains the outer wall-clock deadline during a controller outage.
+
+Migration `0028_agenttask_input_wait_budget` adds an internal field with a zero
+default; no public GraphQL shape changes. Deploy the migration before API and
+worker code. New dispatch workflows allow up to the maximum supported seven-day
+execution budget plus one day of input wait; existing scheduled Temporal
+activities retain their recorded lifetime. Workflow-definition histories use a
+versioned progress activity, preserving replay of their previous status polls.
+Rolling back API/workers reinstates the old wall-clock behavior; keep the additive
+column until the new code is fully retired. Already ended tasks are not revived.
+
+The opt-in Kubernetes regression requires `ASTROLIFT_TEST_KUBECONFIG` pointing
+at a disposable cluster. It creates a unique namespace and a Job, preserves the
+Job UID/spec, and verifies the Job remains active beyond its original deadline.
+It never uses the caller's default Kubernetes context.
