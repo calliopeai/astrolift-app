@@ -30,6 +30,7 @@ from astrolift_agents.models import (
     AgentSecretBundleRef,
     AgentTask,
     AgentTaskEvent,
+    AgentTaskInputMessage,
     Brief,
     DispatcherInstance,
     OrgSkillRepo,
@@ -49,6 +50,7 @@ from astrolift_agents.schema.types import (
     AgentSecretBundleType,
     AgentSecretStatusType,
     AgentTaskEventType,
+    AgentTaskInputMessageType,
     AgentTaskPageType,
     AgentTaskType,
     AgentTriggerType,
@@ -66,6 +68,7 @@ from astrolift_agents.schema.types import (
     agent_secret_bundle_attachment_to_type,
     agent_secret_bundle_to_type,
     agent_secret_status_to_type,
+    agent_task_input_message_to_type,
     agent_task_to_type,
     agent_tasks_to_types,
     agent_trigger_to_type,
@@ -634,6 +637,32 @@ class AgentsQuery:
             "dispatcher__tenant_cluster",
         ).order_by("updated_at")[:capped]
         return agent_tasks_to_types(qs)
+
+    @strawberry.field
+    @require_permission(
+        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+    )
+    @tenant_scoped()
+    def agent_task_input_message(
+        self, info: Info, task_id: strawberry.ID, client_request_id: str
+    ) -> AgentTaskInputMessageType | None:
+        """Recover one enqueue receipt without adding or consuming input."""
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        task_guid, request_guid = _valid_guid(task_id), _valid_guid(client_request_id)
+        if org_pk is None or task_guid is None or request_guid is None:
+            return None
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_TASK_SEND_INPUT)
+            .filter(guid=task_guid, organization_id=org_pk)
+            .first()
+        )
+        if task is None:
+            return None
+        row = AgentTaskInputMessage.objects.filter(
+            organization_id=org_pk, agent_task=task, client_request_id=request_guid
+        ).first()
+        return agent_task_input_message_to_type(row) if row else None
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))

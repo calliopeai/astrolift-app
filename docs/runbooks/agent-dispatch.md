@@ -170,3 +170,31 @@ To debug why a scheduled agent did not run:
 
 - [Deploy runbook](deploy.md)
 - [Incident response runbook](incident-response.md)
+
+## Recovering a queued steering message
+
+`sendAgentTaskInput(taskId, message, clientRequestId)` accepts an optional
+client-generated UUID. Persist the task, UUID and original message before sending.
+A retry with the same task, UUID and edge-trimmed message returns the original
+receipt, including after delivery or task completion. Reusing that UUID with a
+different message is a `PRECONDITION` failure. Omitted/null UUIDs retain the legacy
+behavior: every successful call enqueues a new message.
+
+After a lost response, query
+`agentTaskInputMessage(taskId, clientRequestId)` for the exact receipt. This query
+requires `agent_task.send_input` in the task's scope and the active organization;
+it neither enqueues nor consumes input. A missing receipt is not proof that an
+in-flight send failed. If needed, retry the original mutation with the **same**
+UUID and message; never generate a replacement UUID merely because the response
+was lost. A soft-deleted receipt keeps its UUID reserved and cannot be re-enqueued.
+
+`ok: true` confirms queue admission. `deliveredAt` means the control plane claimed
+the message for runner delivery, not that the harness received or executed it.
+The existing runner batch callback remains at-most-once; losing that callback
+response can still lose the claimed batch.
+
+Rollout: apply migration `astrolift_agents.0029_agent_input_request_id`, deploy the
+API and generated schema, then enable keyed sends in clients after checking that
+the server supports them. Rolling back application code can leave the additive
+nullable column and uniqueness constraint in place. Dropping the column discards
+recovery identities and must not occur while clients can retry outstanding sends.

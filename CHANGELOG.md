@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Deduplicate queued agent steering by an optional client request UUID and expose
+  an exact receipt lookup, so a lost enqueue reply can be recovered after delivery
+  or task completion without repeating the instruction (#1842).
+
 - Preserve native agent questions and tool approvals while an operator answers:
   human wait time has a separate, cumulative 24-hour allowance instead of spending
   the execution timeout. Answers resume the remaining budget, workflow stages use

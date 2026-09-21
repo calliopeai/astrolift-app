@@ -501,6 +501,7 @@ type AstroliftAgentTaskInputMessage {
   author: String!
   createdAt: DateTime!
   deliveredAt: DateTime
+  clientRequestId: String
 }
 
 type AstroliftAgentTaskInputMessageMutationResult {
@@ -5586,7 +5587,7 @@ type Mutation {
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
   replyAgentTaskInput(taskId: ID!, requestSequence: Int!, response: JSON!): AstroliftAgentTaskInputReplyMutationResult!
-  sendAgentTaskInput(taskId: ID!, message: String!): AstroliftAgentTaskInputMessageMutationResult!
+  sendAgentTaskInput(taskId: ID!, message: String!, clientRequestId: String = null): AstroliftAgentTaskInputMessageMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
   ensureAgentBox(input: EnsureAgentBoxInput!, orgId: ID!): AstroliftAgentBoxMutationResult!
   destroyAgentBox(slug: String!): AstroliftAgentBoxMutationResult!
@@ -6217,6 +6218,7 @@ type Query {
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
+  agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!

@@ -519,6 +519,7 @@ export type AstroliftAgentTaskEvent = {
 
 export type AstroliftAgentTaskInputMessage = {
   author: Scalars['String']['output'];
+  clientRequestId?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   deliveredAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
@@ -6819,6 +6820,7 @@ export type MutationScaleServiceAgentArgs = {
 
 
 export type MutationSendAgentTaskInputArgs = {
+  clientRequestId?: InputMaybe<Scalars['String']['input']>;
   message: Scalars['String']['input'];
   taskId: Scalars['ID']['input'];
 };
@@ -7617,6 +7619,7 @@ export type Query = {
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTaskEvents: Array<AstroliftAgentTaskEvent>;
+  agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
@@ -8000,6 +8003,12 @@ export type QueryAgentTaskEventsArgs = {
   after?: Scalars['Int']['input'];
   limit?: Scalars['Int']['input'];
   orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskInputMessageArgs = {
+  clientRequestId: Scalars['String']['input'];
   taskId: Scalars['ID']['input'];
 };
 

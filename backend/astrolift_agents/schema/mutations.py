@@ -1757,14 +1757,14 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(
         action="agents.task.send_input",
-        target=lambda self, info, task_id, message: ("AgentTask", str(task_id)),
+        target=lambda self, info, task_id, message, client_request_id=None: ("AgentTask", str(task_id)),
     )
     @require_permission(
         Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
     )
     @tenant_scoped()
     def send_agent_task_input(
-        self, info: Info, task_id: strawberry.ID, message: str
+        self, info: Info, task_id: strawberry.ID, message: str, client_request_id: str | None = None
     ) -> MutationResultType[AgentTaskInputMessageType]:
         """Queue a follow-up prompt for a RUNNING AgentTask (#1390).
 
@@ -1811,6 +1811,7 @@ class AgentsMutation:
                 message=message,
                 author=author,
                 author_label=author_label,
+                client_request_id=client_request_id,
             )
         except AgentTaskInputError as exc:
             code = {

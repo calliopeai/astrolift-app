@@ -228,6 +228,7 @@ class AgentTaskInputMessageType:
     author: str
     created_at: dt.datetime
     delivered_at: dt.datetime | None
+    client_request_id: str | None = None
 
 
 @strawberry.type(name="AstroliftAgentEnvironmentSpec")
@@ -652,6 +653,7 @@ def agent_task_input_message_to_type(msg) -> AgentTaskInputMessageType:
         author=msg.author_label or "",
         created_at=msg.created_at,
         delivered_at=msg.delivered_at,
+        client_request_id=str(msg.client_request_id) if msg.client_request_id else None,
     )
 
 
