@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Prevent concurrent workflow starts from colliding on blank execution
+  identifiers while creating their run records. The final Temporal workflow
+  identifiers remain unchanged (#1844).
+
 - Preserve native agent questions and tool approvals while an operator answers:
   human wait time has a separate, cumulative 24-hour allowance instead of spending
   the execution timeout. Answers resume the remaining budget, workflow stages use

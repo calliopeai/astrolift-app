@@ -10,6 +10,7 @@ the agent stages (#1020).
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 
 def build_workflow_definition_run_input(
@@ -42,7 +43,8 @@ def build_workflow_definition_run_input(
     run = WorkflowRun.objects.create(
         workflow_kind="WorkflowDefinitionRunWorkflow",
         workflow_definition=definition,
-        workflow_id="",
+        # Concurrent starts share the unique (workflow_id, run_id) constraint.
+        workflow_id=f"pending-{uuid4()}",
         run_id="",
         status=WorkflowRun.Status.RUNNING,
         started_at=timezone.now(),
