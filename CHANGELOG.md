@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Deduplicate queued agent steering by an optional client request UUID and expose
+  an exact receipt lookup, so a lost enqueue reply can be recovered after delivery
+  or task completion without repeating the instruction (#1842).
+
 - Prevent concurrent workflow starts from colliding on blank execution
   identifiers while creating their run records. The final Temporal workflow
   identifiers remain unchanged (#1844).

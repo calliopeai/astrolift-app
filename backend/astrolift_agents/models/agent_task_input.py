@@ -62,6 +62,7 @@ class AgentTaskInputMessage(BaseCoreModel):
         on_delete=models.CASCADE,
         db_index=True,
     )
+    client_request_id = models.UUIDField(null=True, blank=True)
     # The follow-up prompt text handed to the harness verbatim.
     body = models.TextField()
     # Who queued it. Nullable + SET_NULL so a message survives the author's
@@ -86,6 +87,13 @@ class AgentTaskInputMessage(BaseCoreModel):
         # Oldest first, pk breaking the created_at tie — see the module
         # docstring. Every consumer relies on this being a total order.
         ordering = ["created_at", "id"]
+        # Keep the key reserved after soft deletion so a retry cannot re-enqueue.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agent_task", "client_request_id"],
+                name="agentinput_task_request_unique",
+            ),
+        ]
         indexes = [
             # The delivery query: undelivered rows for one task, in order.
             models.Index(

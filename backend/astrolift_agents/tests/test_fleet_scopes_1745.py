@@ -529,3 +529,44 @@ def test_task_projection_confines_placement_metadata(fleet, placement):
         assert str(row.dispatcher.id) == str(dispatcher.guid)
         assert row.dispatcher.cluster_name == (cluster.name if placement == "platform-cluster" else "")
         assert row.dispatcher.cluster_id == (str(cluster.guid) if placement == "platform-cluster" else None)
+
+
+@pytest.mark.parametrize("kind", ["TEAM", "PROJECT", "APP", "ORG"])
+def test_own_scope_can_recover_a_keyed_input_receipt(fleet, kind):
+    bind(fleet, kind, [Permission.AGENT_TASK_SEND_INPUT])
+    task = fleet.tasks[0]
+    running(task)
+    key = str(uuid4())
+    with tenant(fleet):
+        sent = AgentsMutation().send_agent_task_input(
+            fleet.info, task_id=str(task.guid), message="next", client_request_id=key
+        )
+        assert sent.ok
+        receipt = AgentsQuery().agent_task_input_message(
+            fleet.info, task_id=str(task.guid), client_request_id=key
+        )
+    assert receipt.id == sent.data.id
+    assert receipt.client_request_id == key
+    assert receipt.delivered_at is None
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_team_grant_cannot_recover_or_replay_sibling_input(fleet, selected):
+    from astrolift_agents.services.agent_task_input import queue_agent_task_input
+
+    bind(fleet, permissions=[Permission.AGENT_TASK_SEND_INPUT])
+    for task in [fleet.tasks[1], fleet.orphan]:
+        running(task)
+        key = str(uuid4())
+        queue_agent_task_input(task=task, message="private", client_request_id=key)
+        with tenant(fleet, selected):
+            with pytest.raises(PermissionDenied):
+                AgentsQuery().agent_task_input_message(
+                    fleet.info, task_id=str(task.guid), client_request_id=key
+                )
+            result = AgentsMutation().send_agent_task_input(
+                fleet.info, task_id=str(task.guid), message="private", client_request_id=key
+            )
+        assert not result.ok
+        assert result.errors[0].code == "PERMISSION_DENIED"
+        assert task.input_messages.count() == 1
