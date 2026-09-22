@@ -335,7 +335,7 @@ def test_instance_start_configured_denormalizes_org(org, agent_workload):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_migration_0004_backfills_existing_rows_org_null():
+def test_migration_0004_backfills_existing_rows_org_null(request):
     from django.contrib.contenttypes.models import ContentType
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
@@ -346,6 +346,9 @@ def test_migration_0004_backfills_existing_rows_org_null():
 
     # Rewind to the pre-tenancy state and seed legacy rows.
     executor = MigrationExecutor(connection)
+    current_targets = executor.loader.graph.leaf_nodes()
+    # Later transaction tests need the current schema, even if this test fails.
+    request.addfinalizer(lambda: MigrationExecutor(connection).migrate(current_targets))
     executor.migrate(migrate_from)
     old_apps = executor.loader.project_state(migrate_from).apps
     OldDef = old_apps.get_model(app, "WorkflowDefinition")
