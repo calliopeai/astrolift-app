@@ -32,6 +32,7 @@ from astrolift_services.schema.mutations.helpers import (
     _client_ip,
     _maybe_create_proposal_for_write,
     _stage_manifest,
+    _secret_write_payload,
     _upsert_app_secret_metadata,
     _validate_env_key,
     _validate_scope,
@@ -98,7 +99,7 @@ class SecretMutations:
         proposal = _maybe_create_proposal_for_write(
             app=app,
             op=SecretChangeProposal.Op.SET.value,
-            payload={"key": input.key, "value": input.value},
+            payload=_secret_write_payload(input),
             info=info,
         )
         if proposal is not None:
@@ -179,7 +180,7 @@ class SecretMutations:
         proposal = _maybe_create_proposal_for_write(
             app=app,
             op=SecretChangeProposal.Op.SET.value,
-            payload={"key": input.key, "value": input.value},
+            payload=_secret_write_payload(input),
             info=info,
         )
         if proposal is not None:

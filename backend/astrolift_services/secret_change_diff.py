@@ -33,6 +33,7 @@ from typing import Any
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import AppSecretBundleRef, SecretChangeProposal
+from astrolift_services.secret_metadata_ops import current_secret_scope
 
 
 def _mask(value: str) -> str:
@@ -65,21 +66,28 @@ def build_diff(
         key = payload.get("key") or ""
         new_value = payload.get("value") or ""
         before_value = literals.get(key, "")
+        # Scope decides which environments get the value, so the approver
+        # sees it, and any change to it, next to the value (#1758).
+        before_scope = current_secret_scope(app, key)
+        after_scope = payload.get("scope") or before_scope
+        summary = f"Update {key} in {env_display}" if key in literals else f"Add {key} in {env_display}"
+        if after_scope != before_scope:
+            summary += f", scope {before_scope} to {after_scope}"
         return {
             "op": op,
             "before": {
                 "key": key,
                 "value_masked": _mask(before_value),
                 "present": key in literals,
+                "scope": before_scope,
             },
             "after": {
                 "key": key,
                 "value_masked": _mask(new_value),
                 "present": True,
+                "scope": after_scope,
             },
-            "summary": (
-                f"Update {key} in {env_display}" if key in literals else f"Add {key} in {env_display}"
-            ),
+            "summary": summary,
         }
 
     if op == SecretChangeProposal.Op.DELETE.value:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 from datetime import timedelta
 
 from django.utils import timezone
@@ -12,11 +11,16 @@ from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
-    AppSecretMetadata,
     ManagedService,
     SecretChangeProposal,
 )
 from astrolift_services.secret_change_diff import build_diff
+
+# Re-exported under their old names for the mutation modules.
+from astrolift_services.secret_metadata_ops import VALID_SECRET_SOURCES as _VALID_SECRET_SOURCES  # noqa: F401
+from astrolift_services.secret_metadata_ops import (  # noqa: F401
+    upsert_app_secret_metadata as _upsert_app_secret_metadata,
+)
 from core.tenancy import get_current_tenant
 
 
@@ -160,80 +164,6 @@ def _maybe_create_proposal_for_write(
     return proposal
 
 
-_VALID_SECRET_SOURCES = {s.value for s in AppSecretMetadata.Source}
-
-
-def _upsert_app_secret_metadata(
-    *,
-    app: RegisteredApp,
-    key: str,
-    environment_name: str = "",
-    expires_at: dt.datetime | None = None,
-    set_via: str | None = None,
-    scope: str | None = None,
-    actor=None,
-) -> AppSecretMetadata:
-    """Upsert the operator-facing metadata sidecar for a secret literal.
-
-    Idempotent on (registered_app, environment_name, key).  Each call
-    refreshes ``set_at`` to ``timezone.now()`` so the FE can render a
-    'set on <date>' tooltip independent of the underlying audit row.
-
-    ``expires_at=None`` + ``set_via=None`` is a no-op on the timestamp /
-    expiry but still touches ``set_at`` — operators sometimes want a
-    'last-touched' refresh without changing the data, and the cost of
-    one UPDATE per literal write is negligible against the platform's
-    overall throughput.
-
-    ``scope=None`` is "don't touch" as well, and ``all`` only on create:
-    writing a default on every update let a rotate or a bulk import
-    silently widen a key restricted to ``production`` back to ``all``
-    (#1758).
-    """
-    if set_via is not None and set_via not in _VALID_SECRET_SOURCES:
-        # Reject unknown sources up front so a typo doesn't silently
-        # land an out-of-band value on the column.
-        set_via = AppSecretMetadata.Source.WEB.value
-    row = AppSecretMetadata.objects.filter(
-        registered_app=app,
-        environment_name=environment_name or "",
-        key=key,
-        deleted_at__isnull=True,
-    ).first()
-    if row is None:
-        row = AppSecretMetadata.objects.create(
-            registered_app=app,
-            environment_name=environment_name or "",
-            key=key,
-            expires_at=expires_at,
-            source=(set_via or AppSecretMetadata.Source.WEB.value),
-            scope=scope if scope is not None else "all",
-            set_at=timezone.now(),
-            created_by=actor,
-            updated_by=actor,
-        )
-        return row
-    # Apply optional updates atomically.  We don't clear
-    # ``expires_at`` to None or reset ``scope`` unless the caller
-    # explicitly passes a value — `None` means "don't touch" per the
-    # input contract.
-    updates: dict = {"set_at": timezone.now()}
-    if expires_at is not None:
-        updates["expires_at"] = expires_at
-    if set_via is not None:
-        updates["source"] = set_via
-    if scope is not None:
-        updates["scope"] = scope
-    for k, v in updates.items():
-        setattr(row, k, v)
-    if actor is not None:
-        row.updated_by = actor
-    row.save(
-        update_fields=[*updates.keys(), "updated_by", "updated_at"],
-    )
-    return row
-
-
 def _validate_env_key(key: str) -> str | None:
     if not key:
         return "key cannot be empty"
@@ -246,6 +176,21 @@ def _validate_env_key(key: str) -> str | None:
     if not all(c.isalnum() or c == "_" for c in key):
         return f"key {key!r} {_ENV_NAME_HINT}"
     return None
+
+
+def _secret_write_payload(input) -> dict:
+    """Proposal payload for a set/rotate: the value plus the metadata the
+    direct write would record. apply_proposal writes the metadata from it;
+    without it an approved production-only key reverted to ``all`` (#1758).
+    Omitted fields stay out, so apply keeps what is stored."""
+    payload: dict = {"key": input.key, "value": input.value}
+    if input.scope is not None:
+        payload["scope"] = input.scope
+    if input.expires_at is not None:
+        payload["expires_at"] = input.expires_at.isoformat()
+    if input.set_via is not None:
+        payload["set_via"] = input.set_via
+    return payload
 
 
 def _validate_scope(scope: str | None) -> str | None:

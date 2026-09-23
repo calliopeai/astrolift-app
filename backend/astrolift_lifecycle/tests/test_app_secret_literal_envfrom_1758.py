@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import base64
 import itertools
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
@@ -23,6 +25,7 @@ from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
 from astrolift_registry.schema.mutations import RegistryMutation, UpdateManifestInput
 from astrolift_services.models import (
     AppSecretBundleRef,
+    AppSecretMetadata,
     ManagedService,
     SecretBundle,
     SecretChangeProposal,
@@ -33,6 +36,7 @@ from astrolift_services.schema.mutations.types import (
     DeleteAppSecretInput,
     RotateAppSecretInput,
     SetAppSecretInput,
+    SetAppSecretMetadataInput,
 )
 from astrolift_workflows.activities.app_lifecycle import (
     _app_env_secret_name,
@@ -704,3 +708,142 @@ def test_a_deleted_literal_is_left_out_of_the_next_secret_apply(permission_resol
     app.refresh_from_db()
 
     assert _materialize(_deployment(app, env), monkeypatch) == {"KEEP_ME": "keep"}
+
+
+# An approved write must leave the metadata a direct write would. The
+# set/rotate proposals carried only key and value, and apply never wrote
+# AppSecretMetadata, so an approved production-only key fell back to scope
+# "all" and reached previews (#1758 re-review, 1).
+
+
+def _approved(app, write) -> None:
+    _approve(app, _propose(app, write))
+
+
+def _approved_set(app, **fields) -> None:
+    _approved(
+        app,
+        lambda info: ServicesMutation().set_app_secret(
+            info, input=SetAppSecretInput(app_slug=app.slug, **fields)
+        ),
+    )
+
+
+def _live_metadata(app, key: str):
+    return AppSecretMetadata.objects.filter(registered_app=app, key=key, deleted_at__isnull=True)
+
+
+@pytest.fixture
+def approver_grants(permission_resolver):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    return permission_resolver
+
+
+def test_under_approval_an_approved_production_secret_never_reaches_a_preview(
+    approver_grants, app, env, monkeypatch
+):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    preview = _preview_environment(
+        app, env, name="preview-approved", status=PreviewEnvironment.Status.RUNNING
+    )
+
+    _approved_set(app, key="PROD_ONLY", value="prod-value", scope="production")
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "prod-value"}
+
+
+def test_under_approval_a_rotation_without_a_scope_keeps_the_approved_scope(
+    approver_grants, app, env, monkeypatch
+):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-rotated", status=PreviewEnvironment.Status.RUNNING)
+    _approved_set(app, key="PROD_ONLY", value="prod-value", scope="production")
+
+    _approved(
+        app,
+        lambda info: ServicesMutation().rotate_app_secret(
+            info, input=RotateAppSecretInput(app_slug=app.slug, key="PROD_ONLY", value="rotated")
+        ),
+    )
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "rotated"}
+
+
+def test_under_approval_expiry_and_source_travel_with_the_proposal(approver_grants, app, env):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    expires = timezone.now() + timedelta(days=30)
+
+    _approved_set(app, key="API_KEY", value="v", expires_at=expires, set_via="cli")
+
+    row = _live_metadata(app, "API_KEY").get()
+    assert (row.expires_at, row.source, row.scope) == (expires, "cli", "all")
+
+
+def test_the_proposal_diff_shows_the_scope_it_asks_to_approve(approver_grants, app, env):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+
+    proposal_id = _propose(
+        app,
+        lambda info: ServicesMutation().set_app_secret(
+            info,
+            input=SetAppSecretInput(app_slug=app.slug, key="PROD_ONLY", value="v", scope="production"),
+        ),
+    )
+
+    diff = SecretChangeProposal.objects.get(guid=proposal_id).payload_diff
+    assert (diff["before"]["scope"], diff["after"]["scope"]) == ("all", "production")
+    assert "scope all to production" in diff["summary"]
+
+
+def test_under_approval_an_approved_delete_retires_the_metadata_of_a_draft_only_key(
+    approver_grants, app, env
+):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    _approved_set(app, key="DRAFT_ONLY", value="v", scope="production")
+    assert _live_metadata(app, "DRAFT_ONLY").exists()
+
+    _approved(
+        app,
+        lambda info: ServicesMutation().delete_app_secret(
+            info, input=DeleteAppSecretInput(app_slug=app.slug, key="DRAFT_ONLY")
+        ),
+    )
+
+    assert not _live_metadata(app, "DRAFT_ONLY").exists()
+
+
+def test_under_approval_discarding_an_approved_delete_keeps_the_key_scoped(
+    approver_grants, app, env, monkeypatch
+):
+    """While manifest_raw still has the key, an approved delete is a draft.
+    Discarding the draft brings the key back, and it must come back with
+    its restriction, not as scope "all"."""
+    app.manifest_raw = set_app_env_keys(_MANIFEST, {"PROD_ONLY": "repo-value"})
+    app.save(update_fields=["manifest_raw"])
+    with _ctx(app):
+        restricted = ServicesMutation().set_app_secret_metadata(
+            _info(), input=SetAppSecretMetadataInput(app_slug=app.slug, key="PROD_ONLY", scope="production")
+        )
+    assert restricted.ok, restricted.errors
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-discard", status=PreviewEnvironment.Status.RUNNING)
+    _approved(
+        app,
+        lambda info: ServicesMutation().delete_app_secret(
+            info, input=DeleteAppSecretInput(app_slug=app.slug, key="PROD_ONLY")
+        ),
+    )
+
+    _stage_via_update_manifest(app, app.manifest_raw)
+
+    assert app.manifest_raw_staged == ""
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "repo-value"}

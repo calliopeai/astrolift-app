@@ -19,14 +19,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.utils.dateparse import parse_datetime
+
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
+from astrolift_manifest.env_edit import delete_app_env_key, read_app_env, set_app_env_keys
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
     AppSecretBundleRef,
     SecretBundle,
     SecretChangeProposal,
+)
+from astrolift_services.secret_metadata_ops import (
+    retire_app_secret_metadata,
+    upsert_app_secret_metadata,
 )
 
 
@@ -82,6 +88,20 @@ def apply_proposal(
             source = app.manifest_raw_staged or app.manifest_raw or ""
             new_text = set_app_env_keys(source, {key: value})
             _stage_manifest(app, new_text, actor=actor)
+            # The metadata a direct setAppSecret records, from the payload
+            # the proposer submitted. Without it an approved key restricted
+            # to production fell back to scope "all" and reached previews
+            # (#1758). A missing scope keeps the stored one.
+            expires_at = payload.get("expires_at")
+            upsert_app_secret_metadata(
+                app=app,
+                key=key,
+                environment_name="",
+                expires_at=parse_datetime(expires_at) if expires_at else None,
+                set_via=payload.get("set_via"),
+                scope=payload.get("scope"),
+                actor=actor,
+            )
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.DELETE.value:
@@ -97,6 +117,13 @@ def apply_proposal(
                 # approve, we shouldn't fail the apply.
                 return ApplyResult(ok=True)
             _stage_manifest(app, new_text, actor=actor)
+            # Retire the metadata as a direct deleteAppSecret does, but only
+            # once manifest_raw no longer carries the key either. While it
+            # does, the delete is a draft, and discarding the draft brings
+            # the key back; with its metadata gone it would come back
+            # scoped "all" and reach previews.
+            if key not in read_app_env(app.manifest_raw or ""):
+                retire_app_secret_metadata(app, key, actor=actor)
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:
