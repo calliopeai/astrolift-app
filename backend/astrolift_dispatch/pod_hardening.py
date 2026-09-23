@@ -18,7 +18,7 @@ from __future__ import annotations
 from django.conf import settings
 
 #: uid/gid of the ``agent`` user in every astrolift-agents image.
-AGENT_UID = 10001
+AGENT_UID = 42042
 
 NON_ROOT_INSTALL_CONFLICT = (
     "this environment spec runs as non-root, which cannot install packages at boot; "

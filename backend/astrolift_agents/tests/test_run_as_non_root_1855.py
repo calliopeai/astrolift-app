@@ -65,6 +65,12 @@ def _spec(**fields):
 # ---- render ----------------------------------------------------------
 
 
+def test_agent_uid_matches_the_image_contract():
+    """astrolift-agents creates the ``agent`` user with this uid/gid; the two
+    must move together or non-root pods cannot write their HOME."""
+    assert AGENT_UID == 42042
+
+
 def test_root_mode_keeps_default_identity_and_capabilities():
     pod = _pod(_spec())
 
