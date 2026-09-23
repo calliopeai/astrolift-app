@@ -339,6 +339,53 @@ def test_set_metadata_without_a_scope_keeps_the_stored_scope(permission_resolver
     assert _scope_of(app, "META_K") == "production"
 
 
+# An explicit "" matches no environment's allowed scopes, so storing it
+# would stop the key deploying anywhere without an error.
+
+
+def _refused_as_empty_scope(result) -> bool:
+    return result.ok is False and result.errors[0].code == "VALIDATION" and result.errors[0].field == "scope"
+
+
+def test_set_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope=""),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_rotate_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope="  "),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_set_metadata_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="EMPTY_K", scope=""),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
 # ---- setAppSecretMetadata return payload carries scope ------------
 
 

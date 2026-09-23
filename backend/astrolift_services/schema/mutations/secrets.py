@@ -34,6 +34,7 @@ from astrolift_services.schema.mutations.helpers import (
     _stage_manifest,
     _upsert_app_secret_metadata,
     _validate_env_key,
+    _validate_scope,
 )
 from astrolift_services.schema.mutations.types import (
     BulkImportAppSecretsInput,
@@ -75,6 +76,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -163,6 +167,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -304,6 +311,9 @@ class SecretMutations:
         msg = _validate_env_key(input.key)
         if msg:
             return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")

@@ -248,6 +248,15 @@ def _validate_env_key(key: str) -> str | None:
     return None
 
 
+def _validate_scope(scope: str | None) -> str | None:
+    """None keeps the stored scope; an explicit blank is refused. Stored
+    as-is, "" matches no environment, so the key would silently stop
+    deploying anywhere."""
+    if scope is not None and not scope.strip():
+        return "scope must not be empty; omit it to keep the current scope"
+    return None
+
+
 def _resolve_email_service(managed_service_id):
     """Fetch a ManagedService row with the full tenant-cluster path
     pre-joined, gated on ``kind == EMAIL``.
