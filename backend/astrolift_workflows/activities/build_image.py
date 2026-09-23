@@ -78,6 +78,58 @@ def _stub(image_tag: str) -> dict:
     return {"ok": True, "image_ref": image_tag, "stub": True}
 
 
+# The parser fills these in on every container it parses -- a manifest that
+# never mentions dockerfile_path/build_context reads back identically to one
+# that explicitly set them to the default (#1756). There is no third value
+# for "unset", so a container is only treated as overriding the app-level
+# fields when it differs from these.
+_DEFAULT_DOCKERFILE_PATH = "Dockerfile"
+_DEFAULT_BUILD_CONTEXT = "."
+
+
+def _resolve_build_paths(app, deployment) -> tuple[str, str]:
+    """Resolve the (dockerfile_path, build_context) pair a build should use.
+
+    ``[[workloads.containers]]`` accepts per-container ``dockerfile_path`` /
+    ``build_context`` (documented in the manifest reference) and ``persist.py``
+    writes them onto the ``Container`` row, but the build only ever read
+    ``RegisteredApp.dockerfile_path`` / ``build_context`` -- the app-level
+    values set by ``astro app register --dockerfile-path/--build-context`` or
+    derived by monorepo discovery. A manifest that set a container's
+    ``build_context`` to reach a Dockerfile living above its own directory
+    (the ConflictHQ/bdr#139 shape: two registrations of one repo) passed
+    validation and was silently ignored (#1756).
+
+    Prefers ``deployment.workload``'s primary container when the deployment
+    is scoped to one (task / static-site / cron paths set this); otherwise
+    falls back to the app's first workload, mirroring the same "one build
+    for the whole app" simplification ``DeployAppWorkflow`` already applies
+    to ``image_tags`` (v1: one image, shared by every workload). Only a
+    non-default container value overrides the app-level fields, so an app
+    that never touches these manifest keys keeps resolving from
+    ``RegisteredApp`` exactly as before -- register-flag and monorepo-
+    discovery configuration are untouched.
+    """
+    dockerfile_path = app.dockerfile_path or _DEFAULT_DOCKERFILE_PATH
+    build_context = app.build_context or _DEFAULT_BUILD_CONTEXT
+
+    workload = deployment.workload
+    if workload is None:
+        workload = app.workloads.filter(deleted_at__isnull=True).order_by("created_at", "pk").first()
+    if workload is None:
+        return dockerfile_path, build_context
+
+    primary = workload.containers.filter(is_primary=True, deleted_at__isnull=True).first()
+    if primary is None:
+        return dockerfile_path, build_context
+
+    if primary.dockerfile_path and primary.dockerfile_path != _DEFAULT_DOCKERFILE_PATH:
+        dockerfile_path = primary.dockerfile_path
+    if primary.build_context and primary.build_context != _DEFAULT_BUILD_CONTEXT:
+        build_context = primary.build_context
+    return dockerfile_path, build_context
+
+
 def _build_image_sync(inp: BuildImageInput) -> dict:
     """Resolve the deployment, attempt a real build via the BuildDriver.
 
@@ -133,10 +185,11 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
     source_url = _resolve_source_url(app, inp.commit_sha)
     from providers._sdk.build import BuildSpec  # noqa: PLC0415
 
+    dockerfile_path, build_context = _resolve_build_paths(app, deployment)
     spec = BuildSpec(
         source_uri=source_url,
-        dockerfile_path=app.dockerfile_path or "Dockerfile",
-        context_path=app.build_context or ".",
+        dockerfile_path=dockerfile_path,
+        context_path=build_context,
         build_args={str(k): str(v) for k, v in (app.build_args or {}).items()},
     )
     log.info(

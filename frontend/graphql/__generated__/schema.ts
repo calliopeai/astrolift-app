@@ -116,6 +116,10 @@ export type AppdomainremovedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ApplyStagedManifestInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type ApproveByTokenInput = {
   token: Scalars['String']['input'];
 };
@@ -5233,6 +5237,7 @@ export type Mutation = {
   addWildcardDomain: AstroliftAppDomainMutationResult;
   adoptManagedResource: ManagedresourceadoptionpayloadMutationResult;
   adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
+  applyStagedManifest: ManifeststagepayloadMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
@@ -5659,6 +5664,11 @@ export type MutationAdoptManagedResourceArgs = {
 
 export type MutationAdoptRepoCiWorkflowArgs = {
   input: CiWorkflowSyncActionInput;
+};
+
+
+export type MutationApplyStagedManifestArgs = {
+  input: ApplyStagedManifestInput;
 };
 
 

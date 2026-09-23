@@ -91,6 +91,10 @@ type AppdomainremovedpayloadMutationResult {
   data: Appdomainremovedpayload
 }
 
+input ApplyStagedManifestInput {
+  id: GUID!
+}
+
 input ApproveByTokenInput {
   token: String!
 }
@@ -5465,6 +5469,7 @@ type Mutation {
   tearDownApp(input: TearDownAppInput!): SoftdeletepayloadMutationResult!
   transferApp(input: TransferAppInput!): AstroliftRegisteredAppMutationResult!
   updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
+  applyStagedManifest(input: ApplyStagedManifestInput!): ManifeststagepayloadMutationResult!
   syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
   pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
   moveAppToTeam(input: MoveAppToTeamInput!): AstroliftRegisteredAppMutationResult!

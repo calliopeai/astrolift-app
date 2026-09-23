@@ -193,6 +193,118 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
     assert deployment.image_digest == _GOOD_DIGEST
 
 
+# --- container-level dockerfile_path / build_context (#1756) ----------
+#
+# [[workloads.containers]] accepts dockerfile_path/build_context and
+# persist.py writes them onto the Container row, but the build only ever
+# read RegisteredApp.dockerfile_path/build_context -- a manifest that set
+# a container's build_context to reach a Dockerfile above its own
+# directory (the ConflictHQ/bdr#139 monorepo shape) passed validation and
+# was silently ignored.
+
+
+def _capture_build_spec(monkeypatch):
+    """Install a FakeDriver that records the BuildSpec it was called
+    with, and wire it up as the prepared build for _build_image_sync."""
+    from providers._sdk.build import BuildResult
+
+    captured: dict = {}
+
+    class FakeDriver:
+        def build(self, spec, repo, tag):
+            captured["spec"] = spec
+            return BuildResult(success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0)
+
+    prepared = _PreparedBuild(
+        driver=FakeDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+    return captured
+
+
+def test_build_image_honors_the_primary_containers_dockerfile_and_context(monkeypatch):
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(
+        name="web",
+        is_primary=True,
+        dockerfile_path="services/web/Dockerfile",
+        build_context="../..",
+    )
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "services/web/Dockerfile"
+    assert captured["spec"].context_path == "../.."
+
+
+def test_build_image_falls_back_to_app_level_fields_when_container_is_default(monkeypatch):
+    """A container whose manifest never set dockerfile_path/build_context
+    reads back as the parser's own default -- indistinguishable from an
+    explicit default -- and must not clobber the app-level fields set by
+    `astro app register --dockerfile-path/--build-context` or monorepo
+    discovery."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.dockerfile_path = "custom/Dockerfile"
+    app.build_context = "apps/web"
+    app.save(update_fields=["dockerfile_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True)
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "custom/Dockerfile"
+    assert captured["spec"].context_path == "apps/web"
+
+
+def test_build_image_with_no_workloads_yet_uses_app_level_fields(monkeypatch):
+    """Before the manifest has materialized any Workload rows (or for an
+    app that never will), the build must behave exactly as before."""
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.dockerfile_path = "Dockerfile.prod"
+    app.build_context = "services/api"
+    app.save(update_fields=["dockerfile_path", "build_context"])
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "Dockerfile.prod"
+    assert captured["spec"].context_path == "services/api"
+
+
+def test_build_image_prefers_the_deployments_own_workload_over_the_apps_first(monkeypatch):
+    """Task / static-site / cron deploys scope ``Deployment.workload`` to
+    one specific workload -- that one wins over "the app's first"."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    first = Workload.objects.create(registered_app=app, name="migrate", slug="migrate", kind="task")
+    first.containers.create(name="migrate", is_primary=True, dockerfile_path="Dockerfile.migrate")
+    target = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    target.containers.create(name="web", is_primary=True, dockerfile_path="Dockerfile.web")
+    deployment.workload = target
+    deployment.save(update_fields=["workload"])
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "Dockerfile.web"
+
+
 def test_build_image_sync_ignores_a_malformed_registry_digest(monkeypatch):
     """The render pins containers to whatever lands in ``image_digest``, so a
     registry that answers with something other than ``sha256:<64 hex>`` must

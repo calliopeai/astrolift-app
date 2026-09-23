@@ -10,6 +10,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations.types import (
+    ApplyStagedManifestInput,
     PushManifestToRepoInput,
     SyncManifestFromRepoInput,
     UpdateManifestInput,
@@ -84,6 +85,109 @@ class ManifestMutations:
             SyncSnapshot(
                 db_hash=app.manifest_hash or "",
                 repo_hash=app.last_synced_hash or app.manifest_hash or "",
+                last_synced_hash=app.last_synced_hash or "",
+            )
+        )
+        return gql_success(
+            _ManifestStagePayload(
+                id=input.id,
+                sync_state=sync_state.value,
+                raw_manifest=app.manifest_raw or "",
+                raw_manifest_staged=app.manifest_raw_staged or "",
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.apply_staged_manifest")
+    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @tenant_scoped()
+    def apply_staged_manifest(
+        self,
+        info: Info,
+        input: ApplyStagedManifestInput,
+    ) -> MutationResultType[_ManifestStagePayload]:
+        """Apply ``manifest_raw_staged`` straight to ``manifest_raw`` (#1759).
+
+        ``updateManifest`` only ever writes the staging buffer --
+        ``pushManifestToRepo`` (open a PR) and ``syncManifestFromRepo``
+        (pull + apply) are the only paths that move a draft into
+        ``manifest_raw``, and both need a working source connection. An
+        app registered with ``--manifest-raw`` has neither a repo nor a
+        connection, so once such an app staged one edit its manifest was
+        frozen forever -- the only way out was deregister (which tears
+        down the namespace + registry repo) and register again.
+
+        Reachable only when the app cannot push through a connection: an
+        app that can keeps using ``pushManifestToRepo`` so a change still
+        goes through review rather than landing straight from the editor.
+        Reuses the same parse + ``persist_manifest`` path ``registerApp``
+        takes for an inline ``manifest_raw`` -- one apply implementation,
+        whether it runs at registration or from the editor.
+        """
+        from astrolift_manifest.normalize import NormalizationDefaults, normalize
+        from astrolift_manifest.parser import ManifestError, parse_raw
+        from astrolift_manifest.persist import persist_manifest
+        from astrolift_manifest.sync_state import SyncSnapshot, classify_state
+        from astrolift_registry.services.manifest_sync import _pick_source_connection
+
+        # Org-scope the by-guid lookup to the caller's tenant before applying
+        # the staged manifest. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        if app.source_repo and _pick_source_connection(app) is not None:
+            return gql_failure(
+                "SCM_CONNECTION_AVAILABLE",
+                "this app can push staged edits to its source repo -- use "
+                "pushManifestToRepo so the change goes through review",
+            )
+
+        staged = app.manifest_raw_staged or ""
+        if not staged.strip() or staged == (app.manifest_raw or ""):
+            # Nothing staged (or the staged text already matches what's
+            # applied) -- a no-op success, same spirit as
+            # pushManifestToRepo's 'nothing_to_push'.
+            sync_state = classify_state(
+                SyncSnapshot(
+                    db_hash=app.manifest_hash or "",
+                    repo_hash=app.last_synced_hash or app.manifest_hash or "",
+                    last_synced_hash=app.last_synced_hash or "",
+                )
+            )
+            return gql_success(
+                _ManifestStagePayload(
+                    id=input.id,
+                    sync_state=sync_state.value,
+                    raw_manifest=app.manifest_raw or "",
+                    raw_manifest_staged=app.manifest_raw_staged or "",
+                )
+            )
+
+        try:
+            manifest = normalize(parse_raw(staged), defaults=NormalizationDefaults())
+        except ManifestError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"manifest parse failed: {exc}",
+                field="rawManifest",
+            )
+
+        persist_manifest(app, manifest, raw_text=staged)
+        app.manifest_raw_staged = ""
+        # There is no repo anchor for a connection-less app; advance it to
+        # the newly-applied hash so the UI reads in_sync rather than
+        # perpetually db_ahead of a repo that does not exist.
+        app.last_synced_hash = app.manifest_hash
+        app.save(update_fields=["manifest_raw_staged", "last_synced_hash", "updated_at", "version"])
+
+        sync_state = classify_state(
+            SyncSnapshot(
+                db_hash=app.manifest_hash or "",
+                repo_hash=app.last_synced_hash or "",
                 last_synced_hash=app.last_synced_hash or "",
             )
         )

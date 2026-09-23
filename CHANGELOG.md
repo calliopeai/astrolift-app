@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Add an `applyStagedManifest` mutation for apps that have no working source
+  connection to push a staged edit through: it applies `manifest_raw_staged`
+  straight to `manifest_raw` via the same parse-and-persist path
+  `registerApp` uses. Previously `updateManifest` only ever wrote the staging
+  buffer, and the only paths that moved a draft into `manifest_raw`
+  (`syncManifestFromRepo`, `pushManifestToRepo`) required a source
+  connection, so an app registered with `--manifest-raw` could never change
+  its manifest after the first edit. The manifest editor now shows an
+  "Apply" button and a "Staged, not applied" badge instead of "Push to repo"
+  when the app has no source repo (#1759).
+
+- Honour per-container `dockerfile_path` / `build_context` from
+  `[[workloads.containers]]` when building an app's image. The build
+  previously only ever read the app-level `RegisteredApp.dockerfile_path` /
+  `build_context`, so a manifest that set a container's `build_context` to
+  reach a Dockerfile outside its own directory (the monorepo shape where one
+  image serves two registrations of the same repo) passed validation and
+  was silently ignored (#1756).
+
 - Record an empty object instead of failing the mutation audit log when a
   GraphQL mutation is sent with no `variables`. The previous NOT NULL failure
   was only logged as a warning, but it had already poisoned the rest of the

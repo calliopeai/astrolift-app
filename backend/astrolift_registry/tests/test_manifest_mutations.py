@@ -22,8 +22,9 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_identity.models import Organization, Project, Team
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.mutations import (
+    ApplyStagedManifestInput,
     PushManifestToRepoInput,
     RegistryMutation,
     SyncManifestFromRepoInput,
@@ -518,6 +519,148 @@ def test_update_manifest_unknown_app_returns_not_found(
                 id="00000000-0000-0000-0000-000000000000",
                 raw_manifest=_VALID_TOML,
             ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+# --- apply_staged_manifest (#1759) -------------------------------------
+#
+# An app registered with --manifest-raw has no source_repo and no
+# SourceConnection, so updateManifest's staging buffer was the only place
+# an edit could ever land: pushManifestToRepo and syncManifestFromRepo
+# both need a connection to move a draft into manifest_raw. This mutation
+# is the missing "no source, apply directly" path.
+
+_UPDATED_TOML = _VALID_TOML.replace('name = "hello"', 'name = "hello-v2"')
+
+
+def test_apply_staged_manifest_applies_when_there_is_no_source_repo(permission_resolver):
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
+    assert app.manifest_raw_staged == ""
+    assert app.manifest_hash
+    assert app.last_synced_hash == app.manifest_hash
+    assert result.data.raw_manifest.strip() == _UPDATED_TOML.strip()
+    assert result.data.raw_manifest_staged == ""
+    # persist_manifest materializes the manifest's workloads -- the same
+    # path register_app takes for an inline manifest_raw.
+    assert Workload.objects.filter(registered_app=app, slug="web").exists()
+
+
+def test_apply_staged_manifest_applies_when_the_repo_has_no_working_connection(
+    permission_resolver,
+):
+    """A ``source_repo`` with no usable ``SourceConnection`` can't push
+    either -- same escape hatch as a --manifest-raw app with no repo at
+    all."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
+    assert app.manifest_raw_staged == ""
+
+
+def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
+    permission_resolver,
+):
+    """An app with a working source connection keeps using
+    pushManifestToRepo -- direct apply would skip the PR review step."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
+    _scaffold_github_conn(org)
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SCM_CONNECTION_AVAILABLE"
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == _UPDATED_TOML
+
+
+def test_apply_staged_manifest_with_nothing_staged_is_a_noop(permission_resolver):
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.raw_manifest.strip() == _VALID_TOML.strip()
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
+
+
+def test_apply_staged_manifest_rejects_invalid_toml(permission_resolver):
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = "this is = not valid [toml "
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "rawManifest"
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == "this is = not valid [toml "
+
+
+def test_apply_staged_manifest_requires_permission():
+    org, app = _scaffold(manifest_raw=_VALID_TOML, source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+
+
+def test_apply_staged_manifest_unknown_app_returns_not_found(permission_resolver):
+    org, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id="00000000-0000-0000-0000-000000000000"),
         )
     assert not result.ok
     assert result.errors[0].code == "NOT_FOUND"

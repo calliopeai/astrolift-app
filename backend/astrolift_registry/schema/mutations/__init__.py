@@ -26,6 +26,7 @@ from astrolift_registry.schema.mutations.team_access import TeamAccessMutations
 
 # Re-exported for the public import surface (tests / cross-app importers).
 from astrolift_registry.schema.mutations.types import (  # noqa: F401
+    ApplyStagedManifestInput,
     ArchiveAppInput,
     AssignAppToProjectInput,
     GrantTeamAccessInput,

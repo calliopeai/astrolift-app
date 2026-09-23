@@ -295,6 +295,18 @@ class SyncManifestFromRepoInput:
 
 
 @strawberry.input
+class ApplyStagedManifestInput:
+    """Apply ``manifest_raw_staged`` directly to ``manifest_raw`` (#1759).
+
+    Only for apps that cannot go through ``pushManifestToRepo`` -- no
+    ``source_repo``, or no usable ``SourceConnection`` for it. An app that
+    can push keeps using the PR flow so a change still goes through review.
+    """
+
+    id: GUID
+
+
+@strawberry.input
 class TransferAppInput:
     """Move a registered app to a different team or project.
 

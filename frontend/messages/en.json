@@ -1161,6 +1161,8 @@
       "saveDraft": "Save draft",
       "saving": "Saving…",
       "pushToRepo": "Push to repo",
+      "applyStaged": "Apply",
+      "applying": "Applying…",
       "syncStates": {
         "inSync": "Matches repo",
         "dbAhead": "Unsaved drafts here",
@@ -1189,6 +1191,7 @@
       },
       "editor": {
         "unsaved": "unsaved",
+        "stagedNotApplied": "Staged, not applied",
         "description": "Source TOML. Save stages the change in the platform; Push to repo opens a PR."
       },
       "rendered": {
