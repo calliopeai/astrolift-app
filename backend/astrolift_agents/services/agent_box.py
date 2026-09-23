@@ -213,7 +213,7 @@ def render_agent_box_job(
             },
         },
     }
-    harden_agent_pod(job["spec"]["template"]["spec"])
+    harden_agent_pod(job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)))
     return job
 
 
@@ -252,6 +252,13 @@ def start_agent_box(box) -> None:
 
     job_name = box_job_name(box)
     namespace = box_namespace(box)
+
+    spec = box.environment_spec
+    if spec is not None and spec.run_as_non_root and spec.allow_install:
+        from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
+
+        _fail(box, NON_ROOT_INSTALL_CONFLICT)
+        raise AgentBoxError(NON_ROOT_INSTALL_CONFLICT)
 
     try:
         cluster = resolve_agent_cluster(box.organization)
