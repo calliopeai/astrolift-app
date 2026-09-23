@@ -563,6 +563,18 @@ def _load_spec_and_ref(env_spec_slug: str, env_var: str):
     return spec, ref, None
 
 
+def _refuse_unscoped_ref(spec, env_var: str):
+    """A failure envelope when ``env_var``'s effective ref points outside the
+    spec's org namespace (#1921), else ``None``. Removing the binding stays
+    allowed: it never touches the store, and it is how such a ref is cleared."""
+    from astrolift_dispatch.agent_secrets import unscoped_secret_refs
+
+    reason = unscoped_secret_refs(spec).get(env_var)
+    if reason is None:
+        return None
+    return gql_failure(ErrorCode.PRECONDITION.value, reason, field="envVar")
+
+
 def _load_agent_spec(env_spec_slug: str):
     tenant = get_current_tenant()
     org_pk = tenant.organization_id if tenant else None
@@ -610,6 +622,17 @@ def _load_agent_bundle(spec, bundle_id, *, allow_project: bool = False):
                 "project bundle secrets cluster does not match the agent runtime cluster",
             )
     return bundle, None
+
+
+def _refuse_unscoped_bundle(spec, bundle):
+    """A failure envelope when ``bundle`` points outside the spec's org
+    namespace (#1921), else ``None``."""
+    from astrolift_dispatch.agent_secrets import unscoped_bundle_reason
+
+    reason = unscoped_bundle_reason(bundle, organization=spec.organization)
+    if reason is None:
+        return None
+    return gql_failure(ErrorCode.PRECONDITION.value, reason, field="bundleId")
 
 
 def _agent_secrets_backend(spec):
@@ -823,11 +846,17 @@ class AgentsMutation:
                 f"unknown agent type {input.agent_type!r}",
                 field="agentType",
             )
+        from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
+
         try:
             secret_refs = normalize_secret_references(input.secret_refs, field="secretRefs")
             env_vars = normalize_environment_values(input.env_vars, field="envVars")
+            for ref in secret_refs:
+                assert_org_scoped_secret_ref(ref["uri"], organization=org)
         except AgentPackageError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        except SecretRefNamespaceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="secretRefs")
 
         if input.run_as_non_root and input.allow_install:
             return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
@@ -885,6 +914,8 @@ class AgentsMutation:
                     field="agentType",
                 )
             spec.agent_type = input.agent_type
+        from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
+
         try:
             secret_refs = (
                 normalize_secret_references(input.secret_refs, field="secretRefs")
@@ -896,8 +927,13 @@ class AgentsMutation:
                 if input.env_vars is not None
                 else None
             )
+            if secret_refs is not None:
+                for ref in secret_refs:
+                    assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization)
         except AgentPackageError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        except SecretRefNamespaceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="secretRefs")
         if input.name is not None:
             if not input.name.strip():
                 return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
@@ -978,6 +1014,9 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
+        refused = _refuse_unscoped_ref(spec, env_var)
+        if refused is not None:
+            return refused
         if value == "":
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -1015,6 +1054,9 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
+        refused = _refuse_unscoped_ref(spec, env_var)
+        if refused is not None:
+            return refused
         backend, berr = _agent_secrets_backend(spec)
         if berr is not None:
             return berr
@@ -1041,7 +1083,11 @@ class AgentsMutation:
         self, info: Info, env_spec_slug: str, env_var: str, uri: str
     ) -> MutationResultType[AgentSecretStatusType]:
         """Create/update a durable operator binding over manifest refs."""
-        from astrolift_dispatch.agent_secrets import valid_agent_env_var
+        from astrolift_dispatch.agent_secrets import (
+            SecretRefNamespaceError,
+            assert_org_scoped_secret_ref,
+            valid_agent_env_var,
+        )
 
         spec, err = _load_agent_spec(env_spec_slug)
         if err is not None:
@@ -1068,6 +1114,10 @@ class AgentsMutation:
                 "uri must be at most 512 characters",
                 field="uri",
             )
+        try:
+            assert_org_scoped_secret_ref(uri, organization=spec.organization)
+        except SecretRefNamespaceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="uri")
         with transaction.atomic():
             override = (
                 AgentSecretBindingOverride.objects.select_for_update()
@@ -1138,6 +1188,9 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
+        refused = _refuse_unscoped_ref(spec, env_var)
+        if refused is not None:
+            return refused
         backend, berr = _agent_secrets_backend(spec)
         if berr is not None:
             return berr
@@ -1179,7 +1232,11 @@ class AgentsMutation:
         slug: str,
         backend_ref: str = "",
     ) -> MutationResultType[AgentSecretBundleType]:
-        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+        from astrolift_dispatch.agent_secrets import (
+            SecretRefNamespaceError,
+            assert_org_scoped_secret_ref,
+            secret_backend_capabilities,
+        )
         from astrolift_services.models import SecretBundle
 
         spec, err = _load_agent_spec(env_spec_slug)
@@ -1196,6 +1253,10 @@ class AgentsMutation:
                 "backendRef must be at most 512 characters",
                 field="backendRef",
             )
+        try:
+            assert_org_scoped_secret_ref(path, organization=spec.organization)
+        except SecretRefNamespaceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
         try:
             with transaction.atomic():
                 bundle = SecretBundle.objects.create(
@@ -1224,7 +1285,12 @@ class AgentsMutation:
         name: str,
         backend_ref: str,
     ) -> MutationResultType[AgentSecretBundleType]:
-        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+        from astrolift_dispatch.agent_secrets import (
+            SecretRefNamespaceError,
+            assert_org_scoped_secret_ref,
+            secret_backend_capabilities,
+            unscoped_bundle_reason,
+        )
 
         spec, err = _load_agent_spec(env_spec_slug)
         if err is not None:
@@ -1248,9 +1314,18 @@ class AgentsMutation:
                 "backendRef must be at most 512 characters",
                 field="backendRef",
             )
+        try:
+            assert_org_scoped_secret_ref(backend_ref, organization=spec.organization)
+        except SecretRefNamespaceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
         backend = None
         store_err = None
-        if backend_ref != bundle.backend_ref:
+        # A current location outside the namespace (#1921) is never probed:
+        # it is not provably this org's, so moving off it cannot orphan
+        # anything the org owns.
+        if backend_ref != bundle.backend_ref and (
+            unscoped_bundle_reason(bundle, organization=spec.organization) is None
+        ):
             # ``last_known_keys`` is only a cache: out-of-band provider writes
             # may not have refreshed it yet. Read the authoritative store and
             # fail closed on an unreadable source before changing the pointer,
@@ -1290,7 +1365,7 @@ class AgentsMutation:
     def delete_agent_secret_bundle(
         self, info: Info, env_spec_slug: str, bundle_id: strawberry.ID
     ) -> MutationResultType[AgentSecretBundleType]:
-        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities, unscoped_bundle_reason
 
         spec, err = _load_agent_spec(env_spec_slug)
         if err is not None:
@@ -1309,11 +1384,14 @@ class AgentsMutation:
         backend, store_err = _agent_secrets_backend(spec)
         if store_err is not None:
             return store_err
+        # A location outside the org namespace (#1921) is not provably this
+        # org's to delete: drop the control-plane bundle and leave the store.
+        owns_location = unscoped_bundle_reason(bundle, organization=spec.organization) is None
         try:
             # Delete the provider-side bundle as well as its control-plane
             # metadata. ``None`` means it is already absent; an empty dict is
             # still a real provider shell and must be removed.
-            if backend.get(bundle.backend_ref) is not None:
+            if owns_location and backend.get(bundle.backend_ref) is not None:
                 backend.delete(bundle.backend_ref)
         except Exception:  # noqa: BLE001 — never expose a provider response body
             return gql_failure(
@@ -1428,6 +1506,9 @@ class AgentsMutation:
         bundle, berr = _load_agent_bundle(spec, bundle_id)
         if berr is not None:
             return berr
+        refused = _refuse_unscoped_bundle(spec, bundle)
+        if refused is not None:
+            return refused
         key = (key or "").strip()
         if not valid_agent_env_var(key):
             return gql_failure(
@@ -1488,6 +1569,9 @@ class AgentsMutation:
         bundle, berr = _load_agent_bundle(spec, bundle_id)
         if berr is not None:
             return berr
+        refused = _refuse_unscoped_bundle(spec, bundle)
+        if refused is not None:
+            return refused
         backend, store_err = _agent_secrets_backend(spec)
         if store_err is not None:
             return store_err
@@ -1528,6 +1612,9 @@ class AgentsMutation:
         bundle, berr = _load_agent_bundle(spec, bundle_id)
         if berr is not None:
             return berr
+        refused = _refuse_unscoped_bundle(spec, bundle)
+        if refused is not None:
+            return refused
         backend, store_err = _agent_secrets_backend(spec)
         if store_err is not None:
             return store_err

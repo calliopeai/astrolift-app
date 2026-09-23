@@ -91,25 +91,141 @@ def valid_agent_env_var(value: str) -> bool:
     return valid_env_var(value) and not is_reserved_agent_environment_name(value)
 
 
-def effective_secret_refs(spec) -> list[dict[str, str]]:
-    """Merge manifest refs with persistent operator overrides/tombstones."""
+# ---------------------------------------------------------------------------
+# Org secret namespace (#1921)
+# ---------------------------------------------------------------------------
+
+# Every driver files a relative ref under one install-wide root (AWS
+# ``astrolift/``, the GCP and Key Vault name prefix, Vault ``<mount>/astrolift/``)
+# and passes some absolute forms through verbatim (a name already carrying the
+# root, an ARN, ``azure-kv://``). An org without its own cluster shares that
+# store with every other org (``resolve_agent_cluster`` falls back to a platform
+# cluster), and nothing in the root is per org: ``managed/<instance>/url`` and
+# ``astrolift/managed/<instance>/url`` both name another tenant's database URL.
+# The only per-org part a path can carry is the org guid the platform itself puts
+# there, as the default agent bundle location does, so a location an operator or
+# a manifest typed must sit under one of these roots. The guid rather than the
+# slug: slugs are unique only among live orgs, and a slug may spell another org's
+# guid.
+ORG_SECRET_ROOTS = ("agents", "agent-bundles")
+_SECRET_STORE_SCHEMES = ("sm:", "ssm:")
+# The Secrets Manager name alphabet. It also keeps out what a path-joining
+# driver could normalize away (Vault builds an HTTP path from the ref).
+_SECRET_SEGMENT_RE = re.compile(r"[A-Za-z0-9_+=.@-]+")
+_SECRETS_MANAGER_ARN_RE = re.compile(r"arn:[a-z-]+:secretsmanager:[a-z0-9-]*:[0-9]*:secret:(?P<name>.+)")
+
+
+class SecretRefNamespaceError(ValueError):
+    """A typed secret location falls outside its organization's namespace (#1921)."""
+
+
+def _inside_org_secret_roots(path: str, organization) -> bool:
+    segments = path.split("/")
+    return (
+        len(segments) >= 3
+        and segments[0] in ORG_SECRET_ROOTS
+        and segments[1] == str(organization.guid)
+        and all(_SECRET_SEGMENT_RE.fullmatch(s) and s not in (".", "..") for s in segments[2:])
+    )
+
+
+def assert_org_scoped_secret_ref(uri: str, *, organization) -> None:
+    """Raise :class:`SecretRefNamespaceError` unless ``uri`` names a location
+    inside ``organization``'s own secret namespace.
+
+    Accepted: ``agents/<org guid>/...`` or ``agent-bundles/<org guid>/...``,
+    optionally behind a ``secret://`` or ``sm:``/``ssm:`` scheme, leading
+    slashes or the ``astrolift/`` install root, with a ``#field`` selector, or
+    as a Secrets Manager ARN of such a name. Everything else is refused, never
+    rewritten.
+    """
+    path, separator, field = uri.partition("#")
+    path = path.removeprefix("secret://")
+    arn = _SECRETS_MANAGER_ARN_RE.fullmatch(path)
+    if arn:
+        path = arn.group("name")
+    else:
+        for scheme in _SECRET_STORE_SCHEMES:
+            if path.startswith(scheme):
+                path = path[len(scheme) :]
+                break
+        path = path.lstrip("/")
+    path = path.removeprefix("astrolift/")
+    field_ok = not separator or bool(_SECRET_SEGMENT_RE.fullmatch(field))
+    if field_ok and _inside_org_secret_roots(path, organization):
+        return
+    guid = organization.guid
+    raise SecretRefNamespaceError(
+        f"{uri!r} is outside this organization's secret namespace; "
+        f"an agent secret must live under agents/{guid}/ or agent-bundles/{guid}/"
+    )
+
+
+def unscoped_bundle_reason(bundle, *, organization) -> str | None:
+    """Why ``bundle``'s store location must not be read or written on behalf
+    of ``organization``, or ``None`` (#1921).
+
+    An org-level bundle's ``backend_ref`` is free text typed through the agent
+    surface. A project bundle's location is minted by the platform and cannot
+    be edited, and nothing creates team bundles, so neither is checked.
+    """
+    if bundle.project_id is not None or bundle.team_id is not None:
+        return None
+    try:
+        assert_org_scoped_secret_ref(bundle.backend_ref, organization=organization)
+    except SecretRefNamespaceError as exc:
+        return str(exc)
+    return None
+
+
+def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], bool]]:
+    """``env_var -> (ref, typed)`` for :func:`effective_secret_refs`, where
+    ``typed`` says an operator or a manifest wrote the uri rather than the
+    platform deriving it from a project managed-service binding."""
     # Project-resource bindings are defaults. Manifest refs and persistent
     # operator overrides win on collisions so attaching a shared database can
     # never silently replace an explicitly configured credential.
-    refs = {row["env_var"]: row for row in project_managed_service_secret_refs(spec)}
-    refs.update({row["env_var"]: row for row in normalize_secret_refs(getattr(spec, "secret_refs", None))})
+    refs = {row["env_var"]: (row, False) for row in project_managed_service_secret_refs(spec)}
+    refs.update(
+        {row["env_var"]: (row, True) for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
+    )
     if spec is None or not getattr(spec, "pk", None):
-        return list(refs.values())
+        return refs
     try:
         overrides = spec.secret_binding_overrides.filter(deleted_at__isnull=True).order_by("created_at", "pk")
     except (AttributeError, TypeError):
-        return list(refs.values())
+        return refs
     for override in overrides:
         if override.removed:
             refs.pop(override.env_var, None)
         elif override.uri:
-            refs[override.env_var] = {"env_var": override.env_var, "uri": override.uri}
-    return list(refs.values())
+            refs[override.env_var] = ({"env_var": override.env_var, "uri": override.uri}, True)
+    return refs
+
+
+def effective_secret_refs(spec) -> list[dict[str, str]]:
+    """Merge manifest refs with persistent operator overrides/tombstones."""
+    return [ref for ref, _typed in _effective_secret_ref_sources(spec).values()]
+
+
+def unscoped_secret_refs(spec) -> dict[str, str]:
+    """``env_var -> reason`` for each typed effective ref outside the spec's
+    org namespace (#1921): one stored before write-time validation existed,
+    or written straight to the row. Every path that would take it to the store
+    refuses it instead. Project managed-service bindings are derived by the
+    platform and live under the service's own root, so they are not checked.
+    """
+    if spec is None or not getattr(spec, "pk", None):
+        return {}
+    unscoped: dict[str, str] = {}
+    for env_var, (ref, typed) in _effective_secret_ref_sources(spec).items():
+        if not typed:
+            continue
+        try:
+            assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization)
+        except SecretRefNamespaceError as exc:
+            unscoped[env_var] = str(exc)
+    return unscoped
 
 
 def _project_managed_service_bindings(spec):
@@ -509,6 +625,10 @@ def resolve_task_secret_manifest(
     # per-agent refs override every bundle on collision.
     for attachment in bundle_refs:
         bundle = attachment.secret_bundle
+        unscoped_reason = unscoped_bundle_reason(bundle, organization=spec.organization)
+        if unscoped_reason is not None:
+            missing.append(f"bundle:{bundle.slug} ({unscoped_reason})")
+            continue
         try:
             payload = backend.get(bundle.backend_ref)
         except Exception as exc:  # noqa: BLE001
@@ -536,11 +656,17 @@ def resolve_task_secret_manifest(
 
             bundle.last_key_enum_at = timezone.now()
             bundle.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
-    # App bindings first, so a spec's own ref still wins on a collision.
-    for ref in app_refs + refs:
+    unscoped = unscoped_secret_refs(spec)
+    # App bindings first, so a spec's own ref still wins on a collision. They
+    # are derived by the platform, so only the spec's own refs are checked.
+    candidates = [(ref, None) for ref in app_refs] + [(ref, unscoped.get(ref["env_var"])) for ref in refs]
+    for ref, unscoped_reason in candidates:
         uri, env_var = ref["uri"], ref["env_var"]
         if not valid_agent_env_var(env_var):
             missing.append(f"{env_var} ({uri}; invalid or dispatcher-owned env var name)")
+            continue
+        if unscoped_reason is not None:
+            missing.append(f"{env_var} ({unscoped_reason})")
             continue
         try:
             value = read_secret_value(backend, uri)
@@ -568,14 +694,16 @@ def resolve_task_secret_manifest(
     )
 
 
-def probe_ref_statuses(*, cluster, refs: Any) -> list[dict[str, Any]]:
+def probe_ref_statuses(*, cluster, refs: Any, unscoped: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Per-ref presence probe for the status query — metadata only.
 
     Returns ``[{"env_var", "uri", "exists", "error"}]``. Never raises:
     a driver/backend failure lands as ``exists=False`` + an ``error``
     string (mirrors ``bundle_keys`` swallow-and-report) so the status
     surface degrades gracefully instead of 500-ing. Values are never read
-    into the return.
+    into the return. A ref in ``unscoped`` (see :func:`unscoped_secret_refs`)
+    reports its reason and is never probed: its presence belongs to another
+    namespace.
     """
     normalized = normalize_secret_refs(refs)
     backend = None
@@ -592,13 +720,14 @@ def probe_ref_statuses(*, cluster, refs: Any) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for ref in normalized:
         env_var, uri = ref["env_var"], ref["uri"]
-        if backend is None:
+        unscoped_reason = (unscoped or {}).get(env_var)
+        if backend is None or unscoped_reason is not None:
             out.append(
                 {
                     "env_var": env_var,
                     "uri": uri,
                     "exists": False,
-                    "error": backend_error,
+                    "error": unscoped_reason or backend_error,
                     **capabilities,
                 }
             )

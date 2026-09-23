@@ -20,8 +20,13 @@ Coverage:
 * createAgentEnvironmentSpec rejects an unknown agent_type (VALIDATION).
 * createAgentEnvironmentSpec rejects a duplicate slug (CONFLICT).
 * createAgentEnvironmentSpec stores secret_refs as references, not values.
+* createAgentEnvironmentSpec rejects a secretRefs uri outside the org's own
+  secret namespace, a bare or relative name included, and accepts one
+  inside it (#1921).
 * createAgentEnvironmentSpec requires agent_env_spec.create.
 * updateAgentEnvironmentSpec changes only supplied fields.
+* updateAgentEnvironmentSpec rejects a secretRefs uri outside the org's own
+  secret namespace without touching the stored value (#1921).
 * updateAgentEnvironmentSpec is NOT_FOUND for another org's spec.
 * deleteAgentEnvironmentSpec soft-deletes.
 * deleteAgentEnvironmentSpec is NOT_FOUND for another org's spec.
@@ -244,7 +249,12 @@ def test_create_spec_stores_secret_refs_not_values(permission_resolver, info, or
     """The spec must persist secret *references* (uri + env_var), never
     secret values — the dispatcher resolves them at launch time."""
     _grant_crud(permission_resolver)
-    refs = [{"uri": "arn:aws:secretsmanager:us-west-2:1:secret:gh", "env_var": "GITHUB_TOKEN"}]
+    refs = [
+        {
+            "uri": f"arn:aws:secretsmanager:us-west-2:1:secret:agents/{org.guid}/gh",
+            "env_var": "GITHUB_TOKEN",
+        }
+    ]
     with with_tenant_org(org):
         result = AgentsMutation().create_agent_environment_spec(
             info(),
@@ -259,6 +269,77 @@ def test_create_spec_stores_secret_refs_not_values(permission_resolver, info, or
     assert result.ok, result.errors
     spec = AgentEnvironmentSpec.objects.get(organization=org, slug="with-secret")
     assert spec.secret_refs == refs
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "managed/rds-orders/url",
+        "github-token",
+        "sm:github-token",
+        "ssm:github-token",
+        "secret://agents/calliope/anthropic",
+        "astrolift/agents/00000000-0000-0000-0000-000000000000/gh",
+        "astrolift/some-other-app/object-store",
+        "/astrolift/agents/00000000-0000-0000-0000-000000000000/gh",
+        "arn:aws:secretsmanager:us-west-2:1:secret:agents/00000000-0000-0000-0000-000000000000/gh",
+    ],
+)
+def test_create_spec_rejects_secret_ref_outside_org_namespace(
+    permission_resolver, info, org, with_tenant_org, uri
+):
+    """A relative name lands in the install-wide root every org shares
+    (``managed/rds-orders/url`` is another tenant's database URL), and an
+    absolute path or ARN can name anything; only this org's own namespace is
+    accepted, and nothing is rewritten (#1921)."""
+    _grant_crud(permission_resolver)
+    with with_tenant_org(org):
+        result = AgentsMutation().create_agent_environment_spec(
+            info(),
+            input=CreateAgentEnvironmentSpecInput(
+                name="With Secret",
+                slug="with-secret",
+                agent_type="claude",
+                secret_refs=[{"uri": uri, "env_var": "GITHUB_TOKEN"}],
+            ),
+            org_id=str(org.guid),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "secretRefs"
+    assert not AgentEnvironmentSpec.objects.filter(organization=org, slug="with-secret").exists()
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "agents/{guid}/github-token",
+        "sm:agents/{guid}/github-token",
+        "secret://agents/{guid}/github-token",
+        "astrolift/agents/{guid}/github-token",
+    ],
+)
+def test_create_spec_accepts_secret_ref_inside_own_org_namespace(
+    permission_resolver, info, org, with_tenant_org, template
+):
+    """The check confines refs to the org's namespace; it does not reject
+    them outright, in any spelling a driver accepts (#1921)."""
+    _grant_crud(permission_resolver)
+    uri = template.format(guid=org.guid)
+    with with_tenant_org(org):
+        result = AgentsMutation().create_agent_environment_spec(
+            info(),
+            input=CreateAgentEnvironmentSpecInput(
+                name="With Secret",
+                slug="with-secret",
+                agent_type="claude",
+                secret_refs=[{"uri": uri, "env_var": "GITHUB_TOKEN"}],
+            ),
+            org_id=str(org.guid),
+        )
+    assert result.ok, result.errors
+    spec = AgentEnvironmentSpec.objects.get(organization=org, slug="with-secret")
+    assert spec.secret_refs == [{"uri": uri, "env_var": "GITHUB_TOKEN"}]
 
 
 @pytest.mark.parametrize(
@@ -362,6 +443,46 @@ def test_update_spec_rejects_malformed_environment_json(permission_resolver, inf
     assert result.errors[0].code == "VALIDATION"
     spec.refresh_from_db()
     assert spec.env_vars == {"GOOD": "preserved"}
+
+
+def test_update_spec_rejects_secret_ref_outside_org_namespace(
+    permission_resolver, info, org, other_org, with_tenant_org
+):
+    """Same confinement on update as on create (#1921); the pre-existing
+    secret_refs value is left untouched by the rejected write."""
+    _grant_crud(permission_resolver)
+    existing = [{"uri": "sm:kept", "env_var": "KEPT_TOKEN"}]
+    spec = _mk_spec(org, "claude-dev", secret_refs=existing)
+    with with_tenant_org(org):
+        result = AgentsMutation().update_agent_environment_spec(
+            info(),
+            slug="claude-dev",
+            input=UpdateAgentEnvironmentSpecInput(
+                secret_refs=[{"uri": f"astrolift/agents/{other_org.guid}/gh", "env_var": "GITHUB_TOKEN"}]
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "secretRefs"
+    spec.refresh_from_db()
+    assert spec.secret_refs == existing
+
+
+def test_update_spec_accepts_secret_ref_inside_own_org_namespace(
+    permission_resolver, info, org, with_tenant_org
+):
+    _grant_crud(permission_resolver)
+    spec = _mk_spec(org, "claude-dev")
+    uri = f"astrolift/agents/{org.guid}/gh"
+    with with_tenant_org(org):
+        result = AgentsMutation().update_agent_environment_spec(
+            info(),
+            slug="claude-dev",
+            input=UpdateAgentEnvironmentSpecInput(secret_refs=[{"uri": uri, "env_var": "GITHUB_TOKEN"}]),
+        )
+    assert result.ok, result.errors
+    spec.refresh_from_db()
+    assert spec.secret_refs == [{"uri": uri, "env_var": "GITHUB_TOKEN"}]
 
 
 def test_update_spec_not_found_for_other_org(permission_resolver, info, org, other_org, with_tenant_org):

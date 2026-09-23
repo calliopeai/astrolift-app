@@ -170,6 +170,11 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     summary dict the workflow rolls up.
     """
     from astrolift_clusters.models import TenantCluster
+    from astrolift_dispatch.agent_secrets import (
+        SecretRefNamespaceError,
+        assert_org_scoped_secret_ref,
+        unscoped_bundle_reason,
+    )
     from astrolift_registry.models import RegisteredApp
     from astrolift_services.models import SecretBundle
     from core.app_deploy import (
@@ -190,11 +195,26 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     ctx = _context_for_cluster(cluster)
     secrets_backend = driver_for_capability(cluster, "secrets")
     # #441: hand the bundle row to the materialiser so the
-    # last-known-keys cache is refreshed off the same fetch.
+    # last-known-keys cache is refreshed off the same fetch. Scoped to the
+    # app's org: another org's bundle can carry the same slug and ref, and
+    # would be handed this bundle's key names (#1921).
     bundle = SecretBundle.all_objects.filter(
+        organization_id=app.organization_id,
         backend_ref=target["bundle_backend_ref"],
         slug=target["bundle_slug"],
     ).first()
+    # Never read a location outside the app's org namespace (#1921). Without
+    # a row to say what kind of bundle this is, judge the ref as typed.
+    if bundle is not None:
+        unscoped = unscoped_bundle_reason(bundle, organization=app.organization)
+    else:
+        try:
+            assert_org_scoped_secret_ref(target["bundle_backend_ref"], organization=app.organization)
+            unscoped = None
+        except SecretRefNamespaceError as exc:
+            unscoped = str(exc)
+    if unscoped is not None:
+        raise AppDeployError(f"secret bundle {target['bundle_slug']!r}: {unscoped}")
     manifest = _materialize_secret_manifest(
         bundle_slug=target["bundle_slug"],
         bundle_backend_ref=target["bundle_backend_ref"],

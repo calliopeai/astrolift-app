@@ -985,7 +985,11 @@ class AgentsQuery:
             NoAgentClusterError,
             resolve_agent_cluster,
         )
-        from astrolift_dispatch.agent_secrets import effective_secret_refs, probe_ref_statuses
+        from astrolift_dispatch.agent_secrets import (
+            effective_secret_refs,
+            probe_ref_statuses,
+            unscoped_secret_refs,
+        )
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
@@ -1000,7 +1004,11 @@ class AgentsQuery:
             cluster = resolve_agent_cluster(spec.organization)
         except NoAgentClusterError:
             cluster = None
-        rows = probe_ref_statuses(cluster=cluster, refs=effective_secret_refs(spec))
+        rows = probe_ref_statuses(
+            cluster=cluster,
+            refs=effective_secret_refs(spec),
+            unscoped=unscoped_secret_refs(spec),
+        )
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field

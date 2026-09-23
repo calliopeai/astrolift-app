@@ -29,6 +29,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from astrolift_agents.models import AgentEnvironmentSpec
+from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
 from astrolift_identity.models import Organization
 
 
@@ -94,6 +95,11 @@ class Command(BaseCommand):
             {"env_var": env_var, "uri": uri}
             for env_var, uri in _parse_pairs(options.get("secret"), what="secret")
         ]
+        for ref in secret_refs:
+            try:
+                assert_org_scoped_secret_ref(ref["uri"], organization=org)
+            except SecretRefNamespaceError as exc:
+                raise CommandError(str(exc)) from exc
 
         slug = options["slug"]
         spec = AgentEnvironmentSpec.objects.filter(

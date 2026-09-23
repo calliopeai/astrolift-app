@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Confine agent secret locations to the organization's own secret namespace.
+  An env spec's `secretRefs`, `upsertAgentSecretRef`, a manifest's `[secrets]`
+  table, the direct-upload importer, the `upsert_agent_environment_spec`
+  command and an agent bundle's `backendRef` now accept only a location under
+  `agents/<org guid>/` or `agent-bundles/<org guid>/`. A bare or relative name
+  is refused too: every driver files it under the install-wide root that every
+  org without its own cluster shares, so `managed/<instance>/url` named another
+  tenant's database secret. A location stored before this change is never read,
+  written or deleted: spawn and agent-box start fail with a readable error, and
+  so do the secret status probe, set/delete/reveal, bundle key operations, and
+  an app deploy or rotation of an org-level bundle. Removing the binding,
+  deleting such a bundle (its stored value is left alone) and moving a bundle
+  into the namespace still work. Existing refs outside the
+  namespace, including the `agents/<org slug>/...` convention, must be moved
+  before upgrading (#1921).
+
 - Record an empty object instead of failing the mutation audit log when a
   GraphQL mutation is sent with no `variables`. The previous NOT NULL failure
   was only logged as a warning, but it had already poisoned the rest of the
