@@ -21,7 +21,12 @@ from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
 from astrolift_registry.schema.mutations import RegistryMutation, UpdateManifestInput
-from astrolift_services.models import SecretChangeProposal
+from astrolift_services.models import (
+    AppSecretBundleRef,
+    ManagedService,
+    SecretBundle,
+    SecretChangeProposal,
+)
 from astrolift_services.schema.mutations import ApproveSecretChangeInput, ServicesMutation
 from astrolift_services.schema.mutations.types import (
     BulkImportAppSecretsInput,
@@ -31,6 +36,7 @@ from astrolift_services.schema.mutations.types import (
 )
 from astrolift_workflows.activities.app_lifecycle import (
     _app_env_secret_name,
+    _bindings_secret_name,
     _update_secrets_sync,
 )
 from core.app_deploy import render_resources_for_deployment
@@ -131,6 +137,12 @@ def _materialize(deployment, monkeypatch) -> dict[str, str]:
     """The literal Secret's decoded data, or {} when it wasn't materialized."""
     secret = _materialized_literal_secret(deployment, monkeypatch)
     return _decoded(secret) if secret is not None else {}
+
+
+def _env_from_list(resources: list[dict]) -> list[str]:
+    deployment = next(r for r in resources if r["kind"] == "Deployment")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    return [ref["secretRef"]["name"] for ref in container.get("envFrom", [])]
 
 
 def _env_from_names(resources: list[dict]) -> set[str]:
@@ -640,3 +652,55 @@ def test_migration_puts_the_namespace_then_the_secrets_on_the_target(
     assert target.calls[0] == ("ensure_namespace", "acme-hello-app")
     assert target.calls[1][2] == [_app_env_secret_name(app.slug, env.name)]
     assert _decoded(_literal_secrets(target.applied)[0]) == {"API_KEY": "migrated-value"}
+
+
+def test_env_from_lists_literals_first_so_bundles_and_bindings_win(permission_resolver, app, env, team):
+    """A later envFrom source wins a key collision in Kubernetes, and
+    env_injection documents app literal < bundle < managed service, so the
+    list order is the contract, not just membership."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="API_KEY", value="literal-value").ok
+    app.refresh_from_db()
+    bundle = SecretBundle.objects.create(
+        organization=app.organization,
+        team=team,
+        slug="prod-bundle",
+        name="Prod Bundle",
+        backend_ref="vault:/acme/prod",
+    )
+    AppSecretBundleRef.objects.create(registered_app=app, app_environment=env, secret_bundle=bundle)
+    ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="orders",
+        variant="postgres_flexible",
+        status=ManagedService.Status.ACTIVE,
+    )
+
+    resources = render_resources_for_deployment(_deployment(app, env))
+
+    assert _env_from_list(resources) == [
+        _app_env_secret_name(app.slug, env.name),
+        "prod-bundle",
+        _bindings_secret_name(app.slug),
+    ]
+
+
+def test_a_deleted_literal_is_left_out_of_the_next_secret_apply(permission_resolver, app, env, monkeypatch):
+    """The cluster only loses a deleted key if the applied Secret leaves it
+    out: server-side apply under the platform's one field manager prunes
+    fields that manager no longer sends. This pins the leaving-out half."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="KEEP_ME", value="keep").ok
+    assert _set_app_secret(app, key="REMOVE_ME", value="gone").ok
+    with _ctx(app):
+        deleted = ServicesMutation().delete_app_secret(
+            _info(), input=DeleteAppSecretInput(app_slug=app.slug, key="REMOVE_ME")
+        )
+    assert deleted.ok, deleted.errors
+    app.refresh_from_db()
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"KEEP_ME": "keep"}
