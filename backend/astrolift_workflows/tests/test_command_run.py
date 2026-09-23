@@ -16,6 +16,7 @@ from astrolift_workflows.command_run import (
     normalize_timeout,
     plan_job_spec,
 )
+from core.fields.uuid_v7 import uuid7
 
 # ---- timeout normalization -----------------------------------------
 
@@ -147,6 +148,41 @@ def test_plan_rejects_empty_run_id():
             command=("echo",),
             env={},
         )
+
+
+def test_full_guid_hex_prevents_collision():
+    """Two UUIDv7s created back-to-back must produce different job names.
+
+    UUIDv7 prefixes contain only millisecond timestamps, so truncating to [:8]
+    causes collisions across parallel runs. The fix uses the full 32-char hex.
+    Regression test for #1874.
+    """
+    guid1 = uuid7()
+    guid2 = uuid7()
+
+    run_id1 = str(guid1).replace("-", "")
+    run_id2 = str(guid2).replace("-", "")
+
+    plan1 = plan_job_spec(
+        app_slug="api",
+        run_id=run_id1,
+        namespace="ns",
+        image="img",
+        command=("echo",),
+        env={},
+    )
+    plan2 = plan_job_spec(
+        app_slug="api",
+        run_id=run_id2,
+        namespace="ns",
+        image="img",
+        command=("echo",),
+        env={},
+    )
+
+    # Different UUIDs must produce different job names
+    assert plan1.job_name != plan2.job_name
+    assert run_id1 != run_id2
 
 
 # ---- classify_pod_failure ------------------------------------------
