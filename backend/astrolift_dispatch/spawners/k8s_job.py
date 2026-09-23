@@ -133,6 +133,15 @@ class K8sJobSpawner(ContainerSpawner):
                 ),
             )
 
+        # A manifest sync can turn on allow_install after the spec went non-root.
+        requested_spec = getattr(task, "environment_spec", None)
+        if getattr(requested_spec, "run_as_non_root", False) and getattr(
+            requested_spec, "allow_install", False
+        ):
+            from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
+
+            return SpawnResult(external_id="", ok=False, error=NON_ROOT_INSTALL_CONFLICT)
+
         # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
         job_name = f"agent-task-{str(task.guid).replace('-', '')}"
         # Mark the in-process cleanup plan before any ancillary resolution.
@@ -818,5 +827,5 @@ def _render_agent_job(
             },
         },
     }
-    harden_agent_pod(job["spec"]["template"]["spec"])
+    harden_agent_pod(job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)))
     return job

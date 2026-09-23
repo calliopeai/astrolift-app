@@ -75,6 +75,7 @@ from astrolift_agents.services.agent_package import (
 from astrolift_agents.visibility import agent_by_slug
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
+from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -138,6 +139,8 @@ class CreateAgentEnvironmentSpecInput:
     # (AWS→Bedrock, GCP→Vertex) via a minted workload identity instead of
     # an ANTHROPIC_API_KEY. See the dispatcher's managed-model wiring.
     managed_model: bool = False
+    # Run pods as the images' non-root agent user (#1855); excludes allow_install.
+    run_as_non_root: bool = False
     config_repo: str = ""
     config_branch: str = "main"
     config_manifest_path: str = ""
@@ -161,6 +164,7 @@ class UpdateAgentEnvironmentSpecInput:
     allow_install: bool | None = None
     vnc_enabled: bool | None = None
     managed_model: bool | None = None
+    run_as_non_root: bool | None = None
     config_repo: str | None = None
     config_branch: str | None = None
     config_manifest_path: str | None = None
@@ -822,6 +826,9 @@ class AgentsMutation:
         except AgentPackageError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
 
+        if input.run_as_non_root and input.allow_install:
+            return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
+
         slug = input.slug.strip()[:128]
         if AgentEnvironmentSpec.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).exists():
             return gql_failure(
@@ -842,6 +849,7 @@ class AgentsMutation:
                 allow_install=bool(input.allow_install),
                 vnc_enabled=bool(input.vnc_enabled),
                 managed_model=bool(input.managed_model),
+                run_as_non_root=bool(input.run_as_non_root),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
@@ -902,6 +910,10 @@ class AgentsMutation:
             spec.vnc_enabled = bool(input.vnc_enabled)
         if input.managed_model is not None:
             spec.managed_model = bool(input.managed_model)
+        if input.run_as_non_root is not None:
+            spec.run_as_non_root = bool(input.run_as_non_root)
+        if spec.run_as_non_root and spec.allow_install:
+            return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
         if input.config_repo is not None:
             spec.config_repo = input.config_repo.strip()[:512]
         if input.config_branch is not None:

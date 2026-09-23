@@ -254,6 +254,7 @@ class AgentEnvironmentSpecType:
     # (AWS→Bedrock, GCP→Vertex) via a workload-identity ServiceAccount
     # instead of an ANTHROPIC_API_KEY (resolved by the dispatcher at spawn).
     managed_model: bool
+    run_as_non_root: bool
     secret_refs: JSON
     env_vars: JSON
     config_repo: str
@@ -1077,6 +1078,7 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         allow_install=s.allow_install,
         vnc_enabled=s.vnc_enabled,
         managed_model=s.managed_model,
+        run_as_non_root=s.run_as_non_root,
         secret_refs=s.secret_refs or [],
         env_vars=s.env_vars or {},
         config_repo=s.config_repo or "",

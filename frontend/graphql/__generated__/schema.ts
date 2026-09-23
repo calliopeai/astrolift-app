@@ -271,6 +271,7 @@ export type AstroliftAgentEnvironmentSpec = {
   imageTag: Scalars['String']['output'];
   managedModel: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  runAsNonRoot: Scalars['Boolean']['output'];
   runtime: Scalars['String']['output'];
   secretRefs: Scalars['JSON']['output'];
   slug: Scalars['String']['output'];
@@ -4500,6 +4501,7 @@ export type CreateAgentEnvironmentSpecInput = {
   imageTag: Scalars['String']['input'];
   managedModel: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
+  runAsNonRoot: Scalars['Boolean']['input'];
   runtime: Scalars['String']['input'];
   secretRefs: InputMaybe<Scalars['JSON']['input']>;
   slug: Scalars['String']['input'];
@@ -9957,6 +9959,7 @@ export type UpdateAgentEnvironmentSpecInput = {
   imageTag: InputMaybe<Scalars['String']['input']>;
   managedModel: InputMaybe<Scalars['Boolean']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
+  runAsNonRoot: InputMaybe<Scalars['Boolean']['input']>;
   runtime: InputMaybe<Scalars['String']['input']>;
   secretRefs: InputMaybe<Scalars['JSON']['input']>;
   toolPreset: InputMaybe<Scalars['String']['input']>;

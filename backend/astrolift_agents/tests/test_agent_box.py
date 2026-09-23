@@ -368,6 +368,35 @@ def test_the_box_carries_the_agent_sandbox_baseline(org):
     assert container["tty"] is True
 
 
+def test_a_non_root_spec_runs_the_box_as_the_agent_user(org):
+    """#1855: the box honours the spec's mode like a task does."""
+    spec = _spec(org)
+    spec.run_as_non_root = True
+    spec.save()
+    box = _box(org, environment_spec=spec)
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+
+    assert job["spec"]["template"]["spec"]["securityContext"]["runAsUser"] == 10001
+    assert _container_of(job)["securityContext"]["capabilities"] == {"drop": ["ALL"]}
+
+
+def test_a_non_root_box_that_asks_to_install_is_refused_before_the_cluster(org):
+    from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
+
+    spec = _spec(org)
+    spec.run_as_non_root = True
+    spec.allow_install = True
+    spec.save()
+    box = _box(org, environment_spec=spec)
+
+    with pytest.raises(box_service.AgentBoxError, match="non-root"):
+        box_service.start_agent_box(box)
+
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.FAILED
+    assert NON_ROOT_INSTALL_CONFLICT in box.last_error
+
+
 def test_the_box_carries_no_wall_clock_deadline(org):
     """A box is bounded by not being used, not by elapsed time.
 

@@ -48,6 +48,9 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # ServiceAccount instead of an ANTHROPIC_API_KEY. The dispatcher mints
     # the cloud identity + injects the provider's model env at spawn time.
     managed_model = models.BooleanField(default=False)
+    # Run task and box pods as the images' non-root ``agent`` user with all
+    # capabilities dropped (#1855). Excludes ``allow_install``.
+    run_as_non_root = models.BooleanField(default=False)
     # Secret URIs only — values resolved by the dispatcher at launch time.
     # Never store values.  Format:
     #   [{"uri": "arn:aws:secretsmanager:...", "env_var": "GITHUB_TOKEN"}]

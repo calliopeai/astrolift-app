@@ -246,6 +246,7 @@ type AstroliftAgentEnvironmentSpec {
   allowInstall: Boolean!
   vncEnabled: Boolean!
   managedModel: Boolean!
+  runAsNonRoot: Boolean!
   secretRefs: JSON!
   envVars: JSON!
   configRepo: String!
@@ -4549,6 +4550,7 @@ input CreateAgentEnvironmentSpecInput {
   allowInstall: Boolean! = false
   vncEnabled: Boolean! = false
   managedModel: Boolean! = false
+  runAsNonRoot: Boolean! = false
   configRepo: String! = ""
   configBranch: String! = "main"
   configManifestPath: String! = ""
@@ -6893,6 +6895,7 @@ input UpdateAgentEnvironmentSpecInput {
   allowInstall: Boolean = null
   vncEnabled: Boolean = null
   managedModel: Boolean = null
+  runAsNonRoot: Boolean = null
   configRepo: String = null
   configBranch: String = null
   configManifestPath: String = null
