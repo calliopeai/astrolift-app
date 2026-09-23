@@ -558,6 +558,43 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
     return driver.apply_manifests(ctx.slug, AGENT_NAMESPACE, manifests)
 
 
+def apply_manifests_dispatch(
+    *, cluster: TenantCluster, namespace: str, manifests: list[dict[str, Any]]
+) -> Any:
+    """Server-side apply platform-owned ``manifests`` to ``cluster``.
+
+    The same driver path :func:`deploy_agent_dispatch` uses, for other
+    platform components (the Zentinelle gateway, #1887). Returns the
+    driver's ``ApplyResult``; raises :class:`ClusterManagementError` when
+    the driver can't be built or has no ``apply_manifests``.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "apply_manifests"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement apply_manifests",
+        )
+    ctx = _context_for_cluster(cluster)
+    return driver.apply_manifests(ctx.slug, namespace, manifests)
+
+
+def delete_manifests_dispatch(
+    *, cluster: TenantCluster, namespace: str, manifests: list[dict[str, Any]]
+) -> Any:
+    """Delete platform-owned ``manifests`` from ``cluster`` by kind and name.
+
+    Returns the driver's ``DeleteResult``, where an object that is already
+    gone lands in ``not_found`` rather than ``errors``. Raises
+    :class:`ClusterManagementError` like :func:`apply_manifests_dispatch`.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "delete_manifests"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement delete_manifests",
+        )
+    ctx = _context_for_cluster(cluster)
+    return driver.delete_manifests(ctx.slug, namespace, manifests)
+
+
 def cluster_health_dispatch(
     *,
     cluster: TenantCluster,

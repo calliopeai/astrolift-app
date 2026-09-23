@@ -1023,3 +1023,99 @@ class ObservabilityRetentionType:
 
     warn_threshold_days: int
     """When to warn an admin before retention closes on a row."""
+
+
+@strawberry.type(name="AstroliftZentinelleClusterGateway")
+class ZentinelleClusterGatewayType:
+    """A cluster registered with Zentinelle, and its gateway (#1887).
+
+    Never carries a credential: the gateway's lives only in the cluster Secret.
+    """
+
+    cluster_id: GUID
+    cluster_slug: str
+    zentinelle_cluster_id: str
+    """The id Zentinelle knows the cluster by, and the gateway's ZENTINELLE_CLUSTER_ID."""
+
+    gateway_name: str
+    gateway_enabled: bool
+    """Whether the gateway should run here. It is deployed only while the
+    install's ``zentinelle.gateway_enabled`` flag is also on."""
+
+    gateway_deployed: bool
+    status: str
+    """``registered``, ``deployed``, or ``error`` while ``last_error`` stands."""
+
+    registered_at: dt.datetime | None
+    credential_rotated_at: dt.datetime | None
+    last_error: str
+    unregistered: bool
+
+
+@strawberry.type(name="AstroliftZentinelleConnection")
+class ZentinelleConnectionType:
+    """This organization's connection to a Zentinelle deployment (#1887).
+
+    The install credential is stored encrypted and is never returned.
+    """
+
+    id: GUID
+    base_url: str
+    status: str
+    """``connected``, ``revoked`` (Zentinelle refused the install credential)
+    or ``disconnected``."""
+
+    zentinelle_install_id: str
+    tenant_ids: list[str]
+    connected_at: dt.datetime | None
+    disconnected_at: dt.datetime | None
+    last_error: str
+    gateway_feature_enabled: bool
+    """The install-wide ``ZENTINELLE_GATEWAY_ENABLED`` flag."""
+
+    clusters: list[ZentinelleClusterGatewayType]
+
+
+@strawberry.type(name="AstroliftZentinelleDisconnect")
+class ZentinelleDisconnectType:
+    connection: ZentinelleConnectionType
+    warnings: list[str]
+    """What could not be finished: Zentinelle not told (``force``), or clusters
+    whose gateway objects are left behind."""
+
+
+def zentinelle_cluster_gateway_to_type(row) -> ZentinelleClusterGatewayType:
+    return ZentinelleClusterGatewayType(
+        cluster_id=GUID(str(row.cluster.guid)),
+        cluster_slug=row.cluster.slug,
+        zentinelle_cluster_id=row.zentinelle_cluster_id,
+        gateway_name=row.gateway_name,
+        gateway_enabled=row.gateway_enabled,
+        gateway_deployed=row.gateway_deployed,
+        status=row.status,
+        registered_at=row.registered_at,
+        credential_rotated_at=row.credential_rotated_at,
+        last_error=row.last_error,
+        unregistered=row.deleted_at is not None,
+    )
+
+
+def zentinelle_connection_to_type(row) -> ZentinelleConnectionType:
+    from astrolift_operations.models import ZentinelleClusterGateway
+    from astrolift_operations.zentinelle_connect import gateway_feature_enabled
+
+    gateways = (
+        ZentinelleClusterGateway.objects.filter(connection=row).select_related("cluster").order_by("pk")
+    )
+    return ZentinelleConnectionType(
+        id=GUID(str(row.guid)),
+        base_url=row.base_url,
+        status=row.status,
+        zentinelle_install_id=row.zentinelle_install_id,
+        tenant_ids=[str(t) for t in row.tenant_ids or []],
+        connected_at=row.connected_at,
+        disconnected_at=row.disconnected_at,
+        last_error=row.last_error,
+        gateway_feature_enabled=gateway_feature_enabled(),
+        clusters=[zentinelle_cluster_gateway_to_type(g) for g in gateways],
+    )

@@ -517,6 +517,19 @@ CONSTANCE_CONFIG = {
         False,
         "Enable Zentinelle governance surfaces (agent Activity/Reasoning/Token-Usage/Compliance tabs)",
     ),
+    "ZENTINELLE_GATEWAY_ENABLED": (
+        False,
+        "Deploy the Zentinelle gateway (Deployment + Service zentinelle-gateway in astrolift-system) "
+        "into clusters an organization registered with its Zentinelle connection, and let fenced "
+        "agent pods reach it. Off deploys nothing new; turning it off does not remove a running "
+        "gateway (turn the cluster's gateway off, or disconnect).",
+    ),
+    "ZENTINELLE_GATEWAY_IMAGE": (
+        "ghcr.io/calliopeai/zentinelle-gateway:main-107ad0b",
+        "Zentinelle gateway image, pinned. Point it at a mirror or a digest for private registries. "
+        "Needs a build that reads its credential from /var/run/zentinelle (calliopeai/zentinelle#387). "
+        "Applies to gateways deployed after the change.",
+    ),
     "TEMPORAL_ENABLED": (
         ASTROLIFT_TEMPORAL_ENABLED,
         "Enable the durable-workflow runtime. When False the client returns synthetic handles "
@@ -769,7 +782,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Source repositories": {"fields": ("RESTRICT_SOURCE_REPOS_TO_ORG",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
-    "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
+    "Zentinelle": {
+        "fields": ("ZENTINELLE_ENABLED", "ZENTINELLE_GATEWAY_ENABLED", "ZENTINELLE_GATEWAY_IMAGE"),
+        "collapse": False,
+    },
     "Organization modules": {
         "fields": ("CHAT_STUDIO_INTEGRATION_ALLOWED", "AGENT_LIVE_ATTACH_ALLOWED"),
         "collapse": False,

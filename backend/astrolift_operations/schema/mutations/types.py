@@ -389,3 +389,40 @@ class PlaceObservabilityRetentionHoldInput:
 @strawberry.input
 class ReleaseObservabilityRetentionHoldInput:
     hold_id: GUID
+
+
+@strawberry.input
+class ConnectZentinelleInput:
+    """Connect this organization to a Zentinelle deployment (#1887)."""
+
+    url: str
+    """Zentinelle's API base URL, e.g. ``https://zentinelle.example.com``."""
+
+    enrollment_code: str
+    """The one-time code generated in Zentinelle (Settings > Astrolift)."""
+
+
+@strawberry.input
+class DisconnectZentinelleInput:
+    force: bool = False
+    """Disconnect even when Zentinelle cannot be reached. The install then has
+    to be disconnected in Zentinelle too, or its credentials stay valid there."""
+
+
+@strawberry.input
+class ZentinelleClusterInput:
+    cluster_id: GUID
+
+
+@strawberry.input
+class SetZentinelleGatewayEnabledInput:
+    cluster_id: GUID
+    enabled: bool
+
+
+@strawberry.input
+class RotateZentinelleGatewayCredentialInput:
+    cluster_id: GUID
+    overlap_seconds: int | None = None
+    """How long the replaced credential keeps working (default 600, at most
+    86400). 0 ends it now, for a leaked credential."""

@@ -99,6 +99,8 @@ export const ASTROLIFT_PERMISSIONS = [
   "workflow.read",
   "workflow.trigger",
   "workflow.update",
+  "zentinelle.connect",
+  "zentinelle.gateway_manage",
 ] as const;
 
 export type AstroliftPermission = (typeof ASTROLIFT_PERMISSIONS)[number];

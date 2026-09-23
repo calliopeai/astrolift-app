@@ -36,10 +36,12 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     BulkResyncManifestInput,
     BulkRollingRestartInput,
     ClearAlertSubscriptionInput,
+    ConnectZentinelleInput,
     CreateAlertRuleInput,
     CreateWebhookSubscriptionInput,
     DeleteAlertRuleInput,
     DeleteWebhookSubscriptionInput,
+    DisconnectZentinelleInput,
     ExportAppLogsInput,
     ExportAuditEventsInput,
     MarkNotificationReadInput,
@@ -49,21 +51,25 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     ReleaseObservabilityRetentionHoldInput,
     RevokeMobileDeviceInput,
     RotateOutboundWebhookSecretInput,
+    RotateZentinelleGatewayCredentialInput,
     SetAlertSubscriptionInput,
     SetNotificationPreferenceInput,
     SetNotificationProfileInput,
+    SetZentinelleGatewayEnabledInput,
     TestNotificationInput,
     TestWebhookInput,
     UnmuteAlertRuleInput,
     UpdateAlertRuleInput,
     UpdateWebhookSubscriptionInput,
     WebhookSecretReveal,
+    ZentinelleClusterInput,
     _AlertRuleDeletedPayload,
     _MarkAllReadPayload,
     _RevokeMobileDevicePayload,
     _SoftDeletePayload,
 )
 from astrolift_operations.schema.mutations.webhooks import WebhookMutations
+from astrolift_operations.schema.mutations.zentinelle import ZentinelleMutations
 
 
 @strawberry.type
@@ -75,5 +81,6 @@ class OperationsMutation(
     AlertSubscriptionMutations,
     BulkOpsMutations,
     RetentionHoldMutations,
+    ZentinelleMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""

@@ -4227,6 +4227,56 @@ export type AstroliftWorkloadScalingStatus = {
   sourcedAt: Scalars['DateTime']['output'];
 };
 
+export type AstroliftZentinelleClusterGateway = {
+  clusterId: Scalars['GUID']['output'];
+  clusterSlug: Scalars['String']['output'];
+  credentialRotatedAt?: Maybe<Scalars['DateTime']['output']>;
+  gatewayDeployed: Scalars['Boolean']['output'];
+  gatewayEnabled: Scalars['Boolean']['output'];
+  gatewayName: Scalars['String']['output'];
+  lastError: Scalars['String']['output'];
+  registeredAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  unregistered: Scalars['Boolean']['output'];
+  zentinelleClusterId: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleClusterGatewayMutationResult = {
+  data?: Maybe<AstroliftZentinelleClusterGateway>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleConnection = {
+  baseUrl: Scalars['String']['output'];
+  clusters: Array<AstroliftZentinelleClusterGateway>;
+  connectedAt?: Maybe<Scalars['DateTime']['output']>;
+  disconnectedAt?: Maybe<Scalars['DateTime']['output']>;
+  gatewayFeatureEnabled: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  lastError: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  tenantIds: Array<Scalars['String']['output']>;
+  zentinelleInstallId: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleConnectionMutationResult = {
+  data?: Maybe<AstroliftZentinelleConnection>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleDisconnect = {
+  connection: AstroliftZentinelleConnection;
+  warnings: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftZentinelleDisconnectMutationResult = {
+  data?: Maybe<AstroliftZentinelleDisconnect>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
@@ -4497,6 +4547,11 @@ export type ConnectSourceInput = {
 export type ConnectUserSourceProviderInput = {
   providerConfigId: Scalars['GUID']['input'];
   returnTo: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ConnectZentinelleInput = {
+  enrollmentCode: Scalars['String']['input'];
+  url: Scalars['String']['input'];
 };
 
 export type CostWindow =
@@ -4794,6 +4849,10 @@ export type DisconnectSourceInput = {
 export type DisconnectUserSourceProviderInput = {
   confirmAccountLogin: Scalars['String']['input'];
   providerConfigId: Scalars['GUID']['input'];
+};
+
+export type DisconnectZentinelleInput = {
+  force: Scalars['Boolean']['input'];
 };
 
 export type DomainPathRouteInput = {
@@ -5212,6 +5271,7 @@ export type Mutation = {
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
+  connectZentinelle: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
   controlWorkflowExecution: WorkflowExecutionControlResult;
   createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
@@ -5284,6 +5344,7 @@ export type Mutation = {
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
+  disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
@@ -5387,6 +5448,7 @@ export type Mutation = {
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
+  registerZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
@@ -5435,6 +5497,7 @@ export type Mutation = {
   rotateOutboundWebhookSecret: WebhookSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
+  rotateZentinelleGatewayCredential: AstroliftZentinelleClusterGatewayMutationResult;
   runAstroliftAgent: AstroliftAgentTaskMutationResult;
   runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
   runTask: AstroliftTaskRunPayloadMutationResult;
@@ -5465,6 +5528,7 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED. */
@@ -5500,6 +5564,7 @@ export type Mutation = {
   unbindAgentTrigger: AstroliftAgentTriggerResult;
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
+  unregisterZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
   updateAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
@@ -5785,6 +5850,11 @@ export type MutationConnectExistingGithubAppArgs = {
 
 export type MutationConnectSourceArgs = {
   input: ConnectSourceInput;
+};
+
+
+export type MutationConnectZentinelleArgs = {
+  input: ConnectZentinelleInput;
 };
 
 
@@ -6143,6 +6213,11 @@ export type MutationDetachSecretBundleArgs = {
 
 export type MutationDisconnectSourceArgs = {
   input: DisconnectSourceInput;
+};
+
+
+export type MutationDisconnectZentinelleArgs = {
+  input: DisconnectZentinelleInput;
 };
 
 
@@ -6560,6 +6635,11 @@ export type MutationRegisterTenantClusterArgs = {
 };
 
 
+export type MutationRegisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
+};
+
+
 export type MutationReissueManagedDomainCertArgs = {
   clusterId: Scalars['GUID']['input'];
   zone: Scalars['String']['input'];
@@ -6799,6 +6879,11 @@ export type MutationRotateWebhookSecretArgs = {
 };
 
 
+export type MutationRotateZentinelleGatewayCredentialArgs = {
+  input: RotateZentinelleGatewayCredentialInput;
+};
+
+
 export type MutationRunAstroliftAgentArgs = {
   input: RunAstroliftAgentInput;
 };
@@ -6938,6 +7023,11 @@ export type MutationSetProjectBundleSecretValueArgs = {
 
 export type MutationSetRetentionPolicyArgs = {
   input: SetRetentionPolicyInput;
+};
+
+
+export type MutationSetZentinelleGatewayEnabledArgs = {
+  input: SetZentinelleGatewayEnabledInput;
 };
 
 
@@ -7094,6 +7184,11 @@ export type MutationUnmuteAlertRuleArgs = {
 
 export type MutationUnregisterTenantClusterArgs = {
   input: UnregisterTenantClusterInput;
+};
+
+
+export type MutationUnregisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
 };
 
 
@@ -7868,6 +7963,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage. */
   astroliftWorkloads: Array<AstroliftWorkload>;
   astroliftWorkloadsPage: AstroliftWorkloadPage;
+  astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
   /**
    * Query mutation audit logs. Superuser only.
    * @deprecated Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.
@@ -9684,6 +9780,11 @@ export type RotateWebhookSecretInput = {
   connectionId: Scalars['GUID']['input'];
 };
 
+export type RotateZentinelleGatewayCredentialInput = {
+  clusterId: Scalars['GUID']['input'];
+  overlapSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type RunAstroliftAgentInput = {
   agentSlug: Scalars['String']['input'];
   environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
@@ -9809,6 +9910,11 @@ export type SetRetentionPolicyInput = {
   appSlug: Scalars['String']['input'];
   retentionDays: Scalars['Int']['input'];
   signal: Scalars['String']['input'];
+};
+
+export type SetZentinelleGatewayEnabledInput = {
+  clusterId: Scalars['GUID']['input'];
+  enabled: Scalars['Boolean']['input'];
 };
 
 export type SharedDirectoryType = {
@@ -10497,6 +10603,10 @@ export type WorkflowTopologyStage = {
   skillRefs: Array<Scalars['String']['output']>;
   timeoutSeconds: Scalars['Int']['output'];
   workflowRef: Scalars['String']['output'];
+};
+
+export type ZentinelleClusterInput = {
+  clusterId: Scalars['GUID']['input'];
 };
 
 export type CreateSkillMutationVariables = Exact<{

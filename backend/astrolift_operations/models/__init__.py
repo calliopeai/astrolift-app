@@ -26,6 +26,10 @@ from astrolift_operations.models.webhook_delivery import WebhookDelivery
 from astrolift_operations.models.webhook_subscription import WebhookSubscription
 from astrolift_operations.models.workflow_run import WorkflowRun
 from astrolift_operations.models.workload_identity_role import WorkloadIdentityRole
+from astrolift_operations.models.zentinelle_connection import (
+    ZentinelleClusterGateway,
+    ZentinelleConnection,
+)
 
 __all__ = [
     "ANY_STREAM",
@@ -51,6 +55,8 @@ __all__ = [
     "UserAlertSubscription",
     "WorkflowRun",
     "WorkloadIdentityRole",
+    "ZentinelleClusterGateway",
+    "ZentinelleConnection",
     "default_enabled",
     "is_enabled",
 ]

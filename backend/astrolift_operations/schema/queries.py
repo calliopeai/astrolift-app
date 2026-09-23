@@ -24,6 +24,7 @@ from astrolift_operations.models import (
     WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
+    ZentinelleConnection,
     default_enabled,
 )
 from astrolift_operations.schema.types import (
@@ -46,6 +47,7 @@ from astrolift_operations.schema.types import (
     WebhookDeliveryType,
     WebhookSubscriptionType,
     WorkflowRunType,
+    ZentinelleConnectionType,
     alert_event_to_type,
     alert_rule_to_type,
     audit_to_type,
@@ -59,6 +61,7 @@ from astrolift_operations.schema.types import (
     webhook_delivery_to_type,
     webhook_to_type,
     workflow_run_to_type,
+    zentinelle_connection_to_type,
 )
 from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
@@ -810,6 +813,18 @@ class OperationsQuery:
                 )
             )
         return out
+
+    @strawberry.field
+    @require_permission(Permission.ZENTINELLE_CONNECT)
+    @tenant_scoped()
+    def astrolift_zentinelle_connection(self, info: Info) -> ZentinelleConnectionType | None:
+        """This organization's Zentinelle connection and registered clusters (#1887),
+        or null when it is not connected."""
+        org_id = _caller_org_id()
+        if org_id is None:
+            return None
+        connection = ZentinelleConnection.objects.filter(organization_id=org_id).first()
+        return zentinelle_connection_to_type(connection) if connection is not None else None
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)

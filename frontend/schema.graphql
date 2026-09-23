@@ -4272,6 +4272,56 @@ type AstroliftWorkloadScalingStatus {
   sourcedAt: DateTime!
 }
 
+type AstroliftZentinelleClusterGateway {
+  clusterId: GUID!
+  clusterSlug: String!
+  zentinelleClusterId: String!
+  gatewayName: String!
+  gatewayEnabled: Boolean!
+  gatewayDeployed: Boolean!
+  status: String!
+  registeredAt: DateTime
+  credentialRotatedAt: DateTime
+  lastError: String!
+  unregistered: Boolean!
+}
+
+type AstroliftZentinelleClusterGatewayMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftZentinelleClusterGateway
+}
+
+type AstroliftZentinelleConnection {
+  id: GUID!
+  baseUrl: String!
+  status: String!
+  zentinelleInstallId: String!
+  tenantIds: [String!]!
+  connectedAt: DateTime
+  disconnectedAt: DateTime
+  lastError: String!
+  gatewayFeatureEnabled: Boolean!
+  clusters: [AstroliftZentinelleClusterGateway!]!
+}
+
+type AstroliftZentinelleConnectionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftZentinelleConnection
+}
+
+type AstroliftZentinelleDisconnect {
+  connection: AstroliftZentinelleConnection!
+  warnings: [String!]!
+}
+
+type AstroliftZentinelleDisconnectMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftZentinelleDisconnect
+}
+
 input AttachProjectManagedServiceInput {
   managedServiceId: GUID!
   agentEnvironmentSpecSlug: String = null
@@ -4548,6 +4598,11 @@ input ConnectSourceInput {
 input ConnectUserSourceProviderInput {
   providerConfigId: GUID!
   returnTo: String = null
+}
+
+input ConnectZentinelleInput {
+  url: String!
+  enrollmentCode: String!
 }
 
 enum CostWindow {
@@ -4852,6 +4907,10 @@ input DisconnectSourceInput {
 input DisconnectUserSourceProviderInput {
   providerConfigId: GUID!
   confirmAccountLogin: String!
+}
+
+input DisconnectZentinelleInput {
+  force: Boolean! = false
 }
 
 input DomainPathRouteInput {
@@ -5446,6 +5505,12 @@ type Mutation {
   bulkResyncManifest(input: BulkResyncManifestInput!): BulkOperationResult!
   placeObservabilityRetentionHold(input: PlaceObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   releaseObservabilityRetentionHold(input: ReleaseObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
+  connectZentinelle(input: ConnectZentinelleInput!): AstroliftZentinelleConnectionMutationResult!
+  disconnectZentinelle(input: DisconnectZentinelleInput!): AstroliftZentinelleDisconnectMutationResult!
+  registerZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  setZentinelleGatewayEnabled(input: SetZentinelleGatewayEnabledInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  rotateZentinelleGatewayCredential(input: RotateZentinelleGatewayCredentialInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  unregisterZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -6081,6 +6146,7 @@ type Query {
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
   astroliftAuditRetention: AstroliftAuditRetention!
   astroliftObservabilityRetention: [ObservabilityRetentionType!]!
+  astroliftZentinelleConnection: AstroliftZentinelleConnection
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage.")
   astroliftWebhookSubscriptionsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookSubscriptionPage!
@@ -6650,6 +6716,11 @@ input RotateWebhookSecretInput {
   connectionId: GUID!
 }
 
+input RotateZentinelleGatewayCredentialInput {
+  clusterId: GUID!
+  overlapSeconds: Int = null
+}
+
 input RunAstroliftAgentInput {
   agentSlug: String!
   environmentSpecId: GUID = null
@@ -6775,6 +6846,11 @@ input SetRetentionPolicyInput {
   appSlug: String!
   signal: String!
   retentionDays: Int!
+}
+
+input SetZentinelleGatewayEnabledInput {
+  clusterId: GUID!
+  enabled: Boolean!
 }
 
 type SharedDirectoryType {
@@ -7441,4 +7517,8 @@ type WorkflowTopologyStage {
   fanOutDynamic: Boolean!
   onFailure: String!
   timeoutSeconds: Int!
+}
+
+input ZentinelleClusterInput {
+  clusterId: GUID!
 }
