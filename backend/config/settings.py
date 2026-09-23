@@ -105,6 +105,7 @@ API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_
 SECRET_KEY = env_str("DJANGO_SECRET_KEY", "not-a-secret")
 ROOT_URLCONF = env_str("DJANGO_ROOT_URLCONF", "config.urls")
 BASE_URL = env_str("DJANGO_BASE_URL", "app/")
+LOGIN_URL = env_str("DJANGO_LOGIN_URL", "/auth/login")
 LOGIN_REDIRECT_URL = env_str("DJANGO_LOGIN_REDIRECT_URL", f"/{BASE_URL}admin/")
 SWITCHED_FROM_USER = "switched_from_user"
 
@@ -581,6 +582,13 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    "BUILDER_DATA_FILE_MAX_BYTES": (
+        64 * 1024 * 1024,
+        "Largest data file (e.g. an app's data.sqlite) the App Builder accepts in one "
+        "files sync, in decoded bytes. It travels base64 in the request, so the request "
+        "can be a third larger; an ingress in front of the control plane must allow that "
+        "body size. The file is stored in Postgres and shipped to the cluster as Secrets.",
+    ),
     # ---- Admin console surfaces (feature flipper) ----
     # Runtime gates for the platform-admin cost / quotas / permissions
     # screens. Default OFF — the screens ship dark and each gates itself
@@ -782,6 +790,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
         "collapse": False,
     },
+    "App Builder": {"fields": ("BUILDER_DATA_FILE_MAX_BYTES",), "collapse": False},
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
     "Deploy tokens": {
         "fields": (

@@ -1337,12 +1337,14 @@ def _registration_source_archive(
 
 
 def _needs_package_archive(discovered: list[DiscoveredAgentManifest]) -> bool:
+    from astrolift_agents.services.agent_package import manifest_needs_payload
+
     for item in discovered:
         try:
             raw = parse_raw(item.raw_text).raw
         except ManifestError:
             continue
-        if "package" in raw:
+        if manifest_needs_payload(raw):
             return True
     return False
 

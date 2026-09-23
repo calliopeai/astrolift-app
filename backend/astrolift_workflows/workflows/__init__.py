@@ -42,6 +42,7 @@ from astrolift_workflows.workflows.deprovision_managed_service import (
 from astrolift_workflows.workflows.deregister_app import DeregisterAppWorkflow
 from astrolift_workflows.workflows.dev_environment import (
     CreateDevEnvironmentWorkflow,
+    DeployPromotedAppWorkflow,
     SyncDevEnvironmentFilesWorkflow,
 )
 from astrolift_workflows.workflows.dispatch_agent_task import DispatchAgentTaskWorkflow
@@ -120,6 +121,7 @@ __all__ = [
     "DecommissionClusterWorkflow",
     "DeleteSecretBundleFromClustersWorkflow",
     "DeployAppWorkflow",
+    "DeployPromotedAppWorkflow",
     "DeprovisionManagedDomainWorkflow",
     "DeprovisionManagedServiceWorkflow",
     "DeregisterAppWorkflow",

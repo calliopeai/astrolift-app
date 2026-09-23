@@ -6,6 +6,9 @@ Three endpoints, all mounted under ``/api/builder/v1/``:
 * ``PUT    /dev-environments/<guid>/files/``    — sync a new file tree.
 * ``POST   /dev-environments/<guid>/promote/``  — promote to a registered app.
 
+The wire contract, including binary files and the data file (#1858), is
+documented in ``docs/builder-api.md``.
+
 Auth flows through :class:`astrolift_identity.middleware.ApiTokenAuthMiddleware`,
 which is already in the middleware chain. An ``Authorization: Bearer
 alft_at_...`` header resolves to ``request.user`` + attaches the row
@@ -23,6 +26,8 @@ the App Builder always presents a token in practice.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import re
@@ -36,12 +41,21 @@ log = logging.getLogger("astrolift_lifecycle.builder_views")
 _VALID_RUNTIMES = {"python", "node", "ruby", "go", "static"}
 _VALID_PROFILES = {"small", "medium", "large"}
 _MAX_FILES = 100
-_FILE_SIZE_LIMIT = 512 * 1024  # 512 KiB total
+_FILE_SIZE_LIMIT = 512 * 1024  # 512 KiB total, decoded
 
 # DNS-label shape for slugs (k8s names + ingress hostnames must match).
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$")
 
 _TASK_QUEUE = "astrolift-main"
+
+# In-tree provisioner names Kubernetes now serves through a CSI driver; a
+# class naming one only provisions while that driver is installed.
+_CSI_MIGRATED_PROVISIONERS = {
+    "kubernetes.io/aws-ebs": "ebs.csi.aws.com",
+    "kubernetes.io/gce-pd": "pd.csi.storage.gke.io",
+    "kubernetes.io/azure-disk": "disk.csi.azure.com",
+    "kubernetes.io/azure-file": "file.csi.azure.com",
+}
 
 
 def _resolve_org(request: HttpRequest):
@@ -123,12 +137,103 @@ def _module_gate(org):
     )
 
 
-def _load_json(request: HttpRequest):
-    """Parse the request body. Returns ``(body, None)`` or ``(None, err_response)``."""
+def _load_json(request: HttpRequest, *, max_bytes: int | None = None):
+    """Parse the request body. Returns ``(body, None)`` or ``(None, err_response)``.
+
+    ``max_bytes`` is for bodies allowed past Django's
+    ``DATA_UPLOAD_MAX_MEMORY_SIZE``, which ``request.body`` enforces for
+    every endpoint: the declared length is checked against it first, then
+    the stream is read directly.
+    """
+    if max_bytes is None:
+        raw = request.body
+    else:
+        try:
+            length = int(request.META.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            length = 0
+        if length > max_bytes:
+            return None, JsonResponse({"detail": f"request body exceeds {max_bytes} bytes"}, status=413)
+        raw = request.read(max_bytes + 1)
     try:
-        return json.loads(request.body or "{}"), None
+        return json.loads(raw or "{}"), None
     except (ValueError, UnicodeDecodeError):
         return None, JsonResponse({"detail": "invalid JSON body"}, status=400)
+
+
+def _data_file_limit() -> int:
+    from constance import config as constance_config
+
+    return int(constance_config.BUILDER_DATA_FILE_MAX_BYTES)
+
+
+def _max_sync_body_bytes(data_file_limit: int) -> int:
+    """Largest files-sync body worth reading.
+
+    The data file travels base64-encoded (4/3 of its size); JSON escaping
+    can grow text files up to 6x (``\\u00XX``); 1 MiB covers paths and
+    structure.
+    """
+    return 4 * -(-data_file_limit // 3) + 6 * _FILE_SIZE_LIMIT + 1024 * 1024
+
+
+def _path_error(path) -> str:
+    if not isinstance(path, str) or not path:
+        return "file paths must be non-empty strings"
+    if path.startswith("/") or ".." in path:
+        return f"path {path!r} must be relative and must not contain .."
+    return ""
+
+
+def _decode_base64(entry) -> bytes | None:
+    """Decoded bytes of a ``{"content", "encoding": "base64"}`` entry, or None.
+
+    Strict standard alphabet with padding, no line breaks: the content goes
+    to Kubernetes as-is, which decodes it the same way.
+    """
+    if not isinstance(entry, dict) or entry.get("encoding") != "base64":
+        return None
+    content = entry.get("content")
+    if not isinstance(content, str):
+        return None
+    try:
+        return base64.b64decode(content, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _persistent_storage_class(cluster) -> str:
+    """StorageClass a promoted app's data claim can bind through, or ``""``.
+
+    Picks the default class, else the only one, as the #1023 autostamp
+    does. A CSI-backed class whose driver is not installed does not count:
+    that is how an EKS cluster without the EBS CSI driver looks
+    (installer#315), and its claim would sit Pending with the app never
+    starting. Any failure to ask the cluster also answers "no", which
+    promotes with an emptyDir and ``data_persistent: false``.
+    """
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    try:
+        driver = _driver_for_cluster(cluster)
+        ctx = _context_for_cluster(cluster)
+        classes = driver.list_storage_classes(ctx.slug)
+        chosen = next((sc for sc in classes if sc.is_default), None)
+        if chosen is None and len(classes) == 1:
+            chosen = classes[0]
+        if chosen is None or chosen.provisioner == "kubernetes.io/no-provisioner":
+            return ""
+        provisioner = _CSI_MIGRATED_PROVISIONERS.get(chosen.provisioner, chosen.provisioner)
+        if "csi" in provisioner and provisioner not in driver.list_csi_drivers(ctx.slug):
+            return ""
+        return chosen.name
+    except Exception:  # noqa: BLE001 (any probe failure means no persistent volume)
+        log.warning(
+            "persistent volume probe failed for cluster %s; promoting with an emptyDir",
+            cluster.slug,
+            exc_info=True,
+        )
+        return ""
 
 
 def _cluster_q_for_org(org):
@@ -262,7 +367,15 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
 
 @require_http_methods(["PUT"])
 def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
-    """Sync a new file tree into a running dev environment (#767)."""
+    """Sync a new file tree into a running dev environment (#767).
+
+    ``files`` maps a relative path to UTF-8 text, or to
+    ``{"content": <base64>, "encoding": "base64"}`` for a binary file
+    (#1858). ``data_file`` declares the one data file, as
+    ``{"path", "content", "encoding": "base64"}`` with its own size cap
+    (Constance ``BUILDER_DATA_FILE_MAX_BYTES``); omitted keeps the stored
+    one, ``null`` removes it. See ``docs/builder-api.md``.
+    """
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "authentication required"}, status=401)
 
@@ -275,14 +388,19 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
 
     from astrolift_lifecycle.models import DevEnvironment
 
-    dev = DevEnvironment.objects.filter(guid=guid, organization=org, deleted_at__isnull=True).first()
+    dev = (
+        DevEnvironment.objects.defer("data_file")
+        .filter(guid=guid, organization=org, deleted_at__isnull=True)
+        .first()
+    )
     if dev is None:
         return JsonResponse({"detail": "dev environment not found"}, status=404)
 
     if dev.status != DevEnvironment.Status.RUNNING:
         return JsonResponse({"detail": "environment is not running"}, status=409)
 
-    body, err = _load_json(request)
+    data_file_limit = _data_file_limit()
+    body, err = _load_json(request, max_bytes=_max_sync_body_bytes(data_file_limit))
     if err:
         return err
 
@@ -297,28 +415,67 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
             {"detail": f"too many files (max {_MAX_FILES})"},
             status=400,
         )
-    for path_key in files:
-        if not isinstance(path_key, str) or not path_key:
-            return JsonResponse(
-                {"detail": "file paths must be non-empty strings"},
-                status=400,
-            )
-        if path_key.startswith("/") or ".." in path_key:
-            return JsonResponse(
-                {"detail": f"path {path_key!r} must be relative and must not contain .."},
-                status=400,
-            )
+    total_bytes = 0
+    for path_key, value in files.items():
+        path_err = _path_error(path_key)
+        if path_err:
+            return JsonResponse({"detail": path_err}, status=400)
+        if isinstance(value, dict):
+            decoded = _decode_base64(value)
+            if decoded is None:
+                return JsonResponse(
+                    {
+                        "detail": (
+                            f"file {path_key!r} must be text or "
+                            '{"content": <base64>, "encoding": "base64"}'
+                        )
+                    },
+                    status=400,
+                )
+            files[path_key] = {"content": value["content"], "encoding": "base64"}
+            total_bytes += len(decoded)
+        else:
+            total_bytes += len(str(value).encode("utf-8"))
 
-    total_bytes = sum(len(str(v).encode("utf-8")) for v in files.values())
     if total_bytes > _FILE_SIZE_LIMIT:
         return JsonResponse(
             {"detail": f"total file size exceeds {_FILE_SIZE_LIMIT // 1024}KiB limit"},
             status=400,
         )
 
+    update_fields = ["files", "status", "updated_at", "version"]
+    if "data_file" in body:
+        data_file = body["data_file"]
+        if data_file is None:
+            dev.data_file_path, dev.data_file = "", None
+        else:
+            if not isinstance(data_file, dict):
+                return JsonResponse(
+                    {"detail": "data_file must be an object with path, content and encoding, or null"},
+                    status=400,
+                )
+            path_err = _path_error(data_file.get("path"))
+            if not path_err and len(data_file["path"]) > 255:
+                path_err = "path must be at most 255 characters"
+            if path_err:
+                return JsonResponse({"detail": f"data_file: {path_err}"}, status=400)
+            decoded = _decode_base64(data_file)
+            if decoded is None:
+                return JsonResponse(
+                    {"detail": 'data_file must carry base64 content with "encoding": "base64"'},
+                    status=400,
+                )
+            if len(decoded) > data_file_limit:
+                return JsonResponse(
+                    {"detail": f"data_file exceeds the {data_file_limit} byte limit"},
+                    status=400,
+                )
+            dev.data_file_path, dev.data_file = data_file["path"], decoded
+        update_fields += ["data_file_path", "data_file"]
+
     dev.files = files
     dev.status = DevEnvironment.Status.SYNCING
-    dev.save(update_fields=["files", "status", "updated_at", "version"])
+    dev.save(update_fields=update_fields)
 
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import SyncDevEnvironmentFilesInput
@@ -345,7 +502,13 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
 
 @require_http_methods(["POST"])
 def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
-    """Promote a dev environment to a registered production app (#768)."""
+    """Promote a dev environment to a registered production app (#768).
+
+    Besides onboarding the app, serves it from its own namespace (#1858).
+    When the dev env declares a data file, ``data_persistent`` says whether
+    it sits on a persistent volume (true) or an emptyDir that resets on
+    restart (false); it is null without a data file.
+    """
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "authentication required"}, status=401)
 
@@ -358,7 +521,11 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
 
     from astrolift_lifecycle.models import DevEnvironment
 
-    dev = DevEnvironment.objects.filter(guid=guid, organization=org, deleted_at__isnull=True).first()
+    dev = (
+        DevEnvironment.objects.defer("data_file")
+        .filter(guid=guid, organization=org, deleted_at__isnull=True)
+        .first()
+    )
     if dev is None:
         return JsonResponse({"detail": "dev environment not found"}, status=404)
 
@@ -444,6 +611,8 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
                 status=404,
             )
 
+    storage_class = _persistent_storage_class(cluster) if dev.data_file_path else ""
+
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -495,12 +664,33 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             app.slug,
         )
 
+    # Onboarding gives the app a namespace but runs nothing in it; this
+    # serves the uploaded files there, independent of the dev env's own
+    # workload and lifetime.
+    from astrolift_workflows.activities.dev_environment import promoted_app_hostname
+    from astrolift_workflows.inputs import DeployPromotedAppInput
+
+    try:
+        start_workflow(
+            "DeployPromotedAppWorkflow",
+            [DeployPromotedAppInput(dev_environment_id=dev.pk, storage_class=storage_class)],
+            workflow_id=f"DeployPromotedAppWorkflow-{app.guid}",
+            task_queue=_TASK_QUEUE,
+        )
+    except Exception:  # noqa: BLE001
+        log.exception(
+            "failed to start DeployPromotedAppWorkflow for promoted app %s",
+            app.slug,
+        )
+
     return JsonResponse(
         {
             "id": dev.guid,
             "status": dev.status,
             "app_guid": app.guid,
             "app_slug": app.slug,
+            "app_url": f"https://{promoted_app_hostname(app)}",
+            "data_persistent": bool(storage_class) if dev.data_file_path else None,
         },
         status=202,
     )

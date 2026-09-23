@@ -3,14 +3,13 @@
 import Image from "next/image";
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { deviceApprovalReturnPath } from "@/lib/auth/device-return";
 
 function BrandFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-4">
       <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
-      <div className="text-foreground text-lg font-semibold tracking-tight">
-        Astrolift
-      </div>
+      <div className="text-foreground text-lg font-semibold tracking-tight">Astrolift</div>
       <div className="text-muted-foreground text-sm">{children}</div>
     </div>
   );
@@ -36,7 +35,9 @@ function CallbackInner() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }).finally(() => {
-      router.replace("/dashboard");
+      const returnPath = deviceApprovalReturnPath(searchParams.get("next"));
+      if (returnPath === "/dashboard") router.replace(returnPath);
+      else window.location.replace(returnPath);
     });
   }, [router, searchParams]);
 

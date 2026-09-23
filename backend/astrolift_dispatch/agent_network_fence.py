@@ -17,7 +17,7 @@ agent namespace. Enforcement needs a NetworkPolicy-capable CNI.
 
 from __future__ import annotations
 
-from astrolift_clusters.egress import DEFAULT_INTERNAL_CIDRS, EgressPolicy
+from astrolift_clusters.egress import CLUSTER_DNS_PEER, DEFAULT_INTERNAL_CIDRS, EgressPolicy
 
 FENCE_NAME = "astrolift-agent-fence"
 
@@ -41,12 +41,7 @@ def render_agent_fence(*, namespace: str, provider_slug: str = "", allow_cidrs: 
     ipv4_internal = [cidr for cidr in DEFAULT_INTERNAL_CIDRS if ":" not in cidr]
     egress: list[dict] = [
         {
-            "to": [
-                {
-                    "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
-                    "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
-                }
-            ],
+            "to": [dict(CLUSTER_DNS_PEER)],
             "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}],
         },
         {

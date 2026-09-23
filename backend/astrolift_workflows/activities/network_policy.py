@@ -23,7 +23,7 @@ import dataclasses
 import logging
 from collections.abc import Sequence
 
-from astrolift_clusters.egress import EgressPolicy, EgressPolicyError, SourceIPMode
+from astrolift_clusters.egress import CLUSTER_DNS_PEER, EgressPolicy, EgressPolicyError, SourceIPMode
 from astrolift_clusters.egress import render as render_egress
 
 log = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ def render_network_policy(
     # without it.
     egress_rules.append(
         {
-            "to": [{"namespaceSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+            "to": [dict(CLUSTER_DNS_PEER)],
             "ports": list(_DNS_PORTS),
         }
     )
