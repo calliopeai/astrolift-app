@@ -2028,3 +2028,152 @@ def test_a_spec_that_does_not_ask_leaves_the_box_byte_identical_with_the_gateway
 
     assert gateway.zentinelle.calls == []
     assert _canonical_sha256(_job_of(gateway.driver.applied[-1])) == _BARE_BOX_JOB_SHA256
+
+
+def test_a_gateway_box_records_the_connection_that_minted_its_key(org, gateway):
+    box = _box(org, environment_spec=_gateway_spec(org))
+
+    box_service.start_agent_box(box)
+
+    box.refresh_from_db()
+    assert box.model_gateway_connection == gateway.connection
+    assert box.model_gateway_lifetime_ends_at is not None
+
+
+def test_one_boxs_failing_renewal_does_not_end_the_sweep(org, gateway, monkeypatch):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    import astrolift_dispatch.model_gateway as model_gateway
+
+    first = _box(org, environment_spec=_gateway_spec(org), slug="first-box")
+    second = _box(org, environment_spec=_gateway_spec(org, slug="claude-dev-2"), slug="second-box")
+    for box in (first, second):
+        box_service.start_agent_box(box)
+    AgentBox.objects.update(model_gateway_expires_at=timezone.now() + timedelta(minutes=10))
+    renew = model_gateway.renew_run_key
+    renewed = []
+
+    def flaky(*, connection_id, agent_id, ttl_seconds):
+        if agent_id == _box_agent_id(first):
+            raise RuntimeError("database connection lost")
+        renewed.append(agent_id)
+        return renew(connection_id=connection_id, agent_id=agent_id, ttl_seconds=ttl_seconds)
+
+    monkeypatch.setattr(model_gateway, "renew_run_key", flaky)
+
+    summary = box_service.reap_agent_boxes()
+
+    assert summary["evaluated"] == 2
+    assert renewed == [_box_agent_id(second)]
+    second.refresh_from_db()
+    assert (second.model_gateway_expires_at - timezone.now()).total_seconds() > 4400
+
+
+def test_the_reaper_stops_renewing_at_the_keys_lifetime_end(org, gateway):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    # Less than half of the box's 75-minute window: due for renewal at once,
+    # were it not for the lifetime end.
+    gateway.zentinelle.lifetime = timedelta(minutes=30)
+    box = _box(org, environment_spec=_gateway_spec(org))
+    box_service.start_agent_box(box)
+    box.refresh_from_db()
+    # Zentinelle's lifetime cap comes before the box's window.
+    assert box.model_gateway_expires_at == box.model_gateway_lifetime_ends_at
+    gateway.zentinelle.calls.clear()
+
+    box_service.reap_agent_boxes()
+    box_service.reap_agent_boxes()
+
+    assert gateway.zentinelle.calls == []
+    # And an expired key is not renewed either: only a restart mints a new one.
+    AgentBox.objects.filter(pk=box.pk).update(
+        model_gateway_expires_at=timezone.now() - timedelta(seconds=1),
+        model_gateway_lifetime_ends_at=timezone.now() + timedelta(days=1),
+    )
+    box_service.reap_agent_boxes()
+    assert gateway.zentinelle.calls == []
+
+
+def test_a_renewal_that_reaches_the_lifetime_end_says_so(org, gateway, monkeypatch):
+    import logging
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    box = _box(org, environment_spec=_gateway_spec(org))
+    box_service.start_agent_box(box)
+    agent = gateway.zentinelle.agents[_box_agent_id(box)]
+    agent.lifetime_ends_at = timezone.now() + timedelta(minutes=50)
+    AgentBox.objects.filter(pk=box.pk).update(
+        model_gateway_expires_at=timezone.now() + timedelta(minutes=10),
+        model_gateway_lifetime_ends_at=agent.lifetime_ends_at,
+    )
+    records = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    handler = _Capture()
+    logging.getLogger("astrolift_agents.services.agent_box").addHandler(handler)
+    try:
+        box_service.reap_agent_boxes()
+    finally:
+        logging.getLogger("astrolift_agents.services.agent_box").removeHandler(handler)
+
+    box.refresh_from_db()
+    assert box.model_gateway_expires_at == agent.lifetime_ends_at
+    assert any("reaches Zentinelle's key lifetime" in record.getMessage() for record in records)
+
+
+def test_another_providers_key_refuses_the_box_before_anything_is_minted(org, gateway):
+    spec = _gateway_spec(org)
+    spec.env_vars = {**spec.env_vars, "GROQ_API_KEY": "gsk-1"}
+    spec.save(update_fields=["env_vars", "updated_at", "version"])
+    box = _box(org, environment_spec=spec)
+
+    with pytest.raises(box_service.AgentBoxError, match="GROQ_API_KEY"):
+        box_service.start_agent_box(box)
+
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.FAILED
+    assert "another model provider's credential or endpoint" in box.last_error
+    assert gateway.zentinelle.calls == []
+    assert gateway.driver.applied == []
+
+
+def test_a_box_whose_agent_an_administrator_stopped_fails_readably(org, gateway):
+    box = _box(org, environment_spec=_gateway_spec(org))
+    box_service.start_agent_box(box)
+    box_service.stop_agent_box(box)
+    gateway.zentinelle.stop(_box_agent_id(box))
+    gateway.zentinelle.calls.clear()
+
+    with pytest.raises(box_service.AgentBoxError, match="stays stopped"):
+        box_service.start_agent_box(box)
+
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.FAILED
+    assert "stopped in Zentinelle by someone other than this install" in box.last_error
+    assert gateway.zentinelle.paths() == [("POST", f"{_GATEWAY_API}/agents")]
+
+
+def test_a_box_key_is_revoked_only_through_the_install_that_minted_it(org, gateway):
+    from astrolift_dispatch.tests.test_model_gateway_1851 import _connect
+
+    box = _box(org, environment_spec=_gateway_spec(org))
+    box_service.start_agent_box(box)
+    # The organization disconnects and connects again: a new install.
+    gateway.connection.soft_delete()
+    _connect(gateway.zentinelle, org)
+    gateway.zentinelle.calls.clear()
+
+    box_service.stop_agent_box(box)
+
+    assert gateway.zentinelle.calls == []
+    assert gateway.zentinelle.agents[_box_agent_id(box)].status == "active"

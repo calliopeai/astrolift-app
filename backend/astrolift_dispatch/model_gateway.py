@@ -15,26 +15,32 @@ the organization's connection, the cluster's gateway, a runtime that can send
 the key) refuses the run with one sentence, and a failed mint fails it. Nothing
 falls back to provider keys.
 
-In gateway mode the pod takes none of :data:`RESERVED_ENV_NAMES` from a spec,
-a binding, a bundle or the Brief: provider credentials are not even read from
-the secret store, and the dispatcher's wiring goes in last, so no configuration
-can point a runtime elsewhere or substitute another key. A secret under any
-other name is still delivered; provider keys belong in Zentinelle, and the
-agent network fence (#1850) is what bounds egress.
+The pod's env follows one rule. The dispatcher's gateway wiring wins over every
+other source: the key, the routed providers' base URLs and credentials, the
+header variables a runner adds the key to (:data:`RESERVED_ENV_NAMES`, plus a
+runtime's own switches such as goose's provider) are dropped from the spec,
+its bindings, bundles and the Brief, and provider credentials under those
+names are not even read from the secret store. Any other name that carries a
+model provider's credential or endpoint (:data:`REFUSED_ENV_PATTERNS`) refuses
+the run, whichever source delivers it: the agent network fence (#1850) allows
+the public internet, so such a name would let the agent call a provider past
+the gateway. A secret under an unrelated name is still delivered.
 
 A key lives as long as its run: a task's for its timeout plus a margin,
 renewed when a question extends its deadline, and a box's for its idle window,
-renewed by the reaper while the box stays up. Stop and finish revoke it, best
-effort with retries; the expiry is the backstop.
+renewed by the reaper while the box stays up, never past the lifetime
+Zentinelle caps keys at. Stop and finish revoke it through the connection that
+minted it, best effort with retries; the expiry is the backstop.
 """
 
 from __future__ import annotations
 
 import base64
 import logging
+import re
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 log = logging.getLogger("astrolift_dispatch.model_gateway")
@@ -58,7 +64,8 @@ _RETRY_DELAYS_SECONDS = (0.25, 0.5)
 
 _PROVIDER_BASE_URL_ENV = {"anthropic": "ANTHROPIC_BASE_URL", "openai": "OPENAI_BASE_URL"}
 # Anthropic's SDKs append /v1/messages to the base URL, OpenAI's append
-# /chat/completions or /responses, so the OpenAI base carries the /v1.
+# /chat/completions or /responses, so the OpenAI base carries the /v1. Goose
+# 1.37 derives v1/chat/completions from the same /v1.
 _PROVIDER_BASE_PATH = {"anthropic": "", "openai": "/v1"}
 
 #: The providers each catalog runtime calls, and so the base URLs it gets.
@@ -77,6 +84,13 @@ RUNTIME_PROVIDERS: dict[str, tuple[str, ...]] = {
     "base": ("anthropic", "openai"),
 }
 
+#: Env a runtime needs to take the gateway at all, written by the dispatcher.
+#: The goose runner refuses the gateway on any provider but openai, the only
+#: one that sends custom headers, and gets its endpoint from OPENAI_BASE_URL.
+RUNTIME_WIRING: dict[str, tuple[tuple[str, str], ...]] = {
+    "goose": (("GOOSE_PROVIDER", "openai"),),
+}
+
 #: Catalog runtimes that cannot run behind the gateway, and why.
 UNSUPPORTED_RUNTIMES: dict[str, str] = {
     "openhands": "runtime openhands cannot send the gateway key (its CLI builds its model client from "
@@ -89,35 +103,48 @@ UNSUPPORTED_RUNTIMES: dict[str, str] = {
 #: which provider it calls.
 AGENT_TYPE_PROVIDERS: dict[str, tuple[str, ...]] = {"claude": ("anthropic",), "codex": ("openai",)}
 
-#: Never taken from a spec, binding, bundle or Brief in gateway mode: the
-#: gateway wiring (the key, every base URL and header variable a runtime would
-#: follow instead, the switches that send Claude Code to Bedrock or Vertex)
-#: and the model provider credentials the runtimes read.
+#: The gateway takes these over in every gateway run, so they are dropped
+#: from every other source: the key, the routed providers' base URLs and
+#: credentials, and the header variables a runner adds the key to (an
+#: explicit X-Zentinelle-Key entry there would win over it).
 RESERVED_ENV_NAMES = frozenset(
     {
         GATEWAY_KEY_ENV,
         "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_CUSTOM_HEADERS",
         "OPENAI_BASE_URL",
-        "OPENAI_API_BASE",
+        "ANTHROPIC_CUSTOM_HEADERS",
         "OPENAI_CUSTOM_HEADERS",
-        "DEEPSEEK_BASE_URL",
-        "MISTRAL_BASE_URL",
-        "LLM_BASE_URL",
-        "CLAUDE_CODE_USE_BEDROCK",
-        "CLAUDE_CODE_USE_VERTEX",
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN",
         "OPENAI_API_KEY",
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "MISTRAL_API_KEY",
-        "DEEPSEEK_API_KEY",
-        "LLM_API_KEY",
     }
 )
 
+_PROVIDERS = r"(?:ANTHROPIC|OPENAI|AZURE_OPENAI|OPENROUTER|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE|LLM)"
+
+#: Names that carry a model provider's credential or endpoint, or switch a
+#: runtime to a provider, other than the wiring the dispatcher writes. One of
+#: them anywhere in a gateway pod's env refuses the run: the agent network
+#: fence allows the public internet, so it would reach a provider past the
+#: gateway. Matched against the whole name.
+REFUSED_ENV_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(pattern)
+    for pattern in (
+        # Keys of the providers the gateway does not route, and litellm's generic one.
+        r"(?:OPENROUTER|AZURE_OPENAI|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE|LLM)_API_KEY",
+        # aider's per-provider keys and endpoints.
+        r"AIDER_\w+_API_(?:KEY|BASE)",
+        # Bedrock and Vertex credentials. A gateway spec cannot also be a
+        # managed-model spec, which is what would bring AWS credentials legitimately.
+        r"AWS_BEARER_TOKEN_BEDROCK|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY",
+        r"GOOGLE_APPLICATION_CREDENTIALS",
+        # Provider endpoints. goose reads OPENAI_HOST ahead of OPENAI_BASE_URL.
+        _PROVIDERS + r"_(?:BASE_URL|HOST|API_BASE|BASE_PATH|ENDPOINT)",
+        # Switches that send a runtime to another provider.
+        r"GOOSE_PROVIDER|CLAUDE_CODE_USE_BEDROCK|CLAUDE_CODE_USE_VERTEX",
+    )
+)
 
 MODEL_GATEWAY_MANAGED_CONFLICT = (
     "this environment spec sends model traffic through the Zentinelle gateway, which does not proxy "
@@ -126,13 +153,25 @@ MODEL_GATEWAY_MANAGED_CONFLICT = (
 
 
 class ModelGatewayError(Exception):
-    """A gateway-mode run cannot start. The message is the sentence the operator sees."""
+    """A gateway-mode run cannot start. The message is the sentence the operator sees.
+
+    ``maybe_minted`` marks a mint whose outcome is unknown (no answer, a
+    server error, an unusable answer): a key may exist and is revoked.
+    """
+
+    def __init__(self, message: str, *, maybe_minted: bool = False) -> None:
+        super().__init__(message)
+        self.maybe_minted = maybe_minted
 
 
-def _refusal(spec, reason: str) -> ModelGatewayError:
+def _refusal(spec_slug: str, reason: str) -> ModelGatewayError:
     return ModelGatewayError(
-        f"environment spec {spec.slug} sends its model traffic through the Zentinelle gateway, but {reason}"
+        f"environment spec {spec_slug} sends its model traffic through the Zentinelle gateway, but {reason}"
     )
+
+
+def refused_env_name(name: str) -> bool:
+    return any(pattern.fullmatch(name) for pattern in REFUSED_ENV_PATTERNS)
 
 
 def gateway_base_url(provider: str) -> str:
@@ -145,15 +184,15 @@ def runtime_providers(spec) -> tuple[str, ...]:
     """The providers the spec's runtime calls, or a refusal when it cannot use the gateway."""
     runtime = (getattr(spec, "runtime", "") or "").strip()
     if runtime in UNSUPPORTED_RUNTIMES:
-        raise _refusal(spec, UNSUPPORTED_RUNTIMES[runtime])
+        raise _refusal(spec.slug, UNSUPPORTED_RUNTIMES[runtime])
     if runtime:
         providers = RUNTIME_PROVIDERS.get(runtime)
         if providers is None:
-            raise _refusal(spec, f"runtime {runtime!r} is not one the gateway knows how to wire")
+            raise _refusal(spec.slug, f"runtime {runtime!r} is not one the gateway knows how to wire")
         return providers
     providers = AGENT_TYPE_PROVIDERS.get(str(getattr(spec, "agent_type", "") or ""))
     if providers is None:
-        raise _refusal(spec, f"agent type {spec.agent_type!r} names no provider the gateway serves")
+        raise _refusal(spec.slug, f"agent type {spec.agent_type!r} names no provider the gateway serves")
     return providers
 
 
@@ -211,16 +250,19 @@ def with_gateway_key(
 
 @dataclass(frozen=True)
 class ModelGateway:
-    """What a gateway-mode run needs: the organization's connection, and which providers to route."""
+    """What a gateway-mode run needs: the organization's connection, and how to wire the runtime."""
 
     connection: Any
     providers: tuple[str, ...]
+    spec_slug: str
+    runtime_env: tuple[tuple[str, str], ...] = ()
 
     def env(self, secret_name: str) -> list[dict]:
         env: list[dict] = [
             {"name": _PROVIDER_BASE_URL_ENV[provider], "value": gateway_base_url(provider)}
             for provider in self.providers
         ]
+        env.extend({"name": name, "value": value} for name, value in self.runtime_env)
         env.append(
             {
                 "name": GATEWAY_KEY_ENV,
@@ -229,10 +271,30 @@ class ModelGateway:
         )
         return env
 
+    @property
+    def owned_env_names(self) -> frozenset[str]:
+        """Every name the dispatcher's wiring takes over in this run."""
+        return RESERVED_ENV_NAMES | {name for name, _value in self.runtime_env}
+
     def wire_container(self, container: dict, *, secret_name: str) -> None:
-        """Drop every reserved name from the container env, then write the gateway wiring last."""
-        kept = [entry for entry in container.get("env") or [] if entry.get("name") not in RESERVED_ENV_NAMES]
-        container["env"] = kept + self.env(secret_name)
+        """Refuse another provider's credential or endpoint, then write the wiring over every other source.
+
+        Raises :class:`ModelGatewayError` naming the refused variables (never their values).
+        """
+        env = container.get("env") or []
+        owned = self.owned_env_names
+        refused = sorted(
+            {name for entry in env if (name := entry.get("name")) not in owned and refused_env_name(name)}
+        )
+        if refused:
+            raise _refusal(
+                self.spec_slug,
+                "its pod would also get another model provider's credential or endpoint, which reaches "
+                f"the provider past the gateway: {', '.join(refused)}. Remove them from the spec, its "
+                "secret bundles, its app's managed services and the agent's [environment], or turn off "
+                "model_gateway",
+            )
+        container["env"] = [entry for entry in env if entry.get("name") not in owned] + self.env(secret_name)
 
     def mint(self, *, agent_id: str, ttl_seconds: int, name: str, deployment_id: str):
         from astrolift_operations.zentinelle_connect import ZentinelleConnectError, mint_agent_key
@@ -246,9 +308,20 @@ class ModelGateway:
                 deployment_id=deployment_id,
             )
         except ZentinelleConnectError as exc:
+            # No answer, a server error, or an answer without a usable key:
+            # Zentinelle may have minted one all the same.
+            unknown = exc.status is None or exc.status >= 500 or 200 <= exc.status < 300
             raise ModelGatewayError(
-                f"Zentinelle did not mint the run's gateway key, so it was not started: {exc.message}"
+                f"Zentinelle did not mint the run's gateway key, so it was not started: {exc.message}",
+                maybe_minted=unknown,
             ) from None
+
+
+def key_covers(key, seconds: int) -> bool:
+    """Whether a minted key still works ``seconds`` from now (Zentinelle may cap its lifetime)."""
+    from django.utils import timezone
+
+    return key.expires_at is None or key.expires_at >= timezone.now() + timedelta(seconds=seconds)
 
 
 def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
@@ -258,18 +331,18 @@ def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
 
     if getattr(spec, "managed_model", False):
         raise _refusal(
-            spec,
+            spec.slug,
             "it also turns on managed_model, and the gateway does not proxy Bedrock or Vertex; turn one of them off",
         )
     providers = runtime_providers(spec)
     if not gateway_feature_enabled():
-        raise _refusal(spec, "the gateway is off for this install (ZENTINELLE_GATEWAY_ENABLED)")
+        raise _refusal(spec.slug, "the gateway is off for this install (ZENTINELLE_GATEWAY_ENABLED)")
     connection = ZentinelleConnection.objects.filter(organization_id=organization.pk).first()
     if connection is None:
-        raise _refusal(spec, f"organization {organization.slug} is not connected to Zentinelle")
+        raise _refusal(spec.slug, f"organization {organization.slug} is not connected to Zentinelle")
     if connection.status != ZentinelleConnection.Status.CONNECTED:
         raise _refusal(
-            spec,
+            spec.slug,
             f"Zentinelle no longer accepts organization {organization.slug}'s install credential; "
             "disconnect and connect again",
         )
@@ -278,40 +351,61 @@ def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
     slug = getattr(cluster, "slug", "?")
     if gateway is None:
         raise _refusal(
-            spec, f"cluster {slug} runs no Zentinelle gateway; register the cluster with Zentinelle"
+            spec.slug, f"cluster {slug} runs no Zentinelle gateway; register the cluster with Zentinelle"
         )
     if gateway.connection_id != connection.pk:
         # One gateway per cluster, scoped to the tenants of the connection
         # that registered it: another organization's tenants.
         raise _refusal(
-            spec,
+            spec.slug,
             f"the gateway on cluster {slug} was registered through another organization's Zentinelle connection",
         )
     if not gateway.gateway_enabled:
-        raise _refusal(spec, f"the gateway on cluster {slug} is turned off")
+        raise _refusal(spec.slug, f"the gateway on cluster {slug} is turned off")
     if not gateway.gateway_deployed:
-        raise _refusal(spec, f"the gateway on cluster {slug} is not deployed")
-    return ModelGateway(connection=connection, providers=providers)
+        raise _refusal(spec.slug, f"the gateway on cluster {slug} is not deployed")
+    runtime = (getattr(spec, "runtime", "") or "").strip()
+    return ModelGateway(
+        connection=connection,
+        providers=providers,
+        spec_slug=spec.slug,
+        runtime_env=RUNTIME_WIRING.get(runtime, ()),
+    )
 
 
-def _live_connection(organization_id):
+def _minting_connection(connection_id):
+    """The connection that minted a run's key, even if it has since been disconnected."""
     from astrolift_operations.models import ZentinelleConnection
 
-    return ZentinelleConnection.objects.filter(organization_id=organization_id).first()
+    if connection_id is None:
+        return None
+    return ZentinelleConnection.all_objects.filter(pk=connection_id).first()
 
 
-def renew_run_key(*, organization_id, agent_id: str, ttl_seconds: int) -> datetime | None:
-    """Let a run's live key work for ``ttl_seconds`` from now. Returns its new expiry.
+def _live(connection) -> bool:
+    return (
+        connection is not None
+        and connection.deleted_at is None
+        and connection.status == connection.Status.CONNECTED
+    )
 
-    Raises :class:`ModelGatewayError`: the caller decides whether a run can
+
+def renew_run_key(
+    *, connection_id, agent_id: str, ttl_seconds: int
+) -> tuple[datetime | None, datetime | None]:
+    """Let a run's live key work for ``ttl_seconds`` more, as the install that minted it.
+
+    Returns its new expiry and its lifetime end. Raises
+    :class:`ModelGatewayError`: the caller decides whether a run can
     continue without the renewal.
     """
     from astrolift_operations.zentinelle_connect import ZentinelleConnectError, renew_agent_key
 
-    connection = _live_connection(organization_id)
-    if connection is None:
+    connection = _minting_connection(connection_id)
+    if not _live(connection):
         raise ModelGatewayError(
-            f"cannot renew gateway key {agent_id}: the organization is not connected to Zentinelle"
+            f"cannot renew gateway key {agent_id}: the Zentinelle connection that minted it is no longer "
+            "connected, and only that install may renew it"
         )
     try:
         return renew_agent_key(connection=connection, agent_id=agent_id, ttl_seconds=_clamp_ttl(ttl_seconds))
@@ -319,26 +413,35 @@ def renew_run_key(*, organization_id, agent_id: str, ttl_seconds: int) -> dateti
         raise ModelGatewayError(f"Zentinelle did not renew gateway key {agent_id}: {exc.message}") from None
 
 
-def revoke_run_key(*, organization_id, agent_id: str) -> None:
-    """Revoke a run's key, best effort, retrying transient failures. Never raises.
+def revoke_run_key(*, connection_id, agent_id: str, expect_missing: bool = False) -> bool:
+    """Revoke a run's key as the install that minted it, best effort. Never raises.
 
-    A key that cannot be revoked stops at its expiry.
+    Returns whether Zentinelle confirmed the key dead. Anything else (the
+    minting connection disconnected, Zentinelle not knowing the agent, the
+    install refused) is logged as a warning and left to the key's expiry.
+    ``expect_missing`` is for a mint that may not have happened, where an
+    unknown agent is the expected answer.
     """
-    from astrolift_operations.zentinelle_connect import ZentinelleConnectError, revoke_agent_key
+    from astrolift_operations.zentinelle_connect import Revocation, ZentinelleConnectError, revoke_agent_key
     from core.mutations import ErrorCode
 
     try:
-        connection = _live_connection(organization_id)
+        connection = _minting_connection(connection_id)
     except Exception:  # noqa: BLE001 - stop paths must not fail on revocation
         log.warning("model gateway: could not read the connection to revoke %s", agent_id, exc_info=True)
-        return
-    if connection is None or connection.status != connection.Status.CONNECTED:
-        # A disconnected or revoked install took its agents with it.
-        return
+        return False
+    if not _live(connection):
+        log.warning(
+            "model gateway: %s not revoked here: the Zentinelle connection that minted it is no longer "
+            "connected (a disconnect Zentinelle was told about terminated its agents; after a forced one "
+            "the key stops at its expiry)",
+            agent_id,
+        )
+        return False
     reason = ""
     for attempt in range(REVOKE_ATTEMPTS):
         try:
-            revoke_agent_key(connection=connection, agent_id=agent_id)
+            outcome = revoke_agent_key(connection=connection, agent_id=agent_id)
         except ZentinelleConnectError as exc:
             reason = exc.message
             if exc.code != ErrorCode.INTERNAL:
@@ -346,8 +449,17 @@ def revoke_run_key(*, organization_id, agent_id: str) -> None:
         except Exception as exc:  # noqa: BLE001 - stop paths must not fail on revocation
             reason = f"{type(exc).__name__}: {exc}"
         else:
-            log.info("model gateway: revoked %s", agent_id)
-            return
+            if outcome == Revocation.REVOKED:
+                log.info("model gateway: revoked %s", agent_id)
+                return True
+            if outcome == Revocation.UNKNOWN_AGENT and expect_missing:
+                return True
+            reason = {
+                Revocation.UNKNOWN_AGENT: "Zentinelle knows no such agent for the install that minted it",
+                Revocation.INSTALL_REFUSED: "Zentinelle no longer accepts the install that minted it",
+            }[outcome]
+            break
         if attempt < len(_RETRY_DELAYS_SECONDS):
             time.sleep(_RETRY_DELAYS_SECONDS[attempt])
-    log.warning("model gateway: could not revoke %s (%s); the key stops at its expiry", agent_id, reason)
+    log.warning("model gateway: %s not revoked (%s); the key stops at its expiry", agent_id, reason)
+    return False

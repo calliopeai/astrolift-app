@@ -32,6 +32,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import dataclasses
+import enum
 import logging
 import re
 from collections.abc import Callable, Iterator
@@ -90,11 +91,15 @@ _CLUSTER_LOCK_CLASS = int.from_bytes(b"Zent", "big")
 class ZentinelleConnectError(Exception):
     """A refusal a mutation answers with ``code``. ``message`` never holds a credential."""
 
-    def __init__(self, code: ErrorCode, message: str, *, field: str | None = None) -> None:
+    def __init__(
+        self, code: ErrorCode, message: str, *, field: str | None = None, status: int | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.field = field
+        # Zentinelle's HTTP status; None when no answer came back at all.
+        self.status = status
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -219,12 +224,15 @@ def _refused(reply: _Reply, action: str) -> ZentinelleConnectError:
             ErrorCode.INTERNAL,
             f"Zentinelle answered {action} with a redirect ({reply.status} to {reply.location or 'nowhere'}); "
             "connect with the URL it redirects to",
+            status=reply.status,
         )
     if reply.status == 400:
         return ZentinelleConnectError(
-            ErrorCode.VALIDATION, f"Zentinelle refused {action} ({_describe(reply)})"
+            ErrorCode.VALIDATION, f"Zentinelle refused {action} ({_describe(reply)})", status=reply.status
         )
-    return ZentinelleConnectError(ErrorCode.INTERNAL, f"Zentinelle failed {action} ({_describe(reply)})")
+    return ZentinelleConnectError(
+        ErrorCode.INTERNAL, f"Zentinelle failed {action} ({_describe(reply)})", status=reply.status
+    )
 
 
 def _not_connected(connection: ZentinelleConnection) -> ZentinelleConnectError:
@@ -871,12 +879,38 @@ class AgentKey:
     agent_id: str
     api_key: str = dataclasses.field(repr=False)
     expires_at: datetime | None
+    lifetime_ends_at: datetime | None
+    """When Zentinelle stops honouring renewals of the key (its lifetime cap)."""
 
 
-def _agent_expiry(reply: _Reply) -> datetime | None:
+def _agent_times(reply: _Reply) -> tuple[datetime | None, datetime | None]:
+    """``expires_at`` and ``lifetime_ends_at`` from an agent key answer."""
     agent = reply.body.get("agent")
-    raw = agent.get("expires_at") if isinstance(agent, dict) else None
-    return parse_datetime(raw) if isinstance(raw, str) else None
+    agent = agent if isinstance(agent, dict) else {}
+    times = []
+    for name in ("expires_at", "lifetime_ends_at"):
+        raw = agent.get(name)
+        times.append(parse_datetime(raw) if isinstance(raw, str) else None)
+    return times[0], times[1]
+
+
+def _agent_key_refusal(reply: _Reply, agent_id: str, action: str) -> ZentinelleConnectError:
+    """What Zentinelle's per-run key endpoints refuse with, in words an operator acts on."""
+    error = reply.body.get("error")
+    if reply.status == 409 and error == "agent_suspended":
+        return ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            f"agent {agent_id} was stopped in Zentinelle by someone other than this install (an "
+            "administrator, the kill switch, the operator API or the agent itself), and it stays stopped",
+            status=reply.status,
+        )
+    if reply.status == 409 and error == "agent_key_expired":
+        return ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            f"the key of agent {agent_id} expired; only a new mint replaces it",
+            status=reply.status,
+        )
+    return _refused(reply, action)
 
 
 def mint_agent_key(
@@ -890,7 +924,9 @@ def mint_agent_key(
     """Mint the key of ``agent_id`` for one run, as this organization's install.
 
     Minting again for the same agent replaces its key, so a retried spawn or a
-    restarted box gets a fresh one and the old one stops working.
+    restarted box gets a fresh one and the old one stops working. The key's
+    ``expires_at`` is Zentinelle's: it may be earlier than ``ttl_seconds``
+    asked for, when its lifetime cap comes first.
     """
     _require_connected(connection)
     payload = {
@@ -905,33 +941,49 @@ def mint_agent_key(
             ErrorCode.PRECONDITION,
             "this Zentinelle cannot mint per-run agent keys (no /astrolift/agents endpoint, "
             "calliopeai/zentinelle#400); upgrade it",
+            status=reply.status,
         )
     if not reply.ok:
-        raise _refused(reply, "the agent key request")
+        raise _agent_key_refusal(reply, agent_id, "the agent key request")
     api_key = reply.body.get("api_key")
     if not isinstance(api_key, str) or not api_key.startswith(AGENT_KEY_PREFIX):
-        raise ZentinelleConnectError(ErrorCode.INTERNAL, "Zentinelle's answer carried no agent key")
-    return AgentKey(agent_id=agent_id, api_key=api_key, expires_at=_agent_expiry(reply))
+        raise ZentinelleConnectError(
+            ErrorCode.INTERNAL, "Zentinelle's answer carried no agent key", status=reply.status
+        )
+    expires_at, lifetime_ends_at = _agent_times(reply)
+    return AgentKey(
+        agent_id=agent_id, api_key=api_key, expires_at=expires_at, lifetime_ends_at=lifetime_ends_at
+    )
 
 
-def renew_agent_key(*, connection: ZentinelleConnection, agent_id: str, ttl_seconds: int) -> datetime | None:
-    """Let the live key of ``agent_id`` work for ``ttl_seconds`` from now. Returns its new expiry."""
+def renew_agent_key(
+    *, connection: ZentinelleConnection, agent_id: str, ttl_seconds: int
+) -> tuple[datetime | None, datetime | None]:
+    """Let the live key of ``agent_id`` work for ``ttl_seconds`` more, within its lifetime.
+
+    Returns its new ``expires_at`` and its ``lifetime_ends_at``.
+    """
     _require_connected(connection)
     reply = _install_call(connection, "POST", f"/agents/{agent_id}/renew", {"ttl_seconds": ttl_seconds})
     if not reply.ok:
-        raise _refused(reply, "the agent key renewal")
-    return _agent_expiry(reply)
+        raise _agent_key_refusal(reply, agent_id, "the agent key renewal")
+    return _agent_times(reply)
 
 
-def revoke_agent_key(*, connection: ZentinelleConnection, agent_id: str) -> None:
-    """Terminate ``agent_id`` in Zentinelle.
+class Revocation(enum.StrEnum):
+    """What Zentinelle answered a revocation with."""
 
-    Done as well when Zentinelle no longer knows the agent (404), or no longer
-    accepts the install (401) or the connection is no longer live: an install
-    that was disconnected took its agents with it.
-    """
-    if connection.deleted_at is not None or connection.status != ZentinelleConnection.Status.CONNECTED:
-        return
+    REVOKED = "revoked"
+    """Terminated now, or it already was."""
+    UNKNOWN_AGENT = "unknown_agent"
+    """This install minted no such agent, as far as Zentinelle knows (404)."""
+    INSTALL_REFUSED = "install_refused"
+    """Zentinelle no longer accepts this install (401)."""
+
+
+def revoke_agent_key(*, connection: ZentinelleConnection, agent_id: str) -> Revocation:
+    """Terminate ``agent_id`` in Zentinelle, as the install that minted it."""
+    _require_connected(connection)
     reply = _install_call(
         connection,
         "DELETE",
@@ -939,8 +991,12 @@ def revoke_agent_key(*, connection: ZentinelleConnection, agent_id: str) -> None
         revoked_ok=True,
         timeout=AGENT_KEY_REVOKE_TIMEOUT_SECONDS,
     )
-    if reply.ok or reply.status in (401, 404):
-        return
+    if reply.ok:
+        return Revocation.REVOKED
+    if reply.status == 404:
+        return Revocation.UNKNOWN_AGENT
+    if reply.status == 401:
+        return Revocation.INSTALL_REFUSED
     raise _refused(reply, "the agent key revocation")
 
 

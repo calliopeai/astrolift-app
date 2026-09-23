@@ -86,7 +86,7 @@ def reserve_input_wait(task, prepared):
         # The Job may now outlive its gateway key (#1851). A failed renewal
         # refuses the question like a failed reservation, and the runner retries.
         renew_run_key(
-            organization_id=task.organization_id,
+            connection_id=task.model_gateway_connection_id,
             agent_id=task.model_gateway_agent_id,
             ttl_seconds=task_key_ttl(task) + INPUT_WAIT_BUDGET_SECONDS,
         )

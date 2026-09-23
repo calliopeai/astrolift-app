@@ -181,8 +181,9 @@ def render_agent_box_job(
     ranks with the identity env, so a spec cannot redirect the setup either.
     Without it the manifest is the bare box it always was.
 
-    ``model_gateway`` wires the box to the Zentinelle gateway (#1851): no
-    reserved name survives from any source, and the gateway env goes last.
+    ``model_gateway`` wires the box to the Zentinelle gateway (#1851): the
+    wiring wins over every source, and another provider's credential or
+    endpoint from any source raises ``ModelGatewayError``.
     """
     from astrolift_dispatch.agent_secrets import agent_container_env, secret_env_entries
     from astrolift_dispatch.pod_hardening import harden_agent_pod
@@ -323,15 +324,22 @@ def start_agent_box(box) -> None:
         # revoked when it stopped, and this one holds none.
         box.model_gateway_agent_id = ""
         box.model_gateway_expires_at = None
+        box.model_gateway_lifetime_ends_at = None
+        box.model_gateway_connection = None
         box.save(
-            update_fields=["model_gateway_agent_id", "model_gateway_expires_at", "updated_at", "version"]
+            update_fields=[
+                "model_gateway_agent_id",
+                "model_gateway_expires_at",
+                "model_gateway_lifetime_ends_at",
+                "model_gateway_connection",
+                "updated_at",
+                "version",
+            ]
         )
 
     # The env-spec secret packet. Preflighted against the live store so a box
     # whose ANTHROPIC_API_KEY is missing fails to start with that sentence,
     # instead of coming up warm and failing the first time someone attaches.
-    from astrolift_dispatch.model_gateway import RESERVED_ENV_NAMES
-
     try:
         secret_manifest = resolve_task_secret_manifest(
             cluster=cluster,
@@ -339,7 +347,7 @@ def start_agent_box(box) -> None:
             secret_name=box_secret_name(job_name),
             namespace=namespace,
             task_guid=str(box.guid),
-            exclude=RESERVED_ENV_NAMES if gateway is not None else frozenset(),
+            exclude=gateway.owned_env_names if gateway is not None else frozenset(),
         )
     except AgentSecretResolutionError as exc:
         _fail(box, str(exc))
@@ -364,17 +372,23 @@ def start_agent_box(box) -> None:
             raise
 
     secret_env_names = sorted((secret_manifest or {}).get("stringData") or {})
-    job = render_agent_box_job(
-        box=box,
-        image=image,
-        namespace=namespace,
-        job_name=job_name,
-        secret_env_names=secret_env_names,
-        model_service_account=model_wiring.service_account if model_wiring else "",
-        model_env=model_wiring.env if model_wiring else None,
-        payload_env=payload_env,
-        model_gateway=gateway,
-    )
+    from astrolift_dispatch.model_gateway import ModelGatewayError
+
+    try:
+        job = render_agent_box_job(
+            box=box,
+            image=image,
+            namespace=namespace,
+            job_name=job_name,
+            secret_env_names=secret_env_names,
+            model_service_account=model_wiring.service_account if model_wiring else "",
+            model_env=model_wiring.env if model_wiring else None,
+            payload_env=payload_env,
+            model_gateway=gateway,
+        )
+    except ModelGatewayError as exc:
+        _fail(box, str(exc))
+        raise AgentBoxError(str(exc)) from exc
 
     gateway_key = None
     if gateway is not None:
@@ -456,8 +470,9 @@ def start_agent_box(box) -> None:
 
 
 def _mint_box_gateway_key(box, gateway):
-    """Mint the box's gateway key (#1851), recording its agent before the call
-    so that stopping the box revokes it whatever happens next."""
+    """Mint the box's gateway key (#1851), recording its agent and the
+    connection that mints it before the call, so that stopping the box
+    revokes it through that install whatever happens next."""
     from astrolift_dispatch.model_gateway import (
         ModelGatewayError,
         box_agent_id,
@@ -467,7 +482,8 @@ def _mint_box_gateway_key(box, gateway):
 
     agent_id = box_agent_id(box)
     box.model_gateway_agent_id = agent_id
-    box.save(update_fields=["model_gateway_agent_id", "updated_at", "version"])
+    box.model_gateway_connection = gateway.connection
+    box.save(update_fields=["model_gateway_agent_id", "model_gateway_connection", "updated_at", "version"])
     ttl = box_key_ttl(box)
     agent = box.agent_definition
     deployment = getattr(agent, "slug", "") or getattr(box.environment_spec, "slug", "")
@@ -476,48 +492,77 @@ def _mint_box_gateway_key(box, gateway):
             agent_id=agent_id, ttl_seconds=ttl, name=f"{deployment} box {box.slug}", deployment_id=deployment
         )
     except ModelGatewayError as exc:
-        # A mint whose answer was lost may still have created the key.
-        revoke_run_key(organization_id=box.organization_id, agent_id=agent_id)
+        if exc.maybe_minted:
+            revoke_run_key(connection_id=gateway.connection.pk, agent_id=agent_id, expect_missing=True)
         _fail(box, str(exc))
         raise AgentBoxError(str(exc)) from exc
     box.model_gateway_expires_at = key.expires_at or timezone.now() + timedelta(seconds=ttl)
-    box.save(update_fields=["model_gateway_expires_at", "updated_at", "version"])
+    box.model_gateway_lifetime_ends_at = key.lifetime_ends_at
+    box.save(
+        update_fields=["model_gateway_expires_at", "model_gateway_lifetime_ends_at", "updated_at", "version"]
+    )
     return key
 
 
 def _revoke_box_gateway_key(box) -> None:
-    """Best effort; the key's expiry is the backstop. Never raises."""
+    """Best effort, through the install that minted the key; its expiry is the backstop. Never raises."""
     if not box.model_gateway_agent_id:
         return
     from astrolift_dispatch.model_gateway import revoke_run_key
 
-    revoke_run_key(organization_id=box.organization_id, agent_id=box.model_gateway_agent_id)
+    revoke_run_key(connection_id=box.model_gateway_connection_id, agent_id=box.model_gateway_agent_id)
 
 
 def _renew_box_gateway_key(box) -> None:
-    """Keep a live box's gateway key ahead of its expiry (#1851).
+    """Keep a live box's gateway key ahead of its expiry (#1851). Never raises.
 
     Renewed once half of its window is left, so a failure has the other half
     to succeed on a later sweep. A box the reaper no longer sees live is not
-    renewed, and its key lapses within one window.
+    renewed, and its key lapses within one window. Nothing is attempted for a
+    key that already expired or reached its lifetime end: only a restart
+    mints a new one. Any failure is logged and stays with this box, so the
+    sweep carries on for the others.
     """
+    try:
+        _renew_box_gateway_key_if_due(box)
+    except Exception:  # noqa: BLE001 - one box's renewal must not end the sweep
+        log.warning("agent_box: renewing the gateway key of box %s failed", box.slug, exc_info=True)
+
+
+def _renew_box_gateway_key_if_due(box) -> None:
     if not box.model_gateway_agent_id or box.model_gateway_expires_at is None:
         return
     from astrolift_dispatch.model_gateway import ModelGatewayError, box_key_ttl, renew_run_key
 
     ttl = box_key_ttl(box)
     now = timezone.now()
-    if box.model_gateway_expires_at - now > timedelta(seconds=ttl / 2):
+    expires_at = box.model_gateway_expires_at
+    lifetime_ends_at = box.model_gateway_lifetime_ends_at
+    if expires_at <= now or (lifetime_ends_at is not None and expires_at >= lifetime_ends_at):
+        return
+    if expires_at - now > timedelta(seconds=ttl / 2):
         return
     try:
-        expires_at = renew_run_key(
-            organization_id=box.organization_id, agent_id=box.model_gateway_agent_id, ttl_seconds=ttl
+        renewed_until, lifetime_ends_at = renew_run_key(
+            connection_id=box.model_gateway_connection_id,
+            agent_id=box.model_gateway_agent_id,
+            ttl_seconds=ttl,
         )
     except ModelGatewayError as exc:
         log.warning("agent_box: could not renew the gateway key of box %s: %s", box.slug, exc)
         return
-    box.model_gateway_expires_at = expires_at or now + timedelta(seconds=ttl)
-    box.save(update_fields=["model_gateway_expires_at", "updated_at", "version"])
+    box.model_gateway_expires_at = renewed_until or now + timedelta(seconds=ttl)
+    box.model_gateway_lifetime_ends_at = lifetime_ends_at
+    box.save(
+        update_fields=["model_gateway_expires_at", "model_gateway_lifetime_ends_at", "updated_at", "version"]
+    )
+    if lifetime_ends_at is not None and box.model_gateway_expires_at >= lifetime_ends_at:
+        log.warning(
+            "agent_box: the gateway key of box %s reaches Zentinelle's key lifetime at %s and cannot be "
+            "renewed past it; restart the box before then for a new key",
+            box.slug,
+            lifetime_ends_at.isoformat(),
+        )
 
 
 def box_payload_env(box) -> list[dict]:
