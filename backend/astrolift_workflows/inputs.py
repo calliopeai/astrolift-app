@@ -358,6 +358,21 @@ class SyncDevEnvironmentFilesInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DeployPromotedAppInput:
+    """Input for ``DeployPromotedAppWorkflow`` (#1858).
+
+    Fired by the builder ``promote`` endpoint next to ``OnboardAppWorkflow``.
+    Renders the dev environment's runtime into the promoted app's namespace.
+    ``storage_class`` is the StorageClass promote found the cluster can
+    provision the data volume from; empty means an emptyDir, and is what the
+    promote response reported as ``data_persistent: false``.
+    """
+
+    dev_environment_id: int
+    storage_class: str = ""
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class ProvisionManagedDomainInput:
     """Input for ``ProvisionManagedDomainWorkflow`` (#781).
 

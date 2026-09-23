@@ -110,6 +110,7 @@ from astrolift_workflows.activities.deprovision_managed_domain import (
     deprovision_managed_domain_resources,
 )
 from astrolift_workflows.activities.dev_environment import (
+    deploy_promoted_app,
     mark_dev_environment_failed,
     provision_dev_environment,
     sync_dev_environment_files,
@@ -244,6 +245,7 @@ __all__ = [
     "delete_preview_namespace",
     "delete_secret_from_cluster",
     "delete_static_dns_records",
+    "deploy_promoted_app",
     "emit_preview_torn_down_event",
     "deprovision_app_certificate",
     "deprovision_app_dns_record",

@@ -8,7 +8,11 @@ the row so the operator-facing status surface can render it).
 a running env (calls ``sync_dev_environment_files``; same failure
 handling).
 
-Both are intentionally thin: a single activity + a catch-all that
+``DeployPromotedAppWorkflow`` (#1858): serves a promoted app from its own
+namespace (calls ``deploy_promoted_app``; same failure handling, recorded
+on the dev environment the app was promoted from).
+
+All are intentionally thin: a single activity + a catch-all that
 records the failure. The activity is where idempotency + provider
 driver dispatch live.
 """
@@ -21,12 +25,14 @@ from temporalio import workflow
 
 from astrolift_workflows.inputs import (
     CreateDevEnvironmentInput,
+    DeployPromotedAppInput,
     SyncDevEnvironmentFilesInput,
     WorkflowResult,
 )
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.dev_environment import (
+        deploy_promoted_app,
         mark_dev_environment_failed,
         provision_dev_environment,
         sync_dev_environment_files,
@@ -67,6 +73,26 @@ class SyncDevEnvironmentFilesWorkflow:
             )
             return WorkflowResult(ok=True, message="files synced")
         except Exception as exc:  # noqa: BLE001 — explicit catch-all
+            await workflow.execute_activity(
+                mark_dev_environment_failed,
+                args=[input.dev_environment_id, str(exc)],
+                start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            )
+            return WorkflowResult(ok=False, message=str(exc))
+
+
+@workflow.defn(name="DeployPromotedAppWorkflow")
+class DeployPromotedAppWorkflow:
+    @workflow.run
+    async def run(self, input: DeployPromotedAppInput) -> WorkflowResult:
+        try:
+            result = await workflow.execute_activity(
+                deploy_promoted_app,
+                args=[input.dev_environment_id, input.storage_class],
+                start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            )
+            return WorkflowResult(ok=True, message="promoted app deployed", data=result)
+        except Exception as exc:  # noqa: BLE001 (explicit catch-all)
             await workflow.execute_activity(
                 mark_dev_environment_failed,
                 args=[input.dev_environment_id, str(exc)],
