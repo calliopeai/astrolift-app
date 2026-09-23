@@ -12,7 +12,12 @@ All routes live under `/api/builder/v1/` and take and return JSON.
 Send an API token as `Authorization: Bearer alft_at_...`. The CLI device
 flow issues these, one organization per token. The token's organization
 scopes every request: a dev environment in another organization answers
-404. A browser session works for a user with exactly one organization.
+404.
+
+Nothing else is accepted, a browser session included: a request without
+an API token answers `401` with `"reason": "api_token_required"`. The
+routes are CSRF-exempt and previews serve user code on the builder's base
+domain, so a signed-in browser alone must not be enough to act.
 
 The edge must let a bearer request through to `/api/builder/v1/*` without
 an SSO challenge, the same bypass `/api/cli/v1/*` needs.
@@ -33,9 +38,11 @@ tokens carry `write:apps`. Tokens from IDE, mobile or browser enrollment
 are read-only and cannot use these routes.
 
 Create and sync are checked at the organization level. A role granted on a
-team only reaches them through a token issued for that team. Promote is
-checked on its target team, so a team-level grant promotes into that team
-and no other.
+team only reaches them through a token issued for that team, and they
+refuse a token whose team has since been deleted. Promote is checked on
+its target team, so a team-level grant promotes into that team and no
+other. Request headers such as `X-Astrolift-Team` change none of these
+checks.
 
 A refusal is `403` with a reason, in the same shape as the module check:
 

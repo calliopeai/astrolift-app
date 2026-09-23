@@ -7,7 +7,7 @@ the org's cluster and promote apps, whatever their role or the token's scopes.
 
 Requests go through the full middleware stack with real API tokens and real
 RoleBindings on roles taken from the system catalog; only Temporal is patched,
-as in ``test_builder_api.py``.
+as in ``test_builder_api.py``. A browser session is refused outright.
 """
 
 from __future__ import annotations
@@ -242,6 +242,40 @@ def test_create_binds_an_explicit_cluster_of_the_org_or_a_shared_one(world, admi
     assert workflow_starts == ["CreateDevEnvironmentWorkflow"]
 
 
+@pytest.mark.parametrize(
+    "shared_first", [True, False], ids=["shared registered first", "own registered first"]
+)
+def test_the_default_cluster_is_the_orgs_own_before_any_shared_one(workflow_starts, shared_first):
+    """A tenant can publish a cluster as shared (#1918). While the org has a
+    managed cluster of its own, the default never lands on a shared one,
+    whichever has the lower pk."""
+    org = _org("authz-default")
+    if shared_first:
+        shared = _cluster(None, "authz-default-shared")
+        own = _cluster(org, "authz-default-own")
+    else:
+        own = _cluster(org, "authz-default-own")
+        shared = _cluster(None, "authz-default-shared")
+    assert (shared.pk < own.pk) is shared_first
+    user = _member(org, "authz-default-admin", ("org_admin", "ORG", org.id))
+
+    response = _create(_bearer(user, org))
+
+    assert response.status_code == 201, response.content
+    assert DevEnvironment.objects.get(guid=response.json()["id"]).tenant_cluster_id == own.pk
+
+
+def test_the_default_cluster_falls_back_to_a_shared_one(workflow_starts):
+    org = _org("authz-fallback")
+    shared = _cluster(None, "authz-fallback-shared")
+    user = _member(org, "authz-fallback-admin", ("org_admin", "ORG", org.id))
+
+    response = _create(_bearer(user, org))
+
+    assert response.status_code == 201, response.content
+    assert DevEnvironment.objects.get(guid=response.json()["id"]).tenant_cluster_id == shared.pk
+
+
 def test_sync_and_promote_answer_404_for_another_orgs_dev_environment(world, admin, workflow_starts):
     """Pinned, not changed: both routes already looked the dev env up in the caller's org."""
     theirs = _dev_env(
@@ -395,7 +429,8 @@ def test_callers_without_app_create_are_refused_on_every_route(world, workflow_s
         assert response.status_code == 403, response.content
         assert response.json()["reason"] == "missing_permission"
         assert response.json()["permission"] == "app.create"
-    assert create.json()["detail"] == "app.create is required in this organization"
+    where = "on the api token's team" if team else "in this organization"
+    assert create.json()["detail"] == f"app.create is required {where}"
     assert promote.json()["detail"] == "app.create is required on team 'eng'"
     assert DevEnvironment.objects.count() == 1
     assert _untouched(dev)
@@ -485,6 +520,50 @@ def test_a_team_role_reaches_create_and_sync_through_a_token_for_its_team(world,
     assert _promote(dev, headers, team_slug="eng").status_code == 202
 
 
+def test_a_token_for_a_deleted_team_is_refused(world, workflow_starts):
+    """``team_admin`` on Eng with a token issued for Eng. Deleting Eng leaves
+    both the binding and the token behind; neither may still create or sync."""
+    user = _member(world.a, "authz-deleted-team", ("team_admin", "TEAM", world.eng.id))
+    headers = _bearer(user, world.a, team=world.eng)
+    dev = _dev_env(world.a, world.cluster_a, user)
+    world.eng.soft_delete()
+
+    for response in (_create(headers), _sync(dev, headers)):
+        assert response.status_code == 403, response.content
+        assert response.json() == {
+            "detail": "app.create is required on the api token's team",
+            "reason": "missing_permission",
+            "permission": "app.create",
+        }
+    assert DevEnvironment.objects.count() == 1
+    assert _untouched(dev)
+    assert workflow_starts == []
+
+
+def test_request_headers_do_not_widen_the_check(world, workflow_starts):
+    """A team admin of Eng on an org-wide token names Eng in the team header.
+    That lends nothing: create stays org-level and promote into Ops stays on
+    Ops. A header naming another org is refused before the view runs, even
+    for a promote this caller could otherwise make."""
+    user = _member(world.a, "authz-header-spoof", ("team_admin", "TEAM", world.eng.id))
+    team_header = {**_bearer(user, world.a), "HTTP_X_ASTROLIFT_TEAM": str(world.eng.pk)}
+    org_header = {**_bearer(user, world.a), "HTTP_X_ASTROLIFT_ORGANIZATION": str(world.b.guid)}
+
+    created = _create(team_header)
+    into_ops = _promote(_dev_env(world.a, world.cluster_a, user), team_header, team_slug="ops")
+    into_b = _promote(_dev_env(world.a, world.cluster_a, user), org_header, team_slug="eng")
+
+    assert created.status_code == 403, created.content
+    assert created.json()["detail"] == "app.create is required in this organization"
+    assert into_ops.status_code == 403, into_ops.content
+    assert into_ops.json()["detail"] == "app.create is required on team 'ops'"
+    assert into_b.status_code == 403, into_b.content
+    assert into_b.json()["detail"] == "Selected organization does not match the API token's organization."
+    assert DevEnvironment.objects.count() == 2
+    assert not RegisteredApp.objects.exists()
+    assert workflow_starts == []
+
+
 # ---- the permitted path ----------------------------------------------------
 
 
@@ -511,31 +590,31 @@ def test_an_org_admin_ships_end_to_end(world, admin, workflow_starts):
     ]
 
 
-def test_a_session_caller_is_held_to_its_role(world, workflow_starts):
-    """No token means no scope ceiling; the role still decides."""
-    auditor = _member(world.a, "authz-session-auditor", ("org_auditor", "ORG", world.a.id))
+# ---- authentication ------------------------------------------------------
+
+
+def test_a_session_is_refused_on_every_route(world, workflow_starts):
+    """Only an API token authenticates. The routes are CSRF-exempt, CORS
+    answers any origin with credentials, and previews serve user code on the
+    builder's base domain, so a signed-in browser alone, an org owner's
+    included, must not be enough to act."""
     owner = _member(world.a, "authz-session-owner", ("org_owner", "ORG", world.a.id))
+    dev = _dev_env(world.a, world.cluster_a, owner)
+    client = _session(owner)
 
-    denied = _create({}, _session(auditor))
-    allowed = _create({}, _session(owner))
-
-    assert denied.status_code == 403, denied.content
-    assert denied.json()["permission"] == "app.create"
-    assert allowed.status_code == 201, allowed.content
-
-
-def test_the_permission_check_runs_in_the_org_the_view_acts_on(world, workflow_starts):
-    """The tenant middleware takes a session's team header as given. This
-    caller audits org A and administers a team in org B; naming that team
-    must not lend org B's grant to a create in org A."""
-    user = _member(
-        world.a,
-        "authz-two-orgs",
-        ("org_auditor", "ORG", world.a.id),
-        ("team_admin", "TEAM", world.team_b.id),
+    responses = (
+        _create({}, client),
+        _send("put", FILES.format(dev.guid), {"files": {"main.py": "print('synced')"}}, {}, client),
+        _send("post", PROMOTE.format(dev.guid), {"app_name": "Shipped"}, {}, client),
     )
 
-    response = _create({"HTTP_X_ASTROLIFT_TEAM": str(world.team_b.pk)}, _session(user))
-
-    assert response.status_code == 403, response.content
-    assert not DevEnvironment.objects.exists()
+    for response in responses:
+        assert response.status_code == 401, response.content
+        assert response.json() == {
+            "detail": "an api token is required: send Authorization: Bearer alft_at_...",
+            "reason": "api_token_required",
+        }
+    assert DevEnvironment.objects.count() == 1
+    assert _untouched(dev)
+    assert not RegisteredApp.objects.exists()
+    assert workflow_starts == []

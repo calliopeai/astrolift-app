@@ -12,16 +12,15 @@ documented in ``docs/builder-api.md``.
 Auth flows through :class:`astrolift_identity.middleware.ApiTokenAuthMiddleware`,
 which is already in the middleware chain. An ``Authorization: Bearer
 alft_at_...`` header resolves to ``request.user`` + attaches the row
-on ``request._api_token``. Session-cookie auth (browser app) also works
-because the middleware leaves ``request.user`` untouched when there's
-no bearer.
+on ``request._api_token``. Nothing else is accepted, a browser session
+included: the routes are CSRF-exempt, CORS answers any origin with
+credentials by default, and previews and promoted apps serve user code
+from the builder's base domain, so a page on a same-site host could
+otherwise act as whoever is signed in. A browser never sends a bearer
+token by itself.
 
-Org resolution prefers the token's organization (so a token issued
-under org A can never touch org B's data even if the user happens to
-be a member of both); for session-cookie auth we fall back to the
-user's *single* active ORG-scope ``Member`` row. Multi-org session
-auth without a token is rejected because there's no safe default —
-the App Builder always presents a token in practice.
+The token's organization scopes every request, so a token issued under
+org A can never touch org B's data even if its user belongs to both.
 
 Belonging to the org is not enough to act in it (#1878). Past the
 module gate, a token must carry ``write:apps`` and the caller needs
@@ -69,57 +68,35 @@ _CSI_MIGRATED_PROVISIONERS = {
 }
 
 
-def _resolve_org(request: HttpRequest):
-    """Resolve the tenant Organization for the request.
-
-    Returns ``(org, None)`` on success, ``(None, JsonResponse)`` when
-    we can't pick a single org confidently. The error response is
-    pre-rendered so the caller can ``return err`` without re-creating
-    the JSON envelope.
-    """
-    from astrolift_identity.models import Member, Organization
-
-    api_token = getattr(request, "_api_token", None)
-    if api_token is not None:
-        org = Organization.objects.filter(
-            pk=api_token.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        if org is not None:
-            return org, None
-        return None, JsonResponse(
-            {"detail": "token organization no longer exists"},
-            status=403,
-        )
-
-    # Session-cookie path — pick the user's single active ORG-scope
-    # membership. Multi-org without a token is ambiguous, single-org
-    # is the happy path for browser-driven internal tooling.
-    org_ids = list(
-        Member.objects.filter(
-            user=request.user,
-            scope_kind=Member.ScopeKind.ORG,
-            deleted_at__isnull=True,
-            is_active=True,
-        ).values_list("scope_id", flat=True)
+def _token_required() -> JsonResponse:
+    return JsonResponse(
+        {
+            "detail": "an api token is required: send Authorization: Bearer alft_at_...",
+            "reason": "api_token_required",
+        },
+        status=401,
     )
-    if not org_ids:
-        return None, JsonResponse(
-            {"detail": "no organization found for this user"},
-            status=403,
-        )
-    if len(org_ids) > 1:
-        return None, JsonResponse(
-            {"detail": "user belongs to multiple organizations; use an api token"},
-            status=403,
-        )
-    org = Organization.objects.filter(pk=org_ids[0], deleted_at__isnull=True).first()
-    if org is None:
-        return None, JsonResponse(
-            {"detail": "membership organization no longer exists"},
-            status=403,
-        )
-    return org, None
+
+
+def _resolve_org(token):
+    """Resolve the token's Organization.
+
+    Returns ``(org, None)`` on success, ``(None, JsonResponse)`` when the
+    org is gone. The error response is pre-rendered so the caller can
+    ``return err`` without re-creating the JSON envelope.
+    """
+    from astrolift_identity.models import Organization
+
+    org = Organization.objects.filter(
+        pk=token.organization_id,
+        deleted_at__isnull=True,
+    ).first()
+    if org is not None:
+        return org, None
+    return None, JsonResponse(
+        {"detail": "token organization no longer exists"},
+        status=403,
+    )
 
 
 def _module_gate(org):
@@ -148,42 +125,40 @@ def _module_gate(org):
     )
 
 
-def _authorize(request: HttpRequest, org, permissions: tuple[Permission, ...], *, team=None):
-    """403 unless the caller holds every one of ``permissions`` in ``org``, else ``None`` (#1878).
+def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None):
+    """403 unless the token's user holds every one of ``permissions`` in ``org``, else ``None`` (#1878).
 
     A token's scopes cap its user's grants, so a token without
-    ``write:apps`` is refused whatever its user may do. The tenant context
-    is built from ``org`` rather than taken from the tenant middleware,
-    which resolves team and project headers on its own: a session request
-    can name another org's team there, and a targetless check would count
-    that team's bindings. ``team`` scopes the check to the team an app
-    lands in, so a team-level grant covers that team alone.
+    ``write:apps`` is refused whatever its user may do. The check reads the
+    token and the named target only, never the tenant middleware's
+    context, so request headers cannot widen it. ``team`` is the team an
+    app lands in. Without one, a token issued for a team is checked on that
+    team, which the resolver confirms is live and in ``org``: the bindings
+    of a team deleted after the token was issued stop counting.
     """
-    token = getattr(request, "_api_token", None)
-    if token is not None:
-        missing = enforce_scopes(token, (SCOPE_WRITE_APPS,))
-        if missing:
-            return JsonResponse(
-                {
-                    "detail": f"the api token lacks the {missing} scope",
-                    "reason": "missing_scope",
-                    "scope": missing,
-                },
-                status=403,
-            )
+    missing = enforce_scopes(token, (SCOPE_WRITE_APPS,))
+    if missing:
+        return JsonResponse(
+            {
+                "detail": f"the api token lacks the {missing} scope",
+                "reason": "missing_scope",
+                "scope": missing,
+            },
+            status=403,
+        )
 
-    scope = PermissionScope(kind=ScopeKind.TEAM, id=team.pk) if team is not None else None
-    tenant = TenantContext(
-        organization_id=org.pk,
-        team_id=token.team_id if token is not None else None,
-        actor_user_id=request.user.pk,
-    )
-    with tenant_context(tenant):
+    if team is not None:
+        scope, where = PermissionScope(kind=ScopeKind.TEAM, id=team.pk), f"on team {team.slug!r}"
+    elif token.team_id is not None:
+        scope, where = PermissionScope(kind=ScopeKind.TEAM, id=token.team_id), "on the api token's team"
+    else:
+        scope, where = None, "in this organization"
+
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=token.user_id)):
         for permission in permissions:
             try:
                 check_permission(permission, scope=scope)
             except PermissionDenied:
-                where = f"on team {team.slug!r}" if team is not None else "in this organization"
                 return JsonResponse(
                     {
                         "detail": f"{permission.value} is required {where}",
@@ -315,16 +290,17 @@ def _cluster_q_for_org(org):
 @require_http_methods(["POST"])
 def create_dev_environment(request: HttpRequest) -> JsonResponse:
     """Create + start a Calliope App Builder dev environment (#767)."""
-    if not request.user.is_authenticated:
-        return JsonResponse({"detail": "authentication required"}, status=401)
+    token = getattr(request, "_api_token", None)
+    if token is None:
+        return _token_required()
 
-    org, err = _resolve_org(request)
+    org, err = _resolve_org(token)
     if err:
         return err
     err = _module_gate(org)
     if err:
         return err
-    err = _authorize(request, org, (Permission.APP_CREATE,))
+    err = _authorize(token, org, (Permission.APP_CREATE,))
     if err:
         return err
 
@@ -360,10 +336,15 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
 
     # Resolve the target cluster. Explicit ``cluster_guid`` wins; the
     # default path picks the first MANAGED + active cluster bound to
-    # the org (or shared) so the API works "out of the box" without
-    # the App Builder having to enumerate clusters first. Knowing a
-    # guid grants nothing: an explicit guid resolves among the same
+    # the org, else a shared one, so the API works "out of the box"
+    # without the App Builder having to enumerate clusters first. Knowing
+    # a guid grants nothing: an explicit guid resolves among the same
     # org-or-shared clusters, and another org's answers 404 (#1872).
+    # The org's own clusters come first because a tenant can publish a
+    # cluster as shared (#1918), and a lower pk must not send this org's
+    # code to it while the org has a cluster of its own.
+    from django.db.models import F
+
     from astrolift_clusters.models import TenantCluster
 
     cluster_guid = body.get("cluster_guid")
@@ -387,6 +368,7 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
                 lifecycle=TenantCluster.Lifecycle.MANAGED.value,
             )
             .filter(_cluster_q_for_org(org))
+            .order_by(F("organization").asc(nulls_last=True), "pk")
             .first()
         )
         if cluster is None:
@@ -448,16 +430,17 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
     (Constance ``BUILDER_DATA_FILE_MAX_BYTES``); omitted keeps the stored
     one, ``null`` removes it. See ``docs/builder-api.md``.
     """
-    if not request.user.is_authenticated:
-        return JsonResponse({"detail": "authentication required"}, status=401)
+    token = getattr(request, "_api_token", None)
+    if token is None:
+        return _token_required()
 
-    org, err = _resolve_org(request)
+    org, err = _resolve_org(token)
     if err:
         return err
     err = _module_gate(org)
     if err:
         return err
-    err = _authorize(request, org, (Permission.APP_CREATE,))
+    err = _authorize(token, org, (Permission.APP_CREATE,))
     if err:
         return err
 
@@ -594,10 +577,11 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     it sits on a persistent volume (true) or an emptyDir that resets on
     restart (false); it is null without a data file.
     """
-    if not request.user.is_authenticated:
-        return JsonResponse({"detail": "authentication required"}, status=401)
+    token = getattr(request, "_api_token", None)
+    if token is None:
+        return _token_required()
 
-    org, err = _resolve_org(request)
+    org, err = _resolve_org(token)
     if err:
         return err
     err = _module_gate(org)
@@ -621,7 +605,7 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     teams = Team.objects.filter(organization=org, deleted_at__isnull=True)
     team = teams.filter(slug=team_slug).first() if team_slug else teams.order_by("created_at").first()
 
-    err = _authorize(request, org, (Permission.APP_CREATE, Permission.APP_DEPLOY), team=team)
+    err = _authorize(token, org, (Permission.APP_CREATE, Permission.APP_DEPLOY), team=team)
     if err:
         return err
 
