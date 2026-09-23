@@ -23,12 +23,13 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
-from django.test import Client, RequestFactory
+from django.test import Client, RequestFactory, override_settings
 from django.utils import timezone
 
 from astrolift_identity import device_flow
@@ -301,6 +302,13 @@ def test_view_start_returns_session_envelope():
     assert body["poll_interval_seconds"] == device_flow.POLL_INTERVAL_SECONDS
 
 
+@override_settings(APP_BASE_URL="", FRONTEND_URL="http://frontend.test:3000")
+def test_view_start_opens_device_approval_on_frontend_origin():
+    client = Client()
+    body = _post_json(client, "/api/cli/v1/auth/start", {}).json()
+    assert body["login_url"] == (f"http://frontend.test:3000/app/cli/auth/device/{body['session_id']}/")
+
+
 def test_view_start_persists_client_metadata():
     client = Client()
     r = _post_json(client, "/api/cli/v1/auth/start", {"client_label": "lab cli", "client_kind": "mobile"})
@@ -380,8 +388,10 @@ def test_approval_page_requires_auth():
     client = Client()
     row, sid = device_flow.create_session()
     r = client.get(f"/app/cli/auth/device/{sid}/")
-    # @login_required redirects to LOGIN_URL
-    assert r.status_code in (302, 301)
+    assert r.status_code == 302
+    login = urlsplit(r["Location"])
+    assert login.path == "/auth/login"
+    assert parse_qs(login.query)["next"] == [f"/app/cli/auth/device/{sid}/"]
 
 
 def test_approval_page_renders_for_authed_user():

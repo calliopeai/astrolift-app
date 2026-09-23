@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authCallbackUrl, deviceApprovalReturnPath } from "@/lib/auth/device-return";
 
 // In dev (NEXT_PUBLIC_DEV_LOGIN=1) we honour the legacy dev-login
 // bypass and skip everything else. In any other build we read the
@@ -37,10 +38,13 @@ const DISPLAY_KIND: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [idp, setIdp] = React.useState<ActiveIdp | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const apiRoot = process.env.NEXT_PUBLIC_API_ROOT ?? "";
+  const returnPath =
+    typeof window === "undefined"
+      ? "/dashboard"
+      : deviceApprovalReturnPath(new URLSearchParams(window.location.search).get("next"));
 
   React.useEffect(() => {
     if (useDevLogin) {
@@ -52,27 +56,21 @@ export default function LoginPage() {
       } catch {
         // localStorage may be unavailable in some browser modes.
       }
-      window.location.href = `${apiRoot}/app/auth1/dev-login?next=/dashboard`;
+      window.location.href = `${apiRoot}/app/auth1/dev-login?next=${encodeURIComponent(returnPath)}`;
       return;
     }
     fetch(`${apiRoot}/app/auth1/active-idp.json`, { credentials: "include" })
       .then((r) => r.json())
       .then(setIdp)
       .catch((err) => setLoadError(String(err)));
-  }, [apiRoot]);
+  }, [apiRoot, returnPath]);
 
   if (useDevLogin) {
     return <Splash message="Redirecting to dev login…" />;
   }
 
   if (loadError) {
-    return (
-      <Splash
-        message="Couldn't reach the API"
-        detail={loadError}
-        tone="destructive"
-      />
-    );
+    return <Splash message="Couldn't reach the API" detail={loadError} tone="destructive" />;
   }
 
   if (idp === null) {
@@ -83,17 +81,14 @@ export default function LoginPage() {
     return (
       <Splash
         message="No identity provider configured"
-        detail={
-          idp.hint ??
-          "An operator must configure an IdP before users can log in."
-        }
+        detail={idp.hint ?? "An operator must configure an IdP before users can log in."}
         tone="warning"
       />
     );
   }
 
   if (idp.kind === "local") {
-    return <LocalLoginForm next="/dashboard" />;
+    return <LocalLoginForm next={returnPath} />;
   }
 
   // External IdP: render a single CTA that kicks off the auth1 round-trip.
@@ -103,6 +98,7 @@ export default function LoginPage() {
       displayName={idp.displayName}
       loginPath={idp.loginPath ?? "/app/auth1/login"}
       apiRoot={apiRoot}
+      returnPath={returnPath}
     />
   );
 }
@@ -112,18 +108,18 @@ function ExternalIdpCard({
   displayName,
   loginPath,
   apiRoot,
+  returnPath,
 }: {
   kind: string;
   displayName: string;
   loginPath: string;
   apiRoot: string;
+  returnPath: string;
 }) {
-  const ctaLabel = `Continue with ${
-    DISPLAY_KIND[kind] ?? displayName ?? "your provider"
-  }`;
+  const ctaLabel = `Continue with ${DISPLAY_KIND[kind] ?? displayName ?? "your provider"}`;
   function go() {
-    const callback = encodeURIComponent(`${window.location.origin}/auth/callback`);
-    window.location.href = `${apiRoot}${loginPath}?next=${callback}`;
+    const callback = authCallbackUrl(window.location.origin, returnPath);
+    window.location.href = `${apiRoot}${loginPath}?next=${encodeURIComponent(callback)}`;
   }
   return (
     <div className="flex flex-col items-center gap-6">
@@ -132,9 +128,7 @@ function ExternalIdpCard({
         <div className="text-foreground text-xl font-semibold tracking-tight">
           Sign in to Astrolift
         </div>
-        <div className="text-muted-foreground text-sm">
-          via {displayName}
-        </div>
+        <div className="text-muted-foreground text-sm">via {displayName}</div>
       </div>
       <Button onClick={go} size="lg" className="w-72">
         {ctaLabel}
@@ -168,7 +162,8 @@ function LocalLoginForm({ next }: { next: string }) {
         toast.error(body.detail ?? `Login failed (${res.status})`);
         return;
       }
-      router.push(next);
+      if (next === "/dashboard") router.push(next);
+      else window.location.assign(next);
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -177,18 +172,13 @@ function LocalLoginForm({ next }: { next: string }) {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex w-full max-w-sm flex-col items-center gap-6"
-    >
+    <form onSubmit={submit} className="flex w-full max-w-sm flex-col items-center gap-6">
       <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
       <div className="flex flex-col items-center gap-1">
         <div className="text-foreground text-xl font-semibold tracking-tight">
           Sign in to Astrolift
         </div>
-        <div className="text-muted-foreground text-sm">
-          Local username + password
-        </div>
+        <div className="text-muted-foreground text-sm">Local username + password</div>
       </div>
 
       <div className="w-full space-y-2">
@@ -239,15 +229,9 @@ function Splash({
   return (
     <div className="flex flex-col items-center gap-4">
       <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
-      <div className="text-foreground text-lg font-semibold tracking-tight">
-        Astrolift
-      </div>
+      <div className="text-foreground text-lg font-semibold tracking-tight">Astrolift</div>
       <div className={`${toneClass} text-sm`}>{message}</div>
-      {detail && (
-        <div className="text-muted-foreground max-w-md text-center text-xs">
-          {detail}
-        </div>
-      )}
+      {detail && <div className="text-muted-foreground max-w-md text-center text-xs">{detail}</div>}
     </div>
   );
 }

@@ -22,6 +22,7 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import path, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
@@ -329,14 +330,26 @@ class Auth1SessionWorkflow:
         callback_url = cls._fix_proxy_pass(request, callback_url)
         return cls._client.auth0.authorize_redirect(request, callback_url)
 
+    @staticmethod
+    def _post_auth_next_url(next_url: str, session_key: str) -> str:
+        device_path = f"/{settings.BASE_URL.strip('/')}/cli/auth/device/"
+        if next_url.startswith(device_path) and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts=set()
+        ):
+            return next_url
+        token = f"Session {session_key}"
+        separator = "&" if "?" in next_url else "?"
+        return f"{next_url}{separator}token={quote_plus(token)}"
+
     @classmethod
     def callback(cls, request: WSGIRequest):
         """
         Callback entrypoint from the Auth0 Tenant with the token authentication.
 
-        When a ?next= URL was stored by login(), redirect there and append the
-        session token as a `?token=` query parameter so the frontend can store
-        it without needing access to the Django session cookie.
+        When a ?next= URL was stored by login(), redirect there. The frontend
+        callback receives a session token so it can store it without accessing
+        the Django cookie; the same-origin CLI approval page uses that cookie
+        directly and must not receive the token in its URL.
         """
         try:
             logger.debug("[Auth0] Auth0 Tenant callback received.")
@@ -357,9 +370,7 @@ class Auth1SessionWorkflow:
 
             next_url = request.session.pop("auth_next", None)
             if next_url:
-                token = f"Session {request.session.session_key}"
-                separator = "&" if "?" in next_url else "?"
-                url = f"{next_url}{separator}token={quote_plus(token)}"
+                url = cls._post_auth_next_url(next_url, request.session.session_key)
             else:
                 # If FRONTEND_URL is set, redirect there with the session token
                 # so the frontend can complete its auth flow

@@ -605,8 +605,8 @@ def refresh_credentials(
 def build_login_url(*, session_id: str, request) -> str:
     """Construct the browser ``login_url`` returned by /start.
 
-    Honours ``settings.APP_BASE_URL`` when set (production) and
-    falls back to the request's absolute URI in dev. The path is
+    Honours ``settings.APP_BASE_URL`` when set (production), then the
+    configured frontend URL in dev. The path is
     served by :func:`device_flow_approval_view` and includes
     enough context (the session id) for the user to verify they're
     approving the right flow.
@@ -614,7 +614,7 @@ def build_login_url(*, session_id: str, request) -> str:
     from django.conf import settings as dj_settings
 
     path = f"/{dj_settings.BASE_URL}cli/auth/device/{session_id}/"
-    base = (dj_settings.APP_BASE_URL or "").rstrip("/")
+    base = (dj_settings.APP_BASE_URL or dj_settings.FRONTEND_URL or "").rstrip("/")
     if base:
         return base + path
     return request.build_absolute_uri(path)
