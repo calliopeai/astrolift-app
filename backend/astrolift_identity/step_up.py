@@ -357,6 +357,7 @@ def _candidate_mutation_classes() -> list[type]:
     _try("astrolift_services.schema.mutations", "ServicesMutation")
     _try("astrolift_lifecycle.schema.mutations", "LifecycleMutation")
     _try("astrolift_registry.schema.mutations", "RegistryMutation")
+    _try("astrolift_operations.schema.mutations", "OperationsMutation")
     return candidates
 
 

@@ -13,9 +13,14 @@ would lose them, the same reason app NetworkPolicy is opt-in. Those
 destinations go in ``AGENT_EGRESS_ALLOW_CIDRS``. Turning the fence back off
 does not remove an applied policy; delete ``astrolift-agent-fence`` from the
 agent namespace. Enforcement needs a NetworkPolicy-capable CNI.
+
+A cluster running the Zentinelle gateway (#1887) gets one more rule, to the
+gateway's pods by label, so agents reach it without a CIDR carve-out.
 """
 
 from __future__ import annotations
+
+import copy
 
 from astrolift_clusters.egress import CLUSTER_DNS_PEER, DEFAULT_INTERNAL_CIDRS, EgressPolicy
 
@@ -30,6 +35,19 @@ _GKE_METADATA_RULES = (
     {"to": [{"ipBlock": {"cidr": "169.254.169.252/32"}}], "ports": [{"protocol": "TCP", "port": 988}]},
 )
 
+# The Zentinelle gateway's pods (astrolift_operations.zentinelle_connect). Spelled out
+# rather than imported so this module stays free of model imports; a test
+# holds the two to the same namespace, label and port.
+_ZENTINELLE_GATEWAY_RULE = {
+    "to": [
+        {
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "astrolift-system"}},
+            "podSelector": {"matchLabels": {"app": "zentinelle-gateway"}},
+        }
+    ],
+    "ports": [{"protocol": "TCP", "port": 8742}],
+}
+
 
 def _allow_cidrs(raw: str) -> tuple[str, ...]:
     cidrs = tuple(part.strip() for part in raw.split(",") if part.strip())
@@ -37,7 +55,9 @@ def _allow_cidrs(raw: str) -> tuple[str, ...]:
     return EgressPolicy(allowed_cidrs=cidrs).allowed_cidrs
 
 
-def render_agent_fence(*, namespace: str, provider_slug: str = "", allow_cidrs: str = "") -> dict:
+def render_agent_fence(
+    *, namespace: str, provider_slug: str = "", allow_cidrs: str = "", zentinelle_gateway: bool = False
+) -> dict:
     ipv4_internal = [cidr for cidr in DEFAULT_INTERNAL_CIDRS if ":" not in cidr]
     egress: list[dict] = [
         {
@@ -54,6 +74,8 @@ def render_agent_fence(*, namespace: str, provider_slug: str = "", allow_cidrs: 
     egress.extend({"to": [{"ipBlock": {"cidr": cidr}}]} for cidr in _allow_cidrs(allow_cidrs))
     if provider_slug == "gcp":
         egress.extend(_GKE_METADATA_RULES)
+    if zentinelle_gateway:
+        egress.append(copy.deepcopy(_ZENTINELLE_GATEWAY_RULE))
 
     return {
         "apiVersion": "networking.k8s.io/v1",
@@ -80,6 +102,8 @@ def agent_fence_manifests(cluster, namespace: str) -> list[dict]:
     """The fence for ``namespace`` as a one-item list, or empty when off."""
     from constance import config
 
+    from astrolift_operations.zentinelle_connect import fenced_agents_reach_gateway
+
     if not config.AGENT_NETWORK_FENCE:
         return []
     plugin = getattr(cluster, "provider_plugin", None)
@@ -88,5 +112,6 @@ def agent_fence_manifests(cluster, namespace: str) -> list[dict]:
             namespace=namespace,
             provider_slug=str(getattr(plugin, "slug", "") or ""),
             allow_cidrs=str(config.AGENT_EGRESS_ALLOW_CIDRS or ""),
+            zentinelle_gateway=fenced_agents_reach_gateway(cluster),
         )
     ]

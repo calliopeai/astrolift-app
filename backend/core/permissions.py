@@ -206,6 +206,13 @@ class Permission(enum.StrEnum):
     PIPELINE_CANCEL = "pipeline.cancel"  # cancel a running run
     PIPELINE_SECRET_MANAGE = "pipeline.secret_manage"  # add/rotate pipeline secrets
 
+    # --- Zentinelle integration (#1887, #1888) --------------------
+    # Connect / disconnect the org to a Zentinelle deployment and rotate
+    # the credentials it issued.
+    ZENTINELLE_CONNECT = "zentinelle.connect"
+    # Register a cluster with Zentinelle and deploy / remove its gateway.
+    ZENTINELLE_GATEWAY_MANAGE = "zentinelle.gateway_manage"
+
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
 
