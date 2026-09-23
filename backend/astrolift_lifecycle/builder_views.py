@@ -22,6 +22,13 @@ be a member of both); for session-cookie auth we fall back to the
 user's *single* active ORG-scope ``Member`` row. Multi-org session
 auth without a token is rejected because there's no safe default —
 the App Builder always presents a token in practice.
+
+Belonging to the org is not enough to act in it (#1878). Past the
+module gate, a token must carry ``write:apps`` and the caller needs
+``app.create`` to create or sync, and both ``app.create`` and
+``app.deploy`` on the target team to promote. Every cluster and managed
+domain a request names resolves among the org's own rows or shared
+(org NULL) ones (#1872).
 """
 
 from __future__ import annotations
@@ -35,6 +42,10 @@ import re
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+
+from astrolift_identity.api_tokens import SCOPE_WRITE_APPS, enforce_scopes
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
+from core.tenancy import TenantContext, tenant_context
 
 log = logging.getLogger("astrolift_lifecycle.builder_views")
 
@@ -135,6 +146,58 @@ def _module_gate(org):
         {"detail": detail, "reason": reason, "module": CHAT_STUDIO_INTEGRATION},
         status=403,
     )
+
+
+def _authorize(request: HttpRequest, org, permissions: tuple[Permission, ...], *, team=None):
+    """403 unless the caller holds every one of ``permissions`` in ``org``, else ``None`` (#1878).
+
+    A token's scopes cap its user's grants, so a token without
+    ``write:apps`` is refused whatever its user may do. The tenant context
+    is built from ``org`` rather than taken from the tenant middleware,
+    which resolves team and project headers on its own: a session request
+    can name another org's team there, and a targetless check would count
+    that team's bindings. ``team`` scopes the check to the team an app
+    lands in, so a team-level grant covers that team alone.
+    """
+    token = getattr(request, "_api_token", None)
+    if token is not None:
+        missing = enforce_scopes(token, (SCOPE_WRITE_APPS,))
+        if missing:
+            return JsonResponse(
+                {
+                    "detail": f"the api token lacks the {missing} scope",
+                    "reason": "missing_scope",
+                    "scope": missing,
+                },
+                status=403,
+            )
+
+    scope = PermissionScope(kind=ScopeKind.TEAM, id=team.pk) if team is not None else None
+    tenant = TenantContext(
+        organization_id=org.pk,
+        team_id=token.team_id if token is not None else None,
+        actor_user_id=request.user.pk,
+    )
+    with tenant_context(tenant):
+        for permission in permissions:
+            try:
+                check_permission(permission, scope=scope)
+            except PermissionDenied:
+                where = f"on team {team.slug!r}" if team is not None else "in this organization"
+                return JsonResponse(
+                    {
+                        "detail": f"{permission.value} is required {where}",
+                        "reason": "missing_permission",
+                        "permission": permission.value,
+                    },
+                    status=403,
+                )
+    return None
+
+
+def _outside_org(cluster, org) -> bool:
+    """True for a cluster another org owns; shared clusters (org NULL) serve every org."""
+    return cluster is not None and cluster.organization_id not in (None, org.pk)
 
 
 def _load_json(request: HttpRequest, *, max_bytes: int | None = None):
@@ -261,6 +324,9 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
     err = _module_gate(org)
     if err:
         return err
+    err = _authorize(request, org, (Permission.APP_CREATE,))
+    if err:
+        return err
 
     body, err = _load_json(request)
     if err:
@@ -295,16 +361,22 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
     # Resolve the target cluster. Explicit ``cluster_guid`` wins; the
     # default path picks the first MANAGED + active cluster bound to
     # the org (or shared) so the API works "out of the box" without
-    # the App Builder having to enumerate clusters first.
+    # the App Builder having to enumerate clusters first. Knowing a
+    # guid grants nothing: an explicit guid resolves among the same
+    # org-or-shared clusters, and another org's answers 404 (#1872).
     from astrolift_clusters.models import TenantCluster
 
     cluster_guid = body.get("cluster_guid")
     if cluster_guid:
-        cluster = TenantCluster.objects.filter(
-            guid=cluster_guid,
-            deleted_at__isnull=True,
-            is_active=True,
-        ).first()
+        cluster = (
+            TenantCluster.objects.filter(
+                guid=cluster_guid,
+                deleted_at__isnull=True,
+                is_active=True,
+            )
+            .filter(_cluster_q_for_org(org))
+            .first()
+        )
         if cluster is None:
             return JsonResponse({"detail": "cluster not found"}, status=404)
     else:
@@ -385,16 +457,29 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
     err = _module_gate(org)
     if err:
         return err
+    err = _authorize(request, org, (Permission.APP_CREATE,))
+    if err:
+        return err
 
     from astrolift_lifecycle.models import DevEnvironment
 
     dev = (
         DevEnvironment.objects.defer("data_file")
+        .select_related("tenant_cluster")
         .filter(guid=guid, organization=org, deleted_at__isnull=True)
         .first()
     )
     if dev is None:
         return JsonResponse({"detail": "dev environment not found"}, status=404)
+
+    # Create could once bind another org's cluster (#1872); a row made
+    # that way must not keep pushing code to it.
+    if _outside_org(dev.tenant_cluster, org):
+        log.warning("refusing to sync dev environment %s: its cluster belongs to another org", dev.guid)
+        return JsonResponse(
+            {"detail": "dev environment is bound to a cluster outside this organization"},
+            status=409,
+        )
 
     if dev.status != DevEnvironment.Status.RUNNING:
         return JsonResponse({"detail": "environment is not running"}, status=409)
@@ -519,6 +604,27 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     if err:
         return err
 
+    body, err = _load_json(request)
+    if err:
+        return err
+
+    # Resolve the team binding. Promote needs a Team because every
+    # RegisteredApp row has a non-null ``team`` FK; explicit slug wins,
+    # default is the first active team on the org. It is resolved before
+    # the permission check because the check runs on this team: with no
+    # target, a team-scoped token would pass on its own team's grants and
+    # could then land the app in any team. An unknown team falls back to
+    # the org-level check and answers 404 or 422 further down.
+    from astrolift_identity.models import Team
+
+    team_slug = body.get("team_slug")
+    teams = Team.objects.filter(organization=org, deleted_at__isnull=True)
+    team = teams.filter(slug=team_slug).first() if team_slug else teams.order_by("created_at").first()
+
+    err = _authorize(request, org, (Permission.APP_CREATE, Permission.APP_DEPLOY), team=team)
+    if err:
+        return err
+
     from astrolift_lifecycle.models import DevEnvironment
 
     dev = (
@@ -538,10 +644,6 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             status=409,
         )
 
-    body, err = _load_json(request)
-    if err:
-        return err
-
     app_name = (body.get("app_name") or "").strip()
     if not app_name:
         return JsonResponse({"detail": "app_name is required"}, status=400)
@@ -556,26 +658,16 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
 
     environment_name = (body.get("environment_name") or "production").strip() or "production"
 
-    # Resolve the team binding. Promote needs a Team because every
-    # RegisteredApp row has a non-null ``team`` FK; explicit slug wins,
-    # default is the first active team on the org.
-    from astrolift_identity.models import Team
-
-    team_slug = body.get("team_slug")
-    if team_slug:
-        team = Team.objects.filter(slug=team_slug, organization=org, deleted_at__isnull=True).first()
-        if team is None:
+    if team is None:
+        if team_slug:
             return JsonResponse(
                 {"detail": f"team {team_slug!r} not found"},
                 status=404,
             )
-    else:
-        team = Team.objects.filter(organization=org, deleted_at__isnull=True).order_by("created_at").first()
-        if team is None:
-            return JsonResponse(
-                {"detail": "no team found; pass team_slug"},
-                status=422,
-            )
+        return JsonResponse(
+            {"detail": "no team found; pass team_slug"},
+            status=422,
+        )
 
     from astrolift_registry.models import RegisteredApp
 
@@ -596,15 +688,32 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             status=409,
         )
 
+    # Create could once bind another org's cluster (#1872); promoting
+    # such a row would onboard and serve a new app there.
+    if _outside_org(cluster, org):
+        log.warning("refusing to promote dev environment %s: its cluster belongs to another org", dev.guid)
+        return JsonResponse(
+            {"detail": "dev environment is bound to a cluster outside this organization"},
+            status=409,
+        )
+
     # ManagedDomain binding is optional — when the caller passes a
     # ``domain``, look it up by zone and bind it to the env; otherwise
     # leave ``managed_domain=NULL`` and let the org's default kick in.
+    # Zone names are guessable, so only the org's own zones and shared
+    # (org NULL) ones bind; another org's answers 404 (#1872).
+    from django.db.models import Q
+
     from astrolift_clusters.models import ManagedDomain
 
     domain_zone = body.get("domain")
     managed_domain = None
     if domain_zone:
-        managed_domain = ManagedDomain.objects.filter(zone=domain_zone, deleted_at__isnull=True).first()
+        managed_domain = ManagedDomain.objects.filter(
+            Q(organization=org) | Q(organization__isnull=True),
+            zone=domain_zone,
+            deleted_at__isnull=True,
+        ).first()
         if managed_domain is None:
             return JsonResponse(
                 {"detail": f"managed domain {domain_zone!r} not found"},

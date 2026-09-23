@@ -29,7 +29,15 @@ from django.test import Client
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
-from astrolift_identity.models import ApiToken, Member, Organization, OrganizationModule, Team
+from astrolift_identity.models import (
+    ApiToken,
+    Member,
+    Organization,
+    OrganizationModule,
+    Role,
+    RoleBinding,
+    Team,
+)
 from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.activities.dev_environment import _deploy_promoted_app_sync
@@ -39,6 +47,7 @@ from astrolift_workflows.tests.test_builder_runtime_1858 import (
     _seed,
     _sqlite_bytes,
 )
+from core.permissions import Permission
 
 pytestmark = pytest.mark.django_db
 User = get_user_model()
@@ -77,6 +86,17 @@ def user(org):
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    # The routes check app.create and app.deploy (#1878). These tests cover
+    # what an allowed caller gets; test_builder_authz_1872_1878.py covers
+    # who is allowed.
+    role = Role.objects.create(
+        organization=org,
+        name="Builder",
+        slug="builder",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=[Permission.APP_CREATE.value, Permission.APP_DEPLOY.value],
+    )
+    RoleBinding.objects.create(user=u, role=role, scope_kind=RoleBinding.ScopeKind.ORG, scope_id=org.id)
     return u
 
 

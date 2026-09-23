@@ -81,6 +81,16 @@ def _device_flow_bearer(org: Organization) -> str:
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    # The routes also check app.create and app.deploy (#1878); this user
+    # holds both so the module gate is the only thing under test here.
+    role = Role.objects.create(
+        organization=org,
+        name=f"builder-{org.slug}",
+        slug=f"builder-{org.slug}",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=["app.create", "app.deploy"],
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
     row, session_id = device_flow.create_session(client_label="chat-studio")
     assert device_flow.approve_session(row, user=user, organization=org) is None
     later = timezone.now() + device_flow.MIN_POLL_INTERVAL + dt.timedelta(seconds=1)
