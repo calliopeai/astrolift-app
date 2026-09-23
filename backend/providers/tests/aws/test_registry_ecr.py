@@ -120,7 +120,21 @@ def test_delete_repo_not_found_is_idempotent(driver: ECRDriver) -> None:
     driver.delete_repo("acme/never-existed", archive=False)
 
 
-# ---- ensure_repo: clears a stale archive policy on reuse (#1819) --
+# ---- ensure_repo / delete_repo: statement-scoped archive policy (#1819) --
+
+# A statement an operator might set directly on the repo policy — e.g.
+# granting another AWS account pull access. Archiving/re-registering must
+# never destroy this: it is not this driver's to touch.
+_CROSS_ACCOUNT_PULL_STATEMENT = {
+    "Sid": "AllowCrossAccountPull",
+    "Effect": "Allow",
+    "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+    "Action": [
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+    ],
+}
 
 
 def test_ensure_repo_clears_archive_policy_on_reregister(
@@ -138,6 +152,77 @@ def test_ensure_repo_clears_archive_policy_on_reregister(
 
     with pytest.raises(ecr_client.exceptions.RepositoryPolicyNotFoundException):
         ecr_client.get_repository_policy(repositoryName="acme/reregistered")
+
+
+def test_ensure_repo_reregister_with_no_prior_policy_is_a_noop(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """A repo that was never archived carries no policy at all;
+    re-registering it must not create one."""
+    driver.ensure_repo("acme/never-archived")
+
+    driver.ensure_repo("acme/never-archived")
+
+    with pytest.raises(ecr_client.exceptions.RepositoryPolicyNotFoundException):
+        ecr_client.get_repository_policy(repositoryName="acme/never-archived")
+
+
+def test_archive_preserves_an_operator_set_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Archiving must add the deny alongside any statement an operator set
+    on the policy directly, not replace the whole document (#1819 review) —
+    a repo shared cross-account must keep granting that pull access while
+    its app is torn down."""
+    driver.ensure_repo("acme/shared")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/shared",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]}),
+    )
+
+    driver.delete_repo("acme/shared", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/shared")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull", "DenyPushArchived"}
+
+
+def test_ensure_repo_reregister_preserves_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering after an archive must restore push without touching
+    an operator statement that survived the archive (#1819 review)."""
+    driver.ensure_repo("acme/shared")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/shared",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]}),
+    )
+    driver.delete_repo("acme/shared", archive=True)
+
+    driver.ensure_repo("acme/shared")
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/shared")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull"}
+
+
+def test_archive_twice_does_not_duplicate_the_deny_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-running teardown must not pile up a second DenyPushArchived
+    statement each time."""
+    driver.ensure_repo("acme/archived-twice")
+    driver.delete_repo("acme/archived-twice", archive=True)
+
+    driver.delete_repo("acme/archived-twice", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/archived-twice")["policyText"])
+    deny_statements = [s for s in policy["Statement"] if s.get("Sid") == "DenyPushArchived"]
+    assert len(deny_statements) == 1
 
 
 # ---- get_pull_secret ----------------------------------------------

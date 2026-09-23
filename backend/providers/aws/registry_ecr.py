@@ -506,29 +506,36 @@ class ECRDriver(ImageRegistryDriver):
             raise map_client_error(exc) from exc
 
     def _block_push(self, *, name: str) -> None:
-        """Apply a repository policy that denies push. Read remains
-        allowed so deployed pods can still pull the existing image
-        until they're torn down."""
+        """Add a statement denying push, on top of whatever other
+        statements are already on the repo policy. Read remains allowed
+        so deployed pods can still pull the existing image until they're
+        torn down.
+
+        An earlier version of this method called ``set_repository_policy``
+        with ONLY the deny statement, silently replacing (destroying) any
+        policy an operator had set directly — e.g. a cross-account pull
+        grant for another AWS account (#1819 review). Statement-scoped now:
+        read the current policy, drop any stale ``DenyPushArchived`` of
+        ours (so re-archiving is idempotent, not additive), append a fresh
+        one, and write the merged document back.
+        """
         import json
 
-        policy = json.dumps(
+        statements = self._non_archive_statements(name=name)
+        statements.append(
             {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Sid": "DenyPushArchived",
-                        "Effect": "Deny",
-                        "Principal": "*",
-                        "Action": [
-                            "ecr:PutImage",
-                            "ecr:InitiateLayerUpload",
-                            "ecr:UploadLayerPart",
-                            "ecr:CompleteLayerUpload",
-                        ],
-                    },
+                "Sid": "DenyPushArchived",
+                "Effect": "Deny",
+                "Principal": "*",
+                "Action": [
+                    "ecr:PutImage",
+                    "ecr:InitiateLayerUpload",
+                    "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload",
                 ],
             }
         )
+        policy = json.dumps({"Version": "2012-10-17", "Statement": statements})
         try:
             self._client.set_repository_policy(
                 repositoryName=name,
@@ -540,17 +547,53 @@ class ECRDriver(ImageRegistryDriver):
             raise map_client_error(exc) from exc
 
     def _clear_archive_policy(self, *, name: str) -> None:
-        """Remove a repository policy left by ``_block_push`` (#1819).
+        """Remove only the ``DenyPushArchived`` statement ``_block_push``
+        may have left (#1819), keeping any other statement an operator set
+        directly (e.g. cross-account pull) — an earlier version called
+        ``delete_repository_policy`` unconditionally, destroying those too.
 
-        ``_block_push`` is the only place this driver ever calls
-        ``set_repository_policy``, so any policy present on re-registration
-        is the stale ``DenyPushArchived`` deny from an earlier archive, not
-        something an operator set by hand — safe to clear unconditionally.
+        Writes back whatever else remains; drops the policy entirely (not
+        an empty-Statement document, which AWS rejects) once nothing does.
         """
+        import json
+
+        statements = self._non_archive_statements(name=name)
+        if statements:
+            policy = json.dumps({"Version": "2012-10-17", "Statement": statements})
+            try:
+                self._client.set_repository_policy(
+                    repositoryName=name,
+                    policyText=policy,
+                )
+            except self._client.exceptions.RepositoryNotFoundException as exc:
+                raise NotFoundError(f"repository {name} not found") from exc
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+            return
         try:
             self._client.delete_repository_policy(repositoryName=name)
         except self._client.exceptions.RepositoryPolicyNotFoundException:
-            # Common case: the repo exists and was never archived.
+            # Common case: the repo exists and never carried a policy at all.
             return
+        except self._client.exceptions.RepositoryNotFoundException as exc:
+            raise NotFoundError(f"repository {name} not found") from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
+
+    def _non_archive_statements(self, *, name: str) -> list[dict[str, Any]]:
+        """Every statement on ``name``'s repository policy except our own
+        ``DenyPushArchived`` — the ones an operator set directly (e.g.
+        cross-account pull) that archiving and re-registering must never
+        destroy (#1819 review). Empty when the repo carries no policy."""
+        import json
+
+        try:
+            response = self._client.get_repository_policy(repositoryName=name)
+        except self._client.exceptions.RepositoryPolicyNotFoundException:
+            return []
+        except self._client.exceptions.RepositoryNotFoundException as exc:
+            raise NotFoundError(f"repository {name} not found") from exc
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        document = json.loads(response["policyText"])
+        return [s for s in document.get("Statement", []) if s.get("Sid") != "DenyPushArchived"]
