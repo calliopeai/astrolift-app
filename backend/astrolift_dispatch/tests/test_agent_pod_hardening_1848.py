@@ -34,17 +34,17 @@ def test_task_container_cannot_escalate_and_is_bounded():
     assert container["securityContext"]["allowPrivilegeEscalation"] is False
     assert container["resources"] == {
         "requests": {"cpu": "250m", "memory": "512Mi"},
-        "limits": {"cpu": "2", "memory": "4Gi"},
+        "limits": {"cpu": "4", "memory": "8Gi"},
     }
 
 
 def test_bounds_follow_settings(settings):
-    settings.AGENT_POD_CPU_LIMIT = "4"
-    settings.AGENT_POD_MEMORY_LIMIT = "8Gi"
+    settings.AGENT_POD_CPU_LIMIT = "6"
+    settings.AGENT_POD_MEMORY_LIMIT = "12Gi"
 
     limits = _render()["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]
 
-    assert limits == {"cpu": "4", "memory": "8Gi"}
+    assert limits == {"cpu": "6", "memory": "12Gi"}
 
 
 def test_managed_model_service_account_survives_hardening():

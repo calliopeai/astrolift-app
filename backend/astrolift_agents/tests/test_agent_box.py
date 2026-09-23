@@ -362,7 +362,7 @@ def test_the_box_carries_the_agent_sandbox_baseline(org):
     assert pod["automountServiceAccountToken"] is False
     assert pod["securityContext"]["seccompProfile"] == {"type": "RuntimeDefault"}
     assert container["securityContext"]["allowPrivilegeEscalation"] is False
-    assert container["resources"]["limits"] == {"cpu": "2", "memory": "4Gi"}
+    assert container["resources"]["limits"] == {"cpu": "4", "memory": "8Gi"}
     # The tmux attach path still needs a terminal.
     assert container["stdin"] is True
     assert container["tty"] is True
