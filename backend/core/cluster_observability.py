@@ -3341,6 +3341,12 @@ async def fetch_task_pod_logs(
     into a usable driver, no pod is found, or the stream yields nothing
     yet. The resolver layer surfaces the empty list as "no logs yet"
     rather than a 500.
+
+    Each discovery attempt is bound by ``_TASK_LOG_READ_TIMEOUT_SECONDS``,
+    the same ceiling the log stream itself uses — ``list_namespaced_pod``'s
+    own ``timeout_seconds`` covers the read, but not connection setup or a
+    hung DNS/TCP handshake, so a slow apiserver could otherwise wedge the
+    GraphQL worker on a synchronous call it can't cancel.
     """
     from asgiref.sync import sync_to_async
 
@@ -3368,10 +3374,26 @@ async def fetch_task_pod_logs(
                 return name
         return ""
 
-    pod_name = await sync_to_async(_discover)(task_id=task_guid)
+    async def _discover_bounded(*, task_id: str = "", job_name: str = "") -> str:
+        try:
+            return await asyncio.wait_for(
+                sync_to_async(_discover)(task_id=task_id, job_name=job_name),
+                timeout=_TASK_LOG_READ_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            logger.warning(
+                "fetch_task_pod_logs: discovery exceeded %ss for task %s (task_id=%r job_name=%r)",
+                _TASK_LOG_READ_TIMEOUT_SECONDS,
+                task_guid,
+                task_id,
+                job_name,
+            )
+            return ""
+
+    pod_name = await _discover_bounded(task_id=task_guid)
     hint = (pod_name_hint or "").strip()
     if not pod_name and hint:
-        pod_name = await sync_to_async(_discover)(job_name=hint)
+        pod_name = await _discover_bounded(job_name=hint)
     if not pod_name:
         return []
 

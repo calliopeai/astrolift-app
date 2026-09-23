@@ -27,6 +27,7 @@ Covered cases:
 from __future__ import annotations
 
 import datetime as dt
+import time
 from datetime import UTC
 from types import SimpleNamespace
 
@@ -584,6 +585,73 @@ async def test_fetch_task_pod_logs_falls_back_to_job_name(monkeypatch):
         "job_name": "agent-task-deadbeef",
     }
     assert log_backend.calls[0]["pod_name"] == "agent-task-deadbeef-x7q2p"
+
+
+class _HangingPodBackend:
+    """Blocks past any reasonable read on every call -- models a slow or
+    wedged apiserver. ``list_pods`` runs synchronously inside
+    ``sync_to_async``'s thread pool, so a real hang here would otherwise
+    tie up that thread indefinitely with no way for the awaiting coroutine
+    to give up on it."""
+
+    def __init__(self, *, delay: float):
+        self._delay = delay
+        self.calls: list[dict] = []
+
+    def list_pods(self, *, auth, namespace, app_slug, task_id="", job_name=""):
+        self.calls.append({"task_id": task_id, "job_name": job_name})
+        time.sleep(self._delay)
+        return []
+
+
+@pytest.mark.asyncio
+async def test_fetch_task_pod_logs_bounds_hanging_discovery(monkeypatch):
+    """A discovery call that hangs past ``_TASK_LOG_READ_TIMEOUT_SECONDS``
+    degrades to ``[]`` within that bound rather than blocking the caller
+    for as long as the backend takes (#1917 review)."""
+    from core import cluster_observability
+    from core.cluster_observability import fetch_task_pod_logs
+
+    # Small bound so the test itself runs fast; the backend hangs well past
+    # it, so a correct implementation returns long before the backend does.
+    monkeypatch.setattr(cluster_observability, "_TASK_LOG_READ_TIMEOUT_SECONDS", 0.5)
+
+    cluster = SimpleNamespace(
+        slug="c",
+        auth_method="kubeconfig",
+        auth_config={"kubeconfig": "x"},
+        endpoint="https://k8s.invalid",
+        ca_cert="",
+        default_namespace_prefix="",
+        is_active=True,
+    )
+    pod_backend = _HangingPodBackend(delay=3.0)
+    set_pod_backend_for_tests(pod_backend)
+    try:
+        start = time.monotonic()
+        lines = await fetch_task_pod_logs(
+            cluster=cluster,
+            namespace="agents-elsewhere",
+            task_guid="task-guid-9",
+            pod_name_hint="agent-task-deadbeef",
+            tail=200,
+        )
+        elapsed = time.monotonic() - start
+    finally:
+        reset_pod_backend_for_tests()
+
+    assert lines == []
+    # Well under the backend's 3s-per-call, 6s-total delay -- proves the
+    # bound actually applied rather than just happening to finish first.
+    assert elapsed < 4.0
+    # Discovery was actually reached (not short-circuited by some earlier
+    # empty-hint path). Not asserting a call count of 2 here: sync_to_async
+    # defaults to thread_sensitive=True, so the task-id and job_name
+    # attempts serialize onto one thread, and the second can still be
+    # queued behind the first's hang when this assertion runs -- the two
+    # ~0.5s-apart timeout log lines (not asserted on, but visible on a
+    # local run) are what prove both attempts were individually bounded.
+    assert len(pod_backend.calls) >= 1
 
 
 def test_live_pod_backend_uses_task_id_selector(monkeypatch):
