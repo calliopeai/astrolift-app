@@ -165,6 +165,7 @@ def render_agent_box_job(
     shadow the variables the box needs to describe itself.
     """
     from astrolift_dispatch.agent_secrets import agent_container_env, secret_env_entries
+    from astrolift_dispatch.pod_hardening import harden_agent_pod
 
     spec = box.environment_spec
     secret_name = box_secret_name(job_name)
@@ -193,7 +194,7 @@ def render_agent_box_job(
         # finds an agent task's pod, with no box-specific selector anywhere.
         "astrolift.dev/app": str(box.guid),
     }
-    return {
+    job = {
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {"name": job_name, "namespace": namespace, "labels": dict(labels)},
@@ -212,6 +213,8 @@ def render_agent_box_job(
             },
         },
     }
+    harden_agent_pod(job["spec"]["template"]["spec"])
+    return job
 
 
 # ---------------------------------------------------------------------------
