@@ -18,9 +18,13 @@ import pytest
 from astrolift_dispatch.agent_secrets import (
     AgentSecretResolutionError,
     build_task_secret_manifest,
+    delete_secret_value,
     normalize_secret_refs,
+    normalize_secret_uri,
+    read_secret_value,
     resolve_task_secret_manifest,
     task_secret_name,
+    write_secret_value,
 )
 from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner, _render_agent_job
 
@@ -109,6 +113,51 @@ def test_normalize_skips_malformed_and_trims():
         {"uri": "sm:a", "env_var": "TOKEN_A"},
         {"uri": "sm:b", "env_var": "TOKEN_B"},
     ]
+
+
+# ---- normalize_secret_uri / write+read+delete scheme stripping (#1761) ----
+#
+# The CLI reference and agent-packages.md document a ref's uri in the
+# ``secret://path`` form, but no cloud secrets backend accepts a colon in a
+# resource name (AWS Secrets Manager: "ValidationException: Invalid name").
+# Every call into the backend strips the scheme here so a ref persisted with
+# it (before this fix landed) keeps resolving without a data migration.
+
+
+def test_normalize_strips_the_documented_scheme():
+    assert normalize_secret_uri("secret://agents/calliope/anthropic") == "agents/calliope/anthropic"
+
+
+def test_normalize_passes_through_paths_without_the_scheme():
+    assert normalize_secret_uri("sm:agents/calliope/anthropic") == "sm:agents/calliope/anthropic"
+    assert normalize_secret_uri("agents/calliope/anthropic") == "agents/calliope/anthropic"
+
+
+def test_normalize_leaves_sm_routing_intact_after_stripping():
+    # An operator who stacks the documented scheme with the AWS-specific
+    # sm:/ssm: routing prefix must still get routed correctly once the
+    # scheme is gone.
+    assert normalize_secret_uri("secret://sm:agents/x") == "sm:agents/x"
+
+
+def test_write_strips_scheme_before_reaching_the_backend():
+    backend = _FakeSecrets()
+    write_secret_value(backend, "secret://agents/calliope/anthropic", "sk-ant-x")
+    assert backend.upserts == [("agents/calliope/anthropic", {"value": "sk-ant-x"})]
+
+
+def test_read_strips_scheme_before_reaching_the_backend():
+    # Backend storage is always keyed by the bare path (writes are
+    # normalized too), so a ref stored with the scheme still resolves.
+    backend = _FakeSecrets({"agents/calliope/anthropic": {"value": "sk-ant-x"}})
+    assert read_secret_value(backend, "secret://agents/calliope/anthropic") == "sk-ant-x"
+
+
+def test_delete_strips_scheme_before_reaching_the_backend():
+    backend = _FakeSecrets({"agents/calliope/anthropic": {"value": "sk-ant-x"}})
+    delete_secret_value(backend, "secret://agents/calliope/anthropic")
+    assert backend.deletes == ["agents/calliope/anthropic"]
+    assert backend.store == {}
 
 
 # ---- _render_agent_job env ------------------------------------------------
