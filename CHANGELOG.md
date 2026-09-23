@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- The App Builder files sync accepts binary files as base64 with a declared
+  encoding, plus one `data_file` with its own cap (Constance
+  `BUILDER_DATA_FILE_MAX_BYTES`, default 64 MiB). Promote now serves the app
+  from its own namespace, with the data file on a persistent volume when the
+  cluster can provision one; the response carries `app_url` and
+  `data_persistent`. Dev environments provision again: the renderer no longer
+  slices a UUID, and its names use the whole guid. See `docs/builder-api.md`
+  (#1858).
+
 - Deduplicate queued agent steering by an optional client request UUID and expose
   an exact receipt lookup, so a lost enqueue reply can be recovered after delivery
   or task completion without repeating the instruction (#1842).
