@@ -29,9 +29,15 @@ def task_control_lock(task_pk: int):
             cursor.execute("SELECT pg_advisory_unlock(%s)", [key])
 
 
-def docker_daemon_id() -> str:
-    result = subprocess.run(
-        ["docker", "info", "--format", "{{.ID}}"], capture_output=True, text=True, timeout=5
+def docker_daemon_id(connection: dict | None = None) -> str:
+    from astrolift_dispatch.spawners.docker_connection import run_docker
+
+    result = (
+        run_docker(connection, ["info", "--format", "{{.ID}}"])
+        if connection is not None
+        else subprocess.run(
+            ["docker", "info", "--format", "{{.ID}}"], capture_output=True, text=True, timeout=5
+        )
     )
     if result.returncode or not result.stdout.strip():
         raise RuntimeError("Cannot verify the Docker daemon for this task")
@@ -48,7 +54,14 @@ def resolve_task_target(task):
     if not isinstance(namespace, str) or not namespace:
         raise RuntimeError("Task dispatch target has no namespace")
     if backend == "local_docker":
-        if not target.get("docker_daemon_id") or target["docker_daemon_id"] != docker_daemon_id():
+        if "docker_connection" in target and not isinstance(target["docker_connection"], dict):
+            raise RuntimeError("Task has an invalid Docker connection reference")
+        actual_daemon = (
+            docker_daemon_id(target["docker_connection"])
+            if "docker_connection" in target
+            else docker_daemon_id()
+        )
+        if not target.get("docker_daemon_id") or target["docker_daemon_id"] != actual_daemon:
             raise RuntimeError("Task belongs to a different Docker daemon")
         return backend, None, namespace
     if backend != "k8s_job" or not target.get("cluster_guid"):
@@ -62,6 +75,8 @@ def resolve_task_target(task):
 
 
 def freeze_task_target(task, *, backend: str, cluster, namespace: str):
+    from astrolift_dispatch.spawners.docker_connection import snapshot_docker_connection
+
     if task.dispatch_target:
         return resolve_task_target(task)
     if backend not in {"k8s_job", "local_docker"}:
@@ -70,15 +85,18 @@ def freeze_task_target(task, *, backend: str, cluster, namespace: str):
         cluster is None or cluster.organization_id not in (None, task.organization_id)
     ):
         raise RuntimeError("Agent dispatch cluster is missing or belongs to another organization")
+    docker_connection = snapshot_docker_connection() if backend == "local_docker" else None
     task.dispatch_target = {
         "version": 1,
         "backend": backend,
         "namespace": namespace,
         "cluster_guid": str(cluster.guid) if cluster is not None else "",
         "cluster_endpoint": cluster.endpoint if cluster is not None else "",
-        "docker_daemon_id": docker_daemon_id() if backend == "local_docker" else "",
+        "docker_daemon_id": docker_daemon_id(docker_connection) if backend == "local_docker" else "",
         "planned_external_id": f"agent-task-{str(task.guid).replace('-', '')}",
     }
+    if docker_connection is not None:
+        task.dispatch_target["docker_connection"] = docker_connection
     task.save(update_fields=["dispatch_target", "updated_at", "version"])
     return backend, cluster, namespace
 
@@ -87,4 +105,4 @@ def spawner_for_task(task):
     from astrolift_dispatch.spawners.registry import get_spawner
 
     backend, cluster, namespace = resolve_task_target(task)
-    return get_spawner(backend, cluster=cluster, namespace=namespace)
+    return get_spawner(backend, cluster=cluster, namespace=namespace, task=task)

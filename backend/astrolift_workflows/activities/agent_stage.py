@@ -264,7 +264,7 @@ def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
     backend, cluster, namespace = freeze_task_target(
         task, backend=backend, cluster=cluster, namespace=namespace
     )
-    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+    spawner = get_spawner(backend, cluster=cluster, namespace=namespace, task=task)
     try:
         result = spawner.spawn(task)
     except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
@@ -388,7 +388,7 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         if task.external_id:
             try:
                 backend, cluster, namespace = _placement_for_task(task)
-                get_spawner(backend, cluster=cluster, namespace=namespace).stop(task.external_id)
+                get_spawner(backend, cluster=cluster, namespace=namespace, task=task).stop(task.external_id)
             except Exception:  # noqa: BLE001 — K8s deadline remains the backstop
                 log.warning("agent timeout: container stop failed for task %s", task.guid, exc_info=True)
         task.failure = {"message": f"agent exceeded its {timeout_seconds}s timeout"}
@@ -401,10 +401,13 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         # lost worker / stuck provisioning row cannot spin forever.
         return {"status": task.status, "terminal": False}
 
-    backend, cluster, namespace = _placement_for_task(task)
-    spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
-
-    status = spawner.status(task.external_id)
+    try:
+        backend, cluster, namespace = _placement_for_task(task)
+        spawner = get_spawner(backend, cluster=cluster, namespace=namespace, task=task)
+        status = spawner.status(task.external_id)
+    except Exception as exc:  # noqa: BLE001 — keep the heartbeat loop alive until observation recovers
+        log.warning("agent status unavailable for task %s: %s", task.guid, exc)
+        return {"status": task.status, "terminal": False}
 
     if status.running and task.status == AgentTask.Status.PROVISIONING:
         try:
@@ -467,7 +470,7 @@ def _cleanup_terminal_task_secret(task: Any, *, spawner: Any | None = None) -> N
             from astrolift_dispatch.spawners.registry import get_spawner
 
             backend, cluster, namespace = _placement_for_task(task)
-            spawner = get_spawner(backend, cluster=cluster, namespace=namespace)
+            spawner = get_spawner(backend, cluster=cluster, namespace=namespace, task=task)
         cleanup = getattr(spawner, "cleanup_task_secret", None)
         if callable(cleanup):
             cleanup(task.external_id)

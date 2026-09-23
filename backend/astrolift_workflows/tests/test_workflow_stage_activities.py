@@ -938,7 +938,7 @@ def test_poll_uses_the_namespace_frozen_at_stage_spawn(run, definition, monkeypa
             captured["external_id"] = external_id
             return TaskStatus(running=True)
 
-    def _get_spawner(backend: str, *, cluster=None, namespace: str = "default"):
+    def _get_spawner(backend: str, *, cluster=None, namespace: str = "default", task=None):
         captured.update(backend=backend, cluster=cluster, namespace=namespace)
         return _RunningSpawner()
 
@@ -1381,7 +1381,17 @@ def test_stage_task_stop_uses_the_backend_that_spawned_it(run, definition, monke
     from astrolift_dispatch.spawners import registry
     from astrolift_workflows.activities.agent_stage import _cancel_agent_task_sync
 
-    monkeypatch.setattr("astrolift_agents.services.task_target.docker_daemon_id", lambda: "test-daemon")
+    connection = {"test_connection": "original"}
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.docker_connection.snapshot_docker_connection", lambda: connection
+    )
+    seen_connections = []
+
+    def daemon_id(saved_connection=None):
+        seen_connections.append(saved_connection)
+        return "test-daemon"
+
+    monkeypatch.setattr("astrolift_agents.services.task_target.docker_daemon_id", daemon_id)
     DispatcherInstance.objects.create(
         organization=run.organization,
         name="Local workflow dispatcher",
@@ -1393,7 +1403,8 @@ def test_stage_task_stop_uses_the_backend_that_spawned_it(run, definition, monke
     )
     calls = []
 
-    def spawner(backend, *, cluster=None, namespace="default"):
+    def spawner(backend, *, cluster=None, namespace="default", task=None):
+        assert task.dispatch_target["docker_connection"] == connection
         calls.append(backend)
         return _FakeSpawner()
 
@@ -1403,6 +1414,7 @@ def test_stage_task_stop_uses_the_backend_that_spawned_it(run, definition, monke
     result = _cancel_agent_task_sync(str(task.guid))
     assert result["ok"]
     assert calls == ["local_docker", "local_docker"]
+    assert seen_connections and all(saved == connection for saved in seen_connections)
 
 
 @pytest.mark.django_db
@@ -1460,7 +1472,7 @@ def test_cleanup_uses_saved_cluster_and_namespace(run, definition, monkeypatch):
     task.save(update_fields=["namespace", "updated_at", "version"])
     observed = []
 
-    def spawner(backend, *, cluster=None, namespace="default"):
+    def spawner(backend, *, cluster=None, namespace="default", task=None):
         observed.append((backend, str(cluster.guid), namespace))
         return _FakeSpawner()
 

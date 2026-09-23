@@ -143,6 +143,16 @@ spawn returns pending cleanup; a later sweep uses the saved resource name even
 if the worker died before saving the spawn response. Delayed activities cannot
 open a new stage or task on a closed workflow.
 
+Docker tasks also save the connection reference used at dispatch: the absolute
+configuration directory and named context, or the explicit host plus TLS flags
+and certificate-directory reference. Credentials stay in Docker's existing
+storage. Changing the default context, host, or configuration directory does
+not redirect status or cleanup. A saved named context must still resolve to its
+original endpoint and TLS policy; deletion or replacement of that context fails
+explicitly. Every operation verifies the saved daemon identity. Older tasks
+that only saved a daemon ID still require that daemon to be the current one.
+An unavailable daemon or invalid inspection response leaves polling pending.
+
 Cleanup requires the exact workflow run and organization, an explicit
 stage-to-AgentRun-to-AgentTask link, and exclusive ownership of that AgentRun.
 It never selects tasks through workload names or pod prefixes. A missing or

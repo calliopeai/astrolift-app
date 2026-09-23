@@ -5,7 +5,7 @@ from __future__ import annotations
 from astrolift_dispatch.spawners.base import ContainerSpawner
 
 
-def get_spawner(backend: str, *, cluster=None, namespace: str = "default") -> ContainerSpawner:
+def get_spawner(backend: str, *, cluster=None, namespace: str = "default", task=None) -> ContainerSpawner:
     """Return the spawner for the given backend name.
 
     Args:
@@ -20,5 +20,8 @@ def get_spawner(backend: str, *, cluster=None, namespace: str = "default") -> Co
     if backend == "local_docker":
         from astrolift_dispatch.spawners.local_docker import LocalDockerSpawner
 
-        return LocalDockerSpawner()
+        target = getattr(task, "dispatch_target", None) or {}
+        return LocalDockerSpawner(
+            connection=target.get("docker_connection"), expected_daemon_id=target.get("docker_daemon_id")
+        )
     raise ValueError(f"Unknown spawn backend: {backend!r}. Valid: k8s_job, local_docker")
