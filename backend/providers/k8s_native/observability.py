@@ -722,6 +722,13 @@ def default_log_backend() -> LogBackend:
 # kubernetes exec channels: 0=stdin 1=stdout 2=stderr 3=error(status) 4=resize.
 _EXEC_ERROR_CHANNEL = 3
 _EXEC_RESIZE_CHANNEL = 4
+_EXEC_STDIN_CHANNEL = 0
+# v5 adds one message to v4: a binary frame [255, channel] that half-closes
+# that channel, which is how a piped read-to-EOF command gets stdin EOF.
+# Data framing is otherwise identical, so offering v5 first is safe.
+_V5_PROTOCOL = "v5.channel.k8s.io"
+_EXEC_PROTOCOLS = f"{_V5_PROTOCOL},v4.channel.k8s.io"
+_V5_CLOSE = 255
 
 
 class _ExecQueue:
@@ -837,14 +844,24 @@ class InteractiveExecSession:
         await asyncio.get_running_loop().run_in_executor(None, self._resp.write_channel, _EXEC_RESIZE_CHANNEL, payload)
 
     async def close_stdin(self) -> None:
-        """No-op. The kubernetes python client's exec WSClient exposes no
-        working stdin half-close for the negotiated subprotocol — a v5
-        CLOSE-channel (255) write raises and corrupts the stream — so a
-        piped read-to-EOF command (``cat``, ``psql < script``) can't be
-        signalled stdin EOF over the relay. Interactive (TTY) sessions get
-        EOF from Ctrl-D; non-stdin commands finish on their own. Kept as a
-        hook for when upstream client support lands (#1040 follow-up)."""
-        return None
+        """Half-close the remote stdin so a piped read-to-EOF command
+        (``cat``, ``psql < script``) finishes (astrolift#145).
+
+        Needs the v5 subprotocol, negotiated in :func:`open_interactive_exec`.
+        The close is a raw binary frame: the pinned client (<36, see the EKS
+        auth note in providers/pyproject.toml) has no ``close_channel``, and
+        its ``write_channel`` would send it as text. Against an API server
+        that only speaks v4 there is no half-close, so this stays a no-op.
+        """
+        if _negotiated_protocol(self._resp) != _V5_PROTOCOL:
+            return None
+
+        def _send() -> None:
+            from websocket import ABNF
+
+            self._resp.sock.send(bytes([_V5_CLOSE, _EXEC_STDIN_CHANNEL]), opcode=ABNF.OPCODE_BINARY)
+
+        await asyncio.get_running_loop().run_in_executor(None, _send)
 
     async def wait_exit(self) -> int:
         return int(await self._exit_q.get())
@@ -853,6 +870,21 @@ class InteractiveExecSession:
         self._closed.set()
         with contextlib.suppress(Exception):
             await asyncio.get_running_loop().run_in_executor(None, self._resp.close)
+
+
+def _negotiated_protocol(resp: Any) -> str:
+    """The exec subprotocol the API server chose.
+
+    websocket-client records a subprotocol only when it was passed as
+    ``subprotocols=``; the kubernetes client sends it as a raw header, so
+    the server's choice is read from the handshake response.
+    """
+    try:
+        response = getattr(getattr(resp, "sock", None), "handshake_response", None)
+        headers = getattr(response, "headers", None) or {}
+        return str(headers.get("sec-websocket-protocol") or "")
+    except Exception:  # an unknown socket means no half-close
+        return ""
 
 
 def open_interactive_exec(
@@ -875,6 +907,9 @@ def open_interactive_exec(
         raise ClusterAuthError("kubernetes python client is not installed") from exc
 
     api_client = build_api_client(auth)
+    # The websocket client takes the subprotocol from the request headers;
+    # this client is built for this one exec, so the default header is local.
+    api_client.set_default_header("sec-websocket-protocol", _EXEC_PROTOCOLS)
     core_v1 = k8s_client.CoreV1Api(api_client)
     resp = stream(
         core_v1.connect_get_namespaced_pod_exec,
