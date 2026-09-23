@@ -127,6 +127,10 @@ MCP_ALLOWED_ORIGINS = tuple(
 MCP_SESSION_TTL_SECONDS = int(env_str("ASTROLIFT_MCP_SESSION_TTL_SECONDS", "3600"))
 MCP_MAX_REQUEST_BYTES = int(env_str("ASTROLIFT_MCP_MAX_REQUEST_BYTES", str(2 * 1024 * 1024)))
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
+CONSTANCE_ADDITIONAL_FIELDS = {
+    # uid/gid 0 is root, which runAsNonRoot refuses.
+    "posix_id": ["django.forms.IntegerField", {"min_value": 1, "max_value": 2147483647}],
+}
 CONSTANCE_DATABASE_CACHE_BACKEND = "default"
 
 CORS_ORIGIN_WHITELIST = ("https://storage.googleapis.com",)
@@ -472,6 +476,18 @@ CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("
 CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
 
 CONSTANCE_CONFIG = {
+    "AGENT_POD_UID": (
+        42042,
+        "uid non-root agent pods run as. Must be the agent user baked into the agent "
+        "images (astrolift-agents creates 42042); a uid the image does not own cannot "
+        "write its HOME and every non-root pod fails. Change only with matching images.",
+        "posix_id",
+    ),
+    "AGENT_POD_GID": (
+        42042,
+        "gid (and fsGroup) non-root agent pods run as. Same rule as AGENT_POD_UID.",
+        "posix_id",
+    ),
     "TIME_ZONE": (TIME_ZONE, "System timezone"),
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
     "GET_PRESIGNED_URL_EXPIRATION": (3600, "Time to live in seconds of presigned urls for downloading."),
@@ -706,6 +722,7 @@ CONSTANCE_CONFIG = {
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
+    "Agent pods": {"fields": ("AGENT_POD_UID", "AGENT_POD_GID"), "collapse": False},
     "System": {
         "fields": ("TIME_ZONE", "PUT_PRESIGNED_URL_EXPIRATION", "GET_PRESIGNED_URL_EXPIRATION"),
         "collapse": False,
