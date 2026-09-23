@@ -99,9 +99,15 @@ def _deprovision_dns_record_sync(
     The hostname is split into ``(name, parent zone)``; the driver
     speaks records relative to the zone. Returns a summary dict the
     mutation surfaces back to the operator.
+
+    The hostname is caller input and the driver reaches every zone its
+    credentials can, so the zone must be one the platform manages for the
+    app's org, its own or a shared one. Another org's zone is refused the
+    same way as an unmanaged one (#1909).
     """
     from aws._errors import NotFoundError
 
+    from astrolift_clusters.models import managed_domain_for_zone
     from astrolift_lifecycle.custom_domain_handshake import hostname_parent_zone
     from astrolift_registry.models import RegisteredApp
 
@@ -111,6 +117,10 @@ def _deprovision_dns_record_sync(
     ).get(pk=registered_app_id)
     cluster = _cluster_for_app(app)
     parent_zone = hostname_parent_zone(hostname)
+    if managed_domain_for_zone(parent_zone, app.organization_id) is None:
+        raise CapabilityDeprovisionError(
+            f"zone {parent_zone!r} is not a managed domain of this organization",
+        )
     name = hostname.removesuffix("." + parent_zone) if hostname != parent_zone else hostname
     dns_driver = _resolve_capability_driver(cluster, "dns")
     delete_record = getattr(dns_driver, "delete_record", None)
