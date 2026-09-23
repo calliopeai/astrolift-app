@@ -39,6 +39,9 @@ def _token(org, *, scopes, team=None):
         username=f"mcp-{org.slug}",
         email=f"mcp-{org.slug}@example.test",
     )
+    # A bearer authenticates only while its owner is an active member of
+    # its org (#1910).
+    Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.pk)
     row = ApiToken.objects.create(
         user=user,
         organization=org,
@@ -927,10 +930,7 @@ def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(pe
     org = Organization.objects.create(name="MCP Org", slug="mcp-http")
     team = Team.objects.create(organization=org, name="HTTP Team", slug="mcp-http-team")
     project, _cluster, _app, _environment = _resource_graph(org, team, suffix="http")
-    user, token = _token(org, team=team, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
-    # The bearer authenticates only while its owner is an active member
-    # of its org (#1910).
-    Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.pk)
+    _user, token = _token(org, team=team, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
     plaintext = "alft_at_http-integration-token"
     token.token_hash = hashlib.sha256(plaintext.encode()).hexdigest()
     token.save(update_fields=["token_hash", "updated_at", "version"])
