@@ -19,6 +19,7 @@ from astrolift_identity.schema.mutations.helpers import (  # noqa: F401
 )
 from astrolift_identity.schema.mutations.identity_providers import IdentityProviderMutations
 from astrolift_identity.schema.mutations.invitations import InvitationMutations
+from astrolift_identity.schema.mutations.org_modules import OrganizationModuleMutations
 from astrolift_identity.schema.mutations.organizations import OrganizationMutations
 from astrolift_identity.schema.mutations.policies import PolicyMutations
 from astrolift_identity.schema.mutations.profile import ProfileMutations
@@ -60,6 +61,7 @@ from astrolift_identity.schema.mutations.types import (  # noqa: F401
     RevokeInvitationInput,
     RevokeRoleBindingInput,
     SetActiveIdentityProviderInput,
+    SetOrganizationModuleInput,
     SoftDeleteByGuidInput,
     UpdateIdentityProviderInput,
     UpdateMyProfileInput,
@@ -92,6 +94,7 @@ class IdentityMutation(
     RoleMutations,
     InvitationMutations,
     AllowlistMutations,
+    OrganizationModuleMutations,
     ApiTokenMutations,
     PolicyMutations,
     IdentityProviderMutations,

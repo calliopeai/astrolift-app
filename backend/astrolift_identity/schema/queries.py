@@ -97,6 +97,15 @@ class ModuleEntitlementType:
     can_create: bool
     can_manage: bool
     can_run: bool
+    enabled: bool = strawberry.field(
+        description=(
+            "Whether the module is switched on for the active organization. "
+            "Always true for apps, agents, workflows and admin. For the per-org "
+            "modules (chat_studio_integration, agent_live_attach) it is true only "
+            "when an org admin turned the module on and the install has not "
+            "forced it off. Independent of the can* fields."
+        )
+    )
 
 
 @strawberry.type(name="AstroliftMe")
@@ -125,7 +134,12 @@ class MeType:
         Anonymous / no-tenant returns ``[]`` (no slug catalog leak — the
         shell renders only Dashboard). Superuser → every capability true.
         ``dashboard`` is never listed; the shell always renders it.
+
+        ``enabled`` on the per-org modules comes from
+        :func:`astrolift_identity.org_modules.enabled_modules`, the same
+        source the builder API gate reads (#1859).
         """
+        from astrolift_identity.org_modules import enabled_modules
         from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
 
@@ -139,7 +153,12 @@ class MeType:
         is_staff = bool(getattr(user, "is_staff", False) and getattr(user, "is_active", True))
 
         perms = resolve_effective_permissions_anywhere(tenant)
-        rows = module_entitlements(perms, is_superuser=is_superuser, is_staff=is_staff)
+        rows = module_entitlements(
+            perms,
+            is_superuser=is_superuser,
+            is_staff=is_staff,
+            org_modules_enabled=enabled_modules(tenant.organization_id),
+        )
         return [
             ModuleEntitlementType(
                 key=r.key,
@@ -147,6 +166,7 @@ class MeType:
                 can_create=r.can_create,
                 can_manage=r.can_manage,
                 can_run=r.can_run,
+                enabled=r.enabled,
             )
             for r in rows
         ]

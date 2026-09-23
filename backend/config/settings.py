@@ -536,6 +536,20 @@ CONSTANCE_CONFIG = {
         "Enable the Client Cove support case module. Default off until the "
         "authenticated entitlement contract and production smoke test are complete.",
     ),
+    # ---- Organization modules (#1859) ----
+    # Install-wide force-off for modules an org admin turns on per org
+    # (astrolift_identity.org_modules). On by default: the org decides.
+    # Turning one off disables the module for every organization at once.
+    "CHAT_STUDIO_INTEGRATION_ALLOWED": (
+        True,
+        "Organizations may turn on the Chat Studio integration module (shipping apps "
+        "through the builder API). Off forces the module off for every organization.",
+    ),
+    "AGENT_LIVE_ATTACH_ALLOWED": (
+        True,
+        "Organizations may turn on live attach to running agents. Off forces the module "
+        "off for every organization.",
+    ),
     "WEBHOOK_SECRET_ROTATION_GRACE_SECONDS": (
         3600,
         "Window (in seconds) the previous webhook subscription secret stays valid after a "
@@ -756,6 +770,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
     "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
+    "Organization modules": {
+        "fields": ("CHAT_STUDIO_INTEGRATION_ALLOWED", "AGENT_LIVE_ATTACH_ALLOWED"),
+        "collapse": False,
+    },
     "Log exports": {
         "fields": ("APP_LOG_EXPORT_MAX_LINES", "APP_LOG_EXPORT_TTL_SECONDS"),
         "collapse": False,

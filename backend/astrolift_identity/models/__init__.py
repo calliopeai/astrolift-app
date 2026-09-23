@@ -10,6 +10,7 @@ from astrolift_identity.models.organization import Organization
 from astrolift_identity.models.organization_allowlisted_domain import (
     OrganizationAllowlistedDomain,
 )
+from astrolift_identity.models.organization_module import OrganizationModule
 from astrolift_identity.models.policy import Policy
 from astrolift_identity.models.preferences import UserPreferences
 from astrolift_identity.models.project import Project
@@ -47,6 +48,7 @@ __all__ = [
     "OrgDomain",
     "Organization",
     "OrganizationAllowlistedDomain",
+    "OrganizationModule",
     "Policy",
     "Project",
     "RevocationReason",

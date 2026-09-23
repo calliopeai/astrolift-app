@@ -111,6 +111,32 @@ def _resolve_org(request: HttpRequest):
     return org, None
 
 
+def _module_gate(org):
+    """403 when the org cannot use the builder API, else ``None`` (#1859).
+
+    The builder API is the Chat Studio integration module's surface, so it
+    follows that module's per-org switch. ``reason`` lets the client say
+    whether an org admin can fix it or only the install admin can.
+    """
+    from astrolift_identity.org_modules import (
+        CHAT_STUDIO_INTEGRATION,
+        REASON_DISABLED_BY_INSTALL,
+        module_state,
+    )
+
+    enabled, reason = module_state(org.pk, CHAT_STUDIO_INTEGRATION)
+    if enabled:
+        return None
+    if reason == REASON_DISABLED_BY_INSTALL:
+        detail = "the chat_studio_integration module is turned off on this install"
+    else:
+        detail = "the chat_studio_integration module is not enabled for this organization"
+    return JsonResponse(
+        {"detail": detail, "reason": reason, "module": CHAT_STUDIO_INTEGRATION},
+        status=403,
+    )
+
+
 def _load_json(request: HttpRequest, *, max_bytes: int | None = None):
     """Parse the request body. Returns ``(body, None)`` or ``(None, err_response)``.
 
@@ -232,6 +258,9 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
     org, err = _resolve_org(request)
     if err:
         return err
+    err = _module_gate(org)
+    if err:
+        return err
 
     body, err = _load_json(request)
     if err:
@@ -351,6 +380,9 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
         return JsonResponse({"detail": "authentication required"}, status=401)
 
     org, err = _resolve_org(request)
+    if err:
+        return err
+    err = _module_gate(org)
     if err:
         return err
 
@@ -481,6 +513,9 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         return JsonResponse({"detail": "authentication required"}, status=401)
 
     org, err = _resolve_org(request)
+    if err:
+        return err
+    err = _module_gate(org)
     if err:
         return err
 
