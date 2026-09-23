@@ -193,6 +193,9 @@ def test_poll_complete_expires_pending_lazily():
 def _approve_and_issue(now=None):
     user = _make_user()
     org = Organization.objects.create(name="X", slug="x")
+    # The approval page offers only orgs the user is an active member
+    # of, and the issued credentials stop working without one (#1910).
+    _make_member(user, org)
     row, sid = device_flow.create_session(client_label="cli")
     device_flow.approve_session(row, user=user, organization=org)
     later = (now or timezone.now()) + device_flow.MIN_POLL_INTERVAL + dt.timedelta(seconds=1)

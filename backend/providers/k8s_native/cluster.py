@@ -545,17 +545,21 @@ class K8sNativeClusterDriver(ClusterDriver):
         namespace: str,
         app_slug: str,
         task_id: str = "",
+        job_name: str = "",
     ) -> list[PodInfo]:
         """Delegate to the (pluggable) pod backend. Subclasses for
         managed-cloud variants (EKS/GKE/AKS) override only when the
         auth path differs; the listing shape is cloud-neutral.
 
         ``task_id`` (#891) selects an agent task pod by its
-        ``astrolift.dev/task-id`` label; forwarded only when set so
-        backends that predate the kwarg keep working."""
+        ``astrolift.dev/task-id`` label; ``job_name`` (#1712) selects by
+        Kubernetes' own ``job-name`` label. Both are forwarded only when
+        set so backends that predate the kwarg keep working."""
         kwargs: dict[str, Any] = {"auth": auth, "namespace": namespace, "app_slug": app_slug}
         if task_id:
             kwargs["task_id"] = task_id
+        if job_name:
+            kwargs["job_name"] = job_name
         return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="k8s_native", driver="cluster")

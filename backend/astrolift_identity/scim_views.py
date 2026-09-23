@@ -58,13 +58,16 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from astrolift_identity.models import (
+    ApiToken,
     AstroliftSession,
+    DeviceFlowSession,
     Member,
     Organization,
     RevocationReason,
@@ -259,10 +262,15 @@ def _name_parts(body: dict[str, Any], projected: ScimUser) -> tuple[str, str]:
 def _deprovision(member: Member, user) -> None:
     """Deactivate, never delete (spec 04 §11).
 
-    Dropping the ORG membership is what removes access: the tenant
-    middleware resolves a request's organization from *active* ORG
-    Member rows only, so an inactive row leaves the person with no
-    tenant in this org.
+    Dropping the ORG membership removes the person's API access to this
+    org: a bearer token or CLI refresh chain is honoured only while its
+    owner is an active member of the token's org (#1910). The
+    credentials issued under this membership are also revoked here, so
+    re-provisioning the person later does not revive a token that was
+    copied somewhere during their first tenure; they sign in again.
+    Browser sessions are not confined the same way yet: the tenant
+    middleware still honours an ``X-Astrolift-Organization`` header
+    naming this org (#1925).
 
     When that was their last active org membership there is nothing
     left for them anywhere on the install, so the account itself goes
@@ -274,6 +282,7 @@ def _deprovision(member: Member, user) -> None:
     member.is_active = False
     member.lifecycle = Member.Lifecycle.DEACTIVATED
     member.save(update_fields=["is_active", "lifecycle", "updated_at", "version"])
+    _revoke_org_credentials(user, member.scope_id)
 
     if Member.objects.filter(
         user=user,
@@ -287,6 +296,39 @@ def _deprovision(member: Member, user) -> None:
         user.save(update_fields=["is_active"])
     for row in AstroliftSession.objects.filter(user=user, revoked_at__isnull=True):
         revoke_session(row=row, actor_user_id=None, reason=RevocationReason.SCIM_DEPROVISION)
+
+
+def _revoke_org_credentials(user, organization_id: int) -> None:
+    """End every API credential ``user`` holds for one org, or is about
+    to collect for it.
+
+    Besides minted ``alft_at_`` tokens and CLI / mobile refresh chains,
+    this covers a device login already approved but not yet polled and
+    an enrollment QR not yet scanned: either would otherwise mint a
+    fresh token for this org after the person left it.
+    """
+    now = timezone.now()
+    # Sessions first, tokens last: a poll or refresh already in flight
+    # holds its session row lock, so these updates wait for it to commit,
+    # and the token revoke below then also catches the token it minted.
+    sessions = DeviceFlowSession.objects.filter(approved_user=user, organization_id=organization_id)
+    sessions.filter(
+        state__in=[DeviceFlowSession.STATE_APPROVED, DeviceFlowSession.STATE_PRE_APPROVED]
+    ).update(
+        state=DeviceFlowSession.STATE_EXPIRED,
+        enrollment_token_hash="",
+        updated_at=now,
+        version=F("version") + 1,
+    )
+    sessions.exclude(refresh_token_hash="").update(
+        refresh_token_hash="",
+        refresh_token_last_4="",
+        updated_at=now,
+        version=F("version") + 1,
+    )
+    ApiToken.objects.filter(user=user, organization_id=organization_id, is_revoked=False).update(
+        is_revoked=True, updated_at=now, version=F("version") + 1
+    )
 
 
 def _reactivate(member: Member, user) -> None:
