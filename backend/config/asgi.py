@@ -49,10 +49,32 @@ def _build_websocket_app():
 _websocket_app = None
 
 
+def _websocket_origin_ok(scope) -> bool:
+    """Refuse a cookie-authenticated handshake from a foreign origin.
+
+    CORS does not cover WebSockets, and the session cookie rides a
+    handshake from any same-site host, including app and preview hosts
+    that run user code (#1926). Only the cookie is ambient: a bearer
+    handshake (CLI) or a cookieless one (mobile sends its token in
+    ``connectionParams``) proves nothing about the page, so it skips.
+    """
+    from django.conf import settings
+
+    from core.schema.ws_auth import _bearer_from_scope, _header_from_scope, _parse_cookies
+    from core.utils.browser_guard import websocket_origin_allowed
+
+    if _bearer_from_scope(scope) or settings.SESSION_COOKIE_NAME not in _parse_cookies(scope):
+        return True
+    return websocket_origin_allowed(_header_from_scope(scope, "origin"), _header_from_scope(scope, "host"))
+
+
 async def application(scope, receive, send):
     global _websocket_app
     if scope["type"] == "websocket":
         path = scope.get("path", "")
+        if not _websocket_origin_ok(scope):
+            await send({"type": "websocket.close", "code": 4403})
+            return
         if path.startswith("/app/gql/config/ws"):
             if _websocket_app is None:
                 _websocket_app = _build_websocket_app()

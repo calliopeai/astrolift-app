@@ -286,7 +286,8 @@ def device_flow_refresh(request: HttpRequest) -> JsonResponse:
     * 200 + new pair on success
     * 401 on unknown / wrong-prefix refresh token (also the replay
       case after rotation — the prior hash is gone from the row)
-    * 410 on TTL-expired refresh chain
+    * 410 on TTL-expired refresh chain, or once the approving user is
+      no longer an active member of the chain's organization
     """
     body = _json_body(request)
     refresh_token = body.get("refresh_token")

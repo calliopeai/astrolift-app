@@ -21,7 +21,7 @@ from astrolift_identity.api_tokens import (
     reset_current_api_token,
     set_current_api_token,
 )
-from astrolift_identity.models import ApiToken
+from astrolift_identity.models import ApiToken, Member
 from astrolift_registry.models import AppTeamAccess, Workload
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
@@ -277,6 +277,9 @@ def test_ambiguous_authorized_agents_cannot_be_read_or_dispatched(mcp):
 
 @pytest.mark.parametrize("kind,team_token", [("APP", False), ("TEAM", False), ("ORG", True)])
 def test_http_authentication_preserves_scoped_fleet_access(mcp, kind, team_token):
+    # The bearer authenticates only while its owner is an active member
+    # of its org (#1910).
+    Member.objects.create(user=mcp.user, scope_kind=Member.ScopeKind.ORG, scope_id=mcp.world.org.pk)
     bind(mcp, kind, [Permission.AGENT_READ, Permission.AGENT_DISPATCH])
     mcp.credential.team = mcp.world.medops if team_token else None
     mcp.credential.scopes = [SCOPE_MCP_READ]

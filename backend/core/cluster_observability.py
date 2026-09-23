@@ -161,16 +161,26 @@ class _OverrideDriver:
         self._log_backend = log_backend
         self._events_backend = events_backend
 
-    def list_pods(self, *, auth: Any, namespace: str, app_slug: str, task_id: str = "") -> list[Any]:
+    def list_pods(
+        self,
+        *,
+        auth: Any,
+        namespace: str,
+        app_slug: str,
+        task_id: str = "",
+        job_name: str = "",
+    ) -> list[Any]:
         if self._pod_backend is None:
             raise ClusterObservabilityError(
                 "list_pods called without a pod backend override; set_pod_backend_for_tests was not called",
             )
         kwargs: dict[str, Any] = {"auth": auth, "namespace": namespace, "app_slug": app_slug}
-        # Forward task_id only when set so app-path test backends (whose
-        # list_pods predates the kwarg) keep working unchanged (#891).
+        # Forward task_id/job_name only when set so app-path test backends
+        # (whose list_pods predates the kwarg) keep working unchanged (#891, #1712).
         if task_id:
             kwargs["task_id"] = task_id
+        if job_name:
+            kwargs["job_name"] = job_name
         return self._pod_backend.list_pods(**kwargs)
 
     def stream_logs(
@@ -3197,16 +3207,27 @@ def list_app_pods(
     namespace: str,
     app_slug: str,
     task_id: str = "",
+    job_name: str = "",
 ) -> list[Any]:
     """Resolver-facing entry. Returns a list of ``PodInfo`` (from
     the provider SDK). Resolver layer is responsible for catching
     :class:`ClusterObservabilityError` and rendering the empty UI.
 
     ``task_id`` (#891), when set, discovers an agent task pod by its
-    ``astrolift.dev/task-id`` label rather than the ``app_slug`` label."""
+    ``astrolift.dev/task-id`` label rather than the ``app_slug`` label.
+    ``job_name`` (#1712), when set and ``task_id`` is not, discovers a
+    Job's pod by Kubernetes' own ``job-name`` label instead — the only
+    selector that can resolve a Job's real (suffixed) pod name from just
+    the Job's frozen name."""
     driver = _driver_for_cluster(cluster)
     auth = _auth_for_cluster(cluster)
-    return driver.list_pods(auth=auth, namespace=namespace, app_slug=app_slug, task_id=task_id)
+    return driver.list_pods(
+        auth=auth,
+        namespace=namespace,
+        app_slug=app_slug,
+        task_id=task_id,
+        job_name=job_name,
+    )
 
 
 def list_app_pod_warning_events(
@@ -3308,15 +3329,24 @@ async def fetch_task_pod_logs(
        turns a non-empty ``task_id`` into an
        ``astrolift.dev/task-id=<guid>`` label query, so the agent pod is
        resolved exactly on a real cluster (#891).
-    2. ``pod_name_hint`` — the dispatcher records the spawned Job name
-       on ``AgentTask.pod_name``; passed through as a last-resort pod
-       name so a single-pod Job whose pod name equals the Job name (or
-       a future exact pod name) still streams.
+    2. ``pod_name_hint`` — the dispatcher records the spawned Job's name
+       on ``AgentTask.pod_name``, never a real pod name: Kubernetes always
+       appends a generated suffix to a Job's pod, so the Job name itself
+       can never be read as a pod's logs directly (#1712). Re-queried as a
+       ``job_name`` selector instead, which resolves through Kubernetes'
+       own ``job-name`` label — the one label the Job controller stamps on
+       a pod regardless of anything this platform sets.
 
     Returns ``[]`` — never raises — when the cluster can't be turned
     into a usable driver, no pod is found, or the stream yields nothing
     yet. The resolver layer surfaces the empty list as "no logs yet"
     rather than a 500.
+
+    Each discovery attempt is bound by ``_TASK_LOG_READ_TIMEOUT_SECONDS``,
+    the same ceiling the log stream itself uses -- ``list_namespaced_pod``'s
+    own ``timeout_seconds`` covers the read, but not connection setup or a
+    hung DNS/TCP handshake, so a slow apiserver could otherwise wedge the
+    GraphQL worker on a synchronous call it can't cancel.
     """
     from asgiref.sync import sync_to_async
 
@@ -3324,13 +3354,14 @@ async def fetch_task_pod_logs(
     if tail == 0:
         return []
 
-    def _discover() -> str:
+    def _discover(*, task_id: str = "", job_name: str = "") -> str:
         try:
             pods = list_app_pods(
                 cluster=cluster,
                 namespace=namespace,
                 app_slug=task_guid,
-                task_id=task_guid,
+                task_id=task_id,
+                job_name=job_name,
             )
         except ClusterObservabilityError:
             return ""
@@ -3343,9 +3374,26 @@ async def fetch_task_pod_logs(
                 return name
         return ""
 
-    pod_name = await sync_to_async(_discover)()
-    if not pod_name:
-        pod_name = (pod_name_hint or "").strip()
+    async def _discover_bounded(*, task_id: str = "", job_name: str = "") -> str:
+        try:
+            return await asyncio.wait_for(
+                sync_to_async(_discover)(task_id=task_id, job_name=job_name),
+                timeout=_TASK_LOG_READ_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            logger.warning(
+                "fetch_task_pod_logs: discovery exceeded %ss for task %s (task_id=%r job_name=%r)",
+                _TASK_LOG_READ_TIMEOUT_SECONDS,
+                task_guid,
+                task_id,
+                job_name,
+            )
+            return ""
+
+    pod_name = await _discover_bounded(task_id=task_guid)
+    hint = (pod_name_hint or "").strip()
+    if not pod_name and hint:
+        pod_name = await _discover_bounded(job_name=hint)
     if not pod_name:
         return []
 

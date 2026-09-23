@@ -540,6 +540,7 @@ class AKSClusterDriver(ClusterDriver):
         namespace: str,
         app_slug: str,
         task_id: str = "",
+        job_name: str = "",
     ) -> list[PodInfo]:
         """List pods on the AKS cluster.
 
@@ -551,8 +552,9 @@ class AKSClusterDriver(ClusterDriver):
         unchanged.
 
         ``task_id`` (#891) selects an agent task pod by its
-        ``astrolift.dev/task-id`` label; forwarded only when set so
-        backends that predate the kwarg keep working.
+        ``astrolift.dev/task-id`` label; ``job_name`` (#1712) selects by
+        Kubernetes' own ``job-name`` label. Both are forwarded only when
+        set so backends that predate the kwarg keep working.
         """
         kwargs: dict[str, Any] = {
             "auth": self._resolve_aks_auth(auth),
@@ -561,6 +563,8 @@ class AKSClusterDriver(ClusterDriver):
         }
         if task_id:
             kwargs["task_id"] = task_id
+        if job_name:
+            kwargs["job_name"] = job_name
         return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="azure", driver="cluster")
