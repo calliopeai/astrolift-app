@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Record an empty object instead of failing the mutation audit log when a
+  GraphQL mutation is sent with no `variables`. The previous NOT NULL failure
+  was only logged as a warning, but it had already poisoned the rest of the
+  request's transaction (#1882).
+
 - The App Builder files sync accepts binary files as base64 with a declared
   encoding, plus one `data_file` with its own cap (Constance
   `BUILDER_DATA_FILE_MAX_BYTES`, default 64 MiB). Promote now serves the app
