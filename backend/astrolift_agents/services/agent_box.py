@@ -186,6 +186,11 @@ def render_agent_box_job(
         container["env"],
     )
 
+    # No image creates the session's working directory, so the runtime would
+    # make it root-owned and a non-root box could not write where it starts.
+    # An emptyDir there is writable in both modes (fsGroup covers non-root).
+    container["volumeMounts"] = [{"name": "workspace", "mountPath": container["workingDir"]}]
+
     labels = {
         "astrolift.dev/workload-kind": "agent-box",
         "astrolift.dev/agent-box": str(box.guid),
@@ -208,6 +213,7 @@ def render_agent_box_job(
                 "spec": {
                     "restartPolicy": "Never",
                     "containers": [container],
+                    "volumes": [{"name": "workspace", "emptyDir": {}}],
                     **({"serviceAccountName": model_service_account} if model_service_account else {}),
                 },
             },
