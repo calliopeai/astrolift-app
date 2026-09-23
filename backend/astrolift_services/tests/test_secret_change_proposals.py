@@ -313,7 +313,11 @@ def test_propose_secret_change_set_op(permission_resolver):
     assert result.ok, result.errors
     assert result.data.op == "set"
     assert result.data.status == "pending"
-    assert result.data.payload == {"key": "API_KEY", "value": "zzz"}
+    # The proposer only holds app.update here (not secret.read + step-up
+    # elevation), so the mutation's own response masks the literal it was
+    # just given (#1920) — the same gate applies uniformly whether this
+    # proposal is read back immediately or by a later, different caller.
+    assert result.data.payload == {"key": "API_KEY", "value": "[REDACTED]"}
 
 
 def test_propose_secret_change_rejects_bad_op(permission_resolver):

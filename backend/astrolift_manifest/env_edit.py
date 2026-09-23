@@ -11,6 +11,14 @@ formatting are NOT preserved — that's a known limitation of
 the UI and dev-side hand-editing happens through PRs, so the
 trade-off is acceptable for app-secret CRUD.
 
+Redact-side: ``redact_env_values(toml_text)`` replaces every ``[env]``
+value with a fixed placeholder, keys untouched — the read-side
+counterpart to ``set_app_env_keys``, used to mask secret values on
+every surface that returns raw manifest text to a caller who hasn't
+proven ``secret.read`` + step-up elevation (#1920).
+``redact_dotenv_values(text)`` is the same idea for a bulk-import
+``.env`` paste rather than a TOML document.
+
 Used by the GraphQL secrets resolver (#279). Mutations write to
 the staging buffer (``manifest_raw_staged``); the user-driven
 'Push to Repo' flow re-serializes to the source repo.
@@ -60,6 +68,38 @@ def set_app_env_keys(
     return tomli_w.dumps(data)
 
 
+_REDACTED_VALUE = "[REDACTED]"
+
+
+def redact_env_values(toml_text: str) -> str:
+    """Return ``toml_text`` with every value in the top-level ``[env]``
+    table replaced by a fixed placeholder. Keys and every other table
+    (``[[workloads]]``, ``astrolift_version``, …) are left exactly as
+    the parse recovers them — only the ``[env]`` values are secret
+    material (#1920).
+
+    A document that doesn't parse, or has no ``[env]`` table, comes
+    back unchanged — there's nothing to redact, and masking a value
+    nobody could read as a literal anyway would just replace a parse
+    error with a silently wrong document. Round-trips through
+    ``tomli_w`` like :func:`set_app_env_keys`, so comments/formatting
+    outside the values themselves are not byte-preserved — the same
+    accepted trade-off that write path already makes."""
+    if not toml_text or not toml_text.strip():
+        return toml_text
+    try:
+        data = tomllib.loads(toml_text)
+    except tomllib.TOMLDecodeError:
+        return toml_text
+    env_table = data.get("env")
+    if not isinstance(env_table, Mapping) or not env_table:
+        return toml_text
+    import tomli_w
+
+    data["env"] = dict.fromkeys(env_table, _REDACTED_VALUE)
+    return tomli_w.dumps(data)
+
+
 def delete_app_env_key(toml_text: str, key: str) -> tuple[str, bool]:
     """Remove ``key`` from the top-level ``[env]`` table.
 
@@ -105,6 +145,50 @@ def parse_dotenv(text: str) -> dict[str, str]:
             value = value[1:-1]
         out[key] = value
     return out
+
+
+def redact_dotenv_values(text: str) -> str:
+    """Return dotenv-shape ``text`` with every ``KEY=value`` line's value
+    replaced by the same placeholder :func:`redact_env_values` uses, one
+    line at a time. Comment lines, blank lines, and lines that don't
+    parse as ``KEY=value`` (mirrors :func:`parse_dotenv`'s own leniency)
+    are left untouched — there's no secret value on them.
+
+    Line-based rather than "parse then rebuild" like the TOML redactor:
+    ``bulkImportAppSecrets`` accepts free-form dotenv paste, including
+    lines ``parse_dotenv`` will silently skip, and this must never turn
+    a skip into a value disclosure. Used to mask the ``dotenvText``
+    argument before it reaches the mutation audit log, which has no
+    per-caller step-up gate of its own (#1920)."""
+    if not text:
+        return text
+    out_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            out_lines.append(raw_line)
+            continue
+        prefix = ""
+        rest = line
+        if rest.startswith("export "):
+            prefix = "export "
+            rest = rest[len("export ") :].lstrip()
+        if "=" not in rest:
+            out_lines.append(raw_line)
+            continue
+        key, _, _value = rest.partition("=")
+        key = key.strip()
+        if not key or not _is_valid_env_name(key):
+            out_lines.append(raw_line)
+            continue
+        out_lines.append(f"{prefix}{key}={_REDACTED_VALUE}")
+    result = "\n".join(out_lines)
+    # ``splitlines`` drops the record of a trailing newline; restore it
+    # so a line this function never touches (no secret on it) still
+    # round-trips exactly, matching the "untouched" promise above.
+    if text.endswith("\n"):
+        result += "\n"
+    return result
 
 
 def _is_valid_env_name(name: str) -> bool:

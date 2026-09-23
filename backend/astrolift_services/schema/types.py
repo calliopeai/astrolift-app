@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 
 import strawberry
+from strawberry.types import Info
 
 from astrolift_graphql import GUID
 from astrolift_services.models import WorkloadIdentityGrant, grant_state_for
+from astrolift_services.secret_visibility import can_reveal_app_secrets
 
 JSON = strawberry.scalars.JSON
 
@@ -674,7 +677,14 @@ class SecretChangeProposalType:
 
     payload: JSON
     """The proposed change.  Shape varies by op; the FE reads
-    ``payload_diff`` for the render-friendly summary."""
+    ``payload_diff`` for the render-friendly summary.
+
+    ``set`` / ``rotate`` proposals carry the literal plaintext value
+    under ``payload["value"]`` — masked to ``[REDACTED]`` unless the
+    viewer holds ``secret.read`` and is step-up elevated (#1920), the
+    same gate ``revealAppSecret`` enforces. Approvers only ever needed
+    ``secret.approve`` to review a proposal via ``payload_diff``; this
+    field must not become the side door around that."""
 
     payload_diff: JSON
     """Pre-rendered before/after for the proposal-detail page."""
@@ -715,7 +725,19 @@ def secret_change_approval_to_type(approval) -> SecretChangeApprovalType:
     )
 
 
-def secret_change_proposal_to_type(proposal) -> SecretChangeProposalType:
+def _redact_proposal_payload(payload: dict[str, Any], *, can_reveal: bool) -> dict[str, Any]:
+    """Mask ``payload["value"]`` (the literal plaintext on a set/rotate
+    proposal) unless the viewer can reveal secrets (#1920). Other ops
+    (``delete`` / ``attach_bundle`` / ``detach_bundle``) carry no
+    secret value and pass through unchanged."""
+    if can_reveal or "value" not in payload:
+        return payload
+    masked = dict(payload)
+    masked["value"] = "[REDACTED]"
+    return masked
+
+
+def secret_change_proposal_to_type(proposal, *, info: Info) -> SecretChangeProposalType:
     proposer = proposal.proposer
     if proposer is None:
         proposer_display = ""
@@ -741,7 +763,10 @@ def secret_change_proposal_to_type(proposal) -> SecretChangeProposalType:
         status=proposal.status,
         proposer_user_id=proposer_id,
         proposer_display_name=proposer_display,
-        payload=proposal.payload or {},
+        payload=_redact_proposal_payload(
+            proposal.payload or {},
+            can_reveal=can_reveal_app_secrets(info, app=proposal.registered_app),
+        ),
         payload_diff=proposal.payload_diff or {},
         required_approver_count=int(proposal.required_approver_count or 0),
         approvals_count=approved_count,

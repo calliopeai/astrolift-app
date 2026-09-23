@@ -49,6 +49,7 @@ from astrolift_services.schema.mutations.types import (
 from astrolift_services.schema.types import (
     RevealedSecretType,
 )
+from astrolift_services.secret_visibility import redacted_manifest_text
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -102,7 +103,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -133,7 +136,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -180,7 +183,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -208,7 +213,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -247,7 +252,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -274,7 +281,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -391,7 +398,7 @@ class SecretMutations:
             _BulkImportPayload(
                 app_slug=app.slug,
                 keys_set=sorted(kvs.keys()),
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 

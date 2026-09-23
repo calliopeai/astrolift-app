@@ -44,6 +44,7 @@ class ManifestMutations:
             SyncSnapshot,
             classify_state,
         )
+        from astrolift_services.secret_visibility import redacted_manifest_text
 
         # Org-scope the by-guid lookup to the caller's tenant before staging
         # the manifest edit. Fails closed (NOT_FOUND) when org_id is
@@ -91,8 +92,10 @@ class ManifestMutations:
             _ManifestStagePayload(
                 id=input.id,
                 sync_state=sync_state.value,
-                raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged=app.manifest_raw_staged or "",
+                raw_manifest=redacted_manifest_text(info, app=app, raw_text=app.manifest_raw or ""),
+                raw_manifest_staged=redacted_manifest_text(
+                    info, app=app, raw_text=app.manifest_raw_staged or ""
+                ),
             )
         )
 
@@ -125,6 +128,7 @@ class ManifestMutations:
         from astrolift_registry.services.manifest_sync import (
             resync_app_manifest_from_repo,
         )
+        from astrolift_services.secret_visibility import redacted_manifest_text
 
         # Org-scope the by-guid lookup to the caller's tenant before the
         # repo re-fetch + apply (SCM call). Fails closed (NOT_FOUND) when
@@ -166,8 +170,10 @@ class ManifestMutations:
             _ManifestStagePayload(
                 id=input.id,
                 sync_state=sync_state.value,
-                raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged=app.manifest_raw_staged or "",
+                raw_manifest=redacted_manifest_text(info, app=app, raw_text=app.manifest_raw or ""),
+                raw_manifest_staged=redacted_manifest_text(
+                    info, app=app, raw_text=app.manifest_raw_staged or ""
+                ),
             )
         )
 

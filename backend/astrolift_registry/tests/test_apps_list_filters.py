@@ -495,10 +495,12 @@ def test_page_query_count_independent_of_app_count():
     # And the cheap path is genuinely cheap — the resolver only fires
     # a small constant number of queries (page + count +
     # prefetch + viewer/permission checks + #730's active-preview-count
-    # aggregate). The bound is intentionally a constant, not a
+    # aggregate + #1920's bulk viewer-permissions lookup, which
+    # ``app_to_type`` needs to decide whether to mask [env] secret
+    # values per row). The bound is intentionally a constant, not a
     # per-row scaling — N+1 protection is the ``small == full``
     # assertion above; this is the absolute-cheapness assertion.
-    assert len(small_ctx.captured_queries) <= 5, [q["sql"] for q in small_ctx.captured_queries]
+    assert len(small_ctx.captured_queries) <= 6, [q["sql"] for q in small_ctx.captured_queries]
 
 
 # ---------- my-apps parity ---------------------------------------------

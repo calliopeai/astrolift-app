@@ -43,7 +43,7 @@ class ArchiveMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
         if app.archived_at is not None:
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         actor = info.context.request.user
         app.archived_at = timezone.now()
@@ -58,7 +58,7 @@ class ArchiveMutations:
             wl.updated_by = actor
             wl.save(update_fields=["replicas", "pre_archive_replicas", "updated_by", "updated_at", "version"])
 
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.mutation
     @mutation_audit(action="app.restore")
@@ -76,7 +76,7 @@ class ArchiveMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
         if app.archived_at is None:
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         actor = info.context.request.user
         app.archived_at = None
@@ -95,4 +95,4 @@ class ArchiveMutations:
             wl.updated_by = actor
             wl.save(update_fields=["replicas", "pre_archive_replicas", "updated_by", "updated_at", "version"])
 
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))

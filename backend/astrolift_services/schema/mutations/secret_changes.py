@@ -200,7 +200,7 @@ class SecretChangeMutations:
             created_by=actor,
             updated_by=actor,
         )
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -298,7 +298,7 @@ class SecretChangeMutations:
                     )
 
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -398,7 +398,7 @@ class SecretChangeMutations:
             proposal.transition_to(SecretChangeProposal.Status.REJECTED)
 
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -445,4 +445,4 @@ class SecretChangeMutations:
         with transaction.atomic():
             proposal.transition_to(SecretChangeProposal.Status.WITHDRAWN)
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))

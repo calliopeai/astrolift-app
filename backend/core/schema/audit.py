@@ -4,6 +4,8 @@ Strawberry extension that records every mutation execution:
 who called it, when, with what variables, and whether it succeeded.
 
 Sensitive fields (password, pin, token) are redacted from logged variables.
+Manifest/dotenv-shaped arguments have their embedded secret literals
+masked structurally rather than wholesale (#1920) — see ``MANIFEST_TEXT_KEYS``.
 """
 
 import logging
@@ -17,6 +19,17 @@ logger = logging.getLogger(__name__)
 
 SENSITIVE_KEYS = {"password", "pin", "token", "secret", "ssn", "credit_card", "secure"}
 SECRET_VALUE_KEYS = {"value", "values", "plaintext"}
+
+# Arguments that carry a whole manifest/dotenv document rather than one
+# isolated secret value (#1920): ``updateManifest.rawManifest``,
+# ``registerApp.manifestRaw``, and ``bulkImportAppSecrets.dotenvText``
+# all embed ``[env]``-table (or KEY=value) secret literals inline with
+# ordinary, useful-for-audit document content. A blanket
+# ``***REDACTED***`` (right for ``SECRET_VALUE_KEYS``) would also erase
+# that non-secret content; these get the same structural mask the
+# GraphQL response fields use instead, via ``astrolift_manifest.env_edit``.
+MANIFEST_TEXT_KEYS = {"rawmanifest", "manifestraw", "rawmanifeststaged"}
+DOTENV_TEXT_KEYS = {"dotenvtext"}
 
 
 def _redact(value: Any, *, secret_operation: bool = False) -> Any:
@@ -32,6 +45,12 @@ def _redact(value: Any, *, secret_operation: bool = False) -> Any:
         for raw_key, child in value.items():
             key = str(raw_key)
             normalized = key.lower()
+            if normalized in MANIFEST_TEXT_KEYS and isinstance(child, str):
+                redacted[key] = _redact_manifest_text(child)
+                continue
+            if normalized in DOTENV_TEXT_KEYS and isinstance(child, str):
+                redacted[key] = _redact_dotenv_text(child)
+                continue
             sensitive = any(token in normalized for token in SENSITIVE_KEYS)
             # GraphQL operation names are caller-controlled and one document
             # may execute more than one mutation. Never make plaintext safety
@@ -46,6 +65,26 @@ def _redact(value: Any, *, secret_operation: bool = False) -> Any:
     if isinstance(value, (list, tuple)):
         return [_redact(item, secret_operation=secret_operation) for item in value]
     return value
+
+
+def _redact_manifest_text(text: str) -> str:
+    """Mask ``[env]`` values in a manifest-shaped audit variable (#1920).
+
+    The audit log is a durable, superuser-readable record — unlike a
+    live resolver it has no single "current caller" to gate on, so this
+    always masks, the same way ``secret_change_diff.build_diff`` always
+    masks rather than checking a viewer's ``secret.read`` + elevation."""
+    from astrolift_manifest.env_edit import redact_env_values
+
+    return redact_env_values(text)
+
+
+def _redact_dotenv_text(text: str) -> str:
+    """Mask values in a dotenv-shaped audit variable (#1920). See
+    :func:`_redact_manifest_text`."""
+    from astrolift_manifest.env_edit import redact_dotenv_values
+
+    return redact_dotenv_values(text)
 
 
 def _is_secret_operation(action: str) -> bool:

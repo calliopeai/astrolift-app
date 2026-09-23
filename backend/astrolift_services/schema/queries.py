@@ -1565,7 +1565,7 @@ class ServicesQuery:
             if status in valid:
                 qs = qs.filter(status=status)
         # Hard cap so a runaway tenant can't page-of-everything us.
-        return [secret_change_proposal_to_type(p) for p in qs[:200]]
+        return [secret_change_proposal_to_type(p, info=info) for p in qs[:200]]
 
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=secret_change_proposal_app_scope("id"))
@@ -1592,4 +1592,4 @@ class ServicesQuery:
         )
         if proposal is None:
             return None
-        return secret_change_proposal_to_type(proposal)
+        return secret_change_proposal_to_type(proposal, info=info)

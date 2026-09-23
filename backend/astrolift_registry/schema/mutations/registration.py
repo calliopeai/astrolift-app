@@ -358,7 +358,7 @@ class RegistrationMutations:
                 app.slug,
             )
 
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(

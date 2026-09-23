@@ -6,6 +6,8 @@ from astrolift_manifest.env_edit import (
     delete_app_env_key,
     parse_dotenv,
     read_app_env,
+    redact_dotenv_values,
+    redact_env_values,
     set_app_env_keys,
 )
 
@@ -144,3 +146,77 @@ def test_parse_dotenv_skips_lines_without_equals() -> None:
 def test_parse_dotenv_empty_value() -> None:
     parsed = parse_dotenv("EMPTY=\n")
     assert parsed == {"EMPTY": ""}
+
+
+# ---- redact_env_values (#1920) ------------------------------------
+
+
+def test_redact_env_values_masks_values_keeps_keys() -> None:
+    out = redact_env_values(_BASE)
+    parsed = read_app_env(out)
+    assert set(parsed.keys()) == {"DATABASE_URL", "LOG_LEVEL"}
+    assert "postgres://x" not in out
+    assert all(v == "[REDACTED]" for v in parsed.values())
+
+
+def test_redact_env_values_preserves_other_tables() -> None:
+    out = redact_env_values(_BASE)
+    import tomllib
+
+    parsed = tomllib.loads(out)
+    assert parsed["app"]["name"] == "hello"
+    assert parsed["app"]["slug"] == "hello-app"
+    assert parsed["workloads"][0]["name"] == "web"
+    assert parsed["astrolift_version"] == 1
+
+
+def test_redact_env_values_no_env_section_unchanged() -> None:
+    text = '[app]\nname = "x"\nslug = "x"\n'
+    assert redact_env_values(text) == text
+
+
+def test_redact_env_values_empty_input_unchanged() -> None:
+    assert redact_env_values("") == ""
+
+
+def test_redact_env_values_malformed_toml_unchanged() -> None:
+    """Bad TOML returns unchanged — same fail-safe posture as
+    ``read_app_env``; there's no parsed [env] table to mask."""
+    text = "not [valid toml"
+    assert redact_env_values(text) == text
+
+
+# ---- redact_dotenv_values (#1920) ----------------------------------
+
+
+def test_redact_dotenv_values_masks_values_keeps_keys() -> None:
+    text = 'API_KEY=sk-live-secret\nLOG_LEVEL="debug"\n'
+    out = redact_dotenv_values(text)
+    assert "sk-live-secret" not in out
+    assert "debug" not in out
+    assert "API_KEY=[REDACTED]" in out
+    assert "LOG_LEVEL=[REDACTED]" in out
+
+
+def test_redact_dotenv_values_preserves_comments_and_blank_lines() -> None:
+    text = "# a comment\n\nAPI_KEY=secret\n"
+    out = redact_dotenv_values(text)
+    lines = out.splitlines()
+    assert lines[0] == "# a comment"
+    assert lines[1] == ""
+    assert lines[2] == "API_KEY=[REDACTED]"
+
+
+def test_redact_dotenv_values_preserves_export_prefix() -> None:
+    text = "export API_KEY=secret\n"
+    out = redact_dotenv_values(text)
+    assert out == "export API_KEY=[REDACTED]\n"
+
+
+def test_redact_dotenv_values_leaves_unparseable_lines_untouched() -> None:
+    text = "not a kv line\n1INVALID=secret\n"
+    assert redact_dotenv_values(text) == text
+
+
+def test_redact_dotenv_values_empty_input_unchanged() -> None:
+    assert redact_dotenv_values("") == ""
