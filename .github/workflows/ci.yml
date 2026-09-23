@@ -459,6 +459,13 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: config.settings
       DJANGO_SECRET_KEY: ci-not-a-secret
+      # This job never touches a database -- it only introspects schema --
+      # so it never set POSTGRES_ENGINE. It relied on DJANGO_CONFIGURATION
+      # being unset resolving to the always-permissive "Dev" label to skip
+      # the #1715 engine guard. That guard now keys on DEBUG instead (#1732),
+      # so a job with no real database declares one explicitly, the same way
+      # the Dockerfile's collectstatic step already does.
+      POSTGRES_ENGINE: django.db.backends.dummy
       FEATURE_AGENTS: "true"
       FEATURE_WORKFLOWS: "true"
       FEATURE_TEMPORAL: "true"

@@ -432,6 +432,10 @@ def _config_for_capability_uncredentialed(
                 account_id=str(pc.get("account_id", "")),
                 image_scanning_enabled=bool(pc.get("image_scanning_enabled", True)),
                 image_tag_mutability=str(pc.get("image_tag_mutability", "IMMUTABLE")),
+                # Set on an agent-installed (pull mode) cluster, whose agent
+                # boundary denies creating a role that does not carry it;
+                # empty on an admin-provisioned one, which has no boundary.
+                permissions_boundary_arn=str(pc.get("iam_permissions_boundary_arn", "")),
             )
         if capability == "identity":
             from aws.identity_irsa import IRSAConfig

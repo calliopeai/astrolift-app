@@ -24,6 +24,10 @@ class _RepoNotFound(Exception):
     pass
 
 
+class _RepoPolicyNotFound(Exception):
+    pass
+
+
 def _mock_iam():
     iam = SimpleNamespace()
     iam.exceptions = SimpleNamespace(NoSuchEntityException=_NoSuchEntity)
@@ -39,14 +43,27 @@ def _mock_iam():
 
 def _mock_ecr():
     ecr = SimpleNamespace()
-    ecr.exceptions = SimpleNamespace(RepositoryNotFoundException=_RepoNotFound)
+    # Real botocore clients expose every exception class the service
+    # defines as an attribute of `.exceptions`, whether or not a given call
+    # raises it — an `except client.exceptions.X` that never matches still
+    # has to evaluate `X` without an AttributeError. Nothing below raises
+    # RepositoryPolicyNotFoundException (get_repository_policy raises the
+    # not-found-repo one instead), but _non_archive_statements checks for
+    # it first, so it has to exist here too.
+    ecr.exceptions = SimpleNamespace(
+        RepositoryNotFoundException=_RepoNotFound,
+        RepositoryPolicyNotFoundException=_RepoPolicyNotFound,
+    )
 
     def _raise(*_a, **_k):
         raise _RepoNotFound("repository does not exist")
 
     ecr.delete_repository = _raise
-    # The archive path (_block_push) calls set_repository_policy; a missing
-    # repo raises RepositoryNotFoundException there.
+    # The archive path (_block_push) reads the existing policy first (to
+    # preserve any operator statement, #1819 review), then writes the
+    # merged one back; a missing repo raises RepositoryNotFoundException
+    # from both calls.
+    ecr.get_repository_policy = _raise
     ecr.set_repository_policy = _raise
     return ecr
 
