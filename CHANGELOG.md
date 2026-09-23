@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Django model permissions (`config/roles_gen.py`) no longer authorize app
+  code. The legacy scaffold surfaces that read them now admit only the
+  platform operator (an active superuser), the only caller they admitted in
+  practice. Two admitted far more and are closed: the `profile` mutation let
+  any logged-in user edit any user's profile, including username and active
+  flag (edit your own with `updateMyProfile`), and the `/app/core/core/*`
+  group and permission tools needed only a login. They now need a staff
+  session plus the Django admin's own permissions. The generic `delete`
+  mutation still deletes only the seven scaffold models it always could
+  (#1864).
+
 - Record an empty object instead of failing the mutation audit log when a
   GraphQL mutation is sent with no `variables`. The previous NOT NULL failure
   was only logged as a warning, but it had already poisoned the rest of the

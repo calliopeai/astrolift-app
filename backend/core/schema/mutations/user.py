@@ -14,6 +14,7 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.models import Profile, SignRequest
+from core.permissions import require_platform_operator
 from core.schema.mutations.common import UtilityForm
 from core.schema.common import GlobalIDUtils, MutationResult
 from core.schema.mutations.base import resolve_instance_from_id
@@ -41,13 +42,12 @@ def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User
     through, so every caller owns its own gate. All five were audited in #1593:
 
     * ``switch_user`` - ``_may_switch_to`` (superuser or shared switch group)
-    * ``profile_request_pwd_change`` - ``P.PROFILE_CHANGE_RESET_PASSWORD_USERS``
-    * ``profile_request_delete_user`` - ``P.PROFILE_DELETE_USERS``
-    * ``pin_transaction`` - ``Profile.authenticate`` checks the PIN against the
-      *proxy* user's own hash, so acting as them requires their credential
-    * ``sign_request_user`` - ``P.SIGNREQUEST_CHANGE_SIGN``, checked against the
-      target. That grants "may be asked to sign", not access to the asker's
-      data, and is pre-existing semantics rather than a gate added here.
+    * ``profile_request_pwd_change`` - platform operator for another user
+    * ``profile_request_delete_user`` - platform operator for another user
+    * ``pin_transaction`` - authenticating with another user's PIN is refused
+      (#1864; the Django permission it required never existed)
+    * ``sign_request_user`` - refused: sign requests have no permission in
+      Astrolift (#1864; the Django one it named never existed).
     """
     # tenancy: User is a core global model with no organization column, so
     # there is no org clause to add here. Authorization lives at each call
@@ -68,12 +68,8 @@ def _get_sign_request_object(info, global_id: str, raise_not_found: bool = True)
     ImportError rather than enforcing anything. The enforcement they get back
     is the model's, which is stricter than a queryset filter would be:
 
-    * ``sign_request_sign`` - ``SignRequest.sign`` checks
-      ``P.SIGNREQUEST_CHANGE_SIGN``, that the caller is in
-      ``users_allowed_to_sign()``, that they were actually requested, and that
-      an active PinTransaction exists.
-    * ``sign_request_cancel`` - ``SignRequest.cancel`` checks
-      ``P.SIGNREQUEST_CHANGE_CANCEL``.
+    * ``sign_request_sign`` - ``SignRequest.sign`` refuses (#1864).
+    * ``sign_request_cancel`` - ``SignRequest.cancel`` refuses (#1864).
     """
     # tenancy: SignRequest is a core global model with no organization column;
     # affiliation, not org membership, is what bounds visibility (see the model
@@ -237,8 +233,17 @@ class UserMutations:
         instance = UtilityForm.apply_forms(None, info, input_data)
         return UpsertUserResult(instance=instance)
 
-    @strawberry.mutation(description="Update user profile via ProfileSerializer (restricted).")
+    @strawberry.mutation(
+        description="Update any user's profile via ProfileSerializer. Platform operator only; "
+                    "self-service profile edits go through updateMyProfile."
+    )
     def profile(self, info: Info, input: strawberry.scalars.JSON) -> MutationResult:
+        # Field-level Django permissions used to gate this, and a field with no
+        # permission record was writable by anyone, so any user could rename or
+        # deactivate any other user through ``user { id, username, is_active }``.
+        # Django permissions no longer authorize app code (#1864) and no
+        # Astrolift permission covers editing someone else's profile.
+        require_platform_operator(info.context.user)
         from core.serializers.profile import ProfileSerializer
         fields_provided = input.keys()
         user_id = info.context.user.id
@@ -275,28 +280,26 @@ class UserMutations:
 
     @strawberry.mutation(
         description="Request a password reset email. "
-                    "Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users."
+                    "Only the platform operator may send one to another user."
     )
     def profile_request_pwd_change(self, info: Info, user_gid: Optional[strawberry.ID] = None) -> bool:
         user = _get_user_object(info, user_gid, raise_not_found=True) if user_gid else info.context.user
 
         if user != info.context.user:
-            from config.roles_gen import P
-            P.PROFILE_CHANGE_RESET_PASSWORD_USERS.check(info.context.user, True)
+            require_platform_operator(info.context.user)
 
         user.profile.request_reset_password()
         return True
 
     @strawberry.mutation(
         description="Request deletion of a user account. "
-                    "Requires PROFILE_DELETE_USERS permission to delete other users."
+                    "Only the platform operator may delete another user."
     )
     def profile_request_delete_user(self, info: Info, user_gid: Optional[strawberry.ID] = None) -> bool:
         user = _get_user_object(info, user_gid, raise_not_found=True) if user_gid else info.context.user
 
         if user != info.context.user:
-            from config.roles_gen import P
-            P.PROFILE_DELETE_USERS.check(info.context.user, True)
+            require_platform_operator(info.context.user)
 
         Profile.anonymize_user(user)
         if user == info.context.user:
@@ -330,7 +333,7 @@ class UserMutations:
 
     @strawberry.mutation(
         description="Request a sign from a user. "
-                    "The user must have SIGNREQUEST_CHANGE_SIGN permission."
+                    "Sign requests are not available: this always refuses."
     )
     def sign_request_user(
         self,
@@ -354,8 +357,7 @@ class UserMutations:
         return True
 
     @strawberry.mutation(
-        description="Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission "
-                    "and an active PIN transaction. Status must be SIGN_REQUIRED."
+        description="Sign a sign request. Sign requests are not available: this always refuses."
     )
     def sign_request_sign(self, info: Info, gid: str) -> bool:
         sign_request = _get_sign_request_object(info, gid, raise_not_found=True)
@@ -363,7 +365,7 @@ class UserMutations:
         return True
 
     @strawberry.mutation(
-        description="Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission."
+        description="Cancel a sign request. Sign requests are not available: this always refuses."
     )
     def sign_request_cancel(self, info: Info, gid: str, note: str) -> bool:
         sign_request = _get_sign_request_object(info, gid)

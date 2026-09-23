@@ -35,7 +35,7 @@ class RestrictedSerializerMutateTest(TestCase):
             mock_serializer_cls, mock_model, self.mock_info, data={}, instance=None,
         )
 
-        mock_model.p('model').add.check.assert_called_once_with(self.user)
+        mock_model.can_add.assert_called_once_with(self.user)
         self.assertTrue(result.ok)
 
     def test_calls_change_permission_when_instance_provided(self):
@@ -51,7 +51,7 @@ class RestrictedSerializerMutateTest(TestCase):
             data={}, instance=mock_instance,
         )
 
-        mock_model.p('model').change.check.assert_called_once_with(self.user)
+        mock_model.can_change.assert_called_once_with(self.user)
         self.assertTrue(result.ok)
 
     def test_returns_errors_on_validation_failure(self):

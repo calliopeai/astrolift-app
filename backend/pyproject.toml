@@ -21,7 +21,6 @@ extend-exclude = [
   # legacy scaffold (boilerworks-django-nextjs) — untouched here
   "auth1",
   "config/config_merger.py",
-  "config/permissions.py",
   "config/schema.py",
   "config/urls.py",
   "config/views.py",

@@ -23,6 +23,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+
 from core.tenancy import TenantContext, get_current_tenant
 
 
@@ -640,3 +642,37 @@ def all_permissions() -> Iterable[Permission]:
     """Stable sorted iterator over every Permission value."""
 
     return tuple(sorted(Permission, key=lambda p: p.value))
+
+
+# ---- Platform operator ------------------------------------------------
+
+
+def is_platform_operator(user) -> bool:
+    """Whether ``user`` is the install's platform operator: an active Django superuser.
+
+    The resolver treats the same person as holding every permission at every
+    scope. This is the authority for the legacy boilerworks surfaces that
+    used to check Django model permissions (#1864): generic delete, editing
+    another user's profile, Django group membership. They have no
+    ``Permission`` of their own because they are not Astrolift features.
+    Astrolift never grants Django model permissions, so a superuser was the
+    only caller those checks admitted.
+    """
+
+    return bool(
+        user is not None
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "is_active", False)
+        and getattr(user, "is_superuser", False)
+    )
+
+
+def require_platform_operator(user) -> None:
+    """Refuse anyone but the platform operator.
+
+    Raises Django's ``PermissionDenied``, as the Django permission checks it
+    replaces did, so callers and error handling see the same failure.
+    """
+
+    if not is_platform_operator(user):
+        raise DjangoPermissionDenied("Only the platform operator may do this.")

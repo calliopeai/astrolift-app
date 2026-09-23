@@ -1,8 +1,8 @@
 from core.models import Notification
-from core.serializers.restricted_model_serializer import FieldRestrictedSerializer
+from rest_framework import serializers
 
 
-class NotificationSerializer(FieldRestrictedSerializer):
+class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification

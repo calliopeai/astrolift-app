@@ -4,8 +4,6 @@ Exercises field-level permission checks, dataloader-based resolution, and
 queryset scoping on AddressType, UserType, ProfileType, OrganizationType,
 and NotificationType.
 """
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import TestCase
@@ -133,14 +131,14 @@ class AddressFieldPermittedTest(TestCase):
 
 
 class AddressFieldDeniedTest(TestCase):
-    """When permission check returns False, address fields return empty string."""
+    """Anyone but the platform operator gets empty address fields (#1864)."""
 
     def setUp(self):
         from core.schema.types.address import AddressType
         self.AddressType = AddressType
 
-        self.user, self.org = _setup_superuser(
-            username='addr_denied', email='addr_denied@test.com',
+        self.user = User.objects.create_user(
+            username='addr_denied', email='addr_denied@test.com', password='testpass',
         )
         self.address = Address.objects.create(
             address_line_one='456 Oak Ave',
@@ -156,9 +154,7 @@ class AddressFieldDeniedTest(TestCase):
 
     def _resolve_denied(self, field_name):
         fn = _get_resolver(self.AddressType, field_name)
-        with patch.object(Address, 'p') as mock_p:
-            mock_p.return_value.view.by.return_value = False
-            return fn(self.address, info=self.info)
+        return fn(self.address, info=self.info)
 
     def test_address_field_returns_empty_when_denied_address_line_one(self):
         self.assertEqual(self._resolve_denied('address_line_one'), '')
@@ -278,24 +274,20 @@ class ProfileEmailPermittedTest(TestCase):
 
 
 class ProfileEmailDeniedTest(TestCase):
-    """When permission is denied, profile email returns None."""
+    """Anyone but the platform operator gets no profile email (#1864)."""
 
     def setUp(self):
         from core.schema.types.user import ProfileType
         self.ProfileType = ProfileType
 
-        self.user, self.org = _setup_superuser(
-            username='prof_email_denied', email='denied_email@test.com',
+        self.user = User.objects.create_user(
+            username='prof_email_denied', email='denied_email@test.com', password='testpass',
         )
         self.info = FakeInfo(_make_context(self.user))
 
     def test_profile_email_denied(self):
-        from core.models import Profile
-
         fn = _get_resolver(self.ProfileType, 'email')
-        with patch.object(Profile, 'p') as mock_p:
-            mock_p.return_value.view.by.return_value = False
-            result = fn(self.user.profile, info=self.info)
+        result = fn(self.user.profile, info=self.info)
         self.assertIsNone(result)
 
 
