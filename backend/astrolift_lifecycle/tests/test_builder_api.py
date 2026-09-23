@@ -29,7 +29,15 @@ from django.test import Client
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
-from astrolift_identity.models import ApiToken, Member, Organization, OrganizationModule, Team
+from astrolift_identity.models import (
+    ApiToken,
+    Member,
+    Organization,
+    OrganizationModule,
+    Role,
+    RoleBinding,
+    Team,
+)
 from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.activities.dev_environment import _deploy_promoted_app_sync
@@ -39,6 +47,7 @@ from astrolift_workflows.tests.test_builder_runtime_1858 import (
     _seed,
     _sqlite_bytes,
 )
+from core.permissions import Permission
 
 pytestmark = pytest.mark.django_db
 User = get_user_model()
@@ -77,6 +86,17 @@ def user(org):
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    # The routes check app.create and app.deploy (#1878). These tests cover
+    # what an allowed caller gets; test_builder_authz_1872_1878.py covers
+    # who is allowed.
+    role = Role.objects.create(
+        organization=org,
+        name="Builder",
+        slug="builder",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=[Permission.APP_CREATE.value, Permission.APP_DEPLOY.value],
+    )
+    RoleBinding.objects.create(user=u, role=role, scope_kind=RoleBinding.ScopeKind.ORG, scope_id=org.id)
     return u
 
 
@@ -227,6 +247,36 @@ def test_create_without_auth_returns_401(cluster, workflow_starts):
     r = _post_json(client, "/api/builder/v1/dev-environments/", {}, {})
     assert r.status_code == 401
     assert workflow_starts == []
+
+
+@pytest.mark.parametrize("header", ["other-org", "malformed"])
+def test_create_with_a_selected_organization_that_disagrees_with_the_token_returns_403(
+    cluster, other_org, auth_headers, workflow_starts, header
+):
+    """``auth_headers`` carries a token issued to ``org`` (via ``cluster``).
+    Every other test in this module either omits the selected-organization
+    header or matches it, so none of them exercise the reject path
+    ``TenantContextMiddleware`` owns: a conflicting or malformed
+    ``X-Astrolift-Organization`` header must 403 before this view starts
+    any dev-environment work (#1791)."""
+    client = Client()
+    selected = str(other_org.guid) if header == "other-org" else "not-a-guid"
+    r = _post_json(
+        client,
+        "/api/builder/v1/dev-environments/",
+        {
+            "runtime": "python",
+            "runtime_version": "3.12",
+            "start_command": "python main.py",
+            "port": 8000,
+            "resource_profile": "small",
+        },
+        {**auth_headers, "HTTP_X_ASTROLIFT_ORGANIZATION": selected},
+    )
+    assert r.status_code == 403, r.content
+    assert "organization" in r.json()["detail"]
+    assert workflow_starts == []
+    assert not DevEnvironment.objects.exists()
 
 
 def test_create_with_bad_runtime_returns_400(cluster, auth_headers, workflow_starts):

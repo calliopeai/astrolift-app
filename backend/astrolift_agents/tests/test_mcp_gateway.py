@@ -1033,6 +1033,36 @@ def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(pe
     assert "Mcp-Session-Id is required" in missing_session.json()["error"]["message"]
 
 
+@pytest.mark.parametrize("header", ["other-org", "malformed"])
+def test_streamable_http_rejects_a_selected_organization_that_disagrees_with_the_token(header):
+    """The full-stack test above proves the matching-org path through
+    ApiTokenAuthMiddleware + TenantContextMiddleware. Every other gateway
+    test in this module calls ``mcp_gateway`` directly and hand-sets
+    ``request._api_token`` / the tenant context, so none of them actually
+    exercise that middleware pair against the real URL -- the layer that
+    rejects a selected organization that disagrees with the bearer's
+    issuing organization (#1791), ahead of any tool dispatch/cancel."""
+    org = Organization.objects.create(name="MCP Org Mismatch", slug="mcp-http-mismatch")
+    other = Organization.objects.create(name="MCP Other Mismatch", slug="mcp-http-other-mismatch")
+    _user, token = _token(org, scopes=[SCOPE_MCP_READ])
+    plaintext = "alft_at_http-mismatch-token"
+    token.token_hash = hashlib.sha256(plaintext.encode()).hexdigest()
+    token.save(update_fields=["token_hash", "updated_at", "version"])
+    selected = str(other.guid) if header == "other-org" else "not-a-guid"
+
+    response = Client().post(
+        "/api/mcp/v1/",
+        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}),
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {plaintext}",
+        HTTP_ACCEPT="application/json, text/event-stream",
+        HTTP_X_ASTROLIFT_ORGANIZATION=selected,
+    )
+
+    assert response.status_code == 403
+    assert "organization" in response.json()["detail"]
+
+
 @override_settings(MCP_MAX_REQUEST_BYTES=64)
 def test_streamable_http_rejects_oversized_request_before_json_parse():
     org = Organization.objects.create(name="MCP Org", slug="mcp-body-limit")

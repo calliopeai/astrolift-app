@@ -24,7 +24,7 @@ from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
-from aws._errors import NotFoundError, map_client_error
+from aws._errors import NotFoundError, ProviderError, map_client_error
 from aws.session import aws_client
 
 # GitHub's OIDC issuer — present in the trust policy of the per-app
@@ -63,6 +63,16 @@ class ECRConfig(CredentialedConfig):
     """IMMUTABLE prevents tag overwrites (production hygiene; #275
     + #276 audit invariants assume immutable image refs).
     MUTABLE for legacy/dev workflows."""
+
+    permissions_boundary_arn: str = ""
+    """Permissions boundary to attach to the CI push role this driver
+    mints (#1906). Empty on an admin-provisioned (push mode) install,
+    where no boundary exists. Non-empty on an agent-installed (pull
+    mode) one, where the installer agent's own boundary carries a
+    ``DenyRoleCreationWithoutThisBoundary`` statement refusing any
+    ``iam:CreateRole`` that does not attach that same boundary — so
+    leaving this empty there means ``ensure_ci_push_role`` is denied.
+    Mirrors ``IRSAConfig.permissions_boundary_arn``."""
 
 
 class ECRDriver(ImageRegistryDriver):
@@ -104,7 +114,11 @@ class ECRDriver(ImageRegistryDriver):
                 uri=response["repository"]["repositoryUri"],
             )
         except self._client.exceptions.RepositoryAlreadyExistsException:
-            # Repo exists — fetch its URI rather than failing
+            # Repo exists — clear any DenyPushArchived policy a prior
+            # deprovision left in place (#1819) before returning its URI, so
+            # re-registering an app under the same slug restores pushability
+            # instead of silently inheriting the old deny.
+            self._clear_archive_policy(name=name)
             return self._describe_repo(name=name)
         except Exception as exc:
             raise map_client_error(exc) from exc
@@ -435,18 +449,27 @@ class ECRDriver(ImageRegistryDriver):
             ],
         }
 
+        create_kwargs: dict[str, Any] = {
+            "RoleName": role_name,
+            "AssumeRolePolicyDocument": json.dumps(trust_policy),
+            # ASCII-only: IAM rejects an AssumeRolePolicy/role Description
+            # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
+            # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
+            "Description": f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
+            # Tag like every other platform-minted role so the orphan scan
+            # (#995) can reap it as a backstop if teardown is interrupted.
+            "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+        }
+        # Pull-mode installs require every minted role to carry this
+        # boundary (#1906), or the agent's own DenyRoleCreationWithoutThis-
+        # Boundary refuses the CreateRole. Omit it when unset: IAM rejects
+        # an empty PermissionsBoundary, and push-mode installs legitimately
+        # have none.
+        if self._config.permissions_boundary_arn:
+            create_kwargs["PermissionsBoundary"] = self._config.permissions_boundary_arn
+
         try:
-            response = self._iam.create_role(
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(trust_policy),
-                # ASCII-only: IAM rejects an AssumeRolePolicy/role Description
-                # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
-                # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
-                Description=f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
-                # Tag like every other platform-minted role so the orphan scan
-                # (#995) can reap it as a backstop if teardown is interrupted.
-                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
-            )
+            response = self._iam.create_role(**create_kwargs)
             role_arn = response["Role"]["Arn"]
         except self._iam.exceptions.EntityAlreadyExistsException:
             # Refresh the trust policy in case the SCM repo or scope
@@ -483,35 +506,123 @@ class ECRDriver(ImageRegistryDriver):
             raise map_client_error(exc) from exc
 
     def _block_push(self, *, name: str) -> None:
-        """Apply a repository policy that denies push. Read remains
-        allowed so deployed pods can still pull the existing image
-        until they're torn down."""
+        """Add a statement denying push, on top of whatever other
+        statements are already on the repo policy. Read remains allowed
+        so deployed pods can still pull the existing image until they're
+        torn down.
+
+        An earlier version of this method called ``set_repository_policy``
+        with ONLY the deny statement, silently replacing (destroying) any
+        policy an operator had set directly — e.g. a cross-account pull
+        grant for another AWS account (#1819 review). Statement-scoped now:
+        read the current document, drop any stale ``DenyPushArchived`` of
+        ours (so re-archiving is idempotent, not additive), append a fresh
+        one, and write the merged document back — ``Version``/``Id``/
+        anything else on the document untouched.
+        """
         import json
 
-        policy = json.dumps(
+        document, _ = self._policy_without_archive_statement(name=name)
+        document["Statement"].append(
             {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Sid": "DenyPushArchived",
-                        "Effect": "Deny",
-                        "Principal": "*",
-                        "Action": [
-                            "ecr:PutImage",
-                            "ecr:InitiateLayerUpload",
-                            "ecr:UploadLayerPart",
-                            "ecr:CompleteLayerUpload",
-                        ],
-                    },
+                "Sid": "DenyPushArchived",
+                "Effect": "Deny",
+                "Principal": "*",
+                "Action": [
+                    "ecr:PutImage",
+                    "ecr:InitiateLayerUpload",
+                    "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload",
                 ],
             }
         )
         try:
             self._client.set_repository_policy(
                 repositoryName=name,
-                policyText=policy,
+                policyText=json.dumps(document),
             )
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
+
+    def _clear_archive_policy(self, *, name: str) -> None:
+        """Remove only the ``DenyPushArchived`` statement ``_block_push``
+        may have left (#1819), keeping any other statement — and the
+        document's own ``Version``/``Id``/etc — an operator set directly
+        (e.g. cross-account pull). An earlier version called
+        ``delete_repository_policy`` unconditionally, destroying those too.
+
+        No-ops without writing anything when the repo never carried a
+        ``DenyPushArchived`` statement to begin with (no policy at all, or
+        an operator-only policy that was never archived) — nothing here is
+        this driver's to rewrite. Otherwise writes back whatever else
+        remains, or drops the policy entirely (never an empty-``Statement``
+        document, which AWS rejects) once nothing does.
+        """
+        import json
+
+        document, removed = self._policy_without_archive_statement(name=name)
+        if not removed:
+            return
+        if document["Statement"]:
+            try:
+                self._client.set_repository_policy(
+                    repositoryName=name,
+                    policyText=json.dumps(document),
+                )
+            except self._client.exceptions.RepositoryNotFoundException as exc:
+                raise NotFoundError(f"repository {name} not found") from exc
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+            return
+        try:
+            self._client.delete_repository_policy(repositoryName=name)
+        except self._client.exceptions.RepositoryPolicyNotFoundException:
+            # Already gone — another caller cleared it between our read and
+            # this delete. Idempotent, so treat as the desired end state.
+            return
+        except self._client.exceptions.RepositoryNotFoundException as exc:
+            raise NotFoundError(f"repository {name} not found") from exc
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+    def _policy_without_archive_statement(self, *, name: str) -> tuple[dict[str, Any], bool]:
+        """``name``'s repository policy document with our own
+        ``DenyPushArchived`` statement removed, everything else — every
+        other statement an operator may have set directly (e.g.
+        cross-account pull), ``Version``, ``Id``, any other top-level key —
+        untouched (#1819 review). ``({"Version": "2012-10-17", "Statement":
+        []}, False)`` when the repo carries no policy yet.
+
+        IAM allows ``Statement`` to be a single object or a list; both are
+        normalized to a list on the way out so callers can always index or
+        append. The second return value is whether a ``DenyPushArchived``
+        statement was actually found and dropped, so a caller that only
+        wants to clear one can tell "nothing to clear" apart from "cleared
+        down to zero statements."
+        """
+        import json
+
+        try:
+            response = self._client.get_repository_policy(repositoryName=name)
+        except self._client.exceptions.RepositoryPolicyNotFoundException:
+            return {"Version": "2012-10-17", "Statement": []}, False
+        except self._client.exceptions.RepositoryNotFoundException as exc:
+            raise NotFoundError(f"repository {name} not found") from exc
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+        document = json.loads(response["policyText"])
+        raw_statements = document.get("Statement", [])
+        if isinstance(raw_statements, dict):
+            statements = [raw_statements]
+        elif isinstance(raw_statements, list):
+            statements = raw_statements
+        else:
+            raise ProviderError(
+                f"repository {name}: policy Statement must be an object or a list, got {type(raw_statements).__name__}"
+            )
+        kept = [s for s in statements if s.get("Sid") != "DenyPushArchived"]
+        document["Statement"] = kept
+        return document, len(kept) != len(statements)
