@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 
+from astrolift_clusters.models import ManagedDomain
 from astrolift_lifecycle.models import CustomDomain
 from astrolift_lifecycle.models.ingress import IngressRule
 from astrolift_registry.models import RegisteredApp
@@ -118,6 +119,12 @@ def second_app_on_cluster(org, project, team, cluster):
     second.default_tenant_cluster = cluster
     second.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
     return second
+
+
+@pytest.fixture
+def acme_zone(org):
+    """The DNS sweep deletes custom-domain records only in the org's own or shared zones (#1909)."""
+    return ManagedDomain.objects.create(organization=org, zone="acme.com", dns_driver="route53")
 
 
 # ---- pure helpers --------------------------------------------------
@@ -390,6 +397,7 @@ def test_cleanup_ecr_repos_falls_back_when_archive_kwarg_unsupported(
 def test_cleanup_dns_records_walks_custom_domains_and_ingress_rules(
     app_on_cluster,
     cluster,
+    acme_zone,
     monkeypatch,
 ):
     CustomDomain.objects.create(
@@ -445,6 +453,7 @@ def test_cleanup_dns_records_skipped_on_unimplemented_driver(
 def test_cleanup_dns_records_collects_per_target_errors(
     app_on_cluster,
     cluster,
+    acme_zone,
     monkeypatch,
 ):
     CustomDomain.objects.create(

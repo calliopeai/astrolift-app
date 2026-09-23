@@ -30,6 +30,7 @@ from astrolift_clusters.models import (
     ProviderPlugin,
     ProviderPluginConfig,
     TenantCluster,
+    managed_domain_for_zone,
 )
 from astrolift_clusters.schema.types import (
     ManagedDomainType,
@@ -1350,11 +1351,17 @@ class ClustersMutation:
         Either way: requests the wildcard cert and returns CNAME validation
         records the operator must add to their zone.
 
-        Workflow polls every 30s for cert issuance. Once issued: registers
+        Workflow polls every 30s for cert issuance. Once issued: updates
         the ManagedDomain row and marks it active. Use revalidateManagedDomain
         to force an immediate check; reissueManagedDomainCert to delete and
         re-request the cert (sometimes forces ACM/GCP/Azure to pick up
         recently-added validation records).
+
+        The zone must already be registered (createManagedDomain registers
+        and provisions in one step) and belong to the caller's org or be
+        shared. The workflow finds its row by zone name alone, so another
+        org's zone answers NOT_FOUND, the same as an unregistered one
+        (#1909).
         """
         if not zone or "." not in zone:
             return gql_failure(
@@ -1371,6 +1378,8 @@ class ClustersMutation:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         actor = _actor_from_request(info)
@@ -1427,6 +1436,10 @@ class ClustersMutation:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        # The signal, or the restart below, drives the provisioning run for
+        # this zone, so the zone must be the org's own or shared (#1909).
+        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "revalidate")
@@ -1495,6 +1508,9 @@ class ClustersMutation:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        # A reissue revokes the zone's certificate (#1909).
+        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "reissue")

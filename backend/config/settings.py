@@ -74,6 +74,11 @@ else:
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 # SECURITY WARNING: keep the secret key used in production secret!
 
+# Read once, up front: the developer configuration further down (and the
+# #1715 engine guard below it) key off this rather than the
+# DJANGO_CONFIGURATION label, because a label can be left unset and quietly
+# resolve to the permissive default -- a boolean env var cannot silently mean
+# the opposite of the default it was given (#1732).
 DEBUG = env_bool("DJANGO_DEBUG", False)
 DEFAULT_USER_TEST = env_str(
     "DJANGO_DEFAULT_USER_TEST", "admin"
@@ -1093,13 +1098,26 @@ IS_LOCAL = CONFIGURATION.lower() in ("local", "localpg", "localverbose")
 # regardless of DEBUG, so this does not change static serving; ALLOWED_HOSTS
 # keeps its wildcard, so nothing that reaches the app today stops reaching
 # it. What changes is the error page, and that is the point.
+#
+# The other half of #1732: CONFIGURATION defaults to "Dev" a few lines up
+# when DJANGO_CONFIGURATION is unset, which is exactly the SteadyMD
+# install's situation. That install must not inherit the technical error
+# page and cleared password validators just because nothing was declared,
+# so the Dev branch below no longer hardcodes DEBUG -- it keeps whatever
+# DJANGO_DEBUG resolved to above. Every dev/test surface in this repo sets
+# DJANGO_DEBUG explicitly (local.env, docker-compose.yaml, CI's
+# backend-test-shard job), so nothing that already opts in changes; an
+# install that declares neither variable now gets the safe posture by
+# default instead of the most permissive one.
 if CONFIGURATION.lower() in ("prd", "stg", "int"):
     DEBUG = False
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Dev".lower():
-    # The developer configuration keeps the technical error page.
-    DEBUG = True
-    AUTH_PASSWORD_VALIDATORS = []
+    # The developer configuration keeps the technical error page only when
+    # DJANGO_DEBUG says so explicitly (#1732) -- DEBUG itself was already
+    # resolved from that variable at the top of this file.
+    if DEBUG:
+        AUTH_PASSWORD_VALIDATORS = []
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Tests".lower():
     DEBUG = True
@@ -1172,7 +1190,16 @@ else:
 # by some path other than the name check -- a missing POSTGRES_HOST, a settings
 # import order change -- and turns it into a refusal instead of silent data
 # loss. Tests declare sqlite deliberately and are excluded by name.
-if not IS_DEV and not IS_LOCAL and CONFIGURATION.lower() != "tests":
+#
+# Keyed on DEBUG rather than IS_DEV/IS_LOCAL (#1732): IS_DEV is true for any
+# install that never declares DJANGO_CONFIGURATION, because CONFIGURATION
+# silently defaults to "Dev" above -- exactly the label a real deployment can
+# (and did) leave unset, which made this guard inert on the one install it
+# was written for. DEBUG now requires the same explicit DJANGO_DEBUG opt-in
+# that the developer configuration does, so an undeclared configuration gets
+# the same refusal a misspelled one already gets instead of being waved
+# through as "probably a laptop".
+if not DEBUG and CONFIGURATION.lower() != "tests":
     # ``POSTGRES_ENGINE`` unset reads as None, and the membership test
     # below raised TypeError on it -- an unhandled crash from the guard
     # written to turn this exact situation into a readable refusal.

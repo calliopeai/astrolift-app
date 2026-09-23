@@ -21,6 +21,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from astrolift_clusters.models import ManagedDomain
 from astrolift_lifecycle.models import CustomDomain
 from astrolift_lifecycle.schema.mutations import (
     ArchiveAppRegistryRepoInput,
@@ -95,6 +96,12 @@ def app_with_cluster(app, cluster):
     return app
 
 
+@pytest.fixture
+def acme_zone(org):
+    """``deleteAppDnsRecord`` acts only in the org's own or shared managed zones (#1909)."""
+    return ManagedDomain.objects.create(organization=org, zone="acme.com", dns_driver="route53")
+
+
 # ---- deleteAppDnsRecord -------------------------------------------
 
 
@@ -102,6 +109,7 @@ def app_with_cluster(app, cluster):
 def test_delete_app_dns_record_happy_path(
     app_with_cluster,
     cluster,
+    acme_zone,
     fake_info,
     org,
     actor,
@@ -626,6 +634,7 @@ def test_delete_app_ingress_not_found(
 @pytest.mark.django_db
 def test_unsupported_driver_returns_precondition(
     app_with_cluster,
+    acme_zone,
     fake_info,
     org,
     actor,
