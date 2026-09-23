@@ -1073,6 +1073,7 @@ class ClusterDriver(Protocol):
         namespace: str,
         app_slug: str,
         task_id: str = "",
+        job_name: str = "",
     ) -> list[PodInfo]:
         """Return live pods in ``namespace`` filtered to ``app_slug``.
 
@@ -1085,6 +1086,10 @@ class ClusterDriver(Protocol):
         ``task_id`` (#891), when set, selects an agent task pod by its
         ``astrolift.dev/task-id`` label instead — the agent dispatch
         path labels Job pods with the task guid, not an app slug.
+
+        ``job_name`` (#1712), when set and ``task_id`` is not, selects by
+        Kubernetes' own ``job-name`` label — a fallback for resolving a
+        Job's real (suffixed) pod name from just the Job's frozen name.
         """
         ...
 

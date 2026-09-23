@@ -280,6 +280,36 @@ def enforce_scopes(token, required: Iterable[str]) -> str | None:
     return None
 
 
+def with_active_org_member(queryset, *, user: str, organization: str):
+    """Keep only rows whose ``user`` still belongs to ``organization``.
+
+    A credential is only as good as the membership it was issued under
+    (#1910). Its owner must be an active account with a live, active ORG
+    ``Member`` row in that organization, and the organization must not be
+    soft-deleted. SCIM deprovisioning drops only the membership: the
+    account stays active while the person belongs to another org, and
+    their RoleBindings survive, so without this a removed person's bearer
+    keeps acting in the org they left. ``user`` and ``organization`` name
+    the queryset's foreign keys, so the bearer lookup and the device-flow
+    refresh apply the same rule.
+    """
+    from django.db.models import Exists, OuterRef
+
+    from astrolift_identity.models import Member
+
+    membership = Member.objects.filter(
+        user_id=OuterRef(f"{user}_id"),
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=OuterRef(f"{organization}_id"),
+        is_active=True,
+        deleted_at__isnull=True,
+    )
+    return queryset.filter(
+        Exists(membership),
+        **{f"{user}__is_active": True, f"{organization}__deleted_at__isnull": True},
+    )
+
+
 def verify_token(plaintext: str):
     """Hash-lookup a presented plaintext bearer.
 
@@ -288,10 +318,16 @@ def verify_token(plaintext: str):
     * the hash matches a live row (``deleted_at IS NULL``)
     * the row is not revoked
     * the row has not expired
+    * its owner is still an active member of its organization
+      (:func:`with_active_org_member`)
 
     Returns ``None`` in every other case — the caller should respond
     with a generic ``401`` regardless of *why* so we don't leak
     "exists-but-revoked" vs "no such token".
+
+    Every bearer entry point (the HTTP middleware and the exec
+    WebSocket relay) authenticates through here, so the membership rule
+    holds on every surface without a per-view check.
     """
     if not plaintext or not plaintext.startswith(PLAINTEXT_PREFIX):
         return None
@@ -300,10 +336,14 @@ def verify_token(plaintext: str):
 
     digest = _hash(plaintext)
     now = timezone.now()
-    row = ApiToken.objects.filter(
-        token_hash=digest,
-        deleted_at__isnull=True,
-        is_revoked=False,
+    row = with_active_org_member(
+        ApiToken.objects.filter(
+            token_hash=digest,
+            deleted_at__isnull=True,
+            is_revoked=False,
+        ),
+        user="user",
+        organization="organization",
     ).first()
     if row is None:
         return None

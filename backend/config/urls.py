@@ -33,6 +33,7 @@ from auth1.forms import AuthAdminForm
 from auth1.sessions import Auth1SessionWorkflow
 from core import views
 from core.schema.views import CoreStrawberryView
+from core.utils.browser_guard import require_ui_header_for_session
 from core.utils.debug import autologin
 from core.utils.logger_helper import gql_logger
 from core.views_well_known import apple_app_site_association, assetlinks_json
@@ -73,13 +74,15 @@ urls = [
     path(
         "gql/config/",
         csrf_exempt(
-            autologin(
-                gql_logger(
-                    ratelimit(
-                        key="user_or_ip",
-                        rate=settings.RATELIMIT_GRAPHQL_RATE,
-                        block=True,
-                    )(strawberry_view)
+            require_ui_header_for_session(
+                autologin(
+                    gql_logger(
+                        ratelimit(
+                            key="user_or_ip",
+                            rate=settings.RATELIMIT_GRAPHQL_RATE,
+                            block=True,
+                        )(strawberry_view)
+                    )
                 )
             )
         ),
@@ -87,17 +90,22 @@ urls = [
     path(
         "gql/config/auth/",
         csrf_exempt(
-            gql_logger(
-                ratelimit(
-                    key="ip",
-                    rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE,
-                    block=True,
-                )(strawberry_auth_view)
+            require_ui_header_for_session(
+                gql_logger(
+                    ratelimit(
+                        key="ip",
+                        rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE,
+                        block=True,
+                    )(strawberry_auth_view)
+                )
             )
         ),
     ),
     # GraphQL WebSocket subscriptions
-    path("gql/config/ws/", csrf_exempt(CoreStrawberryView.as_view(schema=schema))),
+    path(
+        "gql/config/ws/",
+        csrf_exempt(require_ui_header_for_session(CoreStrawberryView.as_view(schema=schema))),
+    ),
     path("core/", include("core.urls")),
     # Token-gated audit-log export downloads (#433). Lives off the
     # operations app so the route stays close to the model it serves.

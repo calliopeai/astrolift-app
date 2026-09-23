@@ -45,6 +45,7 @@ from django.utils import timezone
 from astrolift_identity.api_tokens import (
     CLI_DEVICE_SCOPES,
     DEFAULT_SCOPES,
+    with_active_org_member,
 )
 from astrolift_identity.api_tokens import (
     mint_token as mint_api_token,
@@ -546,8 +547,9 @@ def refresh_credentials(
     * ``"issued"`` (200) → new pair returned in ``credentials``
     * ``"unknown"`` (401) → hash didn't match any session, or
       prefix is wrong
-    * ``"expired"`` (410) → session is past its refresh TTL or
-      not in a consumable state
+    * ``"expired"`` (410) → session is past its refresh TTL, not in
+      a consumable state, or its approver is no longer an active
+      member of its organization
     """
     from astrolift_identity.models import DeviceFlowSession
 
@@ -579,24 +581,45 @@ def refresh_credentials(
             # same plaintext doesn't keep returning 410-but-still-
             # alive. Clearing the hash also makes the chain dead
             # to any caller who somehow held onto the plaintext.
-            from astrolift_identity.models import ApiToken
-
-            if row.api_token_id:
-                ApiToken.objects.filter(pk=row.api_token_id).update(is_revoked=True)
-            row.refresh_token_hash = ""
-            row.refresh_token_last_4 = ""
-            row.save(
-                update_fields=[
-                    "refresh_token_hash",
-                    "refresh_token_last_4",
-                    "updated_at",
-                    "version",
-                ]
-            )
+            _end_refresh_chain_locked(row)
+            return CompletionResult(status="expired")
+        if not with_active_org_member(
+            DeviceFlowSession.all_objects.filter(pk=row.pk),
+            user="approved_user",
+            organization="organization",
+        ).exists():
+            # The approver has left the org (or the account or org is
+            # gone) since approval (#1910). Minting another access token
+            # would only hand out a bearer the token check refuses, and
+            # the chain could otherwise outlive the membership for its
+            # full 30 days, so end it the way an expired chain ends.
+            _end_refresh_chain_locked(row)
             return CompletionResult(status="expired")
 
         creds = _rotate_refresh_locked(row, now=now)
         return CompletionResult(status="issued", credentials=creds)
+
+
+def _end_refresh_chain_locked(row: DeviceFlowSession) -> None:
+    """Revoke the chain's current access token and clear its refresh
+    hash, so neither the bearer nor the refresh plaintext works again.
+
+    Caller MUST hold the row lock taken in :func:`refresh_credentials`.
+    """
+    from astrolift_identity.models import ApiToken
+
+    if row.api_token_id:
+        ApiToken.objects.filter(pk=row.api_token_id).update(is_revoked=True)
+    row.refresh_token_hash = ""
+    row.refresh_token_last_4 = ""
+    row.save(
+        update_fields=[
+            "refresh_token_hash",
+            "refresh_token_last_4",
+            "updated_at",
+            "version",
+        ]
+    )
 
 
 # ---- URL building ----------------------------------------------------

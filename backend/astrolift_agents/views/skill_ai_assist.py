@@ -22,6 +22,8 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core.utils.browser_guard import require_ui_header_for_session
+
 try:
     import anthropic
 except ImportError:  # package not yet installed; 503 path handles the missing-key case
@@ -39,6 +41,7 @@ _SYSTEM_PROMPT = (
 
 
 @csrf_exempt
+@require_ui_header_for_session
 @require_http_methods(["POST"])
 def skill_ai_assist(request: HttpRequest) -> JsonResponse:
     """Return an AI-generated system prompt suggestion for a new skill.

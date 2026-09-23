@@ -186,6 +186,7 @@ class PodBackend(Protocol):
         namespace: str,
         app_slug: str,
         task_id: str = "",
+        job_name: str = "",
     ) -> list[PodInfo]: ...
 
 
@@ -403,16 +404,23 @@ def _to_container_statuses(
     return out
 
 
-def _pod_label_selector(*, app_slug: str, task_id: str) -> str:
+def _pod_label_selector(*, app_slug: str, task_id: str = "", job_name: str = "") -> str:
     """Label selector for ``list_pods``.
 
     Agent task pods carry ``astrolift.dev/task-id=<guid>`` (set by the
     K8s Job spawner) but app workloads carry ``astrolift.dev/app=<slug>``.
-    A non-empty ``task_id`` selects the agent pod exactly (#891); otherwise
-    fall back to the app-slug selector the app-log surface relies on.
+    A non-empty ``task_id`` selects the agent pod exactly (#891); otherwise a
+    non-empty ``job_name`` selects by ``job-name``, the label the Job
+    controller itself stamps on every pod it creates -- the only selector
+    that can resolve a Job's real (suffixed) pod name from just the frozen
+    Job name, for when the task-id label lookup comes up empty (#1712);
+    otherwise fall back to the app-slug selector the app-log surface relies
+    on.
     """
     if task_id:
         return f"astrolift.dev/task-id={task_id}"
+    if job_name:
+        return f"job-name={job_name}"
     return f"astrolift.dev/app={app_slug}"
 
 
@@ -427,6 +435,7 @@ class LivePodBackend:
         namespace: str,
         app_slug: str,
         task_id: str = "",
+        job_name: str = "",
     ) -> list[PodInfo]:
         try:
             from kubernetes import client as k8s_client
@@ -438,7 +447,7 @@ class LivePodBackend:
         api_client = build_api_client(auth)
         core_v1 = k8s_client.CoreV1Api(api_client)
 
-        label_selector = _pod_label_selector(app_slug=app_slug, task_id=task_id)
+        label_selector = _pod_label_selector(app_slug=app_slug, task_id=task_id, job_name=job_name)
         resp = core_v1.list_namespaced_pod(
             namespace=namespace,
             label_selector=label_selector,

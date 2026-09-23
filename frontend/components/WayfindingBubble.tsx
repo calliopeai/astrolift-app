@@ -73,7 +73,7 @@ export function WayfindingBubble() {
     try {
       const res = await fetch("/api/agents/v1/wayfinding/ask/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-platform": "web" },
         body: JSON.stringify({ question: asked }),
       });
       if (res.status === 503) {

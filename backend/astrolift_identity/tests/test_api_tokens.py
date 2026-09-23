@@ -63,7 +63,7 @@ from astrolift_identity.api_tokens import (
     verify_token,
 )
 from astrolift_identity.middleware import ApiTokenAuthMiddleware
-from astrolift_identity.models import ApiToken, Organization, Team
+from astrolift_identity.models import ApiToken, Member, Organization, Team
 from astrolift_identity.schema.mutations import (
     CreateApiTokenInput,
     IdentityMutation,
@@ -221,6 +221,9 @@ def test_create_api_token_resolves_team(permission_resolver):
 
 
 def _make_token(user, org, *, expires_at=None, is_revoked=False, scopes=None):
+    # A token authenticates only while its owner is an active member of
+    # its org (#1910).
+    Member.objects.get_or_create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.pk)
     minted = mint_token()
     return (
         minted.plaintext,
