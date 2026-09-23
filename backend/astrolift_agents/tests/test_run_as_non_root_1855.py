@@ -12,6 +12,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from constance.test import override_config
 
 from astrolift_agents.models import AgentEnvironmentSpec
 from astrolift_agents.schema.mutations import (
@@ -65,6 +66,12 @@ def _spec(**fields):
 # ---- render ----------------------------------------------------------
 
 
+def test_agent_uid_matches_the_image_contract():
+    """astrolift-agents creates the ``agent`` user with this uid/gid; the two
+    must move together or non-root pods cannot write their HOME."""
+    assert AGENT_UID == 42042
+
+
 def test_root_mode_keeps_default_identity_and_capabilities():
     pod = _pod(_spec())
 
@@ -72,7 +79,7 @@ def test_root_mode_keeps_default_identity_and_capabilities():
     assert "capabilities" not in pod["containers"][0]["securityContext"]
 
 
-def test_non_root_mode_runs_as_agent_user_with_no_capabilities():
+def test_non_root_mode_runs_as_agent_user_with_no_capabilities(db):
     pod = _pod(_spec(run_as_non_root=True))
 
     assert pod["securityContext"] == {
@@ -85,6 +92,15 @@ def test_non_root_mode_runs_as_agent_user_with_no_capabilities():
     container_security = pod["containers"][0]["securityContext"]
     assert container_security == {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}
     assert pod["automountServiceAccountToken"] is False
+
+
+def test_non_root_identity_follows_constance(db):
+    """Installs running their own images, or clusters that mandate a uid
+    range, set the identity once instead of patching the platform."""
+    with override_config(AGENT_POD_UID=50123, AGENT_POD_GID=50124):
+        security = _pod(_spec(run_as_non_root=True))["securityContext"]
+
+    assert (security["runAsUser"], security["runAsGroup"], security["fsGroup"]) == (50123, 50124, 50124)
 
 
 # ---- spawn -----------------------------------------------------------

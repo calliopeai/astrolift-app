@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from django.conf import settings
 
-#: uid/gid of the ``agent`` user in every astrolift-agents image.
-AGENT_UID = 10001
+#: uid/gid of the ``agent`` user in every astrolift-agents image; the
+#: default for the ``AGENT_POD_UID`` / ``AGENT_POD_GID`` Constance settings.
+AGENT_UID = 42042
 
 NON_ROOT_INSTALL_CONFLICT = (
     "this environment spec runs as non-root, which cannot install packages at boot; "
@@ -32,12 +33,15 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False) -> dict:
     pod_security = pod_spec.setdefault("securityContext", {})
     pod_security["seccompProfile"] = {"type": "RuntimeDefault"}
     if non_root:
+        from constance import config
+
+        gid = int(config.AGENT_POD_GID)
         pod_security.update(
             {
                 "runAsNonRoot": True,
-                "runAsUser": AGENT_UID,
-                "runAsGroup": AGENT_UID,
-                "fsGroup": AGENT_UID,
+                "runAsUser": int(config.AGENT_POD_UID),
+                "runAsGroup": gid,
+                "fsGroup": gid,
             }
         )
     for container in pod_spec.get("containers") or []:
