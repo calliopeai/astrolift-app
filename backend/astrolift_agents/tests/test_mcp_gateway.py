@@ -23,7 +23,7 @@ from astrolift_identity.api_tokens import (
     reset_current_api_token,
     set_current_api_token,
 )
-from astrolift_identity.models import ApiToken, Organization, Project, Team
+from astrolift_identity.models import ApiToken, Member, Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_operations.models import AuditEvent
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
@@ -39,6 +39,9 @@ def _token(org, *, scopes, team=None):
         username=f"mcp-{org.slug}",
         email=f"mcp-{org.slug}@example.test",
     )
+    # A bearer authenticates only while its owner is an active member of
+    # its org (#1910).
+    Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.pk)
     row = ApiToken.objects.create(
         user=user,
         organization=org,
