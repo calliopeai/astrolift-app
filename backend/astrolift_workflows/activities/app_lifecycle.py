@@ -1191,7 +1191,7 @@ async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     return summary
 
 
-def _update_secrets_sync(deployment_id: int) -> int:
+def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = None) -> int:
     import base64
 
     from astrolift_lifecycle.models import Deployment
@@ -1205,13 +1205,21 @@ def _update_secrets_sync(deployment_id: int) -> int:
         AppDeployError,
         driver_for_capability,
         driver_for_deployment,
+        driver_for_target_cluster,
     )
 
     d = Deployment.all_objects.select_related(
         "registered_app__organization",
         "app_environment__tenant_cluster__provider_plugin",
     ).get(pk=deployment_id)
-    cluster_driver, ctx, namespace = driver_for_deployment(d)
+    # The migration workflow passes the cluster it is moving the env to.
+    # Only where the Secrets are applied changes: bundle and binding values
+    # still come from the secrets backend of the env's bound cluster, which
+    # is the source until the migration switches the binding.
+    if target_cluster_id is None:
+        cluster_driver, ctx, namespace = driver_for_deployment(d)
+    else:
+        cluster_driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
 
     refs = list(
         AppSecretBundleRef.objects.filter(

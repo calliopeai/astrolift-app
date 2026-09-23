@@ -605,3 +605,38 @@ def test_the_digest_goes_on_rolling_workloads_only(permission_resolver, app, env
 
 def test_no_literal_secrets_adds_no_digest(app, env):
     assert _digest(app, env) is None
+
+
+# A migration applied the workloads to the target cluster but never the
+# Secrets their envFrom names, so the target's pods could not start
+# (#1758 review, M1). The workflow-level ordering lives in
+# astrolift_workflows/tests/test_migrate_app_secrets_1758.py.
+
+
+def test_migration_puts_the_namespace_then_the_secrets_on_the_target(
+    permission_resolver, app, env, monkeypatch
+):
+    from astrolift_workflows.activities.migration import _materialize_secrets_on_target_sync
+
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="API_KEY", value="migrated-value").ok
+    app.refresh_from_db()
+    deployment = _deployment(app, env)
+    target = _FakeClusterDriver()
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_target_cluster",
+        lambda d, target_cluster_id: (target, SimpleNamespace(slug="target-cluster"), "acme-hello-app"),
+    )
+
+    def _source_cluster(d):
+        raise AssertionError("migration secrets must be applied to the target, not the source cluster")
+
+    monkeypatch.setattr("core.app_deploy.driver_for_deployment", _source_cluster)
+
+    assert _materialize_secrets_on_target_sync(deployment.pk, 4242) == 1
+
+    assert [call[0] for call in target.calls] == ["ensure_namespace", "apply_manifests"]
+    assert target.calls[0] == ("ensure_namespace", "acme-hello-app")
+    assert target.calls[1][2] == [_app_env_secret_name(app.slug, env.name)]
+    assert _decoded(_literal_secrets(target.applied)[0]) == {"API_KEY": "migrated-value"}
