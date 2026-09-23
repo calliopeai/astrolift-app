@@ -7,25 +7,23 @@ driver stands in for ``core.cluster_management._driver_for_cluster``.
 
 The seed init container's shell is executed for real against the parts
 the renderer emits, so "the app can read its data file" is checked on the
-reassembled bytes, not on the manifest shape alone.
+reassembled bytes, not on the manifest shape alone. The end-to-end
+acceptance test, through the real endpoints, lives with the builder API
+tests and reuses the helpers here.
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import os
 import sqlite3
 import subprocess
-import uuid
 
 import pytest
-from _sdk.cluster import ApplyResult, StorageClassInfo
-from django.test import Client
+from _sdk.cluster import ApplyResult
 
-from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
-from astrolift_identity.models import ApiToken, Member, Team
+from astrolift_identity.models import Team
 from astrolift_lifecycle.models import DevEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.activities.dev_environment import (
@@ -376,91 +374,3 @@ def test_deploy_promoted_app_without_storage_uses_an_empty_dir(org, cluster, act
     assert _by_kind(resources, "PersistentVolumeClaim") == []
     pod = _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]
     assert {"name": "data", "emptyDir": {}} in pod["volumes"]
-
-
-# ---- acceptance: upload a 10 MiB data.sqlite, the promoted app reads it -----
-
-
-def test_uploaded_sqlite_reaches_the_promoted_app_intact(org, cluster, actor, driver, tmp_path, monkeypatch):
-    """#1858 acceptance, end to end short of a live cluster: a 10 MiB
-    SQLite file goes through the real files endpoint, promote finds a
-    provisionable StorageClass, the promoted-app activity renders the
-    runtime, and the seed init container's own shell rebuilds a file that
-    SQLite opens with every row intact."""
-    Member.objects.create(
-        user=actor,
-        scope_kind=Member.ScopeKind.ORG,
-        scope_id=org.id,
-        is_active=True,
-        lifecycle=Member.Lifecycle.ACTIVE,
-    )
-    Team.objects.create(organization=org, name="Eng", slug="eng")
-    plaintext = PLAINTEXT_PREFIX + uuid.uuid4().hex
-    ApiToken.objects.create(
-        user=actor,
-        organization=org,
-        name="ship",
-        token_hash=hashlib.sha256(plaintext.encode()).hexdigest(),
-        token_last_4=plaintext[-4:],
-        scopes=["admin"],
-    )
-    headers = {"HTTP_AUTHORIZATION": f"Bearer {plaintext}"}
-    starts: list[tuple[str, list]] = []
-    monkeypatch.setattr(
-        "astrolift_workflows.client.start_workflow",
-        lambda name, args, *, workflow_id, task_queue=None: starts.append((name, list(args))),
-    )
-    driver.storage_classes = [StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com")]
-    driver.csi_drivers = ["ebs.csi.aws.com"]
-    data = _sqlite_bytes(tmp_path, rows=160, row_bytes=64 * 1024)
-    assert len(data) >= 10 * 1024 * 1024
-    dev = _dev_env(org, cluster, actor)
-    client = Client()
-
-    synced = client.put(
-        f"/api/builder/v1/dev-environments/{dev.guid}/files/",
-        data=json.dumps(
-            {
-                "files": {"server.py": "print('serve')"},
-                "data_file": {
-                    "path": "data.sqlite",
-                    "content": base64.b64encode(data).decode(),
-                    "encoding": "base64",
-                },
-            }
-        ),
-        content_type="application/json",
-        **headers,
-    )
-    assert synced.status_code == 200, synced.content
-    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
-
-    promoted = client.post(
-        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
-        data=json.dumps({"app_name": "Sales"}),
-        content_type="application/json",
-        **headers,
-    )
-    assert promoted.status_code == 202, promoted.content
-    assert promoted.json()["data_persistent"] is True
-    [deploy_input] = [args[0] for name, args in starts if name == "DeployPromotedAppWorkflow"]
-
-    _deploy_promoted_app_sync(deploy_input.dev_environment_id, deploy_input.storage_class)
-
-    _, resources = driver.applied[-1]
-    assert _by_kind(resources, "PersistentVolumeClaim")[0]["spec"]["storageClassName"] == "gp3"
-    app_env = {
-        e["name"]: e["value"]
-        for e in _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]["containers"][0]["env"]
-    }
-    assert app_env["ASTROLIFT_DATA_FILE"] == "/data/data.sqlite"
-    target = tmp_path / "data" / "data.sqlite"
-    _seed(resources, str(target), tmp_path)
-    assert target.read_bytes() == data
-    conn = sqlite3.connect(target)
-    assert conn.execute("PRAGMA integrity_check").fetchone() == ("ok",)
-    assert conn.execute("SELECT count(*), sum(length(payload)) FROM sales").fetchone() == (
-        160,
-        160 * 64 * 1024,
-    )
-    conn.close()

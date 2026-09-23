@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import sqlite3
 import uuid
 
 import pytest
@@ -31,6 +32,13 @@ from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
 from astrolift_identity.models import ApiToken, Member, Organization, Team
 from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
 from astrolift_registry.models import RegisteredApp
+from astrolift_workflows.activities.dev_environment import _deploy_promoted_app_sync
+from astrolift_workflows.tests.test_builder_runtime_1858 import (
+    _by_kind,
+    _RecordingDriver,
+    _seed,
+    _sqlite_bytes,
+)
 
 pytestmark = pytest.mark.django_db
 User = get_user_model()
@@ -962,3 +970,63 @@ def test_promote_without_a_data_file_does_not_probe_storage(
     assert r.status_code == 202, r.content
     assert r.json()["data_persistent"] is None
     assert driver.calls == 0
+
+
+# ---- acceptance (#1858): upload a 10 MiB data.sqlite, the promoted app reads it --
+
+
+def test_uploaded_sqlite_reaches_the_promoted_app_intact(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch, tmp_path
+):
+    """End to end short of a live cluster: a 10 MiB SQLite file goes
+    through the real files endpoint, promote finds a provisionable
+    StorageClass, the promoted-app activity renders the runtime, and the
+    seed init container's own shell rebuilds a file that SQLite opens with
+    every row intact."""
+    driver = _RecordingDriver(
+        storage_classes=[StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com")],
+        csi_drivers=["ebs.csi.aws.com"],
+    )
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: driver)
+    data = _sqlite_bytes(tmp_path, rows=160, row_bytes=64 * 1024)
+    assert len(data) >= 10 * 1024 * 1024
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+
+    synced = _sync(
+        client,
+        dev,
+        {
+            "files": {"server.py": "print('serve')"},
+            "data_file": {"path": "data.sqlite", "content": _b64(data), "encoding": "base64"},
+        },
+        auth_headers,
+    )
+    assert synced.status_code == 200, synced.content
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+
+    promoted = _post_json(
+        client, f"/api/builder/v1/dev-environments/{dev.guid}/promote/", {"app_name": "Sales"}, auth_headers
+    )
+    assert promoted.status_code == 202, promoted.content
+    assert promoted.json()["data_persistent"] is True
+    [deploy] = [s for s in workflow_starts if s["name"] == "DeployPromotedAppWorkflow"]
+
+    _deploy_promoted_app_sync(deploy["args"][0].dev_environment_id, deploy["args"][0].storage_class)
+
+    _, resources = driver.applied[-1]
+    assert _by_kind(resources, "PersistentVolumeClaim")[0]["spec"]["storageClassName"] == "gp3"
+    pod = _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]
+    assert {e["name"]: e["value"] for e in pod["containers"][0]["env"]}[
+        "ASTROLIFT_DATA_FILE"
+    ] == "/data/data.sqlite"
+    target = tmp_path / "data" / "data.sqlite"
+    _seed(resources, str(target), tmp_path)
+    assert target.read_bytes() == data
+    conn = sqlite3.connect(target)
+    assert conn.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    assert conn.execute("SELECT count(*), sum(length(payload)) FROM sales").fetchone() == (
+        160,
+        160 * 64 * 1024,
+    )
+    conn.close()
