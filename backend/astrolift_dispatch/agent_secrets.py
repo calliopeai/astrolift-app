@@ -331,9 +331,16 @@ def normalize_secret_uri(uri: str) -> str:
     Leaves the rest of the reference (``path[#field]``, optionally still
     ``sm:``/``ssm:``-prefixed for the AWS driver's own backend routing)
     untouched for the backend.
+
+    Raises ``ValueError`` when no path is left: a bare ``secret://`` would
+    otherwise reach the driver as an empty name, which a backend may read
+    as its own root rather than refuse. Every caller already turns an
+    exception here into its "store failed" / "unresolvable" outcome.
     """
     if uri.startswith(_SECRET_URI_SCHEME):
-        return uri[len(_SECRET_URI_SCHEME) :]
+        uri = uri[len(_SECRET_URI_SCHEME) :]
+    if not uri:
+        raise ValueError("secret reference has no path")
     return uri
 
 

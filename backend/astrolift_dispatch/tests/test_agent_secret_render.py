@@ -140,6 +140,23 @@ def test_normalize_leaves_sm_routing_intact_after_stripping():
     assert normalize_secret_uri("secret://sm:agents/x") == "sm:agents/x"
 
 
+def test_normalize_rejects_a_bare_scheme_with_no_path():
+    with pytest.raises(ValueError):
+        normalize_secret_uri("secret://")
+
+
+def test_bare_scheme_never_reaches_the_backend_as_an_empty_path():
+    backend = _FakeSecrets(get_raises_for={""})
+    with pytest.raises(ValueError):
+        write_secret_value(backend, "secret://", "sk-ant-x")
+    with pytest.raises(ValueError):
+        read_secret_value(backend, "secret://")
+    with pytest.raises(ValueError):
+        delete_secret_value(backend, "secret://")
+    assert backend.upserts == []
+    assert backend.deletes == []
+
+
 def test_write_strips_scheme_before_reaching_the_backend():
     backend = _FakeSecrets()
     write_secret_value(backend, "secret://agents/calliope/anthropic", "sk-ant-x")
