@@ -45,6 +45,7 @@ import pathlib
 import subprocess
 from typing import TYPE_CHECKING
 
+from astrolift_dispatch.spawners import substrate_attach_shim
 from astrolift_dispatch.spawners.base import ContainerSpawner, SpawnResult, TaskStatus
 
 if TYPE_CHECKING:
@@ -60,7 +61,8 @@ NAME_MAX_CHARS = 63
 #: Where the box keeps its work. A durableDir, so it rides every snapshot.
 WORKSPACE = "/workspace"
 SHIM_PORT = 80
-_SHIM = pathlib.Path(__file__).with_name("substrate_attach_shim.py")
+#: Imported only for its source, which rides into the box as a payload.
+_SHIM = pathlib.Path(substrate_attach_shim.__file__)
 
 #: containerd's default set, which a root-mode agent pod holds today. Substrate
 #: otherwise grants only AUDIT_WRITE, KILL and NET_BIND_SERVICE, and apt-get

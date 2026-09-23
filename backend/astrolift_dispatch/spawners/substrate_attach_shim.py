@@ -1,7 +1,8 @@
 """In-box attach shim for the substrate backend (#1853 spike, do not merge).
 
-Never imported by Astrolift. SubstrateSpawner ships this file into the box as
-a payload argument and runs it next to the keep-alive, standard library only.
+Runs in the box, never in the backend. SubstrateSpawner imports it only to
+read its source, ships that into the box as a payload argument and starts it
+next to the keep-alive. Standard library only.
 
 Substrate reaches an actor only over HTTP through atenet-router, and a K8s
 exec into the worker pod lands outside the gVisor sandbox. So the box serves
