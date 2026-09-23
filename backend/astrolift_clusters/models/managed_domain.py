@@ -9,6 +9,7 @@ for tenant apps, preview environments, both, or none.
 from __future__ import annotations
 
 from django.db import models
+from django.db.models import Q
 
 from core.models.base import BaseCoreModel
 
@@ -132,3 +133,20 @@ def resolve_managed_domain(
         .order_by("pk")
         .first()
     )
+
+
+def managed_domain_for_zone(zone: str, organization_id: int | None) -> ManagedDomain | None:
+    """The active zone ``organization_id`` may act on by this name, else ``None``.
+
+    Only the org's own zones and shared (org NULL) ones resolve. Zone names
+    are guessable and unique across the install, so another org's zone
+    answers ``None``, exactly like a zone nobody registered (#1909). With no
+    org the shared branch alone would match, so that answers ``None`` too.
+    """
+    if organization_id is None:
+        return None
+    return ManagedDomain.objects.filter(
+        Q(organization_id=organization_id) | Q(organization__isnull=True),
+        zone=zone,
+        deleted_at__isnull=True,
+    ).first()
