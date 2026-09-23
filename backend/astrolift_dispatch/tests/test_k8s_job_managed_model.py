@@ -161,7 +161,7 @@ def test_render_without_service_account_omits_key():
 # ---- full spawn ------------------------------------------------------------
 
 
-def test_spawn_managed_model_applies_sa_then_job(monkeypatch):
+def test_spawn_managed_model_applies_sa_then_job(db, monkeypatch):
     driver = _ManagedDriver()
     result, driver = _spawn(monkeypatch, _Spec(managed_model=True, env_vars={"LOG_LEVEL": "debug"}), driver)
     assert result.ok, result.error
@@ -182,7 +182,7 @@ def test_spawn_managed_model_applies_sa_then_job(monkeypatch):
     assert env["LOG_LEVEL"] == "debug"
 
 
-def test_spawn_without_managed_model_is_unchanged(monkeypatch):
+def test_spawn_without_managed_model_is_unchanged(db, monkeypatch):
     driver = _ManagedDriver()
     result, driver = _spawn(monkeypatch, _Spec(managed_model=False, env_vars={"LOG_LEVEL": "debug"}), driver)
     assert result.ok, result.error
@@ -195,7 +195,7 @@ def test_spawn_without_managed_model_is_unchanged(monkeypatch):
     assert "CLAUDE_CODE_USE_BEDROCK" not in names
 
 
-def test_spawn_managed_model_spec_env_overrides_injected(monkeypatch):
+def test_spawn_managed_model_spec_env_overrides_injected(db, monkeypatch):
     # A spec env var of the same name as an injected one must win, and must
     # be the ONLY entry under that name.
     #

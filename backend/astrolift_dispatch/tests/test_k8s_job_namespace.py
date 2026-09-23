@@ -105,7 +105,7 @@ class _Task:
     agent_definition = _Workload()
 
 
-def test_spawn_ensures_namespace_before_applying_job(monkeypatch):
+def test_spawn_ensures_namespace_before_applying_job(db, monkeypatch):
     driver = _RecordingDriver()
     # spawn() does `from core.cluster_management import ...` at call time, so
     # patch the source module, not the spawner module.
@@ -157,7 +157,7 @@ def test_mutable_implicit_latest_image_is_always_pulled():
     assert _image_pull_policy("registry.example/team/agent@sha256:abc") == "IfNotPresent"
 
 
-def test_failed_apply_cleans_up_partial_job_and_secret(monkeypatch):
+def test_failed_apply_cleans_up_partial_job_and_secret(db, monkeypatch):
     driver = _RecordingDriver(fail_apply=True)
     import core.cluster_management as cm
 
@@ -253,7 +253,7 @@ def test_stop_requests_cascading_deletion_of_exact_job_dependents(monkeypatch):
     ]
 
 
-def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monkeypatch):
+def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(db, monkeypatch):
     driver = _RecordingDriver()
     import core.cluster_management as cm
 
@@ -332,7 +332,7 @@ def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monke
     ]
 
 
-def test_agent_existing_claim_is_referenced_but_never_deleted(monkeypatch):
+def test_agent_existing_claim_is_referenced_but_never_deleted(db, monkeypatch):
     driver = _RecordingDriver()
     import core.cluster_management as cm
 
@@ -380,7 +380,7 @@ def test_agent_existing_claim_is_referenced_but_never_deleted(monkeypatch):
     assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
 
 
-def test_distinct_tasks_created_in_same_millisecond_get_distinct_jobs(monkeypatch):
+def test_distinct_tasks_created_in_same_millisecond_get_distinct_jobs(db, monkeypatch):
     import astrolift_dispatch.brief_injector as brief_injector
     import astrolift_dispatch.snapshot_injector as snapshot_injector
     import core.cluster_management as cm
@@ -468,3 +468,26 @@ def test_owned_stop_refuses_driver_without_real_resource_reads(monkeypatch):
     with pytest.raises(RuntimeError, match="cannot verify"):
         K8sJobSpawner(cluster=object(), namespace="agents").stop("owned-job", expected_task_guid=_Task.guid)
     assert driver.deleted == []
+
+
+def test_fenced_install_applies_the_fence_before_the_job(db, monkeypatch):
+    """#1850: the pod must never start before its NetworkPolicy exists."""
+    from constance.test import override_config
+
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    import astrolift_dispatch.brief_injector as brief_injector
+    import astrolift_dispatch.snapshot_injector as snapshot_injector
+
+    monkeypatch.setattr(brief_injector, "inject_brief_into_job_spec", lambda m, t: m)
+    monkeypatch.setattr(snapshot_injector, "inject_snapshot_into_job_spec", lambda m, t: m)
+
+    with override_config(AGENT_NETWORK_FENCE=True):
+        result = K8sJobSpawner(cluster=object(), namespace="agents-acme").spawn(_Task())
+
+    assert result.ok, result.error
+    kinds = [m["kind"] for m in driver.applied]
+    assert kinds.index("NetworkPolicy") < kinds.index("Job")
