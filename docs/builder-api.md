@@ -12,10 +12,45 @@ All routes live under `/api/builder/v1/` and take and return JSON.
 Send an API token as `Authorization: Bearer alft_at_...`. The CLI device
 flow issues these, one organization per token. The token's organization
 scopes every request: a dev environment in another organization answers
-404. A browser session works for a user with exactly one organization.
+404.
+
+Nothing else is accepted, a browser session included: a request without
+an API token answers `401` with `"reason": "api_token_required"`. The
+routes are CSRF-exempt and previews serve user code on the builder's base
+domain, so a signed-in browser alone must not be enough to act.
 
 The edge must let a bearer request through to `/api/builder/v1/*` without
 an SSO challenge, the same bypass `/api/cli/v1/*` needs.
+
+## Authorization
+
+The organization must have the `chat_studio_integration` module on. After
+that, the caller needs:
+
+| Route | Permission |
+|---|---|
+| create, sync files | `app.create` in the organization |
+| promote | `app.create` and `app.deploy` on the team the app lands in |
+
+A token must also carry the `write:apps` scope (or `admin`). Scopes cap
+what the token's user may do; they never add to it. CLI device-flow
+tokens carry `write:apps`. Tokens from IDE, mobile or browser enrollment
+are read-only and cannot use these routes.
+
+Create and sync are checked at the organization level. A role granted on a
+team only reaches them through a token issued for that team, and they
+refuse a token whose team has since been deleted. Promote is checked on
+its target team, so a team-level grant promotes into that team and no
+other. Request headers such as `X-Astrolift-Team` change none of these
+checks.
+
+A refusal is `403` with a reason, in the same shape as the module check:
+
+```json
+{"detail": "the api token lacks the write:apps scope", "reason": "missing_scope", "scope": "write:apps"}
+{"detail": "app.deploy is required on team 'eng'", "reason": "missing_permission", "permission": "app.deploy"}
+{"detail": "the chat_studio_integration module is not enabled for this organization", "reason": "module_not_enabled", "module": "chat_studio_integration"}
+```
 
 ## Create a dev environment
 
@@ -29,7 +64,7 @@ an SSO challenge, the same bypass `/api/cli/v1/*` needs.
 | `port` | `8080` | the app listens here; also set as `PORT` |
 | `env_vars` | `{}` | name to value |
 | `resource_profile` | `small` | `small`, `medium` or `large` |
-| `cluster_guid` | the org's first managed cluster, else a shared one | pick a cluster explicitly |
+| `cluster_guid` | the org's first managed cluster, else a shared one | one of the org's clusters or a shared one; any other answers `404` |
 
 Returns `201` with `{"id", "status": "creating", "preview_url": null}`.
 Provisioning runs in the background. Syncing files answers `409` until it
@@ -62,8 +97,9 @@ finishes.
 
 Returns `200` with `{"id", "status": "syncing", "file_count"}`. Errors:
 `400` for a malformed or oversized entry, `404` for an unknown
-environment, `409` when the environment is not `running`, and `413` when
-the body is larger than the caps allow (checked before it is read).
+environment, `409` when the environment is not `running` or sits on
+another organization's cluster, and `413` when the body is larger than
+the caps allow (checked before it is read).
 
 ## Promote
 
@@ -73,9 +109,9 @@ the body is larger than the caps allow (checked before it is read).
 |---|---|---|
 | `app_name` | required | |
 | `app_slug` | from `app_name` | DNS label, unique in the org |
-| `team_slug` | the org's first team | |
+| `team_slug` | the org's first team | the permission check runs on this team |
 | `environment_name` | `production` | |
-| `domain` | none | a managed domain zone bound to the environment |
+| `domain` | none | a managed domain zone bound to the environment: one of the org's zones or a shared one; any other answers `404` |
 
 Returns `202`:
 
@@ -92,7 +128,9 @@ Returns `202`:
 
 Promote registers the app (`source_kind` `direct_upload`), onboards it,
 and serves the promoted files from the app's own namespace at `app_url`.
-The app keeps running independently of the dev environment.
+The app keeps running independently of the dev environment. It answers
+`409` for an environment that is not `running` or `failed`, has no
+cluster, or sits on another organization's cluster.
 
 `data_persistent` answers "does data the app writes survive a restart":
 

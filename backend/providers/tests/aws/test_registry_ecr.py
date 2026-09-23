@@ -120,6 +120,194 @@ def test_delete_repo_not_found_is_idempotent(driver: ECRDriver) -> None:
     driver.delete_repo("acme/never-existed", archive=False)
 
 
+# ---- ensure_repo / delete_repo: statement-scoped archive policy (#1819) --
+
+# A statement an operator might set directly on the repo policy — e.g.
+# granting another AWS account pull access. Archiving/re-registering must
+# never destroy this: it is not this driver's to touch.
+_CROSS_ACCOUNT_PULL_STATEMENT = {
+    "Sid": "AllowCrossAccountPull",
+    "Effect": "Allow",
+    "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+    "Action": [
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+    ],
+}
+
+
+def test_ensure_repo_clears_archive_policy_on_reregister(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering an app whose repo was archived must restore
+    pushability rather than leave the prior deprovision's DenyPushArchived
+    policy in place — the bug that made every push read as an explicit
+    deny until an operator ran ``delete-repository-policy`` by hand."""
+    driver.ensure_repo("acme/reregistered")
+    driver.delete_repo("acme/reregistered", archive=True)
+
+    driver.ensure_repo("acme/reregistered")
+
+    with pytest.raises(ecr_client.exceptions.RepositoryPolicyNotFoundException):
+        ecr_client.get_repository_policy(repositoryName="acme/reregistered")
+
+
+def test_ensure_repo_reregister_with_no_prior_policy_is_a_noop(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """A repo that was never archived carries no policy at all;
+    re-registering it must not create one."""
+    driver.ensure_repo("acme/never-archived")
+
+    driver.ensure_repo("acme/never-archived")
+
+    with pytest.raises(ecr_client.exceptions.RepositoryPolicyNotFoundException):
+        ecr_client.get_repository_policy(repositoryName="acme/never-archived")
+
+
+def test_archive_preserves_an_operator_set_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Archiving must add the deny alongside any statement an operator set
+    on the policy directly, not replace the whole document (#1819 review) —
+    a repo shared cross-account must keep granting that pull access while
+    its app is torn down."""
+    driver.ensure_repo("acme/shared")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/shared",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]}),
+    )
+
+    driver.delete_repo("acme/shared", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/shared")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull", "DenyPushArchived"}
+
+
+def test_ensure_repo_reregister_preserves_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering after an archive must restore push without touching
+    an operator statement that survived the archive (#1819 review)."""
+    driver.ensure_repo("acme/shared")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/shared",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]}),
+    )
+    driver.delete_repo("acme/shared", archive=True)
+
+    driver.ensure_repo("acme/shared")
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/shared")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull"}
+
+
+def test_archive_twice_does_not_duplicate_the_deny_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-running teardown must not pile up a second DenyPushArchived
+    statement each time."""
+    driver.ensure_repo("acme/archived-twice")
+    driver.delete_repo("acme/archived-twice", archive=True)
+
+    driver.delete_repo("acme/archived-twice", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/archived-twice")["policyText"])
+    deny_statements = [s for s in policy["Statement"] if s.get("Sid") == "DenyPushArchived"]
+    assert len(deny_statements) == 1
+
+
+def test_archive_preserves_a_single_object_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """IAM allows ``Statement`` to be a single object, not just a list —
+    an operator-written single-statement policy must not crash the
+    archive path or read as having no statements at all (review round 2)."""
+    driver.ensure_repo("acme/single-statement")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/single-statement",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": _CROSS_ACCOUNT_PULL_STATEMENT}),
+    )
+
+    driver.delete_repo("acme/single-statement", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/single-statement")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull", "DenyPushArchived"}
+
+
+def test_ensure_repo_reregister_preserves_single_object_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Same single-object-Statement case, through a re-registration too."""
+    driver.ensure_repo("acme/single-statement")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/single-statement",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": _CROSS_ACCOUNT_PULL_STATEMENT}),
+    )
+    driver.delete_repo("acme/single-statement", archive=True)
+
+    driver.ensure_repo("acme/single-statement")
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/single-statement")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull"}
+
+
+def test_archive_preserves_the_policy_version_and_id(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Rewriting the document to add our statement must carry over the
+    original top-level Version and Id rather than hardcode Version and
+    drop Id (review round 2)."""
+    driver.ensure_repo("acme/has-id")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/has-id",
+        policyText=json.dumps(
+            {
+                "Version": "2008-10-17",
+                "Id": "acme-shared-pull-2026",
+                "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT],
+            }
+        ),
+    )
+
+    driver.delete_repo("acme/has-id", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/has-id")["policyText"])
+    assert policy["Version"] == "2008-10-17"
+    assert policy["Id"] == "acme-shared-pull-2026"
+
+
+def test_clear_archive_policy_does_not_rewrite_an_operator_only_policy(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering a repo whose policy is entirely operator-owned (never
+    archived) must leave that policy byte-for-byte alone rather than
+    round-trip it through a needless set_repository_policy (review round 2,
+    optional item)."""
+    driver.ensure_repo("acme/operator-only")
+    original = json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]})
+    ecr_client.set_repository_policy(repositoryName="acme/operator-only", policyText=original)
+
+    driver.ensure_repo("acme/operator-only")
+
+    policy_text = ecr_client.get_repository_policy(repositoryName="acme/operator-only")["policyText"]
+    assert policy_text == original
+
+
 # ---- get_pull_secret ----------------------------------------------
 
 
@@ -316,3 +504,46 @@ def test_ensure_ci_push_role_without_ids_trusts_login_subject_only() -> None:
         scm_repo_full_name="steadymd/hello-astro-demo",
     )
     assert _trust_sub_patterns(iam) == ["repo:steadymd/hello-astro-demo:*"]
+
+
+# ---- ensure_ci_push_role: permissions boundary (#1906) ------------
+
+
+def test_ensure_ci_push_role_attaches_configured_boundary() -> None:
+    """Pull-mode installs require every minted role to carry the agent's
+    own boundary, or its DenyRoleCreationWithoutThisBoundary statement
+    refuses the CreateRole outright (installer#313)."""
+    iam = _RecordingIam()
+    boundary = "arn:aws:iam::123456789012:policy/conflict-agent-boundary"
+    driver = ECRDriver(
+        config=ECRConfig(
+            region="us-east-1",
+            account_id="123456789012",
+            permissions_boundary_arn=boundary,
+        ),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+    )
+    assert iam.created["PermissionsBoundary"] == boundary
+
+
+def test_ensure_ci_push_role_omits_boundary_when_unset() -> None:
+    """Push-mode installs have no boundary; IAM rejects an empty
+    PermissionsBoundary, so the key must be absent, not blank."""
+    iam = _RecordingIam()
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+    )
+    assert "PermissionsBoundary" not in iam.created
