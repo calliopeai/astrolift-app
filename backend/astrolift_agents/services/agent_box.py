@@ -89,8 +89,11 @@ def box_job_name(box) -> str:
     the same reason ``agent_namespace`` exists (#1379). Keyed on the guid, not
     the slug, so renaming or re-creating a box can never collide with the
     object a previous box left behind.
+
+    UUIDv7 prefixes contain only time; truncating them collides across parallel
+    boxes. Use the full hex (32 chars fits a 63-char DNS label).
     """
-    return dns_label("agent-box", str(box.guid).replace("-", "")[:16])
+    return dns_label("agent-box", str(box.guid).replace("-", ""))
 
 
 def box_secret_name(job_name: str) -> str:

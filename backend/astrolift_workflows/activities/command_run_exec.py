@@ -77,9 +77,12 @@ def _start_sync(command_run_id: int) -> dict[str, Any]:
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     cluster = _cluster_for(run)
+    # UUIDv7 prefixes contain only time; truncating them collides across
+    # parallel command runs. Use the full hex for the run_id.
+    run_id = str(run.guid).replace("-", "")
     plan = plan_job_spec(
         app_slug=app.slug,
-        run_id=str(run.guid)[:8],
+        run_id=run_id,
         namespace=namespace_for_app(app),
         image=_image_for(run, app),
         command=list(run.command or []),
