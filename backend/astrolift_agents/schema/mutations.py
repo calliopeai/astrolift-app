@@ -141,6 +141,8 @@ class CreateAgentEnvironmentSpecInput:
     managed_model: bool = False
     # Run pods as the images' non-root agent user (#1855); excludes allow_install.
     run_as_non_root: bool = False
+    # Boxes set up the agent's payload workspace before the session (#1877).
+    box_workspace: bool = False
     config_repo: str = ""
     config_branch: str = "main"
     config_manifest_path: str = ""
@@ -165,6 +167,7 @@ class UpdateAgentEnvironmentSpecInput:
     vnc_enabled: bool | None = None
     managed_model: bool | None = None
     run_as_non_root: bool | None = None
+    box_workspace: bool | None = None
     config_repo: str | None = None
     config_branch: str | None = None
     config_manifest_path: str | None = None
@@ -850,6 +853,7 @@ class AgentsMutation:
                 vnc_enabled=bool(input.vnc_enabled),
                 managed_model=bool(input.managed_model),
                 run_as_non_root=bool(input.run_as_non_root),
+                box_workspace=bool(input.box_workspace),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
@@ -914,6 +918,8 @@ class AgentsMutation:
             spec.run_as_non_root = bool(input.run_as_non_root)
         if spec.run_as_non_root and spec.allow_install:
             return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
+        if input.box_workspace is not None:
+            spec.box_workspace = bool(input.box_workspace)
         if input.config_repo is not None:
             spec.config_repo = input.config_repo.strip()[:512]
         if input.config_branch is not None:

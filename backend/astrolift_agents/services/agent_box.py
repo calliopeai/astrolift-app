@@ -66,6 +66,11 @@ BOX_ENV_MARKER = "ASTROLIFT_AGENT_BOX"
 BOX_ENV_GUID = "ASTROLIFT_AGENT_BOX_GUID"
 BOX_ENV_SESSION = "ASTROLIFT_TMUX_SESSION"
 
+#: How long a box's payload URL stays valid (#1877). The box fetches it once,
+#: as its pod starts, so this covers scheduling and the image pull, not the
+#: session.
+BOX_PAYLOAD_URL_TTL_SECONDS = 3600
+
 
 class AgentBoxError(RuntimeError):
     """A box could not be started, stopped or observed."""
@@ -152,6 +157,7 @@ def render_agent_box_job(
     secret_env_names: list[str] | None = None,
     model_service_account: str = "",
     model_env: list[dict] | None = None,
+    payload_env: list[dict] | None = None,
 ) -> dict:
     """The Job manifest for a box, built around ``container_spec()``.
 
@@ -163,6 +169,12 @@ def render_agent_box_job(
     Precedence is managed-model defaults, spec env, secret refs, then the platform's own
     identity env last, so nothing an operator writes into an env spec can
     shadow the variables the box needs to describe itself.
+
+    ``payload_env`` is the agent's payload delivery, given when the spec sets
+    ``box_workspace`` (#1877). With it the box runs the runner's workspace
+    setup into its working directory before the session starts, and that env
+    ranks with the identity env, so a spec cannot redirect the setup either.
+    Without it the manifest is the bare box it always was.
     """
     from astrolift_dispatch.agent_secrets import agent_container_env, secret_env_entries
     from astrolift_dispatch.pod_hardening import harden_agent_pod
@@ -175,14 +187,22 @@ def render_agent_box_job(
         session_name=SESSION_NAME,
         idle_timeout_seconds=int(box.idle_timeout_seconds),
         env=_identity_env(box),
+        workspace_setup=payload_env is not None,
     )
     container = container_spec(session)
+
+    # The setup targets the session's own working directory, so the attach
+    # lands in the workspace it built and the IDE keeps its /workspace.
+    workspace_env = []
+    if payload_env is not None:
+        workspace_env = [*payload_env, {"name": "ASTROLIFT_WORKSPACE", "value": container["workingDir"]}]
 
     live_refs = [{"env_var": name, "uri": ""} for name in sorted(secret_env_names or [])]
     container["env"] = _merge_env(
         model_env or [],
         agent_container_env(spec, secret_name),
         secret_env_entries(secret_name, live_refs),
+        workspace_env,
         container["env"],
     )
 
@@ -303,6 +323,14 @@ def start_agent_box(box) -> None:
             _fail(box, str(exc))
             raise AgentBoxError(str(exc)) from exc
 
+    payload_env = None
+    if spec is not None and spec.box_workspace:
+        try:
+            payload_env = box_payload_env(box)
+        except AgentBoxError as exc:
+            _fail(box, str(exc))
+            raise
+
     secret_env_names = sorted((secret_manifest or {}).get("stringData") or {})
     job = render_agent_box_job(
         box=box,
@@ -312,6 +340,7 @@ def start_agent_box(box) -> None:
         secret_env_names=secret_env_names,
         model_service_account=model_wiring.service_account if model_wiring else "",
         model_env=model_wiring.env if model_wiring else None,
+        payload_env=payload_env,
     )
 
     try:
@@ -371,6 +400,65 @@ def start_agent_box(box) -> None:
         ]
     )
     log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
+
+
+def box_payload_env(box) -> list[dict]:
+    """The payload env for a box whose spec sets up its workspace (#1877).
+
+    The payload is the agent's: the same READY Brief a task of that agent
+    runs, delivered by the same code. The agent is the box's own when it was
+    ensured with one, otherwise the spec's, which is the registered agent
+    that carries the spec's slug, the pairing manifest sync creates. Every
+    missing link refuses the start with the one it is, because a box that
+    came up without the workspace its spec asked for would look healthy and
+    be wrong.
+    """
+    from astrolift_agents.models import Brief
+    from astrolift_dispatch.brief_injector import payload_env
+
+    spec = box.environment_spec
+    agent = box.agent_definition or _spec_agent(spec)
+    brief = agent.brief
+    if brief is None or brief.status != Brief.Status.READY:
+        raise AgentBoxError(
+            f"environment spec {spec.slug} sets up the box workspace, but agent {agent.slug} has no "
+            "ready Agent Package Brief; re-sync its source repo"
+        )
+    try:
+        env = payload_env(brief=brief, organization=box.organization, expires_in=BOX_PAYLOAD_URL_TTL_SECONDS)
+    except Exception as exc:  # noqa: BLE001 — one readable failure for the caller
+        raise AgentBoxError(f"could not deliver agent {agent.slug}'s payload to the box: {exc}") from exc
+    if not env:
+        raise AgentBoxError(
+            f"environment spec {spec.slug} sets up the box workspace, but agent {agent.slug} has no "
+            "payload bundle; declare [workspace] or [package] in its astrolift.toml and re-sync it"
+        )
+    return env
+
+
+def _spec_agent(spec):
+    from astrolift_registry.models import Workload
+
+    agents = list(
+        Workload.objects.filter(
+            slug=spec.slug,
+            kind=Workload.Kind.AGENT,
+            registered_app__organization_id=spec.organization_id,
+            registered_app__deleted_at__isnull=True,
+            deleted_at__isnull=True,
+        ).select_related("brief")[:2]
+    )
+    if not agents:
+        raise AgentBoxError(
+            f"environment spec {spec.slug} sets up the box workspace, but no registered agent is named "
+            f"{spec.slug}; ensure the box with an agent, or turn off box_workspace"
+        )
+    if len(agents) > 1:
+        raise AgentBoxError(
+            f"environment spec {spec.slug} sets up the box workspace, but more than one registered agent "
+            f"is named {spec.slug}; ensure the box with the agent to use"
+        )
+    return agents[0]
 
 
 def stop_agent_box(

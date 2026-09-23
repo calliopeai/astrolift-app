@@ -1480,3 +1480,246 @@ def test_subscription_box_does_not_request_a_managed_model_identity(org, cluster
     box_service.start_agent_box(_box(org, environment_spec=_spec(org)))
     job = _job_of(cluster.driver.applied[0])
     assert "serviceAccountName" not in job["spec"]["template"]["spec"]
+
+
+# ---------------------------------------------------------------------------
+# The box sets up the agent's workspace when its spec asks (#1877)
+# ---------------------------------------------------------------------------
+
+_BOX_GUID = "00000000-0000-4000-8000-000000001877"
+
+#: sha256 of the canonical JSON of the bare box Job in the test below, taken
+#: at origin/main before #1877. A spec that does not ask for its workspace
+#: must leave the manifest byte-identical; a deliberate change to the bare box
+#: updates this digest and says why.
+_BARE_BOX_JOB_SHA256 = "6a2befef5a7ef2a3e5c67a62d51d34e08d5fe469296f2b02f33def545c1a0cd6"
+
+
+def _canonical_sha256(manifest: dict) -> str:
+    import hashlib
+    import json
+
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _workspace_spec(org, **kwargs):
+    spec = _spec(org, **kwargs)
+    spec.box_workspace = True
+    spec.save(update_fields=["box_workspace", "updated_at", "version"])
+    return spec
+
+
+def _brief(org, *, slug, storage_key, snapshot=None, status=None):
+    import hashlib
+
+    from astrolift_agents.models import Brief
+
+    return Brief.objects.create(
+        organization=org,
+        content_hash=hashlib.sha256(f"{org.slug}/{slug}/{storage_key}".encode()).hexdigest(),
+        storage_key=storage_key,
+        status=status or Brief.Status.READY,
+        manifest_snapshot=(
+            {
+                "payload_sha256": "ab" * 32,
+                "manifest_path": f"agents/{slug}/astrolift.toml",
+                "requires_payload": True,
+            }
+            if snapshot is None
+            else snapshot
+        ),
+    )
+
+
+def _agent_with_payload(org, *, slug="claude-dev", storage_key=None, **brief_kwargs):
+    agent = _persistent_agent(org, slug=slug)
+    agent.brief = _brief(
+        org,
+        slug=slug,
+        storage_key=f"{org.slug}/payloads/{slug}.zip" if storage_key is None else storage_key,
+        **brief_kwargs,
+    )
+    agent.save(update_fields=["brief", "updated_at", "version"])
+    return agent
+
+
+@pytest.fixture
+def minted(monkeypatch):
+    """The blob store's URL signer, recording what each box asked it to sign."""
+    import astrolift_pipelines.artifact_store as artifact_store
+
+    calls: list[dict] = []
+
+    def presigned_download_url(*, org, blob_key, expires_in=900):
+        calls.append({"org": org.pk, "blob_key": blob_key, "expires_in": expires_in})
+        return f"https://blobs.example.net/{blob_key}?sig=abc"
+
+    monkeypatch.setattr(artifact_store, "presigned_download_url", presigned_download_url)
+    return calls
+
+
+def test_a_spec_that_does_not_ask_leaves_the_box_manifest_byte_identical(org, cluster):
+    from _sdk.agent_session import WORKSPACE_SETUP_COMMAND
+
+    box = _box(org, guid=_BOX_GUID, environment_spec=_spec(org))
+
+    box_service.start_agent_box(box)
+
+    job = _job_of(cluster.driver.applied[-1])
+    container = _container_of(job)
+    assert "readinessProbe" not in container
+    assert WORKSPACE_SETUP_COMMAND not in container["args"][0]
+    assert not {"ASTROLIFT_WORKSPACE", "ASTROLIFT_PAYLOAD_URL"} & set(_env_of(job))
+    assert _canonical_sha256(job) == _BARE_BOX_JOB_SHA256
+
+
+def test_a_workspace_box_sets_up_the_agents_payload_before_its_session(org, cluster, minted):
+    from _sdk.agent_session import SessionSpec
+
+    spec = _workspace_spec(org)
+    agent = _agent_with_payload(org, slug=spec.slug)
+
+    box = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+
+    job = _job_of(cluster.driver.applied[-1])
+    container = _container_of(job)
+    env = _env_of(job)
+    storage_key = agent.brief.storage_key
+    assert minted == [
+        {"org": org.pk, "blob_key": storage_key, "expires_in": box_service.BOX_PAYLOAD_URL_TTL_SECONDS}
+    ]
+    assert env["ASTROLIFT_PAYLOAD_URL"]["value"] == f"https://blobs.example.net/{storage_key}?sig=abc"
+    assert env["ASTROLIFT_PAYLOAD_HASH"]["value"] == "sha256:" + "ab" * 32
+    assert env["ASTROLIFT_MANIFEST_PATH"]["value"] == "agents/claude-dev/astrolift.toml"
+    # The setup builds the workspace where the session starts, so an attach
+    # lands in it, and the IDE keeps the /workspace volume it expects.
+    assert env["ASTROLIFT_WORKSPACE"]["value"] == container["workingDir"] == "/workspace"
+    assert container["volumeMounts"] == [{"name": "workspace", "mountPath": "/workspace"}]
+    assert container["args"] == [
+        keepalive_script(
+            SessionSpec(
+                image=container["image"],
+                session_name=SESSION_NAME,
+                idle_timeout_seconds=box.idle_timeout_seconds,
+                workspace_setup=True,
+            )
+        )
+    ]
+    assert container["readinessProbe"]["exec"]["command"] == ["tmux", "has-session", "-t", f"={SESSION_NAME}"]
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.PROVISIONING
+
+
+def test_the_boxs_own_agent_supplies_the_payload(org, cluster, minted):
+    """Ensured with an agent, the box is that agent in the spec's environment."""
+    spec = _workspace_spec(org)
+    _agent_with_payload(org, slug=spec.slug, storage_key="box-org/payloads/spec-agent.zip")
+    chosen = _agent_with_payload(org, slug="claude-box", storage_key="box-org/payloads/box-agent.zip")
+
+    box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug, agent_slug=chosen.slug)
+
+    assert [call["blob_key"] for call in minted] == ["box-org/payloads/box-agent.zip"]
+
+
+def test_a_spec_cannot_redirect_the_workspace_setup(org, cluster, minted):
+    spec = _workspace_spec(
+        org,
+        env_vars={"ASTROLIFT_WORKSPACE": "/etc", "ASTROLIFT_PAYLOAD_URL": "https://evil.example.net/p.zip"},
+    )
+    _agent_with_payload(org, slug=spec.slug)
+
+    box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+
+    env = _env_of(_job_of(cluster.driver.applied[-1]))
+    assert env["ASTROLIFT_WORKSPACE"]["value"] == "/workspace"
+    assert env["ASTROLIFT_PAYLOAD_URL"]["value"].startswith("https://blobs.example.net/")
+
+
+def _second_agent_named(org, slug):
+    """Another registered app in the same org with an agent of the same slug."""
+    team = Team.objects.create(organization=org, name="Other team", slug="t-other")
+    app = RegisteredApp.objects.create(
+        organization=org, team=team, name="Other", slug="app-other", provisioning_status="ready"
+    )
+    return Workload.objects.create(
+        registered_app=app,
+        name=slug,
+        slug=slug,
+        kind=Workload.Kind.AGENT,
+        run_mode=Workload.RunMode.PERSISTENT,
+    )
+
+
+@pytest.mark.parametrize(
+    ("case", "reason"),
+    [
+        ("no_agent", "no registered agent is named claude-dev"),
+        ("another_orgs_agent", "no registered agent is named claude-dev"),
+        ("two_agents", "more than one registered agent is named claude-dev"),
+        ("no_brief", "agent claude-dev has no ready Agent Package Brief"),
+        ("revoked_brief", "agent claude-dev has no ready Agent Package Brief"),
+        ("no_bundle", "agent claude-dev has no payload bundle"),
+    ],
+)
+def test_a_workspace_box_without_a_payload_refuses_to_start(org, other_org, cluster, minted, case, reason):
+    """A box that came up without the workspace its spec asked for would look
+    healthy and be wrong, so every missing link is the start's failure."""
+    from astrolift_agents.models import Brief
+
+    spec = _workspace_spec(org)
+    if case == "another_orgs_agent":
+        _agent_with_payload(other_org, slug=spec.slug)
+    elif case == "two_agents":
+        _agent_with_payload(org, slug=spec.slug)
+        _second_agent_named(org, spec.slug)
+    elif case == "no_brief":
+        _persistent_agent(org, slug=spec.slug)
+    elif case == "revoked_brief":
+        _agent_with_payload(org, slug=spec.slug, status=Brief.Status.REVOKED)
+    elif case == "no_bundle":
+        _agent_with_payload(org, slug=spec.slug, storage_key="", snapshot={"requires_payload": False})
+
+    with pytest.raises(box_service.AgentBoxError, match=reason):
+        box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+
+    box = AgentBox.objects.get(organization=org)
+    assert box.status == AgentBox.Status.FAILED
+    assert reason in box.last_error
+    assert cluster.driver.applied == []
+    assert minted == []
+
+
+def test_a_payload_that_cannot_be_delivered_refuses_to_start(org, cluster, monkeypatch):
+    from _sdk.blob_store import BlobStoreNotConfiguredError
+
+    import astrolift_pipelines.artifact_store as artifact_store
+
+    def unavailable(**_kwargs):
+        raise BlobStoreNotConfiguredError("no blob store is configured for this install")
+
+    monkeypatch.setattr(artifact_store, "presigned_download_url", unavailable)
+    spec = _workspace_spec(org)
+    _agent_with_payload(org, slug=spec.slug)
+
+    with pytest.raises(
+        box_service.AgentBoxError, match="could not deliver agent claude-dev's payload to the box"
+    ):
+        box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+
+    assert "no blob store is configured" in AgentBox.objects.get(organization=org).last_error
+    assert cluster.driver.applied == []
+
+
+def test_the_refusal_reaches_the_ensure_caller_as_a_result(
+    permission_resolver, info, org, with_tenant_org, cluster, minted
+):
+    """The IDE's button gets the sentence, not a 500."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _workspace_spec(org)
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert "no registered agent is named claude-dev" in result.errors[0].message

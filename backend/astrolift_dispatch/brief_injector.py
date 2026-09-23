@@ -81,7 +81,7 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     # on the Brief snapshot; the kickoff prompt carries the per-dispatch trigger
     # input.
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
-    _append_payload_env(env, task=task, brief=brief, snapshot=snapshot)
+    _append_payload_env(env, task=task, brief=brief)
     env.append({"name": "AGENT_SYSTEM", "value": _runtime_system_prompt(snapshot)})
     env.append({"name": "AGENT_PROMPT", "value": _kickoff_prompt(task)})
 
@@ -124,43 +124,51 @@ def _runtime_system_prompt(snapshot: dict) -> str:
     return f"{system}\n\n---\n\n{tool_section}" if system else tool_section
 
 
-def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Brief, snapshot: dict) -> None:
+def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Brief) -> None:
     """Mint the read-only bundle URL used by modular TOML file references."""
-    storage_key = getattr(brief, "storage_key", "") or ""
-    payload_hash = snapshot.get("payload_sha256", "") or ""
+    snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
     required = bool(snapshot.get("requires_payload"))
-    if not storage_key or not payload_hash:
-        if required:
-            raise RuntimeError("agent Brief requires a payload bundle but has no stored bundle/hash")
-        return
-
+    # Cover scheduling + execution, with a 15-minute floor for normal
+    # tasks and S3's seven-day SigV4 ceiling for unusually long runs.
+    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+    expires_in = min(604800, max(900, timeout + 600))
     try:
-        from astrolift_pipelines.artifact_store import presigned_download_url
-
-        # Cover scheduling + execution, with a 15-minute floor for normal
-        # tasks and S3's seven-day SigV4 ceiling for unusually long runs.
-        timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
-        expires_in = min(604800, max(900, timeout + 600))
-        url = presigned_download_url(
-            org=task.organization,
-            blob_key=storage_key,
-            expires_in=expires_in,
-        )
+        delivery = payload_env(brief=brief, organization=task.organization, expires_in=expires_in)
     except Exception:
         if required:
             raise
         logger.warning("could not mint optional agent payload URL for task %s", task.guid, exc_info=True)
         return
+    if not delivery and required:
+        raise RuntimeError("agent Brief requires a payload bundle but has no stored bundle/hash")
+    env.extend(delivery)
 
-    env.extend(
-        [
-            {"name": "ASTROLIFT_PAYLOAD_URL", "value": url},
-            {"name": "ASTROLIFT_PAYLOAD_HASH", "value": f"sha256:{payload_hash}"},
-        ]
-    )
+
+def payload_env(*, brief: Brief, organization, expires_in: int) -> list[dict[str, str]]:
+    """The env that points the runner at ``brief``'s payload bundle.
+
+    Shared by task pods and by agent boxes that set up the agent's workspace
+    (#1877), so both receive the same bundle the same way. Empty when the
+    Brief stored no bundle. Raises when the download URL cannot be minted;
+    whether that is fatal is the caller's decision.
+    """
+    snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
+    storage_key = getattr(brief, "storage_key", "") or ""
+    payload_hash = snapshot.get("payload_sha256", "") or ""
+    if not storage_key or not payload_hash:
+        return []
+
+    from astrolift_pipelines.artifact_store import presigned_download_url
+
+    url = presigned_download_url(org=organization, blob_key=storage_key, expires_in=expires_in)
+    env = [
+        {"name": "ASTROLIFT_PAYLOAD_URL", "value": url},
+        {"name": "ASTROLIFT_PAYLOAD_HASH", "value": f"sha256:{payload_hash}"},
+    ]
     runtime_manifest = snapshot.get("manifest_path")
     if runtime_manifest:
         env.append({"name": "ASTROLIFT_MANIFEST_PATH", "value": str(runtime_manifest)})
+    return env
 
 
 def _kickoff_prompt(task: AgentTask) -> str:

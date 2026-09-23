@@ -262,6 +262,7 @@ export type AstroliftAgentDetail = {
 export type AstroliftAgentEnvironmentSpec = {
   agentType: Scalars['String']['output'];
   allowInstall: Scalars['Boolean']['output'];
+  boxWorkspace: Scalars['Boolean']['output'];
   configBranch: Scalars['String']['output'];
   configManifestPath: Scalars['String']['output'];
   configRepo: Scalars['String']['output'];
@@ -4507,6 +4508,7 @@ export type CostWindow =
 export type CreateAgentEnvironmentSpecInput = {
   agentType: Scalars['String']['input'];
   allowInstall: Scalars['Boolean']['input'];
+  boxWorkspace: Scalars['Boolean']['input'];
   configBranch: Scalars['String']['input'];
   configManifestPath: Scalars['String']['input'];
   configRepo: Scalars['String']['input'];
@@ -9977,6 +9979,7 @@ export type UnregisterTenantClusterInput = {
 export type UpdateAgentEnvironmentSpecInput = {
   agentType: InputMaybe<Scalars['String']['input']>;
   allowInstall: InputMaybe<Scalars['Boolean']['input']>;
+  boxWorkspace: InputMaybe<Scalars['Boolean']['input']>;
   configBranch: InputMaybe<Scalars['String']['input']>;
   configManifestPath: InputMaybe<Scalars['String']['input']>;
   configRepo: InputMaybe<Scalars['String']['input']>;

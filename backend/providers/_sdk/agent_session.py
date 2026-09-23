@@ -44,6 +44,15 @@ NEVER = 0
 TERMINAL_REGISTRY_ENV = "ASTROLIFT_AGENT_TMUX_REGISTRY"
 TERMINAL_REGISTRY = "/tmp/astrolift-agent-terminals"
 
+#: The runner's setup-only entry point (astrolift-agents, image contract v8):
+#: the payload, ``[workspace]`` repos and deps, and MCP, with no driver. A box
+#: whose spec asks for the agent's workspace runs it before the session (#1877).
+WORKSPACE_SETUP_COMMAND = "astrolift-workspace-setup"
+
+#: Where that setup leaves what the session needs from it (the venv on PATH,
+#: the MCP config path). Sourced before tmux starts, so every window has it.
+WORKSPACE_ENV_FILE = "$HOME/.astrolift/workspace.env"
+
 
 @dataclass(frozen=True)
 class SessionSpec:
@@ -55,6 +64,8 @@ class SessionSpec:
     shell: str = "/bin/bash"
     env: dict[str, str] = field(default_factory=dict)
     working_dir: str = "/workspace"
+    #: Run the runner's workspace setup before the session starts (#1877).
+    workspace_setup: bool = False
 
     def __post_init__(self) -> None:
         if not self.image:
@@ -77,8 +88,12 @@ def keepalive_script(spec: SessionSpec) -> str:
     """
     name = spec.session_name
     timeout = spec.idle_timeout_seconds
+    # A failed setup exits the script under ``set -e``: the box ends with the
+    # runner's one-line reason in its log instead of opening a session that
+    # lacks what the spec asked for.
+    setup = f'{WORKSPACE_SETUP_COMMAND}\n. "{WORKSPACE_ENV_FILE}"\n' if spec.workspace_setup else ""
     return f"""set -eu
-TERMINAL_REGISTRY="${{{TERMINAL_REGISTRY_ENV}:-{TERMINAL_REGISTRY}}}"
+{setup}TERMINAL_REGISTRY="${{{TERMINAL_REGISTRY_ENV}:-{TERMINAL_REGISTRY}}}"
 (umask 077; mkdir -p "$TERMINAL_REGISTRY")
 tmux new-session -d -s {name} -c {spec.working_dir} {spec.shell}
 tmux set-option -t ={name}: status off
@@ -120,12 +135,18 @@ def container_spec(spec: SessionSpec) -> dict[str, object]:
     terminal on the other end; without them tmux refuses to attach and the
     session appears broken rather than absent.
 
-    No ports and no probes. The box serves nothing, so a readiness probe would
-    be asserting something untrue, and an HTTP liveness check would restart a
-    perfectly healthy pod that simply has no listener. The keep-alive loop
-    exiting is the liveness signal.
+    No ports and no liveness probe. The box serves nothing, so an HTTP check
+    would restart a perfectly healthy pod that simply has no listener. The
+    keep-alive loop exiting is the liveness signal.
+
+    A readiness probe only when the box sets up its workspace first (#1877).
+    Ready is what makes a box RUNNING and attachable, and without the probe a
+    pod is ready as soon as its container starts, while the setup is still
+    cloning and installing. An attach then would create the session itself,
+    and the keep-alive's own ``new-session`` would fail and end the box. With
+    it, ready means the session exists.
     """
-    return {
+    container: dict[str, object] = {
         "name": "agent-box",
         "image": spec.image,
         "command": ["/bin/sh", "-lc"],
@@ -137,6 +158,12 @@ def container_spec(spec: SessionSpec) -> dict[str, object]:
             {"name": k, "value": v} for k, v in sorted({**spec.env, TERMINAL_REGISTRY_ENV: TERMINAL_REGISTRY}.items())
         ],
     }
+    if spec.workspace_setup:
+        container["readinessProbe"] = {
+            "exec": {"command": ["tmux", "has-session", "-t", f"={spec.session_name}"]},
+            "periodSeconds": POLL_SECONDS,
+        }
+    return container
 
 
 def attach_argv(session_name: str = SESSION_NAME) -> list[str]:
