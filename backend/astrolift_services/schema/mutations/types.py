@@ -512,6 +512,10 @@ class _AppSecretMetadataPayload:
     set_via: str
     set_at: dt.datetime | None
     scope: str = "all"
+    pending_proposal_id: GUID | None = None
+    """Set when the app requires secret approval and the edit changes the
+    scope: nothing was written, the fields above are the current values,
+    and the change waits on this proposal (#1946)."""
 
 
 @strawberry.type

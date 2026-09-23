@@ -919,3 +919,53 @@ def test_under_approval_a_proposal_applied_without_a_base_stamp_vouches_for_noth
     _stage_via_update_manifest(app, set_app_env_keys(_MANIFEST, {"API_KEY": "approved-long-ago"}))
 
     assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+
+# Under secret approval, a scope change through setAppSecretMetadata widened
+# which environments get a value, previews included, with APP_UPDATE alone.
+# It now waits on a proposal like a value write (#1946).
+
+
+def _set_scope(app, key: str, **fields):
+    with _ctx(app):
+        return ServicesMutation().set_app_secret_metadata(
+            _info(_user()), input=SetAppSecretMetadataInput(app_slug=app.slug, key=key, **fields)
+        )
+
+
+def _repo_secret_restricted_to_production(app) -> None:
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"PROD_ONLY": "repo-value"}))
+    assert _set_scope(app, "PROD_ONLY", scope="production").ok
+
+
+def test_under_approval_a_metadata_scope_change_waits_for_its_proposal(
+    approver_grants, app, env, monkeypatch
+):
+    _repo_secret_restricted_to_production(app)
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-widen", status=PreviewEnvironment.Status.RUNNING)
+
+    widened = _set_scope(app, "PROD_ONLY", scope="all")
+
+    assert widened.ok, widened.errors
+    assert widened.data.pending_proposal_id is not None
+    assert widened.data.scope == "production"
+    assert _live_metadata(app, "PROD_ONLY").get().scope == "production"
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+
+    _approve(app, str(widened.data.pending_proposal_id))
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"PROD_ONLY": "repo-value"}
+
+
+def test_under_approval_a_metadata_edit_that_keeps_the_scope_applies_directly(approver_grants, app, env):
+    _repo_secret_restricted_to_production(app)
+    _require_secret_approval(app)
+
+    result = _set_scope(app, "PROD_ONLY", scope="production", set_via="cli")
+
+    assert result.ok, result.errors
+    assert result.data.pending_proposal_id is None
+    row = _live_metadata(app, "PROD_ONLY").get()
+    assert (row.scope, row.source) == ("production", "cli")
+    assert not SecretChangeProposal.objects.filter(registered_app=app).exists()

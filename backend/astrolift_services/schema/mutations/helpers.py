@@ -178,19 +178,24 @@ def _validate_env_key(key: str) -> str | None:
     return None
 
 
-def _secret_write_payload(input) -> dict:
-    """Proposal payload for a set/rotate: the value plus the metadata the
-    direct write would record. apply_proposal writes the metadata from it;
-    without it an approved production-only key reverted to ``all`` (#1758).
-    Omitted fields stay out, so apply keeps what is stored."""
-    payload: dict = {"key": input.key, "value": input.value}
+def _metadata_fields(input) -> dict:
+    """The metadata a proposal carries for apply_proposal to write, as a
+    direct write would. Omitted fields stay out, so apply keeps what is
+    stored (#1758)."""
+    fields: dict = {}
     if input.scope is not None:
-        payload["scope"] = input.scope
+        fields["scope"] = input.scope
     if input.expires_at is not None:
-        payload["expires_at"] = input.expires_at.isoformat()
+        fields["expires_at"] = input.expires_at.isoformat()
     if input.set_via is not None:
-        payload["set_via"] = input.set_via
-    return payload
+        fields["set_via"] = input.set_via
+    return fields
+
+
+def _secret_write_payload(input) -> dict:
+    """Proposal payload for a set/rotate. Without the metadata an approved
+    production-only key reverted to scope ``all`` (#1758)."""
+    return {"key": input.key, "value": input.value, **_metadata_fields(input)}
 
 
 def _validate_scope(scope: str | None) -> str | None:

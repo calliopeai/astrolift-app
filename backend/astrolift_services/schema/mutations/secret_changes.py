@@ -69,7 +69,9 @@ class SecretChangeMutations:
         the legacy mutations (``setAppSecret`` etc.) proxy to the same
         underlying logic; this is just the canonical surface.
         """
-        valid_ops = {o.value for o in SecretChangeProposal.Op}
+        # set_metadata comes only from setAppSecretMetadata, which checks
+        # that the scope actually changes.
+        valid_ops = {o.value for o in SecretChangeProposal.Op} - {SecretChangeProposal.Op.SET_METADATA.value}
         if input.op not in valid_ops:
             return gql_failure(
                 ErrorCode.VALIDATION.value,

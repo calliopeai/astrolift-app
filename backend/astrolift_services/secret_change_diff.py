@@ -108,6 +108,17 @@ def build_diff(
             "summary": f"Delete {key} from {env_display}",
         }
 
+    if op == SecretChangeProposal.Op.SET_METADATA.value:
+        key = payload.get("key") or ""
+        before_scope = current_secret_scope(app, key, environment_name)
+        after_scope = payload.get("scope") or before_scope
+        return {
+            "op": op,
+            "before": {"key": key, "scope": before_scope},
+            "after": {"key": key, "scope": after_scope},
+            "summary": f"Change scope of {key} in {env_display} from {before_scope} to {after_scope}",
+        }
+
     if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:
         bundle_slug = payload.get("bundle_slug") or ""
         prefix = payload.get("prefix") or ""

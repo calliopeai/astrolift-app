@@ -1,9 +1,10 @@
 """
 Apply step for an approved ``SecretChangeProposal`` (#488).
 
-Translates one of the four op kinds (set | delete | attach_bundle |
-detach_bundle) into the underlying state change against the manifest
-staging buffer or ``AppSecretBundleRef`` table.  Called from the
+Translates one of the op kinds (set | delete | set_metadata |
+attach_bundle | detach_bundle) into the underlying state change against
+the manifest staging buffer, ``AppSecretMetadata`` or the
+``AppSecretBundleRef`` table.  Called from the
 approve resolver once quorum is reached; idempotent on the proposal
 row — if the apply step has already fired the proposal stays in
 ``applied`` and re-firing is a no-op.
@@ -136,6 +137,22 @@ def apply_proposal(
             # scoped "all" and reach previews.
             if key not in read_app_env(app.manifest_raw or ""):
                 retire_app_secret_metadata(app, key, actor=actor)
+            return ApplyResult(ok=True)
+
+        if op == SecretChangeProposal.Op.SET_METADATA.value:
+            key = (payload.get("key") or "").strip()
+            if not key:
+                return ApplyResult(ok=False, error="payload.key is required for set_metadata")
+            expires_at = payload.get("expires_at")
+            upsert_app_secret_metadata(
+                app=app,
+                key=key,
+                environment_name=proposal.environment_name or "",
+                expires_at=parse_datetime(expires_at) if expires_at else None,
+                set_via=payload.get("set_via"),
+                scope=payload.get("scope"),
+                actor=actor,
+            )
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:

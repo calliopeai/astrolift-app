@@ -135,6 +135,7 @@ export type Appsecretmetadatapayload = {
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   key: Scalars['String']['output'];
+  pendingProposalId?: Maybe<Scalars['GUID']['output']>;
   scope: Scalars['String']['output'];
   setAt?: Maybe<Scalars['DateTime']['output']>;
   setVia: Scalars['String']['output'];

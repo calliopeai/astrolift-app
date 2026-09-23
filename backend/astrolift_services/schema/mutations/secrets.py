@@ -31,8 +31,9 @@ from astrolift_services.schema.mutations.helpers import (
     _caller_org_id,
     _client_ip,
     _maybe_create_proposal_for_write,
-    _stage_manifest,
+    _metadata_fields,
     _secret_write_payload,
+    _stage_manifest,
     _upsert_app_secret_metadata,
     _validate_env_key,
     _validate_scope,
@@ -51,6 +52,7 @@ from astrolift_services.schema.mutations.types import (
 from astrolift_services.schema.types import (
     RevealedSecretType,
 )
+from astrolift_services.secret_metadata_ops import current_secret_scope
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -288,6 +290,7 @@ class SecretMutations:
 
     @strawberry.field
     @mutation_audit(action="app.secret.metadata.set", target=_app_secret_target_from_input)
+    @requires_elevation(action_label="app.secret.metadata.set")
     @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def set_app_secret_metadata(
@@ -308,7 +311,12 @@ class SecretMutations:
         deadline.  To clear the deadline pass a value of ``None`` with
         ``set_via='clear'`` — reserved for future expansion when an
         explicit clear semantics is needed (current FE only sets +
-        refreshes; it never clears)."""
+        refreshes; it never clears).
+
+        Scope decides which environments receive the value, so this is a
+        secret write, not just an annotation: it needs a fresh elevation
+        like set/rotate, and with secret approval on a scope change waits
+        on a proposal (#1946)."""
         msg = _validate_env_key(input.key)
         if msg:
             return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
@@ -324,10 +332,39 @@ class SecretMutations:
                 f"unknown set_via value {input.set_via!r}; allowed: {sorted(_VALID_SECRET_SOURCES)}",
                 field="setVia",
             )
+        environment_name = input.environment_name or ""
+        if app.requires_secret_approval and input.scope is not None:
+            current_scope = current_secret_scope(app, input.key, environment_name)
+            if input.scope != current_scope:
+                proposal = _maybe_create_proposal_for_write(
+                    app=app,
+                    op=SecretChangeProposal.Op.SET_METADATA.value,
+                    payload={"key": input.key, **_metadata_fields(input)},
+                    environment_name=environment_name,
+                    info=info,
+                )
+                existing = AppSecretMetadata.objects.filter(
+                    registered_app=app,
+                    environment_name=environment_name,
+                    key=input.key,
+                    deleted_at__isnull=True,
+                ).first()
+                return gql_success(
+                    _AppSecretMetadataPayload(
+                        app_slug=app.slug,
+                        key=input.key,
+                        environment_name=environment_name,
+                        expires_at=existing.expires_at if existing else None,
+                        set_via=existing.source if existing else "",
+                        set_at=existing.set_at if existing else None,
+                        scope=current_scope,
+                        pending_proposal_id=GUID(str(proposal.guid)),
+                    )
+                )
         row = _upsert_app_secret_metadata(
             app=app,
             key=input.key,
-            environment_name=(input.environment_name or ""),
+            environment_name=environment_name,
             expires_at=input.expires_at,
             set_via=input.set_via,
             scope=input.scope,

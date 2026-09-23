@@ -114,6 +114,7 @@ type Appsecretmetadatapayload {
   setVia: String!
   setAt: DateTime
   scope: String!
+  pendingProposalId: GUID
 }
 
 type AppsecretmetadatapayloadMutationResult {

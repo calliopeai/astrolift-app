@@ -21,6 +21,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from constance.test import override_config
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -34,7 +35,7 @@ from astrolift_services.schema.mutations import (
     SetAppSecretInput,
     SetAppSecretMetadataInput,
 )
-from astrolift_services.schema.mutations.types import BulkImportAppSecretsInput
+from astrolift_services.schema.mutations.types import BulkImportAppSecretsInput, ProposeSecretChangeInput
 from astrolift_services.schema.queries import ServicesQuery
 from astrolift_services.secret_literals import allowed_scopes_for_env
 from core.permissions import Permission
@@ -384,6 +385,42 @@ def test_set_metadata_refuses_an_empty_scope(permission_resolver):
         )
     assert _refused_as_empty_scope(result)
     assert _scope_of(app, "EMPTY_K") == "production"
+
+
+# Scope decides which environments receive a value, so changing it is a
+# secret write: it needs the same fresh elevation as set/rotate (#1946).
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_set_metadata_requires_a_fresh_elevation(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "ELEV_K")
+    unelevated = SimpleNamespace(
+        context=SimpleNamespace(user=None, request=SimpleNamespace(user=None, session={}, META={}))
+    )
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            unelevated,
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="ELEV_K", scope="all"),
+        )
+    assert result.ok is False
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    assert _scope_of(app, "ELEV_K") == "production"
+
+
+def test_propose_secret_change_does_not_take_set_metadata(permission_resolver):
+    """set_metadata proposals come only from setAppSecretMetadata, which
+    checks that the scope really changes."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with _ctx(org):
+        result = ServicesMutation().propose_secret_change(
+            _info(),
+            input=ProposeSecretChangeInput(app_slug=app.slug, op="set_metadata", key="ANY_K"),
+        )
+    assert result.ok is False
+    assert (result.errors[0].code, result.errors[0].field) == ("VALIDATION", "op")
 
 
 # ---- setAppSecretMetadata return payload carries scope ------------
