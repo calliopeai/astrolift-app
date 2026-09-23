@@ -128,9 +128,12 @@ class MutationAuditExtension(SchemaExtension):
             if has_errors and result.errors:
                 error_messages = [str(e) for e in result.errors[:5]]
 
-            # Redact sensitive variables
+            # Redact sensitive variables. A mutation sent with inline
+            # literals and no `variables` key leaves `request.variables`
+            # as None; `variables` is NOT NULL, and JSONField's `default`
+            # only backfills an omitted kwarg, not an explicit None.
             variables = _redact(
-                request.variables,
+                request.variables or {},
                 secret_operation=_is_secret_operation(operation_name),
             )
 

@@ -326,7 +326,7 @@ def _cleanup_dns_records_sync(cluster_id: int) -> dict[str, Any]:
     cluster, plus the per-app subdomain IngressRule records the
     platform issued under platform-managed zones.
     """
-    from astrolift_clusters.models import TenantCluster
+    from astrolift_clusters.models import TenantCluster, managed_domain_for_zone
     from astrolift_lifecycle.models import CustomDomain
     from astrolift_lifecycle.models.ingress import IngressRule
 
@@ -358,7 +358,7 @@ def _cleanup_dns_records_sync(cluster_id: int) -> dict[str, Any]:
         CustomDomain.objects.filter(
             registered_app_id__in=app_ids,
             deleted_at__isnull=True,
-        ),
+        ).select_related("registered_app"),
     )
     # IngressRules: platform-issued subdomain entries under managed
     # zones. ``hostname`` is the FQDN we wrote.
@@ -386,6 +386,13 @@ def _cleanup_dns_records_sync(cluster_id: int) -> dict[str, Any]:
     try:
         for d in custom_domains:
             name, zone = _split_hostname(d.hostname)
+            # The hostname is whatever the app's owner typed, and the driver
+            # reaches every zone its credentials can: only the zones the
+            # platform manages for that org, its own or shared, are ours to
+            # clean (#1909).
+            if managed_domain_for_zone(zone, d.registered_app.organization_id) is None:
+                log.info("cleanup_cluster_dns_records: leaving %s, not a managed zone of its org", d.hostname)
+                continue
             _attempt(zone, name, "CNAME", d.hostname)
         for r in ingress_rules:
             name, zone = _split_hostname(r.hostname)

@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
-from astrolift_clusters.models import ProviderPlugin, TenantCluster
+from astrolift_clusters.models import ManagedDomain, ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import CustomDomain
 from astrolift_registry.models import RegisteredApp
@@ -93,6 +93,8 @@ def _scaffold():
         registry_repo_uri="123.dkr.ecr.us-west-2.amazonaws.com/astrolift/web-cap",
         provisioning_status="tearing_down",
     )
+    # DNS records are deleted only in the org's own or shared zones (#1909).
+    ManagedDomain.objects.create(organization=org, zone="example.com", dns_driver="route53")
     return org, cluster, app
 
 

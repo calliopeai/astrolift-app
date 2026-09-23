@@ -97,18 +97,19 @@ class DomainMutations:
         # the platform will create itself when the parent zone is
         # managed). The validation workflow consumes
         # ``required_dns_records`` to know what to probe.
-        from astrolift_clusters.models import ManagedDomain
+        from astrolift_clusters.models import managed_domain_for_zone
         from astrolift_lifecycle.custom_domain_handshake import (
             build_handshake,
             hostname_parent_zone,
             resolve_cluster_ingress_target,
         )
 
+        # A platform-managed parent zone means the platform writes the
+        # records itself, so only the org's own or a shared zone may
+        # count; under another org's zone the hostname is self-serve
+        # (#1909).
         parent_zone = hostname_parent_zone(host)
-        managed_zone = ManagedDomain.objects.filter(
-            zone=parent_zone,
-            deleted_at__isnull=True,
-        ).first()
+        managed_zone = managed_domain_for_zone(parent_zone, app.organization_id)
         # Best-effort cluster pick: prefer the app's default tenant
         # cluster; fall back to whatever cluster the managed-zone
         # row binds. Either way the operator-facing CNAME target is
@@ -243,18 +244,16 @@ class DomainMutations:
                 existing.save(update_fields=update_fields)
             return gql_success(app_domain_to_type(existing))
 
-        from astrolift_clusters.models import ManagedDomain
+        from astrolift_clusters.models import managed_domain_for_zone
         from astrolift_lifecycle.custom_domain_handshake import (
             build_handshake,
             hostname_parent_zone,
             resolve_cluster_ingress_target,
         )
 
+        # Same zone rule as ``addAppDomain`` (#1909).
         parent_zone = hostname_parent_zone(host)
-        managed_zone = ManagedDomain.objects.filter(
-            zone=parent_zone,
-            deleted_at__isnull=True,
-        ).first()
+        managed_zone = managed_domain_for_zone(parent_zone, app.organization_id)
         cluster = getattr(app, "default_tenant_cluster", None)
         cluster_slug = cluster.slug if cluster is not None else "default"
         cname_target = resolve_cluster_ingress_target(

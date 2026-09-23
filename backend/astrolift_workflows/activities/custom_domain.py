@@ -157,7 +157,7 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
     Returns a dict ``{"ensured": list[str], "skipped": list[str],
     "errors": list[str]}``.
     """
-    from astrolift_clusters.models import ManagedDomain
+    from astrolift_clusters.models import managed_domain_for_zone
     from astrolift_lifecycle.custom_domain_handshake import (
         hostname_parent_zone,
     )
@@ -173,11 +173,10 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
             "errors": [],
             "reason": "operator-self-serve zone",
         }
+    # The stored flag is not enough: rows added before #1909 carry it for
+    # another org's zone. Re-resolve among the app's org and shared zones.
     parent_zone = hostname_parent_zone(d.hostname)
-    managed = ManagedDomain.objects.filter(
-        zone=parent_zone,
-        deleted_at__isnull=True,
-    ).first()
+    managed = managed_domain_for_zone(parent_zone, d.registered_app.organization_id)
     if managed is None:
         return {
             "ensured": [],

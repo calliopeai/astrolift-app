@@ -65,3 +65,21 @@ def test_ecr_config_reads_operator_controls() -> None:
     assert config.account_id == "123456789012"
     assert config.image_scanning_enabled is False
     assert config.image_tag_mutability == "MUTABLE"
+
+
+def test_ecr_config_carries_the_agent_permissions_boundary() -> None:
+    """``ensure_ci_push_role`` mints an IAM role too (#1906) — it needs the
+    same boundary ``IRSAConfig`` already carries, or the agent's own
+    DenyRoleCreationWithoutThisBoundary refuses the CreateRole (installer#313)."""
+    config = _config_for_capability("aws", _cluster(iam_permissions_boundary_arn=BOUNDARY), "registry")
+
+    assert type(config).__name__ == "ECRConfig"
+    assert config.permissions_boundary_arn == BOUNDARY
+
+
+def test_ecr_config_has_no_boundary_on_an_admin_provisioned_cluster() -> None:
+    """Push mode has no boundary, and IAM rejects an empty one, so the resolver
+    must yield the empty string the driver knows to omit."""
+    config = _config_for_capability("aws", _cluster(), "registry")
+
+    assert config.permissions_boundary_arn == ""
