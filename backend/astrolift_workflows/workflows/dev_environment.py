@@ -22,6 +22,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 from astrolift_workflows.inputs import (
     CreateDevEnvironmentInput,
@@ -39,6 +40,22 @@ with workflow.unsafe.imports_passed_through():
     )
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=10)
+# Bounded, as DeployAppWorkflow's are: under Temporal's default unlimited
+# retries a failing activity never raises into the catch-alls below, so the
+# failure was never recorded and the retries held a worker thread (#1858).
+_ACTIVITY_RETRY = RetryPolicy(
+    initial_interval=timedelta(seconds=2),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(seconds=30),
+    maximum_attempts=5,
+)
+
+
+def _cause(exc: BaseException) -> str:
+    """The activity's own error; ``str(ActivityError)`` is only "Activity task failed"."""
+    while getattr(exc, "cause", None) is not None:
+        exc = exc.cause  # type: ignore[attr-defined]
+    return str(exc)
 
 
 @workflow.defn(name="CreateDevEnvironmentWorkflow")
@@ -50,15 +67,16 @@ class CreateDevEnvironmentWorkflow:
                 provision_dev_environment,
                 input.dev_environment_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                retry_policy=_ACTIVITY_RETRY,
             )
             return WorkflowResult(ok=True, message="provisioned", data=result)
         except Exception as exc:  # noqa: BLE001 — explicit catch-all
             await workflow.execute_activity(
                 mark_dev_environment_failed,
-                args=[input.dev_environment_id, str(exc)],
+                args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
             )
-            return WorkflowResult(ok=False, message=str(exc))
+            return WorkflowResult(ok=False, message=_cause(exc))
 
 
 @workflow.defn(name="SyncDevEnvironmentFilesWorkflow")
@@ -70,15 +88,16 @@ class SyncDevEnvironmentFilesWorkflow:
                 sync_dev_environment_files,
                 input.dev_environment_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                retry_policy=_ACTIVITY_RETRY,
             )
             return WorkflowResult(ok=True, message="files synced")
         except Exception as exc:  # noqa: BLE001 — explicit catch-all
             await workflow.execute_activity(
                 mark_dev_environment_failed,
-                args=[input.dev_environment_id, str(exc)],
+                args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
             )
-            return WorkflowResult(ok=False, message=str(exc))
+            return WorkflowResult(ok=False, message=_cause(exc))
 
 
 @workflow.defn(name="DeployPromotedAppWorkflow")
@@ -90,12 +109,13 @@ class DeployPromotedAppWorkflow:
                 deploy_promoted_app,
                 args=[input.dev_environment_id, input.storage_class],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                retry_policy=_ACTIVITY_RETRY,
             )
             return WorkflowResult(ok=True, message="promoted app deployed", data=result)
         except Exception as exc:  # noqa: BLE001 (explicit catch-all)
             await workflow.execute_activity(
                 mark_dev_environment_failed,
-                args=[input.dev_environment_id, str(exc)],
+                args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
             )
-            return WorkflowResult(ok=False, message=str(exc))
+            return WorkflowResult(ok=False, message=_cause(exc))
