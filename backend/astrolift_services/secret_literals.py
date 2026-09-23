@@ -39,8 +39,8 @@ def allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) 
     return frozenset({"all", "production"})
 
 
-def literal_secrets_for_environment(app, environment_name: str) -> dict[str, str]:
-    """App-wide ``[env]`` literal secrets visible to one environment.
+def literal_secrets_for_environment(app, environment) -> dict[str, str]:
+    """App-wide ``[env]`` literal secrets visible to one ``AppEnvironment``.
 
     Reads ``manifest_raw_staged`` when set and falls back to
     ``manifest_raw`` otherwise -- a set/rotate/delete/bulk-import mutation
@@ -48,10 +48,9 @@ def literal_secrets_for_environment(app, environment_name: str) -> dict[str, str
     ``astrolift_services.schema.mutations.secrets``), so a literal takes
     effect on the next deploy without a push-to-repo round trip (#1758).
 
-    Filters out keys whose ``AppSecretMetadata.scope`` doesn't match
-    ``environment_name``, mirroring ``_list_app_secrets``'s per-env
-    visibility rule (#752) so the UI list and what reaches a workload's
-    envFrom can never disagree about which keys apply where.
+    Filters out keys whose ``AppSecretMetadata.scope`` doesn't match the
+    environment, with the same ``allowed_scopes_for_env`` rule the UI's
+    secret list uses (#752).
     """
     literals = read_app_env(app.manifest_raw_staged or app.manifest_raw or "")
     if not literals:
@@ -65,25 +64,24 @@ def literal_secrets_for_environment(app, environment_name: str) -> dict[str, str
             deleted_at__isnull=True,
         )
     }
+    # A preview by identity, not by current status: a FAILED or torn-down
+    # preview (its row soft-deleted) is still a preview, and a status or
+    # deleted_at filter here made it fall through to the production
+    # branch and receive production-scoped secrets (#1758 review, H2).
+    # The lineage FK also counts, for a preview whose row is gone.
     preview_branch = (
-        PreviewEnvironment.objects.filter(
-            registered_app=app,
-            app_environment__name=environment_name,
-            deleted_at__isnull=True,
-            status__in=(
-                PreviewEnvironment.Status.BUILDING,
-                PreviewEnvironment.Status.RUNNING,
-            ),
-        )
+        PreviewEnvironment.all_objects.filter(app_environment=environment)
+        .order_by("-created_at", "-pk")
         .values_list("branch", flat=True)
         .first()
     )
-    preview_env_branches = {environment_name: preview_branch} if preview_branch else {}
-    allowed = allowed_scopes_for_env(environment_name, preview_env_branches)
+    is_preview = preview_branch is not None or environment.previewed_environment_id is not None
+    preview_env_branches = {environment.name: preview_branch or ""} if is_preview else {}
+    allowed = allowed_scopes_for_env(environment.name, preview_env_branches)
 
     out: dict[str, str] = {}
     for key, value in literals.items():
-        meta = meta_index.get((environment_name, key)) or meta_index.get(("", key))
+        meta = meta_index.get((environment.name, key)) or meta_index.get(("", key))
         scope = meta.scope if meta else "all"
         if scope in allowed:
             out[key] = value

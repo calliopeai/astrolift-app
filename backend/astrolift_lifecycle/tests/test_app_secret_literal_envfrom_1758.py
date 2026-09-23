@@ -252,3 +252,65 @@ def test_each_environment_gets_its_own_literal_secret(permission_resolver, app, 
     assert prod_secret["metadata"]["name"] != preview_secret["metadata"]["name"]
     assert prod_secret["metadata"]["name"] not in preview_env_from
     assert preview_secret["metadata"]["name"] in preview_env_from
+
+
+# A preview must never receive production-scoped keys, whatever state its
+# build is in. The deploy path used to recognise a preview only while its
+# PreviewEnvironment row was BUILDING or RUNNING and not soft-deleted, so a
+# FAILED or torn-down one fell through to the production scope set
+# (#1758 review, H2).
+
+
+def _set_shared_and_production_only(app) -> None:
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="SHARED", value="shared-value").ok
+    assert _set_app_secret(app, key="PROD_ONLY", value="prod-value", scope="production").ok
+    app.refresh_from_db()
+
+
+def test_running_preview_does_not_receive_production_scoped_keys(permission_resolver, app, env, monkeypatch):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _set_shared_and_production_only(app)
+    preview = _preview_environment(app, env, name="preview-running", status=PreviewEnvironment.Status.RUNNING)
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"SHARED": "shared-value"}
+    assert _materialize(_deployment(app, env), monkeypatch) == {
+        "SHARED": "shared-value",
+        "PROD_ONLY": "prod-value",
+    }
+
+
+def test_failed_preview_does_not_receive_production_scoped_keys(permission_resolver, app, env, monkeypatch):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _set_shared_and_production_only(app)
+    preview = _preview_environment(app, env, name="preview-failed", status=PreviewEnvironment.Status.FAILED)
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"SHARED": "shared-value"}
+
+
+def test_torn_down_preview_does_not_receive_production_scoped_keys(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _set_shared_and_production_only(app)
+    preview = _preview_environment(app, env, name="preview-gone", status=PreviewEnvironment.Status.TORN_DOWN)
+    PreviewEnvironment.all_objects.get(app_environment=preview).soft_delete()
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"SHARED": "shared-value"}
+
+
+def test_preview_known_only_by_its_lineage_does_not_receive_production_scoped_keys(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _set_shared_and_production_only(app)
+    preview = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=env.tenant_cluster,
+        name="preview-lineage",
+        url="https://preview-lineage.hello.example.com",
+        required_approvals=0,
+        previewed_environment=env,
+    )
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"SHARED": "shared-value"}

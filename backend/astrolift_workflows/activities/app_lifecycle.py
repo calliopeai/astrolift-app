@@ -1228,7 +1228,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
     # (app literal < bundle < managed service), so a colliding bundle or
     # binding key still wins -- render_resources_for_deployment lists this
     # secret first in env_from to match.
-    literals = literal_secrets_for_environment(d.registered_app, d.app_environment.name)
+    literals = literal_secrets_for_environment(d.registered_app, d.app_environment)
     if literals:
         resources.append(
             {
