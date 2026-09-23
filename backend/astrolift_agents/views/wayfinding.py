@@ -33,6 +33,8 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core.utils.browser_guard import require_ui_header_for_session
+
 try:
     import anthropic
 except ImportError:  # mirrors skill_ai_assist: the 503 path covers it
@@ -66,6 +68,7 @@ _SYSTEM_PROMPT = (
 
 
 @csrf_exempt
+@require_ui_header_for_session
 @require_http_methods(["POST"])
 def wayfinding_ask(request: HttpRequest) -> JsonResponse:
     """Answer a "where do I…" question over the routes this viewer can reach.

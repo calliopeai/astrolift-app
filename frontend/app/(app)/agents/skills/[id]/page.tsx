@@ -380,7 +380,7 @@ export default function SkillBuilderPage() {
     try {
       const res = await fetch("/api/agents/v1/skills/ai-assist/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-platform": "web" },
         body: JSON.stringify({ name: name.trim(), description: description.trim(), content }),
       });
       if (!res.ok) {
