@@ -1491,8 +1491,9 @@ _BOX_GUID = "00000000-0000-4000-8000-000000001877"
 #: sha256 of the canonical JSON of the bare box Job in the test below, taken
 #: at origin/main before #1877. A spec that does not ask for its workspace
 #: must leave the manifest byte-identical; a deliberate change to the bare box
-#: updates this digest and says why.
-_BARE_BOX_JOB_SHA256 = "6a2befef5a7ef2a3e5c67a62d51d34e08d5fe469296f2b02f33def545c1a0cd6"
+#: updates this digest and says why. Re-pinned after #1924 (#1874) named box
+#: Jobs with the full guid hex: the value origin/main 281e5d7f renders.
+_BARE_BOX_JOB_SHA256 = "36970ddf0d62a4dc63ad2caf5e8660cf3245a8588a77a8cc31ba646ccb400900"
 
 
 def _canonical_sha256(manifest: dict) -> str:
