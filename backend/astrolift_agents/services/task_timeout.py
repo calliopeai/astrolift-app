@@ -80,6 +80,16 @@ def reserve_input_wait(task, prepared):
     if reason:
         raise RuntimeError(reason)
     spawner_for_task(task).reserve_input_wait(task, INPUT_WAIT_BUDGET_SECONDS)
+    if task.model_gateway_agent_id:
+        from astrolift_dispatch.model_gateway import renew_run_key, task_key_ttl
+
+        # The Job may now outlive its gateway key (#1851). A failed renewal
+        # refuses the question like a failed reservation, and the runner retries.
+        renew_run_key(
+            organization_id=task.organization_id,
+            agent_id=task.model_gateway_agent_id,
+            ttl_seconds=task_key_ttl(task) + INPUT_WAIT_BUDGET_SECONDS,
+        )
     # A slow cluster API call also spends execution time before the question
     # exists. Do not acknowledge a new request after that budget has elapsed.
     if reason := task_timeout_reason(task):

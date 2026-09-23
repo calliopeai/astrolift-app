@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 
 from _sdk.agent_session import SESSION_NAME, SessionSpec, attach_argv, container_spec
 from _sdk.k8s_naming import agent_namespace, dns_label
@@ -158,6 +159,7 @@ def render_agent_box_job(
     model_service_account: str = "",
     model_env: list[dict] | None = None,
     payload_env: list[dict] | None = None,
+    model_gateway=None,
 ) -> dict:
     """The Job manifest for a box, built around ``container_spec()``.
 
@@ -175,6 +177,9 @@ def render_agent_box_job(
     setup into its working directory before the session starts, and that env
     ranks with the identity env, so a spec cannot redirect the setup either.
     Without it the manifest is the bare box it always was.
+
+    ``model_gateway`` wires the box to the Zentinelle gateway (#1851): no
+    reserved name survives from any source, and the gateway env goes last.
     """
     from astrolift_dispatch.agent_secrets import agent_container_env, secret_env_entries
     from astrolift_dispatch.pod_hardening import harden_agent_pod
@@ -205,6 +210,8 @@ def render_agent_box_job(
         workspace_env,
         container["env"],
     )
+    if model_gateway is not None:
+        model_gateway.wire_container(container, secret_name=secret_name)
 
     # No image creates the session's working directory, so the runtime would
     # make it root-owned and a non-root box could not write where it starts.
@@ -298,9 +305,30 @@ def start_agent_box(box) -> None:
         _fail(box, f"could not resolve an image for the box: {exc}")
         raise AgentBoxError(f"could not resolve an image for the box: {exc}") from exc
 
+    # A spec that asks for the model gateway (#1851) gets a box only behind it.
+    gateway = None
+    if spec is not None and spec.model_gateway:
+        from astrolift_dispatch.model_gateway import ModelGatewayError, resolve_model_gateway
+
+        try:
+            gateway = resolve_model_gateway(cluster=cluster, organization=box.organization, spec=spec)
+        except ModelGatewayError as exc:
+            _fail(box, str(exc))
+            raise AgentBoxError(str(exc)) from exc
+    elif box.model_gateway_agent_id:
+        # Restarted without the gateway: the previous incarnation's key was
+        # revoked when it stopped, and this one holds none.
+        box.model_gateway_agent_id = ""
+        box.model_gateway_expires_at = None
+        box.save(
+            update_fields=["model_gateway_agent_id", "model_gateway_expires_at", "updated_at", "version"]
+        )
+
     # The env-spec secret packet. Preflighted against the live store so a box
     # whose ANTHROPIC_API_KEY is missing fails to start with that sentence,
     # instead of coming up warm and failing the first time someone attaches.
+    from astrolift_dispatch.model_gateway import RESERVED_ENV_NAMES
+
     try:
         secret_manifest = resolve_task_secret_manifest(
             cluster=cluster,
@@ -308,6 +336,7 @@ def start_agent_box(box) -> None:
             secret_name=box_secret_name(job_name),
             namespace=namespace,
             task_guid=str(box.guid),
+            exclude=RESERVED_ENV_NAMES if gateway is not None else frozenset(),
         )
     except AgentSecretResolutionError as exc:
         _fail(box, str(exc))
@@ -341,7 +370,23 @@ def start_agent_box(box) -> None:
         model_service_account=model_wiring.service_account if model_wiring else "",
         model_env=model_wiring.env if model_wiring else None,
         payload_env=payload_env,
+        model_gateway=gateway,
     )
+
+    gateway_key = None
+    if gateway is not None:
+        gateway_key = _mint_box_gateway_key(box, gateway)
+        from astrolift_dispatch.model_gateway import with_gateway_key
+
+        secret_manifest = with_gateway_key(
+            secret_manifest,
+            gateway_key,
+            secret_name=box_secret_name(job_name),
+            namespace=namespace,
+            owner_guid=str(box.guid),
+        )
+
+    from astrolift_dispatch.model_gateway import redact
 
     try:
         driver = _driver_for_cluster(cluster)
@@ -364,15 +409,20 @@ def start_agent_box(box) -> None:
         )
         result = driver.apply_manifests(ctx.slug, namespace, manifests)
     except Exception as exc:  # noqa: BLE001 — one failure mode for the caller
-        _fail(box, f"applying the box manifests failed: {exc}")
-        raise AgentBoxError(f"applying the box manifests failed: {exc}") from exc
+        _revoke_box_gateway_key(box)
+        message = redact(f"applying the box manifests failed: {exc}", gateway_key)
+        _fail(box, message)
+        # Chained, the original exception's message could carry the key.
+        cause = exc if gateway_key is None else None
+        raise AgentBoxError(message) from cause
 
     if not getattr(result, "ok", False):
-        detail = result.summary() if hasattr(result, "summary") else "apply failed"
+        detail = redact(str(result.summary() if hasattr(result, "summary") else "apply failed"), gateway_key)
         # A partial apply can leave the plaintext-bearing Secret behind.
         _delete_box_objects(cluster, namespace, job_name)
-        _fail(box, str(detail))
-        raise AgentBoxError(str(detail))
+        _revoke_box_gateway_key(box)
+        _fail(box, detail)
+        raise AgentBoxError(detail)
 
     box.status = AgentBox.Status.PROVISIONING
     box.image = image[:512]
@@ -400,6 +450,71 @@ def start_agent_box(box) -> None:
         ]
     )
     log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
+
+
+def _mint_box_gateway_key(box, gateway):
+    """Mint the box's gateway key (#1851), recording its agent before the call
+    so that stopping the box revokes it whatever happens next."""
+    from astrolift_dispatch.model_gateway import (
+        ModelGatewayError,
+        box_agent_id,
+        box_key_ttl,
+        revoke_run_key,
+    )
+
+    agent_id = box_agent_id(box)
+    box.model_gateway_agent_id = agent_id
+    box.save(update_fields=["model_gateway_agent_id", "updated_at", "version"])
+    ttl = box_key_ttl(box)
+    agent = box.agent_definition
+    deployment = getattr(agent, "slug", "") or getattr(box.environment_spec, "slug", "")
+    try:
+        key = gateway.mint(
+            agent_id=agent_id, ttl_seconds=ttl, name=f"{deployment} box {box.slug}", deployment_id=deployment
+        )
+    except ModelGatewayError as exc:
+        # A mint whose answer was lost may still have created the key.
+        revoke_run_key(organization_id=box.organization_id, agent_id=agent_id)
+        _fail(box, str(exc))
+        raise AgentBoxError(str(exc)) from exc
+    box.model_gateway_expires_at = key.expires_at or timezone.now() + timedelta(seconds=ttl)
+    box.save(update_fields=["model_gateway_expires_at", "updated_at", "version"])
+    return key
+
+
+def _revoke_box_gateway_key(box) -> None:
+    """Best effort; the key's expiry is the backstop. Never raises."""
+    if not box.model_gateway_agent_id:
+        return
+    from astrolift_dispatch.model_gateway import revoke_run_key
+
+    revoke_run_key(organization_id=box.organization_id, agent_id=box.model_gateway_agent_id)
+
+
+def _renew_box_gateway_key(box) -> None:
+    """Keep a live box's gateway key ahead of its expiry (#1851).
+
+    Renewed once half of its window is left, so a failure has the other half
+    to succeed on a later sweep. A box the reaper no longer sees live is not
+    renewed, and its key lapses within one window.
+    """
+    if not box.model_gateway_agent_id or box.model_gateway_expires_at is None:
+        return
+    from astrolift_dispatch.model_gateway import ModelGatewayError, box_key_ttl, renew_run_key
+
+    ttl = box_key_ttl(box)
+    now = timezone.now()
+    if box.model_gateway_expires_at - now > timedelta(seconds=ttl / 2):
+        return
+    try:
+        expires_at = renew_run_key(
+            organization_id=box.organization_id, agent_id=box.model_gateway_agent_id, ttl_seconds=ttl
+        )
+    except ModelGatewayError as exc:
+        log.warning("agent_box: could not renew the gateway key of box %s: %s", box.slug, exc)
+        return
+    box.model_gateway_expires_at = expires_at or now + timedelta(seconds=ttl)
+    box.save(update_fields=["model_gateway_expires_at", "updated_at", "version"])
 
 
 def box_payload_env(box) -> list[dict]:
@@ -489,9 +604,12 @@ def stop_agent_box(
             error = f"cluster teardown did not complete: {exc}"
             log.warning("agent_box: %s for box %s", error, box.slug)
             if require_teardown:
+                # A pod left behind loses its model access all the same.
+                _revoke_box_gateway_key(box)
                 box.last_error = error[:LAST_ERROR_MAX_CHARS]
                 box.save(update_fields=["last_error", "updated_at", "version"])
                 raise AgentBoxError(error) from exc
+    _revoke_box_gateway_key(box)
 
     box.status = target
     box.ended_at = timezone.now()
@@ -766,11 +884,13 @@ def reap_agent_boxes() -> dict[str, int]:
             continue
         if observed is None or observed == box.status:
             summary["unchanged"] += 1
+            _renew_box_gateway_key(box)
             continue
         if observed == AgentBox.Status.RUNNING.value:
             box.status = AgentBox.Status.RUNNING
             box.save(update_fields=["status", "updated_at", "version"])
             summary["running"] += 1
+            _renew_box_gateway_key(box)
             continue
         failed = observed == AgentBox.Status.FAILED.value
         # Read the cause before teardown: the pod holding it is one of the

@@ -13,6 +13,9 @@ calliopeai/zentinelle#389):
 * ``POST .../clusters/<id>/rotate`` mints the next credential with an
   overlap, ``DELETE .../clusters/<id>`` revokes one cluster, and
   ``DELETE .../install`` revokes the install with everything it registered.
+* ``POST .../agents`` mints a short-lived agent key for one task or box,
+  ``POST .../agents/<id>/renew`` moves its expiry and ``DELETE
+  .../agents/<id>`` revokes it (calliopeai/zentinelle#400, used by #1851).
 
 The install credential is sealed with ``core.secrets``. A gateway credential
 goes from Zentinelle's answer into the ``zentinelle-gateway-credential``
@@ -32,6 +35,7 @@ import dataclasses
 import logging
 import re
 from collections.abc import Callable, Iterator
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -40,6 +44,7 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db import connection as db_connection
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from astrolift_operations.models import ZentinelleClusterGateway, ZentinelleConnection
 from core.mutations import ErrorCode
@@ -52,6 +57,10 @@ HTTP_TIMEOUT_SECONDS = 10
 
 INSTALL_CREDENTIAL_PREFIX = "sk_astroinst_"
 GATEWAY_CREDENTIAL_PREFIX = "sk_gateway_"
+AGENT_KEY_PREFIX = "sk_agent_"
+# Revocation runs in stop paths that hold a task's row lock; it retries,
+# so each attempt waits less than a mutation's call does.
+AGENT_KEY_REVOKE_TIMEOUT_SECONDS = 5
 
 GATEWAY_NAMESPACE = "astrolift-system"
 GATEWAY_NAME = "zentinelle-gateway"
@@ -157,7 +166,14 @@ class _Reply:
         return 200 <= self.status < 300
 
 
-def _call(method: str, url: str, *, payload: dict[str, Any] | None = None, credential: str = "") -> _Reply:
+def _call(
+    method: str,
+    url: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    credential: str = "",
+    timeout: float = HTTP_TIMEOUT_SECONDS,
+) -> _Reply:
     headers = {"Accept": "application/json"}
     if credential:
         headers["Authorization"] = f"Bearer {credential}"
@@ -169,7 +185,7 @@ def _call(method: str, url: str, *, payload: dict[str, Any] | None = None, crede
             url,
             json=payload,
             headers=headers,
-            timeout=HTTP_TIMEOUT_SECONDS,
+            timeout=timeout,
             allow_redirects=False,
         )
     except requests.RequestException as exc:
@@ -256,6 +272,7 @@ def _install_call(
     payload: dict[str, Any] | None = None,
     *,
     revoked_ok: bool = False,
+    timeout: float = HTTP_TIMEOUT_SECONDS,
 ) -> _Reply:
     """Call Zentinelle as this install. A 401 means Zentinelle disconnected it:
     the connection is marked revoked, and the call fails unless ``revoked_ok``."""
@@ -264,6 +281,7 @@ def _install_call(
         f"{connection.base_url}{API_PATH}{path}",
         payload=payload,
         credential=_install_credential(connection),
+        timeout=timeout,
     )
     if reply.status == 401:
         _mark_revoked(connection)
@@ -840,6 +858,90 @@ def disconnect(*, connection: ZentinelleConnection, actor=None, force: bool = Fa
         "zentinelle: organization %s disconnected from %s", connection.organization_id, connection.base_url
     )
     return DisconnectOutcome(connection=connection, warnings=warnings)
+
+
+# ---- per-run agent keys (#1851) ------------------------------------
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AgentKey:
+    """A key Zentinelle minted for one agent run. ``api_key`` belongs in the
+    run's Secret and nowhere else, so it stays out of ``repr``."""
+
+    agent_id: str
+    api_key: str = dataclasses.field(repr=False)
+    expires_at: datetime | None
+
+
+def _agent_expiry(reply: _Reply) -> datetime | None:
+    agent = reply.body.get("agent")
+    raw = agent.get("expires_at") if isinstance(agent, dict) else None
+    return parse_datetime(raw) if isinstance(raw, str) else None
+
+
+def mint_agent_key(
+    *,
+    connection: ZentinelleConnection,
+    agent_id: str,
+    ttl_seconds: int,
+    name: str = "",
+    deployment_id: str = "",
+) -> AgentKey:
+    """Mint the key of ``agent_id`` for one run, as this organization's install.
+
+    Minting again for the same agent replaces its key, so a retried spawn or a
+    restarted box gets a fresh one and the old one stops working.
+    """
+    _require_connected(connection)
+    payload = {
+        "agent_id": agent_id,
+        "ttl_seconds": ttl_seconds,
+        "name": name[:255],
+        "deployment_id": deployment_id[:255],
+    }
+    reply = _install_call(connection, "POST", "/agents", payload)
+    if reply.status == 404:
+        raise ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            "this Zentinelle cannot mint per-run agent keys (no /astrolift/agents endpoint, "
+            "calliopeai/zentinelle#400); upgrade it",
+        )
+    if not reply.ok:
+        raise _refused(reply, "the agent key request")
+    api_key = reply.body.get("api_key")
+    if not isinstance(api_key, str) or not api_key.startswith(AGENT_KEY_PREFIX):
+        raise ZentinelleConnectError(ErrorCode.INTERNAL, "Zentinelle's answer carried no agent key")
+    return AgentKey(agent_id=agent_id, api_key=api_key, expires_at=_agent_expiry(reply))
+
+
+def renew_agent_key(*, connection: ZentinelleConnection, agent_id: str, ttl_seconds: int) -> datetime | None:
+    """Let the live key of ``agent_id`` work for ``ttl_seconds`` from now. Returns its new expiry."""
+    _require_connected(connection)
+    reply = _install_call(connection, "POST", f"/agents/{agent_id}/renew", {"ttl_seconds": ttl_seconds})
+    if not reply.ok:
+        raise _refused(reply, "the agent key renewal")
+    return _agent_expiry(reply)
+
+
+def revoke_agent_key(*, connection: ZentinelleConnection, agent_id: str) -> None:
+    """Terminate ``agent_id`` in Zentinelle.
+
+    Done as well when Zentinelle no longer knows the agent (404), or no longer
+    accepts the install (401) or the connection is no longer live: an install
+    that was disconnected took its agents with it.
+    """
+    if connection.deleted_at is not None or connection.status != ZentinelleConnection.Status.CONNECTED:
+        return
+    reply = _install_call(
+        connection,
+        "DELETE",
+        f"/agents/{agent_id}",
+        revoked_ok=True,
+        timeout=AGENT_KEY_REVOKE_TIMEOUT_SECONDS,
+    )
+    if reply.ok or reply.status in (401, 404):
+        return
+    raise _refused(reply, "the agent key revocation")
 
 
 def fenced_agents_reach_gateway(cluster) -> bool:

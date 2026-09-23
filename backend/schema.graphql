@@ -248,6 +248,7 @@ type AstroliftAgentEnvironmentSpec {
   managedModel: Boolean!
   runAsNonRoot: Boolean!
   boxWorkspace: Boolean!
+  modelGateway: Boolean!
   secretRefs: JSON!
   envVars: JSON!
   configRepo: String!
@@ -4624,6 +4625,7 @@ input CreateAgentEnvironmentSpecInput {
   managedModel: Boolean! = false
   runAsNonRoot: Boolean! = false
   boxWorkspace: Boolean! = false
+  modelGateway: Boolean! = false
   configRepo: String! = ""
   configBranch: String! = "main"
   configManifestPath: String! = ""
@@ -7001,6 +7003,7 @@ input UpdateAgentEnvironmentSpecInput {
   managedModel: Boolean = null
   runAsNonRoot: Boolean = null
   boxWorkspace: Boolean = null
+  modelGateway: Boolean = null
   configRepo: String = null
   configBranch: String = null
   configManifestPath: String = null

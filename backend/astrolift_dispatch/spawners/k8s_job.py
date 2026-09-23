@@ -111,6 +111,7 @@ class K8sJobSpawner(ContainerSpawner):
     def spawn(self, task: AgentTask) -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec
+        from astrolift_dispatch.model_gateway import redact
         from astrolift_dispatch.snapshot_injector import inject_snapshot_into_job_spec
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
@@ -149,6 +150,20 @@ class K8sJobSpawner(ContainerSpawner):
         # fall through to a database lookup that can mask the original error
         # or delay deletion of the Job and per-task Secret.
         self._spawn_cleanup_refs[job_name] = []
+
+        # Model gateway (#1851): a spec that asks for it runs only behind it,
+        # so every missing piece refuses the run before anything is created.
+        gateway = None
+        if requested_spec is not None and getattr(requested_spec, "model_gateway", False):
+            from astrolift_dispatch.model_gateway import ModelGatewayError, resolve_model_gateway
+
+            try:
+                gateway = resolve_model_gateway(
+                    cluster=self._cluster, organization=task.organization, spec=requested_spec
+                )
+            except ModelGatewayError as exc:
+                logger.warning("k8s_job_spawner: model gateway refused Job %s: %s", job_name, exc)
+                return SpawnResult(external_id=job_name, ok=False, error=str(exc))
 
         # Managed model: when the spec's ``managed_model`` switch is on, the
         # pod uses the cluster's cloud-native model provider (AWS→Bedrock,
@@ -205,6 +220,7 @@ class K8sJobSpawner(ContainerSpawner):
             resolve_task_secret_manifest,
             task_secret_name,
         )
+        from astrolift_dispatch.model_gateway import RESERVED_ENV_NAMES
 
         try:
             secret_manifest = resolve_task_secret_manifest(
@@ -216,6 +232,8 @@ class K8sJobSpawner(ContainerSpawner):
                 # An agent that belongs to an app inherits that app's
                 # managed-service bindings through this Secret (#1700).
                 workload=workload,
+                # Behind the gateway, provider keys are not even read.
+                exclude=RESERVED_ENV_NAMES if gateway is not None else frozenset(),
             )
         except AgentSecretResolutionError as exc:
             logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
@@ -233,11 +251,56 @@ class K8sJobSpawner(ContainerSpawner):
                 env_names=list((secret_manifest.get("stringData") or {}).keys()),
             )
 
+        # Every source has written its env by now (spec, bindings, bundles,
+        # the Brief's [environment]), so nothing can shadow the wiring.
+        if gateway is not None:
+            gateway.wire_container(
+                job_manifest["spec"]["template"]["spec"]["containers"][0],
+                secret_name=task_secret_name(job_name),
+            )
+
         # Final env dedupe (authoritative). SSA rejects duplicate env names.
         # Keeping the last occurrence preserves operator/direct-secret
         # precedence over package defaults while every secret reference points
         # at the same merged per-task Secret.
         _dedupe_job_container_env(job_manifest)
+
+        # Minted last, just before the apply, so a refusal above never leaves
+        # a live key behind. The key goes into the per-task Secret only.
+        gateway_key = None
+        if gateway is not None:
+            from astrolift_dispatch.model_gateway import (
+                ModelGatewayError,
+                revoke_run_key,
+                task_agent_id,
+                task_key_ttl,
+                with_gateway_key,
+            )
+
+            agent_id = task_agent_id(task)
+            # Recorded before the mint, so every stop path revokes the key even
+            # if this process dies between the mint and the apply.
+            task.model_gateway_agent_id = agent_id
+            task.save(update_fields=["model_gateway_agent_id", "updated_at", "version"])
+            try:
+                gateway_key = gateway.mint(
+                    agent_id=agent_id,
+                    ttl_seconds=task_key_ttl(task),
+                    name=f"{workload.slug} task {task.guid}",
+                    deployment_id=workload.slug,
+                )
+            except ModelGatewayError as exc:
+                logger.warning("k8s_job_spawner: no gateway key for Job %s: %s", job_name, exc)
+                # A mint whose answer was lost may still have created the key.
+                revoke_run_key(organization_id=task.organization_id, agent_id=agent_id)
+                return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+            secret_manifest = with_gateway_key(
+                secret_manifest,
+                gateway_key,
+                secret_name=task_secret_name(job_name),
+                namespace=self._namespace,
+                owner_guid=str(task.guid),
+            )
 
         try:
             driver = _driver_for_cluster(self._cluster)
@@ -319,15 +382,22 @@ class K8sJobSpawner(ContainerSpawner):
             result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
+                error = redact(str(error), gateway_key)
                 logger.warning("k8s_job_spawner: apply failed for Job %s: %s", job_name, error)
                 self._cleanup_failed_spawn(job_name)
-                return SpawnResult(external_id=job_name, ok=False, error=str(error))
+                return SpawnResult(external_id=job_name, ok=False, error=error)
             logger.info("k8s_job_spawner: created Job %s for task %s", job_name, task.guid)
             return SpawnResult(external_id=job_name)
         except Exception as exc:
-            logger.exception("k8s_job_spawner: failed to create Job %s", job_name)
+            if gateway_key is None:
+                logger.exception("k8s_job_spawner: failed to create Job %s", job_name)
+            else:
+                # No traceback: its message could carry the Secret's key.
+                logger.warning(
+                    "k8s_job_spawner: failed to create Job %s: %s", job_name, redact(repr(exc), gateway_key)
+                )
             self._cleanup_failed_spawn(job_name)
-            return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+            return SpawnResult(external_id=job_name, ok=False, error=redact(str(exc), gateway_key))
 
     def _cleanup_failed_spawn(self, job_name: str) -> None:
         """Best-effort cleanup after a non-atomic multi-manifest apply.
@@ -430,6 +500,11 @@ class K8sJobSpawner(ContainerSpawner):
         except Exception:  # noqa: BLE001
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
             raise
+        finally:
+            # After the kill, never before it: revocation reads the database
+            # and calls Zentinelle. A pod that survived a failed delete loses
+            # its model access all the same.
+            _revoke_task_gateway_key(external_id)
 
         if spawn_refs is None:
             try:
@@ -513,6 +588,8 @@ class K8sJobSpawner(ContainerSpawner):
         from astrolift_dispatch.agent_secrets import task_secret_name
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
+        # The run is over, so its gateway key goes first.
+        _revoke_task_gateway_key(external_id)
         refs = [
             {
                 "apiVersion": "v1",
@@ -556,6 +633,23 @@ class K8sJobSpawner(ContainerSpawner):
                         else "volume secret delete failed"
                     )
                     raise RuntimeError(str(detail))
+
+
+def _revoke_task_gateway_key(external_id: str) -> None:
+    """Revoke the gateway key of the run behind ``external_id``, if it had one (#1851).
+
+    Best effort and never raises: the key's expiry is the backstop.
+    """
+    try:
+        task = _task_for_external_id(external_id)
+    except Exception:  # noqa: BLE001 - a stop path must not fail on revocation
+        logger.warning("k8s_job_spawner: could not look up task %s to revoke its gateway key", external_id)
+        return
+    if task is None or not task.model_gateway_agent_id:
+        return
+    from astrolift_dispatch.model_gateway import revoke_run_key
+
+    revoke_run_key(organization_id=task.organization_id, agent_id=task.model_gateway_agent_id)
 
 
 def _task_for_external_id(external_id: str):

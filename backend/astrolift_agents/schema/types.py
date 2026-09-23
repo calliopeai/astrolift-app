@@ -256,6 +256,7 @@ class AgentEnvironmentSpecType:
     managed_model: bool
     run_as_non_root: bool
     box_workspace: bool
+    model_gateway: bool
     secret_refs: JSON
     env_vars: JSON
     config_repo: str
@@ -1081,6 +1082,7 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         managed_model=s.managed_model,
         run_as_non_root=s.run_as_non_root,
         box_workspace=s.box_workspace,
+        model_gateway=s.model_gateway,
         secret_refs=s.secret_refs or [],
         env_vars=s.env_vars or {},
         config_repo=s.config_repo or "",
