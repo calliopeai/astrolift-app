@@ -802,7 +802,9 @@ class AgentsQuery:
         which the live pod backend turns into an
         ``astrolift.dev/task-id=<guid>`` label query, so an agent pod is
         found exactly on a real cluster; the recorded Job name on
-        ``AgentTask.pod_name`` remains the last-resort fallback.
+        ``AgentTask.pod_name`` is a last-resort fallback, re-queried as a
+        ``job_name`` selector against Kubernetes' own ``job-name`` label
+        rather than assumed to be the pod's own name (#1712).
         """
         from asgiref.sync import async_to_sync
 
@@ -883,13 +885,16 @@ class AgentsQuery:
             tail=tail,
         )
         if not lines:
-            # The pod is the usual answer here: an agent Job carries
-            # ``ttlSecondsAfterFinished``, so its pod is garbage-collected
-            # an hour after it settles and there is nothing left to read.
+            # Agent-task Jobs set no ttlSecondsAfterFinished (only agent-box,
+            # build, and pipeline Jobs do) -- nothing here garbage-collects a
+            # completed pod on a timer. A missing pod means either an
+            # operator/cancellation stop already deleted the Job, or the two
+            # label-based discovery attempts (task-id, then the Job's own
+            # job-name) both missed.
             _empty(
                 f"no pod logs found on cluster={getattr(cluster, 'slug', '?')} "
                 f"namespace={namespace} pod_hint={pod_name_hint or '(none)'} — "
-                f"the pod may have been garbage-collected after the Job's TTL"
+                f"the pod may have been deleted by an explicit stop/cancel"
             )
         return lines
 

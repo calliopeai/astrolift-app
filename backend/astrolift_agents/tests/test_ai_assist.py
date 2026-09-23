@@ -50,7 +50,8 @@ def auth_client(db):
         email="assist-tester@astrolift.dev",
         password="testpass123",
     )
-    client = Client()
+    # The UI header every browser call sends (#1926).
+    client = Client(HTTP_X_PLATFORM="web")
     client.force_login(user)
     return client
 
