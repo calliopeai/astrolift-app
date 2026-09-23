@@ -93,6 +93,11 @@ PLATFORM_API_URL = env_str("PLATFORM_API_URL", FRONTEND_URL)
 # while this is empty; operators must explicitly provision a bootstrap token
 # before onboarding a Dispatch Service.
 DISPATCHER_BOOTSTRAP_TOKEN = env_str("DISPATCHER_BOOTSTRAP_TOKEN", "")
+# Compute bounds for every agent task and agent box container (#1848).
+AGENT_POD_CPU_REQUEST = env_str("AGENT_POD_CPU_REQUEST", "250m")
+AGENT_POD_CPU_LIMIT = env_str("AGENT_POD_CPU_LIMIT", "4")
+AGENT_POD_MEMORY_REQUEST = env_str("AGENT_POD_MEMORY_REQUEST", "512Mi")
+AGENT_POD_MEMORY_LIMIT = env_str("AGENT_POD_MEMORY_LIMIT", "8Gi")
 API_SYSTEM_USER = env_str("API_SYSTEM_USER", "system")
 API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_automatic_system_operations")
 

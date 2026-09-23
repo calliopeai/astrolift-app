@@ -718,6 +718,7 @@ def _render_agent_job(
     same ordering ``agent_container_env`` relies on for plain-before-secret).
     """
     from astrolift_dispatch.agent_secrets import agent_container_env, task_secret_name
+    from astrolift_dispatch.pod_hardening import harden_agent_pod
 
     primary_container = workload.containers.filter(is_primary=True).first()
     port = primary_container.port if primary_container else 0
@@ -761,7 +762,7 @@ def _render_agent_job(
     command = list(primary_container.command or []) if primary_container else []
     args = list(primary_container.args or []) if primary_container else []
 
-    return {
+    job = {
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {
@@ -817,3 +818,5 @@ def _render_agent_job(
             },
         },
     }
+    harden_agent_pod(job["spec"]["template"]["spec"])
+    return job

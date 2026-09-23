@@ -352,6 +352,22 @@ def test_the_box_pod_is_not_restarted_when_the_session_ends(org):
     assert job["spec"]["backoffLimit"] == 0
 
 
+def test_the_box_carries_the_agent_sandbox_baseline(org):
+    """A box runs the same untrusted code as a task, for longer (#1848)."""
+    box = _box(org, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+    pod = job["spec"]["template"]["spec"]
+    container = _container_of(job)
+
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["seccompProfile"] == {"type": "RuntimeDefault"}
+    assert container["securityContext"]["allowPrivilegeEscalation"] is False
+    assert container["resources"]["limits"] == {"cpu": "4", "memory": "8Gi"}
+    # The tmux attach path still needs a terminal.
+    assert container["stdin"] is True
+    assert container["tty"] is True
+
+
 def test_the_box_carries_no_wall_clock_deadline(org):
     """A box is bounded by not being used, not by elapsed time.
 
