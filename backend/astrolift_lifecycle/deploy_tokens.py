@@ -167,7 +167,13 @@ def verify_token(plaintext: str, app=None):
     Returns the matching row when:
       * its ``token_hash`` matches AND it isn't revoked AND not expired
       * OR its ``previous_token_hash`` matches AND we're inside the
-        grace window AND it isn't revoked.
+        grace window AND it isn't revoked
+      * AND neither its app nor that app's organization is soft-deleted.
+
+    A deploy token is the app's credential, not a person's: it keeps
+    working after whoever minted it leaves the org, so CI does not break
+    on offboarding (the app's admins rotate or revoke it). It stops when
+    the app or org it deploys to is gone (#1910).
 
     ``app`` is optional; if passed we further restrict to that
     registered_app so a leaked token can't be used against the
@@ -193,6 +199,8 @@ def verify_token(plaintext: str, app=None):
         Q(token_hash=digest) | (Q(previous_token_hash=digest) & Q(previous_token_expires_at__gt=now)),
         deleted_at__isnull=True,
         is_revoked=False,
+        registered_app__deleted_at__isnull=True,
+        registered_app__organization__deleted_at__isnull=True,
     )
     if app is not None:
         qs = qs.filter(registered_app=app)

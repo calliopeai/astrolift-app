@@ -11,7 +11,7 @@ from astrolift_agents.tests.test_fleet_scopes_1745 import bind, running
 from astrolift_agents.tests.test_fleet_scopes_1745 import fleet as fleet_fixture
 from astrolift_agents.tests.test_fleet_scopes_1745 import no_opensearch as no_opensearch
 from astrolift_identity.api_tokens import CLI_DEVICE_SCOPES, DEFAULT_SCOPES, mint_token
-from astrolift_identity.models import ApiToken
+from astrolift_identity.models import ApiToken, Member
 from core.permissions import Permission
 
 pytestmark = pytest.mark.django_db
@@ -36,6 +36,9 @@ def test_cli_input_requires_both_bearer_scope_and_task_role(fleet, surface, acce
         kind=AgentTaskEvent.Kind.APPROVAL_REQUIRED,
         request={"version": 1, "kind": "approval", "tool": {"name": "Bash", "input": {"command": "pwd"}}},
     )
+    # The bearer authenticates only while its owner is an active member
+    # of its org (#1910).
+    Member.objects.create(user=fleet.user, scope_kind=Member.ScopeKind.ORG, scope_id=fleet.world.org.pk)
     minted = mint_token()
     ApiToken.objects.create(
         user=fleet.user,

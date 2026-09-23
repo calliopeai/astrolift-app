@@ -23,7 +23,7 @@ from astrolift_identity.api_tokens import (
     reset_current_api_token,
     set_current_api_token,
 )
-from astrolift_identity.models import ApiToken, Organization, Project, Team
+from astrolift_identity.models import ApiToken, Member, Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_operations.models import AuditEvent
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
@@ -927,7 +927,10 @@ def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(pe
     org = Organization.objects.create(name="MCP Org", slug="mcp-http")
     team = Team.objects.create(organization=org, name="HTTP Team", slug="mcp-http-team")
     project, _cluster, _app, _environment = _resource_graph(org, team, suffix="http")
-    _user, token = _token(org, team=team, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
+    user, token = _token(org, team=team, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
+    # The bearer authenticates only while its owner is an active member
+    # of its org (#1910).
+    Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.pk)
     plaintext = "alft_at_http-integration-token"
     token.token_hash = hashlib.sha256(plaintext.encode()).hexdigest()
     token.save(update_fields=["token_hash", "updated_at", "version"])
