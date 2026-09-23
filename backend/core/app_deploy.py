@@ -196,6 +196,46 @@ def _inject_workload_identity(
     )
 
 
+# Controllers whose pods run until they are replaced, so a new Secret value
+# only reaches them through a pod-template change. Not Job or CronJob: their
+# pods read the Secret when each one starts, and a Job's template is
+# immutable, so a changed annotation would fail the apply.
+_ROLLING_POD_TEMPLATE_KINDS = {"Deployment", "StatefulSet", "DaemonSet"}
+
+_LITERAL_SECRETS_DIGEST_ANNOTATION = "astrolift.io/app-env-secrets-digest"
+
+
+def _literal_secrets_digest(literals: dict[str, str]) -> str:
+    """Digest of the literal set, keyed with the platform's SECRET_KEY.
+
+    Changes whenever a key or value does. Keyed because the annotation is
+    readable by anyone who can read the pod spec, and a plain hash of a
+    short value can be brute-forced. Rotating SECRET_KEY changes every
+    digest, which costs one extra rollout.
+    """
+    import json
+
+    from django.utils.crypto import salted_hmac
+
+    canonical = json.dumps(sorted(literals.items()), separators=(",", ":"))
+    return salted_hmac("astrolift.app-env-secrets", canonical, algorithm="sha256").hexdigest()
+
+
+def _stamp_literal_secrets_digest(resources: list[dict[str, Any]], literals: dict[str, str]) -> None:
+    """Put the literal set's digest on each long-running pod template.
+
+    Pods take envFrom values when they start, and Kubernetes rolls a
+    workload only when its pod template changes. Without this, rotating a
+    literal and redeploying the same image left running pods on the old
+    value (#1758 review, M3).
+    """
+    digest = _literal_secrets_digest(literals)
+    for r in resources:
+        if r.get("kind") in _ROLLING_POD_TEMPLATE_KINDS:
+            template_meta = r.setdefault("spec", {}).setdefault("template", {}).setdefault("metadata", {})
+            template_meta.setdefault("annotations", {})[_LITERAL_SECRETS_DIGEST_ANNOTATION] = digest
+
+
 def _workload_identity_annotations(
     *,
     plugin_slug: str,
@@ -905,8 +945,9 @@ def render_resources_for_deployment(
         _bindings_secret_name,
     )
 
+    literals = literal_secrets_for_environment(app, env)
     env_from: list[str] = []
-    if literal_secrets_for_environment(app, env):
+    if literals:
         env_from.append(_app_env_secret_name(app.slug, env.name))
     env_from += sorted(
         AppSecretBundleRef.objects.filter(
@@ -991,6 +1032,9 @@ def render_resources_for_deployment(
                 namespace=namespace,
                 annotations=annotations,
             )
+
+    if literals:
+        _stamp_literal_secrets_digest(resources, literals)
 
     log.info(
         # ``md_id`` read as "managed service id" to more than one person

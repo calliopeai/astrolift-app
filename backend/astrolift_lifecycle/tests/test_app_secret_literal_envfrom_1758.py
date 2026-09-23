@@ -26,6 +26,7 @@ from astrolift_services.schema.mutations import ApproveSecretChangeInput, Servic
 from astrolift_services.schema.mutations.types import (
     BulkImportAppSecretsInput,
     DeleteAppSecretInput,
+    RotateAppSecretInput,
     SetAppSecretInput,
 )
 from astrolift_workflows.activities.app_lifecycle import (
@@ -518,3 +519,89 @@ def test_under_approval_a_later_repo_change_beats_an_older_approval(
     app.save(update_fields=["manifest_raw"])
 
     assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "from-the-repo"}
+
+
+# Pods take envFrom values when they start, and Kubernetes rolls a workload
+# only when its pod template changes, so rotating a literal and redeploying
+# the same image left the running pods on the old value (#1758 review, M3).
+
+_DIGEST = "astrolift.io/app-env-secrets-digest"
+
+_WITH_A_TASK = (
+    _MANIFEST
+    + """
+[[workloads]]
+name = "migrate"
+kind = "task"
+
+  [[workloads.containers]]
+  name = "migrate"
+  is_primary = true
+"""
+)
+
+
+def _pod_template_annotations(resources: list[dict], kind: str) -> dict[str, str]:
+    workload = next(r for r in resources if r["kind"] == kind)
+    return workload["spec"]["template"].get("metadata", {}).get("annotations", {})
+
+
+def _digest(app, env) -> str | None:
+    resources = render_resources_for_deployment(_deployment(app, env))
+    return _pod_template_annotations(resources, "Deployment").get(_DIGEST)
+
+
+def test_rotating_a_literal_changes_the_pod_template(permission_resolver, app, env):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="API_KEY", value="first-value").ok
+    app.refresh_from_db()
+    before = _digest(app, env)
+    unchanged = _digest(app, env)
+
+    with _ctx(app):
+        rotated = ServicesMutation().rotate_app_secret(
+            _info(), input=RotateAppSecretInput(app_slug=app.slug, key="API_KEY", value="second-value")
+        )
+    assert rotated.ok, rotated.errors
+    app.refresh_from_db()
+    after = _digest(app, env)
+
+    assert before is not None
+    assert unchanged == before
+    assert after is not None and after != before
+
+
+def test_the_pod_template_digest_is_keyed_with_the_platform_secret(permission_resolver, app, env, settings):
+    """The annotation is readable by anyone who can read the pod spec; an
+    unkeyed hash of a short value could be brute-forced from it."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="PIN", value="1234").ok
+    app.refresh_from_db()
+    with_platform_key = _digest(app, env)
+
+    settings.SECRET_KEY = "a-different-platform-secret-key-for-this-test"
+
+    assert with_platform_key is not None
+    assert _digest(app, env) != with_platform_key
+
+
+def test_the_digest_goes_on_rolling_workloads_only(permission_resolver, app, env):
+    """A Job's pod template is immutable, so a digest that changes on
+    rotation would fail its apply; its pods read the Secret when they
+    start anyway."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    app.manifest_raw = _WITH_A_TASK
+    app.save(update_fields=["manifest_raw"])
+    assert _set_app_secret(app, key="API_KEY", value="v1").ok
+    app.refresh_from_db()
+
+    resources = render_resources_for_deployment(_deployment(app, env))
+
+    assert _DIGEST in _pod_template_annotations(resources, "Deployment")
+    assert _DIGEST not in _pod_template_annotations(resources, "Job")
+
+
+def test_no_literal_secrets_adds_no_digest(app, env):
+    assert _digest(app, env) is None
