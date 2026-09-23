@@ -907,7 +907,7 @@ def render_resources_for_deployment(
 
     env_from: list[str] = []
     if literal_secrets_for_environment(app, env.name):
-        env_from.append(_app_env_secret_name(app.slug))
+        env_from.append(_app_env_secret_name(app.slug, env.name))
     env_from += sorted(
         AppSecretBundleRef.objects.filter(
             registered_app=app,

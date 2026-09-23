@@ -1105,15 +1105,20 @@ def _bindings_secret_name(app_slug: str, workload_name: str = "") -> str:
     return dns_label("astrolift", "bindings", app_slug, workload_name or None)
 
 
-def _app_env_secret_name(app_slug: str) -> str:
-    """Synthetic k8s Secret name for the app-wide literal ``[env]``
-    secrets (#1758). Mirrors ``_bindings_secret_name``: kept in one
-    helper so the producer (``update_secrets``) and the consumer
+def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
+    """Synthetic k8s Secret name for one environment's app-wide literal
+    ``[env]`` secrets (#1758). Mirrors ``_bindings_secret_name``: kept in
+    one helper so the producer (``update_secrets``) and the consumer
     (``render_resources_for_deployment``) can never drift apart.
+
+    Per environment, because the values are: scope filtering gives prod
+    and a preview different key sets, and both land in the same app
+    namespace on a shared cluster. One app-wide name meant whichever
+    environment materialized last overwrote the other's Secret.
     """
     from _sdk.k8s_naming import dns_label
 
-    return dns_label("astrolift", "app-env", app_slug)
+    return dns_label("astrolift", "app-env", app_slug, environment_name)
 
 
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
@@ -1230,7 +1235,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
                 "apiVersion": "v1",
                 "kind": "Secret",
                 "metadata": {
-                    "name": _app_env_secret_name(d.registered_app.slug),
+                    "name": _app_env_secret_name(d.registered_app.slug, d.app_environment.name),
                     "namespace": namespace,
                     "labels": {
                         "astrolift.io/managed-by": "astrolift",

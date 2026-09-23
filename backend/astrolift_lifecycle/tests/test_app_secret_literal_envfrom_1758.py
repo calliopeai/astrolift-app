@@ -15,7 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from astrolift_lifecycle.models import Deployment
+from astrolift_lifecycle.models import AppEnvironment, Deployment
+from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_services.schema.mutations import ServicesMutation
 from astrolift_services.schema.mutations.types import SetAppSecretInput
 from astrolift_workflows.activities.app_lifecycle import (
@@ -102,9 +103,9 @@ def _decoded(secret: dict) -> dict[str, str]:
     return {k: base64.b64decode(v).decode() for k, v in secret["data"].items()}
 
 
-def _materialize(deployment, monkeypatch) -> dict[str, str]:
+def _materialized_literal_secret(deployment, monkeypatch) -> dict | None:
     """Run update_secrets against a fake cluster and return the literal
-    Secret's decoded data, or {} when it wasn't materialized at all."""
+    Secret it would apply, or None when there is none."""
     driver = _FakeClusterDriver()
     monkeypatch.setattr(
         "core.app_deploy.driver_for_deployment",
@@ -113,7 +114,13 @@ def _materialize(deployment, monkeypatch) -> dict[str, str]:
     _update_secrets_sync(deployment.pk)
     secrets = _literal_secrets(driver.applied)
     assert len(secrets) <= 1
-    return _decoded(secrets[0]) if secrets else {}
+    return secrets[0] if secrets else None
+
+
+def _materialize(deployment, monkeypatch) -> dict[str, str]:
+    """The literal Secret's decoded data, or {} when it wasn't materialized."""
+    secret = _materialized_literal_secret(deployment, monkeypatch)
+    return _decoded(secret) if secret is not None else {}
 
 
 def _env_from_names(resources: list[dict]) -> set[str]:
@@ -130,7 +137,7 @@ def test_set_app_secret_appears_in_env_from(permission_resolver, app, env):
     app.refresh_from_db()
 
     resources = render_resources_for_deployment(_deployment(app, env))
-    assert _app_env_secret_name(app.slug) in _env_from_names(resources)
+    assert _app_env_secret_name(app.slug, env.name) in _env_from_names(resources)
 
 
 def test_no_literal_secrets_omits_the_secret_from_env_from(app, env):
@@ -180,7 +187,7 @@ def test_update_secrets_sync_materializes_the_literal_value(permission_resolver,
     assert len(driver.applied) == 1
     secret = driver.applied[0]
     assert secret["kind"] == "Secret"
-    assert secret["metadata"]["name"] == _app_env_secret_name(app.slug)
+    assert secret["metadata"]["name"] == _app_env_secret_name(app.slug, env.name)
     assert base64.b64decode(secret["data"]["API_KEY"]).decode() == "super-secret"
 
 
@@ -199,3 +206,49 @@ def test_repo_keys_a_secret_cannot_carry_are_skipped_not_applied(app, env, monke
     app.save(update_fields=["manifest_raw"])
 
     assert _materialize(_deployment(app, env), monkeypatch) == {"GOOD_KEY": "kept"}
+
+
+def _preview_environment(app, env, *, name: str, status: str, branch: str = "feat-x"):
+    """An AppEnvironment backed by a PreviewEnvironment row, on the same
+    cluster (and so the same app namespace) as ``env``."""
+    preview_env = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=env.tenant_cluster,
+        name=name,
+        url=f"https://{name}.hello.example.com",
+        required_approvals=0,
+    )
+    PreviewEnvironment.objects.create(
+        registered_app=app,
+        branch=branch,
+        is_manual=True,
+        status=status,
+        hostname=f"{name}.hello.example.com",
+        namespace="acme-hello-app",
+        app_environment=preview_env,
+    )
+    return preview_env
+
+
+def test_each_environment_gets_its_own_literal_secret(permission_resolver, app, env, monkeypatch):
+    """Prod and a preview of the same app share the app namespace on one
+    cluster, and scope filtering gives them different key sets. With one
+    app-wide Secret name, whichever materialized last overwrote the
+    other's, and the preview's pods read production values on their next
+    restart (#1758 review, M2)."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="SHARED", value="shared-value").ok
+    assert _set_app_secret(app, key="PROD_ONLY", value="prod-value", scope="production").ok
+    app.refresh_from_db()
+    preview = _preview_environment(app, env, name="preview-feat-x", status=PreviewEnvironment.Status.RUNNING)
+
+    prod_secret = _materialized_literal_secret(_deployment(app, env), monkeypatch)
+    preview_secret = _materialized_literal_secret(_deployment(app, preview), monkeypatch)
+    preview_env_from = _env_from_names(render_resources_for_deployment(_deployment(app, preview)))
+
+    assert _decoded(prod_secret) == {"SHARED": "shared-value", "PROD_ONLY": "prod-value"}
+    assert _decoded(preview_secret) == {"SHARED": "shared-value"}
+    assert prod_secret["metadata"]["name"] != preview_secret["metadata"]["name"]
+    assert prod_secret["metadata"]["name"] not in preview_env_from
+    assert preview_secret["metadata"]["name"] in preview_env_from
