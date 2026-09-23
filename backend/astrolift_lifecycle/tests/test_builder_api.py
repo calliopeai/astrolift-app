@@ -229,6 +229,36 @@ def test_create_without_auth_returns_401(cluster, workflow_starts):
     assert workflow_starts == []
 
 
+@pytest.mark.parametrize("header", ["other-org", "malformed"])
+def test_create_with_a_selected_organization_that_disagrees_with_the_token_returns_403(
+    cluster, other_org, auth_headers, workflow_starts, header
+):
+    """``auth_headers`` carries a token issued to ``org`` (via ``cluster``).
+    Every other test in this module either omits the selected-organization
+    header or matches it, so none of them exercise the reject path
+    ``TenantContextMiddleware`` owns: a conflicting or malformed
+    ``X-Astrolift-Organization`` header must 403 before this view starts
+    any dev-environment work (#1791)."""
+    client = Client()
+    selected = str(other_org.guid) if header == "other-org" else "not-a-guid"
+    r = _post_json(
+        client,
+        "/api/builder/v1/dev-environments/",
+        {
+            "runtime": "python",
+            "runtime_version": "3.12",
+            "start_command": "python main.py",
+            "port": 8000,
+            "resource_profile": "small",
+        },
+        {**auth_headers, "HTTP_X_ASTROLIFT_ORGANIZATION": selected},
+    )
+    assert r.status_code == 403, r.content
+    assert "organization" in r.json()["detail"]
+    assert workflow_starts == []
+    assert not DevEnvironment.objects.exists()
+
+
 def test_create_with_bad_runtime_returns_400(cluster, auth_headers, workflow_starts):
     client = Client()
     r = _post_json(
