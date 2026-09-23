@@ -22,9 +22,12 @@ import pytest
 from _sdk.agent_session import (
     DEFAULT_IDLE_TIMEOUT_SECONDS,
     NEVER,
+    POLL_SECONDS,
     SESSION_NAME,
     TERMINAL_REGISTRY,
     TERMINAL_REGISTRY_ENV,
+    WORKSPACE_ENV_FILE,
+    WORKSPACE_SETUP_COMMAND,
     SessionSpec,
     attach_argv,
     container_spec,
@@ -317,3 +320,86 @@ def test_dead_panes_and_stale_registrations_do_not_retain_box(socket_name, termi
         if proc.poll() is None:
             proc.kill()
         _tmux(private, "kill-server")
+
+
+# ---- workspace setup before the session (#1877) -------------------------------
+
+
+def test_a_bare_box_runs_no_setup():
+    """Off by default, and off means the keep-alive it always was."""
+    spec = SessionSpec(image="agent:1")
+
+    assert spec.workspace_setup is False
+    assert WORKSPACE_SETUP_COMMAND not in keepalive_script(spec)
+    assert keepalive_script(spec).startswith('set -eu\nTERMINAL_REGISTRY="')
+
+
+def test_setup_runs_and_its_env_is_sourced_before_the_session_starts():
+    script = keepalive_script(SessionSpec(image="agent:1", workspace_setup=True))
+
+    assert script.splitlines()[:3] == ["set -eu", WORKSPACE_SETUP_COMMAND, f'. "{WORKSPACE_ENV_FILE}"']
+    assert script.index(WORKSPACE_ENV_FILE) < script.index("tmux new-session")
+
+
+def test_a_box_that_sets_up_is_ready_only_once_its_session_exists():
+    """Ready makes a box attachable. Setup can take minutes, and an attach
+    during it would create the session and make the keep-alive's own
+    new-session fail."""
+    container = container_spec(SessionSpec(image="agent:1", workspace_setup=True))
+
+    assert container["readinessProbe"] == {
+        "exec": {"command": ["tmux", "has-session", "-t", f"={SESSION_NAME}"]},
+        "periodSeconds": POLL_SECONDS,
+    }
+    assert "livenessProbe" not in container
+    assert "ports" not in container
+
+
+def _fake_setup(tmp_path, monkeypatch, body: str) -> None:
+    """Put a stand-in for the runner's setup first on PATH, with a scratch HOME."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    setup = bin_dir / WORKSPACE_SETUP_COMMAND
+    setup.write_text("#!/bin/sh\n" + body)
+    setup.chmod(0o755)
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+def _probe(socket: str) -> int:
+    probe = container_spec(SessionSpec(image="x", workspace_setup=True))["readinessProbe"]["exec"]["command"]
+    return _tmux(socket, *probe[1:]).returncode
+
+
+@tmux_required
+def test_the_session_inherits_what_the_setup_exported(socket_name, tmp_path, monkeypatch):
+    _fake_setup(
+        tmp_path,
+        monkeypatch,
+        'sleep 1\nmkdir -p "$HOME/.astrolift"\n'
+        'echo "export VIRTUAL_ENV=/workspace/.venv" > "$HOME/.astrolift/workspace.env"\n',
+    )
+    proc = _run_script(SessionSpec(image="x", idle_timeout_seconds=NEVER, workspace_setup=True), socket_name)
+    try:
+        # Not ready while the setup runs: no session to attach to yet.
+        assert _probe(socket_name) != 0
+        _wait_for_session(socket_name)
+        assert _probe(socket_name) == 0
+        shown = _tmux(socket_name, "show-environment", "-g", "VIRTUAL_ENV").stdout.strip()
+        assert shown == "VIRTUAL_ENV=/workspace/.venv"
+    finally:
+        proc.kill()
+
+
+@tmux_required
+def test_a_failed_setup_ends_the_box_before_any_session(socket_name, tmp_path, monkeypatch):
+    _fake_setup(tmp_path, monkeypatch, 'echo "[workspace] workspace.repos[0]: could not clone" >&2\nexit 1\n')
+    proc = _run_script(SessionSpec(image="x", idle_timeout_seconds=NEVER, workspace_setup=True), socket_name)
+    try:
+        assert proc.wait(timeout=10) == 1
+        assert _tmux(socket_name, "has-session", "-t", SESSION_NAME).returncode != 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()

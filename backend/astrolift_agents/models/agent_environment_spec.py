@@ -51,6 +51,9 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # Run task and box pods as the images' non-root ``agent`` user with all
     # capabilities dropped (#1855). Excludes ``allow_install``.
     run_as_non_root = models.BooleanField(default=False)
+    # Boot the agent's payload in a box before its session starts, with the
+    # runner's workspace setup ([workspace] repos, deps, MCP) (#1877).
+    box_workspace = models.BooleanField(default=False)
     # Secret URIs only — values resolved by the dispatcher at launch time.
     # Never store values.  Format:
     #   [{"uri": "arn:aws:secretsmanager:...", "env_var": "GITHUB_TOKEN"}]
