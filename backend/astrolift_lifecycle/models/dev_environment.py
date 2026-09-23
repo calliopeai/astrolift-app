@@ -99,9 +99,19 @@ class DevEnvironment(BaseCoreModel):
     env_vars = models.JSONField(default=dict, blank=True)
     resource_profile = models.CharField(max_length=32, default="small")
 
-    # File tree: ``{relative_path: content_string}``. Capped at
-    # ``FILE_SIZE_LIMIT_BYTES`` total at the API boundary.
+    # File tree: ``{relative_path: content_string}``, or
+    # ``{relative_path: {"content": <base64>, "encoding": "base64"}}`` for a
+    # binary file (#1858). Capped at ``FILE_SIZE_LIMIT_BYTES`` of decoded
+    # content at the API boundary.
     files = models.JSONField(default=dict, blank=True)
+
+    # The one declared data file (#1858), e.g. an app's ``data.sqlite``. It is
+    # too large for the files ConfigMap, so it lives here and reaches the pod
+    # as Secret chunks that a seed init container reassembles under the data
+    # volume. ``data_file_path`` is relative to that volume; empty means no
+    # data file. Queries that do not render manifests defer ``data_file``.
+    data_file_path = models.CharField(max_length=255, blank=True, default="")
+    data_file = models.BinaryField(null=True, blank=True)
 
     status = models.CharField(
         max_length=16,

@@ -15,11 +15,15 @@ need a running Temporal server.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
+import sqlite3
 import uuid
 
 import pytest
+from _sdk.cluster import StorageClassInfo
+from constance.test import override_config
 from django.contrib.auth import get_user_model
 from django.test import Client
 
@@ -28,6 +32,13 @@ from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
 from astrolift_identity.models import ApiToken, Member, Organization, Team
 from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
 from astrolift_registry.models import RegisteredApp
+from astrolift_workflows.activities.dev_environment import _deploy_promoted_app_sync
+from astrolift_workflows.tests.test_builder_runtime_1858 import (
+    _by_kind,
+    _RecordingDriver,
+    _seed,
+    _sqlite_bytes,
+)
 
 pytestmark = pytest.mark.django_db
 User = get_user_model()
@@ -483,10 +494,15 @@ def test_promote_happy_path_creates_app_and_env_and_enqueues_onboard(
     assert dev.status == DevEnvironment.Status.PROMOTING
     assert dev.promoted_app_id == app.id
 
-    assert len(workflow_starts) == 1
-    start = workflow_starts[0]
-    assert start["name"] == "OnboardAppWorkflow"
-    assert start["workflow_id"] == f"OnboardAppWorkflow-{app.guid}"
+    assert [s["name"] for s in workflow_starts] == ["OnboardAppWorkflow", "DeployPromotedAppWorkflow"]
+    onboard, deploy = workflow_starts
+    assert onboard["workflow_id"] == f"OnboardAppWorkflow-{app.guid}"
+    assert deploy["workflow_id"] == f"DeployPromotedAppWorkflow-{app.guid}"
+    assert deploy["args"][0].dev_environment_id == dev.id
+    assert deploy["args"][0].storage_class == ""
+    assert body["app_url"] == "https://builder-org-my-promoted-app.builder-org.dev.astrolift.io"
+    # No data file declared, so there is nothing to persist or warn about.
+    assert body["data_persistent"] is None
 
 
 def test_promote_with_explicit_slug_and_environment(org, cluster, user, team, auth_headers, workflow_starts):
@@ -653,3 +669,364 @@ def test_promote_other_org_env_returns_404(cluster, user, other_org, auth_header
         auth_headers,
     )
     assert r.status_code == 404
+
+
+# ---- binary files + the data file (#1858) ----------------------------
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode()
+
+
+def _sync(client, dev, payload, headers):
+    return _put_json(client, f"/api/builder/v1/dev-environments/{dev.guid}/files/", payload, headers)
+
+
+def test_sync_accepts_binary_files_with_a_declared_encoding(
+    org, cluster, user, auth_headers, workflow_starts
+):
+    dev = _running_dev_env(org, cluster, user)
+    png = _b64(b"\x89PNG\r\n\x1a\n\x00\xff\xfe")
+
+    r = _sync(
+        Client(),
+        dev,
+        {"files": {"server.py": "print('hi')", "logo.png": {"content": png, "encoding": "base64"}}},
+        auth_headers,
+    )
+
+    assert r.status_code == 200, r.content
+    dev.refresh_from_db()
+    assert dev.files == {"server.py": "print('hi')", "logo.png": {"content": png, "encoding": "base64"}}
+    assert dev.data_file_path == ""
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"content": "not base64!", "encoding": "base64"},
+        {"content": "aGk=\n", "encoding": "base64"},
+        {"content": "aGk=", "encoding": "hex"},
+        {"content": "aGk="},
+        {"content": 7, "encoding": "base64"},
+    ],
+)
+def test_sync_rejects_a_binary_file_without_valid_base64(
+    org, cluster, user, auth_headers, workflow_starts, entry
+):
+    dev = _running_dev_env(org, cluster, user)
+
+    r = _sync(Client(), dev, {"files": {"logo.png": entry}}, auth_headers)
+
+    assert r.status_code == 400
+    assert "logo.png" in r.json()["detail"]
+    assert workflow_starts == []
+
+
+def test_sync_counts_binary_files_by_decoded_size(org, cluster, user, auth_headers, workflow_starts):
+    """400 KiB of binary is 533 KiB of base64; the 512 KiB cap is on the
+    decoded bytes, so it fits. 600 KiB decoded does not."""
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+
+    fits = _sync(
+        client,
+        dev,
+        {"files": {"a.bin": {"content": _b64(b"\x00" * 400 * 1024), "encoding": "base64"}}},
+        auth_headers,
+    )
+    assert fits.status_code == 200, fits.content
+
+    dev.status = DevEnvironment.Status.RUNNING
+    dev.save(update_fields=["status", "updated_at", "version"])
+    too_big = _sync(
+        client,
+        dev,
+        {"files": {"a.bin": {"content": _b64(b"\x00" * 600 * 1024), "encoding": "base64"}}},
+        auth_headers,
+    )
+    assert too_big.status_code == 400
+    assert "exceeds" in too_big.json()["detail"]
+
+
+def test_sync_stores_a_10_mib_data_file(org, cluster, user, auth_headers, workflow_starts):
+    """The body is ~14 MiB, well past Django's 2.5 MiB
+    DATA_UPLOAD_MAX_MEMORY_SIZE that ``request.body`` enforces."""
+    dev = _running_dev_env(org, cluster, user)
+    data = bytes(range(256)) * (10 * 1024 * 4)
+
+    r = _sync(
+        Client(),
+        dev,
+        {
+            "files": {"server.py": "print('hi')"},
+            "data_file": {"path": "data.sqlite", "content": _b64(data), "encoding": "base64"},
+        },
+        auth_headers,
+    )
+
+    assert r.status_code == 200, r.content
+    dev.refresh_from_db()
+    assert dev.data_file_path == "data.sqlite"
+    assert bytes(dev.data_file) == data
+    assert dev.files == {"server.py": "print('hi')"}
+    assert len(workflow_starts) == 1
+
+
+def test_sync_keeps_the_data_file_when_omitted_and_removes_it_on_null(
+    org, cluster, user, auth_headers, workflow_starts
+):
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+    _sync(
+        client,
+        dev,
+        {"files": {}, "data_file": {"path": "db.sqlite", "content": _b64(b"rows"), "encoding": "base64"}},
+        auth_headers,
+    )
+
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+    assert _sync(client, dev, {"files": {"a.py": "x"}}, auth_headers).status_code == 200
+    dev.refresh_from_db()
+    assert (dev.data_file_path, bytes(dev.data_file)) == ("db.sqlite", b"rows")
+
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+    assert _sync(client, dev, {"files": {"a.py": "x"}, "data_file": None}, auth_headers).status_code == 200
+    dev.refresh_from_db()
+    assert (dev.data_file_path, dev.data_file) == ("", None)
+
+
+@pytest.mark.parametrize(
+    ("data_file", "fragment"),
+    [
+        ("data.sqlite", "data_file must be an object"),
+        ({"path": "../data.sqlite", "content": "aGk=", "encoding": "base64"}, "data_file: path"),
+        ({"path": "/data.sqlite", "content": "aGk=", "encoding": "base64"}, "data_file: path"),
+        ({"path": "x" * 256, "content": "aGk=", "encoding": "base64"}, "at most 255"),
+        ({"path": "data.sqlite", "content": "aGk="}, "base64"),
+        ({"path": "data.sqlite", "content": "@@@@", "encoding": "base64"}, "base64"),
+    ],
+)
+def test_sync_rejects_a_malformed_data_file(
+    org, cluster, user, auth_headers, workflow_starts, data_file, fragment
+):
+    dev = _running_dev_env(org, cluster, user)
+
+    r = _sync(Client(), dev, {"files": {}, "data_file": data_file}, auth_headers)
+
+    assert r.status_code == 400
+    assert fragment in r.json()["detail"]
+    dev.refresh_from_db()
+    assert dev.status == DevEnvironment.Status.RUNNING
+    assert workflow_starts == []
+
+
+@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024)
+def test_sync_enforces_the_configurable_data_file_limit(org, cluster, user, auth_headers, workflow_starts):
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+
+    at_limit = _sync(
+        client,
+        dev,
+        {"files": {}, "data_file": {"path": "d.db", "content": _b64(b"x" * 1024), "encoding": "base64"}},
+        auth_headers,
+    )
+    assert at_limit.status_code == 200, at_limit.content
+
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+    over = _sync(
+        client,
+        dev,
+        {"files": {}, "data_file": {"path": "d.db", "content": _b64(b"x" * 1025), "encoding": "base64"}},
+        auth_headers,
+    )
+    assert over.status_code == 400
+    assert "1024 byte limit" in over.json()["detail"]
+
+
+@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024)
+def test_sync_refuses_a_body_larger_than_the_limits_allow_before_reading_it(
+    org, cluster, user, auth_headers, workflow_starts
+):
+    dev = _running_dev_env(org, cluster, user)
+    # 1024-byte data cap: 4/3 of it + 6x the 512 KiB files cap + 1 MiB.
+    limit = 1368 + 6 * 512 * 1024 + 1024 * 1024
+
+    r = _sync(Client(), dev, {"files": {"big.txt": "x" * (limit + 1)}}, auth_headers)
+
+    assert r.status_code == 413
+    assert str(limit) in r.json()["detail"]
+    dev.refresh_from_db()
+    assert dev.status == DevEnvironment.Status.RUNNING
+
+
+class _StorageDriver:
+    """Answers the promote-time storage probe the way a cluster would."""
+
+    def __init__(self, storage_classes, csi_drivers=()):
+        self.storage_classes = storage_classes
+        self.csi_drivers = list(csi_drivers)
+        self.calls = 0
+
+    def list_storage_classes(self, cluster):
+        self.calls += 1
+        return self.storage_classes
+
+    def list_csi_drivers(self, cluster):
+        return self.csi_drivers
+
+
+def _promote_with_data(org, cluster, user, auth_headers, monkeypatch, storage_driver):
+    if storage_driver is not None:
+        monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: storage_driver)
+    dev = _running_dev_env(org, cluster, user)
+    DevEnvironment.objects.filter(pk=dev.pk).update(data_file_path="data.sqlite", data_file=b"rows")
+    return _post_json(
+        Client(),
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Sales"},
+        auth_headers,
+    )
+
+
+def test_promote_reports_persistent_data_when_the_cluster_can_provision_it(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch
+):
+    driver = _StorageDriver(
+        [
+            StorageClassInfo(name="standard", is_default=False, provisioner="rancher.io/local-path"),
+            StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com"),
+        ],
+        csi_drivers=["ebs.csi.aws.com"],
+    )
+
+    r = _promote_with_data(org, cluster, user, auth_headers, monkeypatch, driver)
+
+    assert r.status_code == 202, r.content
+    assert r.json()["data_persistent"] is True
+    [deploy] = [s for s in workflow_starts if s["name"] == "DeployPromotedAppWorkflow"]
+    assert deploy["args"][0].storage_class == "gp3"
+
+
+@pytest.mark.parametrize(
+    ("storage_classes", "csi_drivers"),
+    [
+        # The conflict install (installer#315): no StorageClass at all.
+        ([], []),
+        # EKS's in-tree gp2 without the EBS CSI driver: claims sit Pending.
+        ([StorageClassInfo(name="gp2", is_default=True, provisioner="kubernetes.io/aws-ebs")], []),
+        # A CSI class whose driver is not installed.
+        ([StorageClassInfo(name="rbd", is_default=True, provisioner="rook-ceph.rbd.csi.ceph.com")], []),
+        # Static local volumes only; nothing provisions a new claim.
+        ([StorageClassInfo(name="local", is_default=True, provisioner="kubernetes.io/no-provisioner")], []),
+        # Several classes and no default: no safe pick.
+        (
+            [
+                StorageClassInfo(name="a", is_default=False, provisioner="rancher.io/local-path"),
+                StorageClassInfo(name="b", is_default=False, provisioner="rancher.io/local-path"),
+            ],
+            [],
+        ),
+    ],
+)
+def test_promote_falls_back_to_an_empty_dir_without_persistent_volumes(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch, storage_classes, csi_drivers
+):
+    r = _promote_with_data(
+        org, cluster, user, auth_headers, monkeypatch, _StorageDriver(storage_classes, csi_drivers)
+    )
+
+    assert r.status_code == 202, r.content
+    assert r.json()["data_persistent"] is False
+    [deploy] = [s for s in workflow_starts if s["name"] == "DeployPromotedAppWorkflow"]
+    assert deploy["args"][0].storage_class == ""
+
+
+def test_promote_treats_an_unreachable_cluster_as_no_persistent_volumes(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch
+):
+    # No driver patch: the fixture cluster's plugin cannot be built.
+    r = _promote_with_data(org, cluster, user, auth_headers, monkeypatch, None)
+
+    assert r.status_code == 202, r.content
+    assert r.json()["data_persistent"] is False
+
+
+def test_promote_without_a_data_file_does_not_probe_storage(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch
+):
+    driver = _StorageDriver([StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com")])
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: driver)
+    dev = _running_dev_env(org, cluster, user)
+
+    r = _post_json(
+        Client(),
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Static"},
+        auth_headers,
+    )
+
+    assert r.status_code == 202, r.content
+    assert r.json()["data_persistent"] is None
+    assert driver.calls == 0
+
+
+# ---- acceptance (#1858): upload a 10 MiB data.sqlite, the promoted app reads it --
+
+
+def test_uploaded_sqlite_reaches_the_promoted_app_intact(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch, tmp_path
+):
+    """End to end short of a live cluster: a 10 MiB SQLite file goes
+    through the real files endpoint, promote finds a provisionable
+    StorageClass, the promoted-app activity renders the runtime, and the
+    seed init container's own shell rebuilds a file that SQLite opens with
+    every row intact."""
+    driver = _RecordingDriver(
+        storage_classes=[StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com")],
+        csi_drivers=["ebs.csi.aws.com"],
+    )
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: driver)
+    data = _sqlite_bytes(tmp_path, rows=160, row_bytes=64 * 1024)
+    assert len(data) >= 10 * 1024 * 1024
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+
+    synced = _sync(
+        client,
+        dev,
+        {
+            "files": {"server.py": "print('serve')"},
+            "data_file": {"path": "data.sqlite", "content": _b64(data), "encoding": "base64"},
+        },
+        auth_headers,
+    )
+    assert synced.status_code == 200, synced.content
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+
+    promoted = _post_json(
+        client, f"/api/builder/v1/dev-environments/{dev.guid}/promote/", {"app_name": "Sales"}, auth_headers
+    )
+    assert promoted.status_code == 202, promoted.content
+    assert promoted.json()["data_persistent"] is True
+    [deploy] = [s for s in workflow_starts if s["name"] == "DeployPromotedAppWorkflow"]
+
+    _deploy_promoted_app_sync(deploy["args"][0].dev_environment_id, deploy["args"][0].storage_class)
+
+    _, resources = driver.applied[-1]
+    assert _by_kind(resources, "PersistentVolumeClaim")[0]["spec"]["storageClassName"] == "gp3"
+    pod = _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]
+    assert {e["name"]: e["value"] for e in pod["containers"][0]["env"]}[
+        "ASTROLIFT_DATA_FILE"
+    ] == "/data/data.sqlite"
+    target = tmp_path / "data" / "data.sqlite"
+    _seed(resources, str(target), tmp_path)
+    assert target.read_bytes() == data
+    conn = sqlite3.connect(target)
+    assert conn.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    assert conn.execute("SELECT count(*), sum(length(payload)) FROM sales").fetchone() == (
+        160,
+        160 * 64 * 1024,
+    )
+    conn.close()
