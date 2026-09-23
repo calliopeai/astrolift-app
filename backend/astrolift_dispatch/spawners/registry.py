@@ -21,4 +21,15 @@ def get_spawner(backend: str, *, cluster=None, namespace: str = "default") -> Co
         from astrolift_dispatch.spawners.local_docker import LocalDockerSpawner
 
         return LocalDockerSpawner()
+    if backend == "substrate":
+        # Spike (#1853): opt-in per install, and the only reference to the module.
+        from django.conf import settings
+
+        if not settings.SUBSTRATE_SPAWNER_ENABLED:
+            raise ValueError(
+                "The substrate spawn backend is a spike (#1853); set SUBSTRATE_SPAWNER_ENABLED to use it"
+            )
+        from astrolift_dispatch.spawners.substrate import SubstrateSpawner
+
+        return SubstrateSpawner(cluster=cluster, namespace=namespace)
     raise ValueError(f"Unknown spawn backend: {backend!r}. Valid: k8s_job, local_docker")
