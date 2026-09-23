@@ -11,14 +11,23 @@ never reached a pod's environment even after a redeploy.
 from __future__ import annotations
 
 import base64
+import itertools
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
-from astrolift_services.schema.mutations import ServicesMutation
-from astrolift_services.schema.mutations.types import SetAppSecretInput
+from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
+from astrolift_registry.schema.mutations import RegistryMutation, UpdateManifestInput
+from astrolift_services.models import SecretChangeProposal
+from astrolift_services.schema.mutations import ApproveSecretChangeInput, ServicesMutation
+from astrolift_services.schema.mutations.types import (
+    BulkImportAppSecretsInput,
+    DeleteAppSecretInput,
+    SetAppSecretInput,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     _app_env_secret_name,
     _update_secrets_sync,
@@ -43,9 +52,9 @@ kind = "deployment"
 """
 
 
-def _info():
-    request = SimpleNamespace(user=None, META={})
-    return SimpleNamespace(context=SimpleNamespace(user=None, request=request))
+def _info(user=None):
+    request = SimpleNamespace(user=user, META={})
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=request))
 
 
 def _ctx(app):
@@ -314,3 +323,198 @@ def test_preview_known_only_by_its_lineage_does_not_receive_production_scoped_ke
     )
 
     assert _materialize(_deployment(app, preview), monkeypatch) == {"SHARED": "shared-value"}
+
+
+# With secret approval on (#488), set/rotate/delete create a proposal
+# instead of writing the staged buffer. updateManifest and
+# bulkImportAppSecrets write that buffer with no proposal at all, so once
+# literals deploy, reading the buffer as-is let either one put a value in
+# front of a workload without quorum (#1758 review, H1).
+
+_usernames = itertools.count()
+
+
+def _user():
+    n = next(_usernames)
+    return get_user_model().objects.create(username=f"user-{n}@test", email=f"user-{n}@test")
+
+
+def _as(app, user):
+    return _tenant_ctx(TenantContext(organization_id=app.organization_id, actor_user_id=user.id))
+
+
+def _require_secret_approval(app) -> None:
+    app.requires_secret_approval = True
+    app.save(update_fields=["requires_secret_approval"])
+
+
+def _propose(app, write):
+    """Run a secret write as a fresh user; it must come back as a proposal."""
+    proposer = _user()
+    with _as(app, proposer):
+        result = write(_info(proposer))
+    assert result.ok, result.errors
+    assert result.data.pending_proposal_id is not None
+    return str(result.data.pending_proposal_id)
+
+
+def _approve(app, proposal_id: str) -> None:
+    approver = _user()
+    with _as(app, approver):
+        result = ServicesMutation().approve_secret_change(
+            _info(approver), input=ApproveSecretChangeInput(proposal_id=proposal_id)
+        )
+    assert result.ok, result.errors
+    assert SecretChangeProposal.objects.get(guid=proposal_id).status == SecretChangeProposal.Status.APPLIED
+    app.refresh_from_db()
+
+
+def _stage_via_update_manifest(app, text: str) -> None:
+    with _ctx(app):
+        result = RegistryMutation().update_manifest(
+            _info(), input=UpdateManifestInput(id=str(app.guid), raw_manifest=text)
+        )
+    assert result.ok, result.errors
+    app.refresh_from_db()
+
+
+def test_under_approval_a_literal_deploys_once_its_proposal_is_applied(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    _seed_manifest(app)
+    _require_secret_approval(app)
+
+    proposal_id = _propose(
+        app,
+        lambda info: ServicesMutation().set_app_secret(
+            info, input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="approved-value")
+        ),
+    )
+    app.refresh_from_db()
+    assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+    _approve(app, proposal_id)
+    assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "approved-value"}
+
+
+def test_under_approval_bulk_import_does_not_reach_the_workload(permission_resolver, app, env, monkeypatch):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    _require_secret_approval(app)
+
+    with _ctx(app):
+        result = ServicesMutation().bulk_import_app_secrets(
+            _info(), input=BulkImportAppSecretsInput(app_slug=app.slug, dotenv_text="SNUCK_IN=value")
+        )
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert "SNUCK_IN" in app.manifest_raw_staged
+
+    deployment = _deployment(app, env)
+    assert _materialize(deployment, monkeypatch) == {}
+    assert _env_from_names(render_resources_for_deployment(deployment)) == set()
+
+
+def test_under_approval_update_manifest_does_not_reach_the_workload(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    _require_secret_approval(app)
+
+    _stage_via_update_manifest(app, set_app_env_keys(_MANIFEST, {"SNUCK_IN": "value"}))
+    assert "SNUCK_IN" in app.manifest_raw_staged
+
+    deployment = _deployment(app, env)
+    assert _materialize(deployment, monkeypatch) == {}
+    assert _env_from_names(render_resources_for_deployment(deployment)) == set()
+
+
+def test_under_approval_an_unapproved_edit_after_an_approval_is_not_deployed(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    _approve(
+        app,
+        _propose(
+            app,
+            lambda info: ServicesMutation().set_app_secret(
+                info, input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="approved-value")
+            ),
+        ),
+    )
+
+    _stage_via_update_manifest(app, set_app_env_keys(app.manifest_raw_staged, {"API_KEY": "tampered"}))
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+
+def test_under_approval_an_unapproved_removal_keeps_the_repo_value(
+    permission_resolver, app, env, monkeypatch
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    app.manifest_raw = set_app_env_keys(_MANIFEST, {"API_KEY": "from-the-repo"})
+    app.save(update_fields=["manifest_raw"])
+    _require_secret_approval(app)
+
+    without_key, removed = delete_app_env_key(app.manifest_raw, "API_KEY")
+    assert removed
+    _stage_via_update_manifest(app, without_key)
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "from-the-repo"}
+
+
+def test_under_approval_an_approved_delete_removes_the_key(permission_resolver, app, env, monkeypatch):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    app.manifest_raw = set_app_env_keys(_MANIFEST, {"API_KEY": "from-the-repo"})
+    app.save(update_fields=["manifest_raw"])
+    _require_secret_approval(app)
+
+    _approve(
+        app,
+        _propose(
+            app,
+            lambda info: ServicesMutation().delete_app_secret(
+                info, input=DeleteAppSecretInput(app_slug=app.slug, key="API_KEY")
+            ),
+        ),
+    )
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+
+def test_under_approval_a_later_repo_change_beats_an_older_approval(
+    permission_resolver, app, env, monkeypatch
+):
+    """An applied proposal only vouches for a change still pending in the
+    staged buffer. Once the draft is pushed and synced the buffer clears,
+    and a reviewed repo change to the same key must not be overridden by
+    the old approval."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    _approve(
+        app,
+        _propose(
+            app,
+            lambda info: ServicesMutation().set_app_secret(
+                info, input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="approved-value")
+            ),
+        ),
+    )
+    # The draft lands in the repo and syncs back, clearing the buffer ...
+    app.manifest_raw = app.manifest_raw_staged
+    app.manifest_raw_staged = ""
+    app.save(update_fields=["manifest_raw", "manifest_raw_staged"])
+    # ... and a later reviewed repo change moves the key on.
+    app.manifest_raw = set_app_env_keys(app.manifest_raw, {"API_KEY": "from-the-repo"})
+    app.save(update_fields=["manifest_raw"])
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "from-the-repo"}

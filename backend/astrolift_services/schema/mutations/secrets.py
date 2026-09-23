@@ -344,6 +344,14 @@ class SecretMutations:
         info: Info,
         input: BulkImportAppSecretsInput,
     ) -> MutationResultType[_BulkImportPayload]:
+        """Parse a .env paste and stage every key at once.
+
+        Creates no secret-change proposal, even when the app requires
+        secret approval. The deploy path
+        (``astrolift_services.secret_literals``) is what keeps imported
+        keys out of workloads until an applied proposal matches each
+        one (#1758).
+        """
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
