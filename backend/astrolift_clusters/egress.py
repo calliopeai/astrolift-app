@@ -38,6 +38,15 @@ DEFAULT_INTERNAL_CIDRS: tuple[str, ...] = (
 )
 
 
+# Cluster DNS pods. ``k8s-app: kube-dns`` labels the CoreDNS/kube-dns pods
+# (EKS, GKE, AKS, kubeadm), not their namespace, so the peer needs both
+# selectors; a namespaceSelector on the pod label matches nothing (#1868).
+CLUSTER_DNS_PEER = {
+    "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+    "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
+}
+
+
 class SourceIPMode(StrEnum):
     DEFAULT = "default"  # whatever the cluster's normal egress is
     NAT_PINNED = "nat_pinned"  # provider NAT gateway with stable IP set
