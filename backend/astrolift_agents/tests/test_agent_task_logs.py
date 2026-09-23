@@ -128,9 +128,30 @@ class _FixedPodBackend:
         self._pods = list(pods)
         self.calls: list[dict] = []
 
-    def list_pods(self, *, auth, namespace, app_slug, task_id=""):
-        self.calls.append({"namespace": namespace, "app_slug": app_slug, "task_id": task_id})
+    def list_pods(self, *, auth, namespace, app_slug, task_id="", job_name=""):
+        self.calls.append(
+            {"namespace": namespace, "app_slug": app_slug, "task_id": task_id, "job_name": job_name}
+        )
         return list(self._pods)
+
+
+class _ByJobNamePodBackend:
+    """Only resolves a pod when queried by ``job_name`` -- models a real
+    cluster where the task-id label lookup misses (transient or otherwise)
+    but the Job controller's own ``job-name`` label still finds the pod."""
+
+    def __init__(self, *, job_name: str, pod: PodInfo):
+        self._job_name = job_name
+        self._pod = pod
+        self.calls: list[dict] = []
+
+    def list_pods(self, *, auth, namespace, app_slug, task_id="", job_name=""):
+        self.calls.append(
+            {"namespace": namespace, "app_slug": app_slug, "task_id": task_id, "job_name": job_name}
+        )
+        if job_name and job_name == self._job_name:
+            return [self._pod]
+        return []
 
 
 class _ScriptedLogBackend:
@@ -212,16 +233,24 @@ def test_agent_task_logs_tail_caps_line_count(permission_resolver):
 
 @pytest.mark.django_db(transaction=True)
 def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
-    """When discovery returns no pods (the live backend can't select the
-    agent's task-id label), the resolver falls back to the recorded Job
-    name on ``AgentTask.pod_name``."""
+    """When the task-id label lookup finds nothing, the resolver retries
+    discovery keyed on the recorded Job name from ``AgentTask.pod_name`` --
+    as a ``job_name`` selector against Kubernetes' own ``job-name`` label,
+    never as a literal pod name (a Job's pod always carries a generated
+    suffix the Job name doesn't have) (#1712)."""
     org = Organization.objects.create(name="Hint Org", slug="hint-org")
     cluster = _cluster(org, slug="hint-cluster")
     dispatcher = _dispatcher(org, cluster, slug="hint-dispatcher")
     task = _task(org, dispatcher, pod_name="agent-task-deadbeef")
 
     permission_resolver.grant(Permission.AGENT_READ)
-    set_pod_backend_for_tests(_FixedPodBackend([]))  # discovery finds nothing
+    # The task-id selector never matches this backend; only a job_name query
+    # for the recorded Job name resolves the real (suffixed) pod name.
+    pod_backend = _ByJobNamePodBackend(
+        job_name="agent-task-deadbeef",
+        pod=_fake_pod("agent-task-deadbeef-x7q2p"),
+    )
+    set_pod_backend_for_tests(pod_backend)
     log_backend = _ScriptedLogBackend(["hi"])
     set_log_backend_for_tests(log_backend)
     try:
@@ -232,7 +261,44 @@ def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
         reset_log_backend_for_tests()
 
     assert lines == ["hi"]
-    assert log_backend.calls[0]["pod_name"] == "agent-task-deadbeef"
+    # Two discovery calls: task-id first (misses), then job_name (hits).
+    assert pod_backend.calls[0]["task_id"] == str(task.guid)
+    assert pod_backend.calls[0]["job_name"] == ""
+    assert pod_backend.calls[1]["task_id"] == ""
+    assert pod_backend.calls[1]["job_name"] == "agent-task-deadbeef"
+    # The log read targets the pod discovery actually resolved -- the real
+    # generated pod name -- never the raw Job-name hint (which no pod is
+    # ever literally named).
+    assert log_backend.calls[0]["pod_name"] == "agent-task-deadbeef-x7q2p"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_agent_task_logs_pod_name_hint_alone_finds_nothing(permission_resolver):
+    """Proves the pre-fix behavior was dead: a backend that only matches
+    pods by their real (suffixed) name -- never by the Job name a hint
+    carries -- resolves no logs at all when task-id discovery also misses.
+    Before #1712 the resolver passed the Job-name hint straight through as
+    if it were already a pod name, which a real apiserver would 404 on."""
+    org = Organization.objects.create(name="NoMatch Org", slug="nomatch-org")
+    cluster = _cluster(org, slug="nomatch-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="nomatch-dispatcher")
+    task = _task(org, dispatcher, pod_name="agent-task-deadbeef")
+
+    permission_resolver.grant(Permission.AGENT_READ)
+    # Never resolves anything -- neither task-id nor job_name match, so a
+    # correct implementation must not fabricate a pod name from the hint.
+    set_pod_backend_for_tests(_FixedPodBackend([]))
+    log_backend = _ScriptedLogBackend(["should not appear"])
+    set_log_backend_for_tests(log_backend)
+    try:
+        with _tenant(org):
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+    finally:
+        reset_pod_backend_for_tests()
+        reset_log_backend_for_tests()
+
+    assert lines == []
+    assert log_backend.calls == []
 
 
 @pytest.mark.django_db(transaction=True)
@@ -409,10 +475,17 @@ def test_agent_task_logs_reads_stamped_namespace(permission_resolver):
 
 def test_pod_label_selector_prefers_task_id():
     """The pod discovery selector keys on the task-id label when a task_id
-    is given and falls back to the app-slug label otherwise (#891)."""
+    is given (#891), then the Job's own job-name label when only a
+    job_name is given (#1712), and falls back to the app-slug label
+    otherwise."""
     from k8s_native.observability import _pod_label_selector
 
     assert _pod_label_selector(app_slug="web", task_id="guid-1") == "astrolift.dev/task-id=guid-1"
+    assert (
+        _pod_label_selector(app_slug="web", task_id="guid-1", job_name="agent-task-abc")
+        == "astrolift.dev/task-id=guid-1"
+    )
+    assert _pod_label_selector(app_slug="web", job_name="agent-task-abc") == "job-name=agent-task-abc"
     assert _pod_label_selector(app_slug="web", task_id="") == "astrolift.dev/app=web"
 
 
@@ -453,15 +526,71 @@ async def test_fetch_task_pod_logs_discovers_by_task_id():
     # Discovery selected by the task-id label, in the supplied namespace.
     assert pod_backend.calls[0]["task_id"] == "task-guid-9"
     assert pod_backend.calls[0]["namespace"] == "agents-elsewhere"
+    # Only one discovery call -- the task-id selector already hit.
+    assert len(pod_backend.calls) == 1
     # The stream read the discovered pod in that same namespace.
     assert log_backend.calls[0]["namespace"] == "agents-elsewhere"
     assert log_backend.calls[0]["pod_name"] == "agent-task-xyz"
 
 
+@pytest.mark.asyncio
+async def test_fetch_task_pod_logs_falls_back_to_job_name(monkeypatch):
+    """When the task-id selector misses, ``fetch_task_pod_logs`` retries
+    discovery keyed on ``pod_name_hint`` as a ``job_name`` selector, and
+    reads the *resolved* pod name -- never the hint itself, which is a Job
+    name and never a real pod name (#1712)."""
+    from core.cluster_observability import fetch_task_pod_logs
+
+    cluster = SimpleNamespace(
+        slug="c",
+        auth_method="kubeconfig",
+        auth_config={"kubeconfig": "x"},
+        endpoint="https://k8s.invalid",
+        ca_cert="",
+        default_namespace_prefix="",
+        is_active=True,
+    )
+    pod_backend = _ByJobNamePodBackend(
+        job_name="agent-task-deadbeef",
+        pod=_fake_pod("agent-task-deadbeef-x7q2p"),
+    )
+    log_backend = _ScriptedLogBackend(["a"])
+    set_pod_backend_for_tests(pod_backend)
+    set_log_backend_for_tests(log_backend)
+    try:
+        lines = await fetch_task_pod_logs(
+            cluster=cluster,
+            namespace="agents-elsewhere",
+            task_guid="task-guid-9",
+            pod_name_hint="agent-task-deadbeef",
+            tail=200,
+        )
+    finally:
+        reset_pod_backend_for_tests()
+        reset_log_backend_for_tests()
+
+    assert lines == ["a"]
+    assert len(pod_backend.calls) == 2
+    assert pod_backend.calls[0] == {
+        "namespace": "agents-elsewhere",
+        "app_slug": "task-guid-9",
+        "task_id": "task-guid-9",
+        "job_name": "",
+    }
+    assert pod_backend.calls[1] == {
+        "namespace": "agents-elsewhere",
+        "app_slug": "task-guid-9",
+        "task_id": "",
+        "job_name": "agent-task-deadbeef",
+    }
+    assert log_backend.calls[0]["pod_name"] == "agent-task-deadbeef-x7q2p"
+
+
 def test_live_pod_backend_uses_task_id_selector(monkeypatch):
     """``LivePodBackend.list_pods`` selects agent pods by the task-id label
-    (``astrolift.dev/task-id=<guid>``) when ``task_id`` is set, and falls
-    back to the app-slug label otherwise (#891).
+    (``astrolift.dev/task-id=<guid>``) when ``task_id`` is set, by the
+    Job's ``job-name`` label when only ``job_name`` is set (#1712), and
+    falls back to the app-slug label otherwise (#891).
 
     Recording fake: the kubernetes ``CoreV1Api`` is patched so the call
     records the ``label_selector`` it would have sent to the apiserver.
@@ -502,6 +631,15 @@ def test_live_pod_backend_uses_task_id_selector(monkeypatch):
     assert recorded["namespace"] == "astrolift-agents-acme"
     assert recorded["label_selector"] == "astrolift.dev/task-id=task-guid-123"
 
-    # No task_id -> falls back to the app-slug label (app-log surface).
+    # No task_id but a job_name -> the Job controller's own job-name label.
+    obs.LivePodBackend().list_pods(
+        auth=auth,
+        namespace="astrolift-agents-acme",
+        app_slug="ignored-app",
+        job_name="agent-task-deadbeef",
+    )
+    assert recorded["label_selector"] == "job-name=agent-task-deadbeef"
+
+    # Neither set -> falls back to the app-slug label (app-log surface).
     obs.LivePodBackend().list_pods(auth=auth, namespace="acme-web", app_slug="web")
     assert recorded["label_selector"] == "astrolift.dev/app=web"
