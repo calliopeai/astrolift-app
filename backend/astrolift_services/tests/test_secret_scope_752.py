@@ -7,8 +7,8 @@ Covers:
 - setAppSecretMetadata standalone persists scope
 - re-set resets scope to the supplied value (always written)
 - resolver projects scope onto AppSecretType
-- _allowed_scopes_for_env: production env gets {all, production}
-- _allowed_scopes_for_env: preview env gets {all, preview, preview:<branch>}
+- allowed_scopes_for_env: production env gets {all, production}
+- allowed_scopes_for_env: preview env gets {all, preview, preview:<branch>}
 - scope filtering: production-scoped secret hidden in preview env
 - scope filtering: preview-scoped secret hidden in production env
 - scope filtering: preview:<branch> secret visible only in matching branch env
@@ -33,7 +33,8 @@ from astrolift_services.schema.mutations import (
     SetAppSecretInput,
     SetAppSecretMetadataInput,
 )
-from astrolift_services.schema.queries import ServicesQuery, _allowed_scopes_for_env
+from astrolift_services.schema.queries import ServicesQuery
+from astrolift_services.secret_literals import allowed_scopes_for_env
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -134,18 +135,18 @@ def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
-# ---- _allowed_scopes_for_env unit tests ---------------------------
+# ---- allowed_scopes_for_env unit tests ---------------------------
 
 
 def test_allowed_scopes_production_env():
-    scopes = _allowed_scopes_for_env("production", {})
+    scopes = allowed_scopes_for_env("production", {})
     assert "all" in scopes
     assert "production" in scopes
     assert "preview" not in scopes
 
 
 def test_allowed_scopes_preview_env():
-    scopes = _allowed_scopes_for_env("preview-feat", {"preview-feat": "feat/login"})
+    scopes = allowed_scopes_for_env("preview-feat", {"preview-feat": "feat/login"})
     assert "all" in scopes
     assert "preview" in scopes
     assert "preview:feat/login" in scopes
@@ -154,7 +155,7 @@ def test_allowed_scopes_preview_env():
 
 def test_allowed_scopes_unknown_env_treated_as_production():
     # An env_name not in preview_env_branches → treated as non-preview.
-    scopes = _allowed_scopes_for_env("staging", {})
+    scopes = allowed_scopes_for_env("staging", {})
     assert "all" in scopes
     assert "production" in scopes
     assert "preview" not in scopes

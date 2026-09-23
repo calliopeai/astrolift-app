@@ -882,20 +882,29 @@ def render_resources_for_deployment(
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
     namespace = namespace_for_app(app)
 
-    # envFrom: operator secret bundles + the platform-synthesized
-    # managed-service bindings Secret (astrolift-bindings-<slug>, created by
-    # update_secrets). apply_manifests renders via THIS function, so the
-    # env only reaches workloads if it's wired here — the render_manifests
-    # Temporal activity computes the same env_from but its output isn't what
-    # gets applied (#1003). update_secrets creates the bindings Secret
-    # between apply_manifests and poll_rollout, so it exists before rollout.
+    # envFrom: the app's literal [env] secrets + operator secret bundles +
+    # the platform-synthesized managed-service bindings Secret
+    # (astrolift-bindings-<slug>, created by update_secrets).
+    # apply_manifests renders via THIS function, so the env only reaches
+    # workloads if it's wired here — the render_manifests Temporal activity
+    # computes the same env_from but its output isn't what gets applied
+    # (#1003). update_secrets creates these Secrets between apply_manifests
+    # and poll_rollout, so they exist before rollout.
+    #
+    # Order matches env_injection's documented precedence (later wins):
+    # app literal < bundle < managed service (#1758).
     from astrolift_services.models import AppSecretBundleRef
+    from astrolift_services.secret_literals import literal_secrets_for_environment
     from astrolift_workflows.activities.app_lifecycle import (
+        _app_env_secret_name,
         _binding_secret_refs_for_environment,
         _bindings_secret_name,
     )
 
-    env_from = sorted(
+    env_from: list[str] = []
+    if literal_secrets_for_environment(app, env.name):
+        env_from.append(_app_env_secret_name(app.slug))
+    env_from += sorted(
         AppSecretBundleRef.objects.filter(
             registered_app=app,
             app_environment=env,

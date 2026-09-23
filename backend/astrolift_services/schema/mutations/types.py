@@ -15,8 +15,10 @@ class SetAppSecretInput:
 
     The frontend's secrets editor surfaces a 'set' UX; on save the
     mutation writes to ``manifest_raw_staged`` (same buffer #277
-    set up). The user follows up with ``pushManifestToRepo`` to
-    open a PR with the changes."""
+    set up). It reaches a workload's envFrom on the next deploy
+    directly, no push-to-repo round trip required (#1758);
+    ``pushManifestToRepo`` is only needed if the operator also wants
+    git to track the change."""
 
     app_slug: str
     key: str
