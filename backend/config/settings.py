@@ -115,7 +115,16 @@ LOGIN_REDIRECT_URL = env_str("DJANGO_LOGIN_REDIRECT_URL", f"/{BASE_URL}admin/")
 SWITCHED_FROM_USER = "switched_from_user"
 
 CORS_ALLOW_CREDENTIALS = env_bool("DJANGO_CORS_ALLOW_CREDENTIALS", True)
-CORS_ALLOW_ALL_ORIGINS = env_bool("DJANGO_CORS_ALLOW_ALL_ORIGINS", True)
+# Credentialed CORS is limited to the frontend origin(s), never every
+# origin: apps and previews can run user code on a host that is same-site
+# with the control plane, and a blanket allow would let that code drive
+# GraphQL as whoever is signed in (#1926). Not env-switchable on purpose.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    value.strip().rstrip("/")
+    for value in env_str("DJANGO_CORS_ALLOWED_ORIGINS", FRONTEND_URL).split(",")
+    if value.strip()
+]
 CORS_ALLOW_HEADERS = default_headers + (
     "sentry-trace",
     "baggage",
@@ -138,8 +147,6 @@ CONSTANCE_ADDITIONAL_FIELDS = {
     "posix_id": ["django.forms.IntegerField", {"min_value": 1, "max_value": 2147483647}],
 }
 CONSTANCE_DATABASE_CACHE_BACKEND = "default"
-
-CORS_ORIGIN_WHITELIST = ("https://storage.googleapis.com",)
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
