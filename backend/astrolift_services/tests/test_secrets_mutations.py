@@ -172,6 +172,26 @@ def test_set_app_secret_invalid_key_rejected(permission_resolver):
     assert result.errors[0].field == "key"
 
 
+def test_set_app_secret_non_ascii_key_rejected(permission_resolver):
+    """A non-ASCII letter passes str.isalnum, but the deploy path skips the
+    key (a Secret data key is ASCII), so storing it would be a silent
+    no-op rather than a secret (#1758)."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="CLÉ", value="x"),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "key"
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
+
+
 def test_set_app_secret_unknown_app_returns_not_found(permission_resolver):
     org, _, _, _ = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)

@@ -24,7 +24,13 @@ from collections.abc import Mapping
 
 def read_app_env(toml_text: str) -> dict[str, str]:
     """Return the top-level ``[env]`` table as a flat str→str map.
-    Empty dict when the section is absent or empty."""
+    Empty dict when the section is absent or empty.
+
+    Skips keys that are not env-var names and values that are tables or
+    arrays. The mutations never write either, but a hand-edited
+    ``astrolift.toml`` synced from a repo can, and this map is what the
+    deploy path materializes into a Kubernetes Secret (#1758): one key
+    the API server rejects would fail the whole apply."""
     if not toml_text or not toml_text.strip():
         return {}
     try:
@@ -34,7 +40,11 @@ def read_app_env(toml_text: str) -> dict[str, str]:
     env = data.get("env", {}) or {}
     if not isinstance(env, Mapping):
         return {}
-    return {str(k): str(v) for k, v in env.items()}
+    return {
+        str(k): str(v)
+        for k, v in env.items()
+        if _is_valid_env_name(str(k)) and not isinstance(v, (Mapping, list))
+    }
 
 
 def set_app_env_keys(
@@ -109,8 +119,11 @@ def parse_dotenv(text: str) -> dict[str, str]:
 
 def _is_valid_env_name(name: str) -> bool:
     """POSIX env-var name shape: leading letter / underscore,
-    rest alphanumeric / underscore."""
-    if not name:
+    rest alphanumeric / underscore.
+
+    ASCII only: ``str.isalnum`` also accepts letters like ``É``, which a
+    Kubernetes Secret data key (``[-._a-zA-Z0-9]+``) does not."""
+    if not name or not name.isascii():
         return False
     if not (name[0].isalpha() or name[0] == "_"):
         return False

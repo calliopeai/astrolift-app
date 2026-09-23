@@ -229,6 +229,10 @@ def _upsert_app_secret_metadata(
 def _validate_env_key(key: str) -> str | None:
     if not key:
         return "key cannot be empty"
+    # isalpha/isalnum accept non-ASCII letters; read_app_env skips such a
+    # key, so accepting it here would store a secret that never deploys.
+    if not key.isascii():
+        return f"key {key!r} {_ENV_NAME_HINT}"
     if not (key[0].isalpha() or key[0] == "_"):
         return f"key {key!r} {_ENV_NAME_HINT}"
     if not all(c.isalnum() or c == "_" for c in key):

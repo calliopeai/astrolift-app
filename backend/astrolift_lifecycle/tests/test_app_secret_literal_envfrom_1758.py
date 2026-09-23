@@ -57,7 +57,8 @@ def _seed_manifest(app) -> None:
 
 
 def _deployment(app, env) -> Deployment:
-    _seed_manifest(app)
+    if not app.manifest_raw:
+        _seed_manifest(app)
     return Deployment.objects.create(
         registered_app=app,
         app_environment=env,
@@ -73,6 +74,46 @@ def _set_app_secret(app, *, key: str, value: str, scope: str = "all"):
             _info(),
             input=SetAppSecretInput(app_slug=app.slug, key=key, value=value, scope=scope),
         )
+
+
+class _FakeClusterDriver:
+    """Records what update_secrets would apply to the cluster."""
+
+    def __init__(self):
+        self.calls: list[tuple] = []
+        self.applied: list[dict] = []
+
+    def ensure_namespace(self, cluster_slug, namespace, labels, annotations):
+        self.calls.append(("ensure_namespace", namespace))
+
+    def apply_manifests(self, cluster_slug, namespace, manifests):
+        from providers._sdk.cluster import ApplyResult
+
+        self.calls.append(("apply_manifests", namespace, [m["metadata"]["name"] for m in manifests]))
+        self.applied = manifests
+        return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
+
+
+def _literal_secrets(manifests: list[dict]) -> list[dict]:
+    return [m for m in manifests if "astrolift.io/app-env-secrets" in m["metadata"].get("labels", {})]
+
+
+def _decoded(secret: dict) -> dict[str, str]:
+    return {k: base64.b64decode(v).decode() for k, v in secret["data"].items()}
+
+
+def _materialize(deployment, monkeypatch) -> dict[str, str]:
+    """Run update_secrets against a fake cluster and return the literal
+    Secret's decoded data, or {} when it wasn't materialized at all."""
+    driver = _FakeClusterDriver()
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda d: (driver, SimpleNamespace(slug="test-cluster"), "acme-hello-app"),
+    )
+    _update_secrets_sync(deployment.pk)
+    secrets = _literal_secrets(driver.applied)
+    assert len(secrets) <= 1
+    return _decoded(secrets[0]) if secrets else {}
 
 
 def _env_from_names(resources: list[dict]) -> set[str]:
@@ -141,3 +182,20 @@ def test_update_secrets_sync_materializes_the_literal_value(permission_resolver,
     assert secret["kind"] == "Secret"
     assert secret["metadata"]["name"] == _app_env_secret_name(app.slug)
     assert base64.b64decode(secret["data"]["API_KEY"]).decode() == "super-secret"
+
+
+def test_repo_keys_a_secret_cannot_carry_are_skipped_not_applied(app, env, monkeypatch):
+    """A hand-edited repo manifest reaches manifest_raw through sync with no
+    key validation. A key the API server rejects in Secret.data would fail
+    the whole update_secrets apply, so it is skipped (#1758 review, L1)."""
+    app.manifest_raw = (
+        _MANIFEST
+        + "\n[env]\n"
+        + '"HAS SPACE" = "rejected-by-the-api-server"\n'
+        + '"CLÉ" = "also-rejected"\n'
+        + "NESTED = { a = 1 }\n"
+        + 'GOOD_KEY = "kept"\n'
+    )
+    app.save(update_fields=["manifest_raw"])
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"GOOD_KEY": "kept"}
