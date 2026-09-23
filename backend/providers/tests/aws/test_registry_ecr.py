@@ -225,6 +225,89 @@ def test_archive_twice_does_not_duplicate_the_deny_statement(
     assert len(deny_statements) == 1
 
 
+def test_archive_preserves_a_single_object_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """IAM allows ``Statement`` to be a single object, not just a list —
+    an operator-written single-statement policy must not crash the
+    archive path or read as having no statements at all (review round 2)."""
+    driver.ensure_repo("acme/single-statement")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/single-statement",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": _CROSS_ACCOUNT_PULL_STATEMENT}),
+    )
+
+    driver.delete_repo("acme/single-statement", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/single-statement")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull", "DenyPushArchived"}
+
+
+def test_ensure_repo_reregister_preserves_single_object_operator_statement(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Same single-object-Statement case, through a re-registration too."""
+    driver.ensure_repo("acme/single-statement")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/single-statement",
+        policyText=json.dumps({"Version": "2012-10-17", "Statement": _CROSS_ACCOUNT_PULL_STATEMENT}),
+    )
+    driver.delete_repo("acme/single-statement", archive=True)
+
+    driver.ensure_repo("acme/single-statement")
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/single-statement")["policyText"])
+    sids = {s["Sid"] for s in policy["Statement"]}
+    assert sids == {"AllowCrossAccountPull"}
+
+
+def test_archive_preserves_the_policy_version_and_id(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Rewriting the document to add our statement must carry over the
+    original top-level Version and Id rather than hardcode Version and
+    drop Id (review round 2)."""
+    driver.ensure_repo("acme/has-id")
+    ecr_client.set_repository_policy(
+        repositoryName="acme/has-id",
+        policyText=json.dumps(
+            {
+                "Version": "2008-10-17",
+                "Id": "acme-shared-pull-2026",
+                "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT],
+            }
+        ),
+    )
+
+    driver.delete_repo("acme/has-id", archive=True)
+
+    policy = json.loads(ecr_client.get_repository_policy(repositoryName="acme/has-id")["policyText"])
+    assert policy["Version"] == "2008-10-17"
+    assert policy["Id"] == "acme-shared-pull-2026"
+
+
+def test_clear_archive_policy_does_not_rewrite_an_operator_only_policy(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering a repo whose policy is entirely operator-owned (never
+    archived) must leave that policy byte-for-byte alone rather than
+    round-trip it through a needless set_repository_policy (review round 2,
+    optional item)."""
+    driver.ensure_repo("acme/operator-only")
+    original = json.dumps({"Version": "2012-10-17", "Statement": [_CROSS_ACCOUNT_PULL_STATEMENT]})
+    ecr_client.set_repository_policy(repositoryName="acme/operator-only", policyText=original)
+
+    driver.ensure_repo("acme/operator-only")
+
+    policy_text = ecr_client.get_repository_policy(repositoryName="acme/operator-only")["policyText"]
+    assert policy_text == original
+
+
 # ---- get_pull_secret ----------------------------------------------
 
 

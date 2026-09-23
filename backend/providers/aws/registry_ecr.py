@@ -24,7 +24,7 @@ from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
-from aws._errors import NotFoundError, map_client_error
+from aws._errors import NotFoundError, ProviderError, map_client_error
 from aws.session import aws_client
 
 # GitHub's OIDC issuer — present in the trust policy of the per-app
@@ -515,14 +515,15 @@ class ECRDriver(ImageRegistryDriver):
         with ONLY the deny statement, silently replacing (destroying) any
         policy an operator had set directly — e.g. a cross-account pull
         grant for another AWS account (#1819 review). Statement-scoped now:
-        read the current policy, drop any stale ``DenyPushArchived`` of
+        read the current document, drop any stale ``DenyPushArchived`` of
         ours (so re-archiving is idempotent, not additive), append a fresh
-        one, and write the merged document back.
+        one, and write the merged document back — ``Version``/``Id``/
+        anything else on the document untouched.
         """
         import json
 
-        statements = self._non_archive_statements(name=name)
-        statements.append(
+        document, _ = self._policy_without_archive_statement(name=name)
+        document["Statement"].append(
             {
                 "Sid": "DenyPushArchived",
                 "Effect": "Deny",
@@ -535,11 +536,10 @@ class ECRDriver(ImageRegistryDriver):
                 ],
             }
         )
-        policy = json.dumps({"Version": "2012-10-17", "Statement": statements})
         try:
             self._client.set_repository_policy(
                 repositoryName=name,
-                policyText=policy,
+                policyText=json.dumps(document),
             )
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
@@ -548,22 +548,28 @@ class ECRDriver(ImageRegistryDriver):
 
     def _clear_archive_policy(self, *, name: str) -> None:
         """Remove only the ``DenyPushArchived`` statement ``_block_push``
-        may have left (#1819), keeping any other statement an operator set
-        directly (e.g. cross-account pull) — an earlier version called
+        may have left (#1819), keeping any other statement — and the
+        document's own ``Version``/``Id``/etc — an operator set directly
+        (e.g. cross-account pull). An earlier version called
         ``delete_repository_policy`` unconditionally, destroying those too.
 
-        Writes back whatever else remains; drops the policy entirely (not
-        an empty-Statement document, which AWS rejects) once nothing does.
+        No-ops without writing anything when the repo never carried a
+        ``DenyPushArchived`` statement to begin with (no policy at all, or
+        an operator-only policy that was never archived) — nothing here is
+        this driver's to rewrite. Otherwise writes back whatever else
+        remains, or drops the policy entirely (never an empty-``Statement``
+        document, which AWS rejects) once nothing does.
         """
         import json
 
-        statements = self._non_archive_statements(name=name)
-        if statements:
-            policy = json.dumps({"Version": "2012-10-17", "Statement": statements})
+        document, removed = self._policy_without_archive_statement(name=name)
+        if not removed:
+            return
+        if document["Statement"]:
             try:
                 self._client.set_repository_policy(
                     repositoryName=name,
-                    policyText=policy,
+                    policyText=json.dumps(document),
                 )
             except self._client.exceptions.RepositoryNotFoundException as exc:
                 raise NotFoundError(f"repository {name} not found") from exc
@@ -573,27 +579,50 @@ class ECRDriver(ImageRegistryDriver):
         try:
             self._client.delete_repository_policy(repositoryName=name)
         except self._client.exceptions.RepositoryPolicyNotFoundException:
-            # Common case: the repo exists and never carried a policy at all.
+            # Already gone — another caller cleared it between our read and
+            # this delete. Idempotent, so treat as the desired end state.
             return
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
 
-    def _non_archive_statements(self, *, name: str) -> list[dict[str, Any]]:
-        """Every statement on ``name``'s repository policy except our own
-        ``DenyPushArchived`` — the ones an operator set directly (e.g.
-        cross-account pull) that archiving and re-registering must never
-        destroy (#1819 review). Empty when the repo carries no policy."""
+    def _policy_without_archive_statement(self, *, name: str) -> tuple[dict[str, Any], bool]:
+        """``name``'s repository policy document with our own
+        ``DenyPushArchived`` statement removed, everything else — every
+        other statement an operator may have set directly (e.g.
+        cross-account pull), ``Version``, ``Id``, any other top-level key —
+        untouched (#1819 review). ``({"Version": "2012-10-17", "Statement":
+        []}, False)`` when the repo carries no policy yet.
+
+        IAM allows ``Statement`` to be a single object or a list; both are
+        normalized to a list on the way out so callers can always index or
+        append. The second return value is whether a ``DenyPushArchived``
+        statement was actually found and dropped, so a caller that only
+        wants to clear one can tell "nothing to clear" apart from "cleared
+        down to zero statements."
+        """
         import json
 
         try:
             response = self._client.get_repository_policy(repositoryName=name)
         except self._client.exceptions.RepositoryPolicyNotFoundException:
-            return []
+            return {"Version": "2012-10-17", "Statement": []}, False
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
+
         document = json.loads(response["policyText"])
-        return [s for s in document.get("Statement", []) if s.get("Sid") != "DenyPushArchived"]
+        raw_statements = document.get("Statement", [])
+        if isinstance(raw_statements, dict):
+            statements = [raw_statements]
+        elif isinstance(raw_statements, list):
+            statements = raw_statements
+        else:
+            raise ProviderError(
+                f"repository {name}: policy Statement must be an object or a list, got {type(raw_statements).__name__}"
+            )
+        kept = [s for s in statements if s.get("Sid") != "DenyPushArchived"]
+        document["Statement"] = kept
+        return document, len(kept) != len(statements)
