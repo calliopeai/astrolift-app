@@ -399,6 +399,17 @@ def test_a_non_root_box_that_asks_to_install_is_refused_before_the_cluster(org):
     assert NON_ROOT_INSTALL_CONFLICT in box.last_error
 
 
+def test_the_box_starts_in_a_writable_workspace(org):
+    """No image creates /workspace; without a volume a non-root box would
+    start in a root-owned directory it cannot write."""
+    box = _box(org, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+    container = _container_of(job)
+
+    assert container["volumeMounts"] == [{"name": "workspace", "mountPath": container["workingDir"]}]
+    assert job["spec"]["template"]["spec"]["volumes"] == [{"name": "workspace", "emptyDir": {}}]
+
+
 def test_the_box_carries_no_wall_clock_deadline(org):
     """A box is bounded by not being used, not by elapsed time.
 
