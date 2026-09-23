@@ -319,9 +319,12 @@ def start_agent_box(box) -> None:
                 {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
                 {},
             )
+        from astrolift_dispatch.agent_network_fence import agent_fence_manifests
+
         manifests = (
             ([model_wiring.service_account_manifest] if model_wiring else [])
             + ([secret_manifest] if secret_manifest else [])
+            + agent_fence_manifests(cluster, namespace)
             + [job]
         )
         result = driver.apply_manifests(ctx.slug, namespace, manifests)

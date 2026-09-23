@@ -342,7 +342,7 @@ def _spawn(monkeypatch, spec, backend):
     return result, driver
 
 
-def test_spawn_applies_secret_then_job_with_resolved_values(monkeypatch):
+def test_spawn_applies_secret_then_job_with_resolved_values(db, monkeypatch):
     spec = _Spec(
         env_vars={"LOG_LEVEL": "debug"},
         secret_refs=[{"uri": "sm:gh", "env_var": "GITHUB_TOKEN"}],
@@ -367,7 +367,7 @@ def test_spawn_applies_secret_then_job_with_resolved_values(monkeypatch):
     assert "ghp_secret" not in str(job)
 
 
-def test_spawn_without_refs_applies_job_only(monkeypatch):
+def test_spawn_without_refs_applies_job_only(db, monkeypatch):
     result, driver = _spawn(monkeypatch, _Spec(env_vars={"X": "1"}), _FakeSecrets())
     assert result.ok, result.error
     assert [m["kind"] for m in driver.applied] == ["Job"]

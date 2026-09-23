@@ -149,13 +149,13 @@ def _spawn_and_capture(monkeypatch, dispatch_input):
     return {e["name"]: e["value"] for e in container.get("env", [])}
 
 
-def test_spawned_job_includes_trigger_payload_env(monkeypatch):
+def test_spawned_job_includes_trigger_payload_env(db, monkeypatch):
     payload = {"pr": 7, "action": "opened"}
     env = _spawn_and_capture(monkeypatch, payload)
     assert env.get(ENV_NAME) == json.dumps(payload, separators=(",", ":"))
 
 
-def test_spawned_job_omits_env_for_unattended_dispatch(monkeypatch):
+def test_spawned_job_omits_env_for_unattended_dispatch(db, monkeypatch):
     env = _spawn_and_capture(monkeypatch, None)
     assert ENV_NAME not in env
 

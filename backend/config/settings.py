@@ -483,6 +483,19 @@ CONSTANCE_CONFIG = {
         "write its HOME and every non-root pod fails. Change only with matching images.",
         "posix_id",
     ),
+    "AGENT_NETWORK_FENCE": (
+        False,
+        "Apply a NetworkPolicy to agent task and box pods: no inbound pod traffic; outbound "
+        "only DNS and the public internet, never private ranges or cloud metadata. Agents "
+        "that reach private git, an in-cluster Zentinelle, or managed databases need those "
+        "in AGENT_EGRESS_ALLOW_CIDRS first. Turning it off does not remove an applied "
+        "policy (delete astrolift-agent-fence). Needs a NetworkPolicy-capable CNI.",
+    ),
+    "AGENT_EGRESS_ALLOW_CIDRS": (
+        "",
+        "Comma-separated CIDRs agent pods may reach despite the fence, e.g. the control "
+        "plane or Zentinelle when they run in-cluster.",
+    ),
     "AGENT_POD_GID": (
         42042,
         "gid (and fsGroup) non-root agent pods run as. Same rule as AGENT_POD_UID.",
@@ -722,7 +735,10 @@ CONSTANCE_CONFIG = {
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    "Agent pods": {"fields": ("AGENT_POD_UID", "AGENT_POD_GID"), "collapse": False},
+    "Agent pods": {
+        "fields": ("AGENT_POD_UID", "AGENT_POD_GID", "AGENT_NETWORK_FENCE", "AGENT_EGRESS_ALLOW_CIDRS"),
+        "collapse": False,
+    },
     "System": {
         "fields": ("TIME_ZONE", "PUT_PRESIGNED_URL_EXPIRATION", "GET_PRESIGNED_URL_EXPIRATION"),
         "collapse": False,

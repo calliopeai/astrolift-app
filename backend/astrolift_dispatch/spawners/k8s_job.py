@@ -312,6 +312,9 @@ class K8sJobSpawner(ContainerSpawner):
                     ),
                 ),
             )
+            from astrolift_dispatch.agent_network_fence import agent_fence_manifests
+
+            manifests.extend(agent_fence_manifests(self._cluster, self._namespace))
             manifests.append(job_manifest)
             result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
