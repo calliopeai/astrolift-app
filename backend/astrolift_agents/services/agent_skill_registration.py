@@ -313,6 +313,7 @@ def _assemble_brief(
     from astrolift_agents.services.agent_package import (
         build_agent_package,
         compatibility_snapshot,
+        manifest_needs_payload,
         project_manifest_environment,
     )
 
@@ -339,7 +340,7 @@ def _assemble_brief(
         },
         imports=manifest.raw.get("imports") or [],
         federation=federation or manifest.raw.get("federation") or {},
-        payload_required="package" in manifest.raw,
+        payload_required=manifest_needs_payload(manifest.raw),
     )
 
     payload_bytes: bytes | None = None

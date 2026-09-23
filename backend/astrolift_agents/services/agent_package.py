@@ -157,6 +157,16 @@ def normalize_secret_references(
     return normalized
 
 
+def manifest_needs_payload(raw: dict) -> bool:
+    """Whether the runner must receive the source tree as a payload.
+
+    ``[package]`` ships files to the agent; ``[workspace]`` is read by the
+    runner from ``astrolift.toml`` inside that payload (#1847), so without a
+    payload the declared repos and dependencies would silently never load.
+    """
+    return "package" in raw or "workspace" in raw
+
+
 def project_manifest_environment(
     environment_section: Any,
     secrets_section: Any,
