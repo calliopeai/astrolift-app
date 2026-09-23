@@ -22,7 +22,11 @@ preview by identity rather than by build status (#1758 review, H1/H2).
 
 from __future__ import annotations
 
+import json
 import logging
+
+from django.conf import settings
+from django.utils.crypto import constant_time_compare, salted_hmac
 
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -45,10 +49,37 @@ def allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) 
     return frozenset({"all", "production"})
 
 
-def _latest_applied_literal_changes(app) -> dict[str, str | None]:
-    """Per key, what the most recent applied SET/DELETE proposal made it:
-    the value it set, or None when it deleted the key."""
-    latest: dict[str, str | None] = {}
+_BASE_STAMP_SALT = "astrolift.secret-proposal.base-raw"
+
+
+def _base_digest(value: str | None, secret: str | None = None) -> str:
+    # json.dumps keeps an absent key (null) apart from an empty value ("").
+    return salted_hmac(_BASE_STAMP_SALT, json.dumps(value), secret=secret, algorithm="sha256").hexdigest()
+
+
+def base_raw_digest(value: str | None) -> str:
+    """Stamp for a key's ``manifest_raw`` value when a proposal is applied.
+
+    Keyed, because the proposal payload is readable through the GraphQL
+    proposal type and a plain hash of a short old value could be
+    brute-forced."""
+    return _base_digest(value)
+
+
+def _base_raw_matches(stamp: str | None, value: str | None) -> bool:
+    if not stamp:
+        return False
+    # Fallback keys too, so a SECRET_KEY rotation done the Django way does
+    # not quietly void every pending approval.
+    secrets = (settings.SECRET_KEY, *getattr(settings, "SECRET_KEY_FALLBACKS", ()))
+    return any(constant_time_compare(stamp, _base_digest(value, secret)) for secret in secrets)
+
+
+def _latest_applied_literal_changes(app) -> dict[str, tuple[str | None, str | None]]:
+    """Per key, what the most recent applied SET/DELETE proposal made it
+    (the value it set, or None when it deleted the key), with the stamp of
+    the ``manifest_raw`` value it was applied against."""
+    latest: dict[str, tuple[str | None, str | None]] = {}
     applied = (
         SecretChangeProposal.objects.filter(
             registered_app=app,
@@ -63,7 +94,8 @@ def _latest_applied_literal_changes(app) -> dict[str, str | None]:
         key = str(payload.get("key") or "").strip()
         if not key or key in latest:
             continue
-        latest[key] = None if op == SecretChangeProposal.Op.DELETE.value else str(payload.get("value") or "")
+        value = None if op == SecretChangeProposal.Op.DELETE.value else str(payload.get("value") or "")
+        latest[key] = (value, payload.get("base_raw_digest"))
     return latest
 
 
@@ -79,12 +111,15 @@ def _deployable_literals(app) -> dict[str, str]:
     own: ``updateManifest`` and ``bulkImportAppSecrets`` write it without
     creating a proposal (#1758 review, H1). So the deploy starts from
     ``manifest_raw``, and a staged change to a key is taken only when the
-    latest applied proposal for that key produced exactly that change.
-    Anything else keeps the ``manifest_raw`` value. Anchoring on the
-    staged buffer, rather than replaying every applied proposal over
-    ``manifest_raw``, keeps an old approval from overriding a later repo
-    change to the same key: once a draft is pushed and synced the buffer
-    is cleared and the key is no longer a pending change.
+    latest applied proposal for that key produced exactly that change,
+    from the ``manifest_raw`` value the key still has. Anything else keeps
+    the ``manifest_raw`` value. Anchoring on the staged buffer, rather
+    than replaying every applied proposal over ``manifest_raw``, keeps an
+    old approval from overriding a later repo change to the same key: a
+    pushed and synced draft clears the buffer. The base stamp covers the
+    rest: re-staging a value the repo has since rotated out is not
+    covered by the approval that first set it (#1758 re-review, 3). A
+    proposal applied before stamps existed vouches for nothing.
     """
     raw = read_app_env(app.manifest_raw or "")
     if not app.manifest_raw_staged:
@@ -100,7 +135,8 @@ def _deployable_literals(app) -> dict[str, str]:
     out = dict(raw)
     unapproved: list[str] = []
     for key in pending:
-        if key not in approved or approved[key] != staged.get(key):
+        change = approved.get(key)
+        if change is None or change[0] != staged.get(key) or not _base_raw_matches(change[1], raw.get(key)):
             unapproved.append(key)
         elif key in staged:
             out[key] = staged[key]

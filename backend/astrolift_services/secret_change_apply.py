@@ -30,6 +30,7 @@ from astrolift_services.models import (
     SecretBundle,
     SecretChangeProposal,
 )
+from astrolift_services.secret_literals import base_raw_digest
 from astrolift_services.secret_metadata_ops import (
     retire_app_secret_metadata,
     upsert_app_secret_metadata,
@@ -63,6 +64,15 @@ def _stage_manifest(app: RegisteredApp, new_text: str, *, actor) -> None:
     app.save(update_fields=update_fields)
 
 
+def _stamp_base(proposal: SecretChangeProposal, app: RegisteredApp, key: str) -> None:
+    """Record which ``manifest_raw`` value for ``key`` this approval was
+    applied against. The deploy path honours the approval only while the
+    key still has that value there (#1758)."""
+    base = read_app_env(app.manifest_raw or "").get(key)
+    proposal.payload = {**(proposal.payload or {}), "base_raw_digest": base_raw_digest(base)}
+    proposal.save(update_fields=["payload", "updated_at", "version"])
+
+
 def apply_proposal(
     proposal: SecretChangeProposal,
     *,
@@ -85,6 +95,7 @@ def apply_proposal(
             value = payload.get("value") or ""
             if not key:
                 return ApplyResult(ok=False, error="payload.key is required for set")
+            _stamp_base(proposal, app, key)
             source = app.manifest_raw_staged or app.manifest_raw or ""
             new_text = set_app_env_keys(source, {key: value})
             _stage_manifest(app, new_text, actor=actor)
@@ -108,6 +119,7 @@ def apply_proposal(
             key = (payload.get("key") or "").strip()
             if not key:
                 return ApplyResult(ok=False, error="payload.key is required for delete")
+            _stamp_base(proposal, app, key)
             source = app.manifest_raw_staged or app.manifest_raw or ""
             new_text, removed = delete_app_env_key(source, key)
             if not removed:

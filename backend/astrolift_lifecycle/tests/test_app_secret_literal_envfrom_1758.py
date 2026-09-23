@@ -847,3 +847,75 @@ def test_under_approval_discarding_an_approved_delete_keeps_the_key_scoped(
     assert app.manifest_raw_staged == ""
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
     assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "repo-value"}
+
+
+# An applied proposal vouches only while manifest_raw still has the value it
+# was applied against. Otherwise re-staging a value the repo has since
+# rotated out would ride on the approval that first set it
+# (#1758 re-review, 3).
+
+
+def _push_and_sync(app) -> None:
+    """What a merged pushManifestToRepo followed by a sync leaves behind."""
+    app.manifest_raw = app.manifest_raw_staged
+    app.manifest_raw_staged = ""
+    app.save(update_fields=["manifest_raw", "manifest_raw_staged"])
+
+
+def _repo_change(app, text: str) -> None:
+    app.manifest_raw = text
+    app.save(update_fields=["manifest_raw"])
+
+
+def test_under_approval_re_staging_a_value_the_repo_rotated_out_does_not_deploy(
+    approver_grants, app, env, monkeypatch
+):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    _approved_set(app, key="API_KEY", value="leaked-value")
+    _push_and_sync(app)
+    _repo_change(app, set_app_env_keys(app.manifest_raw, {"API_KEY": "rotated-in-the-repo"}))
+
+    _stage_via_update_manifest(app, set_app_env_keys(app.manifest_raw, {"API_KEY": "leaked-value"}))
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "rotated-in-the-repo"}
+
+
+def test_under_approval_re_staging_a_delete_the_repo_undid_does_not_deploy(
+    approver_grants, app, env, monkeypatch
+):
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"API_KEY": "old-value"}))
+    _require_secret_approval(app)
+    _approved(
+        app,
+        lambda info: ServicesMutation().delete_app_secret(
+            info, input=DeleteAppSecretInput(app_slug=app.slug, key="API_KEY")
+        ),
+    )
+    _push_and_sync(app)
+    _repo_change(app, set_app_env_keys(app.manifest_raw, {"API_KEY": "re-added-in-the-repo"}))
+
+    without_key, removed = delete_app_env_key(app.manifest_raw, "API_KEY")
+    assert removed
+    _stage_via_update_manifest(app, without_key)
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"API_KEY": "re-added-in-the-repo"}
+
+
+def test_under_approval_a_proposal_applied_without_a_base_stamp_vouches_for_nothing(
+    approver_grants, app, env, monkeypatch
+):
+    """Proposals applied before the stamp existed fail closed."""
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    SecretChangeProposal.objects.create(
+        registered_app=app,
+        op=SecretChangeProposal.Op.SET.value,
+        payload={"key": "API_KEY", "value": "approved-long-ago"},
+        status=SecretChangeProposal.Status.APPLIED.value,
+        applied_at=timezone.now(),
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+    _stage_via_update_manifest(app, set_app_env_keys(_MANIFEST, {"API_KEY": "approved-long-ago"}))
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {}
