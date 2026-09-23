@@ -21,6 +21,7 @@ from astrolift_identity.models import Organization
 from astrolift_pipelines.build_image import (
     _PLATFORM_DEFAULT_IMAGE,
     resolve_job_image,
+    resolve_pull_secret_name,
 )
 from astrolift_pipelines.models import Job, Pipeline, PipelineRun
 
@@ -96,3 +97,42 @@ def test_the_k8s_path_and_the_runner_path_agree_on_the_default():
     runner = Path("astrolift_pipelines/runner_views.py").read_text()
 
     assert _PLATFORM_DEFAULT_IMAGE in runner
+
+
+# ---- pull secret naming (issue #1874) -----------------------------------
+
+
+def test_pull_secret_name_uses_full_guid_hex_for_uniqueness(run):
+    """Two pipelines created back-to-back must produce different pull secret names.
+
+    UUIDv7 prefixes contain only millisecond timestamps, so truncating to [:8]
+    causes collisions. The fix uses the full 32-char hex. Regression test for #1874.
+    """
+    # Create two pipelines with registry credentials
+    org = run.pipeline.organization
+    org.extra_data = {"pipeline_registry_credentials": "secret-repo-token"}
+    org.save()
+
+    # Create two pipelines back-to-back
+    pipeline1 = Pipeline.objects.create(organization=org, name="ci-1", repo_url="https://github.com/a/b")
+    pipeline2 = Pipeline.objects.create(organization=org, name="ci-2", repo_url="https://github.com/c/d")
+
+    run1 = PipelineRun.objects.create(pipeline=pipeline1, run_number=1, trigger_ref="main")
+    run2 = PipelineRun.objects.create(pipeline=pipeline2, run_number=1, trigger_ref="main")
+
+    name1 = resolve_pull_secret_name(run1)
+    name2 = resolve_pull_secret_name(run2)
+
+    # Different pipelines must produce different pull secret names
+    assert name1 is not None
+    assert name2 is not None
+    assert name1 != name2
+    # Verify the full guid hex is used (32 chars for guid, plus prefix)
+    assert len(name1) == len("pipeline-pull-") + 32
+
+
+def test_pull_secret_name_returns_none_without_credentials(run):
+    """When registry credentials are not configured, return None."""
+    secret_name = resolve_pull_secret_name(run)
+
+    assert secret_name is None

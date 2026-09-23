@@ -65,8 +65,10 @@ def resolve_pull_secret_name(pipeline_run) -> str | None:
     if not extra.get("pipeline_registry_credentials"):
         return None
 
-    # Pull secret naming convention: mirrors the ServiceAccount name
-    sa_prefix = str(pipeline_run.pipeline.guid).replace("-", "")[:8]
+    # Pull secret naming convention: mirrors the ServiceAccount name.
+    # UUIDv7 prefixes contain only time; truncating them collides across
+    # parallel pipelines. Use the full hex (32 chars fits a 63-char DNS label).
+    sa_prefix = str(pipeline_run.pipeline.guid).replace("-", "")
     return f"pipeline-pull-{sa_prefix}"
 
 
