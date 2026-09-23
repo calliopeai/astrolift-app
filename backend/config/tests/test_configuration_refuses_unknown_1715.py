@@ -84,31 +84,39 @@ _PRINT_POSTURE = (
 )
 
 
-def _posture(configuration: str) -> dict:
+def _posture(configuration: str | None, **extra_env: str) -> dict:
     """Import settings the way a deployment does and report its posture.
 
     The POSTGRES_* variables are set because a server configuration
     refuses to start without a database engine -- correctly, and a test
     that imports without them is testing the refusal, not the posture.
     Nothing connects; ``DATABASES`` is only read.
+
+    ``configuration=None`` omits DJANGO_CONFIGURATION entirely, mirroring
+    an install that never declares one (#1732) rather than one that spells
+    the name wrong. ``**extra_env`` layers on top, e.g. DJANGO_DEBUG or a
+    DOTENV pointed at a path that does not exist.
     """
     import json
 
+    env = {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "DJANGO_SETTINGS_MODULE": "config.settings",
+        "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+        "POSTGRES_ENGINE": "django.db.backends.postgresql",
+        "POSTGRES_DB": "astrolift",
+        "POSTGRES_USER": "astrolift",
+        "POSTGRES_PASSWORD": "unused-by-an-import",
+        "POSTGRES_HOST": "postgres.invalid",
+        "POSTGRES_PORT": "5432",
+        **extra_env,
+    }
+    if configuration is not None:
+        env["DJANGO_CONFIGURATION"] = configuration
     result = subprocess.run(
         [sys.executable, "-c", _PRINT_POSTURE],
         cwd=BACKEND,
-        env={
-            "PATH": "/usr/bin:/bin:/usr/local/bin",
-            "DJANGO_CONFIGURATION": configuration,
-            "DJANGO_SETTINGS_MODULE": "config.settings",
-            "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
-            "POSTGRES_ENGINE": "django.db.backends.postgresql",
-            "POSTGRES_DB": "astrolift",
-            "POSTGRES_USER": "astrolift",
-            "POSTGRES_PASSWORD": "unused-by-an-import",
-            "POSTGRES_HOST": "postgres.invalid",
-            "POSTGRES_PORT": "5432",
-        },
+        env=env,
         capture_output=True,
         text=True,
         timeout=120,
@@ -132,10 +140,95 @@ def test_a_server_configuration_keeps_its_password_validators(name):
     assert _posture(name)["validators"] > 0
 
 
-def test_the_developer_configuration_keeps_the_technical_error_page():
+def test_the_developer_configuration_keeps_the_technical_error_page(tmp_path):
     """The trade is right on a laptop and wrong on a server; this is the
-    laptop."""
-    assert _posture("dev")["debug"] is True
+    laptop. DJANGO_DEBUG=1 is what every dev/test surface in this repo sets
+    explicitly (local.env, docker-compose.yaml, CI's backend-test-shard job)
+    -- that explicit opt-in is what makes it a laptop, rather than an
+    install that forgot to declare a configuration (#1732)."""
+    posture = _posture("dev", DJANGO_DEBUG="1", DOTENV=str(tmp_path / "absent.env"))
+    assert posture["debug"] is True
+
+
+# ---------------------------------------------------------------------
+# An undeclared configuration is not a developer laptop (#1732)
+# ---------------------------------------------------------------------
+
+
+def test_an_undeclared_configuration_does_not_enable_debug(tmp_path):
+    """CONFIGURATION defaults to "Dev" a few lines into settings.py when
+    DJANGO_CONFIGURATION is unset -- exactly the SteadyMD install's
+    situation (finding 1 on #1732). DEBUG must not silently follow that
+    default; only an explicit DJANGO_DEBUG opts in."""
+    posture = _posture(None, DOTENV=str(tmp_path / "absent.env"))
+    assert posture["debug"] is False
+
+
+def test_an_undeclared_configuration_keeps_its_password_validators(tmp_path):
+    """The same silent default used to clear AUTH_PASSWORD_VALIDATORS along
+    with DEBUG, so an install that never declared a configuration kept
+    every password rule off too."""
+    posture = _posture(None, DOTENV=str(tmp_path / "absent.env"))
+    assert posture["validators"] > 0
+
+
+def test_explicit_dev_without_debug_flag_does_not_enable_debug(tmp_path):
+    """ "dev" is never set explicitly anywhere in this repo's own configs --
+    it is only ever reached through the default above -- but an operator
+    who does set it gets the same safe posture unless they also opt into
+    DJANGO_DEBUG."""
+    posture = _posture("dev", DOTENV=str(tmp_path / "absent.env"))
+    assert posture["debug"] is False
+
+
+def test_an_undeclared_configuration_refuses_sqlite(tmp_path):
+    """The #1715 SQLite guard used to be inert here: CONFIGURATION silently
+    resolved to "Dev", and IS_DEV excused every dev-labelled configuration
+    from the guard. An install that never declares DJANGO_CONFIGURATION is
+    exactly the SteadyMD install's situation (#1732) -- the guard must hold
+    for it, not just for configurations that spell their name correctly.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_SETTINGS],
+        cwd=BACKEND,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "DJANGO_SETTINGS_MODULE": "config.settings",
+            "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+            "POSTGRES_ENGINE": "django.db.backends.sqlite3",
+            "POSTGRES_DB": ":memory:",
+            "DOTENV": str(tmp_path / "absent.env"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode != 0
+    assert "must not run on SQLite" in result.stderr
+
+
+def test_a_job_with_no_real_database_can_declare_the_dummy_engine(tmp_path):
+    """Re-keying the #1715 guard onto DEBUG (#1732) means a caller with no
+    real database -- the CI `contracts` job introspects schema and never
+    connects to one -- must say so explicitly rather than relying on an
+    undeclared configuration reading as a developer laptop. This is the same
+    POSTGRES_ENGINE=django.db.backends.dummy pattern the Dockerfile's
+    collectstatic step already relies on."""
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_SETTINGS],
+        cwd=BACKEND,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "DJANGO_SETTINGS_MODULE": "config.settings",
+            "PYTHONPATH": f"{BACKEND}:{BACKEND / 'providers'}",
+            "POSTGRES_ENGINE": "django.db.backends.dummy",
+            "DOTENV": str(tmp_path / "absent.env"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
 
 
 def test_a_server_configuration_with_no_database_engine_refuses_to_start(tmp_path):
