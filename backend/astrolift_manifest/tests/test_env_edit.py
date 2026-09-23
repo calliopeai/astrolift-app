@@ -61,6 +61,12 @@ def test_read_app_env_keeps_numeric_scalars() -> None:
     assert read_app_env("[env]\nCOUNT = 3\nRATIO = 1.5\n") == {"COUNT": "3", "RATIO": "1.5"}
 
 
+def test_read_app_env_spells_booleans_the_toml_way() -> None:
+    """A deployed literal is the process's env value; Python's "True"
+    fails a program's == "true" check."""
+    assert read_app_env("[env]\nENABLED = true\nDEBUG = false\n") == {"ENABLED": "true", "DEBUG": "false"}
+
+
 def test_parse_dotenv_skips_non_ascii_keys() -> None:
     assert parse_dotenv("CLÉ=x\nKEY=y\n") == {"KEY": "y"}
 

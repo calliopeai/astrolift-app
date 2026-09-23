@@ -41,10 +41,20 @@ def read_app_env(toml_text: str) -> dict[str, str]:
     if not isinstance(env, Mapping):
         return {}
     return {
-        str(k): str(v)
+        str(k): _env_value(v)
         for k, v in env.items()
         if _is_valid_env_name(str(k)) and not isinstance(v, (Mapping, list))
     }
+
+
+def _env_value(value: object) -> str:
+    """A TOML scalar as the string a process sees in its environment.
+
+    Booleans keep TOML's spelling: ``str(True)`` is Python's ``"True"``,
+    which a program checking ``== "true"`` reads as false."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def set_app_env_keys(
