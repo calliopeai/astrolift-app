@@ -120,6 +120,26 @@ def test_delete_repo_not_found_is_idempotent(driver: ECRDriver) -> None:
     driver.delete_repo("acme/never-existed", archive=False)
 
 
+# ---- ensure_repo: clears a stale archive policy on reuse (#1819) --
+
+
+def test_ensure_repo_clears_archive_policy_on_reregister(
+    driver: ECRDriver,
+    ecr_client,
+) -> None:
+    """Re-registering an app whose repo was archived must restore
+    pushability rather than leave the prior deprovision's DenyPushArchived
+    policy in place — the bug that made every push read as an explicit
+    deny until an operator ran ``delete-repository-policy`` by hand."""
+    driver.ensure_repo("acme/reregistered")
+    driver.delete_repo("acme/reregistered", archive=True)
+
+    driver.ensure_repo("acme/reregistered")
+
+    with pytest.raises(ecr_client.exceptions.RepositoryPolicyNotFoundException):
+        ecr_client.get_repository_policy(repositoryName="acme/reregistered")
+
+
 # ---- get_pull_secret ----------------------------------------------
 
 
@@ -316,3 +336,46 @@ def test_ensure_ci_push_role_without_ids_trusts_login_subject_only() -> None:
         scm_repo_full_name="steadymd/hello-astro-demo",
     )
     assert _trust_sub_patterns(iam) == ["repo:steadymd/hello-astro-demo:*"]
+
+
+# ---- ensure_ci_push_role: permissions boundary (#1906) ------------
+
+
+def test_ensure_ci_push_role_attaches_configured_boundary() -> None:
+    """Pull-mode installs require every minted role to carry the agent's
+    own boundary, or its DenyRoleCreationWithoutThisBoundary statement
+    refuses the CreateRole outright (installer#313)."""
+    iam = _RecordingIam()
+    boundary = "arn:aws:iam::123456789012:policy/conflict-agent-boundary"
+    driver = ECRDriver(
+        config=ECRConfig(
+            region="us-east-1",
+            account_id="123456789012",
+            permissions_boundary_arn=boundary,
+        ),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+    )
+    assert iam.created["PermissionsBoundary"] == boundary
+
+
+def test_ensure_ci_push_role_omits_boundary_when_unset() -> None:
+    """Push-mode installs have no boundary; IAM rejects an empty
+    PermissionsBoundary, so the key must be absent, not blank."""
+    iam = _RecordingIam()
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="steadymd/hello-astro-demo",
+    )
+    assert "PermissionsBoundary" not in iam.created

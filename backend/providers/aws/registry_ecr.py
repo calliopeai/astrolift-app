@@ -64,6 +64,16 @@ class ECRConfig(CredentialedConfig):
     + #276 audit invariants assume immutable image refs).
     MUTABLE for legacy/dev workflows."""
 
+    permissions_boundary_arn: str = ""
+    """Permissions boundary to attach to the CI push role this driver
+    mints (#1906). Empty on an admin-provisioned (push mode) install,
+    where no boundary exists. Non-empty on an agent-installed (pull
+    mode) one, where the installer agent's own boundary carries a
+    ``DenyRoleCreationWithoutThisBoundary`` statement refusing any
+    ``iam:CreateRole`` that does not attach that same boundary — so
+    leaving this empty there means ``ensure_ci_push_role`` is denied.
+    Mirrors ``IRSAConfig.permissions_boundary_arn``."""
+
 
 class ECRDriver(ImageRegistryDriver):
     """boto3-backed ECR driver."""
@@ -104,7 +114,11 @@ class ECRDriver(ImageRegistryDriver):
                 uri=response["repository"]["repositoryUri"],
             )
         except self._client.exceptions.RepositoryAlreadyExistsException:
-            # Repo exists — fetch its URI rather than failing
+            # Repo exists — clear any DenyPushArchived policy a prior
+            # deprovision left in place (#1819) before returning its URI, so
+            # re-registering an app under the same slug restores pushability
+            # instead of silently inheriting the old deny.
+            self._clear_archive_policy(name=name)
             return self._describe_repo(name=name)
         except Exception as exc:
             raise map_client_error(exc) from exc
@@ -435,18 +449,27 @@ class ECRDriver(ImageRegistryDriver):
             ],
         }
 
+        create_kwargs: dict[str, Any] = {
+            "RoleName": role_name,
+            "AssumeRolePolicyDocument": json.dumps(trust_policy),
+            # ASCII-only: IAM rejects an AssumeRolePolicy/role Description
+            # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
+            # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
+            "Description": f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
+            # Tag like every other platform-minted role so the orphan scan
+            # (#995) can reap it as a backstop if teardown is interrupted.
+            "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+        }
+        # Pull-mode installs require every minted role to carry this
+        # boundary (#1906), or the agent's own DenyRoleCreationWithoutThis-
+        # Boundary refuses the CreateRole. Omit it when unset: IAM rejects
+        # an empty PermissionsBoundary, and push-mode installs legitimately
+        # have none.
+        if self._config.permissions_boundary_arn:
+            create_kwargs["PermissionsBoundary"] = self._config.permissions_boundary_arn
+
         try:
-            response = self._iam.create_role(
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(trust_policy),
-                # ASCII-only: IAM rejects an AssumeRolePolicy/role Description
-                # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
-                # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
-                Description=f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
-                # Tag like every other platform-minted role so the orphan scan
-                # (#995) can reap it as a backstop if teardown is interrupted.
-                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
-            )
+            response = self._iam.create_role(**create_kwargs)
             role_arn = response["Role"]["Arn"]
         except self._iam.exceptions.EntityAlreadyExistsException:
             # Refresh the trust policy in case the SCM repo or scope
@@ -513,5 +536,21 @@ class ECRDriver(ImageRegistryDriver):
             )
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+    def _clear_archive_policy(self, *, name: str) -> None:
+        """Remove a repository policy left by ``_block_push`` (#1819).
+
+        ``_block_push`` is the only place this driver ever calls
+        ``set_repository_policy``, so any policy present on re-registration
+        is the stale ``DenyPushArchived`` deny from an earlier archive, not
+        something an operator set by hand — safe to clear unconditionally.
+        """
+        try:
+            self._client.delete_repository_policy(repositoryName=name)
+        except self._client.exceptions.RepositoryPolicyNotFoundException:
+            # Common case: the repo exists and was never archived.
+            return
         except Exception as exc:
             raise map_client_error(exc) from exc
