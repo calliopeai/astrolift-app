@@ -49,14 +49,13 @@ def test_egress_always_allows_dns():
         app_label="api",
         egress_policy=EgressPolicy(),
     )
-    dns_rules = [
-        e
-        for e in out["spec"]["egress"]
-        if any(
-            "namespaceSelector" in t and t["namespaceSelector"]["matchLabels"].get("k8s-app") == "kube-dns"
-            for t in e.get("to", [])
-        )
-    ]
+    dns_peer = {
+        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+        "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
+    }
+    # #1868: the pod label goes on podSelector; as a namespaceSelector it
+    # matched no namespace and cut DNS for every opted-in app.
+    dns_rules = [e for e in out["spec"]["egress"] if dns_peer in e.get("to", [])]
     assert len(dns_rules) == 1
     ports = dns_rules[0]["ports"]
     assert {"protocol": "UDP", "port": 53} in ports
