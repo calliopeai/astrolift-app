@@ -168,6 +168,12 @@ class RemoveOrganizationAllowlistDomainInput:
 
 
 @strawberry.input
+class SetOrganizationModuleInput:
+    key: str
+    enabled: bool
+
+
+@strawberry.input
 class CreateRoleInput:
     slug: str
     name: str
@@ -364,6 +370,12 @@ class _MarkOnboardingCompletePayload:
 class _LogoutAllSessionsPayload:
     revoked_count: int
     kept_current: bool
+
+
+@strawberry.type(name="AstroliftOrganizationModule")
+class _OrganizationModulePayload:
+    key: str
+    enabled: bool
 
 
 @strawberry.type(name="AstroliftElevatePayload")

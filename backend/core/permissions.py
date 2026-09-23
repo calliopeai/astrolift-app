@@ -222,6 +222,13 @@ class ModuleEntitlement:
 
     ``dashboard`` is intentionally NOT a module here: the shell always
     renders it, so it carries no entitlement row.
+
+    ``enabled`` says whether the module is switched on for the active org
+    at all (#1859). The entity modules are always on; the per-org modules
+    in :data:`ORG_MODULE_KEYS` are on only where an org admin turned them
+    on and the install has not forced them off. It is independent of the
+    ``can_*`` fields: a superuser can hold every capability of a module
+    that is still off for the org.
     """
 
     key: str
@@ -229,6 +236,7 @@ class ModuleEntitlement:
     can_create: bool
     can_manage: bool
     can_run: bool
+    enabled: bool
 
 
 # Permission slugs the ``admin`` module's view/manage capability keys off
@@ -243,12 +251,18 @@ _ADMIN_VIEW_SLUGS = (
     "audit_log.read",
 )
 
+# Modules an org admin switches on per organization (#1859). The keys match
+# ``astrolift_identity.models.OrganizationModule.Key``; the org-side state
+# lives there because this module sits below the identity app.
+ORG_MODULE_KEYS = ("chat_studio_integration", "agent_live_attach")
+
 
 def module_entitlements(
     perms: Iterable[str],
     *,
     is_superuser: bool = False,
     is_staff: bool = False,
+    org_modules_enabled: Iterable[str] = (),
 ) -> list[ModuleEntitlement]:
     """The single source-of-truth mapping from permission slugs to the
     ``me.modules`` capability manifest (spec 34/36 §0.3).
@@ -256,35 +270,54 @@ def module_entitlements(
     ``perms`` is the viewer's effective permission slug set for the
     active tenant (typically the result of
     :func:`astrolift_identity.permission_resolver.resolve_effective_permissions`).
-    Returns one :class:`ModuleEntitlement` per entity module in a stable
-    order: ``apps``, ``agents``, ``workflows``, ``admin``.
+    ``org_modules_enabled`` is the set of :data:`ORG_MODULE_KEYS` that are
+    on for the active org (``astrolift_identity.org_modules.enabled_modules``).
+    Returns one :class:`ModuleEntitlement` per module in a stable order:
+    ``apps``, ``agents``, ``workflows``, ``admin``,
+    ``chat_studio_integration``, ``agent_live_attach``.
 
     The mapping table is fixed (do not re-derive capability anywhere
     else):
 
-    ===========  ===============  =================  ============================  ================
-    key          can_view         can_create         can_manage                    can_run
-    ===========  ===============  =================  ============================  ================
-    ``apps``     app.read         app.create         app.update | app.delete       app.deploy
-    ``agents``   agent.read       agent.create       agent.update | agent.delete   agent.dispatch
-    ``workflows``workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
-    ``admin``    any admin slug   cluster.register   same as can_view              (always false)
-                 OR staff/super   | org.manage_members
-    ===========  ===============  =================  ============================  ================
+    ============================  ===============  =================  ============================  ================
+    key                           can_view         can_create         can_manage                    can_run
+    ============================  ===============  =================  ============================  ================
+    ``apps``                      app.read         app.create         app.update | app.delete       app.deploy
+    ``agents``                    agent.read       agent.create       agent.update | agent.delete   agent.dispatch
+    ``workflows``                 workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
+    ``admin``                     any admin slug   cluster.register   same as can_view              (always false)
+                                  OR staff/super   | org.manage_members
+    ``chat_studio_integration``   app.read         app.create         app.update | app.delete       app.deploy
+    ``agent_live_attach``         agent.read       (always false)     (always false)                agent_box.attach
+    ============================  ===============  =================  ============================  ================
+
+    ``chat_studio_integration`` mirrors ``apps`` because shipping from
+    Chat Studio creates and deploys apps. ``enabled`` is ``True`` for the
+    first four (install-wide) and, for the two per-org modules, whether
+    the key is in ``org_modules_enabled``.
 
     ``dashboard`` is always visible and is **not** returned here.
 
-    Superuser short-circuits to every capability ``true`` on every
-    module, matching the bootstrap-admin bypass elsewhere in this module.
+    Superuser short-circuits every ``can_*`` to ``true`` on every module,
+    matching the bootstrap-admin bypass elsewhere in this module, but not
+    ``enabled``: a superuser cannot use a module that is off for the org.
     The ``admin`` module additionally lights its view/manage capability
     for staff (``is_staff``) even without an explicit admin slug.
     """
     held = set(perms)
+    org_on = set(org_modules_enabled)
 
     if is_superuser:
         return [
-            ModuleEntitlement(key=key, can_view=True, can_create=True, can_manage=True, can_run=True)
-            for key in ("apps", "agents", "workflows", "admin")
+            ModuleEntitlement(
+                key=key,
+                can_view=True,
+                can_create=True,
+                can_manage=True,
+                can_run=True,
+                enabled=key not in ORG_MODULE_KEYS or key in org_on,
+            )
+            for key in ("apps", "agents", "workflows", "admin", *ORG_MODULE_KEYS)
         ]
 
     def has(slug: str) -> bool:
@@ -296,6 +329,7 @@ def module_entitlements(
         can_create=has("app.create"),
         can_manage=has("app.update") or has("app.delete"),
         can_run=has("app.deploy"),
+        enabled=True,
     )
     agents = ModuleEntitlement(
         key="agents",
@@ -303,6 +337,7 @@ def module_entitlements(
         can_create=has("agent.create"),
         can_manage=has("agent.update") or has("agent.delete"),
         can_run=has("agent.dispatch"),
+        enabled=True,
     )
     workflows = ModuleEntitlement(
         key="workflows",
@@ -310,6 +345,7 @@ def module_entitlements(
         can_create=has("workflow.create"),
         can_manage=has("workflow.update") or has("workflow.delete"),
         can_run=has("workflow.trigger"),
+        enabled=True,
     )
     admin_view = is_staff or any(has(slug) for slug in _ADMIN_VIEW_SLUGS)
     admin = ModuleEntitlement(
@@ -318,8 +354,25 @@ def module_entitlements(
         can_create=has("cluster.register") or has("org.manage_members"),
         can_manage=admin_view,
         can_run=False,
+        enabled=True,
     )
-    return [apps, agents, workflows, admin]
+    chat_studio_integration = ModuleEntitlement(
+        key="chat_studio_integration",
+        can_view=apps.can_view,
+        can_create=apps.can_create,
+        can_manage=apps.can_manage,
+        can_run=apps.can_run,
+        enabled="chat_studio_integration" in org_on,
+    )
+    agent_live_attach = ModuleEntitlement(
+        key="agent_live_attach",
+        can_view=has("agent.read"),
+        can_create=False,
+        can_manage=False,
+        can_run=has("agent_box.attach"),
+        enabled="agent_live_attach" in org_on,
+    )
+    return [apps, agents, workflows, admin, chat_studio_integration, agent_live_attach]
 
 
 class ScopeKind(enum.StrEnum):

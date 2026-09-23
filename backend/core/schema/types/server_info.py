@@ -95,6 +95,16 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "admin.permissions_enabled",
         "Platform-admin Permissions console (/administration/permissions) is enabled.",
     ),
+    (
+        "CHAT_STUDIO_INTEGRATION_ALLOWED",
+        "modules.chat_studio_integration_allowed",
+        "Organizations may turn on the Chat Studio integration module. Off forces it off for every organization.",
+    ),
+    (
+        "AGENT_LIVE_ATTACH_ALLOWED",
+        "modules.agent_live_attach_allowed",
+        "Organizations may turn on live agent attach. Off forces it off for every organization.",
+    ),
 )
 
 

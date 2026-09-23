@@ -25,7 +25,7 @@ from django.test import Client
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.api_tokens import PLAINTEXT_PREFIX
-from astrolift_identity.models import ApiToken, Member, Organization, Team
+from astrolift_identity.models import ApiToken, Member, Organization, OrganizationModule, Team
 from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
 from astrolift_registry.models import RegisteredApp
 
@@ -38,7 +38,12 @@ User = get_user_model()
 
 @pytest.fixture
 def org():
-    return Organization.objects.create(name="Builder Org", slug="builder-org")
+    org = Organization.objects.create(name="Builder Org", slug="builder-org")
+    # The builder API requires the org's chat_studio_integration module (#1859).
+    OrganizationModule.objects.create(
+        organization=org, key=OrganizationModule.Key.CHAT_STUDIO_INTEGRATION, enabled=True
+    )
+    return org
 
 
 @pytest.fixture
