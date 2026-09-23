@@ -17,8 +17,9 @@ from types import SimpleNamespace
 
 import pytest
 from constance.test import override_config
-from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 
 from astrolift_identity import org_modules
 from astrolift_identity.models import Organization, OrganizationModule, Role, RoleBinding
@@ -242,12 +243,13 @@ def test_orgs_with_a_dev_environment_get_the_builder_module(org_a, org_b, user):
     from astrolift_lifecycle.models import DevEnvironment
 
     DevEnvironment.objects.create(organization=org_a, creator=user)
-    migration = importlib.import_module(
-        "astrolift_identity.migrations.0032_enable_chat_studio_module_for_builder_orgs"
-    )
-    migration.enable_for_existing_builder_orgs(django_apps, None)
+    name = "0032_enable_chat_studio_module_for_builder_orgs"
+    migration = importlib.import_module(f"astrolift_identity.migrations.{name}")
+    # The models as the migration sees them, not today's.
+    historical = MigrationExecutor(connection).loader.project_state(("astrolift_identity", name)).apps
+    migration.enable_for_existing_builder_orgs(historical, None)
     # A second run is a no-op rather than a duplicate-row error.
-    migration.enable_for_existing_builder_orgs(django_apps, None)
+    migration.enable_for_existing_builder_orgs(historical, None)
 
     assert org_modules.module_state(org_a.id, CHAT) == (True, None)
     assert org_modules.module_state(org_b.id, CHAT)[0] is False

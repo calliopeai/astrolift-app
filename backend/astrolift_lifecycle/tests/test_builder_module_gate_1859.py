@@ -21,7 +21,7 @@ from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity import device_flow
-from astrolift_identity.models import Member, Organization, OrganizationModule, Team
+from astrolift_identity.models import Member, Organization, OrganizationModule, Role, RoleBinding, Team
 
 pytestmark = pytest.mark.django_db
 
@@ -99,17 +99,34 @@ def _call(method: str, path: str, bearer: str):
     )
 
 
-def _me_modules(bearer: str) -> dict[str, dict]:
+def _graphql(bearer: str, query: str, variables: dict | None = None) -> dict:
     response = Client().post(
         "/app/gql/config/",
-        data=json.dumps({"query": "{ me { modules { key enabled canCreate } } }"}),
+        data=json.dumps({"query": query, "variables": variables or {}}),
         content_type="application/json",
         HTTP_AUTHORIZATION=f"Bearer {bearer}",
     )
     assert response.status_code == 200, response.content
     payload = response.json()
     assert "errors" not in payload, payload
-    return {row["key"]: row for row in payload["data"]["me"]["modules"]}
+    return payload["data"]
+
+
+def _me_modules(bearer: str) -> dict[str, dict]:
+    data = _graphql(bearer, "{ me { modules { key enabled canCreate } } }")
+    return {row["key"]: row for row in data["me"]["modules"]}
+
+
+_SET_MODULE = """
+mutation Set($input: SetOrganizationModuleInput!) {
+  setOrganizationModule(input: $input) {
+    ok
+    errors { code }
+    data { key enabled }
+  }
+}
+"""
+_ENABLE = {"input": {"key": MODULE, "enabled": True}}
 
 
 def test_acceptance_org_b_is_off_org_a_is_on():
@@ -166,3 +183,63 @@ def test_gate_runs_before_the_dev_environment_lookup():
     )
     assert response.status_code == 403
     assert response.json()["reason"] == "module_not_enabled"
+
+
+def _admin_api_token(org: Organization, perms: tuple[str, ...]) -> str:
+    """An admin-scoped API token (the settings surface a browser admin uses),
+    for a member holding ``perms``. Device-flow CLI tokens cannot reach
+    ``org.update``: their scope ceiling stops short of org settings."""
+    from astrolift_identity.api_tokens import mint_token
+    from astrolift_identity.models import ApiToken
+
+    user = get_user_model().objects.create_user(
+        username=f"admin-{org.slug}", email=f"admin-{org.slug}@astrolift.dev", password="pw"
+    )
+    Member.objects.create(
+        user=user,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=org.id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+    )
+    role = Role.objects.create(
+        name=f"admin-role-{org.slug}",
+        slug=f"admin-role-{org.slug}",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=list(perms),
+        is_system=False,
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
+    minted = mint_token()
+    ApiToken.objects.create(
+        user=user,
+        organization=org,
+        name="settings",
+        token_hash=minted.token_hash,
+        token_last_4=minted.last4,
+        scopes=["admin"],
+    )
+    return minted.plaintext
+
+
+def test_org_admin_turns_the_module_on_over_graphql_and_the_builder_opens():
+    """End to end with the real permission resolver: only a member holding
+    ``org.update`` can switch the module on, and doing so opens the builder
+    to the org's device-flow tokens."""
+    org = _org("gate-org-admin", enabled=False)
+    cli = _device_flow_bearer(org)
+    assert _call("post", ROUTES[0][1], cli).status_code == 403
+
+    member = _admin_api_token(org, perms=("org.read",))
+    denied = _graphql(member, _SET_MODULE, _ENABLE)["setOrganizationModule"]
+    assert denied["ok"] is False
+    assert denied["errors"][0]["code"] == "PERMISSION_DENIED"
+    assert _call("post", ROUTES[0][1], cli).status_code == 403
+
+    admin_org = _org("gate-org-admin-2", enabled=False)
+    admin = _admin_api_token(admin_org, perms=("org.read", "org.update"))
+    result = _graphql(admin, _SET_MODULE, _ENABLE)["setOrganizationModule"]
+    assert result == {"ok": True, "errors": [], "data": {"key": MODULE, "enabled": True}}
+    admin_cli = _device_flow_bearer(admin_org)
+    assert _me_modules(admin_cli)[MODULE]["enabled"] is True
+    assert _call("post", ROUTES[0][1], admin_cli).status_code == 201
