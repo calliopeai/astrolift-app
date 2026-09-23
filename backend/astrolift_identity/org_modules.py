@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from astrolift_identity.models import OrganizationModule
 
-CHAT_STUDIO_INTEGRATION = OrganizationModule.Key.CHAT_STUDIO_INTEGRATION.value
-AGENT_LIVE_ATTACH = OrganizationModule.Key.AGENT_LIVE_ATTACH.value
+CHAT_STUDIO_INTEGRATION = str(OrganizationModule.Key.CHAT_STUDIO_INTEGRATION)
+AGENT_LIVE_ATTACH = str(OrganizationModule.Key.AGENT_LIVE_ATTACH)
 
 # Module key -> the Constance switch the install admin turns off to force
 # the module off for every organization.
@@ -40,7 +40,7 @@ def allowed_by_install(key: str) -> bool:
     return bool(getattr(constance_config, INSTALL_SWITCHES[key]))
 
 
-def module_state(organization_id: int, key: str) -> tuple[bool, str | None]:
+def module_state(organization_id: int | None, key: str) -> tuple[bool, str | None]:
     """``(enabled, reason)`` for one module in one org; ``reason`` is None when on."""
     if not allowed_by_install(key):
         return False, REASON_DISABLED_BY_INSTALL
@@ -49,7 +49,7 @@ def module_state(organization_id: int, key: str) -> tuple[bool, str | None]:
     return True, None
 
 
-def enabled_modules(organization_id: int) -> frozenset[str]:
+def enabled_modules(organization_id: int | None) -> frozenset[str]:
     """Every module key that is on for the org, for ``me.modules``."""
     org_on = set(
         OrganizationModule.objects.filter(organization_id=organization_id, enabled=True).values_list(
