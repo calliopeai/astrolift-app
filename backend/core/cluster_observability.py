@@ -3343,7 +3343,7 @@ async def fetch_task_pod_logs(
     rather than a 500.
 
     Each discovery attempt is bound by ``_TASK_LOG_READ_TIMEOUT_SECONDS``,
-    the same ceiling the log stream itself uses — ``list_namespaced_pod``'s
+    the same ceiling the log stream itself uses -- ``list_namespaced_pod``'s
     own ``timeout_seconds`` covers the read, but not connection setup or a
     hung DNS/TCP handshake, so a slow apiserver could otherwise wedge the
     GraphQL worker on a synchronous call it can't cancel.
