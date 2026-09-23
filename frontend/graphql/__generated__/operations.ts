@@ -9759,7 +9759,7 @@ export type RotateAppSecretInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
-  scope: Scalars['String']['input'];
+  scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
   value: Scalars['String']['input'];
 };
@@ -9848,7 +9848,7 @@ export type SetAppSecretInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
-  scope: Scalars['String']['input'];
+  scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
   value: Scalars['String']['input'];
 };
@@ -9858,7 +9858,7 @@ export type SetAppSecretMetadataInput = {
   environmentName: InputMaybe<Scalars['String']['input']>;
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   key: Scalars['String']['input'];
-  scope: Scalars['String']['input'];
+  scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
 };
 

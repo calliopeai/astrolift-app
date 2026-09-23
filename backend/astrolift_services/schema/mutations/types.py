@@ -43,11 +43,13 @@ class SetAppSecretInput:
     integration may pass an explicit value so the FE can render
     'Set via CLI on May 12' in the secret-row's last-edited tooltip."""
 
-    scope: str = "all"
+    scope: str | None = None
     """Audience scope (#752).  One of ``all`` / ``production`` /
     ``preview`` / ``preview:<branch>``.  Persisted on the sidecar
     metadata row; resolution-time filtering drops the secret for envs
-    that don't match."""
+    that don't match.  Omitted/null keeps the existing scope, and a new
+    row starts at ``all``: a write that doesn't name a scope must not
+    widen a key an operator restricted (#1758)."""
 
 
 @strawberry.input
@@ -74,8 +76,9 @@ class SetAppSecretMetadataInput:
     None preserves the existing value when the row already exists;
     on first creation defaults to ``web``."""
 
-    scope: str = "all"
-    """Audience scope (#752).  Defaults to ``all``."""
+    scope: str | None = None
+    """Audience scope (#752).  None preserves the existing value when
+    the row already exists; on first creation defaults to ``all``."""
 
 
 @strawberry.input
@@ -100,7 +103,7 @@ class RotateAppSecretInput:
     # carries the previous value back through.
     expires_at: dt.datetime | None = None
     set_via: str | None = None
-    scope: str = "all"
+    scope: str | None = None
 
 
 @strawberry.input

@@ -170,7 +170,7 @@ def _upsert_app_secret_metadata(
     environment_name: str = "",
     expires_at: dt.datetime | None = None,
     set_via: str | None = None,
-    scope: str = "all",
+    scope: str | None = None,
     actor=None,
 ) -> AppSecretMetadata:
     """Upsert the operator-facing metadata sidecar for a secret literal.
@@ -184,6 +184,11 @@ def _upsert_app_secret_metadata(
     'last-touched' refresh without changing the data, and the cost of
     one UPDATE per literal write is negligible against the platform's
     overall throughput.
+
+    ``scope=None`` is "don't touch" as well, and ``all`` only on create:
+    writing a default on every update let a rotate or a bulk import
+    silently widen a key restricted to ``production`` back to ``all``
+    (#1758).
     """
     if set_via is not None and set_via not in _VALID_SECRET_SOURCES:
         # Reject unknown sources up front so a typo doesn't silently
@@ -202,20 +207,23 @@ def _upsert_app_secret_metadata(
             key=key,
             expires_at=expires_at,
             source=(set_via or AppSecretMetadata.Source.WEB.value),
-            scope=scope,
+            scope=scope if scope is not None else "all",
             set_at=timezone.now(),
             created_by=actor,
             updated_by=actor,
         )
         return row
     # Apply optional updates atomically.  We don't clear
-    # ``expires_at`` to None unless the caller explicitly passes a
-    # value — `None` means "don't touch" per the input contract.
-    updates: dict = {"set_at": timezone.now(), "scope": scope}
+    # ``expires_at`` to None or reset ``scope`` unless the caller
+    # explicitly passes a value — `None` means "don't touch" per the
+    # input contract.
+    updates: dict = {"set_at": timezone.now()}
     if expires_at is not None:
         updates["expires_at"] = expires_at
     if set_via is not None:
         updates["source"] = set_via
+    if scope is not None:
+        updates["scope"] = scope
     for k, v in updates.items():
         setattr(row, k, v)
     if actor is not None:
