@@ -1246,8 +1246,10 @@ def test_an_app_wide_scope_proposal_lists_the_environments_that_keep_their_own_s
 # setAppSecretMetadata decides between writing and proposing from the scope
 # in force: an app-wide edit that names the scope in force applies directly.
 # Read outside a lock, that scope could be one an approved change was
-# committing at that moment, and the direct write then put back the scope
-# the approval had just changed, without a proposal.
+# committing at that moment. The edit's UPDATE of the app-wide row then
+# waited for the approval and put back the scope it had just changed,
+# without a proposal. (With no app-wide row yet, the edit's INSERT fails on
+# the unique constraint instead.)
 
 
 def _lock_waiters() -> int:
@@ -1276,13 +1278,12 @@ def _on_own_connection(fn) -> tuple[threading.Thread, dict]:
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("change", ["metadata", "metadata-over-an-app-wide-row", "rotation"])
+@pytest.mark.parametrize("change", ["metadata", "rotation"])
 def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
     approver_grants, app, env, monkeypatch, change
 ):
     _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
-    if change == "metadata-over-an-app-wide-row":
-        assert _set_scope(app, "K", set_via="web").ok
+    assert _set_scope(app, "K", set_via="web").ok
     _require_secret_approval(app)
     preview = _preview_environment(app, env, name="preview-race", status=PreviewEnvironment.Status.RUNNING)
     if change == "rotation":
