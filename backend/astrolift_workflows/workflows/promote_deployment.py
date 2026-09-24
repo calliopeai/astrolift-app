@@ -79,8 +79,7 @@ class PromoteDeploymentWorkflow:
         # Resolve the new row's status. If approvals are required,
         # the row landed pending_approval and we hand off to the
         # approve mutation's existing flow.
-        from asgiref.sync import sync_to_async  # noqa: E402  (workflow-context import)
-
+        #
         # We can't query Django from a workflow without a sandbox
         # exception; instead branch in the apply path itself by
         # letting pre_flight fail-fast if the row is still pending
@@ -89,8 +88,14 @@ class PromoteDeploymentWorkflow:
         await workflow.execute_activity(pre_flight, new_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(mark_deploying, new_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(render_manifests, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(apply_manifests, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(update_secrets, new_id, start_to_close_timeout=_TIMEOUT)
+        # The Secrets before the workloads that read them, for the reason
+        # DeployAppWorkflow gives (#1758). Patched for replay.
+        if workflow.patched("deploy-secrets-before-apply"):
+            await workflow.execute_activity(update_secrets, new_id, start_to_close_timeout=_TIMEOUT)
+            await workflow.execute_activity(apply_manifests, new_id, start_to_close_timeout=_TIMEOUT)
+        else:
+            await workflow.execute_activity(apply_manifests, new_id, start_to_close_timeout=_TIMEOUT)
+            await workflow.execute_activity(update_secrets, new_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(wait_dns, new_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(poll_rollout, new_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(health_check, new_id, start_to_close_timeout=_TIMEOUT)
