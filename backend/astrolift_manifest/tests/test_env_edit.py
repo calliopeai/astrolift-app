@@ -38,6 +38,39 @@ def test_read_app_env_missing_section() -> None:
     assert read_app_env(text) == {}
 
 
+def test_read_app_env_skips_keys_a_kubernetes_secret_cannot_carry() -> None:
+    """A repo manifest can hold keys no mutation writes. They are skipped,
+    not passed on to a Secret apply that would reject them (#1758)."""
+    text = (
+        "[env]\n"
+        '"has-a-dash" = "a"\n'
+        '"1LEADING_DIGIT" = "b"\n'
+        '"HAS SPACE" = "c"\n'
+        '"CLÉ" = "d"\n'
+        'GOOD_KEY = "z"\n'
+    )
+    assert read_app_env(text) == {"GOOD_KEY": "z"}
+
+
+def test_read_app_env_skips_tables_and_arrays() -> None:
+    text = '[env]\nGOOD_KEY = "z"\nLIST = [1, 2]\n\n[env.NESTED]\na = 1\n'
+    assert read_app_env(text) == {"GOOD_KEY": "z"}
+
+
+def test_read_app_env_keeps_numeric_scalars() -> None:
+    assert read_app_env("[env]\nCOUNT = 3\nRATIO = 1.5\n") == {"COUNT": "3", "RATIO": "1.5"}
+
+
+def test_read_app_env_spells_booleans_the_toml_way() -> None:
+    """A deployed literal is the process's env value; Python's "True"
+    fails a program's == "true" check."""
+    assert read_app_env("[env]\nENABLED = true\nDEBUG = false\n") == {"ENABLED": "true", "DEBUG": "false"}
+
+
+def test_parse_dotenv_skips_non_ascii_keys() -> None:
+    assert parse_dotenv("CLÉ=x\nKEY=y\n") == {"KEY": "y"}
+
+
 def test_read_app_env_empty_input() -> None:
     assert read_app_env("") == {}
 

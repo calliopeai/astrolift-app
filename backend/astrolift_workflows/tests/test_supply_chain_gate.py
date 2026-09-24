@@ -367,6 +367,9 @@ def _run_promote(monkeypatch, gate_result: dict) -> tuple[object, list[str]]:
         return None
 
     monkeypatch.setattr(temporalio_workflow, "execute_activity", _fake_execute_activity)
+    # run() is called outside a workflow, so there is no history for
+    # patched() to consult; answer as a fresh run does.
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: True)
 
     result = asyncio.new_event_loop().run_until_complete(
         PromoteDeploymentWorkflow().run(

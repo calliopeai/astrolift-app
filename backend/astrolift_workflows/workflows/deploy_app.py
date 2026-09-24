@@ -241,12 +241,38 @@ class DeployAppWorkflow:
             await workflow.execute_activity(
                 render_manifests, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )
-            await workflow.execute_activity(
-                apply_manifests, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
-            )
-            await workflow.execute_activity(
-                update_secrets, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
-            )
+            # The Secrets go first (#1758). A rotated literal changes the
+            # pod-template digest, so apply rolls the pods, and a new pod
+            # reads its Secret once, at start. The other way round, a pod
+            # could start on the old value and never roll again, because
+            # its digest was already current. Patched so a deploy in flight
+            # when this rolls out replays in its original order.
+            if workflow.patched("deploy-secrets-before-apply"):
+                await workflow.execute_activity(
+                    update_secrets,
+                    deployment_id,
+                    start_to_close_timeout=_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                await workflow.execute_activity(
+                    apply_manifests,
+                    deployment_id,
+                    start_to_close_timeout=_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+            else:
+                await workflow.execute_activity(
+                    apply_manifests,
+                    deployment_id,
+                    start_to_close_timeout=_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                await workflow.execute_activity(
+                    update_secrets,
+                    deployment_id,
+                    start_to_close_timeout=_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
 
             # Static-site asset pipeline (#1010): PLATFORM_BUILD dispatches an
             # in-cluster build/sync Job (terminal — it polls internally like
