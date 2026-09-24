@@ -81,15 +81,18 @@ class AppSecretMetadata(BaseCoreModel):
             "other values when they call setAppSecretMetadata explicitly."
         ),
     )
-    scope = models.CharField(
+    scope = models.CharField(  # noqa: DJ001 - null means "follow the app-wide row", distinct from ""
         max_length=48,
         default="all",
+        null=True,
+        blank=True,
         help_text=(
             "Audience scope for this secret row. 'all' = every environment "
             "(default); 'production' = non-preview envs only; 'preview' = "
             "any active preview env; 'preview:<branch>' = one specific "
             "preview branch. Resolution-time filtering drops rows whose "
-            "scope doesn't match the env being queried."
+            "scope doesn't match the env being queried. Null on a "
+            "per-environment row: the row follows the key's app-wide scope."
         ),
     )
     set_at = models.DateTimeField(

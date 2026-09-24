@@ -1026,7 +1026,7 @@ class AgentsMutation:
         absent returns success (desired end-state holds). The env-spec's
         reference itself is untouched — only the store value is removed.
         """
-        from astrolift_dispatch.agent_secrets import delete_secret_value
+        from astrolift_dispatch.agent_secrets import delete_secret_value, normalize_secret_uri
 
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
@@ -1037,8 +1037,10 @@ class AgentsMutation:
         absent = AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=False, error=None)
         try:
             # Probe-then-delete keeps an already-absent ref idempotent while
-            # still deleting a present-but-empty provider shell.
-            if backend.get(ref["uri"]) is None:
+            # still deleting a present-but-empty provider shell. Calls the
+            # backend directly (not read_secret_value), so it needs its own
+            # scheme normalization (#1761) rather than inheriting it.
+            if backend.get(normalize_secret_uri(ref["uri"])) is None:
                 return gql_success(absent)
             delete_secret_value(backend, ref["uri"])
         except Exception:  # noqa: BLE001 — provider errors can include sensitive response data

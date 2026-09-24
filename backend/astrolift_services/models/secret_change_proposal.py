@@ -4,7 +4,8 @@ SecretChangeProposal — quorum-gated secret writes (#488).
 Mirror of the deployment approval workflow (#410/#419/#420) for secret
 changes.  When ``RegisteredApp.requires_secret_approval`` is on, the
 secret-write mutations (``setAppSecret`` / ``deleteAppSecret`` /
-``attachSecretBundle`` / ``detachSecretBundle``) stop applying directly
+``attachSecretBundle`` / ``detachSecretBundle``, and a
+``setAppSecretMetadata`` that changes a scope) stop applying directly
 and instead create a proposal row that needs N approvers before the
 underlying op fires.
 
@@ -45,6 +46,7 @@ class SecretChangeProposal(BaseCoreModel):
         DELETE = "delete"
         ATTACH_BUNDLE = "attach_bundle"
         DETACH_BUNDLE = "detach_bundle"
+        SET_METADATA = "set_metadata"
 
     class Status(models.TextChoices):
         PENDING = "pending"
@@ -86,10 +88,12 @@ class SecretChangeProposal(BaseCoreModel):
     op = models.CharField(max_length=32, choices=Op.choices)
 
     # The proposed change.  Shape varies by ``op``:
-    # - set:           {"key": "API_KEY", "value": "..."}
+    # - set:           {"key": "API_KEY", "value": "...", "scope"?, "expires_at"?, "set_via"?}
     # - delete:        {"key": "API_KEY"}
     # - attach_bundle: {"bundle_slug": "...", "prefix": "..."}
     # - detach_bundle: {"attachment_id": "<guid>"}
+    # - set_metadata:  {"key": "API_KEY", "scope": "...", "expires_at"?, "set_via"?}
+    # set/delete gain "base_raw_digest" when applied (see secret_literals).
     payload = models.JSONField(default=dict, blank=True)
 
     # Pre-rendered diff for reviewers.  Built at propose time from the
