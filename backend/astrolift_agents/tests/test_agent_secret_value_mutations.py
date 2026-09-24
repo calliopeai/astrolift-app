@@ -1169,19 +1169,17 @@ def test_delete_leaves_a_location_another_live_bundle_still_holds(
     permission_resolver, info, org, with_tenant_org, fake_store
 ):
     """Two bundles stored on one location before backendRef was unique:
-    deleting one drops only its row, and the last one out deletes the store."""
+    deleting one drops only its row, and the last one out deletes the store.
+    Both carry the same spelling, so the in-memory store, which has no
+    driver's name mapping, sees the one location they share."""
     from astrolift_services.models import SecretBundle
 
     permission_resolver.grant(Permission.SECRET_WRITE)
     location = _bundle_ns(org, "shared")
     fake_store.store = {location: {"API_KEY": "k"}}
     spec = _spec(org)
-    holder = SecretBundle.objects.create(
-        organization=org, name="Holder", slug="holder", backend_ref=location
-    )
-    alias = SecretBundle.objects.create(
-        organization=org, name="Alias", slug="alias", backend_ref=f"astrolift/{location}"
-    )
+    holder = SecretBundle.objects.create(organization=org, name="Holder", slug="holder", backend_ref=location)
+    alias = SecretBundle.objects.create(organization=org, name="Alias", slug="alias", backend_ref=location)
 
     with with_tenant_org(org):
         dropped = AgentsMutation().delete_agent_secret_bundle(
