@@ -9,18 +9,33 @@
   - **Agent refs.** An env spec's `secretRefs`, `upsertAgentSecretRef`, a
     manifest's `[secrets]` table, the direct-upload importer and the
     `upsert_agent_environment_spec` command accept only a location under
-    `agents/<org guid>/`, `agent-bundles/<org guid>/` or `services/<org guid>/`.
-    An ARN is refused; use the relative form.
+    `agents/<org guid>/`. `secret://` is allowed and stripped once before the
+    check and the store, so `secret://agents/<org guid>/x` is the secret at
+    `agents/<org guid>/x`. An ARN is refused; use the relative form. A bundle
+    location and a managed-service secret are refused: attach the bundle or
+    the service instead.
   - **Bundles.** An agent bundle's `backendRef` must sit under
-    `agent-bundles/<org guid>/` and may not use `secret://`.
+    `agent-bundles/<org guid>/`, may not use `secret://`, and must not name a
+    location another live bundle of the org holds, in any spelling. Deleting
+    a bundle leaves a location another bundle still holds.
   - **Managed services.** Every secret ref a managed-service config names
     (`*_secret_ref`, `*_secret_arn`, the AWS-native `SecretArn` and
-    `DomainJoinServiceAccountSecret`, the existing-S3 `credential_bundle`) is
-    held to the same namespace. That applies at provision, update, manifest
-    persist and adopt, and again before a driver runs. A binding the driver
-    copied from the config is refused when it is synced, deployed, mounted,
-    granted to the app's role or injected into an agent. Refs the driver mints
-    itself keep resolving.
+    `DomainJoinServiceAccountSecret`, the existing-S3 `credential_bundle`)
+    must sit under `services/<org guid>/<owner guid>/`, where the owner is the
+    service's app, or its project for a project service, and may not use
+    `secret://`. Google Secret Manager references (Cloud Functions
+    `secret_environment` and `secret_volumes`, Managed Kafka Connect
+    `secret_paths`) must be in the install's project and carry the id the GCP
+    secrets driver gives that namespace. That applies at provision, update,
+    manifest persist and adopt, and again before a driver runs. A binding the
+    driver copied from the config is refused when it is synced, deployed,
+    mounted, granted to the app's role or injected into an agent. Refs the
+    driver mints itself keep resolving.
+  - **Cloud Functions identities.** A config's `service_account_email` or
+    `build_service_account` must be listed in the new install policy
+    `cloud_functions_allowed_service_accounts`. Empty, the default, refuses
+    every one; omitting the field still runs the function as Google's default
+    runtime account.
   - **Value mutations.** `setAgentSecretValue`, `deleteAgentSecretValue` and
     `revealAgentSecretValue` act only on refs typed on the spec. An env var
     that comes from a managed-service binding is refused as managed by the
