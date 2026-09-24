@@ -126,6 +126,23 @@ def current_secret_scope(app, key: str, environment_name: str = "") -> str:
     return scope_in_force(scopes.get(environment_name), scopes.get(""))
 
 
+def environment_scopes(app, key: str) -> dict[str, str]:
+    """The per-environment rows of ``key`` that carry a scope of their own,
+    by environment name. A change to the app-wide scope does not reach
+    them."""
+    return dict(
+        AppSecretMetadata.objects.filter(
+            registered_app=app,
+            key=key,
+            deleted_at__isnull=True,
+            scope__isnull=False,
+        )
+        .exclude(environment_name="")
+        .order_by("environment_name")
+        .values_list("environment_name", "scope")
+    )
+
+
 def retire_app_secret_metadata(app, key: str, *, actor=None) -> None:
     """Soft-delete every metadata row for ``key``, so a later re-add
     doesn't inherit a stale expiry, source or scope."""

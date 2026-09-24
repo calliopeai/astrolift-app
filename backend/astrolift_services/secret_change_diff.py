@@ -33,7 +33,7 @@ from typing import Any
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import AppSecretBundleRef, SecretChangeProposal
-from astrolift_services.secret_metadata_ops import current_secret_scope
+from astrolift_services.secret_metadata_ops import current_secret_scope, environment_scopes
 
 
 def _mask(value: str) -> str:
@@ -44,6 +44,21 @@ def _mask(value: str) -> str:
     if len(value) <= 4:
         return "***"
     return f"{value[:3]}***{value[-1]}"
+
+
+def _kept_scopes(app: RegisteredApp, key: str, before_scope: str, after_scope: str) -> tuple[str, str]:
+    """For an app-wide scope change, the environments it does not reach:
+    per-environment rows with a scope of their own that differs from the
+    new one. Returned as the diff's ``overrides`` entry and a summary
+    suffix, both empty when there are none. Without them, approving
+    "production only" reads as covering every environment (#1758)."""
+    if after_scope == before_scope:
+        return "", ""
+    kept = {env: scope for env, scope in environment_scopes(app, key).items() if scope != after_scope}
+    return (
+        ", ".join(f"{env} ({scope})" for env, scope in kept.items()),
+        "".join(f"; {env} keeps {scope}" for env, scope in kept.items()),
+    )
 
 
 def build_diff(
@@ -73,6 +88,15 @@ def build_diff(
         summary = f"Update {key} in {env_display}" if key in literals else f"Add {key} in {env_display}"
         if after_scope != before_scope:
             summary += f", scope {before_scope} to {after_scope}"
+        overrides, kept_summary = _kept_scopes(app, key, before_scope, after_scope)
+        after: dict[str, Any] = {
+            "key": key,
+            "value_masked": _mask(new_value),
+            "present": True,
+            "scope": after_scope,
+        }
+        if overrides:
+            after["overrides"] = overrides
         return {
             "op": op,
             "before": {
@@ -81,13 +105,8 @@ def build_diff(
                 "present": key in literals,
                 "scope": before_scope,
             },
-            "after": {
-                "key": key,
-                "value_masked": _mask(new_value),
-                "present": True,
-                "scope": after_scope,
-            },
-            "summary": summary,
+            "after": after,
+            "summary": summary + kept_summary,
         }
 
     if op == SecretChangeProposal.Op.DELETE.value:
@@ -112,11 +131,18 @@ def build_diff(
         key = payload.get("key") or ""
         before_scope = current_secret_scope(app, key, environment_name)
         after_scope = payload.get("scope") or before_scope
+        summary = f"Change scope of {key} in {env_display} from {before_scope} to {after_scope}"
+        after = {"key": key, "scope": after_scope}
+        if not environment_name:
+            overrides, kept_summary = _kept_scopes(app, key, before_scope, after_scope)
+            if overrides:
+                after["overrides"] = overrides
+            summary += kept_summary
         return {
             "op": op,
             "before": {"key": key, "scope": before_scope},
-            "after": {"key": key, "scope": after_scope},
-            "summary": f"Change scope of {key} in {env_display} from {before_scope} to {after_scope}",
+            "after": after,
+            "summary": summary,
         }
 
     if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:

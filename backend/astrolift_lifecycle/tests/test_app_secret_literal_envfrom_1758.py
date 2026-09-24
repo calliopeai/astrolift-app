@@ -1083,3 +1083,33 @@ def test_set_metadata_refuses_an_environment_the_app_does_not_have(approver_gran
         assert result.ok is False, name
         assert (result.errors[0].code, result.errors[0].field) == ("NOT_FOUND", "environmentName"), name
     assert not AppSecretMetadata.objects.filter(key="K").exists()
+
+
+def test_an_app_wide_scope_proposal_lists_the_environments_that_keep_their_own_scope(
+    approver_grants, app, env
+):
+    """A per-environment row with a scope of its own is not reached by an
+    app-wide change, so the approver must see it next to the new scope."""
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    running = PreviewEnvironment.Status.RUNNING
+    pinned = _preview_environment(app, env, name="preview-pinned", status=running, branch="feat-a")
+    follows = _preview_environment(app, env, name="preview-follows", status=running, branch="feat-b")
+    matches = _preview_environment(app, env, name="preview-matches", status=running, branch="feat-c")
+    assert _set_scope(app, "K", environment_name=pinned.name, scope="all").ok
+    assert _set_scope(app, "K", environment_name=follows.name, set_via="cli").ok
+    assert _set_scope(app, "K", environment_name=matches.name, scope="production").ok
+    _require_secret_approval(app)
+
+    by_metadata = _set_scope(app, "K", scope="production")
+    by_rotation = _propose(
+        app,
+        lambda info: ServicesMutation().rotate_app_secret(
+            info, input=RotateAppSecretInput(app_slug=app.slug, key="K", value="rotated", scope="production")
+        ),
+    )
+
+    for proposal_id in (str(by_metadata.data.pending_proposal_id), by_rotation):
+        diff = SecretChangeProposal.objects.get(guid=proposal_id).payload_diff
+        assert (diff["before"]["scope"], diff["after"]["scope"]) == ("all", "production")
+        assert diff["after"]["overrides"] == "preview-pinned (all)"
+        assert diff["summary"].endswith("; preview-pinned keeps all")
