@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Cluster and deployment history no longer shows one org another org's rows.
+  `astroliftClusterLifecycleAudit` returns only mutations run in the caller's
+  org, and matches the cluster by whole value instead of by a substring of the
+  variables. `MutationAuditLog` now records the org; rows written before this
+  change appear in no tenant's timeline (superusers still read them through
+  `auditLogs`). `bootstrapRuns` / `lastBootstrapRun` return only the runs the
+  caller's org recorded; legacy runs on an org-owned cluster take that
+  cluster's org. `astroliftDeploymentApprovalHistory` and `approvedBy` ignore
+  audit rows another org wrote against the deployment (#1955).
+
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the
   platform operator (an active superuser), the only caller they admitted in

@@ -546,11 +546,15 @@ def _resolve_quorum_lists(
     app = deployment.registered_app
     deployment_guid = str(deployment.guid)
 
+    # Held to the deployment's org (#1955): another org's refused approve
+    # on this guid still writes an audit row targeting it, and its actor
+    # would be listed here by name and email.
     approved_events = list(
         AuditEvent.objects.filter(
             action__in=("deployment.approve", "deployment.approve_by_token"),
             target_id=deployment_guid,
             actor_kind="user",
+            organization_id=app.organization_id,
         )
         .exclude(actor_id="")
         .order_by("occurred_at")

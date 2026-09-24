@@ -13,6 +13,8 @@ from django.conf import settings
 from django.db import models
 from strawberry.extensions import SchemaExtension
 
+from core.tenancy import get_current_tenant
+
 logger = logging.getLogger(__name__)
 
 SENSITIVE_KEYS = {"password", "pin", "token", "secret", "ssn", "credit_card", "secure"}
@@ -58,6 +60,17 @@ class MutationAuditLog(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mutation_audit_logs",
+    )
+    # The org whose session ran the mutation. Tenant-facing readers must
+    # filter on it: the variables alone cannot say whose row it is (#1955).
+    # NULL for rows written without a tenant, including every row written
+    # before the column existed; no tenant view shows those.
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -137,8 +150,10 @@ class MutationAuditExtension(SchemaExtension):
                 secret_operation=_is_secret_operation(operation_name),
             )
 
+            tenant = get_current_tenant()
             MutationAuditLog.objects.create(
                 user=user,
+                organization_id=tenant.organization_id if tenant else None,
                 operation=operation_name,
                 variables=variables,
                 success=not has_errors,

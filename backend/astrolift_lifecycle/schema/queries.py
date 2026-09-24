@@ -904,7 +904,11 @@ class LifecycleQuery:
 
         Tenant scoping rides on the deployment lookup — a request for
         a sibling-org deployment returns an empty list rather than
-        leaking row counts.
+        leaking row counts. The audit rows are also held to the caller's
+        org (#1955): ``@mutation_audit`` records the target from the
+        input before the resolver's org check runs, so another org's
+        refused ``approveDeployment`` on this guid writes a row with this
+        ``target_id`` in that org.
         """
         from django.db.models import Q
 
@@ -926,7 +930,7 @@ class LifecycleQuery:
 
         deployment_guid = str(deployment.guid)
         events = (
-            AuditEvent.objects.filter(action__in=_APPROVAL_LIFECYCLE_ACTIONS)
+            AuditEvent.objects.filter(action__in=_APPROVAL_LIFECYCLE_ACTIONS, organization_id=org_id)
             .filter(
                 Q(target_id=deployment_guid) | Q(data__deployment_id=deployment_guid),
             )

@@ -84,11 +84,15 @@ class TenantClusterType:
 
         # Re-scope by caller org (#1183). This field inherits the parent
         # cluster's scoping, but a leaked parent must not widen access to
-        # another org's bootstrap history. Not @tenant_scoped, so a None
-        # tenant collapses org_id to None and matches only platform-shared
-        # rows — never another tenant's.
+        # another org's bootstrap history. The runs are held to the caller's
+        # org too (#1955): a shared cluster resolves for every org, and any
+        # of them can record a run on it. Not @tenant_scoped, so a None
+        # tenant fails closed here; the union and the NULL-org rows would
+        # otherwise both match.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
         cluster = TenantCluster.objects.filter(
             Q(organization_id=org_id) | Q(organization_id__isnull=True),
             guid=str(self.id),
@@ -96,7 +100,7 @@ class TenantClusterType:
         if cluster is None:
             return None
         run = (
-            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster)
+            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster, organization_id=org_id)
             .select_related("triggered_by")
             .order_by("-ended_at")
             .first()
@@ -119,9 +123,11 @@ class TenantClusterType:
         from core.tenancy import get_current_tenant
 
         capped = max(1, min(int(limit or 10), 100))
-        # Re-scope by caller org (#1183) — see last_bootstrap_run.
+        # Re-scope by caller org (#1183, #1955) — see last_bootstrap_run.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
         cluster = TenantCluster.objects.filter(
             Q(organization_id=org_id) | Q(organization_id__isnull=True),
             guid=str(self.id),
@@ -129,7 +135,7 @@ class TenantClusterType:
         if cluster is None:
             return []
         qs = (
-            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster)
+            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster, organization_id=org_id)
             .select_related("triggered_by")
             .order_by("-ended_at")[:capped]
         )
