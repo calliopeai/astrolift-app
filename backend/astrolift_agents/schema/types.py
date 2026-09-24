@@ -256,6 +256,7 @@ class AgentEnvironmentSpecType:
     managed_model: bool
     run_as_non_root: bool
     box_workspace: bool
+    model_gateway: bool
     secret_refs: JSON
     env_vars: JSON
     config_repo: str
@@ -305,8 +306,9 @@ class AgentBoxType:
     # whom cannot answer "can I destroy this one". Empty for a box ensured by
     # an API token, which has no human owner and is shared org-wide.
     owner_email: str
-    # Non-empty only on a box that failed to start or whose teardown did not
-    # complete; it is the sentence an operator needs, not a stack trace.
+    # Non-empty only on a box that failed to start, whose teardown did not
+    # complete, or whose gateway key cannot be renewed past Zentinelle's key
+    # lifetime (#1851); it is the sentence an operator needs, not a stack trace.
     last_error: str
     created_at: dt.datetime
     started_at: dt.datetime | None
@@ -1081,6 +1083,7 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         managed_model=s.managed_model,
         run_as_non_root=s.run_as_non_root,
         box_workspace=s.box_workspace,
+        model_gateway=s.model_gateway,
         secret_refs=s.secret_refs or [],
         env_vars=s.env_vars or {},
         config_repo=s.config_repo or "",

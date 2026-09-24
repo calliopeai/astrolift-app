@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from strawberry.types import Info
 
 from core.models import PinTransaction, Profile, SignRequest, UserSwitchGroup
+from core.permissions import is_platform_operator
 from core.schema.common import permission_filtered_queryset
 from core.schema.dataloaders import (
     batch_load_first_names,
@@ -77,7 +78,8 @@ class UserSwitchType:
 
 
 # ---------------------------------------------------------------------------
-# ProfileType — heavy permission checks on every field
+# ProfileType: personal fields only the platform operator sees (#1864; they
+# checked Django field permissions, which Astrolift never grants)
 # ---------------------------------------------------------------------------
 
 @strawberry_django.type(Profile)
@@ -92,25 +94,19 @@ class ProfileType:
 
     @strawberry_django.field(description="Direct reference to User.email.")
     def email(self, info: Info) -> Optional[str]:
-        if Profile.p('email').view.by(info.context.user):
+        if is_platform_operator(info.context.user):
             return self.user.email
         return None
 
     @strawberry_django.field
     def first_name(self, info: Info) -> Optional[str]:
-        if info.context.check_permission(
-            f"Profile.p('first_name').view.by({info.context.user.id})",
-            lambda: Profile.p('first_name').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             return self.first_name
         return None
 
     @strawberry_django.field
     def last_name(self, info: Info) -> Optional[str]:
-        if info.context.check_permission(
-            f"Profile.p('last_name').view.by({info.context.user.id})",
-            lambda: Profile.p('last_name').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             return self.last_name
         return None
 
@@ -124,10 +120,7 @@ class ProfileType:
 
     @strawberry_django.field
     async def avatar(self, info: Info) -> Optional[UploadType]:
-        if info.context.check_permission(
-            f"Profile.p('avatar').view.by({info.context.user.id})",
-            lambda: Profile.p('avatar').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             if self.avatar_id:
                 loader = info.context.get_loader('load_upload_by_id', batch_load_uploads)
                 return await loader.load(self.avatar_id)
@@ -135,10 +128,7 @@ class ProfileType:
 
     @strawberry_django.field
     async def signature(self, info: Info) -> Optional[UploadType]:
-        if info.context.check_permission(
-            f"Profile.p('signature').view.by({info.context.user.id})",
-            lambda: Profile.p('signature').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             if self.signature_id:
                 loader = info.context.get_loader('load_upload_by_id', batch_load_uploads)
                 return await loader.load(self.signature_id)
@@ -160,20 +150,14 @@ class UserType:
 
     @strawberry_django.field
     async def first_name(self, info: Info) -> str:
-        if info.context.check_permission(
-            f"Profile.p('first_name').view.by({info.context.user.id})",
-            lambda: Profile.p('first_name').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             loader = info.context.get_loader('load_first_names', batch_load_first_names)
             return await loader.load(self.id)
         return ''
 
     @strawberry_django.field
     async def last_name(self, info: Info) -> str:
-        if info.context.check_permission(
-            f"Profile.p('last_name').view.by({info.context.user.id})",
-            lambda: Profile.p('last_name').view.by(info.context.user),
-        ):
+        if is_platform_operator(info.context.user):
             loader = info.context.get_loader('load_last_names', batch_load_last_names)
             return await loader.load(self.id)
         return ''

@@ -1,14 +1,13 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 
 import pytz
 from core.utils import cached_classproperty
-from core.utils.performance import cache_class_method
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -27,44 +26,36 @@ class QueryOperator(Enum):
 
 
 class ModelPermissionsMixin:
+    """Access hooks the boilerworks scaffold hangs off every legacy model.
 
-    @classmethod
-    @cache_class_method(timeout=timedelta(minutes=1))
-    def model_permissions(cls):
-        from config.permissions import ModelPermissions
-        return ModelPermissions(model=cls)
-
-    @classmethod
-    def p(cls, element: str):
-        return cls.model_permissions()[element]
+    They used to consult Django model permissions (``config.roles_gen``),
+    which Astrolift never grants, so the only caller they admitted was a
+    superuser. They now ask ``core.permissions`` instead of a second
+    permission system (#1864). The class keeps its name because historical
+    migrations list it in ``bases``.
+    """
 
     @classmethod
     def get_queryset(cls, queryset: QuerySet, user: settings.AUTH_USER_MODEL) -> QuerySet:
-        """
-        Filter queryset by user permissions
-        """
-        # Superusers bypass all permission checks
-        if user and user.is_authenticated and user.is_superuser:
-            return queryset
+        from core.permissions import require_platform_operator
 
-        if cls.p('model').view:
-            cls.p('model').view.check(user)
-        else:
-            from core_logs.models import PermissionAccessLog
-            PermissionAccessLog.log_denied(user,
-                                           msg=f'Indirect error. Model {cls.p("model")} has no view permission. '
-                                               f'This also happens if permissions object P has not been updated.')
-            raise PermissionError(f'User {user} has no view permission for {cls.p("model")}')
-
+        require_platform_operator(user)
         return queryset
 
+    # For models the retired catalogue had no permission for, ``can_add`` and
+    # ``can_change`` checked nothing and admitted everyone. They refuse
+    # everyone but the operator now, which is stricter on purpose.
     @classmethod
     def can_add(cls, user: settings.AUTH_USER_MODEL):
-        cls.p('model').add and cls.p('model').add.check(user)
+        from core.permissions import require_platform_operator
+
+        require_platform_operator(user)
 
     @classmethod
     def can_change(cls, user: settings.AUTH_USER_MODEL):
-        cls.p('model').change and cls.p('model').change.check(user)
+        from core.permissions import require_platform_operator
+
+        require_platform_operator(user)
 
     @property
     def global_id(self):
@@ -72,11 +63,28 @@ class ModelPermissionsMixin:
         return to_base64(type_name, self.pk)
 
     def delete_check(self, info, *args, **kwargs):
-        """
-        Check if user has permission to delete the object and delete it if so.
-        """
-        self.model_permissions()['model'].delete.check(info.context.user)
+        from core.permissions import require_platform_operator
+
+        require_platform_operator(info.context.user)
+        if self._meta.label_lower not in GENERIC_DELETE_MODELS:
+            raise PermissionDenied(f'{type(self).__name__} cannot be deleted through the generic delete.')
         self.delete(*args, **kwargs)
+
+
+# The only models the generic ``delete(gid)`` mutation ever deleted.
+# ``config.roles_gen`` carried a delete permission for these seven. On
+# every other model, ``delete_check`` hit a permission that did not exist
+# and raised for everyone, superusers included. Refusing the rest keeps
+# the operator from hard-deleting rows the hook never reached (#1864).
+GENERIC_DELETE_MODELS = frozenset({
+    'core.address',
+    'core.application',
+    'core.fileupload',
+    'core.link',
+    'core.notification',
+    'core.profile',
+    'organization.organization',
+})
 
 
 class Tracking(ModelPermissionsMixin, models.Model):

@@ -165,12 +165,9 @@ class Command(BaseCommand):
             return {"error": str(e)}
 
     def _get_permissions(self):
-        try:
-            from config.roles_gen import P
+        from core.permissions import Permission
 
-            return [{"name": p.name, "value": p.value} for p in P]
-        except Exception:
-            return []
+        return [{"name": p.name, "value": p.value} for p in Permission]
 
     def _get_apps(self):
         platform_apps = []

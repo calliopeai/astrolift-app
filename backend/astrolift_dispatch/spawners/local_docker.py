@@ -30,6 +30,17 @@ class LocalDockerSpawner(ContainerSpawner):
 
         workload = task.agent_definition
         spec = getattr(task, "environment_spec", None)
+        if getattr(spec, "model_gateway", False):
+            # The gateway runs in a cluster (#1851); running without it here
+            # would be the silent fallback gateway mode exists to prevent.
+            return SpawnResult(
+                external_id="",
+                ok=False,
+                error=(
+                    f"environment spec {spec.slug} sends its model traffic through the Zentinelle gateway, "
+                    "which runs in Kubernetes clusters; local Docker dispatch cannot use it"
+                ),
+            )
         # Honour the runtime catalog / explicit image_tag precedence, same as
         # the K8s spawner; fall back to ubuntu only when nothing resolves.
         image = _resolve_base_image(workload, spec) if (workload or spec) else "ubuntu:22.04"

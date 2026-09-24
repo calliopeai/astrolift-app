@@ -6,9 +6,8 @@ import uuid
 from datetime import timedelta
 from enum import Enum
 from functools import lru_cache
-from typing import List, Optional, Tuple
+from typing import List, NoReturn, Optional, Tuple
 
-from config.roles_gen import P
 from constance import config
 from core.middleware.current_user import get_current_user
 from core.models import GlobalIDLink, RequiresApproveMixin, Tracking
@@ -19,10 +18,11 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
-from django.db.models import Model, Q, QuerySet
+from django.db.models import Model, QuerySet
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -130,7 +130,10 @@ class PinTransaction(models.Model):
     @classmethod
     def add_transaction(cls, user, kind, proxy_user=None, data=None):
         if proxy_user and kind == PinTransactionKindChoices.AUTHENTICATED:
-            P.PINTRANSACTION_ADD_TRANSACTION_USING_PROXY_USER_PIN.check(user)
+            # The Django permission this checked was never generated, so the
+            # check raised AttributeError for everyone, superusers included.
+            # Refusing keeps that outcome without a second permission system (#1864).
+            raise PermissionDenied('Authenticating with another user\'s PIN is not permitted.')
 
         active = cls.objects.active_authentication(user)
         if active:
@@ -195,6 +198,14 @@ class SignRequestMixin:
     def on_reset_sign_request(self) -> 'SignRequest':
         """This called after the sign request is reset"""
         return None  # type: ignore[return-value]
+
+
+def _refuse_sign_requests() -> NoReturn:
+    """Every sign-request action checked a Django permission that was never
+    generated, so each one raised AttributeError for everyone. They refuse
+    explicitly now that Django permissions no longer authorize app code (#1864).
+    """
+    raise PermissionDenied('Sign requests are not available.')
 
 
 class SignRequest(Tracking):
@@ -292,23 +303,13 @@ class SignRequest(Tracking):
         return self.status == SignRequestStatusChoices.SIGNED
 
     def users_allowed_to_sign(self) -> QuerySet[User]:
-        instance = self.global_id_link.get_instance()
-        if not instance:
-            return settings.AUTH_USER_MODEL.objects.none()
-
-        users = instance.users_allowed_to_sign() if isinstance(instance, SignRequestMixin) else self.sign_requested
-        query_criteria: Q = Q(groups__permissions__in=[P.SIGNREQUEST_CHANGE_SIGN.perm()])
-        if not instance.author_can_sign():
-            query_criteria &= ~Q(pk=self.user.id)
-        return users.filter(
-            query_criteria
-        ).distinct()
+        _refuse_sign_requests()
 
     def request_user(self, user: User, should_notify: bool = True) -> 'SignRequest':
         """
         Request the sign from the user
         """
-        P.SIGNREQUEST_CHANGE_SIGN.check(user)
+        _refuse_sign_requests()
         self.global_id_link.get_instance().on_request_sign(user)
 
         (
@@ -341,7 +342,7 @@ class SignRequest(Tracking):
         self.global_id_link.get_instance().on_request_sign_change(previous_status, status)
 
     def sign(self, user: User):
-        P.SIGNREQUEST_CHANGE_SIGN.check(user)
+        _refuse_sign_requests()
         self.global_id_link.get_instance().on_sign(user)
 
         from core.models import PinTransaction
@@ -376,7 +377,7 @@ class SignRequest(Tracking):
         return self
 
     def cancel(self, user, note=None):
-        P.SIGNREQUEST_CHANGE_CANCEL.check(user)
+        _refuse_sign_requests()
 
         self.cancel_by = user
         self.cancel_at = timezone.now()
@@ -399,7 +400,7 @@ class SignRequest(Tracking):
             pass
 
     def reset_sign_request(self, user: User) -> 'SignRequest':
-        P.SIGNREQUEST_CHANGE_SIGN.check(user)
+        _refuse_sign_requests()
         return self.global_id_link.get_instance().on_reset_sign_request()
 
 
