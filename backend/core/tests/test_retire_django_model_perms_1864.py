@@ -70,8 +70,12 @@ _SKIP_PARTS = {"providers", "vendor", "migrations", "node_modules", "__pycache__
 
 # The Django admin authorizes on Django permissions by design; that is the
 # one place the issue keeps them. ``core/views.py`` holds the admin's
-# group-and-permission tooling (linked from admin actions).
-_ADMIN_FILES = {pathlib.Path("core/views.py")}
+# group-and-permission tooling (linked from admin actions) AND
+# ``download_file``, an unrelated streaming-export view -- exempting the
+# whole file would leave that one unguarded if an offence ever landed
+# there (#1949). Only ``admin_tooling`` itself (the gate) and the views it
+# decorates are exempt; see ``_admin_tooling_exempt_names``.
+_ADMIN_TOOLING_FILE = pathlib.Path("core/views.py")
 
 _RETIRED_MODULES = {"config.roles_gen", "config.permissions"}
 _RETIRED_NAMES = {"AbstractPermissions", "FieldRestrictedSerializer", "ModelPermissions", "FieldPermissions"}
@@ -83,6 +87,68 @@ _DJANGO_PERMISSION_CALLS = {
     "get_group_permissions",
     "get_user_permissions",
 }
+# Django ORM lookups that traverse to a permission relation. Prefixes, not
+# exact names: real code spells them ``user_permissions__codename``,
+# ``groups__permissions__x``, etc. (#1949).
+_PERMISSION_LOOKUP_PREFIXES = ("user_permissions__", "groups__permissions")
+_RETIRED_IMPORT_NAMES = {
+    "django.contrib.auth.decorators": {"permission_required"},
+    "django.contrib.auth.mixins": {"PermissionRequiredMixin"},
+}
+_RETIRED_IMPORT_MODULES = ("rest_framework.permissions", "rolepermissions")
+
+
+def _matches_retired_import_module(module: str) -> bool:
+    return any(module == m or module.startswith(f"{m}.") for m in _RETIRED_IMPORT_MODULES)
+
+
+def _admin_tooling_exempt_names(tree: ast.AST) -> frozenset[str]:
+    """``core/views.py`` functions allowed to hold the admin's own Django
+    permission checks: ``admin_tooling`` (the gate itself) and whatever it
+    decorates. Derived from the decorator, not hand-copied, so a new
+    ``@admin_tooling`` view is exempt automatically and anything else --
+    ``download_file`` included -- is scanned like any other function (#1949).
+    """
+
+    exempt = {"admin_tooling"}
+    for node in ast.iter_child_nodes(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for dec in node.decorator_list:
+            target = dec.func if isinstance(dec, ast.Call) else dec
+            if isinstance(target, ast.Name) and target.id == "admin_tooling":
+                exempt.add(node.name)
+    return frozenset(exempt)
+
+
+def _walk_skipping(tree: ast.AST, exempt_functions: frozenset[str]):
+    """Like ``ast.walk``, but does not descend into a ``def`` named in
+    ``exempt_functions`` -- the guardrail must not see inside it."""
+
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in exempt_functions:
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _is_groups_permission_filter(call: ast.Call) -> bool:
+    """``<expr>.groups.filter(permissions=...)`` / ``.exclude`` / ``.get`` --
+    Django's ``Group.permissions`` read straight through a ``.groups``
+    relation. One hop is unambiguous and needs no bare ``permissions=``
+    keyword match: that also matches Astrolift's own ``Role.permissions``
+    and every ``Permission`` tuple/dataclass field of the same name,
+    dozens of times over, across the codebase (#1949)."""
+
+    func = call.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr in {"filter", "exclude", "get"}
+        and isinstance(func.value, ast.Attribute)
+        and func.value.attr == "groups"
+    )
 
 
 def _app_sources():
@@ -90,40 +156,69 @@ def _app_sources():
         rel = path.relative_to(BACKEND)
         if _SKIP_PARTS & set(rel.parts) or "tests" in rel.parts or rel.name.startswith("test_"):
             continue
-        if rel.name == "admin.py" or rel in _ADMIN_FILES:
+        if rel.name == "admin.py":
             continue
         yield rel, path
 
 
-def _offences(tree: ast.AST) -> list[str]:
+def _offences(tree: ast.AST, *, exempt_functions: frozenset[str] = frozenset()) -> list[str]:
     found = []
-    for node in ast.walk(tree):
+    for node in _walk_skipping(tree, exempt_functions):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
+            names = {a.name for a in node.names}
             if node.level and module == "roles_gen":
                 found.append("imports roles_gen")
             if module in _RETIRED_MODULES:
                 found.append(f"imports {module}")
-            if module == "config" and {a.name for a in node.names} & {"roles_gen", "permissions"}:
+            if module == "config" and names & {"roles_gen", "permissions"}:
                 found.append("imports config.roles_gen / config.permissions")
+            if module in _RETIRED_IMPORT_NAMES:
+                hit = names & _RETIRED_IMPORT_NAMES[module]
+                if hit:
+                    found.append(f"imports {sorted(hit)[0]} from {module}")
+            if _matches_retired_import_module(module):
+                found.append(f"imports {module}")
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name in _RETIRED_MODULES:
                     found.append(f"imports {alias.name}")
+                if _matches_retired_import_module(alias.name):
+                    found.append(f"imports {alias.name}")
         elif isinstance(node, ast.Name) and node.id in _RETIRED_NAMES:
             found.append(f"uses {node.id}")
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            if node.func.attr in _DJANGO_PERMISSION_CALLS:
-                found.append(f"calls .{node.func.attr}()")
-        elif isinstance(node, ast.keyword) and node.arg and node.arg.startswith("groups__permissions"):
+        elif isinstance(node, ast.Attribute):
+            # Any reference, not just a call: `f = user.has_perm` hands out
+            # the same authority as `user.has_perm(...)` (#1949).
+            if node.attr in _DJANGO_PERMISSION_CALLS or node.attr in _RETIRED_NAMES:
+                found.append(f"references .{node.attr}")
+        elif isinstance(node, ast.Call) and _is_groups_permission_filter(node):
+            for kw in node.keywords:
+                if kw.arg and (kw.arg == "permissions" or kw.arg.startswith("permissions__")):
+                    found.append(f"filters .groups.{node.func.attr}(...) on {kw.arg}")
+        elif isinstance(node, ast.keyword) and node.arg and node.arg.startswith(_PERMISSION_LOOKUP_PREFIXES):
             found.append(f"filters on {node.arg}")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            # Dynamic dispatch spells the same name as a plain string:
+            # `getattr(user, 'has_perm')`, `importlib.import_module('config.roles_gen')`,
+            # and a lookup key built via `**{...}` or `Q((...))` rather than
+            # a keyword argument (#1949).
+            value = node.value
+            if value in _DJANGO_PERMISSION_CALLS:
+                found.append(f"string constant names .{value}")
+            if value in _RETIRED_MODULES:
+                found.append(f"string constant names {value}")
+            if any(prefix in value for prefix in _PERMISSION_LOOKUP_PREFIXES):
+                found.append(f"string constant references {value}")
     return found
 
 
 def test_no_app_module_authorizes_on_django_model_permissions():
     offenders = {}
     for rel, path in _app_sources():
-        found = _offences(ast.parse(path.read_text(), filename=str(rel)))
+        tree = ast.parse(path.read_text(), filename=str(rel))
+        exempt = _admin_tooling_exempt_names(tree) if rel == _ADMIN_TOOLING_FILE else frozenset()
+        found = _offences(tree, exempt_functions=exempt)
         if found:
             offenders[str(rel)] = sorted(set(found))
     assert offenders == {}, (
@@ -139,17 +234,119 @@ def test_the_retired_modules_are_gone():
 
 
 def test_the_guardrail_sees_an_offence():
-    """A scan that reads the wrong thing would pass forever; prove it bites."""
-    sample = ast.parse(
-        "from config.roles_gen import P\n"
-        "def f(user):\n"
-        "    return user.has_perm('app.x') or User.objects.filter(groups__permissions__codename='x')\n"
+    """A scan that reads the wrong thing would pass forever; prove it bites
+    on the original shape and on every one #1949's review added -- a bound
+    reference, dynamic dispatch through a plain string, the ``**{...}`` /
+    ``Q(())`` string-keyed lookup forms, a direct
+    ``.groups.filter(permissions=...)``, and the newly retired imports --
+    each on its own line so a broken probe names exactly what regressed.
+    The last two entries are negative: the same shapes real RBAC code uses
+    legitimately (a bare ``permissions=`` keyword, ``login_required``) must
+    not trip the guardrail, per #1949's own false-positive sweep.
+    """
+    probes = {
+        "call": (
+            "def f(user):\n"
+            "    return user.has_perm('app.x') or User.objects.filter(groups__permissions__codename='x')\n",
+            ["references .has_perm", "filters on groups__permissions__codename"],
+        ),
+        "import": ("from config.roles_gen import P\n", ["imports config.roles_gen"]),
+        "bound reference": ("f = user.has_perm\n", ["references .has_perm"]),
+        "getattr dynamic dispatch": (
+            "dyn = getattr(user, 'has_perm')\n",
+            ["string constant names .has_perm"],
+        ),
+        "dynamic module import": (
+            "mod = importlib.import_module('config.roles_gen')\n",
+            ["string constant names config.roles_gen"],
+        ),
+        "qualified retired name": (
+            "cls = s.FieldRestrictedSerializer\n",
+            ["references .FieldRestrictedSerializer"],
+        ),
+        "user_permissions__ keyword": (
+            "User.objects.filter(user_permissions__codename='x')\n",
+            ["filters on user_permissions__codename"],
+        ),
+        "dict-splat lookup key": (
+            "User.objects.filter(**{'groups__permissions__x': 1})\n",
+            ["string constant references groups__permissions__x"],
+        ),
+        "Q-tuple lookup key": (
+            "User.objects.filter(Q(('groups__permissions__x', 1)))\n",
+            ["string constant references groups__permissions__x"],
+        ),
+        "groups.filter(permissions=)": (
+            "user.groups.filter(permissions=p)\n",
+            ["filters .groups.filter(...) on permissions"],
+        ),
+        "groups.exclude(permissions=)": (
+            "user.groups.exclude(permissions=p)\n",
+            ["filters .groups.exclude(...) on permissions"],
+        ),
+        "permission_required import": (
+            "from django.contrib.auth.decorators import permission_required\n",
+            ["imports permission_required from django.contrib.auth.decorators"],
+        ),
+        "PermissionRequiredMixin import": (
+            "from django.contrib.auth.mixins import PermissionRequiredMixin\n",
+            ["imports PermissionRequiredMixin from django.contrib.auth.mixins"],
+        ),
+        "rest_framework.permissions import": (
+            "from rest_framework.permissions import IsAuthenticated\n",
+            ["imports rest_framework.permissions"],
+        ),
+        "rolepermissions import": ("import rolepermissions\n", ["imports rolepermissions"]),
+        "unrelated permissions= keyword": ("Role.objects.create(permissions=[1, 2])\n", []),
+        "unrelated login_required import": (
+            "from django.contrib.auth.decorators import login_required\n",
+            [],
+        ),
+    }
+    for label, (source, expected) in probes.items():
+        assert sorted(_offences(ast.parse(source))) == sorted(expected), label
+
+
+def test_core_views_exemption_covers_only_admin_tooling_views():
+    """#1949: exempting the whole file would leave ``download_file`` --
+    an unrelated streaming-export view with no Django permission logic of
+    its own -- unguarded if an offence were ever added there. Only
+    ``admin_tooling`` and the views it decorates are exempt."""
+    path = BACKEND / _ADMIN_TOOLING_FILE
+    source = path.read_text()
+    tree = ast.parse(source, filename=str(_ADMIN_TOOLING_FILE))
+    exempt = _admin_tooling_exempt_names(tree)
+
+    assert "download_file" not in exempt
+    assert exempt == {
+        "admin_tooling",
+        "user_permissions_tree",
+        "compare_user_permissions",
+        "search_users",
+        "compare_user_permissions_data",
+        "search_groups",
+        "toggle_group_membership",
+        "compare_group_permissions_data",
+        "toggle_permission_in_group",
+    }
+
+    # The file passes the guardrail with the exemption applied (also
+    # exercised end to end via `test_no_app_module_authorizes_...` above)...
+    assert _offences(tree, exempt_functions=exempt) == []
+
+    # ...but an offence added to the one function the exemption does not
+    # cover is still caught, proving the narrowing is real and not just
+    # theoretical.
+    injected = ast.parse(
+        source.replace(
+            "def download_file(request):\n",
+            "def download_file(request):\n    request.user.has_perm('x')\n",
+            1,
+        ),
+        filename=str(_ADMIN_TOOLING_FILE),
     )
-    assert sorted(_offences(sample)) == [
-        "calls .has_perm()",
-        "filters on groups__permissions__codename",
-        "imports config.roles_gen",
-    ]
+    injected_exempt = _admin_tooling_exempt_names(injected)
+    assert _offences(injected, exempt_functions=injected_exempt) == ["references .has_perm"]
 
 
 # ---------------------------------------------------------------------------
