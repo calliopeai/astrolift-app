@@ -1,12 +1,40 @@
 """
-System role catalog.
+System role catalog: the stock roles every install carries (#1864).
 
-These roles ship with the platform and are upserted by a one-shot
-data migration on every deploy. They cannot be edited (``is_system=True``)
-and are scoped per-level so the role chooser in the UI can filter to
-the level the user is granting on.
+These roles ship with the platform, and a resync data migration writes
+them to every install whenever the catalogue changes. They cannot be
+edited or deleted (``is_system=True``); an organization clones one into a
+custom role to change it. Each is scoped to a level so the role chooser
+can offer the roles that fit where a grant is made. The resolver does not
+read ``scope_level``: a binding grants its role's permissions on its own
+scope and everything below it.
 
-Source of truth: ``specs/03`` §4.3.
+The tiers #1864 names map onto the catalogue like this:
+
+==================  ================================================================
+Tier                Roles
+==================  ================================================================
+Org Owner           ``org_owner``
+Org Admin           ``org_admin``
+Team Admin          ``team_owner`` (can also delete the team), ``team_admin``
+Project Maintainer  ``project_admin``; ``app_admin`` for a single app
+Developer           ``team_developer``, ``project_developer``, ``app_developer``
+Operator            ``team_operator``, ``project_operator``, ``app_deployer``
+Viewer              ``org_viewer``, ``team_viewer``, ``project_viewer``, ``app_viewer``
+Auditor             ``org_auditor``
+==================  ================================================================
+
+plus the single-purpose ``org_billing``, ``cluster_owner`` and
+``app_approver``.
+
+Every role's permission list is pinned slug by slug in
+``astrolift_identity/tests/test_stock_roles_1864.py``. Org owner carries
+the whole ``Permission`` enum and org admin all of it but two, so adding a
+permission changes their lists too. Any change fails that test until the
+pin is updated, and reaches an existing install only through a new resync
+migration (copy ``0034``).
+
+Source of truth for the original set: ``specs/03`` §4.3.
 """
 
 from __future__ import annotations
@@ -49,6 +77,15 @@ _READ_ALL = (
     # holds the moment those resolvers re-gate.
     Permission.AGENT_READ,
     Permission.WORKFLOW_READ,
+)
+
+# The part of ``_READ_ALL`` that is audit rather than reading: the audit log
+# and the log export that pairs with it for compliance evidence. The org
+# viewer holds ``_READ_ALL`` without it.
+_AUDIT_GRANTS = (
+    Permission.AUDIT_LOG_READ,
+    Permission.AUDIT_LOG_EXPORT,
+    Permission.APP_LOG_EXPORT,
 )
 
 _DEPLOY_OPS = (
@@ -121,6 +158,43 @@ _WORKFLOW_DEVELOPER = (
     Permission.WORKFLOW_TRIGGER,
 )
 
+# Operator tier (#1864): run, attach and cancel, no configuration. It runs
+# apps (deploy, rollback), agents (dispatch) and workflows (trigger), and
+# cancelling rides on those grants: ``agent.dispatch`` cancels an agent
+# task, ``workflow.trigger`` a workflow run, ``app.deploy`` aborts a
+# deployment. It attaches to agent boxes (the exec relay) and to running
+# agent tasks (``agent_task.watch``, the VNC relay), and reads what it
+# operates, logs and metrics included. It creates, edits and deletes
+# nothing, holds no secret, and cannot steer a running task
+# (``agent_task.send_input`` stays with org owners and admins).
+_OPERATE = (
+    Permission.APP_READ,
+    Permission.APP_READ_LOGS,
+    Permission.APP_LOG_EXPORT,
+    Permission.APP_READ_METRICS,
+    Permission.APP_DEPLOY,
+    Permission.APP_ROLLBACK,
+    Permission.AGENT_READ,
+    Permission.AGENT_DISPATCH,
+    Permission.AGENT_BOX_ATTACH,
+    Permission.AGENT_TASK_WATCH,
+    Permission.AGENT_ENV_SPEC_READ,
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_TRIGGER,
+)
+
+# Zentinelle defaults from the #1888 RBAC table. Org owner and org admin
+# hold every Zentinelle permission through their full-enum comprehensions;
+# the auditor and viewer defaults sit on those roles below. #1888 gives
+# "Developer: usage and policy view on their projects". Every hands-on tier
+# at team and project level carries it (owners, admins, developers and
+# operators), so no admin sees less of their own scope than the developers
+# they manage.
+_ZENTINELLE_HANDS_ON = (
+    Permission.ZENTINELLE_USAGE_VIEW,
+    Permission.ZENTINELLE_POLICY_VIEW,
+)
+
 # (slug, scope_level, name, description, permissions)
 SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
     (
@@ -149,7 +223,30 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "ORG",
         "Organization Auditor",
         "All read permissions plus audit log access.",
-        _READ_ALL,
+        (
+            *_READ_ALL,
+            # "Auditor: status, policy and audit view, and audit export" (#1888).
+            Permission.ZENTINELLE_STATUS_VIEW,
+            Permission.ZENTINELLE_POLICY_VIEW,
+            Permission.ZENTINELLE_AUDIT_VIEW,
+            Permission.ZENTINELLE_AUDIT_EXPORT,
+        ),
+    ),
+    (
+        "org_viewer",
+        "ORG",
+        "Organization Viewer",
+        "Read-only access across the organization, without the audit log.",
+        (
+            # The auditor's read set without the audit grants, so the
+            # auditor holds all of this plus audit (#1864: "Auditor (read
+            # plus audit)"). Strictly read-only: unlike ``team_viewer`` it
+            # does not submit forms.
+            *(p for p in _READ_ALL if p not in _AUDIT_GRANTS),
+            # "Viewer: status" (#1888). Status is org-wide, so no team,
+            # project or app viewer carries it.
+            Permission.ZENTINELLE_STATUS_VIEW,
+        ),
     ),
     (
         "cluster_owner",
@@ -194,6 +291,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # mirroring the full app CRUD a team owner holds.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
+            *_ZENTINELLE_HANDS_ON,
         ),
     ),
     (
@@ -222,6 +320,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
+            *_ZENTINELLE_HANDS_ON,
         ),
     ),
     (
@@ -248,7 +347,15 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # no app.update/delete); canManage stays false.
             *_AGENT_DEVELOPER,
             *_WORKFLOW_DEVELOPER,
+            *_ZENTINELLE_HANDS_ON,
         ),
+    ),
+    (
+        "team_operator",
+        "TEAM",
+        "Team Operator",
+        "Run, attach to and cancel the team's apps, agents and workflows; no configuration.",
+        (Permission.TEAM_READ, Permission.PROJECT_READ, *_OPERATE, *_ZENTINELLE_HANDS_ON),
     ),
     (
         "team_viewer",
@@ -290,6 +397,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
+            *_ZENTINELLE_HANDS_ON,
         ),
     ),
     (
@@ -307,7 +415,15 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # no app.update/delete); canManage stays false.
             *_AGENT_DEVELOPER,
             *_WORKFLOW_DEVELOPER,
+            *_ZENTINELLE_HANDS_ON,
         ),
+    ),
+    (
+        "project_operator",
+        "PROJECT",
+        "Project Operator",
+        "Run, attach to and cancel the project's apps, agents and workflows; no configuration.",
+        (Permission.PROJECT_READ, *_OPERATE, *_ZENTINELLE_HANDS_ON),
     ),
     (
         "project_viewer",

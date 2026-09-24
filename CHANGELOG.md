@@ -16,12 +16,18 @@
   the app, never a bare hash of the text) is checked against the live
   staged buffer (`CONFLICT` on a stale read) so an apply never lands a
   draft the caller never actually reviewed; it is required whenever the
-  edit changes env. An edit that changes env, meaning the top-level `[env]`
-  table or any container, job or task `env` table, is gated the same way
-  `setAppSecret` gates a direct secret write: a fresh session elevation,
-  or, when the app requires secret approval, every changed `[env]` key must
-  match an applied secret-change proposal and anything else (container env
-  included) is refused. The audit entry names the changed keys, never
+  edit changes env or a managed-service binding. An edit that changes env
+  (the top-level `[env]` table or any container, job or task `env` table)
+  or a managed-service binding (read off a rolled-back dry run of the
+  reconcile) is gated the same way `setAppSecret` gates a direct secret
+  write: a fresh session elevation, or, when the app requires secret
+  approval, every changed `[env]` key must match an applied secret-change
+  proposal, and anything else is refused except a managed-service release
+  (remove or detach). Attaching or rebinding a project managed service
+  also needs `project.update` on the project, the permission
+  `attachProjectManagedService` checks; `registerApp` applies the same
+  check to an inline manifest. A manifest the reconcile rejects returns
+  `VALIDATION`. The audit entry names the changed keys and bindings, never
   values or digests. The manifest editor now shows an "Apply" button
   (disabled while the draft has unsaved local edits) and a "Staged, not
   applied" badge instead of "Push to repo" when the app has no source repo,
@@ -41,12 +47,29 @@
   manifest's own directory and rejected (parse time for an absolute path,
   build time for a resolved result that climbs above the repo root) rather
   than silently falling back. Kaniko reads `--dockerfile` relative to the
-  build context, so a container's Dockerfile is passed relative to the
-  effective context rather than the repo root. A manifest with more than
-  one distinct non-default `dockerfile_path` or `build_context` across its
-  containers is rejected at parse time, since exactly one image is ever
-  built for an app, so a second, different value would just be the same
-  silent drop this feature closes.
+  build context, so the Dockerfile (a container's, or an app-level one under
+  a container's build context) is passed relative to the effective context,
+  and a Dockerfile outside that context is refused: kaniko tries such a
+  path against its own working directory first, which reaches the build
+  pod's filesystem. A manifest with more than one distinct non-default
+  `dockerfile_path` or `build_context` across its containers is rejected at
+  parse time, since exactly one image is ever built for an app, so a
+  second, different value would just be the same silent drop this feature
+  closes.
+
+- Every install now carries the stock role catalogue (#1864). Three system
+  roles are new. Team Operator and Project Operator run, attach to and cancel
+  the apps, agents and workflows in their scope, and change no configuration.
+  Organization Viewer reads the whole organization but not its audit log. The
+  rest of the Zentinelle permissions from #1888 are declared: configure,
+  policy view and edit, usage view, audit view and export, status view, and
+  conformance view. They gate nothing until the Zentinelle screens land, but
+  the stock roles already carry the #1888 defaults. Org owners and admins hold
+  all of them. Auditors get status, policy and audit view plus audit export.
+  Team owners and admins, project admins, and the team and project developers
+  and operators get usage and policy view. The organization viewer gets
+  status. No existing role loses a permission. Migration
+  `astrolift_identity.0034` applies the catalogue to existing installs.
 
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the
