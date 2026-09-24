@@ -1103,6 +1103,29 @@ def test_under_approval_an_explicit_per_environment_scope_waits_for_its_proposal
     assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "repo-value"}
 
 
+def test_under_approval_an_explicit_per_environment_scope_equal_to_the_scope_in_force_waits_for_its_proposal(
+    approver_grants, app, env, monkeypatch
+):
+    """The review's probe with the scope named: pinning a preview to the
+    scope it already has still stops later app-wide changes reaching it,
+    so it waits on a proposal like any scope change."""
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-pin", status=PreviewEnvironment.Status.RUNNING)
+
+    pinned = _set_scope(
+        app, "K", environment_name=preview.name, scope="all", expires_at=timezone.now() + timedelta(days=30)
+    )
+
+    assert pinned.ok, pinned.errors
+    assert pinned.data.pending_proposal_id is not None
+    assert pinned.data.scope == "all"
+    assert not _live_metadata(app, "K").filter(environment_name=preview.name).exists()
+    narrowed = _set_scope(app, "K", scope="production")
+    _approve(app, str(narrowed.data.pending_proposal_id))
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+
+
 def test_set_metadata_refuses_an_environment_the_app_does_not_have(approver_grants, app, env):
     """A row for a name the app does not have would govern whatever
     environment later takes that name."""
@@ -1164,9 +1187,10 @@ def test_an_app_wide_scope_proposal_lists_the_environments_that_keep_their_own_s
 
 
 # setAppSecretMetadata decides between writing and proposing from the scope
-# in force. Read outside a lock, that scope could be one an approved change
-# was committing at that moment: a preview pinned to "all" then kept a key
-# the approval had just restricted to production, without a proposal.
+# in force: an app-wide edit that names the scope in force applies directly.
+# Read outside a lock, that scope could be one an approved change was
+# committing at that moment, and the direct write then put back the scope
+# the approval had just changed, without a proposal.
 
 
 def _lock_waiters() -> int:
@@ -1201,7 +1225,7 @@ def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
 ):
     _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
     if change == "metadata-over-an-app-wide-row":
-        assert _set_scope(app, "K", set_via="cli").ok
+        assert _set_scope(app, "K", set_via="web").ok
     _require_secret_approval(app)
     preview = _preview_environment(app, env, name="preview-race", status=PreviewEnvironment.Status.RUNNING)
     if change == "rotation":
@@ -1224,21 +1248,19 @@ def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
 
     applier, applier_box = _on_own_connection(apply_and_hold)
     assert applied.wait(timeout=30)
-    pinner, pinner_box = _on_own_connection(
-        lambda: _set_scope(app, "K", environment_name=preview.name, scope="all")
-    )
+    editor, editor_box = _on_own_connection(lambda: _set_scope(app, "K", scope="all", set_via="cli"))
     deadline = time.monotonic() + 30
-    while pinner.is_alive() and not _lock_waiters() and time.monotonic() < deadline:
+    while editor.is_alive() and not _lock_waiters() and time.monotonic() < deadline:
         time.sleep(0.05)
     release.set()
     applier.join(timeout=30)
-    pinner.join(timeout=30)
+    editor.join(timeout=30)
 
     assert "error" not in applier_box, applier_box
-    assert "error" not in pinner_box, pinner_box
-    pinned = pinner_box["result"]
-    assert pinned.ok, pinned.errors
-    assert pinned.data.pending_proposal_id is not None
-    assert pinned.data.scope == "production"
-    assert not _live_metadata(app, "K").filter(environment_name=preview.name).exists()
+    assert "error" not in editor_box, editor_box
+    edited = editor_box["result"]
+    assert edited.ok, edited.errors
+    assert edited.data.pending_proposal_id is not None
+    assert edited.data.scope == "production"
+    assert _live_metadata(app, "K").get(environment_name="").scope == "production"
     assert _materialize(_deployment(app, preview), monkeypatch) == {}

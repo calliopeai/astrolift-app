@@ -317,7 +317,10 @@ class SecretMutations:
         Scope decides which environments receive the value, so this is a
         secret write, not just an annotation: it needs a fresh elevation
         like set/rotate, and with secret approval on a scope change waits
-        on a proposal (#1946)."""
+        on a proposal (#1946). So does any explicit per-environment scope,
+        even one equal to the scope in force: it pins the environment, and
+        later app-wide changes stop reaching it. An edit that names no
+        scope leaves it as it is and applies directly."""
         msg = _validate_env_key(input.key)
         if msg:
             return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
@@ -359,7 +362,9 @@ class SecretMutations:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
             if app.requires_secret_approval and input.scope is not None:
                 current_scope = current_secret_scope(app, input.key, environment_name)
-                if input.scope != current_scope:
+                # A per-environment scope pins the environment even when it
+                # equals the scope in force, so it is always a scope change.
+                if environment_name or input.scope != current_scope:
                     proposal = _maybe_create_proposal_for_write(
                         app=app,
                         op=SecretChangeProposal.Op.SET_METADATA.value,
