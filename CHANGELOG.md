@@ -12,6 +12,20 @@
   cluster's org. `astroliftDeploymentApprovalHistory` and `approvedBy` ignore
   audit rows another org wrote against the deployment (#1955).
 
+- Every install now carries the stock role catalogue (#1864). Three system
+  roles are new. Team Operator and Project Operator run, attach to and cancel
+  the apps, agents and workflows in their scope, and change no configuration.
+  Organization Viewer reads the whole organization but not its audit log. The
+  rest of the Zentinelle permissions from #1888 are declared: configure,
+  policy view and edit, usage view, audit view and export, status view, and
+  conformance view. They gate nothing until the Zentinelle screens land, but
+  the stock roles already carry the #1888 defaults. Org owners and admins hold
+  all of them. Auditors get status, policy and audit view plus audit export.
+  Team owners and admins, project admins, and the team and project developers
+  and operators get usage and policy view. The organization viewer gets
+  status. No existing role loses a permission. Migration
+  `astrolift_identity.0034` applies the catalogue to existing installs.
+
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the
   platform operator (an active superuser), the only caller they admitted in
