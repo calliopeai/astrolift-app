@@ -2,16 +2,26 @@
 
 ## Unreleased
 
-- Add an `applyStagedManifest` mutation for apps that have no working source
-  connection to push a staged edit through: it applies `manifest_raw_staged`
-  straight to `manifest_raw` via the same parse-and-persist path
-  `registerApp` uses. Previously `updateManifest` only ever wrote the staging
-  buffer, and the only paths that moved a draft into `manifest_raw`
-  (`syncManifestFromRepo`, `pushManifestToRepo`) required a source
-  connection, so an app registered with `--manifest-raw` could never change
-  its manifest after the first edit. The manifest editor now shows an
-  "Apply" button and a "Staged, not applied" badge instead of "Push to repo"
-  when the app has no source repo (#1759).
+- Add an `applyStagedManifest` mutation for apps that have no source repo to
+  push a staged edit through: it applies `manifest_raw_staged` straight to
+  `manifest_raw` via the same parse-and-persist path `registerApp` uses.
+  Previously `updateManifest` only ever wrote the staging buffer, and the
+  only paths that moved a draft into `manifest_raw` (`syncManifestFromRepo`,
+  `pushManifestToRepo`) required a source repo, so an app registered with
+  `--manifest-raw` could never change its manifest after the first edit. A
+  repo-backed app always goes through `pushManifestToRepo` for review,
+  whatever its connection health: this mutation is reachable only for an
+  app with no `source_repo` at all. Runs under `select_for_update()`, and
+  the caller's last-known `rawManifestStagedHash` is checked against the
+  live staged buffer (`CONFLICT` on a stale read) so an apply never lands a
+  draft the caller never actually reviewed. An edit that changes the
+  top-level `[env]` literal table is gated the same way `setAppSecret`
+  gates a direct secret write: refused when the app requires secret
+  approval, else a fresh session elevation. The manifest editor now shows an
+  "Apply" button (disabled while the draft has unsaved local edits) and a
+  "Staged, not applied" badge instead of "Push to repo" when the app has no
+  source repo, and confirms before applying, listing which `[env]` key
+  names (never values) are about to change (#1759).
 
 - Honour per-container `dockerfile_path` / `build_context` from
   `[[workloads.containers]]` when building an app's image. The build
@@ -19,7 +29,17 @@
   `build_context`, so a manifest that set a container's `build_context` to
   reach a Dockerfile outside its own directory (the monorepo shape where one
   image serves two registrations of the same repo) passed validation and
-  was silently ignored (#1756).
+  was silently ignored (#1756). An explicit app-level value (an
+  `--dockerfile-path`/`--build-context` register flag, or monorepo
+  discovery) wins outright; a container's field only applies on whichever
+  of the two the app hasn't itself customized, resolved against the
+  manifest's own directory and rejected (parse time for an absolute path,
+  build time for a resolved result that climbs above the repo root) rather
+  than silently falling back. A manifest with more than one distinct
+  non-default `dockerfile_path` or `build_context` across its containers is
+  rejected at parse time, since exactly one image is ever built for an app,
+  so a second, different value would just be the same silent drop this
+  feature closes.
 
 - Record an empty object instead of failing the mutation audit log when a
   GraphQL mutation is sent with no `variables`. The previous NOT NULL failure

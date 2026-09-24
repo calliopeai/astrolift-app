@@ -329,3 +329,89 @@ def test_update_app_rejects_unknown_build_mode(permission_resolver):
     # The rejected update must not have mutated the row.
     app = RegisteredApp.objects.get(slug="app")
     assert app.build_mode == "ci_pushed"
+
+
+# --- dockerfile_path / build_context are repo-root-relative paths, not
+# arbitrary filesystem paths (#1756 adversarial review, H3) -------------
+#
+# Kaniko takes both verbatim as --dockerfile / --context-sub-path, so an
+# app-level value with no further base to resolve against must be
+# rejected at register/update time, the same way a container-level value
+# is rejected once resolved (astrolift_manifest.parser / build_image.py).
+
+
+def test_register_app_rejects_an_absolute_dockerfile_path(permission_resolver):
+    org, project = _scaffold()
+    permission_resolver.grant(Permission.APP_CREATE)
+
+    with _ctx(org):
+        result = RegistryMutation().register_app(
+            _info(),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="Bad Path",
+                slug="bad-path",
+                source_repo="acme/bad-path",
+                dockerfile_path="/etc/passwd",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "dockerfilePath"
+    assert not RegisteredApp.objects.filter(slug="bad-path").exists()
+
+
+def test_register_app_rejects_a_build_context_that_escapes_the_repo_root(permission_resolver):
+    org, project = _scaffold()
+    permission_resolver.grant(Permission.APP_CREATE)
+
+    with _ctx(org):
+        result = RegistryMutation().register_app(
+            _info(),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="Escapes",
+                slug="escapes",
+                source_repo="acme/escapes",
+                build_context="../..",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "buildContext"
+    assert not RegisteredApp.objects.filter(slug="escapes").exists()
+
+
+def test_update_app_rejects_an_absolute_build_context(permission_resolver):
+    org, project = _scaffold()
+    permission_resolver.grant(Permission.APP_CREATE)
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        register = RegistryMutation().register_app(
+            _info(),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="App",
+                slug="app",
+                source_repo="acme/app",
+            ),
+        )
+        assert register.ok, register.errors
+
+        result = RegistryMutation().update_app(
+            _info(),
+            input=UpdateAppInput(
+                id=register.data.id,
+                build_context="/abs/path",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "buildContext"
+    # The rejected update must not have mutated the row.
+    app = RegisteredApp.objects.get(slug="app")
+    assert app.build_context == "."

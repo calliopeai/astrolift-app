@@ -282,6 +282,34 @@ def _validate_build_strategy(raw):
     return value, None
 
 
+def _validate_build_path_field(raw, *, field: str):
+    """Validate an incoming app-level ``dockerfile_path`` / ``build_context``.
+
+    These are already meant to be relative to the repo root directly (the
+    build reads them as-is, or resolves a container-level offset against
+    them -- see ``build_image._resolve_build_context_base``), so an
+    absolute path or a leading ``..`` is always wrong here, unlike a
+    container-level field which only becomes wrong once resolved against
+    a base (#1756 adversarial review).
+
+    Returns ``(value, error)`` mirroring ``_validate_build_mode``. A None
+    or empty input passes straight through unchanged -- ``register_app``
+    applies its own ``"Dockerfile"``/``"."`` default on an empty value,
+    and ``update_app``'s ``None`` is the "leave untouched" sentinel.
+    ``field`` is the GraphQL-facing input field name (e.g.
+    ``"dockerfilePath"``), used both in the error message and the
+    envelope's ``field`` so the FE can point at the right input.
+    """
+    if not raw:
+        return raw, None
+    from astrolift_manifest.path_safety import validate_repo_relative_field
+
+    error = validate_repo_relative_field(raw, field=field)
+    if error is not None:
+        return None, gql_failure(ErrorCode.VALIDATION.value, error, field=field)
+    return raw, None
+
+
 def _normalize_build_args(raw):
     """Coerce the incoming ``build_args`` JSON into a flat str→str map.
 

@@ -93,6 +93,7 @@ type AppdomainremovedpayloadMutationResult {
 
 input ApplyStagedManifestInput {
   id: GUID!
+  expectedStagedHash: String = null
 }
 
 input ApproveByTokenInput {
@@ -3181,6 +3182,7 @@ type AstroliftRegisteredApp {
   manifestHash: String!
   rawManifest: String!
   rawManifestStaged: String!
+  rawManifestStagedHash: String!
   lastSyncedHash: String!
   manifestSyncState: String!
   registryRepoUri: String!

@@ -1155,3 +1155,119 @@ tools = ["jira-create"]
     assert raw.workloads[0].kind == "agent"
     # Inline brief tables are the brief assembler's concern — not manifest refs.
     assert raw.skills == ()
+
+
+# --- container-level dockerfile_path / build_context safety (#1756
+# adversarial review, H3 / M1) -------------------------------------------
+#
+# Both end up as --dockerfile / --context-sub-path arguments to the
+# in-cluster kaniko build (build_image.py), verbatim. An absolute path
+# is never valid input to that resolution, whatever the base ends up
+# being, so it's rejected here rather than reaching the build unchecked.
+# Only one image is ever built for an app, so two containers declaring
+# different non-default values would have one silently ignored, the
+# same silent-drop class this feature exists to close.
+
+
+def test_parse_rejects_an_absolute_container_dockerfile_path():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  dockerfile_path = "/etc/passwd"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "dockerfile_path" in str(exc.value)
+
+
+def test_parse_rejects_an_absolute_container_build_context():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  build_context = "/abs"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "build_context" in str(exc.value)
+
+
+def test_parse_rejects_conflicting_dockerfile_paths_across_containers():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "a"
+  is_primary = true
+  dockerfile_path = "Dockerfile.a"
+
+  [[workloads.containers]]
+  name = "b"
+  dockerfile_path = "Dockerfile.b"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "dockerfile_path" in str(exc.value)
+
+
+def test_parse_rejects_conflicting_build_contexts_across_containers():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "a"
+  is_primary = true
+  build_context = "apps/a"
+
+  [[workloads.containers]]
+  name = "b"
+  build_context = "apps/b"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "build_context" in str(exc.value)
+
+
+def test_parse_allows_only_one_container_to_customize_build_fields():
+    """One container customizing a field is not a conflict -- the
+    other container simply reads back at the parser's own default."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "a"
+  is_primary = true
+  dockerfile_path = "Dockerfile.a"
+
+  [[workloads.containers]]
+  name = "b"
+"""
+    raw = parse_raw(toml)
+    containers = raw.workloads[0].containers
+    assert containers[0].dockerfile_path == "Dockerfile.a"
+    assert containers[1].dockerfile_path == "Dockerfile"

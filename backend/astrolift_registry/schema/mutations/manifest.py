@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from strawberry.types import Info
 
@@ -19,9 +21,55 @@ from astrolift_registry.schema.mutations.types import (
 )
 from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
+
+
+def _audit_env_change(
+    app: RegisteredApp,
+    *,
+    before_text: str,
+    after_text: str,
+    changed_keys: list[str],
+    decision: str,
+) -> None:
+    """Sibling audit entry for an ``[env]``-literal change through
+    ``applyStagedManifest`` (#1759 adversarial review, H1).
+
+    ``@mutation_audit`` (on the resolver above) already records one entry
+    per call, but it doesn't know about manifest-specific detail -- same
+    reason ``app.secret.reveal.disclosure`` and ``_emit_deny_audit`` emit
+    their own sibling entry rather than stretching the generic one.
+    Carries content hashes + key **names** only, never the literal
+    values, mirroring ``AppSecret``'s own audit trail (which never logs a
+    secret value either).
+    """
+    from astrolift_manifest.normalize import raw_text_hash
+
+    tenant = get_current_tenant()
+    try:
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="app.manifest.apply_env_change",
+                decision=decision,
+                target_kind="RegisteredApp",
+                target_id=str(app.guid),
+                duration_ms=0,
+                permissions=(Permission.APP_UPDATE.value,),
+                extra={
+                    "before_hash": raw_text_hash(before_text),
+                    "after_hash": raw_text_hash(after_text),
+                    "changed_keys": changed_keys,
+                },
+            )
+        )
+    except Exception:  # noqa: BLE001 -- audit emission must never break the caller
+        log.exception("apply_staged_manifest: audit emit failed for app=%s", app.guid)
 
 
 @strawberry.type
@@ -111,94 +159,184 @@ class ManifestMutations:
         ``updateManifest`` only ever writes the staging buffer --
         ``pushManifestToRepo`` (open a PR) and ``syncManifestFromRepo``
         (pull + apply) are the only paths that move a draft into
-        ``manifest_raw``, and both need a working source connection. An
-        app registered with ``--manifest-raw`` has neither a repo nor a
-        connection, so once such an app staged one edit its manifest was
-        frozen forever -- the only way out was deregister (which tears
-        down the namespace + registry repo) and register again.
+        ``manifest_raw``. A repo-backed app always goes through one of
+        those for review, whatever its connection health (adversarial
+        review, #1759); this mutation is reachable only for an app with
+        no ``source_repo`` at all -- the ``--manifest-raw`` registration
+        shape, which otherwise had no way to ever change its manifest
+        after the first staged edit (the only way out was deregister,
+        which tears down the namespace + registry repo, and register
+        again).
 
-        Reachable only when the app cannot push through a connection: an
-        app that can keeps using ``pushManifestToRepo`` so a change still
-        goes through review rather than landing straight from the editor.
+        An edit that changes the top-level ``[env]`` literal table is
+        gated the same way ``setAppSecret`` gates a direct secret write
+        (adversarial review): refused outright when the app requires
+        secret approval -- there is no proposal-flow equivalent on this
+        mutation -- else a fresh session elevation. Without this, this
+        mutation would be a permission-only bypass of the review
+        #1758/#1915 put behind every other secret-literal write path.
+
+        Runs under ``select_for_update()`` so a concurrent
+        ``updateManifest`` / ``applyStagedManifest`` on the same app
+        can't interleave with this read-modify-write.
+        ``expected_staged_hash`` (optional) detects a stale read of the
+        staged buffer and refuses with ``CONFLICT`` rather than applying
+        a draft the caller never actually reviewed.
+
         Reuses the same parse + ``persist_manifest`` path ``registerApp``
         takes for an inline ``manifest_raw`` -- one apply implementation,
         whether it runs at registration or from the editor.
         """
-        from astrolift_manifest.normalize import NormalizationDefaults, normalize
+        from django.db import transaction
+
+        from astrolift_identity.step_up import check_elevation
+        from astrolift_manifest.env_edit import read_app_env
+        from astrolift_manifest.normalize import (
+            NormalizationDefaults,
+            normalize,
+            raw_text_hash,
+        )
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.persist import persist_manifest
         from astrolift_manifest.sync_state import SyncSnapshot, classify_state
-        from astrolift_registry.services.manifest_sync import _pick_source_connection
 
-        # Org-scope the by-guid lookup to the caller's tenant before applying
-        # the staged manifest. Fails closed (NOT_FOUND) when org_id is
-        # None (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
-        if app is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
-
-        if app.source_repo and _pick_source_connection(app) is not None:
-            return gql_failure(
-                "SCM_CONNECTION_AVAILABLE",
-                "this app can push staged edits to its source repo -- use "
-                "pushManifestToRepo so the change goes through review",
-            )
-
-        staged = app.manifest_raw_staged or ""
-        if not staged.strip() or staged == (app.manifest_raw or ""):
-            # Nothing staged (or the staged text already matches what's
-            # applied) -- a no-op success, same spirit as
-            # pushManifestToRepo's 'nothing_to_push'.
+        def _result(current: RegisteredApp) -> MutationResultType[_ManifestStagePayload]:
             sync_state = classify_state(
                 SyncSnapshot(
-                    db_hash=app.manifest_hash or "",
-                    repo_hash=app.last_synced_hash or app.manifest_hash or "",
-                    last_synced_hash=app.last_synced_hash or "",
+                    db_hash=current.manifest_hash or "",
+                    repo_hash=current.last_synced_hash or current.manifest_hash or "",
+                    last_synced_hash=current.last_synced_hash or "",
                 )
             )
             return gql_success(
                 _ManifestStagePayload(
                     id=input.id,
                     sync_state=sync_state.value,
-                    raw_manifest=app.manifest_raw or "",
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest=current.manifest_raw or "",
+                    raw_manifest_staged=current.manifest_raw_staged or "",
                 )
             )
 
-        try:
-            manifest = normalize(parse_raw(staged), defaults=NormalizationDefaults())
-        except ManifestError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"manifest parse failed: {exc}",
-                field="rawManifest",
+        # Org-scope the by-guid lookup to the caller's tenant before applying
+        # the staged manifest. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        with transaction.atomic():
+            app = (
+                RegisteredApp.objects.select_for_update()
+                .filter(guid=str(input.id), organization_id=org_id)
+                .first()
             )
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
-        persist_manifest(app, manifest, raw_text=staged)
-        app.manifest_raw_staged = ""
-        # There is no repo anchor for a connection-less app; advance it to
-        # the newly-applied hash so the UI reads in_sync rather than
-        # perpetually db_ahead of a repo that does not exist.
-        app.last_synced_hash = app.manifest_hash
-        app.save(update_fields=["manifest_raw_staged", "last_synced_hash", "updated_at", "version"])
+            if app.archived_at is not None:
+                return gql_failure(
+                    "APP_ARCHIVED",
+                    "app is archived -- unarchive it before applying a manifest change",
+                )
 
-        sync_state = classify_state(
-            SyncSnapshot(
-                db_hash=app.manifest_hash or "",
-                repo_hash=app.last_synced_hash or "",
-                last_synced_hash=app.last_synced_hash or "",
-            )
-        )
-        return gql_success(
-            _ManifestStagePayload(
-                id=input.id,
-                sync_state=sync_state.value,
-                raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged=app.manifest_raw_staged or "",
-            )
-        )
+            # H2 (adversarial review): a repo-backed app always pushes
+            # through pushManifestToRepo for review, whatever its
+            # connection health -- only an app with no source_repo at
+            # all has nothing else to apply the staged edit through.
+            if app.source_repo:
+                return gql_failure(
+                    "SCM_REPO_CONFIGURED",
+                    "this app pushes changes through its source repo -- use "
+                    "pushManifestToRepo so the change goes through review",
+                )
+
+            staged = app.manifest_raw_staged or ""
+
+            actual_hash = raw_text_hash(staged)
+            if input.expected_staged_hash and input.expected_staged_hash != actual_hash:
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    "the staged manifest changed since you loaded it -- refresh and try again",
+                )
+
+            if not staged.strip():
+                # Nothing staged -- a no-op success, same spirit as
+                # pushManifestToRepo's 'nothing_to_push'.
+                return _result(app)
+
+            if staged == (app.manifest_raw or ""):
+                # The staged text already matches what's applied -- clear
+                # the redundant copy (same convention updateManifest uses
+                # for an edit that converges back to the synced content)
+                # instead of leaving it to read as a perpetual "staged,
+                # not applied".
+                app.manifest_raw_staged = ""
+                app.save(update_fields=["manifest_raw_staged", "updated_at", "version"])
+                return _result(app)
+
+            try:
+                manifest = normalize(parse_raw(staged), defaults=NormalizationDefaults())
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed: {exc}",
+                    field="rawManifest",
+                )
+
+            # H1 (adversarial review): a change to the [env] literal table
+            # is a secret change wherever it lands.
+            before_env = read_app_env(app.manifest_raw or "")
+            after_env = read_app_env(staged)
+            if before_env != after_env:
+                changed_keys = sorted(
+                    k for k in set(before_env) | set(after_env) if before_env.get(k) != after_env.get(k)
+                )
+                if app.requires_secret_approval:
+                    _audit_env_change(
+                        app,
+                        before_text=app.manifest_raw or "",
+                        after_text=staged,
+                        changed_keys=changed_keys,
+                        decision="DENY",
+                    )
+                    return gql_failure(
+                        "SECRET_APPROVAL_REQUIRED",
+                        "this edit changes [env] secret literals and this app requires "
+                        "secret approval -- use setAppSecret/rotateAppSecret so the "
+                        "change goes through the proposal flow",
+                    )
+                deny = check_elevation(
+                    info,
+                    action_label="app.manifest.apply_secret_change",
+                    resolver_name="ManifestMutations.apply_staged_manifest",
+                )
+                if deny is not None:
+                    _audit_env_change(
+                        app,
+                        before_text=app.manifest_raw or "",
+                        after_text=staged,
+                        changed_keys=changed_keys,
+                        decision="DENY",
+                    )
+                    return deny
+                _audit_env_change(
+                    app,
+                    before_text=app.manifest_raw or "",
+                    after_text=staged,
+                    changed_keys=changed_keys,
+                    decision="ALLOW",
+                )
+
+            persist_manifest(app, manifest, raw_text=staged)
+            app.manifest_raw_staged = ""
+            # There is no repo anchor for a connection-less app -- there
+            # is no repo at all, so last_synced_hash is left alone rather
+            # than set to a hash no repo ever had (adversarial review).
+            # _result()'s "or manifest_hash" fallback (mirroring
+            # ``astrolift_registry.schema.types._repo_hash_for``'s own
+            # convention for "no known repo hash") already reads this as
+            # in_sync.
+            app.save(update_fields=["manifest_raw_staged", "updated_at", "version"])
+
+            return _result(app)
 
     @strawberry.field
     @mutation_audit(action="app.sync_manifest_from_repo")

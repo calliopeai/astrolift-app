@@ -24,6 +24,7 @@ from astrolift_registry.schema.mutations.helpers import (
     _normalize_build_args,
     _resolve_approval_inputs,
     _validate_build_mode,
+    _validate_build_path_field,
     _validate_build_strategy,
     _validate_effective_approval_policy,
 )
@@ -186,6 +187,16 @@ class RegistrationMutations:
         build_args, build_args_err = _normalize_build_args(input.build_args)
         if build_args_err is not None:
             return build_args_err
+        dockerfile_path, dockerfile_path_err = _validate_build_path_field(
+            input.dockerfile_path, field="dockerfilePath"
+        )
+        if dockerfile_path_err is not None:
+            return dockerfile_path_err
+        build_context, build_context_err = _validate_build_path_field(
+            input.build_context, field="buildContext"
+        )
+        if build_context_err is not None:
+            return build_context_err
 
         app = RegisteredApp.objects.create(
             organization=project.organization,
@@ -203,8 +214,8 @@ class RegistrationMutations:
             deploy_branch=input.deploy_branch or input.default_branch or "main",
             build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
             build_strategy=build_strategy or RegisteredApp.BuildStrategy.OFF.value,
-            dockerfile_path=input.dockerfile_path or "Dockerfile",
-            build_context=input.build_context or ".",
+            dockerfile_path=dockerfile_path or "Dockerfile",
+            build_context=build_context or ".",
             build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,

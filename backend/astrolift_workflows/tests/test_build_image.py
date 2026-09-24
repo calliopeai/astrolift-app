@@ -227,10 +227,16 @@ def _capture_build_spec(monkeypatch):
 
 
 def test_build_image_honors_the_primary_containers_dockerfile_and_context(monkeypatch):
+    """A container's build_context is resolved against the manifest's own
+    directory, not passed through verbatim (#1756 adversarial review, H3):
+    "../.." from a manifest two directories deep reaches the repo root,
+    same shape as the issue's own example."""
     from astrolift_registry.models import Workload
 
     deployment = _make_deployment()
     app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.save(update_fields=["manifest_path"])
     workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
     workload.containers.create(
         name="web",
@@ -242,8 +248,27 @@ def test_build_image_honors_the_primary_containers_dockerfile_and_context(monkey
     captured = _capture_build_spec(monkeypatch)
     _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
 
-    assert captured["spec"].dockerfile_path == "services/web/Dockerfile"
-    assert captured["spec"].context_path == "../.."
+    assert captured["spec"].dockerfile_path == "apps/web/services/web/Dockerfile"
+    assert captured["spec"].context_path == "."
+
+
+def test_build_image_rejects_a_container_build_context_that_escapes_the_repo_root(monkeypatch):
+    """A build_context of ../../../etc from the same two-deep manifest
+    climbs above the repo root -- a hard failure, not a silent
+    pass-through or a silent fall-back to the app-level default (#1756
+    adversarial review, H3)."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.save(update_fields=["manifest_path"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True, build_context="../../../etc")
+
+    _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="escapes the repository root"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
 
 
 def test_build_image_falls_back_to_app_level_fields_when_container_is_default(monkeypatch):

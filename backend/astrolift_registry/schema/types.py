@@ -437,6 +437,11 @@ class RegisteredAppType:
     manifest_hash: str
     raw_manifest: str
     raw_manifest_staged: str
+    # sha256 of raw_manifest_staged -- never the text itself, so a caller
+    # can detect "did the staged buffer change under me" (applyStagedManifest's
+    # optimistic-concurrency input) without a secret literal ever having to
+    # round-trip through a mutation input variable (#1759 adversarial review).
+    raw_manifest_staged_hash: str
     last_synced_hash: str
     manifest_sync_state: str
 
@@ -946,6 +951,7 @@ def app_to_type(
     managed_hostname: str | None = None,
     include_retention_policies: bool = False,
 ) -> RegisteredAppType:
+    from astrolift_manifest.normalize import raw_text_hash
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
         classify_state,
@@ -985,6 +991,7 @@ def app_to_type(
         manifest_hash=app.manifest_hash,
         raw_manifest=app.manifest_raw or "",
         raw_manifest_staged=app.manifest_raw_staged or "",
+        raw_manifest_staged_hash=raw_text_hash(app.manifest_raw_staged or ""),
         last_synced_hash=app.last_synced_hash or "",
         manifest_sync_state=sync_state.value,
         registry_repo_uri=app.registry_repo_uri,

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import posixpath
 
 from temporalio import activity
 
@@ -78,15 +79,6 @@ def _stub(image_tag: str) -> dict:
     return {"ok": True, "image_ref": image_tag, "stub": True}
 
 
-# The parser fills these in on every container it parses -- a manifest that
-# never mentions dockerfile_path/build_context reads back identically to one
-# that explicitly set them to the default (#1756). There is no third value
-# for "unset", so a container is only treated as overriding the app-level
-# fields when it differs from these.
-_DEFAULT_DOCKERFILE_PATH = "Dockerfile"
-_DEFAULT_BUILD_CONTEXT = "."
-
-
 def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     """Resolve the (dockerfile_path, build_context) pair a build should use.
 
@@ -100,18 +92,39 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     (the ConflictHQ/bdr#139 shape: two registrations of one repo) passed
     validation and was silently ignored (#1756).
 
+    Precedence: an app-level field away from the parser's default was set
+    deliberately -- an explicit register/update flag -- and wins outright;
+    the manifest's container-level fields only get a say on the field(s)
+    the app hasn't itself customized (adversarial review, #1756 follow-up:
+    an explicit app-level choice must not be silently overridden by
+    whatever a manifest, possibly authored by someone else, declares).
+    A container value is resolved as an offset from the manifest's own
+    directory (``dirname(app.manifest_path)``) and normalized
+    (``posixpath``) -- the shape the issue's own example uses (``"../.."``
+    from a manifest two directories deep reaching the repo root); a result
+    that would climb above the repo root (or is itself absolute) is a hard
+    failure, not a silent fall-back to the app-level value -- kaniko's
+    ``--context-sub-path`` / ``--dockerfile`` take the resolved value
+    verbatim, so a wrong build must not run at all.
+
     Prefers ``deployment.workload``'s primary container when the deployment
     is scoped to one (task / static-site / cron paths set this); otherwise
     falls back to the app's first workload, mirroring the same "one build
     for the whole app" simplification ``DeployAppWorkflow`` already applies
-    to ``image_tags`` (v1: one image, shared by every workload). Only a
-    non-default container value overrides the app-level fields, so an app
-    that never touches these manifest keys keeps resolving from
-    ``RegisteredApp`` exactly as before -- register-flag and monorepo-
-    discovery configuration are untouched.
+    to ``image_tags`` (v1: one image, shared by every workload).
     """
-    dockerfile_path = app.dockerfile_path or _DEFAULT_DOCKERFILE_PATH
-    build_context = app.build_context or _DEFAULT_BUILD_CONTEXT
+    from astrolift_manifest.path_safety import resolve_repo_relative
+    from astrolift_manifest.types import DEFAULT_BUILD_CONTEXT, DEFAULT_DOCKERFILE_PATH
+
+    dockerfile_path = app.dockerfile_path or DEFAULT_DOCKERFILE_PATH
+    build_context = app.build_context or DEFAULT_BUILD_CONTEXT
+    dockerfile_is_default = dockerfile_path == DEFAULT_DOCKERFILE_PATH
+    context_is_default = build_context == DEFAULT_BUILD_CONTEXT
+
+    if not (dockerfile_is_default or context_is_default):
+        # Both app-level fields were customized -- nothing left for a
+        # container to override.
+        return dockerfile_path, build_context
 
     workload = deployment.workload
     if workload is None:
@@ -123,10 +136,30 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     if primary is None:
         return dockerfile_path, build_context
 
-    if primary.dockerfile_path and primary.dockerfile_path != _DEFAULT_DOCKERFILE_PATH:
-        dockerfile_path = primary.dockerfile_path
-    if primary.build_context and primary.build_context != _DEFAULT_BUILD_CONTEXT:
-        build_context = primary.build_context
+    manifest_dir = posixpath.dirname(app.manifest_path or "") or DEFAULT_BUILD_CONTEXT
+
+    if (
+        dockerfile_is_default
+        and primary.dockerfile_path
+        and primary.dockerfile_path != DEFAULT_DOCKERFILE_PATH
+    ):
+        resolved = resolve_repo_relative(manifest_dir, primary.dockerfile_path)
+        if resolved is None:
+            raise RuntimeError(
+                f"container dockerfile_path {primary.dockerfile_path!r} resolved against "
+                f"{manifest_dir!r} escapes the repository root -- refusing to build"
+            )
+        dockerfile_path = resolved
+
+    if context_is_default and primary.build_context and primary.build_context != DEFAULT_BUILD_CONTEXT:
+        resolved = resolve_repo_relative(manifest_dir, primary.build_context)
+        if resolved is None:
+            raise RuntimeError(
+                f"container build_context {primary.build_context!r} resolved against "
+                f"{manifest_dir!r} escapes the repository root -- refusing to build"
+            )
+        build_context = resolved
+
     return dockerfile_path, build_context
 
 

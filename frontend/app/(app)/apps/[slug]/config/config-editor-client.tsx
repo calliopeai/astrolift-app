@@ -45,6 +45,7 @@ import type {
   ManifestSyncState,
 } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { changedEnvKeyNames } from "@/lib/manifest/env-diff";
 import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 
 import { AppTabs } from "../components/app-tabs";
@@ -301,6 +302,16 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   const busy = updateState.loading || syncState.loading || pushState.loading || applyState.loading;
   const [confirmSync, setConfirmSync] = React.useState(false);
+  const [confirmApply, setConfirmApply] = React.useState(false);
+
+  // Key NAMES only (never values) that applying the staged buffer would
+  // change in the top-level [env] table -- surfaced in the apply confirm
+  // dialog so an operator sees what's about to change before it does
+  // (#1759 adversarial review, M4).
+  const changedEnvKeys = React.useMemo(
+    () => changedEnvKeyNames(a?.rawManifest ?? "", a?.rawManifestStaged ?? ""),
+    [a?.rawManifest, a?.rawManifestStaged],
+  );
 
   async function handleSave() {
     if (!a) return;
@@ -332,7 +343,11 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   async function handleApply() {
     if (!a) return;
-    const { data } = await applyManifest({ variables: { input: { id: a.id } } });
+    const { data } = await applyManifest({
+      variables: {
+        input: { id: a.id, expectedStagedHash: a.rawManifestStagedHash },
+      },
+    });
     if (data?.applyStagedManifest.ok) {
       const next = data.applyStagedManifest.data;
       const text = next?.rawManifest || "";
@@ -340,7 +355,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       baselineRef.current = text;
       toast.success("Applied");
     } else {
-      toast.error(data?.applyStagedManifest.errors?.[0]?.message ?? "Apply failed");
+      throw new Error(data?.applyStagedManifest.errors?.[0]?.message ?? "Apply failed");
     }
   }
 
@@ -512,8 +527,9 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             // manifest_raw_staged forever.
             <Button
               variant="outline"
-              onClick={handleApply}
-              disabled={busy || !a.rawManifestStaged}
+              onClick={() => setConfirmApply(true)}
+              disabled={busy || !a.rawManifestStaged || isDirty}
+              title={isDirty ? "Save or discard your local edits first" : undefined}
             >
               <CheckIcon className="size-4" />
               {applyState.loading ? t("applying") : t("applyStaged")}
@@ -670,6 +686,19 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         confirmLabel={t("confirmSync.confirm")}
         destructive
         onConfirm={handleSync}
+      />
+
+      <ConfirmDialog
+        open={confirmApply}
+        onOpenChange={setConfirmApply}
+        title={t("confirmApply.title")}
+        description={
+          changedEnvKeys.length > 0
+            ? t("confirmApply.descriptionWithEnv", { keys: changedEnvKeys.join(", ") })
+            : t("confirmApply.description")
+        }
+        confirmLabel={t("confirmApply.confirm")}
+        onConfirm={handleApply}
       />
     </PageShell>
   );

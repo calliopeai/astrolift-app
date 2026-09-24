@@ -20,8 +20,10 @@ import urllib.error
 from types import SimpleNamespace
 
 import pytest
+from constance.test import override_config
 
 from astrolift_identity.models import Organization, Project, Team
+from astrolift_identity.session_elevation import METHOD_PASSWORD, elevate
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.mutations import (
     ApplyStagedManifestInput,
@@ -31,6 +33,7 @@ from astrolift_registry.schema.mutations import (
     UpdateManifestInput,
 )
 from astrolift_scm.models import SourceConnection
+from core.mutations import AuditEntry, register_audit_writer
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import TenantContext, tenant_context
@@ -40,6 +43,36 @@ pytestmark = pytest.mark.django_db
 
 def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
+
+
+class _FakeSession(dict):
+    """Stand-in for ``HttpRequest.session`` -- dict-like, same minimal
+    surface ``astrolift_identity.tests.test_step_up_auth`` uses."""
+
+    modified = False
+
+
+def _info_with_session(session):
+    """A resolver ``Info`` proxy carrying a real (un/elevated) session,
+    for the ``applyStagedManifest`` step-up gate (#1759 adversarial
+    review, H1) -- ``_info()`` above has no request at all, which
+    ``check_elevation`` treats as a direct test call and bypasses."""
+    request = SimpleNamespace(user=None, session=session)
+    return SimpleNamespace(context=SimpleNamespace(user=None, request=request))
+
+
+@pytest.fixture
+def audit_capture():
+    """Capture every emitted AuditEntry for assertion."""
+    captured: list[AuditEntry] = []
+    from core.mutations import _audit_writer as _orig_writer  # noqa: PLC2701
+
+    def _writer(entry: AuditEntry) -> None:
+        captured.append(entry)
+
+    register_audit_writer(_writer)
+    yield captured
+    register_audit_writer(_orig_writer)
 
 
 def _scaffold(
@@ -552,7 +585,10 @@ def test_apply_staged_manifest_applies_when_there_is_no_source_repo(permission_r
     assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
     assert app.manifest_raw_staged == ""
     assert app.manifest_hash
-    assert app.last_synced_hash == app.manifest_hash
+    # H2 (adversarial review): there is no repo to anchor to for a
+    # connection-less app, so last_synced_hash is left exactly as it was
+    # rather than advanced to a hash no repo ever had.
+    assert app.last_synced_hash == "abc"
     assert result.data.raw_manifest.strip() == _UPDATED_TOML.strip()
     assert result.data.raw_manifest_staged == ""
     # persist_manifest materializes the manifest's workloads -- the same
@@ -560,12 +596,14 @@ def test_apply_staged_manifest_applies_when_there_is_no_source_repo(permission_r
     assert Workload.objects.filter(registered_app=app, slug="web").exists()
 
 
-def test_apply_staged_manifest_applies_when_the_repo_has_no_working_connection(
+def test_apply_staged_manifest_rejects_when_the_repo_has_no_working_connection(
     permission_resolver,
 ):
-    """A ``source_repo`` with no usable ``SourceConnection`` can't push
-    either -- same escape hatch as a --manifest-raw app with no repo at
-    all."""
+    """H2 (adversarial review): a repo-backed app always goes through
+    pushManifestToRepo for review, whatever its connection health -- a
+    dead/missing SourceConnection is not a second escape hatch into a
+    direct apply. Only an app with no source_repo at all (asserted
+    above) has nothing else to apply the staged edit through."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
     app.manifest_raw_staged = _UPDATED_TOML
     app.save(update_fields=["manifest_raw_staged"])
@@ -577,10 +615,11 @@ def test_apply_staged_manifest_applies_when_the_repo_has_no_working_connection(
             input=ApplyStagedManifestInput(id=str(app.guid)),
         )
 
-    assert result.ok, result.errors
+    assert not result.ok
+    assert result.errors[0].code == "SCM_REPO_CONFIGURED"
     app.refresh_from_db()
-    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
-    assert app.manifest_raw_staged == ""
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()
+    assert app.manifest_raw_staged == _UPDATED_TOML
 
 
 def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
@@ -601,7 +640,7 @@ def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
         )
 
     assert not result.ok
-    assert result.errors[0].code == "SCM_CONNECTION_AVAILABLE"
+    assert result.errors[0].code == "SCM_REPO_CONFIGURED"
     app.refresh_from_db()
     assert app.manifest_raw_staged == _UPDATED_TOML
 
@@ -664,3 +703,213 @@ def test_apply_staged_manifest_unknown_app_returns_not_found(permission_resolver
         )
     assert not result.ok
     assert result.errors[0].code == "NOT_FOUND"
+
+
+# --- [env] literal changes require the same gate as a direct secret
+# write (#1759 adversarial review, H1) ----------------------------------
+#
+# applyStagedManifest reuses persist_manifest, which would otherwise
+# apply an [env] change with no more ceremony than any other manifest
+# edit -- a permission-only bypass of the review setAppSecret /
+# rotateAppSecret / #1915 put behind every other secret-literal write.
+
+_TOML_WITH_ENV = """
+astrolift_version = 1
+name = "hello"
+
+[env]
+FOO = "bar"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+"""
+_TOML_WITH_ENV_CHANGED = _TOML_WITH_ENV.replace('FOO = "bar"', 'FOO = "baz"')
+
+
+def test_apply_staged_manifest_refuses_an_env_change_when_secret_approval_is_required(
+    permission_resolver, audit_capture
+):
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.requires_secret_approval = True
+    app.manifest_raw_staged = _TOML_WITH_ENV_CHANGED
+    app.save(update_fields=["manifest_raw_staged", "requires_secret_approval"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    assert "setAppSecret" in result.errors[0].message
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
+    assert app.manifest_raw_staged == _TOML_WITH_ENV_CHANGED
+
+    # The sibling audit entry carries key NAMES + content hashes, never
+    # the literal values ("bar" / "baz" never appear anywhere in it).
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "DENY"
+    assert entry.extra["changed_keys"] == ["FOO"]
+    assert set(entry.extra) == {"before_hash", "after_hash", "changed_keys"}
+    serialized = json.dumps(entry.extra)
+    assert "bar" not in serialized
+    assert "baz" not in serialized
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_apply_staged_manifest_requires_elevation_for_an_env_change(permission_resolver, audit_capture):
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_ENV_CHANGED
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    session = _FakeSession()  # un-elevated
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(session),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
+    assert app.manifest_raw_staged == _TOML_WITH_ENV_CHANGED
+    actions = [e.action for e in audit_capture]
+    assert "app.manifest.apply_env_change" in actions
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_apply_staged_manifest_applies_an_env_change_once_elevated(permission_resolver):
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_ENV_CHANGED
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(session),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV_CHANGED.strip()
+
+
+def test_apply_staged_manifest_skips_the_elevation_gate_without_an_env_change(permission_resolver):
+    """The vast majority of manifest edits never touch [env] -- forcing
+    step-up on every one of them would be needless friction. Un-elevated,
+    REQUIRE_STEP_UP_AUTH on, but nothing in [env] changed: applies clean."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True), _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(_FakeSession()),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
+
+
+# --- optimistic concurrency, archived apps, identical no-op (#1759
+# adversarial review, M3) -----------------------------------------------
+
+
+def test_apply_staged_manifest_conflict_on_a_stale_expected_hash(permission_resolver):
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash="stale" * 8),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "CONFLICT"
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()
+    assert app.manifest_raw_staged == _UPDATED_TOML
+
+
+def test_apply_staged_manifest_applies_when_the_expected_hash_matches(permission_resolver):
+    from astrolift_manifest.normalize import raw_text_hash
+
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(
+                id=str(app.guid),
+                expected_staged_hash=raw_text_hash(_UPDATED_TOML),
+            ),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
+
+
+def test_apply_staged_manifest_refuses_an_archived_app(permission_resolver):
+    from django.utils import timezone
+
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.archived_at = timezone.now()
+    app.save(update_fields=["manifest_raw_staged", "archived_at"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "APP_ARCHIVED"
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()
+    assert app.manifest_raw_staged == _UPDATED_TOML
+
+
+def test_apply_staged_manifest_identical_staged_buffer_skips_repersisting(permission_resolver, monkeypatch):
+    """Staged text that already matches what's applied is cleared as a
+    no-op rather than re-run through persist_manifest (M3)."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _VALID_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    def _boom(*a, **k):
+        raise AssertionError("persist_manifest must not run for an identical staged buffer")
+
+    monkeypatch.setattr("astrolift_manifest.persist.persist_manifest", _boom)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()

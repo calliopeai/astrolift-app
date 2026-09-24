@@ -1208,6 +1208,12 @@
         "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge.",
         "confirm": "Pull from repo"
       },
+      "confirmApply": {
+        "title": "Apply staged manifest?",
+        "description": "Applies the staged draft straight to the live manifest; the next deploy uses it immediately.",
+        "descriptionWithEnv": "Applies the staged draft straight to the live manifest, changing these env values: {keys}. The next deploy uses it immediately.",
+        "confirm": "Apply"
+      },
       "view": {
         "form": "Form",
         "code": "Code"

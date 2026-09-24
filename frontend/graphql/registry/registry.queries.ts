@@ -60,6 +60,7 @@ const APP_FIELDS = gql`
     previewScreenshotUrl
     rawManifest
     rawManifestStaged
+    rawManifestStagedHash
     lastSyncedHash
     manifestSyncState
     lastResyncAt

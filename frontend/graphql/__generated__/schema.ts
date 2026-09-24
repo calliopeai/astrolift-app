@@ -117,6 +117,7 @@ export type AppdomainremovedpayloadMutationResult = {
 };
 
 export type ApplyStagedManifestInput = {
+  expectedStagedHash: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
 };
 
@@ -3192,6 +3193,7 @@ export type AstroliftRegisteredApp = {
   provisioningStatus: Scalars['String']['output'];
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
+  rawManifestStagedHash: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
