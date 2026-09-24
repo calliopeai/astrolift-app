@@ -21,8 +21,8 @@ Example (run on a live container via smd-opscode
         --env EMR_SERVICE_BASE_URL=https://emr.prd.smdinfra.net \\
         --secret EMR_AGENT_TOKEN=agents/<org guid>/emr-agent-token
 
-A ``--secret`` location must sit under ``agents/<org guid>/``,
-``agent-bundles/<org guid>/`` or ``services/<org guid>/`` (#1921).
+A ``--secret`` location must sit under ``agents/<org guid>/`` (#1921); it may
+carry the ``secret://`` scheme.
 """
 
 from __future__ import annotations

@@ -12,9 +12,13 @@ what holds the location, its identifier, the field, and the reason.
     manage.py audit_agent_secret_namespace --org steadymd
 
 Move each value it lists under ``agents/<org guid>/`` (typed agent refs),
-``agent-bundles/<org guid>/`` (org secret bundles) or ``services/<org guid>/``
-(managed-service config), point the ref there, and run it again until it
-prints nothing.
+``agent-bundles/<org guid>/`` (org secret bundles) or
+``services/<org guid>/<owner guid>/`` (managed-service config, where the owner is
+the service's app, or its project for a project service), point the ref there,
+and run it again until it prints nothing. A Google Secret Manager reference in a
+GCP service's config (Cloud Functions ``secret_environment``/``secret_volumes``,
+Managed Kafka Connect ``secret_paths``) must name, in the install project, the
+secret id the GCP secrets driver gives that location.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from astrolift_services.models import ManagedService, SecretBundle
 from astrolift_services.secret_ref_config import (
     managed_binding_ref_reason,
     service_organization,
+    service_owner,
     unscoped_config_secret_refs,
 )
 
@@ -77,7 +82,10 @@ class Command(BaseCommand):
 
     def _services(self, org):
         services = ManagedService.objects.filter(deleted_at__isnull=True).select_related(
-            "registered_app__organization", "project__organization"
+            "registered_app__organization",
+            "project__organization",
+            "tenant_cluster__provider_plugin",
+            "app_environment__tenant_cluster__provider_plugin",
         )
         if org is not None:
             services = services.filter(Q(registered_app__organization=org) | Q(project__organization=org))
@@ -85,8 +93,9 @@ class Command(BaseCommand):
             organization = service_organization(svc)
             where = f"{svc.kind}/{svc.name or svc.kind} ({svc.guid})"
             findings: dict[str, str] = {}
+            owner, cluster = service_owner(svc), svc.effective_cluster
             for config in (svc.config, svc.applied_config):
-                for path, _ref, reason in unscoped_config_secret_refs(config, organization=organization):
+                for path, _ref, reason in unscoped_config_secret_refs(config, owner=owner, cluster=cluster):
                     findings.setdefault(f"config.{path}", reason)
             if not findings:
                 # A driver may also copy a string from a field no check names

@@ -40,16 +40,16 @@ class ManagedServicePreflightError(ValueError):
     """A live cluster cannot satisfy a Kubernetes service requirement."""
 
 
-def _assert_config_secret_refs_scoped(svc: Any) -> None:
-    """Refuse a stored config carrying a secret ref outside the owning org's
-    namespace before a driver dereferences it (#1921). The mutations and the
-    manifest check a config as it is written; this catches one stored before
-    they did."""
+def _assert_config_secret_refs_scoped(svc: Any, cluster: Any) -> None:
+    """Refuse a stored config carrying a secret ref outside its owner's
+    namespace before a driver dereferences it or hands it to a cloud API
+    (#1921). The mutations and the manifest check a config as it is written;
+    this catches one stored before they did."""
     from astrolift_dispatch.agent_secrets import SecretRefNamespaceError
-    from astrolift_services.secret_ref_config import assert_config_secret_refs_scoped, service_organization
+    from astrolift_services.secret_ref_config import assert_config_secret_refs_scoped, service_owner
 
     try:
-        assert_config_secret_refs_scoped(svc.config, organization=service_organization(svc))
+        assert_config_secret_refs_scoped(svc.config, owner=service_owner(svc), cluster=cluster)
     except SecretRefNamespaceError as exc:
         raise ManagedServicePreflightError(f"managed service {svc.name or svc.kind!r}: {exc}") from exc
 
@@ -608,7 +608,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
         )
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
-    _assert_config_secret_refs_scoped(svc)
+    _assert_config_secret_refs_scoped(svc, cluster)
     _run_managed_service_preflight(svc, cluster)
     try:
         resolved = resolve_managed_driver(
@@ -666,7 +666,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
 
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
-    _assert_config_secret_refs_scoped(svc)
+    _assert_config_secret_refs_scoped(svc, cluster)
     _run_managed_service_preflight(svc, cluster)
     try:
         resolved = resolve_managed_driver(

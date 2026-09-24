@@ -107,11 +107,18 @@ def valid_agent_env_var(value: str) -> bool:
 # manifest or a managed-service config typed must sit under one of these roots.
 # The guid rather than the slug: slugs are unique only among live orgs, and a
 # slug may spell another org's guid.
-ORG_SECRET_ROOTS = ("agents", "agent-bundles", "services")
+#
+# Each root has one kind of holder. A typed agent ref may name only agents/:
+# agent-bundles/ holds bundle payloads, which setAgentSecretValue would replace
+# with {"value": ...}, and services/<org guid>/<owner guid>/ holds the secrets
+# of one app's or project's managed services, which an env-spec editor may not
+# read or overwrite (astrolift_services.secret_ref_config).
+AGENT_SECRET_ROOTS = ("agents",)
 # A secret bundle is one store location holding many keys, so it gets the one
 # root whose locations are bundles.
 BUNDLE_SECRET_ROOTS = ("agent-bundles",)
 _SECRET_STORE_SCHEMES = ("sm:", "ssm:")
+_SECRET_REFERENCE_SCHEME = "secret://"
 # The Secrets Manager name alphabet. It also keeps out what a path-joining
 # driver could normalize away (Vault builds an HTTP path from the ref).
 _SECRET_SEGMENT_RE = re.compile(r"[A-Za-z0-9_+=.@-]+")
@@ -121,48 +128,80 @@ class SecretRefNamespaceError(ValueError):
     """A typed secret location falls outside its organization's namespace (#1921)."""
 
 
-def _inside_org_secret_roots(path: str, organization, roots: tuple[str, ...]) -> bool:
+def canonical_secret_ref(uri: str) -> str:
+    """``uri`` in the one spelling the namespace check judges and a store
+    driver receives (#1921).
+
+    ``secret://`` is the documented reference scheme, and manifests use it
+    (``secret://agents/<org guid>/github``), but no store name carries it: the
+    AWS driver would look up ``astrolift/secret://agents/...``, a name Secrets
+    Manager rejects, and the GCP driver a different secret id. Only this
+    function strips it, once, where a typed ref enters resolution (and where a
+    typed ref is validated as it is written). Everything after that judges and
+    resolves the result, so the check and the driver cannot disagree about
+    which location a ref names.
+    """
+    return str(uri or "").strip().removeprefix(_SECRET_REFERENCE_SCHEME)
+
+
+def _inside_org_secret_roots(path: str, organization, roots: tuple[str, ...], owner) -> bool:
     segments = path.split("/")
+    scope = [str(organization.guid)] + ([str(owner.guid)] if owner is not None else [])
+    fixed = 1 + len(scope)
     return (
-        len(segments) >= 3
+        len(segments) > fixed
         and segments[0] in roots
-        and segments[1] == str(organization.guid)
-        and all(_SECRET_SEGMENT_RE.fullmatch(s) and s not in (".", "..") for s in segments[2:])
+        and segments[1:fixed] == scope
+        and all(_SECRET_SEGMENT_RE.fullmatch(s) and s not in (".", "..") for s in segments[fixed:])
     )
 
 
-def in_org_secret_namespace(uri: str, *, organization, roots: tuple[str, ...] = ORG_SECRET_ROOTS) -> bool:
-    """Whether ``uri`` names a location inside ``organization``'s own secret
-    namespace: ``<root>/<org guid>/...`` for one of ``roots``.
+def in_org_secret_namespace(uri: str, *, organization, roots: tuple[str, ...], owner=None) -> bool:
+    """Whether the store location ``uri`` sits inside ``organization``'s own
+    secret namespace: ``<root>/<org guid>/...`` for one of ``roots``, and
+    ``<root>/<org guid>/<owner guid>/...`` when ``owner`` is given.
 
-    The location may carry a ``secret://`` or ``sm:``/``ssm:`` scheme, leading
-    slashes or the ``astrolift/`` install root, and a ``#field`` selector.
-    Nothing else is accepted and nothing is rewritten. That includes an ARN: it
-    names a secret in whatever account and region it spells, while the relative
-    form always resolves in the driver's own store.
+    ``uri`` is judged as a driver receives it. It may carry an ``sm:``/``ssm:``
+    scheme, leading slashes or the ``astrolift/`` install root, and a
+    ``#field`` selector, because every driver reads those as the same location.
+    Nothing else is accepted and nothing is rewritten. That includes
+    ``secret://``, which no driver strips (see :func:`canonical_secret_ref`),
+    and an ARN: it names a secret in whatever account and region it spells,
+    while the relative form always resolves in the driver's own store.
     """
     path, separator, field = uri.partition("#")
-    path = path.removeprefix("secret://")
     for scheme in _SECRET_STORE_SCHEMES:
         if path.startswith(scheme):
             path = path[len(scheme) :]
             break
     path = path.lstrip("/").removeprefix("astrolift/")
     field_ok = not separator or bool(_SECRET_SEGMENT_RE.fullmatch(field))
-    return field_ok and _inside_org_secret_roots(path, organization, roots)
+    return field_ok and _inside_org_secret_roots(path, organization, roots, owner)
+
+
+def _agent_secret_ref_reason(uri: str, *, organization, typed: str) -> str | None:
+    """Why the canonical agent ref ``uri`` must not be resolved, or ``None``.
+    ``typed`` is the spelling to quote back."""
+    if in_org_secret_namespace(uri, organization=organization, roots=AGENT_SECRET_ROOTS):
+        return None
+    return (
+        f"{typed!r} is outside this organization's agent secret namespace; an agent secret must "
+        f"live under agents/{organization.guid}/ (attach a secret bundle or a managed service "
+        "instead of naming its location)"
+    )
 
 
 def assert_org_scoped_secret_ref(uri: str, *, organization) -> None:
-    """Raise :class:`SecretRefNamespaceError` unless the agent secret ref
-    ``uri`` names a location inside ``organization``'s own secret namespace
-    (see :func:`in_org_secret_namespace`)."""
-    if in_org_secret_namespace(uri, organization=organization):
-        return
-    guid = organization.guid
-    raise SecretRefNamespaceError(
-        f"{uri!r} is outside this organization's secret namespace; an agent secret must live "
-        f"under agents/{guid}/, agent-bundles/{guid}/ or services/{guid}/"
-    )
+    """Raise :class:`SecretRefNamespaceError` unless the typed agent secret
+    ref ``uri`` names a location under ``agents/<org guid>/``.
+
+    It is judged in its canonical form (:func:`canonical_secret_ref`), the one
+    resolution hands the store, so ``secret://agents/<org guid>/x`` passes and
+    resolves exactly like ``agents/<org guid>/x``.
+    """
+    reason = _agent_secret_ref_reason(canonical_secret_ref(uri), organization=organization, typed=uri)
+    if reason is not None:
+        raise SecretRefNamespaceError(reason)
 
 
 def assert_org_scoped_bundle_ref(backend_ref: str, *, organization) -> None:
@@ -186,6 +225,25 @@ def assert_org_scoped_bundle_ref(backend_ref: str, *, organization) -> None:
         )
 
 
+def bundle_location_key(backend_ref: str) -> str:
+    """A spelling-blind key for the store location ``backend_ref`` names.
+
+    Two refs with one key may name one physical secret on some driver. AWS
+    reads ``sm:``, a leading ``/`` and the ``astrolift/`` root as the same
+    name. GCP maps ``/`` and every character outside ``[A-Za-z0-9_-]`` to
+    ``-``. Key Vault is case-insensitive and folds runs of ``-``. The key is
+    coarser than all three, so it may call two distinct locations one, never
+    one location two, which is the safe side for a uniqueness check (#1921).
+    """
+    path = backend_ref.strip().partition("#")[0]
+    for scheme in _SECRET_STORE_SCHEMES:
+        if path.startswith(scheme):
+            path = path[len(scheme) :]
+            break
+    path = path.lstrip("/").removeprefix("astrolift/")
+    return re.sub(r"[^a-z0-9]+", "-", path.lower()).strip("-")
+
+
 def unscoped_bundle_reason(bundle, *, organization) -> str | None:
     """Why ``bundle``'s store location must not be read or written on behalf
     of ``organization``, or ``None`` (#1921).
@@ -206,7 +264,12 @@ def unscoped_bundle_reason(bundle, *, organization) -> str | None:
 def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], Any]]:
     """``env_var -> (ref, binding)`` for :func:`effective_secret_refs`.
     ``binding`` is the project managed-service binding row the platform
-    derived the ref from, or ``None`` when an operator or a manifest typed it."""
+    derived the ref from, or ``None`` when an operator or a manifest typed it.
+
+    A typed ref's ``uri`` is its canonical form (:func:`canonical_secret_ref`):
+    every consumer, the namespace check and each store call alike, reads it
+    from here, so none of them strips a scheme on its own.
+    """
     # Project-resource bindings are defaults. Manifest refs and persistent
     # operator overrides win on collisions so attaching a shared database can
     # never silently replace an explicitly configured credential.
@@ -214,7 +277,10 @@ def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], Any]]
         _managed_binding_secret_refs(_project_managed_service_bindings(spec))
     )
     refs.update(
-        {row["env_var"]: (row, None) for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
+        {
+            row["env_var"]: ({"env_var": row["env_var"], "uri": canonical_secret_ref(row["uri"])}, None)
+            for row in normalize_secret_refs(getattr(spec, "secret_refs", None))
+        }
     )
     if spec is None or not getattr(spec, "pk", None):
         return refs
@@ -226,7 +292,10 @@ def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], Any]]
         if override.removed:
             refs.pop(override.env_var, None)
         elif override.uri:
-            refs[override.env_var] = ({"env_var": override.env_var, "uri": override.uri}, None)
+            refs[override.env_var] = (
+                {"env_var": override.env_var, "uri": canonical_secret_ref(override.uri)},
+                None,
+            )
     return refs
 
 
@@ -262,13 +331,11 @@ def unscoped_secret_refs(spec) -> dict[str, str]:
     for env_var, (ref, binding) in _effective_secret_ref_sources(spec).items():
         if binding is not None:
             reason = managed_binding_ref_reason(binding.managed_service, ref["uri"])
-            if reason is not None:
-                unscoped[env_var] = reason
-            continue
-        try:
-            assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization)
-        except SecretRefNamespaceError as exc:
-            unscoped[env_var] = str(exc)
+        else:
+            # Already canonical: judge the very string the store will get.
+            reason = _agent_secret_ref_reason(ref["uri"], organization=spec.organization, typed=ref["uri"])
+        if reason is not None:
+            unscoped[env_var] = reason
     return unscoped
 
 

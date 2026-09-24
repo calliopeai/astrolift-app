@@ -4,10 +4,12 @@ An org without its own cluster shares the install's secret store with every
 other org, and every driver files a relative ref under one install-wide root:
 ``managed/rds-orders/url`` and ``astrolift/managed/rds-orders/url`` name the
 same AWS secret, another tenant's database URL. A location an operator or a
-manifest typed must therefore sit under ``agents/<org guid>/``,
-``agent-bundles/<org guid>/`` or ``services/<org guid>/``, and a managed-service
-binding the agent inherits resolves only if the driver minted it or it sits
-there too.
+manifest typed must therefore sit under ``agents/<org guid>/``. The other org
+roots hold other things: ``agent-bundles/`` holds bundle payloads and
+``services/<org guid>/<owner guid>/`` one app's or project's managed-service
+secrets, so a typed agent ref naming either is refused. A managed-service
+binding the agent inherits resolves only if the driver minted it or it sits in
+its service's namespace.
 
 The predicate is pinned directly. The spawn and agent-box preflight
 (``resolve_task_secret_manifest``) is pinned on real rows with an in-memory
@@ -44,9 +46,8 @@ ORG = SimpleNamespace(guid=uuid.UUID(G))
         f"astrolift/agents/{G}/gh",
         f"secret://agents/{G}/gh",
         f"secret://sm:agents/{G}/gh",
-        f"agent-bundles/{G}/shared-defaults",
+        f"  secret://agents/{G}/gh  ",
         f"agents/{G}/bundle#API_KEY",
-        f"services/{G}/kafka#password",
     ],
 )
 def test_accepts_a_location_inside_the_org_namespace(uri):
@@ -67,6 +68,18 @@ def test_accepts_a_location_inside_the_org_namespace(uri):
         pytest.param(f"agents/{OTHER}/gh", id="another-org"),
         pytest.param(f"astrolift/agents/{OTHER}/gh", id="another-org-absolute"),
         pytest.param(f"agent-bundles/{OTHER}/shared", id="another-orgs-bundle"),
+        # setAgentSecretValue on this ref would replace the bundle's keys with
+        # {"value": ...}.
+        pytest.param(f"agent-bundles/{G}/shared-defaults", id="own-bundle-location-holds-a-bundle"),
+        pytest.param(f"agents/{G}/../agent-bundles/{G}/shared", id="dot-dot-into-the-bundle-root"),
+        # One app's managed-service secrets, which APP_UPDATE on that app does
+        # not grant an env-spec editor.
+        pytest.param(f"services/{G}/{OTHER}/kafka#password", id="a-managed-service-secret"),
+        pytest.param(f"services/{G}/kafka#password", id="the-org-level-services-root"),
+        # The canonical form strips the scheme once and the check judges what
+        # is left, which still carries one: exactly what the store would get.
+        pytest.param(f"secret://secret://agents/{G}/gh", id="scheme-twice"),
+        pytest.param(f"sm:secret://agents/{G}/gh", id="scheme-after-the-store-scheme"),
         pytest.param(f"project-bundles/{G}/{OTHER}/jira", id="project-bundle-bypasses-membership"),
         pytest.param(f"agents/{G}-extra/gh", id="guid-prefix-collision"),
         pytest.param(f"agents/{G.upper()}/gh", id="guid-case"),
@@ -252,6 +265,123 @@ def test_spawn_resolves_refs_and_bundles_inside_the_org_namespace(org, monkeypat
     manifest = _resolve(spec)
 
     assert manifest["stringData"] == {"GITHUB_TOKEN": "ghp_own", "API_KEY": "k"}
+
+
+class _AwsSecretsManager:
+    """Enough of boto3's Secrets Manager client for ``AWSSecretsBackend.get``,
+    keeping the service's name rule: a name outside ``[A-Za-z0-9/_+=.@-]`` is a
+    ``ValidationException``, which is what ``astrolift/secret://...`` gets."""
+
+    class exceptions:  # noqa: N801 - boto3's attribute name
+        class ResourceNotFoundException(Exception):
+            pass
+
+    def __init__(self, secrets):
+        self.secrets = dict(secrets)
+        self.secret_ids: list[str] = []
+
+    def get_secret_value(self, *, SecretId):  # noqa: N803 - boto3's keyword
+        import re
+
+        self.secret_ids.append(SecretId)
+        if not re.fullmatch(r"[A-Za-z0-9/_+=.@-]+", SecretId):
+            error = RuntimeError("Invalid name")
+            error.response = {"Error": {"Code": "ValidationException", "Message": "Invalid name"}}
+            raise error
+        if SecretId not in self.secrets:
+            raise self.exceptions.ResourceNotFoundException(SecretId)
+        return {"SecretString": self.secrets[SecretId]}
+
+
+class NotFound(Exception):  # noqa: N818 - google.api_core's class name, which the driver matches
+    pass
+
+
+class _GcpSecretManager:
+    """Enough of the Secret Manager client for ``GCPSecretsBackend.get``."""
+
+    def __init__(self, secrets):
+        self.secrets = dict(secrets)
+        self.names: list[str] = []
+
+    def access_secret_version(self, *, name):
+        self.names.append(name)
+        if name not in self.secrets:
+            raise NotFound(name)
+        return SimpleNamespace(payload=SimpleNamespace(data=self.secrets[name].encode("utf-8")))
+
+
+@pytest.mark.parametrize("spelling", ["agents/{guid}/github", "secret://agents/{guid}/github"])
+def test_a_secret_reference_resolves_to_the_same_aws_secret_as_its_location(org, monkeypatch, spelling):
+    """Company-agent manifests write ``secret://agents/<org guid>/<name>``.
+    The scheme is stripped once, so the check and the real AWS driver both see
+    the relative location: Secrets Manager is asked for
+    ``astrolift/agents/<org guid>/github``, never ``astrolift/secret://...``."""
+    from aws.secrets import AWSSecretsBackend, SecretsConfig
+
+    name = f"astrolift/agents/{org.guid}/github"
+    client = _AwsSecretsManager({name: "ghp_own"})
+    _install(
+        monkeypatch,
+        AWSSecretsBackend(config=SecretsConfig(region="us-west-2"), sm_client=client, ssm_client=object()),
+    )
+    spec = _spec(org, [{"env_var": "GITHUB_TOKEN", "uri": spelling.format(guid=org.guid)}])
+
+    manifest = _resolve(spec)
+
+    assert manifest["stringData"] == {"GITHUB_TOKEN": "ghp_own"}
+    assert client.secret_ids == [name]
+
+
+@pytest.mark.parametrize("spelling", ["agents/{guid}/github", "secret://agents/{guid}/github"])
+def test_a_secret_reference_resolves_to_the_same_gcp_secret_as_its_location(org, monkeypatch, spelling):
+    """Unstripped, the GCP driver would map the scheme into the id
+    (``astrolift-secret---agents-...``), a different secret."""
+    from gcp.secrets import GCPSecretsBackend, GCPSecretsConfig
+
+    name = f"projects/acme-prod/secrets/astrolift-agents-{org.guid}-github/versions/latest"
+    client = _GcpSecretManager({name: "ghp_own"})
+    _install(monkeypatch, GCPSecretsBackend(config=GCPSecretsConfig(project_id="acme-prod", client=client)))
+    spec = _spec(org, [{"env_var": "GITHUB_TOKEN", "uri": spelling.format(guid=org.guid)}])
+
+    manifest = _resolve(spec)
+
+    assert manifest["stringData"] == {"GITHUB_TOKEN": "ghp_own"}
+    assert client.names == [name]
+
+
+def test_a_binding_override_with_the_scheme_resolves_to_its_location(org, monkeypatch):
+    from astrolift_agents.models.agent_secret_binding import AgentSecretBindingOverride
+
+    spec = _spec(org)
+    AgentSecretBindingOverride.objects.create(
+        environment_spec=spec, env_var="GITHUB_TOKEN", uri=f"secret://agents/{org.guid}/github"
+    )
+    store = _install(monkeypatch, _Store({f"agents/{org.guid}/github": {"value": "ghp_own"}}))
+
+    assert _resolve(spec)["stringData"] == {"GITHUB_TOKEN": "ghp_own"}
+    assert store.reads == [f"agents/{org.guid}/github"]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        pytest.param("agent-bundles/{guid}/shared", id="a-bundle-payload"),
+        pytest.param("services/{guid}/{other}/db-password", id="a-managed-service-secret"),
+        pytest.param("secret://secret://agents/{guid}/github", id="a-scheme-left-after-canonicalizing"),
+    ],
+)
+def test_spawn_refuses_a_stored_typed_ref_outside_the_agent_root(org, monkeypatch, location):
+    """A row written before typed refs were narrowed to ``agents/`` is never
+    read: a bundle's payload and a service's secret belong to their holders."""
+    uri = location.format(guid=org.guid, other=OTHER)
+    spec = _spec(org, [{"env_var": "LEAKED", "uri": uri}])
+    store = _install(monkeypatch, _Store({uri: {"value": "not-yours"}}))
+
+    with pytest.raises(AgentSecretResolutionError, match="LEAKED"):
+        _resolve(spec)
+
+    assert store.reads == []
 
 
 def test_spawn_resolves_a_project_bundle_the_platform_minted(org, monkeypatch):

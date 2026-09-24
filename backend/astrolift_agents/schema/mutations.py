@@ -654,6 +654,45 @@ def _refuse_unscoped_bundle(spec, bundle):
     return gql_failure(ErrorCode.PRECONDITION.value, reason, field="bundleId")
 
 
+def _org_bundle_at(spec, backend_ref: str, *, exclude_pk=None):
+    """Another live org bundle of the spec's org whose ``backend_ref`` names
+    the same store location as ``backend_ref``, or ``None`` (#1921)."""
+    from astrolift_dispatch.agent_secrets import bundle_location_key
+    from astrolift_services.models import SecretBundle
+
+    key = bundle_location_key(backend_ref)
+    rows = SecretBundle.objects.filter(
+        organization_id=spec.organization_id,
+        project__isnull=True,
+        team__isnull=True,
+        deleted_at__isnull=True,
+    ).only("pk", "slug", "backend_ref")
+    if exclude_pk is not None:
+        rows = rows.exclude(pk=exclude_pk)
+    return next(
+        (row for row in rows.order_by("created_at", "pk") if bundle_location_key(row.backend_ref) == key),
+        None,
+    )
+
+
+def _refuse_shared_bundle_location(spec, backend_ref: str, *, exclude_pk=None):
+    """A CONFLICT envelope when ``backend_ref`` names a location another live
+    org bundle already holds, else ``None`` (#1921).
+
+    One location, one bundle: deleting either bundle would delete the other's
+    keys, and the delete guard for an attached bundle checks only its own
+    attachments.
+    """
+    other = _org_bundle_at(spec, backend_ref, exclude_pk=exclude_pk)
+    if other is None:
+        return None
+    return gql_failure(
+        ErrorCode.CONFLICT.value,
+        f"backendRef names the store location of secret bundle {other.slug!r}; a location holds one bundle",
+        field="backendRef",
+    )
+
+
 def _agent_secrets_backend(spec):
     """Resolve ``(backend, None)`` for the spec's org secret store, or
     ``(None, failure)``.
@@ -1116,6 +1155,7 @@ class AgentsMutation:
         from astrolift_dispatch.agent_secrets import (
             SecretRefNamespaceError,
             assert_org_scoped_secret_ref,
+            canonical_secret_ref,
             valid_agent_env_var,
         )
 
@@ -1165,15 +1205,17 @@ class AgentsMutation:
         backend, berr = _agent_secrets_backend(spec)
         exists = False
         error = None
+        # The spelling resolution hands the store, as the status query shows it.
+        resolved_uri = canonical_secret_ref(override.uri)
         if berr is None:
             from astrolift_dispatch.agent_secrets import read_secret_value
 
             try:
-                exists = bool(read_secret_value(backend, override.uri))
+                exists = bool(read_secret_value(backend, resolved_uri))
             except Exception:  # noqa: BLE001 — never reflect provider response bodies
                 error = "secret presence check failed; inspect the provider audit log"
         return gql_success(
-            AgentSecretStatusType(env_var=env_var, uri=override.uri, exists=exists, error=error)
+            AgentSecretStatusType(env_var=env_var, uri=resolved_uri, exists=exists, error=error)
         )
 
     @strawberry.field
@@ -1287,6 +1329,9 @@ class AgentsMutation:
             assert_org_scoped_bundle_ref(path, organization=spec.organization)
         except SecretRefNamespaceError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
+        refused = _refuse_shared_bundle_location(spec, path)
+        if refused is not None:
+            return refused
         try:
             with transaction.atomic():
                 bundle = SecretBundle.objects.create(
@@ -1348,6 +1393,10 @@ class AgentsMutation:
             assert_org_scoped_bundle_ref(backend_ref, organization=spec.organization)
         except SecretRefNamespaceError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
+        if backend_ref != bundle.backend_ref:
+            refused = _refuse_shared_bundle_location(spec, backend_ref, exclude_pk=bundle.pk)
+            if refused is not None:
+                return refused
         backend = None
         store_err = None
         # A current location outside the namespace (#1921) is never probed:
@@ -1415,8 +1464,13 @@ class AgentsMutation:
         if store_err is not None:
             return store_err
         # A location outside the org namespace (#1921) is not provably this
-        # org's to delete: drop the control-plane bundle and leave the store.
-        owns_location = unscoped_bundle_reason(bundle, organization=spec.organization) is None
+        # org's to delete, and one another live bundle also names (stored
+        # before backendRef was unique) still holds that bundle's keys: drop
+        # the control-plane bundle and leave the store.
+        owns_location = (
+            unscoped_bundle_reason(bundle, organization=spec.organization) is None
+            and _org_bundle_at(spec, bundle.backend_ref, exclude_pk=bundle.pk) is None
+        )
         try:
             # Delete the provider-side bundle as well as its control-plane
             # metadata. ``None`` means it is already absent; an empty dict is

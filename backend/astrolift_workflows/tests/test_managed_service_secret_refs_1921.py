@@ -11,7 +11,9 @@ again where each one would:
 * the resolve paths that read stored rows: app deploy, volume credentials and
   the app's IRSA grants.
 
-A ref the driver minted from the instance's identity keeps resolving.
+A ref the driver minted from the instance's identity keeps resolving. The
+namespace is the owning app's, ``services/<org guid>/<app guid>/``, so a config
+naming another app of the same org is refused on these paths too.
 """
 
 from __future__ import annotations
@@ -71,7 +73,20 @@ def _world():
         provisioning_status="ready",
     )
     env = AppEnvironment.objects.create(registered_app=app, name="production", tenant_cluster=cluster)
-    return SimpleNamespace(org=org, app=app, env=env, cluster=cluster)
+    return SimpleNamespace(org=org, team=team, project=project, app=app, env=env, cluster=cluster)
+
+
+def _other_app_ns(world, name):
+    """A location in the namespace of another app of the same org."""
+    other = RegisteredApp.objects.create(
+        organization=world.org,
+        team=world.team,
+        project=world.project,
+        name="Billing",
+        slug="billing-msr-1921",
+        provisioning_status="ready",
+    )
+    return f"services/{world.org.guid}/{other.guid}/{name}"
 
 
 def _service(world, *, config=None, kind=ManagedService.Kind.EVENT_STREAM, name="events"):
@@ -107,6 +122,38 @@ def test_the_activity_refuses_a_stored_config_before_the_driver_runs(activity):
         pytest.raises(ManagedServicePreflightError, match=f"services/{world.org.guid}/"),
     ):
         activity(svc.pk)
+
+
+def test_the_activity_refuses_a_google_secret_in_another_project_before_the_driver_runs():
+    """Cloud Functions hands ``secret_environment`` to Google, so a config
+    stored before the write-time check reaches no API: the preflight refuses
+    a project other than the install's."""
+    world = _world()
+    ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name="GCP", slug="gcp", plugin_version="0.0.1")], ignore_conflicts=True
+    )
+    world.cluster.provider_plugin = ProviderPlugin.objects.get(slug="gcp")
+    world.cluster.provider_config = {"project_id": "acme-prod", "region": "us-central1"}
+    world.cluster.save(update_fields=["provider_plugin", "provider_config"])
+    own = f"astrolift-services-{world.org.guid}-{world.app.guid}-api-token"
+    svc = _service(
+        world,
+        kind=ManagedService.Kind.FAAS,
+        name="fn",
+        config={
+            "secret_environment": [
+                {"key": "API_TOKEN", "secret": own, "version": "1", "project_id": "victim-project"}
+            ]
+        },
+    )
+
+    with (
+        patch(
+            "astrolift_drivers.managed_resolution.resolve_managed_driver", side_effect=_driver_must_not_run
+        ),
+        pytest.raises(ManagedServicePreflightError, match="install project 'acme-prod'"),
+    ):
+        _provision_sync(svc.pk)
 
 
 # ---- binding sync ---------------------------------------------------------------
@@ -174,9 +221,20 @@ def test_sync_refuses_a_volume_credential_copied_from_the_config():
     assert not ManagedServiceVolumeBinding.objects.filter(managed_service=svc).exists()
 
 
-def test_sync_writes_refs_the_driver_minted_and_config_refs_inside_the_org():
+def test_sync_refuses_a_ref_copied_from_a_config_naming_another_apps_secret():
     world = _world()
-    own = f"services/{world.org.guid}/kafka#password"
+    theirs = _other_app_ns(world, "kafka")
+    svc = _service(world, config={"password_secret_ref": f"{theirs}#password"})
+
+    with pytest.raises(ValueError, match=f"services/{world.org.guid}/{world.app.guid}/"):
+        _sync(svc, Binding(env_vars={"EVENT_STREAM_PASSWORD": ValueRef(secret_ref=f"{theirs}#password")}))
+
+    assert not ManagedServiceBinding.objects.filter(managed_service=svc).exists()
+
+
+def test_sync_writes_refs_the_driver_minted_and_config_refs_inside_the_apps_namespace():
+    world = _world()
+    own = f"services/{world.org.guid}/{world.app.guid}/kafka#password"
     svc = _service(world, config={"password_secret_ref": own})
 
     _sync(
@@ -257,6 +315,24 @@ def world_and_planted_row():
 def test_deploy_refuses_a_binding_row_planted_before_the_config_check(world_and_planted_row, deploy_drivers):
     world, _svc = world_and_planted_row
     deploy_drivers.store.store[_VICTIM] = {"value": "postgres://victim"}
+
+    with pytest.raises(AppDeployError, match="EVENT_STREAM_PASSWORD"):
+        _deploy(world)
+
+    assert deploy_drivers.store.reads == []
+    assert deploy_drivers.cluster.applied == []
+
+
+def test_deploy_refuses_a_stored_row_copied_from_another_apps_namespace(deploy_drivers):
+    """Stored under the org-wide ``services/<org guid>/`` rule of the previous
+    round: the row names another app's secret, so it is never read."""
+    world = _world()
+    theirs = _other_app_ns(world, "db-password")
+    svc = _service(world, config={"password_secret_ref": theirs})
+    ManagedServiceBinding.objects.create(
+        managed_service=svc, env_key="EVENT_STREAM_PASSWORD", env_value_ref=theirs, is_secret=True
+    )
+    deploy_drivers.store.store[theirs] = {"value": "billing-db-password"}
 
     with pytest.raises(AppDeployError, match="EVENT_STREAM_PASSWORD"):
         _deploy(world)

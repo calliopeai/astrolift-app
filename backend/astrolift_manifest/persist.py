@@ -347,8 +347,11 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
         )
         if item is not None:
             validate_config(item, config)
+        # The service's owner decides its secret namespace (#1921): the app
+        # for an app-scoped service, the project for a project-scoped one.
+        owner = app if service.owner_scope == "app" else app.project
         try:
-            assert_config_secret_refs_scoped(config, organization=app.organization)
+            assert_config_secret_refs_scoped(config, owner=owner, cluster=env.tenant_cluster)
         except SecretRefNamespaceError as exc:
             raise ValueError(f"managed service {service.name or service.kind!r}: {exc}") from exc
         variant = item.variant if item is not None else (service.variant or "")

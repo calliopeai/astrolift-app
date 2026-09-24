@@ -57,20 +57,23 @@ def _spec(org, refs):
     )
 
 
-def _app_service(org, *, config):
+def _app_service(org, *, config, plugin_slug=None, provider_config=None):
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
 
     team = Team.objects.create(organization=org, name="Eng", slug=f"eng-{org.slug}")
     project = Project.objects.create(organization=org, team=team, name="P", slug=f"p-{org.slug}")
+    plugin_slug = plugin_slug or f"k8s-{org.slug}"
     ProviderPlugin.objects.bulk_create(
-        [ProviderPlugin(name="K8s audit", slug=f"k8s-{org.slug}", plugin_version="1.0.0")]
+        [ProviderPlugin(name=f"Plugin {plugin_slug}", slug=plugin_slug, plugin_version="1.0.0")],
+        ignore_conflicts=True,
     )
     cluster = TenantCluster.objects.create(
         organization=org,
-        provider_plugin=ProviderPlugin.objects.get(slug=f"k8s-{org.slug}"),
+        provider_plugin=ProviderPlugin.objects.get(slug=plugin_slug),
         name="Prod",
         slug=f"prod-{org.slug}",
         endpoint="https://cluster.example.com",
+        provider_config=dict(provider_config or {}),
     )
     app = RegisteredApp.objects.create(
         organization=org,
@@ -137,7 +140,50 @@ def test_lists_every_kind_of_location_the_release_refuses():
     by_field = {row[4]: row[5] for row in rows}
     assert f"agents/{org.guid}/" in by_field["GITHUB_TOKEN"]
     assert f"agent-bundles/{org.guid}/" in by_field["backendRef"]
-    assert f"services/{org.guid}/" in by_field["config.password_secret_ref"]
+    assert f"services/{org.guid}/{service.registered_app.guid}/" in by_field["config.password_secret_ref"]
+
+
+def test_lists_config_naming_another_owners_secret_and_a_foreign_google_secret():
+    """Round two accepted any ``services/<org guid>/`` location; the owner
+    split refuses one outside the service's own app, and a Cloud Functions
+    secret outside the owner's Google Secret Manager ids."""
+    org = _org("acme-owner-audit")
+    other_app = "0192f3c4-3333-7eee-8fff-333333333333"
+    service = _app_service(org, config={"password_secret_ref": f"services/{org.guid}/{other_app}/db"})
+    gcp_org = _org("globex-gcp-audit")
+    function = _app_service(
+        gcp_org,
+        plugin_slug="gcp",
+        provider_config={"project_id": "globex-prod", "region": "us-central1"},
+        config={
+            "secret_environment": [
+                {"key": "API_TOKEN", "secret": "astrolift-cloudsql-orders-master", "version": "1"}
+            ]
+        },
+    )
+
+    found = {(row[0], row[3], row[4]): row[5] for row in _audit()}
+
+    assert set(found) == {
+        ("acme-owner-audit", f"event_stream/events ({service.guid})", "config.password_secret_ref"),
+        ("globex-gcp-audit", f"event_stream/events ({function.guid})", "config.secret_environment[0].secret"),
+    }
+    owner_ns = f"services/{org.guid}/{service.registered_app.guid}/"
+    assert (
+        owner_ns
+        in found[("acme-owner-audit", f"event_stream/events ({service.guid})", "config.password_secret_ref")]
+    )
+    gcp_root = f"astrolift-services-{gcp_org.guid}-{function.registered_app.guid}-"
+    assert (
+        gcp_root
+        in found[
+            (
+                "globex-gcp-audit",
+                f"event_stream/events ({function.guid})",
+                "config.secret_environment[0].secret",
+            )
+        ]
+    )
 
 
 def test_filters_to_one_organization_by_slug_or_guid():

@@ -692,6 +692,8 @@ _VICTIM = "managed/rds-orders/master"
             "arn:aws:secretsmanager:us-west-2:123456789012:secret:astrolift/agents/{org}/gh-AbCdEf",
             id="arn-even-of-an-own-name",
         ),
+        pytest.param("agent-bundles/{org}/shared", id="a-bundle-location"),
+        pytest.param("services/{org}/{other}/db-password", id="a-managed-service-secret"),
     ],
 )
 def test_upsert_ref_rejects_a_location_outside_the_org_namespace(
@@ -843,6 +845,80 @@ def test_status_reports_a_stored_ref_outside_the_org_namespace_without_probing(
     assert fake_store.reads == [_ns(org, "gh")]
 
 
+def test_every_value_surface_hands_the_store_the_location_a_reference_names(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """``secret://agents/<org guid>/gh`` is the secret at ``agents/<org guid>/gh``
+    on every surface (#1921): set, reveal, the status probe and delete hand the
+    store the location, never the scheme a driver would file as part of the
+    name."""
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    permission_resolver.grant(Permission.SECRET_READ)
+    permission_resolver.grant(Permission.SECRET_LIST)
+    location = f"agents/{org.guid}/gh"
+    spec = _spec(org, refs=[{"uri": f"secret://{location}", "env_var": "GITHUB_TOKEN"}])
+
+    with with_tenant_org(org):
+        written = AgentsMutation().set_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN", value="ghp_new"
+        )
+        revealed = AgentsMutation().reveal_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+        rows = AgentsQuery().agent_environment_spec_secret_status(info, slug=spec.slug)
+        deleted = AgentsMutation().delete_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+
+    assert written.ok is True, written.errors
+    assert revealed.ok is True, revealed.errors
+    assert revealed.data.value == "ghp_new"
+    assert [(row.env_var, row.uri, row.exists) for row in rows] == [("GITHUB_TOKEN", location, True)]
+    assert deleted.ok is True, deleted.errors
+    assert fake_store.upserts == [(location, {"value": "ghp_new"})]
+    assert set(fake_store.reads) == {location}
+    assert fake_store.deletes == [location]
+
+
+def test_upsert_ref_probes_the_location_a_reference_names(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    location = f"agents/{org.guid}/gh"
+    fake_store.store = {location: {"value": "ghp_x"}}
+    spec = _spec(org, refs=[])
+
+    with with_tenant_org(org):
+        result = AgentsMutation().upsert_agent_secret_ref(
+            info, env_spec_slug=spec.slug, env_var="GH_TOKEN", uri=f"secret://{location}"
+        )
+
+    assert result.ok is True, result.errors
+    assert (result.data.uri, result.data.exists) == (location, True)
+    assert fake_store.reads == [location]
+
+
+def test_set_refuses_a_stored_ref_naming_a_bundle_location(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """A typed ref under ``agent-bundles/`` would let setAgentSecretValue
+    replace an attached bundle's keys with ``{"value": ...}`` (#1921)."""
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    location = _bundle_ns(org, "shared")
+    fake_store.store = {location: {"API_KEY": "k", "OTHER_KEY": "o"}}
+    spec = _spec(org, refs=[{"uri": location, "env_var": "SHADOW"}])
+
+    with with_tenant_org(org):
+        result = AgentsMutation().set_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="SHADOW", value="clobbered"
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert fake_store.upserts == []
+    assert fake_store.store[location] == {"API_KEY": "k", "OTHER_KEY": "o"}
+
+
 _VICTIM_BUNDLE = "managed/rds-orders/credentials"
 
 
@@ -989,6 +1065,139 @@ def test_update_bundle_moves_off_a_location_outside_the_org_namespace_without_re
     assert bundle.backend_ref == _bundle_ns(org, "planted")
     assert fake_store.reads == []
     assert fake_store.store[_VICTIM_BUNDLE] == {"PASSWORD": "victim-pw"}
+
+
+# ---- one store location holds one bundle (#1921) --------------------------------
+
+
+@pytest.mark.parametrize(
+    "spelling",
+    [
+        pytest.param("agent-bundles/{org}/shared-defaults", id="the-same-location"),
+        pytest.param("/agent-bundles/{org}/shared-defaults", id="leading-slash"),
+        pytest.param("astrolift/agent-bundles/{org}/shared-defaults", id="install-root"),
+        pytest.param("sm:agent-bundles/{org}/shared-defaults", id="store-scheme"),
+        pytest.param("agent-bundles/{org}/Shared-Defaults", id="case-key-vault-ignores"),
+        pytest.param("agent-bundles/{org}/shared_defaults", id="underscore-key-vault-folds"),
+        pytest.param("agent-bundles/{org}/shared/defaults", id="slash-gcp-folds"),
+    ],
+)
+def test_create_bundle_refuses_a_location_another_bundle_holds(
+    permission_resolver, info, org, with_tenant_org, fake_store, spelling
+):
+    """Deleting either of two bundles on one location would delete the other's
+    keys, and the delete guard only knows its own attachments."""
+    from astrolift_services.models import SecretBundle
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+    with with_tenant_org(org):
+        first = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, name="Shared defaults", slug="shared-defaults"
+        )
+        alias = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="Alias",
+            slug="alias",
+            backend_ref=spelling.format(org=org.guid),
+        )
+
+    assert first.ok is True, first.errors
+    assert alias.ok is False
+    assert alias.errors[0].code == ErrorCode.CONFLICT.value
+    assert alias.errors[0].field == "backendRef"
+    assert "'shared-defaults'" in alias.errors[0].message
+    assert not SecretBundle.objects.filter(organization=org, slug="alias").exists()
+
+
+def test_create_bundle_accepts_a_distinct_location_and_another_orgs_same_name(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    other = Organization.objects.create(name="Other Org", slug="other-org-unique-1921")
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+    other_spec = _spec(other, slug="other-dev")
+    with with_tenant_org(org):
+        first = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, name="Shared", slug="shared"
+        )
+        second = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, name="Shared 2", slug="shared-2"
+        )
+    with with_tenant_org(other):
+        theirs = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=other_spec.slug, name="Shared", slug="shared"
+        )
+
+    assert [first.ok, second.ok, theirs.ok] == [True, True, True], (
+        first.errors,
+        second.errors,
+        theirs.errors,
+    )
+
+
+def test_update_bundle_refuses_to_move_onto_another_bundles_location(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    from astrolift_services.models import SecretBundle
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+    with with_tenant_org(org):
+        held = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, name="Held", slug="held"
+        )
+        mover = AgentsMutation().create_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, name="Mover", slug="mover"
+        )
+        moved = AgentsMutation().update_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=mover.data.id,
+            name="Mover",
+            backend_ref=f"/{_bundle_ns(org, 'held')}",
+        )
+
+    assert held.ok is True, held.errors
+    assert moved.ok is False
+    assert moved.errors[0].code == ErrorCode.CONFLICT.value
+    assert SecretBundle.objects.get(organization=org, slug="mover").backend_ref == _bundle_ns(org, "mover")
+
+
+def test_delete_leaves_a_location_another_live_bundle_still_holds(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """Two bundles stored on one location before backendRef was unique:
+    deleting one drops only its row, and the last one out deletes the store."""
+    from astrolift_services.models import SecretBundle
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    location = _bundle_ns(org, "shared")
+    fake_store.store = {location: {"API_KEY": "k"}}
+    spec = _spec(org)
+    holder = SecretBundle.objects.create(
+        organization=org, name="Holder", slug="holder", backend_ref=location
+    )
+    alias = SecretBundle.objects.create(
+        organization=org, name="Alias", slug="alias", backend_ref=f"astrolift/{location}"
+    )
+
+    with with_tenant_org(org):
+        dropped = AgentsMutation().delete_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, bundle_id=str(alias.guid)
+        )
+        assert dropped.ok is True, dropped.errors
+        assert fake_store.deletes == []
+        assert fake_store.store[location] == {"API_KEY": "k"}
+        assert SecretBundle.objects.filter(pk=holder.pk).exists()
+
+        last = AgentsMutation().delete_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, bundle_id=str(holder.guid)
+        )
+
+    assert last.ok is True, last.errors
+    assert fake_store.deletes == [location]
 
 
 # ---- binding-derived refs belong to the service (#1921) -------------------------
