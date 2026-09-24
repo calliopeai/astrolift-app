@@ -99,6 +99,16 @@ def _proposal_target_from_input(*args, **kwargs):
     return "SecretChangeProposal", str(pid)
 
 
+def _overrides_at_apply_extra(result) -> dict | None:
+    """``@mutation_audit`` extras for an approve that applied an app-wide
+    scope: the per-environment scopes it did not reach, as recorded on the
+    proposal. Only that entry, because the payload also holds the value."""
+    payload = getattr(result.data, "payload", None) if result.ok and result.data is not None else None
+    if not payload or "overrides_at_apply" not in payload:
+        return None
+    return {"overrides_at_apply": payload["overrides_at_apply"]}
+
+
 def _app_secret_target_from_input(*args, **kwargs):
     """``@mutation_audit`` target hook for secret writes.
 

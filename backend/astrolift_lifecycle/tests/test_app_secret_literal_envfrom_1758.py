@@ -49,6 +49,7 @@ from astrolift_workflows.activities.app_lifecycle import (
     _bindings_secret_name,
     _update_secrets_sync,
 )
+from core import mutations as core_mutations
 from core.app_deploy import render_resources_for_deployment
 from core.permissions import Permission
 from core.tenancy import TenantContext
@@ -1141,6 +1142,45 @@ def test_a_pin_proposal_says_the_environment_stops_following_the_app_wide_scope(
     diff = SecretChangeProposal.objects.get(guid=str(pinned.data.pending_proposal_id)).payload_diff
     assert (diff["before"].get("follows_app_wide"), diff["after"].get("follows_app_wide")) == (True, False)
     assert diff["summary"].startswith("Pin scope of K in preview-pin-diff to all;")
+
+
+@pytest.mark.parametrize("via", ["metadata", "rotation"])
+def test_an_applied_app_wide_scope_change_records_the_environments_it_did_not_reach(
+    approver_grants, app, env, via
+):
+    """The diff is built when the change is proposed, so it misses a pin
+    approved while the change waited. The applied proposal and its approve
+    audit row record the pins as they stood when it applied."""
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    _require_secret_approval(app)
+    preview = _preview_environment(
+        app, env, name="preview-late-pin", status=PreviewEnvironment.Status.RUNNING
+    )
+    if via == "rotation":
+        narrowing_id = _propose(
+            app,
+            lambda info: ServicesMutation().rotate_app_secret(
+                info, input=RotateAppSecretInput(app_slug=app.slug, key="K", value="v2", scope="production")
+            ),
+        )
+    else:
+        narrowing_id = str(_set_scope(app, "K", scope="production").data.pending_proposal_id)
+    pinned = _set_scope(app, "K", environment_name=preview.name, scope="all")
+    _approve(app, str(pinned.data.pending_proposal_id))
+
+    captured: list = []
+    original = core_mutations._audit_writer
+    core_mutations.register_audit_writer(captured.append)
+    try:
+        _approve(app, narrowing_id)
+    finally:
+        core_mutations.register_audit_writer(original)
+
+    applied = SecretChangeProposal.objects.get(guid=narrowing_id)
+    assert "overrides" not in applied.payload_diff["after"]
+    assert applied.payload.get("overrides_at_apply") == {"preview-late-pin": "all"}
+    approvals = [e.extra for e in captured if e.action == "app.secret.proposal.approve"]
+    assert approvals == [{"overrides_at_apply": {"preview-late-pin": "all"}}]
 
 
 def test_set_metadata_refuses_an_environment_the_app_does_not_have(approver_grants, app, env):

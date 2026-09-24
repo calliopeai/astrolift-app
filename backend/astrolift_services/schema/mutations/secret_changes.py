@@ -25,6 +25,7 @@ from astrolift_services.schema.mutations.helpers import (
     _actor_user,
     _caller_org_id,
     _is_eligible_secret_approver,
+    _overrides_at_apply_extra,
     _proposal_target_from_input,
     _proposal_ttl_seconds,
     _self_approve_secrets_allowed,
@@ -208,6 +209,7 @@ class SecretChangeMutations:
     @mutation_audit(
         action="app.secret.proposal.approve",
         target=_proposal_target_from_input,
+        extras=_overrides_at_apply_extra,
     )
     @require_permission(
         Permission.SECRET_APPROVE, scope=secret_change_proposal_app_scope("input.proposal_id")

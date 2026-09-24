@@ -33,6 +33,7 @@ from astrolift_services.models import (
 )
 from astrolift_services.secret_literals import base_raw_digest
 from astrolift_services.secret_metadata_ops import (
+    environment_scopes,
     retire_app_secret_metadata,
     upsert_app_secret_metadata,
 )
@@ -71,6 +72,18 @@ def _stamp_base(proposal: SecretChangeProposal, app: RegisteredApp, key: str) ->
     key still has that value there (#1758)."""
     base = read_app_env(app.manifest_raw or "").get(key)
     proposal.payload = {**(proposal.payload or {}), "base_raw_digest": base_raw_digest(app, key, base)}
+    proposal.save(update_fields=["payload", "updated_at", "version"])
+
+
+def _record_overrides_at_apply(
+    proposal: SecretChangeProposal, app: RegisteredApp, key: str, scope: str
+) -> None:
+    """Record on the applied proposal the per-environment rows whose own
+    scope differs from the app-wide ``scope`` it set, as they stood when it
+    applied. The diff was built when the change was proposed and cannot
+    show a row pinned after that (#1758)."""
+    kept = {env: own for env, own in environment_scopes(app, key).items() if own != scope}
+    proposal.payload = {**(proposal.payload or {}), "overrides_at_apply": kept}
     proposal.save(update_fields=["payload", "updated_at", "version"])
 
 
@@ -114,6 +127,8 @@ def apply_proposal(
                 scope=payload.get("scope"),
                 actor=actor,
             )
+            if payload.get("scope") is not None:
+                _record_overrides_at_apply(proposal, app, key, payload["scope"])
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.DELETE.value:
@@ -158,6 +173,8 @@ def apply_proposal(
                 scope=payload.get("scope"),
                 actor=actor,
             )
+            if not proposal.environment_name and payload.get("scope") is not None:
+                _record_overrides_at_apply(proposal, app, key, payload["scope"])
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:
