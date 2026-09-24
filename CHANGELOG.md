@@ -2,21 +2,39 @@
 
 ## Unreleased
 
-- Confine agent secret locations to the organization's own secret namespace.
-  An env spec's `secretRefs`, `upsertAgentSecretRef`, a manifest's `[secrets]`
-  table, the direct-upload importer, the `upsert_agent_environment_spec`
-  command and an agent bundle's `backendRef` now accept only a location under
-  `agents/<org guid>/` or `agent-bundles/<org guid>/`. A bare or relative name
-  is refused too: every driver files it under the install-wide root that every
-  org without its own cluster shares, so `managed/<instance>/url` named another
-  tenant's database secret. A location stored before this change is never read,
-  written or deleted: spawn and agent-box start fail with a readable error, and
-  so do the secret status probe, set/delete/reveal, bundle key operations, and
-  an app deploy or rotation of an org-level bundle. Removing the binding,
-  deleting such a bundle (its stored value is left alone) and moving a bundle
-  into the namespace still work. Existing refs outside the
-  namespace, including the `agents/<org slug>/...` convention, must be moved
-  before upgrading (#1921).
+- Confine agent and managed-service secret locations to the organization's own
+  secret namespace (#1921). Every driver files a relative ref under the
+  install-wide root that every org without its own cluster shares, so
+  `managed/<instance>/url` named another tenant's database secret.
+  - **Agent refs.** An env spec's `secretRefs`, `upsertAgentSecretRef`, a
+    manifest's `[secrets]` table, the direct-upload importer and the
+    `upsert_agent_environment_spec` command accept only a location under
+    `agents/<org guid>/`, `agent-bundles/<org guid>/` or `services/<org guid>/`.
+    An ARN is refused; use the relative form.
+  - **Bundles.** An agent bundle's `backendRef` must sit under
+    `agent-bundles/<org guid>/` and may not use `secret://`.
+  - **Managed services.** Every secret ref a managed-service config names
+    (`*_secret_ref`, `*_secret_arn`, the AWS-native `SecretArn` and
+    `DomainJoinServiceAccountSecret`, the existing-S3 `credential_bundle`) is
+    held to the same namespace. That applies at provision, update, manifest
+    persist and adopt, and again before a driver runs. A binding the driver
+    copied from the config is refused when it is synced, deployed, mounted,
+    granted to the app's role or injected into an agent. Refs the driver mints
+    itself keep resolving.
+  - **Value mutations.** `setAgentSecretValue`, `deleteAgentSecretValue` and
+    `revealAgentSecretValue` act only on refs typed on the spec. An env var
+    that comes from a managed-service binding is refused as managed by the
+    platform.
+  - **Stored locations fail closed.** A location stored before this change is
+    never read, written or deleted. Spawn, agent-box start, app deploy and
+    hourly rotation fail with a readable error, and so do the status probe,
+    value and bundle key operations, and bundle key refresh. Removing a binding,
+    deleting such a bundle (the stored value is left alone) and moving a bundle
+    into the namespace still work.
+  - **Migrate before upgrading.** Run the read-only
+    `manage.py audit_agent_secret_namespace` to list what stops resolving,
+    including the `agents/<org slug>/...` convention and bare names. Move each
+    value into the namespace and point the ref there before upgrading.
 
 - Record an empty object instead of failing the mutation audit log when a
   GraphQL mutation is sent with no `variables`. The previous NOT NULL failure

@@ -249,12 +249,8 @@ def test_create_spec_stores_secret_refs_not_values(permission_resolver, info, or
     """The spec must persist secret *references* (uri + env_var), never
     secret values — the dispatcher resolves them at launch time."""
     _grant_crud(permission_resolver)
-    refs = [
-        {
-            "uri": f"arn:aws:secretsmanager:us-west-2:1:secret:agents/{org.guid}/gh",
-            "env_var": "GITHUB_TOKEN",
-        }
-    ]
+    # The org's own namespace in its relative form (#1921): an ARN is refused.
+    refs = [{"uri": f"sm:agents/{org.guid}/gh", "env_var": "GITHUB_TOKEN"}]
     with with_tenant_org(org):
         result = AgentsMutation().create_agent_environment_spec(
             info(),
