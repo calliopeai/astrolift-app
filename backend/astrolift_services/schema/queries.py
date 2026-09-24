@@ -61,6 +61,7 @@ from astrolift_services.schema.types import (
 )
 from astrolift_services.scopes import managed_service_scope_by_guid, secret_change_proposal_app_scope
 from astrolift_services.secret_literals import allowed_scopes_for_env
+from astrolift_services.secret_metadata_ops import scope_in_force
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -347,8 +348,10 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     from ``AppSecretMetadata`` when present (#677 / #678 / #752).
     Metadata is looked up by ``(env_name, key)`` with empty env_name as
     a fallback for the 'applies to every env' default — a per-env row
-    wins over the wildcard.  Missing metadata defaults to no expiry +
-    ``set_via='web'`` + ``scope='all'`` so older rows render identically.
+    wins over the wildcard, except that one without a scope of its own
+    takes the wildcard's (``scope_in_force``).  Missing metadata
+    defaults to no expiry + ``set_via='web'`` + ``scope='all'`` so older
+    rows render identically.
 
     Secrets whose ``scope`` doesn't match the queried env are filtered
     out (#752).  Preview envs accept ``all``, ``preview``, and
@@ -393,8 +396,10 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     for env_name in env_names:
         allowed = allowed_scopes_for_env(env_name, preview_env_branches)
         for key in sorted(literals):
-            meta = meta_index.get((env_name, key)) or meta_index.get(("", key))
-            secret_scope = meta.scope if meta else "all"
+            own = meta_index.get((env_name, key))
+            app_wide = meta_index.get(("", key))
+            meta = own or app_wide
+            secret_scope = scope_in_force(own.scope if own else None, app_wide.scope if app_wide else None)
             if secret_scope not in allowed:
                 continue
             out.append(

@@ -378,7 +378,9 @@ class SecretMutations:
                 expires_at=row.expires_at,
                 set_via=row.source,
                 set_at=row.set_at,
-                scope=row.scope,
+                # A per-environment row may store no scope and follow the
+                # app-wide one; report the scope the key actually has here.
+                scope=current_secret_scope(app, row.key, row.environment_name),
             )
         )
 

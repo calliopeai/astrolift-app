@@ -46,30 +46,33 @@ def upsert_app_secret_metadata(
 
     ``scope=None`` is "don't touch" as well: writing a default on every
     update let a rotate or a bulk import silently widen a key restricted
-    to ``production`` back to ``all`` (#1758). On create it means the
-    scope already in force, the app-wide row's for a per-environment row
-    and otherwise ``all``. The deploy prefers the per-environment row, so
-    one created as ``all`` to record an expiry widened a production-only
-    key into that environment (#1946).
+    to ``production`` back to ``all`` (#1758). On create, an app-wide row
+    starts at ``all``, and a per-environment row stores no scope, so it
+    follows the app-wide row (``scope_in_force``). The deploy prefers the
+    per-environment row: created as ``all`` to record an expiry, it
+    widened a production-only key into that environment (#1946), and
+    created as a copy of the app-wide scope, it kept an approved app-wide
+    narrowing from ever reaching that environment.
     """
     if set_via is not None and set_via not in VALID_SECRET_SOURCES:
         # Reject unknown sources up front so a typo doesn't silently
         # land an out-of-band value on the column.
         set_via = AppSecretMetadata.Source.WEB.value
+    environment_name = environment_name or ""
     row = AppSecretMetadata.objects.filter(
         registered_app=app,
-        environment_name=environment_name or "",
+        environment_name=environment_name,
         key=key,
         deleted_at__isnull=True,
     ).first()
     if row is None:
         row = AppSecretMetadata.objects.create(
             registered_app=app,
-            environment_name=environment_name or "",
+            environment_name=environment_name,
             key=key,
             expires_at=expires_at,
             source=(set_via or AppSecretMetadata.Source.WEB.value),
-            scope=scope if scope is not None else current_secret_scope(app, key, environment_name or ""),
+            scope=scope if scope is not None else (None if environment_name else "all"),
             set_at=timezone.now(),
             created_by=actor,
             updated_by=actor,
@@ -96,10 +99,22 @@ def upsert_app_secret_metadata(
     return row
 
 
+def scope_in_force(environment_scope: str | None, app_wide_scope: str | None) -> str:
+    """The scope that governs a key in one environment: the scope of its
+    per-environment row, else its app-wide row's, else ``all``. None is a
+    missing row or a per-environment row that follows the app-wide one.
+    The deploy path, the secrets list and the approval check all resolve
+    a key's scope here."""
+    if environment_scope is not None:
+        return environment_scope
+    if app_wide_scope is not None:
+        return app_wide_scope
+    return "all"
+
+
 def current_secret_scope(app, key: str, environment_name: str = "") -> str:
-    """The scope that governs ``key`` in ``environment_name`` today: its
-    per-environment row, else its app-wide row, else ``all``. The same
-    fallback the deploy path and the secrets list use."""
+    """``scope_in_force`` for ``key`` in ``environment_name``, from the
+    stored rows."""
     scopes = dict(
         AppSecretMetadata.objects.filter(
             registered_app=app,
@@ -108,7 +123,7 @@ def current_secret_scope(app, key: str, environment_name: str = "") -> str:
             deleted_at__isnull=True,
         ).values_list("environment_name", "scope")
     )
-    return scopes.get(environment_name) or scopes.get("") or "all"
+    return scope_in_force(scopes.get(environment_name), scopes.get(""))
 
 
 def retire_app_secret_metadata(app, key: str, *, actor=None) -> None:

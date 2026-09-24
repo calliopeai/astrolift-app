@@ -989,3 +989,66 @@ def test_under_approval_a_new_per_environment_row_does_not_widen_the_key(
     assert result.data.pending_proposal_id is None
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
     assert result.data.scope == "production"
+
+
+# A per-environment row written without a scope copied the app-wide scope in
+# force when it was created, and the deploy prefers that row. An approved
+# app-wide narrowing therefore never reached the environment, and the
+# approver's diff showed only the app-wide row (#1758 re-review, M1).
+
+
+def test_under_approval_narrowing_the_app_wide_scope_reaches_a_preview_with_its_own_row(
+    approver_grants, app, env, monkeypatch
+):
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-pin", status=PreviewEnvironment.Status.RUNNING)
+    expiry = _set_scope(
+        app, "K", environment_name=preview.name, expires_at=timezone.now() + timedelta(days=30)
+    )
+    assert expiry.ok, expiry.errors
+    assert expiry.data.pending_proposal_id is None
+
+    narrowed = _set_scope(app, "K", scope="production")
+    _approve(app, str(narrowed.data.pending_proposal_id))
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"K": "repo-value"}
+
+
+def test_a_per_environment_row_without_a_scope_follows_the_app_wide_scope(
+    approver_grants, app, env, monkeypatch
+):
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    preview = _preview_environment(app, env, name="preview-follow", status=PreviewEnvironment.Status.RUNNING)
+    assert _set_scope(app, "K", environment_name=preview.name, set_via="cli").ok
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"K": "repo-value"}
+
+    assert _set_scope(app, "K", scope="production").ok
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"K": "repo-value"}
+
+    assert _set_scope(app, "K", scope="preview").ok
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"K": "repo-value"}
+    assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+
+def test_under_approval_an_explicit_per_environment_scope_waits_for_its_proposal(
+    approver_grants, app, env, monkeypatch
+):
+    _repo_secret_restricted_to_production(app)
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-own", status=PreviewEnvironment.Status.RUNNING)
+
+    widened = _set_scope(app, "PROD_ONLY", environment_name=preview.name, scope="all")
+
+    assert widened.ok, widened.errors
+    assert widened.data.pending_proposal_id is not None
+    assert widened.data.scope == "production"
+    assert not _live_metadata(app, "PROD_ONLY").filter(environment_name=preview.name).exists()
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+
+    _approve(app, str(widened.data.pending_proposal_id))
+
+    assert _materialize(_deployment(app, preview), monkeypatch) == {"PROD_ONLY": "repo-value"}
+    assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "repo-value"}

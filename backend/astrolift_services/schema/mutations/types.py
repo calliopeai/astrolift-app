@@ -78,7 +78,9 @@ class SetAppSecretMetadataInput:
 
     scope: str | None = None
     """Audience scope (#752).  None preserves the existing value when
-    the row already exists; on first creation defaults to ``all``."""
+    the row already exists.  On first creation an app-wide row starts at
+    ``all``, and a per-environment row stores none and follows the
+    key's app-wide scope, including later changes to it."""
 
 
 @strawberry.input

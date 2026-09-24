@@ -364,6 +364,38 @@ def test_a_new_per_environment_row_without_a_scope_takes_the_scope_in_force(perm
     assert "ENV_ROW_K" not in [s.key for s in secrets if s.source == "literal"]
 
 
+def test_a_per_environment_row_without_a_scope_follows_the_app_wide_scope_in_the_list(permission_resolver):
+    """Stored as a copy of the app-wide scope, the row kept showing the key
+    in its environment after the app-wide scope was narrowed."""
+    org, app, cluster, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    _add_preview_env(app, cluster, env_name="pr-follow", branch="feat/follow")
+
+    def listed():
+        secrets = ServicesQuery().astrolift_app_secrets(
+            _info(), app_slug=app.slug, environment_name="pr-follow"
+        )
+        return {s.key: (s.scope, s.set_via) for s in secrets if s.source == "literal"}
+
+    with _ctx(org):
+        annotated = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(
+                app_slug=app.slug, key="SHARED_KEY", environment_name="pr-follow", set_via="cli"
+            ),
+        )
+        before = listed()
+        narrowed = ServicesMutation().set_app_secret_metadata(
+            _info(), input=SetAppSecretMetadataInput(app_slug=app.slug, key="SHARED_KEY", scope="production")
+        )
+        after = listed()
+    assert annotated.ok, annotated.errors
+    assert narrowed.ok, narrowed.errors
+    assert before["SHARED_KEY"] == ("all", "cli")
+    assert "SHARED_KEY" not in after
+
+
 # An explicit "" matches no environment's allowed scopes, so storing it
 # would stop the key deploying anywhere without an error.
 

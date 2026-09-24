@@ -31,6 +31,7 @@ from django.utils.crypto import constant_time_compare, salted_hmac
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_services.models import AppSecretMetadata, SecretChangeProposal
+from astrolift_services.secret_metadata_ops import scope_in_force
 
 log = logging.getLogger(__name__)
 
@@ -167,13 +168,13 @@ def literal_secrets_for_environment(app, environment) -> dict[str, str]:
     if not literals:
         return {}
 
-    meta_index: dict[tuple[str, str], AppSecretMetadata] = {
-        (m.environment_name, m.key): m
-        for m in AppSecretMetadata.objects.filter(
+    scopes: dict[tuple[str, str], str | None] = {
+        (env_name, key): scope
+        for env_name, key, scope in AppSecretMetadata.objects.filter(
             registered_app=app,
             key__in=list(literals.keys()),
             deleted_at__isnull=True,
-        )
+        ).values_list("environment_name", "key", "scope")
     }
     # A preview by identity, not by current status: a FAILED or torn-down
     # preview (its row soft-deleted) is still a preview, and a status or
@@ -192,8 +193,6 @@ def literal_secrets_for_environment(app, environment) -> dict[str, str]:
 
     out: dict[str, str] = {}
     for key, value in literals.items():
-        meta = meta_index.get((environment.name, key)) or meta_index.get(("", key))
-        scope = meta.scope if meta else "all"
-        if scope in allowed:
+        if scope_in_force(scopes.get((environment.name, key)), scopes.get(("", key))) in allowed:
             out[key] = value
     return out
