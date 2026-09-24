@@ -19,15 +19,18 @@
   edit changes env or a managed-service binding. An edit that changes env
   (the top-level `[env]` table or any container, job or task `env` table)
   or a managed-service binding (read off a rolled-back dry run of the
-  reconcile) is gated the same way `setAppSecret` gates a direct secret
-  write: a fresh session elevation, or, when the app requires secret
-  approval, every changed `[env]` key must match an applied secret-change
-  proposal, and anything else is refused except a managed-service release
-  (remove or detach). Attaching or rebinding a project managed service
+  reconcile, or declared on an app that has no environment yet, which the
+  first deploy's environment bootstrap would reconcile unchecked) is gated
+  the same way `setAppSecret` gates a direct secret write: a fresh session
+  elevation, or, when the app requires secret approval, every changed
+  `[env]` key must match an applied secret-change proposal, and anything
+  else is refused except a managed-service release (remove or detach).
+  Attaching or rebinding a project managed service
   also needs `project.update` on the project, the permission
   `attachProjectManagedService` checks; `registerApp` applies the same
   check to an inline manifest. A manifest the reconcile rejects returns
-  `VALIDATION`. The audit entry names the changed keys and bindings, never
+  `VALIDATION`, including a project-scoped service on an app that belongs
+  to no project. The audit entry names the changed keys and bindings, never
   values or digests. The manifest editor now shows an "Apply" button
   (disabled while the draft has unsaved local edits) and a "Staged, not
   applied" badge instead of "Push to repo" when the app has no source repo,

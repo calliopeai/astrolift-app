@@ -528,3 +528,55 @@ def test_a_failed_provision_is_retried(monkeypatch, django_capture_on_commit_cal
         persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
 
     assert _provision_names(started) == ["ProvisionManagedServiceWorkflow"]
+
+
+# ---------------------------------------------------------------------
+# Deferred declarations and project scope without a project (#1759)
+# ---------------------------------------------------------------------
+
+_PROJECT_SCOPED = """
+name = "hello"
+[[managed_services]]
+kind = "postgres"
+name = "shared"
+owner_scope = "project"
+"""
+
+
+def test_declarations_on_an_app_with_no_environment_come_back_deferred(monkeypatch):
+    """Nothing is reconciled without an environment, but a caller that
+    gates bindings has to see what the bootstrap will reconcile later."""
+    _catalog(monkeypatch)
+    app = _scaffold()
+
+    result = persist_manifest(app, _normalize(_PROJECT_SCOPED), raw_text=_PROJECT_SCOPED)
+
+    assert [(s.owner_scope, s.kind, s.name) for s in result.managed_services_deferred] == [
+        ("project", "postgres", "shared")
+    ]
+    assert result.managed_service_changes == []
+    assert not ManagedService.objects.exists()
+
+
+def test_a_project_scoped_service_on_an_app_with_no_project_is_refused_before_any_lookup(monkeypatch):
+    """project=None matched other orgs' app-private rows of the same kind
+    and name, and creating one broke the owner-scope CHECK constraint."""
+    _catalog(monkeypatch)
+    app = _scaffold()
+    app.project = None
+    app.save(update_fields=["project"])
+    _add_environment(app)
+    other_org = Organization.objects.create(name="Other", slug="other")
+    other_team = Team.objects.create(organization=other_org, name="T", slug="t-other")
+    other_app = RegisteredApp.objects.create(
+        organization=other_org, team=other_team, name="Theirs", slug="theirs"
+    )
+    ManagedService.objects.create(
+        registered_app=other_app, app_environment=_add_environment(other_app), kind="postgres", name="shared"
+    )
+
+    with pytest.raises(ValueError, match="belongs to no project"):
+        persist_manifest(app, _normalize(_PROJECT_SCOPED), raw_text=_PROJECT_SCOPED)
+
+    assert not ManagedServiceAttachment.objects.exists()
+    assert ManagedService.objects.count() == 1

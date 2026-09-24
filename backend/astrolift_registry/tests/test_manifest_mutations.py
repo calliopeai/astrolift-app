@@ -1668,3 +1668,208 @@ def test_apply_staged_manifest_refuses_when_the_reconcile_changes_after_the_gate
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _VALID_TOML.strip()
     assert app.manifest_raw_staged == _UPDATED_TOML
+
+
+# --- an app with no environment yet (#1759 re-review, round 5) ----------
+#
+# reconcile_managed_services reconciles nothing when the app has no
+# environment, so the dry run showed no binding and the gate let an
+# APP_UPDATE caller apply an owner_scope="project" entry unchecked. The
+# first CI deploy then bootstraps an environment and reconciles
+# manifest_raw with nobody to check, which creates the attachment.
+
+
+def _managed_cluster(app):
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="manifest-mutations-provider",
+        defaults={
+            "name": "Manifest mutations provider",
+            "plugin_version": "0.0.1",
+            "capabilities_manifest": {},
+            "config_schema": {},
+        },
+    )
+    cluster = TenantCluster.objects.create(
+        organization=app.organization,
+        slug=f"manifest-mutations-managed-{app.pk}",
+        name="Managed",
+        provider_plugin=plugin,
+        endpoint="https://example.invalid",
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    app.default_tenant_cluster = cluster
+    app.save(update_fields=["default_tenant_cluster"])
+    return cluster
+
+
+@pytest.mark.parametrize("project_update", [False, True])
+def test_a_project_binding_applied_to_an_app_with_no_environment_is_gated_before_bootstrap(
+    permission_resolver, audit_capture, monkeypatch, project_update
+):
+    from astrolift_registry.schema.mutations.helpers import _bootstrap_app_environments
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+    from core.permissions import PermissionScope, ScopeKind
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    cluster = _managed_cluster(app)
+    shared = ManagedService.objects.create(
+        project=app.project,
+        tenant_cluster=cluster,
+        environment_name="production",
+        kind="postgres",
+        name="shared",
+        variant="resolved-default",
+        config={"size": "small"},
+        status=ManagedService.Status.ACTIVE,
+    )
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _PROJECT_BINDING
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    if project_update:
+        permission_resolver.grant(
+            Permission.PROJECT_UPDATE, scope=PermissionScope(kind=ScopeKind.PROJECT, id=app.project_id)
+        )
+
+    result = _apply(org, app)
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+    assert entry.extra["managed_service_changes"] == ["declare project:postgres/shared@production"]
+
+    # The first ci_deploy of an app with no environment bootstraps one and
+    # reconciles manifest_raw.
+    app.refresh_from_db()
+    _bootstrap_app_environments(app, [])
+
+    attached = ManagedServiceAttachment.objects.filter(
+        managed_service=shared, app_environment__registered_app=app, deleted_at__isnull=True
+    )
+    if project_update:
+        assert result.ok, result.errors
+        assert entry.decision == "ALLOW"
+        assert [a.workload_names for a in attached] == [["web"]]
+    else:
+        assert not result.ok
+        assert result.errors[0].code == "PERMISSION_DENIED"
+        assert entry.decision == "DENY"
+        assert not attached.exists()
+
+
+@pytest.mark.parametrize(
+    ("setup", "expected"),
+    [
+        pytest.param("no-hash", "VALIDATION", id="no-expected-hash"),
+        pytest.param("not-elevated", "STEP_UP_REQUIRED", id="not-elevated"),
+        pytest.param("approval", "SECRET_APPROVAL_REQUIRED", id="secret-approval-app"),
+        pytest.param("elevated", "applied", id="elevated"),
+    ],
+)
+def test_an_app_managed_service_declared_on_an_app_with_no_environment_is_gated(
+    permission_resolver, audit_capture, monkeypatch, setup, expected
+):
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _APP_SERVICE
+    app.requires_secret_approval = setup == "approval"
+    app.save(update_fields=["manifest_raw_staged", "requires_secret_approval"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    session = _FakeSession()
+    if setup == "elevated":
+        elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True), _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(session),
+            input=ApplyStagedManifestInput(
+                id=str(app.guid),
+                expected_staged_hash=None if setup == "no-hash" else staged_manifest_hash(app),
+            ),
+        )
+
+    app.refresh_from_db()
+    if expected == "applied":
+        assert result.ok, result.errors
+        assert app.manifest_raw == _TOML_WITH_CONTAINER + _APP_SERVICE
+        entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+        assert entry.decision == "ALLOW"
+        assert entry.extra["managed_service_changes"] == ["declare app:postgres/db@production"]
+    else:
+        assert not result.ok
+        assert result.errors[0].code == expected
+        assert app.manifest_raw == _TOML_WITH_CONTAINER
+
+
+# --- project-scoped service on an app with no project (round 5) ---------
+
+
+@pytest.mark.parametrize("foreign_row", [False, True])
+def test_apply_staged_manifest_refuses_a_project_service_when_the_app_has_no_project(
+    permission_resolver, monkeypatch, foreign_row
+):
+    """Looking project services up on project=None matched every org's
+    app-private rows of that kind and name (an existence oracle); with no
+    such row, creating one hit the owner-scope CHECK constraint (INTERNAL).
+    Either way the answer is a plain VALIDATION refusal, before any lookup."""
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    app.project = None
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _PROJECT_BINDING
+    app.save(update_fields=["project", "manifest_raw_staged"])
+    _add_environment(app)
+    if foreign_row:
+        other_org = Organization.objects.create(name="Other", slug="other-org")
+        other_team = Team.objects.create(organization=other_org, name="T", slug="t-other")
+        other_app = RegisteredApp.objects.create(
+            organization=other_org, team=other_team, name="Theirs", slug="theirs"
+        )
+        other_env = _add_environment(other_app)
+        ManagedService.objects.create(
+            registered_app=other_app, app_environment=other_env, kind="postgres", name="shared"
+        )
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert "belongs to no project" in result.errors[0].message
+    assert not ManagedServiceAttachment.objects.exists()
+    app.refresh_from_db()
+    assert app.manifest_raw == _TOML_WITH_CONTAINER
+
+
+# --- the ALLOW audit entry is written only once the apply lands ---------
+
+
+def test_apply_staged_manifest_writes_no_allow_audit_for_an_apply_that_did_not_land(
+    permission_resolver, audit_capture, monkeypatch
+):
+    import astrolift_manifest.persist as persist_module
+
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_ENV_CHANGED
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    real = persist_module.persist_manifest
+    calls = []
+
+    def _persist(*args, **kwargs):
+        result = real(*args, **kwargs)
+        calls.append(result)
+        if len(calls) == 2:
+            result.managed_service_changes.append(("attach", "project:postgres/shared@production"))
+        return result
+
+    monkeypatch.setattr(persist_module, "persist_manifest", _persist)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "CONFLICT"
+    assert not any(e.action == "app.manifest.apply_secret_change" for e in audit_capture)
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()

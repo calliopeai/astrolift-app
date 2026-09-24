@@ -64,6 +64,11 @@ class PersistResult:
     # without re-deriving reconcile's rules; RELEASE_ACTIONS are the ones
     # that only take a binding away.
     managed_service_changes: list[tuple[str, str]] = dataclasses.field(default_factory=list)
+    # Declarations the reconcile could not act on yet because the app has no
+    # environment. Registration's environment bootstrap reconciles them
+    # later with no caller to check, so a caller that gates bindings has to
+    # gate these now (applyStagedManifest, #1759).
+    managed_services_deferred: tuple[ManagedServiceManifest, ...] = ()
     hash_changed: bool = False
 
     @property
@@ -189,6 +194,7 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
     result.managed_service_attachments_updated += managed.managed_service_attachments_updated
     result.managed_service_attachments_removed += managed.managed_service_attachments_removed
     result.managed_service_changes += managed.managed_service_changes
+    result.managed_services_deferred = managed.managed_services_deferred
 
     return result
 
@@ -324,13 +330,24 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
     App scope produces one resource per selected environment. Project scope
     produces one shared project resource and one attachment per environment.
     When environments do not exist yet registration calls this again after
-    bootstrap; returning an empty result here is therefore intentional.
+    bootstrap, so nothing is reconciled here; the declarations come back in
+    ``managed_services_deferred`` instead, for a caller that gates them.
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_services.managed_service_catalog import resolve_variant, validate_config
     from astrolift_services.models import ManagedService, ManagedServiceAttachment
 
     result = PersistResult()
+    # Before any lookup: filtering project services on project=None matches
+    # every app-private row of that kind and name, in any org, and creating
+    # one with no owner trips the owner-scope CHECK constraint.
+    if app.project_id is None:
+        for service in services:
+            if service.owner_scope == "project":
+                raise ValueError(
+                    f"managed service {service.name or service.kind!r} has owner_scope 'project' "
+                    "but the app belongs to no project"
+                )
     environments = {
         row.name: row
         for row in AppEnvironment.objects.filter(
@@ -339,6 +356,7 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
         ).select_related("tenant_cluster__provider_plugin")
     }
     if not environments:
+        result.managed_services_deferred = tuple(services)
         return result
 
     desired_app: set[tuple[int, str, str]] = set()

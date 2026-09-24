@@ -116,25 +116,34 @@ def _dry_run_persist(app: RegisteredApp, manifest, *, raw_text: str):
 
 
 def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
-    """Refusal envelope for a staged edit, or None when it may apply (#1759).
+    """``(refusal, allow_audit)`` for a staged edit (#1759).
+
+    A refusal envelope when it may not apply. Otherwise the fields of the
+    ALLOW audit entry, which the caller writes once the apply has actually
+    landed, or None when the edit changes nothing secret.
 
     A secret change is an env change (``env``, from
-    ``astrolift_manifest.env_diff``) or a managed-service binding the
+    ``astrolift_manifest.env_diff``), a managed-service binding the
     reconcile would create, change or release
-    (``persisted.managed_service_changes``). Every one needs the
-    ``expectedStagedHash`` the caller reviewed and an audit entry, and:
+    (``persisted.managed_service_changes``), or a managed service the app
+    declares but can't reconcile yet because it has no environment
+    (``persisted.managed_services_deferred``). Registration's environment
+    bootstrap reconciles those later with nobody to check, so they are
+    gated now as if they were being attached. Every secret change needs
+    the ``expectedStagedHash`` the caller reviewed and an audit entry, and:
 
-    * creating or rebinding an attachment to a project managed service
-      needs project.update on the app's project, the permission
-      attachProjectManagedService checks. APP_UPDATE alone would otherwise
-      put a shared project database's credentials in a pod whose command
-      the caller controls;
+    * creating or rebinding an attachment to a project managed service,
+      or declaring one on an app with no environment, needs project.update
+      on the app's project, the permission attachProjectManagedService
+      checks. APP_UPDATE alone would otherwise put a shared project
+      database's credentials in a pod whose command the caller controls;
     * when the app requires secret approval, each changed ``[env]`` key
-      needs a matching applied proposal. Container env and any
-      managed-service change that isn't a release (remove / detach) are
-      refused, since no proposal can carry them and every one of them can
-      put a service's credentials in front of a workload. A release only
-      takes credentials away, so it goes through with elevation;
+      needs a matching applied proposal. Container env, any
+      managed-service change that isn't a release (remove / detach) and
+      any deferred declaration are refused, since no proposal can carry
+      them and every one of them can put a service's credentials in front
+      of a workload. A release only takes credentials away, so it goes
+      through with elevation;
     * otherwise the change needs a fresh session elevation.
     """
     from astrolift_identity.step_up import check_elevation
@@ -142,23 +151,35 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
     from astrolift_services.secret_proposal_match import match_applied_proposals
 
     services = [f"{action} {target}" for action, target in persisted.managed_service_changes]
-    if not env and not services:
-        return None
+    declared = [
+        f"declare {service.owner_scope}:{service.kind}/{(service.name or service.kind).strip()}"
+        f"@{service.environment}"
+        for service in persisted.managed_services_deferred
+    ]
+    if not env and not services and not declared:
+        return None, None
     audit: dict = {"changed_keys": [change.label for change in env]}
-    if services:
-        audit["managed_service_changes"] = services
+    if services or declared:
+        audit["managed_service_changes"] = services + declared
 
     # The hash pins the apply to the exact buffer the caller reviewed; for
     # a secret change that can't be optional.
     if not input.expected_staged_hash:
-        return gql_failure(
-            ErrorCode.VALIDATION.value,
-            "this edit changes env or managed-service bindings -- pass the "
-            "rawManifestStagedHash you reviewed as expectedStagedHash",
-            field="expectedStagedHash",
+        return (
+            gql_failure(
+                ErrorCode.VALIDATION.value,
+                "this edit changes env or managed-service bindings -- pass the "
+                "rawManifestStagedHash you reviewed as expectedStagedHash",
+                field="expectedStagedHash",
+            ),
+            None,
         )
 
-    if persisted.managed_service_attachments_created or persisted.managed_service_attachments_updated:
+    if (
+        persisted.managed_service_attachments_created
+        or persisted.managed_service_attachments_updated
+        or any(service.owner_scope == "project" for service in persisted.managed_services_deferred)
+    ):
         try:
             if app.project_id is None:
                 raise PermissionDenied(Permission.PROJECT_UPDATE, None, "the app belongs to no project")
@@ -168,10 +189,13 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
             )
         except PermissionDenied:
             _audit_secret_change(app, decision="DENY", **audit)
-            return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value,
-                "attaching a project managed service to this app needs project.update on "
-                "its project -- a project admin can attach it with attachProjectManagedService",
+            return (
+                gql_failure(
+                    ErrorCode.PERMISSION_DENIED.value,
+                    "attaching a project managed service to this app needs project.update on "
+                    "its project -- a project admin can attach it with attachProjectManagedService",
+                ),
+                None,
             )
 
     needs_elevation = True
@@ -188,15 +212,19 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
                 for action, target in persisted.managed_service_changes
                 if action not in RELEASE_ACTIONS
             ]
+            + declared
         )
         if unapproved:
             _audit_secret_change(app, decision="DENY", unapproved_keys=unapproved, **audit)
-            return gql_failure(
-                "SECRET_APPROVAL_REQUIRED",
-                "this app requires secret approval and nothing approved these changes: "
-                f"{', '.join(unapproved)} -- change [env] through setAppSecret/rotateAppSecret/"
-                "deleteAppSecret and apply once approved; container, job and task env and "
-                "managed-service bindings can't be approved through a proposal",
+            return (
+                gql_failure(
+                    "SECRET_APPROVAL_REQUIRED",
+                    "this app requires secret approval and nothing approved these changes: "
+                    f"{', '.join(unapproved)} -- change [env] through setAppSecret/rotateAppSecret/"
+                    "deleteAppSecret and apply once approved; container, job and task env and "
+                    "managed-service bindings can't be approved through a proposal",
+                ),
+                None,
             )
         audit["proposal_ids"] = match.proposal_ids
         # What is left of the managed-service changes only releases
@@ -211,9 +239,8 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
         )
         if deny is not None:
             _audit_secret_change(app, decision="DENY", **audit)
-            return deny
-    _audit_secret_change(app, decision="ALLOW", **audit)
-    return None
+            return deny, None
+    return None, audit
 
 
 @strawberry.type
@@ -440,7 +467,7 @@ class ManifestMutations:
                     f"managed services: {exc}",
                     field="rawManifest",
                 )
-            refusal = _gate_secret_change(info, app, input, env, dry_run)
+            refusal, allowed = _gate_secret_change(info, app, input, env, dry_run)
             if refusal is not None:
                 return refusal
 
@@ -449,7 +476,10 @@ class ManifestMutations:
                     persisted = persist_manifest(app, manifest, raw_text=staged)
                     # The gate cleared the dry run's effects; a write that
                     # landed in between must not widen them unchecked.
-                    if sorted(persisted.managed_service_changes) != sorted(dry_run.managed_service_changes):
+                    if (
+                        sorted(persisted.managed_service_changes) != sorted(dry_run.managed_service_changes)
+                        or persisted.managed_services_deferred != dry_run.managed_services_deferred
+                    ):
                         raise _RollBack()
             except _RollBack:
                 return gql_failure(
@@ -471,6 +501,10 @@ class ManifestMutations:
             # convention for "no known repo hash") already reads this as
             # in_sync.
             app.save(update_fields=["manifest_raw_staged", "updated_at", "version"])
+            # Only now: an ALLOW entry for an apply that then failed would
+            # record a secret change that never happened.
+            if allowed is not None:
+                _audit_secret_change(app, decision="ALLOW", **allowed)
 
             return _result(app)
 
