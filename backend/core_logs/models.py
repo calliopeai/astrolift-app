@@ -98,10 +98,7 @@ class PermissionAccessLog(models.Model):
 
     @classmethod
     def _permission(cls, permission: Permission):
-        from config.permissions import AbstractPermissions
-        if permission and isinstance(permission, (Permission, AbstractPermissions)):
-            return permission.perm() if isinstance(permission, AbstractPermissions) else permission
-        return None
+        return permission if isinstance(permission, Permission) else None
 
 
 class GQLLog(models.Model):

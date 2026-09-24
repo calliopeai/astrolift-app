@@ -253,6 +253,7 @@ type AstroliftAgentEnvironmentSpec {
   managedModel: Boolean!
   runAsNonRoot: Boolean!
   boxWorkspace: Boolean!
+  modelGateway: Boolean!
   secretRefs: JSON!
   envVars: JSON!
   configRepo: String!
@@ -4630,6 +4631,7 @@ input CreateAgentEnvironmentSpecInput {
   managedModel: Boolean! = false
   runAsNonRoot: Boolean! = false
   boxWorkspace: Boolean! = false
+  modelGateway: Boolean! = false
   configRepo: String! = ""
   configBranch: String! = "main"
   configManifestPath: String! = ""
@@ -5309,16 +5311,18 @@ type Mutation {
   """Upsert user profile via UtilityForm.apply_forms."""
   upsertUser(input: UserInput!): UpsertUserResult!
 
-  """Update user profile via ProfileSerializer (restricted)."""
+  """
+  Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile.
+  """
   profile(input: JSON!): MutationResult!
 
   """
-  Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users.
+  Request a password reset email. Only the platform operator may send one to another user.
   """
   profileRequestPwdChange(userGid: ID = null): Boolean!
 
   """
-  Request deletion of a user account. Requires PROFILE_DELETE_USERS permission to delete other users.
+  Request deletion of a user account. Only the platform operator may delete another user.
   """
   profileRequestDeleteUser(userGid: ID = null): Boolean!
 
@@ -5331,16 +5335,18 @@ type Mutation {
   pinTransaction(pin: String!, proxyUser: ID = null): Boolean!
 
   """
-  Request a sign from a user. The user must have SIGNREQUEST_CHANGE_SIGN permission.
+  Request a sign from a user. Sign requests are not available: this always refuses.
   """
   signRequestUser(gid: String!, userToRequest: ID!): Boolean!
 
   """
-  Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED.
+  Sign a sign request. Sign requests are not available: this always refuses.
   """
   signRequestSign(gid: String!): Boolean!
 
-  """Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission."""
+  """
+  Cancel a sign request. Sign requests are not available: this always refuses.
+  """
   signRequestCancel(gid: String!, note: String!): Boolean!
 
   """Create or update a notification via NotificationSerializer."""
@@ -5397,7 +5403,7 @@ type Mutation {
   fileUpload(mimetype: String!, fileUploadGid: ID = null, metadata: JSON = null, name: String = null, description: String = null, isPublic: Boolean = false): FileUploadResult!
 
   """
-  Upload an image for a specific profile image field (avatar, signature). Supports the approval request workflow for non-whitelisted fields.
+  Upload an image for a specific profile image field (avatar, signature).
   """
   profileImageFieldUpload(globalId: ID!, mimetype: String!, field: ProfileImageField = null, metadata: JSON = null): ProfileImageFieldUploadResult!
 
@@ -7008,6 +7014,7 @@ input UpdateAgentEnvironmentSpecInput {
   managedModel: Boolean = null
   runAsNonRoot: Boolean = null
   boxWorkspace: Boolean = null
+  modelGateway: Boolean = null
   configRepo: String = null
   configBranch: String = null
   configManifestPath: String = null

@@ -79,6 +79,8 @@ def reserve_input_wait(task, prepared):
     reason = task_timeout_reason(task)
     if reason:
         raise RuntimeError(reason)
+    if task.model_gateway_agent_id:
+        _renew_gateway_key_for_input_wait(task)
     spawner_for_task(task).reserve_input_wait(task, INPUT_WAIT_BUDGET_SECONDS)
     # A slow cluster API call also spends execution time before the question
     # exists. Do not acknowledge a new request after that budget has elapsed.
@@ -86,3 +88,30 @@ def reserve_input_wait(task, prepared):
         raise RuntimeError(reason)
     task.input_wait_budget_seconds = INPUT_WAIT_BUDGET_SECONDS
     task.save(update_fields=["input_wait_budget_seconds", "updated_at", "version"])
+
+
+def _renew_gateway_key_for_input_wait(task):
+    """Let the task's gateway key outlast the wait a question reserves (#1851).
+
+    Renewed before the Job's deadline moves, so a refused renewal, or one that
+    Zentinelle's key lifetime cuts short, refuses the question like a failed
+    reservation and leaves the deadline where it was; the runner retries. The
+    key has to last as long as the task's own clock can still run it: its
+    timeout and the wait budget, less what it has spent.
+    """
+    from astrolift_dispatch.model_gateway import ModelGatewayError, key_covers, renew_run_key, task_key_ttl
+
+    expires_at, _lifetime_ends_at = renew_run_key(
+        connection_id=task.model_gateway_connection_id,
+        agent_id=task.model_gateway_agent_id,
+        ttl_seconds=task_key_ttl(task) + INPUT_WAIT_BUDGET_SECONDS,
+    )
+    started = task.provisioning_at or task.started_at or task.queued_at
+    spent = max(0.0, (timezone.now() - started).total_seconds()) if started else 0.0
+    left = max(1, int(task.timeout_seconds or 300)) + INPUT_WAIT_BUDGET_SECONDS - spent
+    if not key_covers(expires_at, left):
+        raise ModelGatewayError(
+            f"Zentinelle caps gateway key {task.model_gateway_agent_id} at {expires_at.isoformat()}, before "
+            f"the task's {INPUT_WAIT_BUDGET_SECONDS}s input wait could end, so the question was refused; "
+            "raise ASTROLIFT_AGENT_KEY_MAX_LIFETIME_SECONDS in Zentinelle"
+        )

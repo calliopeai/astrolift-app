@@ -459,7 +459,6 @@ class CustomUserAdmin(UserAdmin):
         'reset_password',
         'switch_current_user',
         'anonymize',
-        'reset_cache_permissions'
     )
     search_fields = 'username', 'email', 'profile__display_name',
 
@@ -472,11 +471,6 @@ class CustomUserAdmin(UserAdmin):
             except Exception as e:
                 logger.exception(f'Failed to anonymize {user.username}: {e}')
                 messages.error(request, mark_safe(f'Failed to anonymize {obj_to_link(user)}: {e}'))
-
-    def reset_cache_permissions(self, request, queryset):
-        from core.systems.permissions import AllPermissions
-        AllPermissions.reset()
-        messages.info(request, 'Permissions cache reset')
 
     def show_users_permissions(self, request, queryset):
         user_ids = set()
