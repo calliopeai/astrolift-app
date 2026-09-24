@@ -22,45 +22,56 @@ from astrolift_registry.schema.mutations.types import (
 from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    check_permission,
+    require_permission,
+)
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
 
 
-def _audit_env_change(
+def _audit_secret_change(
     app: RegisteredApp,
     *,
-    changed_keys: list[str],
     decision: str,
+    changed_keys: list[str],
+    managed_service_changes: list[str] | None = None,
     unapproved_keys: list[str] | None = None,
     proposal_ids: list[str] | None = None,
 ) -> None:
-    """Sibling audit entry for an env change through ``applyStagedManifest``
-    (#1759 adversarial review, H1).
+    """Sibling audit entry for a secret change through ``applyStagedManifest``
+    (#1759 adversarial review, H1): env keys and managed-service bindings.
 
-    ``@mutation_audit`` (on the resolver above) already records one entry
-    per call, but it doesn't know about manifest-specific detail -- same
+    ``@mutation_audit`` (on the resolver) already records one entry per
+    call, but it doesn't know about manifest-specific detail -- same
     reason ``app.secret.reveal.disclosure`` and ``_emit_deny_audit`` emit
     their own sibling entry rather than stretching the generic one.
-    Carries key **names** only, never values and no digest of the
-    manifest text either: an unkeyed hash of text that holds a secret
-    lets anyone who can read the audit log confirm a guess at it offline.
+    Carries **names** only, never values and no digest of the manifest
+    text either: an unkeyed hash of text that holds a secret lets anyone
+    who can read the audit log confirm a guess at it offline.
     ``unapproved_keys`` / ``proposal_ids`` say why an app that requires
     secret approval was refused, or which applied proposals allowed it.
     """
     extra: dict[str, list[str]] = {"changed_keys": changed_keys}
-    if unapproved_keys is not None:
-        extra["unapproved_keys"] = unapproved_keys
-    if proposal_ids is not None:
-        extra["proposal_ids"] = proposal_ids
+    for key, value in (
+        ("managed_service_changes", managed_service_changes),
+        ("unapproved_keys", unapproved_keys),
+        ("proposal_ids", proposal_ids),
+    ):
+        if value is not None:
+            extra[key] = value
     tenant = get_current_tenant()
     try:
         emit_audit(
             AuditEntry(
                 actor_user_id=tenant.actor_user_id if tenant else None,
                 organization_id=tenant.organization_id if tenant else None,
-                action="app.manifest.apply_env_change",
+                action="app.manifest.apply_secret_change",
                 decision=decision,
                 target_kind="RegisteredApp",
                 target_id=str(app.guid),
@@ -71,6 +82,138 @@ def _audit_env_change(
         )
     except Exception:  # noqa: BLE001 -- audit emission must never break the caller
         log.exception("apply_staged_manifest: audit emit failed for app=%s", app.guid)
+
+
+class _RollBack(Exception):
+    """Unwinds a savepoint whose writes must not survive, carrying its result out."""
+
+    def __init__(self, value=None):
+        super().__init__()
+        self.value = value
+
+
+def _dry_run_persist(app: RegisteredApp, manifest, *, raw_text: str):
+    """What ``persist_manifest`` would change, with every write rolled back.
+
+    Managed-service effects depend on database state the manifest text
+    does not show: which environments exist, which attachments a project
+    admin detached (reconcile re-creates a declared one). So the gate
+    reads them off a real reconcile in a savepoint rather than a text
+    diff. ``on_commit`` callbacks queued inside the savepoint (provision /
+    deprovision workflow starts) are discarded with it.
+    """
+    from django.db import transaction
+
+    from astrolift_manifest.persist import persist_manifest
+
+    try:
+        with transaction.atomic():
+            raise _RollBack(persist_manifest(app, manifest, raw_text=raw_text))
+    except _RollBack as rolled_back:
+        # persist_manifest updated the in-memory row too.
+        app.refresh_from_db()
+        return rolled_back.value
+
+
+def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
+    """Refusal envelope for a staged edit, or None when it may apply (#1759).
+
+    A secret change is an env change (``env``, from
+    ``astrolift_manifest.env_diff``) or a managed-service binding the
+    reconcile would create, change or release
+    (``persisted.managed_service_changes``). Every one needs the
+    ``expectedStagedHash`` the caller reviewed and an audit entry, and:
+
+    * creating or rebinding an attachment to a project managed service
+      needs project.update on the app's project, the permission
+      attachProjectManagedService checks. APP_UPDATE alone would otherwise
+      put a shared project database's credentials in a pod whose command
+      the caller controls;
+    * when the app requires secret approval, each changed ``[env]`` key
+      needs a matching applied proposal. Container env and any
+      managed-service change that isn't a release (remove / detach) are
+      refused, since no proposal can carry them and every one of them can
+      put a service's credentials in front of a workload. A release only
+      takes credentials away, so it goes through with elevation;
+    * otherwise the change needs a fresh session elevation.
+    """
+    from astrolift_identity.step_up import check_elevation
+    from astrolift_manifest.persist import RELEASE_ACTIONS
+    from astrolift_services.secret_proposal_match import match_applied_proposals
+
+    services = [f"{action} {target}" for action, target in persisted.managed_service_changes]
+    if not env and not services:
+        return None
+    audit: dict = {"changed_keys": [change.label for change in env]}
+    if services:
+        audit["managed_service_changes"] = services
+
+    # The hash pins the apply to the exact buffer the caller reviewed; for
+    # a secret change that can't be optional.
+    if not input.expected_staged_hash:
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "this edit changes env or managed-service bindings -- pass the "
+            "rawManifestStagedHash you reviewed as expectedStagedHash",
+            field="expectedStagedHash",
+        )
+
+    if persisted.managed_service_attachments_created or persisted.managed_service_attachments_updated:
+        try:
+            if app.project_id is None:
+                raise PermissionDenied(Permission.PROJECT_UPDATE, None, "the app belongs to no project")
+            check_permission(
+                Permission.PROJECT_UPDATE,
+                scope=PermissionScope(kind=ScopeKind.PROJECT, id=app.project_id),
+            )
+        except PermissionDenied:
+            _audit_secret_change(app, decision="DENY", **audit)
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "attaching a project managed service to this app needs project.update on "
+                "its project -- a project admin can attach it with attachProjectManagedService",
+            )
+
+    needs_elevation = True
+    if app.requires_secret_approval:
+        match = match_applied_proposals(
+            app,
+            {change.key: change.after for change in env if change.app_wide},
+        )
+        unapproved = (
+            match.unapproved
+            + [change.label for change in env if not change.app_wide]
+            + [
+                f"{action} {target}"
+                for action, target in persisted.managed_service_changes
+                if action not in RELEASE_ACTIONS
+            ]
+        )
+        if unapproved:
+            _audit_secret_change(app, decision="DENY", unapproved_keys=unapproved, **audit)
+            return gql_failure(
+                "SECRET_APPROVAL_REQUIRED",
+                "this app requires secret approval and nothing approved these changes: "
+                f"{', '.join(unapproved)} -- change [env] through setAppSecret/rotateAppSecret/"
+                "deleteAppSecret and apply once approved; container, job and task env and "
+                "managed-service bindings can't be approved through a proposal",
+            )
+        audit["proposal_ids"] = match.proposal_ids
+        # What is left of the managed-service changes only releases
+        # bindings; nothing approves those, so they need elevation.
+        needs_elevation = bool(services)
+
+    if needs_elevation:
+        deny = check_elevation(
+            info,
+            action_label="app.manifest.apply_secret_change",
+            resolver_name="ManifestMutations.apply_staged_manifest",
+        )
+        if deny is not None:
+            _audit_secret_change(app, decision="DENY", **audit)
+            return deny
+    _audit_secret_change(app, decision="ALLOW", **audit)
+    return None
 
 
 @strawberry.type
@@ -169,18 +312,18 @@ class ManifestMutations:
         which tears down the namespace + registry repo, and register
         again).
 
-        An edit that changes env is gated the same way ``setAppSecret``
-        gates a direct secret write (adversarial review): "env" is the
+        An edit that changes env or a managed-service binding is gated the
+        same way ``setAppSecret`` gates a direct secret write (adversarial
+        review; ``_gate_secret_change`` has the rules). "Env" is the
         top-level ``[env]`` table and every container, job and task env
         table, since container env reaches the pod too and outranks
-        ``[env]`` there (``astrolift_manifest.env_diff``). When the app
-        requires secret approval, every changed ``[env]`` key must match
-        an applied secret-change proposal (the approved value, or an
-        approved delete) and anything else is refused, container env
-        included, since no proposal can carry it; otherwise the change
-        needs a fresh session elevation. Without this, this mutation
-        would be a permission-only bypass of the review every other
-        secret-literal write path sits behind.
+        ``[env]`` there (``astrolift_manifest.env_diff``). A binding is any
+        managed service or project attachment the reconcile would create,
+        change or release, read off a rolled-back dry run; attaching a
+        project managed service also needs project.update on the project.
+        Without this, this mutation would be a permission-only bypass of
+        the review every other secret-literal write path sits behind, and
+        of the permission ``attachProjectManagedService`` checks.
 
         Runs under ``select_for_update()`` so a concurrent
         ``updateManifest`` / ``applyStagedManifest`` on the same app
@@ -197,14 +340,12 @@ class ManifestMutations:
         from django.db import transaction
         from django.utils.crypto import constant_time_compare
 
-        from astrolift_identity.step_up import check_elevation
         from astrolift_manifest.env_diff import env_changes
         from astrolift_manifest.normalize import NormalizationDefaults, normalize
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.persist import persist_manifest
         from astrolift_manifest.sync_state import SyncSnapshot, classify_state
         from astrolift_registry.services.staged_manifest import staged_manifest_hash
-        from astrolift_services.secret_proposal_match import match_applied_proposals
 
         def _result(current: RegisteredApp) -> MutationResultType[_ManifestStagePayload]:
             sync_state = classify_state(
@@ -288,61 +429,39 @@ class ManifestMutations:
                     field="rawManifest",
                 )
 
-            # H1 (adversarial review): an env change is a secret change
-            # wherever it lands, [env] or a container's own env.
-            changes = env_changes(app.manifest_raw or "", staged)
-            if changes:
-                changed_keys = [change.label for change in changes]
-                # The hash pins the apply to the exact buffer the caller
-                # reviewed; for a secret change that can't be optional.
-                if not input.expected_staged_hash:
-                    return gql_failure(
-                        ErrorCode.VALIDATION.value,
-                        "this edit changes env -- pass the rawManifestStagedHash you "
-                        "reviewed as expectedStagedHash",
-                        field="expectedStagedHash",
-                    )
-                if app.requires_secret_approval:
-                    match = match_applied_proposals(
-                        app,
-                        {change.key: change.after for change in changes if change.app_wide},
-                    )
-                    unapproved = match.unapproved + [
-                        change.label for change in changes if not change.app_wide
-                    ]
-                    if unapproved:
-                        _audit_env_change(
-                            app,
-                            changed_keys=changed_keys,
-                            decision="DENY",
-                            unapproved_keys=unapproved,
-                        )
-                        return gql_failure(
-                            "SECRET_APPROVAL_REQUIRED",
-                            "this app requires secret approval and no applied secret-change "
-                            f"proposal covers these env changes: {', '.join(unapproved)} -- "
-                            "change [env] through setAppSecret/rotateAppSecret/deleteAppSecret "
-                            "and apply once approved; container, job and task env can't be "
-                            "approved through a proposal",
-                        )
-                    _audit_env_change(
-                        app,
-                        changed_keys=changed_keys,
-                        decision="ALLOW",
-                        proposal_ids=match.proposal_ids,
-                    )
-                else:
-                    deny = check_elevation(
-                        info,
-                        action_label="app.manifest.apply_secret_change",
-                        resolver_name="ManifestMutations.apply_staged_manifest",
-                    )
-                    if deny is not None:
-                        _audit_env_change(app, changed_keys=changed_keys, decision="DENY")
-                        return deny
-                    _audit_env_change(app, changed_keys=changed_keys, decision="ALLOW")
+            # H1 (adversarial review): env values and managed-service
+            # bindings are secret changes, wherever in the manifest they sit.
+            env = env_changes(app.manifest_raw or "", staged)
+            try:
+                dry_run = _dry_run_persist(app, manifest, raw_text=staged)
+            except ValueError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"managed services: {exc}",
+                    field="rawManifest",
+                )
+            refusal = _gate_secret_change(info, app, input, env, dry_run)
+            if refusal is not None:
+                return refusal
 
-            persist_manifest(app, manifest, raw_text=staged)
+            try:
+                with transaction.atomic():
+                    persisted = persist_manifest(app, manifest, raw_text=staged)
+                    # The gate cleared the dry run's effects; a write that
+                    # landed in between must not widen them unchecked.
+                    if sorted(persisted.managed_service_changes) != sorted(dry_run.managed_service_changes):
+                        raise _RollBack()
+            except _RollBack:
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    "managed services changed while this apply ran -- refresh and try again",
+                )
+            except ValueError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"managed services: {exc}",
+                    field="rawManifest",
+                )
             app.manifest_raw_staged = ""
             # There is no repo anchor for a connection-less app -- there
             # is no repo at all, so last_synced_hash is left alone rather

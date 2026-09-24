@@ -285,12 +285,17 @@ def _validate_build_strategy(raw):
 def _validate_build_path_field(raw, *, field: str):
     """Validate an incoming app-level ``dockerfile_path`` / ``build_context``.
 
-    These are already meant to be relative to the repo root directly (the
-    build hands them to kaniko as-is -- see
-    ``build_image._resolve_build_paths``), so an absolute path or a
-    leading ``..`` is always wrong here, unlike a container-level field
-    which only becomes wrong once resolved against the manifest's
-    directory (#1756 adversarial review).
+    ``build_context`` is relative to the repo root and ``dockerfile_path``
+    to that build context, which is how kaniko reads them. When a
+    container's ``build_context`` stands in for an unset app-level one,
+    the build rebases this ``dockerfile_path`` onto it
+    (``build_image._resolve_build_paths``). Either way an absolute path or
+    a leading ``..`` is always wrong here: a Dockerfile must sit inside
+    its build context, and kaniko resolves a ``..`` path against its own
+    working directory before the context, which reaches the build pod's
+    filesystem (#1756 adversarial review). A container-level field is
+    different: it only becomes wrong once resolved against the
+    manifest's directory.
 
     Returns ``(value, error)`` mirroring ``_validate_build_mode``. A None
     or empty input passes straight through unchanged -- ``register_app``
@@ -308,6 +313,53 @@ def _validate_build_path_field(raw, *, field: str):
     if error is not None:
         return None, gql_failure(ErrorCode.VALIDATION.value, error, field=field)
     return raw, None
+
+
+def _project_service_attach_denial(manifest_raw: str, project):
+    """PERMISSION_DENIED envelope when an inline manifest declares a project
+    managed service the caller could not attach directly, else None.
+
+    Registration reconciles the manifest's managed services once the app's
+    environments exist (``_bootstrap_app_environments``), and an
+    ``owner_scope = "project"`` entry naming an existing project service
+    attaches it to the new app: the same attachment
+    attachProjectManagedService makes, which needs project.update. Without
+    this check APP_CREATE alone would bind a shared project database's
+    credentials to a workload the caller writes (#1759 re-review). A
+    manifest that doesn't parse attaches nothing: registration stores it
+    as ``parse_failed`` and bootstrap skips it.
+    """
+    if not (manifest_raw or "").strip():
+        return None
+    from astrolift_manifest.normalize import normalize
+    from astrolift_manifest.parser import ManifestError, parse_raw
+    from core.permissions import (
+        Permission,
+        PermissionDenied,
+        PermissionScope,
+        ScopeKind,
+        check_permission,
+    )
+
+    try:
+        services = normalize(parse_raw(manifest_raw)).managed_services
+    except ManifestError:
+        return None
+    names = sorted({f"{s.kind}/{(s.name or s.kind).strip()}" for s in services if s.owner_scope == "project"})
+    if not names:
+        return None
+    try:
+        check_permission(
+            Permission.PROJECT_UPDATE, scope=PermissionScope(kind=ScopeKind.PROJECT, id=project.pk)
+        )
+    except PermissionDenied:
+        return gql_failure(
+            ErrorCode.PERMISSION_DENIED.value,
+            f"the manifest attaches project managed service(s) {', '.join(names)}, which needs "
+            f"project.update on project {project.slug!r}",
+            field="manifestRaw",
+        )
+    return None
 
 
 def _normalize_build_args(raw):

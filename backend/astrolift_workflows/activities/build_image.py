@@ -106,17 +106,19 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     failure, not a silent fall-back to the app-level value, so a wrong
     build never runs at all.
 
-    Kaniko does not read ``--dockerfile`` from the repo root: after trying
-    the path against its own working directory (``/workspace``, empty in
-    the executor image) it joins it onto the build context
-    (``--context-sub-path``) and cleans the result
+    Kaniko does not read ``--dockerfile`` from the repo root. It first
+    tries the path against its own working directory (``/workspace``) and
+    only then joins it onto the build context (``--context-sub-path``)
     (``resolveDockerfilePath`` in kaniko's ``cmd/executor/cmd/root.go``).
-    A container dockerfile, once resolved to a repo-root path, is therefore
-    handed over relative to the effective build context; passed as-is it
-    doubled the prefix under any context other than the root
-    (``apps/web`` + ``apps/web/Dockerfile.prod``). Because kaniko cleans
-    the join, a Dockerfile above the context but inside the clone, as a
-    ``../`` path, is read like ``docker build -f`` reads one.
+    So the Dockerfile is handed over relative to the effective build
+    context (as a repo-root path it doubled the prefix under any context
+    but the root: ``apps/web`` + ``apps/web/Dockerfile.prod``), and it must
+    sit inside that context. A ``../`` path would be tried against the
+    working directory first, where ``../../var/run/secrets/...`` is the
+    build pod's own service-account token, which kaniko would then read as
+    the Dockerfile. An app-level ``dockerfile_path`` is relative to
+    the app-level build context, which is the repo root whenever a
+    container's ``build_context`` can apply, so it is rebased the same way.
 
     Prefers ``deployment.workload``'s primary container when the deployment
     is scoped to one (task / static-site / cron paths set this); otherwise
@@ -149,14 +151,18 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
 
     manifest_dir = posixpath.dirname(app.manifest_path or "") or DEFAULT_BUILD_CONTEXT
 
-    container_dockerfile = None
-    if (
-        dockerfile_is_default
-        and primary.dockerfile_path
-        and primary.dockerfile_path != DEFAULT_DOCKERFILE_PATH
-    ):
-        container_dockerfile = resolve_repo_relative(manifest_dir, primary.dockerfile_path)
-        if container_dockerfile is None:
+    # The Dockerfile as a repo-root path, rebased onto the context below.
+    # None leaves the default "Dockerfile", which is context-relative already.
+    dockerfile_in_repo = None
+    if not dockerfile_is_default:
+        dockerfile_in_repo = resolve_repo_relative(DEFAULT_BUILD_CONTEXT, dockerfile_path)
+        if dockerfile_in_repo is None:
+            raise RuntimeError(
+                f"app dockerfile_path {dockerfile_path!r} escapes the repository root -- refusing to build"
+            )
+    elif primary.dockerfile_path and primary.dockerfile_path != DEFAULT_DOCKERFILE_PATH:
+        dockerfile_in_repo = resolve_repo_relative(manifest_dir, primary.dockerfile_path)
+        if dockerfile_in_repo is None:
             raise RuntimeError(
                 f"container dockerfile_path {primary.dockerfile_path!r} resolved against "
                 f"{manifest_dir!r} escapes the repository root -- refusing to build"
@@ -171,10 +177,16 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
             )
         build_context = resolved
 
-    if container_dockerfile is not None:
+    if dockerfile_in_repo is not None:
         # Both are repo-root paths; anchoring them at "/" keeps relpath from
         # consulting this process's working directory.
-        dockerfile_path = posixpath.relpath(f"/{container_dockerfile}", f"/{build_context}")
+        dockerfile_path = posixpath.relpath(f"/{dockerfile_in_repo}", f"/{build_context}")
+        if dockerfile_path == ".." or dockerfile_path.startswith("../"):
+            raise RuntimeError(
+                f"dockerfile {dockerfile_in_repo!r} is outside the build context {build_context!r} "
+                "-- kaniko would resolve it against its own working directory first; "
+                "refusing to build"
+            )
 
     return dockerfile_path, build_context
 

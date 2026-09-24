@@ -330,45 +330,24 @@ def test_build_image_prefers_the_deployments_own_workload_over_the_apps_first(mo
     assert captured["spec"].dockerfile_path == "Dockerfile.web"
 
 
-# Kaniko joins --dockerfile onto --context-sub-path (resolveDockerfilePath in
-# its cmd/executor/cmd/root.go), so a container dockerfile resolved to a
-# repo-root path has to reach it relative to the build context (#1756
-# re-review). Passed as the repo-root path, any context other than "."
-# doubled the prefix.
+# Kaniko tries --dockerfile against its own working directory, then joins it
+# onto --context-sub-path (resolveDockerfilePath in its
+# cmd/executor/cmd/root.go). So the Dockerfile has to reach it relative to
+# the build context (#1756 re-review: as a repo-root path, any context but
+# "." doubled the prefix), and inside it: a ../ path is tried against the
+# working directory first, where ../../var/run/secrets/... is the build
+# pod's own service-account token.
 
 
-@pytest.mark.parametrize(
-    ("app_context", "container_context", "container_dockerfile", "expected"),
-    [
-        pytest.param(
-            "apps/web", ".", "Dockerfile.prod", ("Dockerfile.prod", "apps/web"), id="app-level-context"
-        ),
-        pytest.param(
-            ".",
-            "docker",
-            "docker/Dockerfile",
-            ("Dockerfile", "apps/web/docker"),
-            id="container-level-context",
-        ),
-        pytest.param(
-            "apps/web",
-            ".",
-            "../../docker/web.Dockerfile",
-            ("../../docker/web.Dockerfile", "apps/web"),
-            id="dockerfile-above-the-context",
-        ),
-    ],
-)
-def test_build_image_passes_a_container_dockerfile_relative_to_the_build_context(
-    monkeypatch, app_context, container_context, container_dockerfile, expected
-):
+def _container_build(app_dockerfile, app_context, container_dockerfile, container_context):
     from astrolift_registry.models import Workload
 
     deployment = _make_deployment()
     app = deployment.registered_app
     app.manifest_path = "apps/web/astrolift.toml"
+    app.dockerfile_path = app_dockerfile
     app.build_context = app_context
-    app.save(update_fields=["manifest_path", "build_context"])
+    app.save(update_fields=["manifest_path", "dockerfile_path", "build_context"])
     workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
     workload.containers.create(
         name="web",
@@ -376,6 +355,42 @@ def test_build_image_passes_a_container_dockerfile_relative_to_the_build_context
         dockerfile_path=container_dockerfile,
         build_context=container_context,
     )
+    return deployment
+
+
+@pytest.mark.parametrize(
+    ("app_dockerfile", "app_context", "container_dockerfile", "container_context", "expected"),
+    [
+        pytest.param(
+            "Dockerfile",
+            "apps/web",
+            "Dockerfile.prod",
+            ".",
+            ("Dockerfile.prod", "apps/web"),
+            id="container-dockerfile-app-context",
+        ),
+        pytest.param(
+            "Dockerfile",
+            ".",
+            "docker/Dockerfile",
+            "docker",
+            ("Dockerfile", "apps/web/docker"),
+            id="container-dockerfile-container-context",
+        ),
+        pytest.param(
+            "apps/web/docker/Dockerfile.web",
+            ".",
+            "Dockerfile",
+            "docker",
+            ("Dockerfile.web", "apps/web/docker"),
+            id="app-dockerfile-container-context",
+        ),
+    ],
+)
+def test_build_image_passes_the_dockerfile_relative_to_the_build_context(
+    monkeypatch, app_dockerfile, app_context, container_dockerfile, container_context, expected
+):
+    deployment = _container_build(app_dockerfile, app_context, container_dockerfile, container_context)
 
     captured = _capture_build_spec(monkeypatch)
     _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
@@ -383,18 +398,37 @@ def test_build_image_passes_a_container_dockerfile_relative_to_the_build_context
     assert (captured["spec"].dockerfile_path, captured["spec"].context_path) == expected
 
 
+@pytest.mark.parametrize(
+    ("app_dockerfile", "app_context", "container_dockerfile", "container_context"),
+    [
+        pytest.param("Dockerfile", "apps/web", "../../docker/web.Dockerfile", ".", id="above-the-context"),
+        pytest.param(
+            "Dockerfile",
+            "apps/web",
+            "../../var/run/secrets/kubernetes.io/serviceaccount/token",
+            ".",
+            id="service-account-token",
+        ),
+        pytest.param(
+            "Dockerfile.prod", ".", "Dockerfile", "sub", id="app-dockerfile-above-a-container-context"
+        ),
+    ],
+)
+def test_build_image_refuses_a_dockerfile_outside_the_build_context(
+    monkeypatch, app_dockerfile, app_context, container_dockerfile, container_context
+):
+    deployment = _container_build(app_dockerfile, app_context, container_dockerfile, container_context)
+
+    captured = _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="outside the build context"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+    assert "spec" not in captured
+
+
 def test_build_image_rejects_a_container_dockerfile_that_escapes_the_repo_root(monkeypatch):
     """Rebasing onto the context happens after the inside-the-repo check,
     so a dockerfile above the repo root still fails the build."""
-    from astrolift_registry.models import Workload
-
-    deployment = _make_deployment()
-    app = deployment.registered_app
-    app.manifest_path = "apps/web/astrolift.toml"
-    app.build_context = "apps/web"
-    app.save(update_fields=["manifest_path", "build_context"])
-    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
-    workload.containers.create(name="web", is_primary=True, dockerfile_path="../../../Dockerfile")
+    deployment = _container_build("Dockerfile", "apps/web", "../../../Dockerfile", ".")
 
     _capture_build_spec(monkeypatch)
     with pytest.raises(RuntimeError, match="escapes the repository root"):

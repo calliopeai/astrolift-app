@@ -754,7 +754,7 @@ def test_apply_staged_manifest_refuses_an_env_change_when_secret_approval_is_req
     # values ("bar" / "baz"), and no digest of the manifest text either
     # (#1759 re-review: an unkeyed hash of secret-bearing text is an
     # offline guessing oracle for anyone who can read the audit log).
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "DENY"
     assert entry.extra == {"changed_keys": ["FOO"], "unapproved_keys": ["FOO"]}
     serialized = json.dumps(entry.extra)
@@ -781,7 +781,7 @@ def test_apply_staged_manifest_requires_elevation_for_an_env_change(permission_r
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
     assert app.manifest_raw_staged == _TOML_WITH_ENV_CHANGED
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "DENY"
     assert entry.extra == {"changed_keys": ["FOO"]}
 
@@ -998,7 +998,7 @@ def test_apply_staged_manifest_requires_elevation_for_container_job_and_task_env
     app.refresh_from_db()
     assert app.manifest_raw == before
     assert app.manifest_raw_staged == after
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "DENY"
     assert entry.extra == {"changed_keys": labels}
     assert "evil" not in json.dumps(entry.extra)
@@ -1024,7 +1024,7 @@ def test_apply_staged_manifest_applies_a_container_env_change_once_elevated(
     assert result.ok, result.errors
     app.refresh_from_db()
     assert app.manifest_raw == after
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "ALLOW"
     assert entry.extra == {"changed_keys": labels}
 
@@ -1051,7 +1051,7 @@ def test_apply_staged_manifest_refuses_container_env_when_secret_approval_is_req
     assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
     app.refresh_from_db()
     assert app.manifest_raw == before
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.extra == {"changed_keys": labels, "unapproved_keys": labels}
 
 
@@ -1172,7 +1172,7 @@ def test_apply_staged_manifest_applies_an_approved_secret_change(
     app.refresh_from_db()
     assert read_app_env(app.manifest_raw) == expected_env
     assert app.manifest_raw_staged == ""
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "ALLOW"
     assert entry.extra == {"changed_keys": ["FOO"], "proposal_ids": [proposal_id]}
 
@@ -1204,7 +1204,7 @@ def test_apply_staged_manifest_refuses_an_unapproved_change_next_to_an_approved_
     assert "BAR" in result.errors[0].message
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
-    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
     assert entry.decision == "DENY"
     assert entry.extra == {"changed_keys": ["BAR", "FOO"], "unapproved_keys": ["BAR"]}
 
@@ -1288,3 +1288,383 @@ def test_app_type_lists_the_staged_env_changes_by_name_only():
     names = app_to_type(app).staged_env_changes
     assert names == ["LOG_LEVEL", "OPTS", "workloads.web.containers.web.env.DATABASE_URL"]
     assert not any("evil" in name or "debug" in name for name in names)
+
+
+# --- managed-service bindings are secret changes too (#1759 re-review) --
+#
+# applyStagedManifest -> persist_manifest -> reconcile_managed_services
+# let an APP_UPDATE caller on a no-repo app stage an owner_scope="project"
+# entry naming an existing project service, which attached it to the app;
+# the next deploy envFroms the project database's credentials into a pod
+# whose command that caller wrote. attachProjectManagedService needs
+# project.update. App-scoped bindings changed with no step-up either.
+
+_PROJECT_BINDING = """
+[[managed_services]]
+kind = "postgres"
+name = "shared"
+owner_scope = "project"
+environment = "production"
+bind_workloads = ["web"]
+"""
+
+_APP_SERVICE = """
+[[managed_services]]
+kind = "postgres"
+name = "db"
+environment = "production"
+bind_workloads = ["web"]
+"""
+
+
+def _catalog(monkeypatch):
+    monkeypatch.setattr(
+        "astrolift_services.managed_service_catalog.resolve_variant",
+        lambda **kwargs: SimpleNamespace(variant=kwargs.get("requested_variant") or "resolved-default"),
+    )
+    monkeypatch.setattr("astrolift_services.managed_service_catalog.validate_config", lambda *_: None)
+
+
+def _add_environment(app, name="production"):
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_lifecycle.models import AppEnvironment
+
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="manifest-mutations-provider",
+        defaults={
+            "name": "Manifest mutations provider",
+            "plugin_version": "0.0.1",
+            "capabilities_manifest": {},
+            "config_schema": {},
+        },
+    )
+    cluster = TenantCluster.objects.create(
+        organization=app.organization,
+        slug=f"manifest-mutations-{app.pk}-{name}",
+        name=f"Manifest mutations {name}",
+        provider_plugin=plugin,
+        endpoint="https://example.invalid",
+    )
+    return AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name=name)
+
+
+def _project_service(app, env):
+    """A project database a project admin created, the shape the manifest
+    entry above reconciles onto (same cluster, variant and config)."""
+    from astrolift_services.models import ManagedService
+
+    return ManagedService.objects.create(
+        project=app.project,
+        tenant_cluster=env.tenant_cluster,
+        environment_name=env.name,
+        kind="postgres",
+        name="shared",
+        variant="resolved-default",
+        config={"size": "small"},
+        status=ManagedService.Status.ACTIVE,
+    )
+
+
+def _persisted(app, text):
+    from astrolift_manifest.normalize import NormalizationDefaults, normalize
+    from astrolift_manifest.parser import parse_raw
+    from astrolift_manifest.persist import persist_manifest
+
+    persist_manifest(app, normalize(parse_raw(text), defaults=NormalizationDefaults()), raw_text=text)
+    app.refresh_from_db()
+
+
+def _apply(org, app, info=None):
+    with _ctx(org):
+        return RegistryMutation().apply_staged_manifest(
+            info or _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+
+def test_apply_staged_manifest_refuses_a_project_attachment_without_project_update(
+    permission_resolver, audit_capture, monkeypatch
+):
+    """The reviewer's scenario, with step-up off so nothing else stops it."""
+    from astrolift_services.models import ManagedServiceAttachment
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    env = _add_environment(app)
+    shared = _project_service(app, env)
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _PROJECT_BINDING
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert not ManagedServiceAttachment.objects.filter(managed_service=shared).exists()
+    app.refresh_from_db()
+    assert app.manifest_raw == _TOML_WITH_CONTAINER
+    assert not Workload.objects.filter(registered_app=app).exists()
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {
+        "changed_keys": [],
+        "managed_service_changes": ["attach project:postgres/shared@production"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("grant_on", "elevated", "expected"),
+    [
+        pytest.param("own", True, "applied", id="project-update-and-elevated"),
+        pytest.param("own", False, "STEP_UP_REQUIRED", id="project-update-not-elevated"),
+        pytest.param("other", True, "PERMISSION_DENIED", id="project-update-on-another-project"),
+    ],
+)
+def test_apply_staged_manifest_project_attachment_needs_project_update_and_elevation(
+    permission_resolver, monkeypatch, grant_on, elevated, expected
+):
+    from astrolift_services.models import ManagedServiceAttachment
+    from core.permissions import PermissionScope, ScopeKind
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    env = _add_environment(app)
+    shared = _project_service(app, env)
+    other = Project.objects.create(organization=org, team=app.team, name="Other", slug="other")
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _PROJECT_BINDING
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    project_id = app.project_id if grant_on == "own" else other.pk
+    permission_resolver.grant(
+        Permission.PROJECT_UPDATE, scope=PermissionScope(kind=ScopeKind.PROJECT, id=project_id)
+    )
+    session = _FakeSession()
+    if elevated:
+        elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True):
+        result = _apply(org, app, _info_with_session(session))
+
+    attachments = ManagedServiceAttachment.objects.filter(
+        managed_service=shared, app_environment=env, deleted_at__isnull=True
+    )
+    if expected == "applied":
+        assert result.ok, result.errors
+        assert [a.workload_names for a in attachments] == [["web"]]
+    else:
+        assert not result.ok
+        assert result.errors[0].code == expected
+        assert not attachments.exists()
+
+
+def test_apply_staged_manifest_re_attaching_a_detached_project_service_needs_project_update(
+    permission_resolver, monkeypatch
+):
+    """The gate reads what the reconcile would do, not the text diff: the
+    binding is already in manifest_raw, but a project admin detached it,
+    so any apply would re-create the attachment."""
+    from astrolift_services.models import ManagedServiceAttachment
+
+    _catalog(monkeypatch)
+    raw = _TOML_WITH_CONTAINER + _PROJECT_BINDING
+    org, app = _scaffold(manifest_raw=raw, manifest_hash="abc", source_repo="")
+    env = _add_environment(app)
+    shared = _project_service(app, env)
+    ManagedServiceAttachment.objects.create(
+        managed_service=shared, app_environment=env, manifest_managed=True, workload_names=["web"]
+    ).soft_delete()
+    app.manifest_raw_staged = raw.replace('kind = "deployment"', 'kind = "deployment"\nreplicas = 2')
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert not ManagedServiceAttachment.objects.filter(
+        managed_service=shared, deleted_at__isnull=True
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "change"),
+    [
+        pytest.param(
+            _TOML_WITH_CONTAINER,
+            _TOML_WITH_CONTAINER + _APP_SERVICE,
+            "create app:postgres/db@production",
+            id="adds-a-service",
+        ),
+        pytest.param(
+            _TOML_WITH_CONTAINER + _APP_SERVICE,
+            _TOML_WITH_CONTAINER + _APP_SERVICE.replace('bind_workloads = ["web"]', 'bind_workloads = ["*"]'),
+            "update app:postgres/db@production",
+            id="widens-bind-workloads",
+        ),
+    ],
+)
+def test_apply_staged_manifest_requires_elevation_for_an_app_managed_service_change(
+    permission_resolver, audit_capture, monkeypatch, before, after, change
+):
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(source_repo="")
+    _add_environment(app)
+    _persisted(app, before)
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    rows_before = list(
+        ManagedService.objects.filter(registered_app=app).values_list("name", "bind_workloads")
+    )
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True):
+        result = _apply(org, app, _info_with_session(_FakeSession()))
+
+    assert not result.ok
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    assert (
+        list(ManagedService.objects.filter(registered_app=app).values_list("name", "bind_workloads"))
+        == rows_before
+    )
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {"changed_keys": [], "managed_service_changes": [change]}
+
+
+def test_apply_staged_manifest_requires_the_expected_hash_for_a_managed_service_change(
+    permission_resolver, monkeypatch
+):
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    _add_environment(app)
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _APP_SERVICE
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(), input=ApplyStagedManifestInput(id=str(app.guid))
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "expectedStagedHash"
+    assert not ManagedService.objects.filter(registered_app=app).exists()
+
+
+def test_apply_staged_manifest_refuses_a_managed_service_binding_when_secret_approval_is_required(
+    permission_resolver, audit_capture, monkeypatch
+):
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    _add_environment(app)
+    app.requires_secret_approval = True
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _APP_SERVICE
+    app.save(update_fields=["manifest_raw_staged", "requires_secret_approval"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    assert not ManagedService.objects.filter(registered_app=app).exists()
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+    assert entry.extra["unapproved_keys"] == ["create app:postgres/db@production"]
+
+
+@pytest.mark.parametrize(("step_up", "expected"), [(False, "applied"), (True, "STEP_UP_REQUIRED")])
+def test_apply_staged_manifest_releases_a_managed_service_on_an_approval_app_with_elevation(
+    permission_resolver, audit_capture, monkeypatch, step_up, expected
+):
+    """A release only takes credentials away, so an approval-required app
+    can make it, but nothing approves it, so it needs elevation."""
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(source_repo="")
+    _add_environment(app)
+    _persisted(app, _TOML_WITH_CONTAINER + _APP_SERVICE)
+    app.requires_secret_approval = True
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER
+    app.save(update_fields=["manifest_raw_staged", "requires_secret_approval"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=step_up):
+        result = _apply(org, app, _info_with_session(_FakeSession()))
+
+    row = ManagedService.objects.get(registered_app=app, name="db")
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_secret_change")
+    assert entry.extra["managed_service_changes"] == ["remove app:postgres/db@production"]
+    if expected == "applied":
+        assert result.ok, result.errors
+        assert row.manifest_managed is False
+        assert entry.decision == "ALLOW"
+    else:
+        assert result.errors[0].code == expected
+        assert row.manifest_managed is True
+        assert entry.decision == "DENY"
+
+
+def test_apply_staged_manifest_turns_a_reconcile_error_into_a_validation_failure(
+    permission_resolver, monkeypatch
+):
+    """reconcile_managed_services raises ValueError for a manifest it can't
+    reconcile; that is a VALIDATION envelope with nothing persisted, not
+    an INTERNAL error."""
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    _add_environment(app)
+    app.manifest_raw_staged = _TOML_WITH_CONTAINER + _APP_SERVICE.replace(
+        'environment = "production"', 'environment = "staging"'
+    )
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "rawManifest"
+    assert "staging" in result.errors[0].message
+    app.refresh_from_db()
+    assert app.manifest_raw == _TOML_WITH_CONTAINER
+    assert not Workload.objects.filter(registered_app=app).exists()
+
+
+def test_apply_staged_manifest_refuses_when_the_reconcile_changes_after_the_gate(
+    permission_resolver, monkeypatch
+):
+    """The gate clears the dry run's effects. If the real reconcile does
+    more (a write landed in between), nothing is applied."""
+    import astrolift_manifest.persist as persist_module
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    real = persist_module.persist_manifest
+    calls = []
+
+    def _persist(*args, **kwargs):
+        result = real(*args, **kwargs)
+        calls.append(result)
+        if len(calls) == 2:
+            result.managed_service_changes.append(("attach", "project:postgres/shared@production"))
+        return result
+
+    monkeypatch.setattr(persist_module, "persist_manifest", _persist)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "CONFLICT"
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()
+    assert app.manifest_raw_staged == _UPDATED_TOML

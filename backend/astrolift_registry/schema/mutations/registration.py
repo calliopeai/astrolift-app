@@ -22,6 +22,7 @@ from astrolift_registry.schema.mutations.helpers import (
     _ensure_owner_access,
     _generate_unique_app_slug,
     _normalize_build_args,
+    _project_service_attach_denial,
     _resolve_approval_inputs,
     _validate_build_mode,
     _validate_build_path_field,
@@ -197,6 +198,10 @@ class RegistrationMutations:
         )
         if build_context_err is not None:
             return build_context_err
+        # Before the app exists: a refusal must leave nothing half-registered.
+        attach_denial = _project_service_attach_denial(input.manifest_raw or "", project)
+        if attach_denial is not None:
+            return attach_denial
 
         app = RegisteredApp.objects.create(
             organization=project.organization,

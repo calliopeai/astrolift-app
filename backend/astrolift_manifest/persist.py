@@ -35,6 +35,10 @@ from astrolift_manifest.types import (
     WorkloadManifest,
 )
 
+# Reconcile actions that only take a binding away: nothing new can read a
+# service's credentials through one (applyStagedManifest's approval rule).
+RELEASE_ACTIONS = frozenset({"remove", "detach"})
+
 
 @dataclasses.dataclass(slots=True)
 class PersistResult:
@@ -51,7 +55,15 @@ class PersistResult:
     managed_services_updated: int = 0
     managed_services_removed: int = 0
     managed_service_attachments_created: int = 0
+    managed_service_attachments_updated: int = 0
     managed_service_attachments_removed: int = 0
+    # One (action, target) pair per managed-service row or attachment the
+    # reconcile created, changed or released, e.g. ("attach",
+    # "project:postgres/shared@production"). Names only, so a caller can
+    # gate or audit exactly what changed (applyStagedManifest, #1759)
+    # without re-deriving reconcile's rules; RELEASE_ACTIONS are the ones
+    # that only take a binding away.
+    managed_service_changes: list[tuple[str, str]] = dataclasses.field(default_factory=list)
     hash_changed: bool = False
 
     @property
@@ -68,6 +80,7 @@ class PersistResult:
             or self.managed_services_updated
             or self.managed_services_removed
             or self.managed_service_attachments_created
+            or self.managed_service_attachments_updated
             or self.managed_service_attachments_removed
         ) > 0
 
@@ -173,7 +186,9 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
     result.managed_services_updated += managed.managed_services_updated
     result.managed_services_removed += managed.managed_services_removed
     result.managed_service_attachments_created += managed.managed_service_attachments_created
+    result.managed_service_attachments_updated += managed.managed_service_attachments_updated
     result.managed_service_attachments_removed += managed.managed_service_attachments_removed
+    result.managed_service_changes += managed.managed_service_changes
 
     return result
 
@@ -374,6 +389,7 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                     lifecycle_policy=lifecycle,
                 )
                 result.managed_services_created += 1
+                result.managed_service_changes.append(("create", f"app:{service.kind}/{name}@{env.name}"))
                 _enqueue_provision(row)
                 continue
             if not row.manifest_managed:
@@ -406,6 +422,7 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                 row.lifecycle_policy = lifecycle
                 row.save()
                 result.managed_services_updated += 1
+                result.managed_service_changes.append(("update", f"app:{service.kind}/{name}@{env.name}"))
                 _enqueue_update(row) if row.backend_ref else _enqueue_provision(row)
             elif _needs_provision_retry(row):
                 # Unchanged, but never provisioned -- the enqueue that
@@ -437,6 +454,7 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                     lifecycle_policy=lifecycle,
                 )
                 result.managed_services_created += 1
+                result.managed_service_changes.append(("create", f"project:{service.kind}/{name}"))
                 _enqueue_provision(row)
             else:
                 if row.tenant_cluster_id != env.tenant_cluster_id:
@@ -464,9 +482,12 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                 workload_names=list(service.bind_workloads),
             )
             result.managed_service_attachments_created += 1
+            result.managed_service_changes.append(("attach", f"project:{service.kind}/{name}@{env.name}"))
         elif attachment.manifest_managed and attachment.workload_names != list(service.bind_workloads):
             attachment.workload_names = list(service.bind_workloads)
             attachment.save(update_fields=["workload_names", "updated_at", "version"])
+            result.managed_service_attachments_updated += 1
+            result.managed_service_changes.append(("rebind", f"project:{service.kind}/{name}@{env.name}"))
         elif not attachment.manifest_managed:
             raise ValueError(
                 f"project managed service {name!r} is already attached imperatively to {env.name!r}"
@@ -483,6 +504,8 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
         row.manifest_managed = False
         row.save(update_fields=["manifest_managed", "updated_at", "version"])
         result.managed_services_removed += 1
+        env_name = row.app_environment.name if row.app_environment_id else ""
+        result.managed_service_changes.append(("remove", f"app:{row.kind}/{row.name}@{env_name}"))
         _enqueue_deprovision(row)
 
     stale_attachments = ManagedServiceAttachment.objects.filter(
@@ -490,9 +513,13 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
         manifest_managed=True,
         deleted_at__isnull=True,
     ).exclude(pk__in=desired_attachments)
-    for attachment in stale_attachments:
+    for attachment in stale_attachments.select_related("managed_service", "app_environment"):
         attachment.soft_delete()
         result.managed_service_attachments_removed += 1
+        service_row = attachment.managed_service
+        result.managed_service_changes.append(
+            ("detach", f"project:{service_row.kind}/{service_row.name}@{attachment.app_environment.name}")
+        )
 
     return result
 
