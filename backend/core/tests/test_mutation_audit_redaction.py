@@ -1,3 +1,4 @@
+from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
 from core.schema.audit import _is_secret_operation, _redact
 
 _STAGED_TOML = """\
@@ -25,7 +26,7 @@ def test_update_manifest_raw_manifest_variable_masks_env_values() -> None:
 
 def test_register_app_manifest_raw_variable_masks_env_values() -> None:
     """``registerApp``'s inline seed manifest uses the opposite field
-    order (``manifestRaw``) from ``updateManifest``'s ``rawManifest`` —
+    order (``manifestRaw``) from ``updateManifest``'s ``rawManifest``;
     both must be covered."""
     variables = {"input": {"sourceRepo": "acme/demo", "manifestRaw": _STAGED_TOML}}
     redacted = _redact(variables)
@@ -37,7 +38,7 @@ def test_bulk_import_dotenv_text_variable_masks_values() -> None:
     variables = {"input": {"appSlug": "demo", "dotenvText": "API_KEY=sk-live-super-secret\n"}}
     redacted = _redact(variables)
     assert "sk-live-super-secret" not in redacted["input"]["dotenvText"]
-    assert "API_KEY=[REDACTED]" in redacted["input"]["dotenvText"]
+    assert f"API_KEY={REDACTED_ENV_VALUE}" in redacted["input"]["dotenvText"]
 
 
 def test_secret_operation_redacts_generic_value_recursively():

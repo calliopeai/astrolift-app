@@ -542,3 +542,55 @@ def test_compose_verifiers_returns_first_truthy():
     assert combined(fake_user, METHOD_WEBAUTHN, "x") is True
     assert combined(fake_user, METHOD_PASSWORD, "x") is True
     assert combined(fake_user, "magic_link", "x") is False
+
+
+# ---- is_elevated_and_attested (#1920) -----------------------------------
+
+
+class _ElevationProbe:
+    @requires_elevation(action_label="probe")
+    def run(self, info):
+        return "ran"
+
+
+@pytest.mark.parametrize(
+    ("step_up_on", "shape", "elevated", "attestation_required"),
+    [
+        (True, "api_token", False, False),
+        (False, "session", False, False),
+        (True, "no_request", False, False),
+        (True, "no_session", False, False),
+        (True, "session", False, False),
+        (True, "session", True, False),
+        (True, "session", True, True),
+        (True, "session", False, True),
+    ],
+)
+def test_is_elevated_and_attested_agrees_with_requires_elevation(
+    monkeypatch, step_up_on, shape, elevated, attestation_required
+):
+    """The read-side predicate must answer exactly as the mutation gate
+    does, in every branch, or masking and revealAppSecret disagree about
+    who may see a secret."""
+    from astrolift_identity.step_up import is_elevated_and_attested
+
+    monkeypatch.setattr(
+        "astrolift_identity.step_up._attestation_gate_active", lambda request: attestation_required
+    )
+    user = _admin_user()
+    session = _FakeSession()
+    if elevated:
+        elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+    info = _info(user, session=session)
+    if shape == "api_token":
+        info.context.request._api_token = object()
+    elif shape == "no_request":
+        info = SimpleNamespace(context=SimpleNamespace(request=None, user=user))
+    elif shape == "no_session":
+        info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=user), user=user))
+
+    with override_config(REQUIRE_STEP_UP_AUTH=step_up_on):
+        gate_allows = _ElevationProbe().run(info) == "ran"
+        predicate_allows = is_elevated_and_attested(info)
+
+    assert predicate_allows is gate_allows

@@ -29,6 +29,7 @@ from astrolift_services.schema.mutations.helpers import (
     _proposal_ttl_seconds,
     _self_approve_secrets_allowed,
     _validate_env_key,
+    _validate_env_value,
 )
 from astrolift_services.schema.mutations.types import (
     ApproveSecretChangeInput,
@@ -104,6 +105,9 @@ class SecretChangeMutations:
                     "value is required for op=set",
                     field="value",
                 )
+            msg = _validate_env_value(input.key, input.value)
+            if msg:
+                return gql_failure(ErrorCode.VALIDATION.value, msg, field="value")
             payload: dict = {"key": input.key, "value": input.value}
         elif input.op == SecretChangeProposal.Op.DELETE.value:
             if not input.key:

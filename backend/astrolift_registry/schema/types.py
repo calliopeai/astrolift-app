@@ -437,7 +437,7 @@ class RegisteredAppType:
 
     manifest_hash: str
     # ``[env]`` values are masked (keys kept) unless the viewer holds
-    # ``secret.read`` and is step-up elevated — see ``app_to_type`` /
+    # ``secret.read`` and is step-up elevated; see ``app_to_type`` /
     # ``can_reveal_app_secrets`` (#1920).
     raw_manifest: str
     raw_manifest_staged: str
@@ -965,17 +965,18 @@ def app_to_type(
     )
     reprovision = build_reprovision_state(app)
     project = app.project if app.project_id else None
-    # #1920 — ``raw_manifest`` / ``raw_manifest_staged`` carry the
-    # app's ``[env]`` table in the clear. Anyone with ``app.read`` can
-    # reach this type, but the same secret values ``revealAppSecret``
-    # requires ``secret.read`` + a fresh step-up elevation for; apply
-    # the identical gate here or that mutation's guard is decorative.
+    # #1920: ``raw_manifest`` / ``raw_manifest_staged`` carry the app's
+    # ``[env]`` table in the clear. Anyone with ``app.read`` can reach
+    # this type, but those are the values ``revealAppSecret`` requires
+    # ``secret.read`` + a fresh step-up elevation for; apply the identical
+    # gate here or that mutation's guard is decorative.
     from astrolift_services.secret_visibility import can_reveal_app_secrets
 
-    can_reveal = can_reveal_app_secrets(info, app=app, known_permissions=viewer_permissions)
     raw_manifest = app.manifest_raw or ""
     raw_manifest_staged = app.manifest_raw_staged or ""
-    if not can_reveal:
+    if (raw_manifest or raw_manifest_staged) and not can_reveal_app_secrets(
+        info, app=app, known_permissions=viewer_permissions
+    ):
         from astrolift_manifest.env_edit import redact_env_values
 
         raw_manifest = redact_env_values(raw_manifest)

@@ -1,9 +1,9 @@
-"""#1920 — raw manifest text must mask ``[env]`` values unless the
+"""#1920: raw manifest text must mask ``[env]`` values unless the
 caller holds ``secret.read`` and is step-up elevated, the same gate
 ``revealAppSecret`` enforces.
 
 Covers the ``RegisteredApp`` GraphQL type (single-app + list queries,
-which take two different code paths inside ``app_to_type`` — a fresh
+which take two different code paths inside ``app_to_type``: a fresh
 per-app RBAC lookup vs. a pre-resolved bulk ``viewerPermissions`` map)
 and the manifest-stage mutation that echoes raw text directly.
 """
@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from astrolift_graphql import GUID
 from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
 from astrolift_identity.session_elevation import METHOD_PASSWORD, elevate
+from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations import RegistryMutation
 from astrolift_registry.schema.mutations.types import UpdateManifestInput
@@ -79,7 +80,7 @@ def _make_user(username: str) -> object:
 
 
 def _grant(user, org, *permissions: str) -> None:
-    """Real Role + org-scoped RoleBinding — ``resolve_effective_permissions``
+    """Real Role + org-scoped RoleBinding. ``resolve_effective_permissions``
     reads RoleBinding rows directly, so a stubbed permission resolver
     (as ``test_secrets_mutations.py`` uses) would be invisible to it."""
     role = Role.objects.create(
@@ -124,7 +125,7 @@ def test_astrolift_app_masks_env_values_for_app_read_only(seed_cluster):
     assert result is not None
     assert _SECRET_VALUE not in result.raw_manifest
     assert "API_KEY" in result.raw_manifest
-    assert "[REDACTED]" in result.raw_manifest
+    assert REDACTED_ENV_VALUE in result.raw_manifest
 
 
 @override_config(REQUIRE_STEP_UP_AUTH=True)
@@ -145,7 +146,7 @@ def test_astrolift_app_reveals_env_values_for_secret_read_elevated(seed_cluster)
 
 @override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_astrolift_app_masks_for_secret_read_without_elevation(seed_cluster):
-    """Holding secret.read is not enough on its own — the step-up half
+    """Holding secret.read is not enough on its own: the step-up half
     of the gate must also be satisfied, same as ``revealAppSecret``."""
     org, app = _scaffold()
     seed_cluster(org)
@@ -159,7 +160,7 @@ def test_astrolift_app_masks_for_secret_read_without_elevation(seed_cluster):
     assert _SECRET_VALUE not in result.raw_manifest
 
 
-# ---- astroliftMyApps (list query — bulk viewerPermissions path) ---
+# ---- astroliftMyApps (list query, bulk viewerPermissions path) ---
 
 
 def test_astrolift_my_apps_masks_env_values_for_app_read_only():
@@ -195,7 +196,7 @@ def test_astrolift_my_apps_reveals_env_values_for_secret_read_elevated():
 
 def test_update_manifest_masks_env_values_for_app_update_only():
     """``app.update`` (not app.read/secret.read) is all this mutation
-    requires to run — but its response must not become a side-door
+    requires to run, but its response must not become a side-door
     into every other secret already staged on the app (#1920)."""
     org, app = _scaffold()
     caller = _make_user("update-only")
@@ -212,7 +213,7 @@ def test_update_manifest_masks_env_values_for_app_update_only():
     assert _SECRET_VALUE not in result.data.raw_manifest_staged
     assert "API_KEY" in result.data.raw_manifest_staged
     app.refresh_from_db()
-    # The fix is response-shaping only — the stored staged text is untouched.
+    # The fix is response-shaping only: the stored staged text is untouched.
     assert app.manifest_raw_staged == _STAGED_TOML
 
 
@@ -233,3 +234,228 @@ def test_update_manifest_reveals_env_values_for_secret_read_elevated():
     assert result.ok is True, result.errors
     assert _SECRET_VALUE in result.data.raw_manifest
     assert _SECRET_VALUE in result.data.raw_manifest_staged
+
+
+# ---- masked read -> save round trip (#1920 review) ------------------
+
+_OLD_SECRET = "sk-live-old-rotated-000"
+_DB_SECRET = "pw-222"
+
+_HAND_EDITED_TOML = f"""\
+# hand-edited in the repo
+astrolift_version = 1
+name = "hello"   # display name
+
+[env]
+# previous key: {_OLD_SECRET}
+API_KEY   = "{_SECRET_VALUE}"   # prod
+DB_URL = 'postgres://app:{_DB_SECRET}@db/app'
+LOG_LEVEL = "info"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+"""
+
+
+def _stage(app, text: str) -> None:
+    app.manifest_raw_staged = text
+    app.save(update_fields=["manifest_raw_staged"])
+
+
+def _masked_staged_read(org, app, caller) -> str:
+    with _ctx(org, caller):
+        read = RegistryQuery().astrolift_app(_info(caller), slug=app.slug)
+    masked = read.raw_manifest_staged
+    for secret in (_SECRET_VALUE, _OLD_SECRET, _DB_SECRET):
+        assert secret not in masked
+    return masked
+
+
+def _save(org, app, caller, text: str):
+    with _ctx(org, caller):
+        return RegistryMutation().update_manifest(
+            _info(caller),
+            input=UpdateManifestInput(id=GUID(str(app.guid)), raw_manifest=text),
+        )
+
+
+def test_update_manifest_masked_round_trip_keeps_the_stored_text(seed_cluster):
+    """Load the masked editor text and save it back unchanged. Before
+    #1920's review that replaced every stored secret with the
+    placeholder; now the stored document, comments included, is
+    byte-identical afterwards."""
+    org, app = _scaffold()
+    seed_cluster(org)
+    _stage(app, _HAND_EDITED_TOML)
+    caller = _make_user("round-trip")
+    _grant(caller, org, "app.read", "app.update")
+
+    masked = _masked_staged_read(org, app, caller)
+    result = _save(org, app, caller, masked)
+
+    assert result.ok is True, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == _HAND_EDITED_TOML
+    assert result.data.raw_manifest_staged == masked
+
+
+def test_update_manifest_masked_save_keeps_secrets_next_to_an_edit(seed_cluster):
+    org, app = _scaffold()
+    seed_cluster(org)
+    _stage(app, _HAND_EDITED_TOML)
+    caller = _make_user("round-trip-edit")
+    _grant(caller, org, "app.read", "app.update")
+
+    masked = _masked_staged_read(org, app, caller)
+    result = _save(org, app, caller, masked.replace('name = "web"', 'name = "api"'))
+
+    assert result.ok is True, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == _HAND_EDITED_TOML.replace('name = "web"', 'name = "api"')
+
+
+def test_update_manifest_rejects_a_placeholder_with_no_stored_value(seed_cluster):
+    org, app = _scaffold()
+    seed_cluster(org)
+    _stage(app, _HAND_EDITED_TOML)
+    caller = _make_user("round-trip-ghost")
+    _grant(caller, org, "app.read", "app.update")
+
+    masked = _masked_staged_read(org, app, caller)
+    result = _save(
+        org, app, caller, masked.replace("LOG_LEVEL", f'GHOST = "{REDACTED_ENV_VALUE}"\nLOG_LEVEL')
+    )
+
+    assert result.ok is False
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "rawManifest"
+    assert "GHOST" in result.errors[0].message
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == _HAND_EDITED_TOML
+
+
+# ---- registerApp -------------------------------------------------------
+
+
+def _register(org, project, *, slug: str, manifest_raw: str):
+    from astrolift_registry.schema.mutations import RegisterAppInput
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        return RegistryMutation().register_app(
+            SimpleNamespace(context=SimpleNamespace(user=None, request=None)),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="Copied",
+                slug=slug,
+                source_repo=f"acme/{slug}",
+                manifest_raw=manifest_raw,
+            ),
+        )
+
+
+def test_register_app_rejects_a_masked_placeholder(permission_resolver, seed_cluster):
+    """A manifest copied out of a masked read has nothing to restore
+    from on a new app; storing it would make the placeholder the secret."""
+    from astrolift_manifest.env_edit import redact_env_values
+    from core.permissions import Permission
+
+    org, app = _scaffold()
+    seed_cluster(org)
+    permission_resolver.grant(Permission.APP_CREATE)
+
+    result = _register(org, app.project, slug="copied-app", manifest_raw=redact_env_values(_BASE_TOML))
+
+    assert result.ok is False
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "manifestRaw"
+    assert not RegisteredApp.objects.filter(slug="copied-app").exists()
+
+
+def test_register_app_bootstrap_error_does_not_quote_the_manifest(
+    monkeypatch, permission_resolver, seed_cluster
+):
+    """A database error's detail can quote the row it failed on, manifest
+    text included. That string is shown to app.read callers as
+    ``manifestBootstrapError`` and was logged with its traceback."""
+    import logging
+
+    from core.permissions import Permission
+
+    org, app = _scaffold()
+    seed_cluster(org)
+    permission_resolver.grant(Permission.APP_CREATE)
+
+    def failing_persist(app, manifest, *, raw_text=""):
+        raise RuntimeError(f"Failing row contains ({raw_text})")
+
+    monkeypatch.setattr("astrolift_manifest.persist.persist_manifest", failing_persist)
+
+    records: list[logging.LogRecord] = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    logger = logging.getLogger("astrolift_registry.schema.mutations.registration")
+    handler = _Capture(level=logging.DEBUG)
+    previous_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    try:
+        result = _register(org, app.project, slug="failing-app", manifest_raw=_BASE_TOML)
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+
+    assert result.ok is True, result.errors
+    registered = RegisteredApp.objects.get(slug="failing-app")
+    assert registered.manifest_bootstrap_status == "parse_failed"
+    assert _SECRET_VALUE not in registered.manifest_bootstrap_error
+    formatted = "\n".join(logging.Formatter().format(record) for record in records)
+    assert "manifest workload persist failed for failing-app" in formatted
+    assert _SECRET_VALUE not in formatted
+
+
+# ---- one reveal check per query (#1920 review) ---------------------
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_apps_list_checks_elevation_once_per_query(monkeypatch):
+    """Every app on a list page asks the same elevation question; a
+    query cannot change the answer mid-flight, so it is asked once."""
+    from astrolift_identity import step_up
+    from config.schema import schema
+    from core.schema.context import StrawberryContext
+
+    org, app = _scaffold()
+    RegisteredApp.objects.create(
+        organization=org,
+        team=app.team,
+        project=app.project,
+        name="Second",
+        slug="second-app",
+        manifest_raw=_BASE_TOML,
+    )
+    viewer = _make_user("list-memo")
+    _grant(viewer, org, "app.read", "secret.read")
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    calls: list[int] = []
+    real_check = step_up.is_elevated_and_attested
+
+    def counting_check(info):
+        calls.append(1)
+        return real_check(info)
+
+    monkeypatch.setattr("astrolift_identity.step_up.is_elevated_and_attested", counting_check)
+    context = StrawberryContext(SimpleNamespace(user=viewer, session=session, META={}))
+
+    with _ctx(org, viewer):
+        result = schema.execute_sync("query { astroliftMyApps { slug rawManifest } }", context_value=context)
+
+    assert result.errors is None, result.errors
+    assert len(result.data["astroliftMyApps"]) == 2
+    assert all(_SECRET_VALUE in item["rawManifest"] for item in result.data["astroliftMyApps"])
+    assert len(calls) == 1

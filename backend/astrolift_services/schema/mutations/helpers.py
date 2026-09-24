@@ -236,6 +236,20 @@ def _validate_env_key(key: str) -> str | None:
     return None
 
 
+def _validate_env_value(key: str, value: str) -> str | None:
+    """Refuse the masked-read placeholder as a value (#1920).
+
+    It is what a caller who cannot reveal secrets sees in place of every
+    [env] value, so it gets pasted. Stored, it would make the manifest
+    unparseable (``parse_raw`` refuses it) and block every later save and
+    deploy until someone replaced it."""
+    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+
+    if value == REDACTED_ENV_VALUE:
+        return f"value for {key!r} is the masked placeholder from a masked read, not a secret value"
+    return None
+
+
 def _resolve_email_service(managed_service_id):
     """Fetch a ManagedService row with the full tenant-cluster path
     pre-joined, gated on ``kind == EMAIL``.

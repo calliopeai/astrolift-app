@@ -52,21 +52,20 @@ _DEFAULT_MESSAGE = "Sensitive operation requires recent authentication."
 def is_elevated_and_attested(info: Any) -> bool:
     """True when ``info``'s call satisfies the gate ``@requires_elevation`` enforces.
 
-    Same rule, in order: API-token calls are exempt (token issuance —
-    operator + password + MFA in the UI — is the authentication;
-    step-up is a session-scoped recency concept that doesn't
-    translate); the Constance ``REQUIRE_STEP_UP_AUTH`` off-switch
-    (default off) makes the whole gate a no-op until an install opts
-    in; a resolver invoked with no request/session (a unit test
-    bypassing HTTP) is treated as satisfied since there's no session
-    to elevate; otherwise the session must be freshly elevated and,
-    when the install requires device attestation, attested too.
+    The same four rules, in order: an API-token call passes (issuing the
+    token was the authentication; step-up is a session recency check);
+    the Constance ``REQUIRE_STEP_UP_AUTH`` switch (default off) passes
+    everything until an install opts in; a call with no request/session
+    (a unit test bypassing HTTP) passes; otherwise the session must be
+    freshly elevated and, when the install requires device attestation,
+    attested too.
 
-    Exposed so a read path that must *redact* rather than hard-fail
-    (e.g. masking a secret value on a field ``@requires_elevation``
-    doesn't wrap, #1920) asks the identical question the mutation
-    gate asks — one predicate, so the two surfaces can never drift
-    apart.
+    A side-effect-free boolean, for a read path that must mask rather
+    than refuse (#1920). It is not wired into the decorator itself:
+    #1945 moves the decorator's body into ``check_elevation``, and that
+    function should return None exactly when this returns True.
+    ``test_is_elevated_and_attested_agrees_with_requires_elevation``
+    holds the two together until then.
     """
     request = getattr(getattr(info, "context", None), "request", None)
     if request is not None and getattr(request, "_api_token", None) is not None:
@@ -76,7 +75,7 @@ def is_elevated_and_attested(info: Any) -> bool:
 
         if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
             return True
-    except Exception:  # noqa: BLE001 — see requires_elevation for rationale
+    except Exception:  # noqa: BLE001 -- as in requires_elevation: fall through to the gate
         pass
     if request is None or not hasattr(request, "session"):
         return True
@@ -103,24 +102,49 @@ def requires_elevation(
 
         @functools.wraps(fn)
         def wrapper(self, info, *args, **kwargs):
-            if is_elevated_and_attested(info):
-                return fn(self, info, *args, **kwargs)
-            # Everything below builds the deny response. Re-derive
-            # ``request`` / ``attest_required`` here rather than have
-            # ``is_elevated_and_attested`` hand them back — that keeps
-            # the shared predicate a plain boolean callers elsewhere
-            # can rely on without knowing this decorator's internals.
             request = getattr(getattr(info, "context", None), "request", None)
+            # API-token-authenticated calls bypass step-up — the
+            # token issuance ceremony (operator + password + MFA in
+            # the UI) is the authentication; step-up is a session-
+            # scoped recency concept that doesn't translate. CI
+            # runners holding a scoped token would otherwise be
+            # locked out of every gated mutation. The token's scope
+            # set still gates *what* it can do — step-up is about
+            # session freshness, not authorization.
+            if request is not None and getattr(request, "_api_token", None) is not None:
+                return fn(self, info, *args, **kwargs)
+            # Global step-up off-switch (default OFF). Installs that want
+            # the SOC2 / SOX recency gate flip
+            # ``REQUIRE_STEP_UP_AUTH = True`` in Constance. Default-off so
+            # small / SSO-only / single-operator installs don't trip on
+            # every sensitive mutation — they opt in when their
+            # compliance posture demands it.
+            try:
+                from constance import config as constance_config
+
+                if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
+                    return fn(self, info, *args, **kwargs)
+            except Exception:
+                # Constance unavailable (early-boot test path) — fall
+                # through to the existing gate so prod behavior isn't
+                # silently disabled by a config-load failure.
+                pass
+            # Direct-call path (pytest mutations bypassing HTTP).
+            # A real HTTP request always carries a session attribute
+            # because SessionMiddleware runs before the GraphQL view
+            # — so the only way ``request`` lacks ``session`` is a
+            # unit test calling the resolver directly. Bypass with a
+            # warning rather than failing every existing test; the
+            # security gate at the HTTP layer is unaffected.
             if request is None or not hasattr(request, "session"):
-                # ``is_elevated_and_attested`` already treats this as
-                # satisfied, so this branch is unreachable in practice;
-                # kept as a defensive fallback.
                 log.debug(
                     "step_up: no request/session on info (direct test call?); bypassing %s",
                     fn.__qualname__,
                 )
                 return fn(self, info, *args, **kwargs)
             session = request.session
+            status = get_status(session)
+
             # #496 — when the install requires attestation for
             # sensitive ops, the attestation gate runs in *addition*
             # to the standard step-up freshness gate. A session that
@@ -128,6 +152,8 @@ def requires_elevation(
             # deny, with ``requires_attestation: true`` so the FE
             # opens the attest-prompt instead of the password-prompt.
             attest_required = _attestation_gate_active(request)
+            if status.elevated and not attest_required:
+                return fn(self, info, *args, **kwargs)
             supported = _supported_step_up_methods(session)
             if attest_required:
                 _emit_deny_audit(

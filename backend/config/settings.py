@@ -1067,6 +1067,16 @@ logger.warning(f"DJANGO_CONFIGURATION: {CONFIGURATION}")
 
 SENTRY_DSN = env_str("SENTRY_DSN")
 
+# An error event must not carry what the request or the stack held
+# (#1920). A GraphQL request body is the mutation's variables (secret
+# values, whole manifests, the step-up credential), and a frame's locals
+# include the resolver's ``input``. The SDK's own scrubbing matches key
+# names such as "password"; "rawManifest", "value" and "input" pass.
+SENTRY_PRIVACY_OPTIONS = {
+    "max_request_body_size": "never",
+    "include_local_variables": False,
+}
+
 match CONFIGURATION.lower():
     case "stg" | "dev" | "prd" | "prod":
         if SENTRY_DSN:
@@ -1075,6 +1085,7 @@ match CONFIGURATION.lower():
                 traces_sample_rate=1.0,
                 profiles_sample_rate=1.0,
                 environment=CONFIGURATION,
+                **SENTRY_PRIVACY_OPTIONS,
             )
         else:
             logger.info("Sentry DSN not configured; skipping Sentry init")

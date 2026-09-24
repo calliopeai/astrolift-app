@@ -39,6 +39,7 @@ class ManifestMutations:
         Validates the TOML parses before staging — bad TOML never
         lands in the buffer. Empty input clears the staging buffer.
         """
+        from astrolift_manifest.env_edit import resolve_masked_env_values
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.sync_state import (
             SyncSnapshot,
@@ -55,7 +56,21 @@ class ManifestMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
-        text = input.raw_manifest or ""
+        # A caller without secret.read + elevation reads [env] masked and the
+        # editor saves the whole document back, so every masked value must be
+        # put back from the text that read came from (staged, else raw) or the
+        # save would replace each secret with the placeholder (#1920).
+        text, unresolved_keys = resolve_masked_env_values(
+            input.raw_manifest or "",
+            fallback_text=app.manifest_raw_staged or app.manifest_raw or "",
+        )
+        if unresolved_keys:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "rawManifest contains a masked placeholder for key(s) with no stored value "
+                f"to restore: {', '.join(unresolved_keys)}",
+                field="rawManifest",
+            )
         if text.strip():
             try:
                 parse_raw(text)

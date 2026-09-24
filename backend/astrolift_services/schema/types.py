@@ -680,14 +680,16 @@ class SecretChangeProposalType:
     ``payload_diff`` for the render-friendly summary.
 
     ``set`` / ``rotate`` proposals carry the literal plaintext value
-    under ``payload["value"]`` — masked to ``[REDACTED]`` unless the
-    viewer holds ``secret.read`` and is step-up elevated (#1920), the
-    same gate ``revealAppSecret`` enforces. Approvers only ever needed
-    ``secret.approve`` to review a proposal via ``payload_diff``; this
-    field must not become the side door around that."""
+    under ``payload["value"]``. It is masked to ``[REDACTED]`` unless
+    the viewer holds ``secret.read`` and is step-up elevated (#1920),
+    the same gate ``revealAppSecret`` enforces. Approvers only ever
+    needed ``secret.approve`` to review a proposal via ``payload_diff``;
+    this field must not become the side door around that."""
 
     payload_diff: JSON
-    """Pre-rendered before/after for the proposal-detail page."""
+    """Pre-rendered before/after for the proposal-detail page. Its
+    ``value_masked`` hints are ``***`` under the same gate as
+    ``payload``."""
 
     required_approver_count: int
     approvals_count: int
@@ -725,16 +727,37 @@ def secret_change_approval_to_type(approval) -> SecretChangeApprovalType:
     )
 
 
-def _redact_proposal_payload(payload: dict[str, Any], *, can_reveal: bool) -> dict[str, Any]:
-    """Mask ``payload["value"]`` (the literal plaintext on a set/rotate
-    proposal) unless the viewer can reveal secrets (#1920). Other ops
-    (``delete`` / ``attach_bundle`` / ``detach_bundle``) carry no
-    secret value and pass through unchanged."""
-    if can_reveal or "value" not in payload:
-        return payload
-    masked = dict(payload)
-    masked["value"] = "[REDACTED]"
-    return masked
+_DIFF_SIDES = ("before", "after")
+
+
+def _proposal_secret_material(payload: dict[str, Any], payload_diff: dict[str, Any]) -> bool:
+    """Whether the proposal carries anything a viewer who cannot reveal
+    secrets must not see: a set/rotate ``payload["value"]``, or a
+    ``payload_diff`` value hint. delete / attach_bundle / detach_bundle
+    usually carry neither, and skip the reveal check entirely."""
+    if "value" in payload:
+        return True
+    return any(
+        isinstance(payload_diff.get(side), dict) and payload_diff[side].get("value_masked")
+        for side in _DIFF_SIDES
+    )
+
+
+def _redact_proposal(payload: dict[str, Any], payload_diff: dict[str, Any]) -> tuple[dict, dict]:
+    """Mask a proposal for a viewer who cannot reveal secrets (#1920).
+
+    ``payload["value"]`` is the literal plaintext. ``value_masked`` in
+    the diff is a hint built at propose time from the first three and
+    last characters of the before/after values, four plaintext
+    characters of the secret, so it collapses to ``***``."""
+    if "value" in payload:
+        payload = {**payload, "value": "[REDACTED]"}
+    redacted_diff = dict(payload_diff)
+    for side in _DIFF_SIDES:
+        entry = payload_diff.get(side)
+        if isinstance(entry, dict) and entry.get("value_masked"):
+            redacted_diff[side] = {**entry, "value_masked": "***"}
+    return payload, redacted_diff
 
 
 def secret_change_proposal_to_type(proposal, *, info: Info) -> SecretChangeProposalType:
@@ -755,6 +778,13 @@ def secret_change_proposal_to_type(proposal, *, info: Info) -> SecretChangePropo
     )
     approved_count = sum(1 for a in approvals if a.decision == "approved")
 
+    payload = proposal.payload or {}
+    payload_diff = proposal.payload_diff or {}
+    if _proposal_secret_material(payload, payload_diff) and not can_reveal_app_secrets(
+        info, app=proposal.registered_app
+    ):
+        payload, payload_diff = _redact_proposal(payload, payload_diff)
+
     return SecretChangeProposalType(
         id=GUID(str(proposal.guid)),
         registered_app_slug=proposal.registered_app.slug,
@@ -763,11 +793,8 @@ def secret_change_proposal_to_type(proposal, *, info: Info) -> SecretChangePropo
         status=proposal.status,
         proposer_user_id=proposer_id,
         proposer_display_name=proposer_display,
-        payload=_redact_proposal_payload(
-            proposal.payload or {},
-            can_reveal=can_reveal_app_secrets(info, app=proposal.registered_app),
-        ),
-        payload_diff=proposal.payload_diff or {},
+        payload=payload,
+        payload_diff=payload_diff,
         required_approver_count=int(proposal.required_approver_count or 0),
         approvals_count=approved_count,
         expires_at=proposal.expires_at,

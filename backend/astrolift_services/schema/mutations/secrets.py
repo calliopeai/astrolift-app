@@ -34,6 +34,7 @@ from astrolift_services.schema.mutations.helpers import (
     _stage_manifest,
     _upsert_app_secret_metadata,
     _validate_env_key,
+    _validate_env_value,
 )
 from astrolift_services.schema.mutations.types import (
     BulkImportAppSecretsInput,
@@ -76,6 +77,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        validation_msg = _validate_env_value(input.key, input.value)
+        if validation_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -166,6 +170,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        validation_msg = _validate_env_value(input.key, input.value)
+        if validation_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -363,8 +370,8 @@ class SecretMutations:
             )
         # Validate all keys before staging so a single bad name
         # doesn't write a half-applied result.
-        for key in kvs:
-            msg = _validate_env_key(key)
+        for key, value in kvs.items():
+            msg = _validate_env_key(key) or _validate_env_value(key, value)
             if msg:
                 return gql_failure(
                     ErrorCode.VALIDATION.value,

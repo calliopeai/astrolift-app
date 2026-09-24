@@ -143,6 +143,7 @@ def parse_raw(toml_text: str) -> RawManifest:
         raise ManifestError(f"invalid TOML: {exc}", line=line, column=col) from exc
 
     name = _require_str(data, "name", "name")
+    _reject_masked_env_values(data)
     workloads = tuple(
         _parse_workload(item, f"workloads[{i}]") for i, item in enumerate(data.get("workloads", []))
     )
@@ -1162,6 +1163,27 @@ def _reject_inline_secrets(value: dict[str, Any], path: str) -> None:
             )
         if isinstance(item, dict):
             _reject_inline_secrets(item, f"{path}.{key}")
+
+
+def _reject_masked_env_values(data: dict[str, Any]) -> None:
+    """The masked-read placeholder is never a real ``[env]`` value (#1920).
+
+    A document still carrying it came from a masked read whose values
+    were never put back. Applying, syncing, or deploying it would replace
+    each stored secret with the placeholder, so it is refused here, on the
+    path every one of those takes. The message names keys, never values."""
+    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+
+    env = data.get("env")
+    if not isinstance(env, dict):
+        return
+    masked = sorted(str(key) for key, value in env.items() if value == REDACTED_ENV_VALUE)
+    if masked:
+        raise ManifestError(
+            f"[env] {', '.join(masked)} holds the masked placeholder from a masked read "
+            "instead of a value; set the real value",
+            path=f"env.{masked[0]}",
+        )
 
 
 def _require_str(d: dict[str, Any], key: str, path: str) -> str:
