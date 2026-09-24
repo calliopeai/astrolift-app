@@ -38,6 +38,12 @@ class ManifestMutations:
 
         Validates the TOML parses before staging — bad TOML never
         lands in the buffer. Empty input clears the staging buffer.
+
+        An ``[env]`` edit staged here creates no secret-change proposal,
+        even when the app requires secret approval. The deploy path
+        (``astrolift_services.secret_literals``) is what keeps such an
+        edit out of workloads until an applied proposal matches it
+        (#1758).
         """
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.sync_state import (

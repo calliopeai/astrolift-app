@@ -1105,6 +1105,22 @@ def _bindings_secret_name(app_slug: str, workload_name: str = "") -> str:
     return dns_label("astrolift", "bindings", app_slug, workload_name or None)
 
 
+def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
+    """Synthetic k8s Secret name for one environment's app-wide literal
+    ``[env]`` secrets (#1758). Mirrors ``_bindings_secret_name``: kept in
+    one helper so the producer (``update_secrets``) and the consumer
+    (``render_resources_for_deployment``) can never drift apart.
+
+    Per environment, because the values are: scope filtering gives prod
+    and a preview different key sets, and both land in the same app
+    namespace on a shared cluster. One app-wide name meant whichever
+    environment materialized last overwrote the other's Secret.
+    """
+    from _sdk.k8s_naming import dns_label
+
+    return dns_label("astrolift", "app-env", app_slug, environment_name)
+
+
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     from astrolift_lifecycle.models import Deployment
     from astrolift_workflows.activities.direct_apply import DryRunFailed, apply_with_dry_run
@@ -1175,7 +1191,7 @@ async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     return summary
 
 
-def _update_secrets_sync(deployment_id: int) -> int:
+def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = None) -> int:
     import base64
 
     from astrolift_lifecycle.models import Deployment
@@ -1184,17 +1200,26 @@ def _update_secrets_sync(deployment_id: int) -> int:
         ManagedServiceBinding,
         ManagedServiceVolumeBinding,
     )
+    from astrolift_services.secret_literals import literal_secrets_for_environment
     from core.app_deploy import (
         AppDeployError,
         driver_for_capability,
         driver_for_deployment,
+        driver_for_target_cluster,
     )
 
     d = Deployment.all_objects.select_related(
         "registered_app__organization",
         "app_environment__tenant_cluster__provider_plugin",
     ).get(pk=deployment_id)
-    cluster_driver, ctx, namespace = driver_for_deployment(d)
+    # The migration workflow passes the cluster it is moving the env to.
+    # Only where the Secrets are applied changes: bundle and binding values
+    # still come from the secrets backend of the env's bound cluster, which
+    # is the source until the migration switches the binding.
+    if target_cluster_id is None:
+        cluster_driver, ctx, namespace = driver_for_deployment(d)
+    else:
+        cluster_driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
 
     refs = list(
         AppSecretBundleRef.objects.filter(
@@ -1205,6 +1230,33 @@ def _update_secrets_sync(deployment_id: int) -> int:
     )
 
     resources: list[dict[str, Any]] = []
+
+    # ---- app-wide literal [env] secrets (#1758) --------------------
+    # Lowest precedence source per env_injection's documented merge order
+    # (app literal < bundle < managed service), so a colliding bundle or
+    # binding key still wins -- render_resources_for_deployment lists this
+    # secret first in env_from to match.
+    literals = literal_secrets_for_environment(d.registered_app, d.app_environment)
+    if literals:
+        resources.append(
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": _app_env_secret_name(d.registered_app.slug, d.app_environment.name),
+                    "namespace": namespace,
+                    "labels": {
+                        "astrolift.io/managed-by": "astrolift",
+                        "astrolift.io/app-env-secrets": d.registered_app.slug,
+                    },
+                },
+                "type": "Opaque",
+                "data": {
+                    key: base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+                    for key, value in literals.items()
+                },
+            },
+        )
 
     # ---- operator-authored secret bundles --------------------------
     if refs:
@@ -1379,12 +1431,15 @@ def _update_secrets_sync(deployment_id: int) -> int:
 
 @activity.defn(name="astrolift.deploy.update_secrets")
 async def update_secrets(deployment_id: int) -> int:
-    """Materialize the app's secret bundles into Kubernetes Secrets.
+    """Materialize the app's literal [env] secrets and secret bundles into
+    Kubernetes Secrets.
 
     Each ``AppSecretBundleRef`` for (app, env) becomes one k8s Secret
     named after the SecretBundle's slug, with values fetched from the
-    platform secrets backend driver and base64-encoded. Apps with no
-    secret bundles configured no-op cleanly.
+    platform secrets backend driver and base64-encoded. The app-wide
+    literal ``[env]`` secrets (set via setAppSecret et al) become one
+    additional Secret named by ``_app_env_secret_name`` (#1758). Apps with
+    neither configured no-op cleanly.
     """
     from asgiref.sync import sync_to_async
 

@@ -25,6 +25,7 @@ from astrolift_services.schema.mutations.helpers import (
     _actor_user,
     _caller_org_id,
     _is_eligible_secret_approver,
+    _overrides_at_apply_extra,
     _proposal_target_from_input,
     _proposal_ttl_seconds,
     _self_approve_secrets_allowed,
@@ -69,7 +70,9 @@ class SecretChangeMutations:
         the legacy mutations (``setAppSecret`` etc.) proxy to the same
         underlying logic; this is just the canonical surface.
         """
-        valid_ops = {o.value for o in SecretChangeProposal.Op}
+        # set_metadata comes only from setAppSecretMetadata, which checks
+        # that the scope actually changes.
+        valid_ops = {o.value for o in SecretChangeProposal.Op} - {SecretChangeProposal.Op.SET_METADATA.value}
         if input.op not in valid_ops:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -206,6 +209,7 @@ class SecretChangeMutations:
     @mutation_audit(
         action="app.secret.proposal.approve",
         target=_proposal_target_from_input,
+        extras=_overrides_at_apply_extra,
     )
     @require_permission(
         Permission.SECRET_APPROVE, scope=secret_change_proposal_app_scope("input.proposal_id")

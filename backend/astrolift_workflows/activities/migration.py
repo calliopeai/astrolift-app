@@ -1,26 +1,30 @@
 """Activities for ``MigrateAppWorkflow`` — moves an app environment
 from its current ``tenant_cluster`` to a target cluster.
 
-Migration is a 5-step pipeline:
+Migration is a 6-step pipeline:
 
-  1. validate_migration_target  — target is MANAGED + not the source.
-  2. apply_to_target_cluster    — render against the source env's
-                                   config, apply to the target cluster's
-                                   namespace + driver. The
-                                   ``AppEnvironment.tenant_cluster``
-                                   binding is still the SOURCE at this
-                                   step — both clusters are running the
-                                   app simultaneously after apply.
-  3. poll_rollout_on_target     — wait for target workloads to roll out.
-  4. switch_app_env_binding     — atomic flip of
-                                   ``AppEnvironment.tenant_cluster_id``
-                                   to the target. Future deploys land
-                                   on target.
-  5. drain_source_cluster       — delete the app's resources from source
-                                   (namespace cascade). Optional.
+  1. validate_migration_target:      target is MANAGED + not the source.
+  2. materialize_secrets_on_target:  ensure the namespace on the target
+                                      and apply the literal, bundle and
+                                      managed-service binding Secrets the
+                                      workloads name in envFrom.
+  3. apply_to_target_cluster:        render against the source env's
+                                      config, apply to the target cluster's
+                                      namespace + driver. The
+                                      ``AppEnvironment.tenant_cluster``
+                                      binding is still the SOURCE at this
+                                      step; both clusters are running the
+                                      app simultaneously after apply.
+  4. poll_rollout_on_target:         wait for target workloads to roll out.
+  5. switch_app_env_binding:         atomic flip of
+                                      ``AppEnvironment.tenant_cluster_id``
+                                      to the target. Future deploys land
+                                      on target.
+  6. drain_source_cluster:           delete the app's resources from source
+                                      (namespace cascade). Optional.
 
-Step 4 is the moment of truth — once it commits, the new cluster is
-the binding for the env. Step 5 is best-effort: if it fails, the
+Step 5 is the moment of truth: once it commits, the new cluster is
+the binding for the env. Step 6 is best-effort: if it fails, the
 migration is still ``ok`` because the target is serving traffic; the
 operator gets a clear message that the source still has lingering
 resources and can clean up manually.
@@ -66,6 +70,55 @@ async def validate_migration_target(app_environment_id: int, target_cluster_id: 
     await sync_to_async(_validate_migration_target_sync)(app_environment_id, target_cluster_id)
 
 
+def _ensure_target_namespace(driver, ctx, namespace: str, app) -> None:
+    """Create or update the app's namespace on the target cluster."""
+    driver.ensure_namespace(
+        ctx.slug,
+        namespace,
+        {
+            "astrolift.io/managed-by": "astrolift",
+            "astrolift.io/organization": app.organization.slug,
+            "astrolift.io/app": app.slug,
+        },
+        {"astrolift.io/registered-app-id": str(app.pk)},
+    )
+
+
+def _materialize_secrets_on_target_sync(deployment_id: int, target_cluster_id: int) -> int:
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_workflows.activities.app_lifecycle import _update_secrets_sync
+    from core.app_deploy import driver_for_target_cluster
+
+    d = Deployment.all_objects.select_related("registered_app__organization").get(pk=deployment_id)
+    driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
+    # This runs before apply_to_target_cluster, the step that used to be
+    # the first to create the namespace; a Secret needs it to exist.
+    _ensure_target_namespace(driver, ctx, namespace, d.registered_app)
+    return _update_secrets_sync(deployment_id, target_cluster_id=target_cluster_id)
+
+
+@activity.defn(name="astrolift.migration.materialize_secrets_on_target")
+async def materialize_secrets_on_target(deployment_id: int, target_cluster_id: int) -> int:
+    """Apply the app's literal, bundle and managed-service binding Secrets
+    to the target cluster.
+
+    apply_to_target_cluster applies the workloads, whose envFrom names
+    these Secrets, but never created the Secrets there, so the target's
+    pods could not start (#1758 review, M1). Runs first so they exist
+    before any pod does.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    count = await sync_to_async(_materialize_secrets_on_target_sync)(deployment_id, target_cluster_id)
+    log.info(
+        "migrate materialize_secrets_on_target applied %d secret(s)",
+        count,
+        extra={"deployment_id": deployment_id, "target_cluster_id": target_cluster_id},
+    )
+    return count
+
+
 def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) -> dict[str, list[str]]:
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import Deployment
@@ -81,17 +134,7 @@ def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) ->
     ).get(pk=deployment_id)
     driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
     target_cluster = TenantCluster.all_objects.get(pk=target_cluster_id)
-    # Ensure the namespace exists on the target.
-    driver.ensure_namespace(
-        ctx.slug,
-        namespace,
-        {
-            "astrolift.io/managed-by": "astrolift",
-            "astrolift.io/organization": d.registered_app.organization.slug,
-            "astrolift.io/app": d.registered_app.slug,
-        },
-        {"astrolift.io/registered-app-id": str(d.registered_app.pk)},
-    )
+    _ensure_target_namespace(driver, ctx, namespace, d.registered_app)
     resources = render_resources_for_deployment(d, cluster_override=target_cluster)
     if not resources:
         raise AppDeployError(
@@ -319,6 +362,7 @@ async def drain_source_cluster(
 __all__ = [
     "apply_to_target_cluster",
     "drain_source_cluster",
+    "materialize_secrets_on_target",
     "poll_rollout_on_target",
     "switch_app_env_binding",
     "validate_migration_target",

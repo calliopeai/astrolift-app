@@ -60,6 +60,8 @@ from astrolift_services.schema.types import (
     workload_identity_grant_to_type,
 )
 from astrolift_services.scopes import managed_service_scope_by_guid, secret_change_proposal_app_scope
+from astrolift_services.secret_literals import allowed_scopes_for_env
+from astrolift_services.secret_metadata_ops import scope_in_force
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -334,20 +336,6 @@ def _bundle_key_count(bundle) -> int:
     return known_key_count(bundle)
 
 
-def _allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) -> frozenset[str]:
-    """Compute the set of scope values that a secret must have to be
-    visible in ``env_name``.
-
-    Preview envs accept ``all``, ``preview``, and ``preview:<branch>``.
-    All other envs (production, staging, …) accept ``all`` and
-    ``production``.
-    """
-    if env_name in preview_env_branches:
-        branch = preview_env_branches[env_name]
-        return frozenset({"all", "preview", f"preview:{branch}"})
-    return frozenset({"all", "production"})
-
-
 def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     """Compose the merged secret view across:
     - manifest [env] literals (app-wide → repeated per env)
@@ -360,8 +348,10 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     from ``AppSecretMetadata`` when present (#677 / #678 / #752).
     Metadata is looked up by ``(env_name, key)`` with empty env_name as
     a fallback for the 'applies to every env' default — a per-env row
-    wins over the wildcard.  Missing metadata defaults to no expiry +
-    ``set_via='web'`` + ``scope='all'`` so older rows render identically.
+    wins over the wildcard, except that one without a scope of its own
+    takes the wildcard's (``scope_in_force``).  Missing metadata
+    defaults to no expiry + ``set_via='web'`` + ``scope='all'`` so older
+    rows render identically.
 
     Secrets whose ``scope`` doesn't match the queried env are filtered
     out (#752).  Preview envs accept ``all``, ``preview``, and
@@ -404,10 +394,12 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     )
 
     for env_name in env_names:
-        allowed = _allowed_scopes_for_env(env_name, preview_env_branches)
+        allowed = allowed_scopes_for_env(env_name, preview_env_branches)
         for key in sorted(literals):
-            meta = meta_index.get((env_name, key)) or meta_index.get(("", key))
-            secret_scope = meta.scope if meta else "all"
+            own = meta_index.get((env_name, key))
+            app_wide = meta_index.get(("", key))
+            meta = own or app_wide
+            secret_scope = scope_in_force(own.scope if own else None, app_wide.scope if app_wide else None)
             if secret_scope not in allowed:
                 continue
             out.append(
