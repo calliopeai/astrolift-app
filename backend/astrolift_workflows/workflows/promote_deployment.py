@@ -79,8 +79,7 @@ class PromoteDeploymentWorkflow:
         # Resolve the new row's status. If approvals are required,
         # the row landed pending_approval and we hand off to the
         # approve mutation's existing flow.
-        from asgiref.sync import sync_to_async  # noqa: E402  (workflow-context import)
-
+        #
         # We can't query Django from a workflow without a sandbox
         # exception; instead branch in the apply path itself by
         # letting pre_flight fail-fast if the row is still pending
