@@ -1,23 +1,13 @@
 from typing import Dict, List, Tuple
 
-from config.roles_gen import P
 from core.models import Address, Profile
-from core.serializers import FieldRestrictedSerializer
 from core.serializers.address import AddressSerializer
 from core.serializers.user import UserSerializer
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-# Optional import - Domain-specific functionality
-try:
-    from domain_app.models import ApprovalRequest
-    HAS_DOMAIN_APP = True
-except ImportError:
-    ApprovalRequest = None
-    HAS_DOMAIN_APP = False
 
-
-class ProfileSerializer(FieldRestrictedSerializer):
+class ProfileSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
     birth_date = serializers.DateField(required=False, allow_null=True, help_text="Date of birth of the employee. Format: YYYY-MM-DD")
     user = UserSerializer(required=False)
@@ -62,84 +52,25 @@ class ProfileSerializer(FieldRestrictedSerializer):
         if not validated_data:
             return instance
 
-        # Use approval request if domain app is available
-        if HAS_DOMAIN_APP:
-            with ApprovalRequest.objects.for_instance(
-                    instance=draft,
-                    permission=P.PROFILE_APPROVE_CHANGES.perm(),
-                    created_by=original.user,
-            ) as context:
-                instance: Profile = draft
-                instance.document_option = Profile.DocumentOptions.DRAFTED
-                user_data = validated_data.pop('user', {})
-                if 'first_name' in validated_data:
-                    user_data = {
-                                    'first_name': validated_data.get('first_name')
-                                } | user_data
-                if 'last_name' in validated_data:
-                    user_data = {
-                                    'last_name': validated_data.get('last_name')
-                                } | user_data
-                if user_data:
-                    User.objects.filter(id=user_data.pop('id', original.user.id)).update(**user_data)
-                if 'address' in validated_data:
-                    address_data = validated_data.pop('address')
-                    if instance.address_id is None:
-                        address = Address.objects.create(**address_data)
-                        setattr(instance, "address_id", address.id)
-                    else:
-                        Address.objects.filter(id=instance.address_id).update(**address_data)
+        # ``domain_app`` (the scaffold's approval workflow) is not part of
+        # Astrolift, so the draft is updated directly.
+        instance: Profile = draft
+        user_data = validated_data.pop('user', {})
+        if user_data:
+            User.objects.filter(id=user_data.pop('id', original.user.id)).update(**user_data)
+        if 'address' in validated_data:
+            address_data = validated_data.pop('address')
+            if instance.address_id is None:
+                address = Address.objects.create(**address_data)
+                setattr(instance, "address_id", address.id)
+            else:
+                Address.objects.filter(id=instance.address_id).update(**address_data)
 
-                for key, value in validated_data.items():
-                    setattr(instance, key, value)
-                instance.save()
-            self.send_approval_notification(instance, context.request)
-        else:
-            # Without domain app, directly update profile
-            instance: Profile = draft
-            user_data = validated_data.pop('user', {})
-            if user_data:
-                User.objects.filter(id=user_data.pop('id', original.user.id)).update(**user_data)
-            if 'address' in validated_data:
-                address_data = validated_data.pop('address')
-                if instance.address_id is None:
-                    address = Address.objects.create(**address_data)
-                    setattr(instance, "address_id", address.id)
-                else:
-                    Address.objects.filter(id=instance.address_id).update(**address_data)
-
-            for key, value in validated_data.items():
-                setattr(instance, key, value)
-            instance.save()
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
 
         return instance
-
-    def send_approval_notification(self, instance: Profile, approval_request):
-        """Send approval notification (Domain-specific)."""
-        if not HAS_DOMAIN_APP:
-            return
-
-        try:
-            from domain_app.notifications import Notifications, ProfileApprovalBroadcastParameters
-
-            request = self.context.get('request', None)
-            requester = request.user if request else None
-            target_user = instance.parent.user if instance.parent else instance.user
-
-            notif_params = ProfileApprovalBroadcastParameters(
-                original_sender=requester,
-                broadcast_recipient=None,
-                updated_user=target_user
-            )
-            Notifications.PROFILE_APPROVAL_BROADCAST.send(
-                sender=requester if request.user != target_user else target_user,
-                recipient=None,
-                parameters=notif_params,
-                instance=approval_request,
-            )
-        except ImportError:
-            # domain app not available - skip notification
-            pass
 
     @staticmethod
     def update_whitelisted(original: Profile, draft: Profile, whitelisted: dict):

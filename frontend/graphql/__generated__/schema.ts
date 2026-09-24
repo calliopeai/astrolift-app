@@ -5418,13 +5418,13 @@ export type Mutation = {
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
-  /** Update user profile via ProfileSerializer (restricted). */
+  /** Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile. */
   profile: MutationResult;
-  /** Upload an image for a specific profile image field (avatar, signature). Supports the approval request workflow for non-whitelisted fields. */
+  /** Upload an image for a specific profile image field (avatar, signature). */
   profileImageFieldUpload: ProfileImageFieldUploadResult;
-  /** Request deletion of a user account. Requires PROFILE_DELETE_USERS permission to delete other users. */
+  /** Request deletion of a user account. Only the platform operator may delete another user. */
   profileRequestDeleteUser: Scalars['Boolean']['output'];
-  /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
+  /** Request a password reset email. Only the platform operator may send one to another user. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
   promoteDeployment: AstroliftDeploymentMutationResult;
   proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
@@ -5531,11 +5531,11 @@ export type Mutation = {
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
-  /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
+  /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
-  /** Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED. */
+  /** Sign a sign request. Sign requests are not available: this always refuses. */
   signRequestSign: Scalars['Boolean']['output'];
-  /** Request a sign from a user. The user must have SIGNREQUEST_CHANGE_SIGN permission. */
+  /** Request a sign from a user. Sign requests are not available: this always refuses. */
   signRequestUser: Scalars['Boolean']['output'];
   signalWorkflowInstance: MutationResult;
   softDeleteApp: SoftdeletepayloadMutationResult;

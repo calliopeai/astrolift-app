@@ -138,7 +138,7 @@ CONVENTION_ENTRY_POINTS = (
 # can only shrink.
 KNOWN_UNREACHABLE: frozenset[str] = frozenset(
     {
-        # 16 modules imported by nothing and reached by no framework
+        # 15 modules imported by nothing and reached by no framework
         # convention. Baselined from this detector's first stable run and
         # reviewed as families, not one by one -- said plainly because the
         # difference matters: this is accepted debt, not a certification that
@@ -156,7 +156,6 @@ KNOWN_UNREACHABLE: frozenset[str] = frozenset(
         "core.utils.date_formatter",
         "core.utils.object_utils",
         "core.systems.organization_system",
-        "core.systems.security",
         # Test support no test imports. Here rather than in the test-only
         # list by a route worth recording: that check skips `core.testing.*`
         # because existing to be imported by tests is the package's job, and

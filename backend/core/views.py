@@ -1,13 +1,39 @@
+from functools import wraps
+
 from core.utils.file_processor.file_export_util import Echo, FileExport
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.db.models import Q
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 
-@login_required
+def admin_tooling(*perms):
+    """Django admin tooling, held to the admin's own terms (#1864).
+
+    These views read and edit Django groups and permissions for the admin
+    actions that link to them. Behind ``login_required`` alone any logged-in
+    user could list every user on the install, join any group and add any
+    permission to one. Django permissions authorize the Django admin and
+    nothing else, so the views require what the admin requires: a staff
+    session plus the model permissions for the rows they touch.
+    """
+
+    def decorator(view):
+        @wraps(view)
+        def guarded(request, *args, **kwargs):
+            if not request.user.has_perms(perms):
+                return HttpResponseForbidden()
+            return view(request, *args, **kwargs)
+
+        return staff_member_required(guarded)
+
+    return decorator
+
+
+@admin_tooling('auth.view_user', 'auth.view_group')
 def user_permissions_tree(request):
     user_ids = request.GET.getlist('ids')
 
@@ -106,7 +132,7 @@ def download_file(request):
     )
 
 
-@login_required
+@admin_tooling('auth.view_user')
 def compare_user_permissions(request):
     """
     Main view for comparing user permissions.
@@ -122,7 +148,7 @@ def compare_user_permissions(request):
     return render(request, "core/compare_user_permissions.html", context)
 
 
-@login_required
+@admin_tooling('auth.view_user')
 def search_users(request):
     """
     HTMX endpoint to search users for the comparison tool.
@@ -147,7 +173,7 @@ def search_users(request):
     return render(request, "core/partials/user_search_results.html", context)
 
 
-@login_required
+@admin_tooling('auth.view_user', 'auth.view_group')
 def compare_user_permissions_data(request):
     """
     HTMX endpoint that returns the comparison data when users are selected.
@@ -209,7 +235,7 @@ def compare_user_permissions_data(request):
     return render(request, "core/partials/comparison_table.html", context)
 
 
-@login_required
+@admin_tooling('auth.view_group')
 def search_groups(request):
     """
     HTMX endpoint to search groups for the comparison tool.
@@ -232,7 +258,7 @@ def search_groups(request):
     return render(request, "core/partials/group_search_results.html", context)
 
 
-@login_required
+@admin_tooling('auth.change_user')
 def toggle_group_membership(request):
     """
     Endpoint to add or remove a user from a group.
@@ -273,7 +299,7 @@ def toggle_group_membership(request):
         }, status=500)
 
 
-@login_required
+@admin_tooling('auth.view_group')
 def compare_group_permissions_data(request):
     """
     HTMX endpoint that returns the comparison data for groups.
@@ -350,7 +376,7 @@ def compare_group_permissions_data(request):
     return render(request, "core/partials/group_comparison_table.html", context)
 
 
-@login_required
+@admin_tooling('auth.change_group')
 def toggle_permission_in_group(request):
     """
     Endpoint to add or remove a permission from a group.

@@ -8,7 +8,7 @@ from django.utils import timezone
 from graphql import GraphQLError
 from strawberry.types import Info
 
-from core.schema.common import GlobalIDUtils, MutationResult
+from core.schema.common import GlobalIDUtils, MutationResult, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -20,28 +20,26 @@ class NotificationMutations:
     def notification(self, info: Info, input: strawberry.scalars.JSON) -> MutationResult:
         from core.serializers.notification import NotificationSerializer
 
-        kwargs = {
-            'data': input,
-            'partial': True,
-            'context': {'request': info.context.request},
-        }
+        if input.get('guid'):
+            # `guid` names an existing row for an update. `Notification` has
+            # no `guid` field (only `BaseCoreModel` subclasses do) and
+            # `NotificationSerializer` is a plain ModelSerializer with
+            # `user`/`subject`/`message` all writable, so letting this
+            # through would let the caller re-address or rewrite a
+            # notification they only own as its recipient (#1949). The
+            # retired `FieldRestrictedSerializer` used to raise on this same
+            # payload (KeyError on the undeclared `guid` field) before any
+            # permission check ran, so updates never succeeded for anyone;
+            # refuse them the same way, without the crash. Creates (no
+            # `guid`) are unaffected.
+            return MutationResult(
+                ok=False,
+                errors=[ValidationError(field='guid', messages=['Updating a notification is not supported.'])],
+            )
 
-        # Handle lookup by guid for updates
-        guid = input.get('guid')
-        if guid:
-            from core.models import Notification
-            instance = Notification.objects.filter(guid=guid).first()
-            if instance:
-                # Ownership check mirroring notification_read (#1193): a caller
-                # may only upsert their OWN notification. guids are globally
-                # unique, so without this any authenticated user could target
-                # (and overwrite) another user's notification by supplying its
-                # guid.
-                if instance.user != info.context.user:
-                    raise ValueError('Notification does not belong to user')
-                kwargs['instance'] = instance
-
-        serializer = NotificationSerializer(**kwargs)
+        serializer = NotificationSerializer(
+            data=input, partial=True, context={'request': info.context.request}
+        )
         if serializer.is_valid():
             serializer.save()
             return MutationResult.success()

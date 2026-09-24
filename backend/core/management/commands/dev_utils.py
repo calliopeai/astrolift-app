@@ -5,10 +5,8 @@ import os
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from core.systems.permissions import AllPermissions
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.models import Permission
 from django.core import management
 from django.core.management.base import ALL_CHECKS, BaseCommand
 from django.db.migrations import Migration, questioner
@@ -40,7 +38,6 @@ class Command(BaseCommand):
         parser.add_argument('--hardreset', action="store_true",
                             help='Deletes db.sqlite3, migrations and load fixtures', )
         parser.add_argument('--loaddata', action="store_true", help='migrations, migrate and load fixtures', )
-        parser.add_argument('--gen_perms', action="store_true", help='generate permissions enum', )
         parser.add_argument(
             "--scriptable",
             action="store_true",
@@ -76,10 +73,6 @@ class Command(BaseCommand):
         self.include_header = options["include_header"]
         self.dry_run = options["dry_run"]
         self.add_fixture_migration = options["add_fixture_migration"]
-
-        if options['gen_perms']:
-            self.generate_permissions_enum()
-            return
 
         if options['generate_schema']:
             out = 'static/gql/schema.graphql'
@@ -170,35 +163,6 @@ class Command(BaseCommand):
                     "loaddata",
                     "--ignorenonexistent",
                     f'core/fixtures/{app_fixture.replace(".", "_")}.json')
-
-    def generate_permissions_enum(self):
-        permissions: [Permission] = AllPermissions.load_permissions().permissions.values()
-        out = [
-            '# file generated using: python manage.py dev_utils --gen_perms ',
-            '# do not modify\n',
-            'from .permissions import AbstractPermissions\n',
-            'from enum import Enum\n\n',
-            'class P(AbstractPermissions, Enum):'
-        ]
-        enums = []
-        for p in permissions:
-            try:
-                model = apps.get_model(app_label=p.content_type.app_label, model_name=p.content_type.model)
-                id = AllPermissions.p_to_id(p)
-                enum = id.upper().replace('.', '_').replace('-', '_').replace(f'_{model._meta.model_name}'.upper(), '')
-                entry = f'    {enum} = "{id}"'
-                enums.append(entry)
-            except Exception as e:
-                p.delete()
-                logger.error(f'Error generating permissions enum: {e}')
-                logger.error(f'Permission: {p}')
-
-        out.extend(sorted(enums))
-        out.append('\n')
-
-        with open('config/roles_gen.py', 'w') as handle:
-            handle.write('\n'.join(out))
-            logger.info(f'Permissions Generated in: {handle.name}')
 
     @property
     def log_output(self):
