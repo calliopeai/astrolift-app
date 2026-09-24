@@ -3184,6 +3184,7 @@ type AstroliftRegisteredApp {
   rawManifest: String!
   rawManifestStaged: String!
   rawManifestStagedHash: String!
+  stagedEnvChanges: [String!]!
   lastSyncedHash: String!
   manifestSyncState: String!
   registryRepoUri: String!

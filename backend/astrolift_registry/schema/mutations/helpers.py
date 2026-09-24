@@ -286,11 +286,11 @@ def _validate_build_path_field(raw, *, field: str):
     """Validate an incoming app-level ``dockerfile_path`` / ``build_context``.
 
     These are already meant to be relative to the repo root directly (the
-    build reads them as-is, or resolves a container-level offset against
-    them -- see ``build_image._resolve_build_context_base``), so an
-    absolute path or a leading ``..`` is always wrong here, unlike a
-    container-level field which only becomes wrong once resolved against
-    a base (#1756 adversarial review).
+    build hands them to kaniko as-is -- see
+    ``build_image._resolve_build_paths``), so an absolute path or a
+    leading ``..`` is always wrong here, unlike a container-level field
+    which only becomes wrong once resolved against the manifest's
+    directory (#1756 adversarial review).
 
     Returns ``(value, error)`` mirroring ``_validate_build_mode``. A None
     or empty input passes straight through unchanged -- ``register_app``

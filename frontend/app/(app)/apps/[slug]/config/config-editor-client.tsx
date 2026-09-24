@@ -45,7 +45,6 @@ import type {
   ManifestSyncState,
 } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
-import { changedEnvKeyNames } from "@/lib/manifest/env-diff";
 import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 
 import { AppTabs } from "../components/app-tabs";
@@ -305,13 +304,11 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   const [confirmApply, setConfirmApply] = React.useState(false);
 
   // Key NAMES only (never values) that applying the staged buffer would
-  // change in the top-level [env] table -- surfaced in the apply confirm
-  // dialog so an operator sees what's about to change before it does
-  // (#1759 adversarial review, M4).
-  const changedEnvKeys = React.useMemo(
-    () => changedEnvKeyNames(a?.rawManifest ?? "", a?.rawManifestStaged ?? ""),
-    [a?.rawManifest, a?.rawManifestStaged],
-  );
+  // change, across [env] and every container/job/task env table --
+  // computed by the server with the same diff applyStagedManifest gates
+  // on, so the confirm dialog lists what the server treats as a secret
+  // change (#1759 adversarial review).
+  const changedEnvKeys = a?.stagedEnvChanges ?? [];
 
   async function handleSave() {
     if (!a) return;

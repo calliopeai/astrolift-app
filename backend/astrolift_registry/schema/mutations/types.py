@@ -302,14 +302,16 @@ class ApplyStagedManifestInput:
     always goes through ``pushManifestToRepo`` for review, whatever its
     connection health (#1759 adversarial review).
 
-    ``expected_staged_hash`` (optional) is the caller's last-known
+    ``expected_staged_hash`` is the caller's last-known
     ``AstroliftRegisteredApp.rawManifestStagedHash`` -- a mismatch means
     the staged buffer changed since the caller loaded it, and the
     mutation refuses with ``CONFLICT`` rather than applying a draft the
-    operator never reviewed. A hash, not the raw text, so a manifest
+    operator never reviewed. A digest, not the raw text, so a manifest
     carrying literal secrets (#1758) never has to round-trip through a
     mutation input variable (and so an audit log of mutation variables).
-    Omitted (or empty) skips the check.
+    Required when the staged edit changes env (``VALIDATION`` without
+    it); omitted (or empty) skips the check for any other edit, so a
+    caller written before the field existed keeps working.
     """
 
     id: GUID

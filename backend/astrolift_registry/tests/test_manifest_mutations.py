@@ -32,6 +32,7 @@ from astrolift_registry.schema.mutations import (
     SyncManifestFromRepoInput,
     UpdateManifestInput,
 )
+from astrolift_registry.services.staged_manifest import staged_manifest_hash
 from astrolift_scm.models import SourceConnection
 from core.mutations import AuditEntry, register_audit_writer
 from core.permissions import Permission
@@ -739,7 +740,7 @@ def test_apply_staged_manifest_refuses_an_env_change_when_secret_approval_is_req
     with _ctx(org):
         result = RegistryMutation().apply_staged_manifest(
             _info(),
-            input=ApplyStagedManifestInput(id=str(app.guid)),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
         )
 
     assert not result.ok
@@ -749,12 +750,13 @@ def test_apply_staged_manifest_refuses_an_env_change_when_secret_approval_is_req
     assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
     assert app.manifest_raw_staged == _TOML_WITH_ENV_CHANGED
 
-    # The sibling audit entry carries key NAMES + content hashes, never
-    # the literal values ("bar" / "baz" never appear anywhere in it).
+    # The sibling audit entry carries key NAMES only: never the literal
+    # values ("bar" / "baz"), and no digest of the manifest text either
+    # (#1759 re-review: an unkeyed hash of secret-bearing text is an
+    # offline guessing oracle for anyone who can read the audit log).
     entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
     assert entry.decision == "DENY"
-    assert entry.extra["changed_keys"] == ["FOO"]
-    assert set(entry.extra) == {"before_hash", "after_hash", "changed_keys"}
+    assert entry.extra == {"changed_keys": ["FOO"], "unapproved_keys": ["FOO"]}
     serialized = json.dumps(entry.extra)
     assert "bar" not in serialized
     assert "baz" not in serialized
@@ -771,7 +773,7 @@ def test_apply_staged_manifest_requires_elevation_for_an_env_change(permission_r
     with _ctx(org):
         result = RegistryMutation().apply_staged_manifest(
             _info_with_session(session),
-            input=ApplyStagedManifestInput(id=str(app.guid)),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
         )
 
     assert not result.ok
@@ -779,8 +781,9 @@ def test_apply_staged_manifest_requires_elevation_for_an_env_change(permission_r
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
     assert app.manifest_raw_staged == _TOML_WITH_ENV_CHANGED
-    actions = [e.action for e in audit_capture]
-    assert "app.manifest.apply_env_change" in actions
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {"changed_keys": ["FOO"]}
 
 
 @override_config(REQUIRE_STEP_UP_AUTH=True)
@@ -795,7 +798,7 @@ def test_apply_staged_manifest_applies_an_env_change_once_elevated(permission_re
     with _ctx(org):
         result = RegistryMutation().apply_staged_manifest(
             _info_with_session(session),
-            input=ApplyStagedManifestInput(id=str(app.guid)),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
         )
 
     assert result.ok, result.errors
@@ -847,8 +850,6 @@ def test_apply_staged_manifest_conflict_on_a_stale_expected_hash(permission_reso
 
 
 def test_apply_staged_manifest_applies_when_the_expected_hash_matches(permission_resolver):
-    from astrolift_manifest.normalize import raw_text_hash
-
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="")
     app.manifest_raw_staged = _UPDATED_TOML
     app.save(update_fields=["manifest_raw_staged"])
@@ -859,7 +860,7 @@ def test_apply_staged_manifest_applies_when_the_expected_hash_matches(permission
             _info(),
             input=ApplyStagedManifestInput(
                 id=str(app.guid),
-                expected_staged_hash=raw_text_hash(_UPDATED_TOML),
+                expected_staged_hash=staged_manifest_hash(app),
             ),
         )
 
@@ -913,3 +914,377 @@ def test_apply_staged_manifest_identical_staged_buffer_skips_repersisting(permis
     app.refresh_from_db()
     assert app.manifest_raw_staged == ""
     assert app.manifest_raw.strip() == _VALID_TOML.strip()
+
+
+# --- container, job and task env are env too (#1759 re-review) ---------
+#
+# The first gate diffed only the top-level [env] table. Container env
+# (every [[workloads.containers]] entry, and the container each [[jobs]] /
+# [[tasks]] entry desugars to) is rendered straight into the pod spec and
+# outranks [env] there, so the same key on a container walked past it.
+
+_TOML_WITH_CONTAINER = """
+astrolift_version = 1
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+[[workloads.containers]]
+name = "web"
+is_primary = true
+"""
+
+_TOML_WITH_JOB_AND_TASK = (
+    _TOML_WITH_CONTAINER
+    + """
+[[jobs]]
+name = "nightly"
+schedule = "0 3 * * *"
+env = { TOKEN = "a" }
+
+[[tasks]]
+name = "migrate"
+env = { DROP = "no" }
+"""
+)
+
+_CONTAINER_ENV_CASES = [
+    pytest.param(
+        _TOML_WITH_CONTAINER,
+        _TOML_WITH_CONTAINER.replace(
+            "is_primary = true",
+            'is_primary = true\nenv = { FOO = "attacker", DATABASE_URL = "postgres://evil" }',
+        ),
+        ["workloads.web.containers.web.env.DATABASE_URL", "workloads.web.containers.web.env.FOO"],
+        id="workload-container-adds-keys",
+    ),
+    pytest.param(
+        _TOML_WITH_JOB_AND_TASK,
+        _TOML_WITH_JOB_AND_TASK.replace('TOKEN = "a"', 'TOKEN = "evil"'),
+        ["jobs.nightly.env.TOKEN"],
+        id="job-changes-a-value",
+    ),
+    pytest.param(
+        _TOML_WITH_JOB_AND_TASK,
+        _TOML_WITH_JOB_AND_TASK.replace('env = { DROP = "no" }', ""),
+        ["tasks.migrate.env.DROP"],
+        id="task-removes-a-key",
+    ),
+]
+
+
+@pytest.mark.parametrize(("before", "after", "labels"), _CONTAINER_ENV_CASES)
+def test_apply_staged_manifest_requires_elevation_for_container_job_and_task_env(
+    permission_resolver, audit_capture, before, after, labels
+):
+    """The reviewer's probe: an APP_UPDATE caller with no elevation put
+    FOO / DATABASE_URL on the primary container instead of in [env],
+    applied, and got neither a step-up nor an audit entry."""
+    org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True), _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(_FakeSession()),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    app.refresh_from_db()
+    assert app.manifest_raw == before
+    assert app.manifest_raw_staged == after
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {"changed_keys": labels}
+    assert "evil" not in json.dumps(entry.extra)
+
+
+def test_apply_staged_manifest_applies_a_container_env_change_once_elevated(
+    permission_resolver, audit_capture
+):
+    before, after, labels = _CONTAINER_ENV_CASES[0].values
+    org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    with override_config(REQUIRE_STEP_UP_AUTH=True), _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(session),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw == after
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "ALLOW"
+    assert entry.extra == {"changed_keys": labels}
+
+
+def test_apply_staged_manifest_refuses_container_env_when_secret_approval_is_required(
+    permission_resolver, audit_capture
+):
+    """No secret-change proposal can carry a container's env, so an app that
+    requires secret approval never takes one through this mutation."""
+    before, after, labels = _CONTAINER_ENV_CASES[0].values
+    org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
+    app.requires_secret_approval = True
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged", "requires_secret_approval"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    app.refresh_from_db()
+    assert app.manifest_raw == before
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.extra == {"changed_keys": labels, "unapproved_keys": labels}
+
+
+# --- expectedStagedHash is required for an env change (#1759 re-review) --
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        pytest.param(_TOML_WITH_ENV, _TOML_WITH_ENV_CHANGED, id="app-wide-env"),
+        pytest.param(*_CONTAINER_ENV_CASES[0].values[:2], id="container-env"),
+    ],
+)
+def test_apply_staged_manifest_requires_the_expected_hash_for_an_env_change(
+    permission_resolver, before, after
+):
+    """Step-up is off here (the default), so nothing else would stop it:
+    an env change must be pinned to the buffer the caller reviewed."""
+    org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "expectedStagedHash"
+    app.refresh_from_db()
+    assert app.manifest_raw == before
+
+
+# --- propose -> approve -> apply on an app with no source repo ----------
+# (#1759 re-review). apply_proposal writes an approved change into
+# manifest_raw_staged; before this, applyStagedManifest refused every
+# [env] change on an approval-required app, so an approved change could
+# never reach manifest_raw.
+
+
+def _user(username: str):
+    from django.contrib.auth import get_user_model
+
+    user, _ = get_user_model().objects.get_or_create(
+        username=username, defaults={"email": f"{username}@example.com"}
+    )
+    return user
+
+
+def _user_info(user):
+    request = SimpleNamespace(user=user, META={})
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=request))
+
+
+def _approve_secret_change(org, app, permission_resolver, *, key: str, value: str | None) -> str:
+    """The real #488 flow: the proposer's setAppSecret (``value``) or
+    deleteAppSecret (``value=None``) opens a proposal, a second user
+    approves it, and apply_proposal stages the approved change."""
+    from astrolift_services.schema.mutations import (
+        ApproveSecretChangeInput,
+        DeleteAppSecretInput,
+        ServicesMutation,
+        SetAppSecretInput,
+    )
+
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    proposer, approver = _user("proposer"), _user("approver")
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=proposer.pk)):
+        if value is None:
+            proposed = ServicesMutation().delete_app_secret(
+                _user_info(proposer), input=DeleteAppSecretInput(app_slug=app.slug, key=key)
+            )
+        else:
+            proposed = ServicesMutation().set_app_secret(
+                _user_info(proposer), input=SetAppSecretInput(app_slug=app.slug, key=key, value=value)
+            )
+    assert proposed.ok, proposed.errors
+    assert proposed.data.pending_proposal_id is not None
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=approver.pk)):
+        approved = ServicesMutation().approve_secret_change(
+            _user_info(approver),
+            input=ApproveSecretChangeInput(proposal_id=str(proposed.data.pending_proposal_id)),
+        )
+    assert approved.ok, approved.errors
+    assert approved.data.status == "applied"
+    app.refresh_from_db()
+    return str(proposed.data.pending_proposal_id)
+
+
+def _approval_required_app():
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.requires_secret_approval = True
+    app.save(update_fields=["requires_secret_approval"])
+    return org, app
+
+
+@pytest.mark.parametrize(("value", "expected_env"), [("rotated", {"FOO": "rotated"}), (None, {})])
+def test_apply_staged_manifest_applies_an_approved_secret_change(
+    permission_resolver, audit_capture, value, expected_env
+):
+    from astrolift_manifest.env_edit import read_app_env
+
+    org, app = _approval_required_app()
+    proposal_id = _approve_secret_change(org, app, permission_resolver, key="FOO", value=value)
+    assert read_app_env(app.manifest_raw_staged) == expected_env
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert read_app_env(app.manifest_raw) == expected_env
+    assert app.manifest_raw_staged == ""
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "ALLOW"
+    assert entry.extra == {"changed_keys": ["FOO"], "proposal_ids": [proposal_id]}
+
+
+def test_apply_staged_manifest_refuses_an_unapproved_change_next_to_an_approved_one(
+    permission_resolver, audit_capture
+):
+    """An approved FOO does not carry an unreviewed BAR staged on top of it
+    through updateManifest, which creates no proposal."""
+    org, app = _approval_required_app()
+    _approve_secret_change(org, app, permission_resolver, key="FOO", value="rotated")
+    sneaky = app.manifest_raw_staged.replace('FOO = "rotated"', 'FOO = "rotated"\nBAR = "unreviewed"')
+    assert sneaky != app.manifest_raw_staged
+    with _ctx(org):
+        staged = RegistryMutation().update_manifest(
+            _info(), input=UpdateManifestInput(id=str(app.guid), raw_manifest=sneaky)
+        )
+    assert staged.ok, staged.errors
+    app.refresh_from_db()
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    assert "BAR" in result.errors[0].message
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
+    entry = next(e for e in audit_capture if e.action == "app.manifest.apply_env_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {"changed_keys": ["BAR", "FOO"], "unapproved_keys": ["BAR"]}
+
+
+def test_apply_staged_manifest_refuses_a_value_a_later_approval_replaced(permission_resolver):
+    """Only the latest applied proposal for a key counts: re-staging the
+    value an older approval set, after a newer one replaced it, is not
+    approved."""
+    org, app = _approval_required_app()
+    _approve_secret_change(org, app, permission_resolver, key="FOO", value="first")
+    first_staged = app.manifest_raw_staged
+    _approve_secret_change(org, app, permission_resolver, key="FOO", value="second")
+    with _ctx(org):
+        staged = RegistryMutation().update_manifest(
+            _info(), input=UpdateManifestInput(id=str(app.guid), raw_manifest=first_staged)
+        )
+    assert staged.ok, staged.errors
+    app.refresh_from_db()
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
+
+
+# --- keyed staged-buffer digest (#1759 re-review) ------------------------
+
+
+def test_raw_manifest_staged_hash_is_keyed_and_bound_to_the_app(settings):
+    """A bare sha256 of the unmasked staged text, served to every app.read
+    holder, confirms an offline guess at a masked [env] value. The served
+    digest must depend on the server key and on the app."""
+    import hashlib
+
+    from astrolift_registry.schema.types import app_to_type
+
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_ENV_CHANGED
+    app.save(update_fields=["manifest_raw_staged"])
+    other = RegisteredApp.objects.create(
+        organization=org,
+        team=app.team,
+        project=app.project,
+        name="Other",
+        slug="other-app",
+        manifest_raw=_TOML_WITH_ENV,
+        manifest_raw_staged=_TOML_WITH_ENV_CHANGED,
+    )
+
+    served = app_to_type(app).raw_manifest_staged_hash
+    assert served == staged_manifest_hash(app)
+    assert served != hashlib.sha256(_TOML_WITH_ENV_CHANGED.encode("utf-8")).hexdigest()
+    assert served != app_to_type(other).raw_manifest_staged_hash
+    settings.SECRET_KEY = "a-different-server-key-for-this-test-only"
+    assert staged_manifest_hash(app) != served
+
+
+# --- server-computed env change names for the confirm dialog ------------
+# (#1759 re-review). The dialog used a line-based [env] reader that
+# missed container env, dotted keys and inline tables.
+
+
+def test_app_type_lists_the_staged_env_changes_by_name_only():
+    from astrolift_registry.schema.types import app_to_type
+
+    before = _TOML_WITH_CONTAINER.replace('name = "hello"', 'name = "hello"\nenv.LOG_LEVEL = "info"')
+    after = before.replace(
+        'env.LOG_LEVEL = "info"', 'env.LOG_LEVEL = "debug"\nenv.OPTS = { a = "x" }'
+    ).replace("is_primary = true", 'is_primary = true\nenv = { DATABASE_URL = "postgres://evil" }')
+    org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
+    assert app_to_type(app).staged_env_changes == []
+
+    app.manifest_raw_staged = after
+    app.save(update_fields=["manifest_raw_staged"])
+    names = app_to_type(app).staged_env_changes
+    assert names == ["LOG_LEVEL", "OPTS", "workloads.web.containers.web.env.DATABASE_URL"]
+    assert not any("evil" in name or "debug" in name for name in names)

@@ -3206,6 +3206,7 @@ export type AstroliftRegisteredApp = {
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
   sourceWebhookInstalledAt?: Maybe<Scalars['DateTime']['output']>;
+  stagedEnvChanges: Array<Scalars['String']['output']>;
   subdomain: Scalars['String']['output'];
   teamId?: Maybe<Scalars['GUID']['output']>;
   teamName: Scalars['String']['output'];

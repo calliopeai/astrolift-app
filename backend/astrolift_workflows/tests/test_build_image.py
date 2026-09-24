@@ -330,6 +330,77 @@ def test_build_image_prefers_the_deployments_own_workload_over_the_apps_first(mo
     assert captured["spec"].dockerfile_path == "Dockerfile.web"
 
 
+# Kaniko joins --dockerfile onto --context-sub-path (resolveDockerfilePath in
+# its cmd/executor/cmd/root.go), so a container dockerfile resolved to a
+# repo-root path has to reach it relative to the build context (#1756
+# re-review). Passed as the repo-root path, any context other than "."
+# doubled the prefix.
+
+
+@pytest.mark.parametrize(
+    ("app_context", "container_context", "container_dockerfile", "expected"),
+    [
+        pytest.param(
+            "apps/web", ".", "Dockerfile.prod", ("Dockerfile.prod", "apps/web"), id="app-level-context"
+        ),
+        pytest.param(
+            ".",
+            "docker",
+            "docker/Dockerfile",
+            ("Dockerfile", "apps/web/docker"),
+            id="container-level-context",
+        ),
+        pytest.param(
+            "apps/web",
+            ".",
+            "../../docker/web.Dockerfile",
+            ("../../docker/web.Dockerfile", "apps/web"),
+            id="dockerfile-above-the-context",
+        ),
+    ],
+)
+def test_build_image_passes_a_container_dockerfile_relative_to_the_build_context(
+    monkeypatch, app_context, container_context, container_dockerfile, expected
+):
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.build_context = app_context
+    app.save(update_fields=["manifest_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(
+        name="web",
+        is_primary=True,
+        dockerfile_path=container_dockerfile,
+        build_context=container_context,
+    )
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert (captured["spec"].dockerfile_path, captured["spec"].context_path) == expected
+
+
+def test_build_image_rejects_a_container_dockerfile_that_escapes_the_repo_root(monkeypatch):
+    """Rebasing onto the context happens after the inside-the-repo check,
+    so a dockerfile above the repo root still fails the build."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.build_context = "apps/web"
+    app.save(update_fields=["manifest_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True, dockerfile_path="../../../Dockerfile")
+
+    _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="escapes the repository root"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+
 def test_build_image_sync_ignores_a_malformed_registry_digest(monkeypatch):
     """The render pins containers to whatever lands in ``image_digest``, so a
     registry that answers with something other than ``sha256:<64 hex>`` must

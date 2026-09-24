@@ -76,17 +76,6 @@ def manifest_hash(serialized: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def raw_text_hash(text: str) -> str:
-    """sha256 of raw manifest text, verbatim (no TOML parse/normalize).
-
-    Used where the caller needs to detect "did this exact text change"
-    rather than "did the semantic manifest change" -- e.g.
-    ``RegisteredApp.manifest_raw_staged``'s optimistic-concurrency check
-    on ``applyStagedManifest`` (#1759 adversarial review), which must
-    work even when the staged text doesn't parse yet."""
-    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
-
-
 # ---- helpers ----------------------------------------------------------
 
 

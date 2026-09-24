@@ -12,16 +12,21 @@
   repo-backed app always goes through `pushManifestToRepo` for review,
   whatever its connection health: this mutation is reachable only for an
   app with no `source_repo` at all. Runs under `select_for_update()`, and
-  the caller's last-known `rawManifestStagedHash` is checked against the
-  live staged buffer (`CONFLICT` on a stale read) so an apply never lands a
-  draft the caller never actually reviewed. An edit that changes the
-  top-level `[env]` literal table is gated the same way `setAppSecret`
-  gates a direct secret write: refused when the app requires secret
-  approval, else a fresh session elevation. The manifest editor now shows an
-  "Apply" button (disabled while the draft has unsaved local edits) and a
-  "Staged, not applied" badge instead of "Push to repo" when the app has no
-  source repo, and confirms before applying, listing which `[env]` key
-  names (never values) are about to change (#1759).
+  the caller's last-known `rawManifestStagedHash` (a keyed digest bound to
+  the app, never a bare hash of the text) is checked against the live
+  staged buffer (`CONFLICT` on a stale read) so an apply never lands a
+  draft the caller never actually reviewed; it is required whenever the
+  edit changes env. An edit that changes env, meaning the top-level `[env]`
+  table or any container, job or task `env` table, is gated the same way
+  `setAppSecret` gates a direct secret write: a fresh session elevation,
+  or, when the app requires secret approval, every changed `[env]` key must
+  match an applied secret-change proposal and anything else (container env
+  included) is refused. The audit entry names the changed keys, never
+  values or digests. The manifest editor now shows an "Apply" button
+  (disabled while the draft has unsaved local edits) and a "Staged, not
+  applied" badge instead of "Push to repo" when the app has no source repo,
+  and confirms before applying, listing the env key names (never values)
+  the server reports the draft changes (`stagedEnvChanges`) (#1759).
 
 - Honour per-container `dockerfile_path` / `build_context` from
   `[[workloads.containers]]` when building an app's image. The build
@@ -35,11 +40,13 @@
   of the two the app hasn't itself customized, resolved against the
   manifest's own directory and rejected (parse time for an absolute path,
   build time for a resolved result that climbs above the repo root) rather
-  than silently falling back. A manifest with more than one distinct
-  non-default `dockerfile_path` or `build_context` across its containers is
-  rejected at parse time, since exactly one image is ever built for an app,
-  so a second, different value would just be the same silent drop this
-  feature closes.
+  than silently falling back. Kaniko reads `--dockerfile` relative to the
+  build context, so a container's Dockerfile is passed relative to the
+  effective context rather than the repo root. A manifest with more than
+  one distinct non-default `dockerfile_path` or `build_context` across its
+  containers is rejected at parse time, since exactly one image is ever
+  built for an app, so a second, different value would just be the same
+  silent drop this feature closes.
 
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the

@@ -103,9 +103,18 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     (``posixpath``) -- the shape the issue's own example uses (``"../.."``
     from a manifest two directories deep reaching the repo root); a result
     that would climb above the repo root (or is itself absolute) is a hard
-    failure, not a silent fall-back to the app-level value -- kaniko's
-    ``--context-sub-path`` / ``--dockerfile`` take the resolved value
-    verbatim, so a wrong build must not run at all.
+    failure, not a silent fall-back to the app-level value, so a wrong
+    build never runs at all.
+
+    Kaniko does not read ``--dockerfile`` from the repo root: it joins it
+    onto the build context (``--context-sub-path``) and cleans the result
+    (``resolveDockerfilePath`` in kaniko's ``cmd/executor/cmd/root.go``).
+    A container dockerfile, once resolved to a repo-root path, is therefore
+    handed over relative to the effective build context; passed as-is it
+    doubled the prefix under any context other than the root
+    (``apps/web`` + ``apps/web/Dockerfile.prod``). Because kaniko cleans
+    the join, a Dockerfile above the context but inside the clone, as a
+    ``../`` path, is read like ``docker build -f`` reads one.
 
     Prefers ``deployment.workload``'s primary container when the deployment
     is scoped to one (task / static-site / cron paths set this); otherwise
@@ -138,18 +147,18 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
 
     manifest_dir = posixpath.dirname(app.manifest_path or "") or DEFAULT_BUILD_CONTEXT
 
+    container_dockerfile = None
     if (
         dockerfile_is_default
         and primary.dockerfile_path
         and primary.dockerfile_path != DEFAULT_DOCKERFILE_PATH
     ):
-        resolved = resolve_repo_relative(manifest_dir, primary.dockerfile_path)
-        if resolved is None:
+        container_dockerfile = resolve_repo_relative(manifest_dir, primary.dockerfile_path)
+        if container_dockerfile is None:
             raise RuntimeError(
                 f"container dockerfile_path {primary.dockerfile_path!r} resolved against "
                 f"{manifest_dir!r} escapes the repository root -- refusing to build"
             )
-        dockerfile_path = resolved
 
     if context_is_default and primary.build_context and primary.build_context != DEFAULT_BUILD_CONTEXT:
         resolved = resolve_repo_relative(manifest_dir, primary.build_context)
@@ -159,6 +168,11 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
                 f"{manifest_dir!r} escapes the repository root -- refusing to build"
             )
         build_context = resolved
+
+    if container_dockerfile is not None:
+        # Both are repo-root paths; anchoring them at "/" keeps relpath from
+        # consulting this process's working directory.
+        dockerfile_path = posixpath.relpath(f"/{container_dockerfile}", f"/{build_context}")
 
     return dockerfile_path, build_context
 
