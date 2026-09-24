@@ -400,6 +400,15 @@ PLUGIN = ProviderPlugin(
                 "exclusiveMinimum": 0,
                 "default": 5,
             },
+            "cloud_functions_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails a Cloud Run function config may run the function or its "
+                    "build as. The tenant's code runs with that identity, so list only accounts that "
+                    "can read nothing another tenant owns. Empty refuses every config-supplied account."
+                ),
+            },
             "api_gateway_region": {
                 "type": "string",
                 "description": "API Gateway deployment region; falls back to the cluster region.",

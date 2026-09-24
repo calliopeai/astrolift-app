@@ -30,6 +30,7 @@ from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 KIND = "faas"
 _API_ROOT = "https://cloudfunctions.googleapis.com/v2"
 _FUNCTION_ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,61}[a-z0-9]$")
+_SECRET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,255}$")
 _OUTPUT_ONLY = {
     "createTime",
     "name",
@@ -112,6 +113,13 @@ class CloudFunctionsConfig:
     deletion_protection_default: bool = True
     operation_timeout_seconds: float = 1800
     poll_interval_seconds: float = 5
+    allowed_service_accounts: tuple[str, ...] = ()
+    """Service account emails a config may run the function or its build as.
+
+    The function's code and its build steps come from the tenant and run as
+    that identity, so they can read whatever it can read, Secret Manager
+    included. Empty refuses every config-supplied account, which leaves
+    Google's default runtime service account, as when the field is omitted."""
 
 
 class CloudFunctionsRestClient:
@@ -623,6 +631,17 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         max_instances = int(cfg.get("max_instances") or 0)
         if max_instances and min_instances > max_instances:
             return "min_instances cannot exceed max_instances"
+        allowed_accounts = {account.strip().casefold() for account in self._config.allowed_service_accounts}
+        for field in ("service_account_email", "build_service_account"):
+            account = str(cfg.get(field) or "").strip()
+            # The build account is a resource name,
+            # projects/<project or ->/serviceAccounts/<email>; the email names it.
+            email = account.rsplit("/serviceAccounts/", 1)[-1]
+            if account and email.casefold() not in allowed_accounts:
+                return (
+                    f"{field} {email!r} is not allowed by the cluster install policy "
+                    "cloud_functions_allowed_service_accounts"
+                )
         environment = set((cfg.get("environment") or {}).keys())
         secret_keys: set[str] = set()
         allow_latest = bool(cfg.get("allow_latest_secret_versions"))
@@ -632,6 +651,10 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                 return "secret_environment keys must be non-empty and unique"
             if not str(item.get("secret") or "") or not str(item.get("version") or ""):
                 return "secret_environment entries require secret and version"
+            if not self._secret_in_function_project(item):
+                return (
+                    f"secret_environment secrets must be secret ids in the function project {self._config.project_id}"
+                )
             secret_keys.add(key)
             if str(item.get("version") or "") == "latest" and not allow_latest:
                 return "latest secret_environment versions require allow_latest_secret_versions=true"
@@ -647,6 +670,8 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             volume_mounts.add(mount_path)
             if not str(volume.get("secret") or "") or not list(volume.get("versions") or []):
                 return "secret volumes require secret and at least one version"
+            if not self._secret_in_function_project(volume):
+                return f"secret volume secrets must be secret ids in the function project {self._config.project_id}"
             for version in volume.get("versions") or []:
                 version_path = str(version.get("path") or "")
                 if not str(version.get("version") or "") or not version_path:
@@ -697,6 +722,18 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         if forbidden_clear:
             return f"clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
         return ""
+
+    def _secret_in_function_project(self, entry: dict[str, Any]) -> bool:
+        """Whether a secret entry names a secret id in the function's project.
+
+        Google reads the secret with the function's runtime identity, so a
+        ``project_id`` naming any other project, or a resource path in
+        ``secret``, points that read outside the install (#1921). A project
+        number cannot be matched against the configured id, so it is refused.
+        """
+        project = str(entry.get("project_id") or "").strip()
+        secret = str(entry.get("secret") or "")
+        return bool(_SECRET_ID_RE.fullmatch(secret)) and (not project or project == self._config.project_id)
 
     def _body(
         self,

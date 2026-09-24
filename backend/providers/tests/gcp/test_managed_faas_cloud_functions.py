@@ -93,6 +93,10 @@ class FakeFunctions:
         return operation
 
 
+RUNTIME_ACCOUNT = "function@project-1.iam.gserviceaccount.com"
+BUILD_ACCOUNT = "builder@project-1.iam.gserviceaccount.com"
+
+
 @pytest.fixture
 def config() -> CloudFunctionsConfig:
     return CloudFunctionsConfig(
@@ -100,6 +104,7 @@ def config() -> CloudFunctionsConfig:
         region="us-central1",
         operation_timeout_seconds=1,
         poll_interval_seconds=0,
+        allowed_service_accounts=(RUNTIME_ACCOUNT, BUILD_ACCOUNT),
     )
 
 
@@ -124,7 +129,7 @@ def _full_config() -> dict[str, Any]:
             "generation": "7",
         },
         "build_environment": {"GOOGLE_FUNCTION_SOURCE": "main.py"},
-        "build_service_account": "projects/project-1/serviceAccounts/builder@project-1.iam.gserviceaccount.com",
+        "build_service_account": f"projects/project-1/serviceAccounts/{BUILD_ACCOUNT}",
         "worker_pool": "projects/build/locations/us-central1/workerPools/private",
         "docker_repository": "projects/project-1/locations/us-central1/repositories/functions",
         "automatic_runtime_updates": True,
@@ -150,7 +155,7 @@ def _full_config() -> dict[str, Any]:
                 "versions": [{"version": "3", "path": "ca.pem"}],
             },
         ],
-        "service_account_email": "function@project-1.iam.gserviceaccount.com",
+        "service_account_email": RUNTIME_ACCOUNT,
         "ingress": "ALLOW_INTERNAL_AND_GCLB",
         "vpc_connector": "projects/project-1/locations/us-central1/connectors/functions",
         "vpc_connector_egress": "ALL_TRAFFIC",
@@ -451,6 +456,108 @@ def test_invalid_configs_fail_closed(
 ) -> None:
     result = driver.provision(replace(SPEC, config=manifest_config))
     assert not result.ok and message in result.message
+
+
+def _minimal(**extra: Any) -> dict[str, Any]:
+    return {"runtime": "python314", "storage_source": {"bucket": "b", "object": "o"}, **extra}
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        pytest.param(
+            {"service_account_email": "platform-admin@project-1.iam.gserviceaccount.com"},
+            "service_account_email 'platform-admin@project-1.iam.gserviceaccount.com' is not allowed",
+            id="runtime-account-not-allowlisted",
+        ),
+        pytest.param(
+            {"build_service_account": "projects/-/serviceAccounts/platform-admin@project-1.iam.gserviceaccount.com"},
+            "build_service_account 'platform-admin@project-1.iam.gserviceaccount.com' is not allowed",
+            id="build-account-not-allowlisted",
+        ),
+        pytest.param(
+            {"secret_environment": [{"key": "T", "secret": "token", "version": "7", "project_id": "victim"}]},
+            "secret ids in the function project project-1",
+            id="secret-env-in-another-project",
+        ),
+        pytest.param(
+            {"secret_environment": [{"key": "T", "secret": "token", "version": "7", "project_id": "123456789012"}]},
+            "secret ids in the function project project-1",
+            id="secret-env-project-number",
+        ),
+        pytest.param(
+            {"secret_environment": [{"key": "T", "secret": "projects/victim/secrets/token", "version": "7"}]},
+            "secret ids in the function project project-1",
+            id="secret-env-resource-path",
+        ),
+        pytest.param(
+            {
+                "secret_volumes": [
+                    {
+                        "mount_path": "/etc/s",
+                        "secret": "token",
+                        "project_id": "victim",
+                        "versions": [{"version": "7", "path": "t"}],
+                    }
+                ]
+            },
+            "secret volume secrets must be secret ids in the function project project-1",
+            id="secret-volume-in-another-project",
+        ),
+    ],
+)
+def test_identity_and_secret_project_escapes_fail_closed(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+    extra: dict[str, Any],
+    message: str,
+) -> None:
+    """The tenant's code runs as the function's runtime and build accounts and
+    Google reads each secret with that identity, so an account outside the
+    install's allowlist, or a secret outside the install project, is refused
+    before any API call (#1921)."""
+    result = driver.provision(replace(SPEC, config=_minimal(**extra)))
+    assert not result.ok and message in result.message
+    assert client.calls == []
+
+
+def test_an_empty_allowlist_refuses_every_config_supplied_account(client: FakeFunctions) -> None:
+    driver = CloudFunctionsDriver(
+        config=CloudFunctionsConfig(project_id="project-1", region="us-central1"),
+        client=client,
+        sleep=lambda _: None,
+    )
+    refused = driver.provision(replace(SPEC, config=_minimal(service_account_email=RUNTIME_ACCOUNT)))
+    assert not refused.ok and "cloud_functions_allowed_service_accounts" in refused.message
+    # Omitted, Google runs it as the project's default account, as before.
+    assert driver.provision(replace(SPEC, config=_minimal())).ok
+
+
+def test_allowlisted_accounts_and_install_project_secrets_are_accepted(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+) -> None:
+    result = driver.provision(
+        replace(
+            SPEC,
+            config=_minimal(
+                service_account_email=RUNTIME_ACCOUNT.upper(),
+                build_service_account=f"projects/-/serviceAccounts/{BUILD_ACCOUNT}",
+                secret_environment=[{"key": "T", "secret": "token", "version": "7", "project_id": "project-1"}],
+                secret_volumes=[{"mount_path": "/etc/s", "secret": "ca", "versions": [{"version": "3", "path": "ca"}]}],
+            ),
+        ),
+    )
+    assert result.ok, result.message
+
+
+def test_update_refuses_an_account_outside_the_allowlist(driver: CloudFunctionsDriver, client: FakeFunctions) -> None:
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    updated = driver.update(
+        UpdateSpec(result.handle, config={"service_account_email": "platform-admin@project-1.iam.gserviceaccount.com"}),
+    )
+    assert not updated.ok and "not allowed by the cluster install policy" in updated.message
+    assert not [call for call in client.calls if call[0] == "patch"]
 
 
 def test_schema_and_snapshot_contract_are_honest(driver: CloudFunctionsDriver) -> None:

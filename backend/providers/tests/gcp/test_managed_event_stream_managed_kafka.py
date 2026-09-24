@@ -291,7 +291,7 @@ def _full_config() -> dict[str, Any]:
                         "dns_domain_names": ["internal.example.test"],
                     },
                 ],
-                "secret_paths": ["projects/p/secrets/db/versions/7"],
+                "secret_paths": ["projects/project-1/secrets/db/versions/7"],
                 "connectors": [
                     {
                         "id": "warehouse-sink",
@@ -666,6 +666,32 @@ def test_status_surfaces_failed_connector(driver: ManagedKafkaDriver, client: Fa
                 ],
             },
             "exact numeric versions",
+        ),
+        # Google loads these into the workers with the Managed Kafka service
+        # identity, so a secret in another project is refused (#1921).
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "secret_paths": ["projects/victim/secrets/db/versions/7"],
+                    },
+                ],
+            },
+            "must name projects/project-1/secrets/<id>/versions/<n>",
+        ),
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "secret_paths": ["projects/project-1/secrets/db/../../victim/versions/7"],
+                    },
+                ],
+            },
+            "must name projects/project-1/secrets/<id>/versions/<n>",
         ),
         (
             {

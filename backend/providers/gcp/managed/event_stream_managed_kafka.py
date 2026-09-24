@@ -41,6 +41,7 @@ KIND = "event_stream"
 _API_ROOT = "https://managedkafka.googleapis.com/v1"
 _ID_RE = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _TOPIC_RE = re.compile(r"^[A-Za-z0-9._-]{1,249}$")
+_SECRET_VERSION_RE = re.compile(r"^projects/(?P<project>[^/]+)/secrets/[A-Za-z0-9_-]{1,255}/versions/[0-9]+$")
 _REGISTRY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]{0,62}$")
 _ACL_ID_RE = re.compile(
     r"^(?:cluster|allTopics|allConsumerGroups|allTransactionalIds|"
@@ -1088,6 +1089,14 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             for secret_path in connect.get("secret_paths") or []:
                 if not re.search(r"/versions/[0-9]+$", str(secret_path)):
                     return f"Connect cluster {connect_id} secret_paths require exact numeric versions"
+                # Google loads each secret into the workers with the Managed
+                # Kafka service identity, so one in another project would be
+                # read on the install's authority (#1921).
+                if not _secret_version_in_project(str(secret_path), self._config.project_id):
+                    return (
+                        f"Connect cluster {connect_id} secret_paths must name "
+                        f"projects/{self._config.project_id}/secrets/<id>/versions/<n>"
+                    )
             raw_error = _raw_fields_error(connect, protected=_CONNECT_STRUCTURED_FIELDS)
             if raw_error:
                 return f"Connect cluster {connect_id}: {raw_error}"
@@ -1693,6 +1702,16 @@ def _capacity_body(cfg: dict[str, Any], size: str, *, required: bool) -> dict[st
         return {}
     vcpu, memory_bytes = _capacity_values(cfg, size)
     return {"vcpuCount": str(vcpu), "memoryBytes": str(memory_bytes)}
+
+
+def _secret_version_in_project(secret_path: str, project_id: str) -> bool:
+    """Whether ``secret_path`` is ``projects/<project_id>/secrets/<id>/versions/<n>``.
+
+    The configured project id, not the project number: a number cannot be
+    matched here, so it is refused rather than trusted.
+    """
+    match = _SECRET_VERSION_RE.fullmatch(secret_path)
+    return match is not None and match.group("project") == project_id
 
 
 def _raw_fields_error(cfg: dict[str, Any], *, protected: set[str] | None = None) -> str:
