@@ -1,9 +1,10 @@
 """
 Apply step for an approved ``SecretChangeProposal`` (#488).
 
-Translates one of the four op kinds (set | delete | attach_bundle |
-detach_bundle) into the underlying state change against the manifest
-staging buffer or ``AppSecretBundleRef`` table.  Called from the
+Translates one of the op kinds (set | delete | set_metadata |
+attach_bundle | detach_bundle) into the underlying state change against
+the manifest staging buffer, ``AppSecretMetadata`` or the
+``AppSecretBundleRef`` table.  Called from the
 approve resolver once quorum is reached; idempotent on the proposal
 row — if the apply step has already fired the proposal stays in
 ``applied`` and re-firing is a no-op.
@@ -19,14 +20,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.utils.dateparse import parse_datetime
+
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
+from astrolift_manifest.env_edit import delete_app_env_key, read_app_env, set_app_env_keys
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
     AppSecretBundleRef,
     SecretBundle,
     SecretChangeProposal,
+)
+from astrolift_services.secret_literals import base_raw_digest
+from astrolift_services.secret_metadata_ops import (
+    environment_scopes,
+    retire_app_secret_metadata,
+    upsert_app_secret_metadata,
 )
 
 
@@ -57,6 +66,27 @@ def _stage_manifest(app: RegisteredApp, new_text: str, *, actor) -> None:
     app.save(update_fields=update_fields)
 
 
+def _stamp_base(proposal: SecretChangeProposal, app: RegisteredApp, key: str) -> None:
+    """Record which ``manifest_raw`` value for ``key`` this approval was
+    applied against. The deploy path honours the approval only while the
+    key still has that value there (#1758)."""
+    base = read_app_env(app.manifest_raw or "").get(key)
+    proposal.payload = {**(proposal.payload or {}), "base_raw_digest": base_raw_digest(app, key, base)}
+    proposal.save(update_fields=["payload", "updated_at", "version"])
+
+
+def _record_overrides_at_apply(
+    proposal: SecretChangeProposal, app: RegisteredApp, key: str, scope: str
+) -> None:
+    """Record on the applied proposal the per-environment rows whose own
+    scope differs from the app-wide ``scope`` it set, as they stood when it
+    applied. The diff was built when the change was proposed and cannot
+    show a row pinned after that (#1758)."""
+    kept = {env: own for env, own in environment_scopes(app, key).items() if own != scope}
+    proposal.payload = {**(proposal.payload or {}), "overrides_at_apply": kept}
+    proposal.save(update_fields=["payload", "updated_at", "version"])
+
+
 def apply_proposal(
     proposal: SecretChangeProposal,
     *,
@@ -79,15 +109,33 @@ def apply_proposal(
             value = payload.get("value") or ""
             if not key:
                 return ApplyResult(ok=False, error="payload.key is required for set")
+            _stamp_base(proposal, app, key)
             source = app.manifest_raw_staged or app.manifest_raw or ""
             new_text = set_app_env_keys(source, {key: value})
             _stage_manifest(app, new_text, actor=actor)
+            # The metadata a direct setAppSecret records, from the payload
+            # the proposer submitted. Without it an approved key restricted
+            # to production fell back to scope "all" and reached previews
+            # (#1758). A missing scope keeps the stored one.
+            expires_at = payload.get("expires_at")
+            upsert_app_secret_metadata(
+                app=app,
+                key=key,
+                environment_name="",
+                expires_at=parse_datetime(expires_at) if expires_at else None,
+                set_via=payload.get("set_via"),
+                scope=payload.get("scope"),
+                actor=actor,
+            )
+            if payload.get("scope") is not None:
+                _record_overrides_at_apply(proposal, app, key, payload["scope"])
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.DELETE.value:
             key = (payload.get("key") or "").strip()
             if not key:
                 return ApplyResult(ok=False, error="payload.key is required for delete")
+            _stamp_base(proposal, app, key)
             source = app.manifest_raw_staged or app.manifest_raw or ""
             new_text, removed = delete_app_env_key(source, key)
             if not removed:
@@ -97,6 +145,36 @@ def apply_proposal(
                 # approve, we shouldn't fail the apply.
                 return ApplyResult(ok=True)
             _stage_manifest(app, new_text, actor=actor)
+            # Retire the metadata as a direct deleteAppSecret does, but only
+            # once manifest_raw no longer carries the key either. While it
+            # does, the delete is a draft, and discarding the draft brings
+            # the key back; with its metadata gone it would come back
+            # scoped "all" and reach previews.
+            if key not in read_app_env(app.manifest_raw or ""):
+                retire_app_secret_metadata(app, key, actor=actor)
+            return ApplyResult(ok=True)
+
+        if op == SecretChangeProposal.Op.SET_METADATA.value:
+            key = (payload.get("key") or "").strip()
+            if not key:
+                return ApplyResult(ok=False, error="payload.key is required for set_metadata")
+            # setAppSecretMetadata checks the scope in force under this lock
+            # before it writes; holding it here keeps that check from reading
+            # the scope this apply is changing. Set and delete hold it
+            # through _stage_manifest.
+            RegisteredApp.objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+            expires_at = payload.get("expires_at")
+            upsert_app_secret_metadata(
+                app=app,
+                key=key,
+                environment_name=proposal.environment_name or "",
+                expires_at=parse_datetime(expires_at) if expires_at else None,
+                set_via=payload.get("set_via"),
+                scope=payload.get("scope"),
+                actor=actor,
+            )
+            if not proposal.environment_name and payload.get("scope") is not None:
+                _record_overrides_at_apply(proposal, app, key, payload["scope"])
             return ApplyResult(ok=True)
 
         if op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:

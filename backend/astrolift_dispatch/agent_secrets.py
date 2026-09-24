@@ -313,6 +313,36 @@ def resolve_secrets_backend(cluster) -> Any:
 # Store contract — the one place the {"value": ...} shape + uri-as-path lives
 # ---------------------------------------------------------------------------
 
+# The CLI reference and agent-packages.md document a ref's uri in the form
+# ``secret://path``, but every SecretsBackend contract is bare ``path[#field]``
+# -- no cloud provider's name validator tolerates a colon (AWS Secrets
+# Manager rejects it outright: "ValidationException: Invalid name", #1761).
+# Stripped here, at every read/write/delete call, rather than at CLI-input
+# time or in the stored ``secret_refs``/``AgentSecretBindingOverride`` row:
+# a ref already persisted with the scheme (from before this fix) keeps
+# resolving with no data migration, since normalization happens at use time
+# regardless of what's stored.
+_SECRET_URI_SCHEME = "secret://"
+
+
+def normalize_secret_uri(uri: str) -> str:
+    """Strip the documented ``secret://`` scheme, if present.
+
+    Leaves the rest of the reference (``path[#field]``, optionally still
+    ``sm:``/``ssm:``-prefixed for the AWS driver's own backend routing)
+    untouched for the backend.
+
+    Raises ``ValueError`` when no path is left: a bare ``secret://`` would
+    otherwise reach the driver as an empty name, which a backend may read
+    as its own root rather than refuse. Every caller already turns an
+    exception here into its "store failed" / "unresolvable" outcome.
+    """
+    if uri.startswith(_SECRET_URI_SCHEME):
+        uri = uri[len(_SECRET_URI_SCHEME) :]
+    if not uri:
+        raise ValueError("secret reference has no path")
+    return uri
+
 
 def write_secret_value(backend, uri: str, value: str) -> None:
     """Write ``value`` to ``uri`` in the store (create-or-update).
@@ -321,7 +351,7 @@ def write_secret_value(backend, uri: str, value: str) -> None:
     "rotate an existing value" identically, so this is the whole write
     path for set/rotate.
     """
-    backend.upsert(uri, {SECRET_VALUE_KEY: value})
+    backend.upsert(normalize_secret_uri(uri), {SECRET_VALUE_KEY: value})
 
 
 def read_secret_value(backend, uri: str) -> str | None:
@@ -333,7 +363,7 @@ def read_secret_value(backend, uri: str) -> str | None:
     """
     value = resolve_secret_reference(
         backend,
-        uri,
+        normalize_secret_uri(uri),
         default_key=SECRET_VALUE_KEY,
     )
     return value or None
@@ -341,7 +371,7 @@ def read_secret_value(backend, uri: str) -> str | None:
 
 def delete_secret_value(backend, uri: str) -> None:
     """Delete the secret stored at ``uri`` (soft-delete window per driver)."""
-    backend.delete(uri)
+    backend.delete(normalize_secret_uri(uri))
 
 
 # ---------------------------------------------------------------------------
