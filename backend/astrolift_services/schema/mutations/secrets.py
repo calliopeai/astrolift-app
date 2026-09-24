@@ -333,6 +333,19 @@ class SecretMutations:
                 field="setVia",
             )
         environment_name = input.environment_name or ""
+        if (
+            environment_name
+            and not AppEnvironment.objects.filter(
+                registered_app=app, name=environment_name, deleted_at__isnull=True
+            ).exists()
+        ):
+            # A row for a name the app does not have would govern whatever
+            # environment later takes that name, a preview included.
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"environment {environment_name!r} not found",
+                field="environmentName",
+            )
         if app.requires_secret_approval and input.scope is not None:
             current_scope = current_secret_scope(app, input.key, environment_name)
             if input.scope != current_scope:

@@ -22,6 +22,7 @@ from django.utils import timezone
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import delete_app_env_key, set_app_env_keys
+from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations import RegistryMutation, UpdateManifestInput
 from astrolift_services.models import (
     AppSecretBundleRef,
@@ -1052,3 +1053,33 @@ def test_under_approval_an_explicit_per_environment_scope_waits_for_its_proposal
 
     assert _materialize(_deployment(app, preview), monkeypatch) == {"PROD_ONLY": "repo-value"}
     assert _materialize(_deployment(app, env), monkeypatch) == {"PROD_ONLY": "repo-value"}
+
+
+def test_set_metadata_refuses_an_environment_the_app_does_not_have(approver_grants, app, env):
+    """A row for a name the app does not have would govern whatever
+    environment later takes that name."""
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    gone = _preview_environment(app, env, name="preview-gone", status=PreviewEnvironment.Status.TORN_DOWN)
+    gone.soft_delete()
+    other_app = RegisteredApp.objects.create(
+        organization=app.organization,
+        project=app.project,
+        team=app.team,
+        name="Other",
+        slug="other-app",
+        provisioning_status="ready",
+    )
+    AppEnvironment.objects.create(
+        registered_app=other_app,
+        tenant_cluster=env.tenant_cluster,
+        name="only-in-other-app",
+        url="https://other.example.com",
+        required_approvals=0,
+    )
+
+    for name in ("no-such-env", gone.name, "only-in-other-app"):
+        result = _set_scope(app, "K", environment_name=name, expires_at=timezone.now() + timedelta(days=30))
+
+        assert result.ok is False, name
+        assert (result.errors[0].code, result.errors[0].field) == ("NOT_FOUND", "environmentName"), name
+    assert not AppSecretMetadata.objects.filter(key="K").exists()
