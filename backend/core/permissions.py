@@ -214,6 +214,24 @@ class Permission(enum.StrEnum):
     ZENTINELLE_CONNECT = "zentinelle.connect"
     # Register a cluster with Zentinelle and deploy / remove its gateway.
     ZENTINELLE_GATEWAY_MANAGE = "zentinelle.gateway_manage"
+    # The rest of the #1888 RBAC table, declared ahead of the screens that
+    # check them so the stock roles can carry their defaults (#1864). Each
+    # notes the levels #1888 scopes it to; a stock role carries it only when
+    # the role's own level is one of them.
+    # Capability toggles and the Zentinelle settings held in Astrolift (org).
+    ZENTINELLE_CONFIGURE = "zentinelle.configure"
+    # Policies in effect (org, team, project).
+    ZENTINELLE_POLICY_VIEW = "zentinelle.policy_view"
+    ZENTINELLE_POLICY_EDIT = "zentinelle.policy_edit"
+    # Model usage and cost (org, team, project).
+    ZENTINELLE_USAGE_VIEW = "zentinelle.usage_view"
+    # The evidence and audit stream (org, team, project).
+    ZENTINELLE_AUDIT_VIEW = "zentinelle.audit_view"
+    ZENTINELLE_AUDIT_EXPORT = "zentinelle.audit_export"
+    # The health card and per-cluster gateway status (org).
+    ZENTINELLE_STATUS_VIEW = "zentinelle.status_view"
+    # Declared-versus-observed verdicts per agent, task and fleet (org, team, project).
+    ZENTINELLE_CONFORMANCE_VIEW = "zentinelle.conformance_view"
 
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
