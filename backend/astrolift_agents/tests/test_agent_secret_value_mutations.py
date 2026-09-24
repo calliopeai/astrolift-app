@@ -688,6 +688,10 @@ _VICTIM = "managed/rds-orders/master"
             "arn:aws:secretsmanager:us-west-2:123456789012:secret:astrolift/managed/rds-orders/master-AbCdEf",
             id="arn-of-another-tenants-secret",
         ),
+        pytest.param(
+            "arn:aws:secretsmanager:us-west-2:123456789012:secret:astrolift/agents/{org}/gh-AbCdEf",
+            id="arn-even-of-an-own-name",
+        ),
     ],
 )
 def test_upsert_ref_rejects_a_location_outside_the_org_namespace(
@@ -704,7 +708,7 @@ def test_upsert_ref_rejects_a_location_outside_the_org_namespace(
             info,
             env_spec_slug=spec.slug,
             env_var="EXFIL_TOKEN",
-            uri=uri.format(other=other.guid),
+            uri=uri.format(other=other.guid, org=org.guid),
         )
 
     assert result.ok is False
@@ -849,6 +853,8 @@ _VICTIM_BUNDLE = "managed/rds-orders/credentials"
         pytest.param(f"astrolift/{_VICTIM_BUNDLE}", id="absolute-spelling"),
         pytest.param("agent-bundles/{other}/shared", id="another-orgs-bundle"),
         pytest.param("project-bundles/{org}/{other}/jira", id="a-project-bundle-location"),
+        pytest.param("secret://agent-bundles/{org}/shared", id="a-secret-reference-not-a-location"),
+        pytest.param("agents/{org}/shared", id="an-org-root-that-is-not-for-bundles"),
     ],
 )
 def test_create_bundle_rejects_a_location_outside_the_org_namespace(
@@ -983,3 +989,112 @@ def test_update_bundle_moves_off_a_location_outside_the_org_namespace_without_re
     assert bundle.backend_ref == _bundle_ns(org, "planted")
     assert fake_store.reads == []
     assert fake_store.store[_VICTIM_BUNDLE] == {"PASSWORD": "victim-pw"}
+
+
+# ---- binding-derived refs belong to the service (#1921) -------------------------
+
+
+def _spec_with_project_binding(org, *, binding_ref="astrolift/rds/orders-db/url"):
+    """A spec attached to a project database whose ``DATABASE_URL`` the
+    platform derived from the service's binding."""
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_identity.models import Project, Team
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment, ManagedServiceBinding
+
+    team = Team.objects.create(organization=org, name="Eng", slug="eng-value-1921")
+    project = Project.objects.create(organization=org, team=team, name="P", slug="p-value-1921")
+    ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name="K8s value 1921", slug="k8s-value-1921", plugin_version="1.0.0")]
+    )
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        provider_plugin=ProviderPlugin.objects.get(slug="k8s-value-1921"),
+        name="Shared",
+        slug="shared-value-1921",
+        endpoint="https://cluster.example.com",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+    )
+    service = ManagedService.objects.create(
+        project=project,
+        tenant_cluster=cluster,
+        kind="postgres",
+        name="orders-db",
+        backend_ref="postgres/orders-db",
+        status="active",
+    )
+    ManagedServiceBinding.objects.create(
+        managed_service=service, env_key="DATABASE_URL", env_value_ref=binding_ref, is_secret=True
+    )
+    spec = _spec(org)
+    ManagedServiceAttachment.objects.create(managed_service=service, agent_environment_spec=spec)
+    return spec
+
+
+@pytest.mark.parametrize(
+    ("operation", "kwargs", "permission"),
+    [
+        pytest.param("set_agent_secret_value", {"value": "attacker"}, Permission.SECRET_WRITE, id="set"),
+        pytest.param("delete_agent_secret_value", {}, Permission.SECRET_WRITE, id="delete"),
+        pytest.param("reveal_agent_secret_value", {}, Permission.SECRET_READ, id="reveal"),
+    ],
+)
+def test_value_mutations_leave_a_binding_derived_ref_to_its_service(
+    permission_resolver, info, org, with_tenant_org, fake_store, operation, kwargs, permission
+):
+    """The agent surface manages refs typed on the spec. ``DATABASE_URL`` here
+    is the database's own credential: overwriting, deleting or revealing it
+    through the agent would act on the service."""
+    permission_resolver.grant(permission)
+    fake_store.store = {"astrolift/rds/orders-db/url": {"value": "postgres://orders"}}
+    spec = _spec_with_project_binding(org)
+
+    with with_tenant_org(org):
+        result = getattr(AgentsMutation(), operation)(
+            info, env_spec_slug=spec.slug, env_var="DATABASE_URL", **kwargs
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert result.errors[0].field == "envVar"
+    assert "managed by the platform" in result.errors[0].message
+    assert fake_store.reads == []
+    assert fake_store.upserts == []
+    assert fake_store.deletes == []
+    assert fake_store.store == {"astrolift/rds/orders-db/url": {"value": "postgres://orders"}}
+
+
+def test_remove_still_hides_a_binding_derived_ref_from_the_spec(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    from astrolift_dispatch.agent_secrets import effective_secret_refs
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec_with_project_binding(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().remove_agent_secret_ref(
+            info, env_spec_slug=spec.slug, env_var="DATABASE_URL"
+        )
+
+    assert result.ok is True, result.errors
+    assert "DATABASE_URL" not in {ref["env_var"] for ref in effective_secret_refs(spec)}
+    assert fake_store.reads == []
+
+
+def test_value_mutations_still_manage_a_typed_ref_that_overrides_a_binding(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """A typed ref that takes over the env var is the spec's again."""
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec_with_project_binding(org)
+    own = _ns(org, "db-url")
+    spec.secret_refs = [{"uri": own, "env_var": "DATABASE_URL"}]
+    spec.save()
+
+    with with_tenant_org(org):
+        result = AgentsMutation().set_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="DATABASE_URL", value="postgres://own"
+        )
+
+    assert result.ok is True, result.errors
+    assert fake_store.upserts == [(own, {"value": "postgres://own"})]

@@ -23,15 +23,17 @@ from astrolift_dispatch.agent_secrets import (
     in_org_secret_namespace,
 )
 
-# A config key names a secret in the platform's store when it is spelled
-# ``*_secret_ref``, ``*_secret_refs``, ``*_secret_arn`` or ``*_secret_arns``
-# (``password_secret_ref``, ``body_secret_refs``, ``secret_arn``), which is the
-# convention every driver follows, or is one of the few fields that name a
-# secret without following it. A string held directly by such a key is a ref,
-# and so is a string in a list or map it holds. The Kubernetes ``secretRef`` and
-# ``secretKeyRef`` spellings are not matched on purpose: they name a Secret in
-# the workload's own namespace, not a location in the platform's store.
-_SECRET_REF_KEY_SUFFIXES = ("secret_ref", "secret_refs", "secret_arn", "secret_arns")
+# A config key names a secret in the platform's store when it ends in
+# ``secret_ref`` or ``secret_refs`` (the Astrolift convention:
+# ``password_secret_ref``, ``body_secret_refs``) or names a Secrets Manager ARN
+# the way either Astrolift or AWS spells one (``secret_arn``, ``secret_arns``,
+# the native ``SecretArn`` and ``SecretARN``), in any case, or is one of the few
+# fields that name a secret some other way. A string held directly by such a
+# key is a ref, and so is a string in a list or map it holds. ``Ref`` is matched
+# only after a separator: the Kubernetes ``secretRef`` spelling, and a CRD's
+# ``passwordSecretRef``, name a Secret in the workload's own namespace, not a
+# location in the platform's store.
+_SECRET_REF_KEY_RE = re.compile(r"(secret[_-]refs?|secret[_-]?arns?)$", re.IGNORECASE)
 _SECRET_REF_KEYS = frozenset(
     {
         # k8s_native object_store existing_s3: a bundle path, copied into the
@@ -59,7 +61,7 @@ def _is_secret_ref_key(key: Any) -> bool:
     name = str(key)
     if name in _WAIVED_SECRET_REF_KEYS:
         return False
-    return name in _SECRET_REF_KEYS or name.endswith(_SECRET_REF_KEY_SUFFIXES)
+    return name in _SECRET_REF_KEYS or bool(_SECRET_REF_KEY_RE.search(name))
 
 
 def config_secret_refs(config: Any) -> list[tuple[str, str]]:
@@ -119,12 +121,21 @@ def _namespace_message(organization) -> str:
     )
 
 
+def unscoped_config_secret_refs(config: Any, *, organization) -> list[tuple[str, str, str]]:
+    """``(path, ref, reason)`` for each secret reference in ``config`` that
+    sits outside ``organization``'s namespace."""
+    return [
+        (path, ref, f"config.{path} {ref!r} is {_namespace_message(organization)}")
+        for path, ref in config_secret_refs(config)
+        if not _scoped(ref, organization)
+    ]
+
+
 def assert_config_secret_refs_scoped(config: Any, *, organization) -> None:
     """Raise :class:`SecretRefNamespaceError` naming the first secret
     reference in ``config`` that sits outside ``organization``'s namespace."""
-    for path, ref in config_secret_refs(config):
-        if not _scoped(ref, organization):
-            raise SecretRefNamespaceError(f"config.{path} {ref!r} is {_namespace_message(organization)}")
+    for _path, _ref, reason in unscoped_config_secret_refs(config, organization=organization):
+        raise SecretRefNamespaceError(reason)
 
 
 def service_organization(service) -> Any:

@@ -19,7 +19,10 @@ Example (run on a live container via smd-opscode
         --config-repo steadymd/smd-agents \\
         --manifest-path agents/emr-bug-triage/astrolift.toml \\
         --env EMR_SERVICE_BASE_URL=https://emr.prd.smdinfra.net \\
-        --secret EMR_AGENT_TOKEN=smd-emr-agent-token
+        --secret EMR_AGENT_TOKEN=agents/<org guid>/emr-agent-token
+
+A ``--secret`` location must sit under ``agents/<org guid>/``,
+``agent-bundles/<org guid>/`` or ``services/<org guid>/`` (#1921).
 """
 
 from __future__ import annotations

@@ -4,8 +4,10 @@ An org without its own cluster shares the install's secret store with every
 other org, and every driver files a relative ref under one install-wide root:
 ``managed/rds-orders/url`` and ``astrolift/managed/rds-orders/url`` name the
 same AWS secret, another tenant's database URL. A location an operator or a
-manifest typed must therefore sit under ``agents/<org guid>/`` or
-``agent-bundles/<org guid>/``.
+manifest typed must therefore sit under ``agents/<org guid>/``,
+``agent-bundles/<org guid>/`` or ``services/<org guid>/``, and a managed-service
+binding the agent inherits resolves only if the driver minted it or it sits
+there too.
 
 The predicate is pinned directly. The spawn and agent-box preflight
 (``resolve_task_secret_manifest``) is pinned on real rows with an in-memory
@@ -44,8 +46,7 @@ ORG = SimpleNamespace(guid=uuid.UUID(G))
         f"secret://sm:agents/{G}/gh",
         f"agent-bundles/{G}/shared-defaults",
         f"agents/{G}/bundle#API_KEY",
-        f"arn:aws:secretsmanager:us-west-2:123456789012:secret:astrolift/agents/{G}/gh-AbCdEf",
-        f"arn:aws:secretsmanager:us-west-2:123456789012:secret:agents/{G}/gh-AbCdEf",
+        f"services/{G}/kafka#password",
     ],
 )
 def test_accepts_a_location_inside_the_org_namespace(uri):
@@ -89,6 +90,16 @@ def test_accepts_a_location_inside_the_org_namespace(uri):
             id="slash-prefixed-arn-the-aws-driver-passes-through",
         ),
         pytest.param(f"arn:aws:ssm:us-west-2:123456789012:parameter/astrolift/agents/{G}/gh", id="ssm-arn"),
+        # An ARN names a secret in whatever account and region it spells; the
+        # relative form always resolves in the driver's own store.
+        pytest.param(
+            f"arn:aws:secretsmanager:us-west-2:123456789012:secret:astrolift/agents/{G}/gh-AbCdEf",
+            id="arn-even-of-an-own-name",
+        ),
+        pytest.param(
+            f"arn:aws:secretsmanager:us-west-2:123456789012:secret:agents/{G}/gh-AbCdEf",
+            id="arn-of-a-relative-own-name",
+        ),
         pytest.param(
             "azure-kv://platform.vault.azure.net/secrets/astrolift-managed-orders-master",
             id="key-vault-explicit-reference",
@@ -102,6 +113,26 @@ def test_rejects_a_location_outside_the_org_namespace(uri):
 
     with pytest.raises(SecretRefNamespaceError, match=f"agents/{G}/"):
         assert_org_scoped_secret_ref(uri, organization=ORG)
+
+
+@pytest.mark.parametrize(
+    ("backend_ref", "message"),
+    [
+        pytest.param(f"secret://agent-bundles/{G}/shared", "secret:// reference", id="reference-scheme"),
+        pytest.param(f"agents/{G}/shared", "must live under agent-bundles/", id="not-the-bundle-root"),
+        pytest.param(f"services/{G}/shared", "must live under agent-bundles/", id="services-root"),
+        pytest.param(f"agent-bundles/{OTHER}/shared", "must live under agent-bundles/", id="another-org"),
+    ],
+)
+def test_a_bundle_location_is_a_store_path_under_the_bundle_root(backend_ref, message):
+    """A bundle location is handed to the driver as it is, so it names a
+    store path, never a ``secret://`` reference, and only under the one root
+    whose locations are bundles."""
+    from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_bundle_ref
+
+    with pytest.raises(SecretRefNamespaceError, match=message):
+        assert_org_scoped_bundle_ref(backend_ref, organization=ORG)
+    assert_org_scoped_bundle_ref(f"agent-bundles/{G}/shared", organization=ORG)
 
 
 # ---- spawn / agent-box preflight ---------------------------------------------
@@ -261,22 +292,69 @@ def test_spawn_resolves_a_project_bundle_the_platform_minted(org, monkeypatch):
     assert _resolve(spec)["stringData"] == {"JIRA_TOKEN": "j"}
 
 
-def test_spawn_keeps_resolving_app_bindings_that_share_a_typed_refs_name(org, monkeypatch):
-    """An app's managed-service binding is derived by the platform and lives
-    under the service's own root. Only the spec's own ref is checked, even when
-    both carry the same env var (the spec's ref wins, as before)."""
-    import astrolift_dispatch.agent_secrets as agent_secrets
+def _app_with_service(org, *, config=None):
+    """An app with one environment, an agent workload, and a managed service
+    whose config is ``config``."""
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_identity.models import Project, Team
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp, Workload
+    from astrolift_services.models import ManagedService
 
+    team = Team.objects.create(organization=org, name="Eng", slug="eng-app-1921")
+    project = Project.objects.create(organization=org, team=team, name="P", slug="p-app-1921")
+    ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name="K8s app 1921", slug="k8s-app-1921", plugin_version="1.0.0")]
+    )
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        provider_plugin=ProviderPlugin.objects.get(slug="k8s-app-1921"),
+        name="Prod",
+        slug="prod-app-1921",
+        endpoint="https://cluster.example.com",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+    )
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="Orders",
+        slug="orders-1921",
+        provisioning_status="ready",
+    )
+    env = AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="production")
+    service = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind="event_stream",
+        name="events",
+        config=dict(config or {}),
+        backend_ref="event_stream/events",
+        status="active",
+    )
+    agent = Workload.objects.create(
+        registered_app=app, name="Brief", slug="orders-brief", kind=Workload.Kind.AGENT
+    )
+    return service, agent
+
+
+def _bind(service, env_key, ref):
+    from astrolift_services.models import ManagedServiceBinding
+
+    ManagedServiceBinding.objects.create(
+        managed_service=service, env_key=env_key, env_value_ref=ref, is_secret=True
+    )
+
+
+def test_spawn_keeps_resolving_app_bindings_that_share_a_typed_refs_name(org, monkeypatch):
+    """An app's managed-service binding the driver minted resolves where the
+    driver put it. Only the spec's own ref is checked as typed, even when both
+    carry the same env var (the spec's ref wins, as before)."""
     own_ref = f"agents/{org.guid}/db"
     spec = _spec(org, [{"env_var": "DATABASE_URL", "uri": own_ref}])
-    monkeypatch.setattr(
-        agent_secrets,
-        "app_managed_service_secret_refs",
-        lambda _workload: [
-            {"env_var": "DATABASE_URL", "uri": "astrolift/managed/app-db/url"},
-            {"env_var": "OBJECT_STORE_KEY", "uri": "astrolift/managed/app-bucket/key"},
-        ],
-    )
+    service, agent = _app_with_service(org)
+    _bind(service, "DATABASE_URL", "astrolift/managed/app-db/url")
+    _bind(service, "OBJECT_STORE_KEY", "astrolift/managed/app-bucket/key")
     _install(
         monkeypatch,
         _Store(
@@ -288,6 +366,59 @@ def test_spawn_keeps_resolving_app_bindings_that_share_a_typed_refs_name(org, mo
         ),
     )
 
-    manifest = _resolve(spec, workload=object())
+    manifest = _resolve(spec, workload=agent)
 
     assert manifest["stringData"] == {"DATABASE_URL": "postgres://own", "OBJECT_STORE_KEY": "bucket-key"}
+
+
+def test_spawn_refuses_an_app_binding_copied_from_a_config_outside_the_org(org, monkeypatch):
+    """The binding exemption is for refs the platform minted. A driver copies
+    ``password_secret_ref`` into the row, so a service configured with another
+    tenant's secret must not carry it into the agent's pod."""
+    spec = _spec(org)
+    service, agent = _app_with_service(org, config={"password_secret_ref": "managed/rds-orders/url"})
+    _bind(service, "EVENT_STREAM_PASSWORD", "managed/rds-orders/url")
+    store = _install(monkeypatch, _Store({"managed/rds-orders/url": {"value": "postgres://victim"}}))
+
+    with pytest.raises(AgentSecretResolutionError, match="EVENT_STREAM_PASSWORD"):
+        _resolve(spec, workload=agent)
+
+    assert store.reads == []
+
+
+def test_spawn_refuses_a_project_binding_copied_from_a_config_outside_the_org(org, monkeypatch):
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_identity.models import Project, Team
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+
+    team = Team.objects.create(organization=org, name="Eng", slug="eng-proj-1921")
+    project = Project.objects.create(organization=org, team=team, name="P", slug="p-proj-1921")
+    ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name="K8s proj 1921", slug="k8s-proj-1921", plugin_version="1.0.0")]
+    )
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        provider_plugin=ProviderPlugin.objects.get(slug="k8s-proj-1921"),
+        name="Shared",
+        slug="shared-proj-1921",
+        endpoint="https://cluster.example.com",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+    )
+    service = ManagedService.objects.create(
+        project=project,
+        tenant_cluster=cluster,
+        kind="redis",
+        name="cache",
+        config={"auth_mode": "external", "password_secret_ref": "managed/rds-orders/url"},
+        backend_ref="redis/cache",
+        status="active",
+    )
+    _bind(service, "REDIS_PASSWORD", "managed/rds-orders/url")
+    spec = _spec(org)
+    ManagedServiceAttachment.objects.create(managed_service=service, agent_environment_spec=spec)
+    store = _install(monkeypatch, _Store({"managed/rds-orders/url": {"value": "victim-pw"}}))
+
+    with pytest.raises(AgentSecretResolutionError, match="REDIS_PASSWORD"):
+        _resolve(spec)
+
+    assert store.reads == []

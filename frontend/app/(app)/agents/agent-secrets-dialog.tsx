@@ -300,7 +300,7 @@ export function AgentSecretsDialog({
         />
         <Input
           className="font-mono"
-          placeholder={`Provider URI (for example sm:${refNamespace}/token)`}
+          placeholder={`Provider URI (for example ${refNamespace}/token)`}
           value={refUri}
           onChange={(event) => setRefUri(event.target.value)}
         />

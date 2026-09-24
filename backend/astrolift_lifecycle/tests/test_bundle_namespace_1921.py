@@ -96,7 +96,9 @@ def test_deploy_refuses_an_org_bundle_outside_the_org_namespace(org, app, env, d
     _attach(app, env, organization=org, backend_ref=_VICTIM)
     drivers.store.store[_VICTIM] = {"PASSWORD": "victim-pw"}
 
-    with pytest.raises(AppDeployError, match=f"agent-bundles/{org.guid}/"):
+    with pytest.raises(
+        AppDeployError, match=f"secret bundle 'db-bundle'.*must live under agent-bundles/{org.guid}/"
+    ):
         _deploy(app, env)
 
     assert drivers.store.reads == []
@@ -128,7 +130,9 @@ def test_rotation_refuses_an_org_bundle_outside_the_org_namespace(org, app, env,
     drivers.store.store[_VICTIM] = {"PASSWORD": "victim-pw"}
     [target] = _list_targets_sync(bundle.pk)
 
-    with pytest.raises(AppDeployError, match=f"agent-bundles/{org.guid}/"):
+    with pytest.raises(
+        AppDeployError, match=f"secret bundle 'db-bundle'.*must live under agent-bundles/{org.guid}/"
+    ):
         _refresh_in_cluster_sync(target)
 
     assert drivers.store.reads == []
@@ -156,16 +160,59 @@ def test_rotation_writes_the_key_cache_onto_this_orgs_bundle_only(org, team, app
     assert theirs.last_known_keys == []
 
 
+def test_rotation_refreshes_the_bundle_the_target_was_listed_from(org, team, app, env, drivers):
+    """A deleted row with the same slug and ref in the same org is not the
+    bundle this app attached; the target names the row by id."""
+    retired = SecretBundle.objects.create(
+        organization=org, team=team, name="db-bundle", slug="db-bundle", backend_ref="vault/db"
+    )
+    retired.soft_delete()
+    live = _attach(app, env, organization=org, team=team, backend_ref="vault/db")
+    drivers.store.store["vault/db"] = {"PASSWORD": "pw"}
+    [target] = _list_targets_sync(live.pk)
+    assert target["secret_bundle_id"] == live.pk
+
+    _refresh_in_cluster_sync(target)
+
+    live.refresh_from_db()
+    retired = SecretBundle.all_objects.get(pk=retired.pk)
+    assert live.last_known_keys == ["PASSWORD"]
+    assert retired.last_known_keys == []
+
+
+def test_rotation_refuses_a_target_naming_no_bundle_of_the_apps_org(org, team, app, env, drivers):
+    other = Organization.objects.create(name="Initech", slug="initech-1921")
+    other_team = Team.objects.create(organization=other, name="Initech Eng", slug="initech-eng")
+    theirs = SecretBundle.objects.create(
+        organization=other, team=other_team, name="db-bundle", slug="db-bundle", backend_ref="vault/db"
+    )
+    ours = _attach(app, env, organization=org, team=team, backend_ref="vault/db")
+    drivers.store.store["vault/db"] = {"PASSWORD": "pw"}
+    [target] = _list_targets_sync(ours.pk)
+    target["secret_bundle_id"] = theirs.pk
+
+    with pytest.raises(AppDeployError, match="names no bundle of this app's organization"):
+        _refresh_in_cluster_sync(target)
+
+    assert drivers.store.reads == []
+
+
 # ---- key-count refresh ---------------------------------------------------------
 
 
-def test_key_refresh_never_lists_an_org_bundle_outside_the_org_namespace(org, app, env):
+def test_key_refresh_refuses_an_org_bundle_outside_the_org_namespace(org, app, env):
+    """The refusal is raised, not logged as a stale snapshot: the caller
+    decides whether to surface or swallow it, like any other refresh error."""
+    from astrolift_dispatch.agent_secrets import SecretRefNamespaceError
     from astrolift_services.bundle_keys import refresh_bundle_known_keys
 
     bundle = _attach(app, env, organization=org, backend_ref=_VICTIM)
     store = _Store({_VICTIM: {"PASSWORD": "victim-pw"}})
 
-    assert refresh_bundle_known_keys(bundle, secrets_backend=store) == []
+    with pytest.raises(
+        SecretRefNamespaceError, match=f"secret bundle 'db-bundle'.*agent-bundles/{org.guid}/"
+    ):
+        refresh_bundle_known_keys(bundle, secrets_backend=store)
 
     bundle.refresh_from_db()
     assert bundle.last_known_keys == []
