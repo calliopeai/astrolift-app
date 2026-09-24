@@ -132,15 +132,27 @@ def build_diff(
         before_scope = current_secret_scope(app, key, environment_name)
         after_scope = payload.get("scope") or before_scope
         summary = f"Change scope of {key} in {env_display} from {before_scope} to {after_scope}"
+        before: dict[str, Any] = {"key": key, "scope": before_scope}
         after = {"key": key, "scope": after_scope}
         if not environment_name:
             overrides, kept_summary = _kept_scopes(app, key, before_scope, after_scope)
             if overrides:
                 after["overrides"] = overrides
             summary += kept_summary
+        else:
+            # A per-environment scope pins the environment, even at the scope
+            # it already has, so the approver must see that it stops
+            # following the app-wide scope, not a change "from all to all".
+            before["follows_app_wide"] = environment_name not in environment_scopes(app, key)
+            after["follows_app_wide"] = False
+            if before["follows_app_wide"]:
+                summary = (
+                    f"Pin scope of {key} in {env_display} to {after_scope}; it follows the app-wide "
+                    f"scope ({before_scope}) now, and later app-wide changes stop reaching it"
+                )
         return {
             "op": op,
-            "before": {"key": key, "scope": before_scope},
+            "before": before,
             "after": after,
             "summary": summary,
         }

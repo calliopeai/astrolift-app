@@ -1126,6 +1126,23 @@ def test_under_approval_an_explicit_per_environment_scope_equal_to_the_scope_in_
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
 
 
+def test_a_pin_proposal_says_the_environment_stops_following_the_app_wide_scope(approver_grants, app, env):
+    """Pinned at the scope it already has, the diff otherwise reads as a
+    change from all to all, which an approver would take for a no-op."""
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    _require_secret_approval(app)
+    preview = _preview_environment(
+        app, env, name="preview-pin-diff", status=PreviewEnvironment.Status.RUNNING
+    )
+
+    pinned = _set_scope(app, "K", environment_name=preview.name, scope="all")
+
+    assert pinned.data.pending_proposal_id is not None
+    diff = SecretChangeProposal.objects.get(guid=str(pinned.data.pending_proposal_id)).payload_diff
+    assert (diff["before"].get("follows_app_wide"), diff["after"].get("follows_app_wide")) == (True, False)
+    assert diff["summary"].startswith("Pin scope of K in preview-pin-diff to all;")
+
+
 def test_set_metadata_refuses_an_environment_the_app_does_not_have(approver_grants, app, env):
     """A row for a name the app does not have would govern whatever
     environment later takes that name."""
