@@ -1159,7 +1159,7 @@ def test_an_app_wide_scope_proposal_lists_the_environments_that_keep_their_own_s
     for proposal_id in (str(by_metadata.data.pending_proposal_id), by_rotation):
         diff = SecretChangeProposal.objects.get(guid=proposal_id).payload_diff
         assert (diff["before"]["scope"], diff["after"]["scope"]) == ("all", "production")
-        assert diff["after"]["overrides"] == "preview-pinned (all)"
+        assert diff["after"].get("overrides") == "preview-pinned (all)"
         assert diff["summary"].endswith("; preview-pinned keeps all")
 
 
