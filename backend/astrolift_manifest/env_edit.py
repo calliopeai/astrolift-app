@@ -32,6 +32,7 @@ the staging buffer (``manifest_raw_staged``); the user-driven
 
 from __future__ import annotations
 
+import json
 import re
 import string
 import tomllib
@@ -94,6 +95,52 @@ _MASKED_LITERAL = f'"{REDACTED_ENV_VALUE}"'
 _COMMENT_MARKER = "# [ASTROLIFT_REDACTED_ENV_COMMENT:{}]"
 _COMMENT_MARKER_RE = re.compile(r"# \[ASTROLIFT_REDACTED_ENV_COMMENT:([1-9][0-9]*)\]")
 
+# An imported agent's manifest_raw is JSON, not TOML (#1944): tomllib
+# happens to reject most JSON, and the unparseable-text line scan below
+# then masked it whole -- but only by accident, because a sibling key
+# such as "environment" usually contains the substring "env" and trips
+# that scan's conservative regex. A payload that never spells "env" came
+# back unmasked. JSON gets its own explicit, deliberate rule instead.
+_JSON_SECRET_NAME_TOKENS = (
+    "env",
+    "secret",
+    "password",
+    "token",
+    "credential",
+    "private_key",
+    "privatekey",
+    "pin",
+)
+
+
+def _redact_json_value(value: object) -> object:
+    if isinstance(value, dict):
+        redacted = {}
+        for key, child in value.items():
+            name = str(key).lower()
+            if any(token in name for token in _JSON_SECRET_NAME_TOKENS):
+                redacted[key] = REDACTED_ENV_VALUE
+            else:
+                redacted[key] = _redact_json_value(child)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_json_value(item) for item in value]
+    return value
+
+
+def _redact_json_manifest(text: str) -> str | None:
+    """``text`` masked as JSON, or None when it is not JSON (the caller
+    falls back to the TOML path). Any key named ``env`` or that looks
+    like it holds a secret is masked whole, at any depth."""
+    stripped = text.lstrip()
+    if not stripped or stripped[0] not in "{[":
+        return None
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return json.dumps(_redact_json_value(data), sort_keys=True)
+
 
 def redact_env_values(toml_text: str) -> str:
     """Return ``toml_text`` with every top-level ``[env]`` value, and
@@ -107,9 +154,16 @@ def redact_env_values(toml_text: str) -> str:
     by line, or replaced whole by :data:`REDACTED_DOCUMENT` when the
     line scan cannot account for every line that might hold a secret.
     A rejected ``updateManifest``/``registerApp`` input is exactly
-    that kind of text, and the mutation audit log records it."""
+    that kind of text, and the mutation audit log records it.
+
+    An imported agent's ``manifest_raw`` is JSON, not TOML; see
+    :func:`_redact_json_manifest`, tried first since JSON is rarely
+    also valid TOML."""
     if not toml_text or not toml_text.strip():
         return toml_text
+    json_masked = _redact_json_manifest(toml_text)
+    if json_masked is not None:
+        return json_masked
     try:
         data = tomllib.loads(toml_text)
     except tomllib.TOMLDecodeError:
@@ -118,6 +172,14 @@ def redact_env_values(toml_text: str) -> str:
             return REDACTED_DOCUMENT
         return _mask(toml_text, layout)
     env_table = data.get("env")
+    if "env" in data and not isinstance(env_table, Mapping):
+        # A root `env` present but not a table (a string, a list, ...)
+        # is the same shape a caller could hide a literal secret in;
+        # there is no [env]-table structure here to edit in place, so
+        # the whole document is rebuilt with that value masked (#1944).
+        import tomli_w
+
+        return tomli_w.dumps({**data, "env": REDACTED_ENV_VALUE})
     if not isinstance(env_table, Mapping):
         return toml_text
     masked_data = {**data, "env": dict.fromkeys(env_table, REDACTED_ENV_VALUE)}

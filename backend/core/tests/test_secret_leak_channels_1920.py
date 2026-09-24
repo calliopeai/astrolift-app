@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 
+import pytest
 import sentry_sdk
 from django.http import JsonResponse
 from django.test import RequestFactory
@@ -146,3 +147,76 @@ def test_sentry_error_events_carry_no_request_body() -> None:
     captured = _capture_request_body(_sentry_client(settings.SENTRY_PRIVACY_OPTIONS))
     assert _SECRET not in captured
     assert _DATA_SECRET not in captured
+
+
+# ---- Sentry's StrawberryIntegration bypasses the schema entirely (#1944) ----
+#
+# sentry-sdk auto-enables an integration the moment its target library is
+# importable -- true for strawberry-graphql here always -- and does so by
+# monkeypatching a class method the first time any Client in the process
+# processes that integration's identifier. Neither is undone by a later
+# Client's own ``disabled_integrations``: sentry_sdk tracks "have we ever
+# processed this identifier" and "was it ever installed" in two
+# process-global sets, so an earlier client (in this file, the bare
+# ``_sentry_client({})`` calls above) permanently decides the outcome for
+# every client built afterward, this test's included. These fixtures force
+# a clean slate so the scenario is provable regardless of test order.
+
+
+@pytest.fixture
+def _fresh_strawberry_integration():
+    from sentry_sdk.integrations import _installed_integrations, _processed_integrations
+    from strawberry.http import async_base_view, sync_base_view
+
+    original_sync = sync_base_view.SyncBaseHTTPView._handle_errors
+    original_async = async_base_view.AsyncBaseHTTPView._handle_errors
+    had_processed = "strawberry" in _processed_integrations
+    had_installed = "strawberry" in _installed_integrations
+    _processed_integrations.discard("strawberry")
+    _installed_integrations.discard("strawberry")
+    try:
+        yield
+    finally:
+        sync_base_view.SyncBaseHTTPView._handle_errors = original_sync
+        async_base_view.AsyncBaseHTTPView._handle_errors = original_async
+        _processed_integrations.discard("strawberry")
+        _installed_integrations.discard("strawberry")
+        if had_processed:
+            _processed_integrations.add("strawberry")
+        if had_installed:
+            _installed_integrations.add("strawberry")
+
+
+def test_sentry_strawberry_integration_does_not_leak_a_coerced_variable_value(
+    _fresh_strawberry_integration,
+) -> None:
+    """A real request through CoreStrawberryView: setAgentSecretValue's
+    ``value`` argument is a plain String, so a variable of the wrong shape
+    fails GraphQL's variable-coercion step -- before any resolver, any
+    permission check, or SecretSafeSchema.process_errors ever runs -- and
+    the rejected literal lands in the coercion error's own message.
+    StrawberryIntegration patches _handle_errors to report every such
+    error via ``event_from_exception``, bypassing the schema completely.
+
+    No DB, session or permissions needed: coercion happens before any of
+    that is looked at, exactly why it slips past the schema's own guard."""
+    from django.conf import settings
+
+    from config.schema import schema
+    from core.schema.views import CoreStrawberryView
+
+    sentry_client = _sentry_client(settings.SENTRY_PRIVACY_OPTIONS)
+    query = (
+        "mutation Op($s: String!, $e: String!, $v: String!) {"
+        " setAgentSecretValue(envSpecSlug: $s, envVar: $e, value: $v) { ok } }"
+    )
+    body = json.dumps({"query": query, "variables": {"s": "spec", "e": "API_KEY", "v": {"nested": _SECRET}}})
+    request = RequestFactory().post("/app/gql/config/", data=body, content_type="application/json")
+    view = CoreStrawberryView.as_view(schema=schema)
+    with sentry_sdk.new_scope() as scope:
+        scope.set_client(sentry_client)
+        response = view(request)
+
+    assert response.status_code == 200, response.content
+    assert b"errors" in response.content
+    assert _SECRET not in _events(sentry_client)

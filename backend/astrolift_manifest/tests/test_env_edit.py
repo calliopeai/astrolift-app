@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 
 from astrolift_manifest.env_edit import (
@@ -270,6 +271,63 @@ def test_redact_env_values_falls_back_to_a_masked_rebuild() -> None:
     assert "sk-live-nested-1" not in out
     assert "sk-live-nested-2" not in out
     assert tomllib.loads(out)["env"] == {"API_KEY": _V, "extra": _V}
+
+
+# ---- redact_env_values: a root `env` that isn't a table (#1944) ----
+
+
+def test_redact_env_values_masks_a_non_table_root_env_string() -> None:
+    """``env = "..."`` parses fine as TOML -- it's a root string, not
+    the [env] table -- so the old ``isinstance(env_table, Mapping)``
+    check fell through and returned the secret verbatim."""
+    text = 'name = "hello"\nenv = "sk-live-root-env-string"\n'
+    out = redact_env_values(text)
+    assert "sk-live-root-env-string" not in out
+    assert tomllib.loads(out)["name"] == "hello"
+
+
+def test_redact_env_values_masks_a_non_table_root_env_list() -> None:
+    text = 'name = "hello"\nenv = ["sk-live-root-a", "sk-live-root-b"]\n'
+    out = redact_env_values(text)
+    assert "sk-live-root-a" not in out
+    assert "sk-live-root-b" not in out
+
+
+# ---- redact_env_values: JSON manifest_raw (imported agents, #1944) -
+
+
+def test_redact_env_values_masks_a_json_env_key() -> None:
+    """An imported agent's ``manifest_raw`` is JSON (#1944): the
+    [env]-table equivalent is a top-level "env" key and must be masked
+    deliberately, not by accident because a sibling key like
+    "environment" happens to contain the substring "env"."""
+    text = json.dumps({"agent": {"name": "demo"}, "env": {"API_KEY": "sk-live-json-env-1"}})
+    out = redact_env_values(text)
+    assert "sk-live-json-env-1" not in out
+    parsed = json.loads(out)
+    assert parsed["agent"]["name"] == "demo"
+    assert parsed["env"] == REDACTED_ENV_VALUE
+
+
+def test_redact_env_values_masks_json_secret_looking_keys_without_an_env_key() -> None:
+    text = json.dumps({"agent": {"name": "demo"}, "credential": "sk-live-json-2"})
+    out = redact_env_values(text)
+    assert "sk-live-json-2" not in out
+
+
+def test_redact_env_values_masks_json_even_without_the_substring_env() -> None:
+    """Before #1944 this depended on the accident of the substring
+    "env" appearing anywhere and tripping the unparseable-text scan's
+    regex; a payload naming its secrets only "secret_refs" used to come
+    back unmasked."""
+    text = json.dumps({"agent": {"name": "demo"}, "secret_refs": {"API_KEY": "sk-live-json-3"}})
+    out = redact_env_values(text)
+    assert "sk-live-json-3" not in out
+
+
+def test_redact_env_values_json_without_env_or_secret_keys_unchanged() -> None:
+    text = json.dumps({"agent": {"name": "demo"}, "runtime": {"image": "demo:latest"}})
+    assert json.loads(redact_env_values(text)) == json.loads(text)
 
 
 # ---- redact_env_values: text tomllib rejects ----------------------

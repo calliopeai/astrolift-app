@@ -39,13 +39,13 @@ class ManifestMutations:
         Validates the TOML parses before staging — bad TOML never
         lands in the buffer. Empty input clears the staging buffer.
         """
-        from astrolift_manifest.env_edit import resolve_masked_env_values
+        from astrolift_manifest.env_edit import redact_env_values, resolve_masked_env_values
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.sync_state import (
             SyncSnapshot,
             classify_state,
         )
-        from astrolift_services.secret_visibility import redacted_manifest_text
+        from astrolift_services.secret_visibility import can_reveal_app_secrets, redacted_manifest_text
 
         # Org-scope the by-guid lookup to the caller's tenant before staging
         # the manifest edit. Fails closed (NOT_FOUND) when org_id is
@@ -83,8 +83,20 @@ class ManifestMutations:
 
         # Identity: if the staged content matches the synced content,
         # clear the staging buffer rather than carrying a redundant
-        # copy.
-        if text == (app.manifest_raw or ""):
+        # copy. A caller who cannot reveal secrets must not learn
+        # anything from whether this clears: comparing the *restored*
+        # text (real [env] literals) against manifest_raw would confirm
+        # a guessed value the instant it happened to match the stored
+        # one, even though the response itself is masked either way.
+        # Such a caller only gets the shortcut when their own
+        # submission -- before restoration -- is byte-identical to
+        # their masked view of the synced manifest; that proves nothing
+        # changed without ever comparing a guess to a real value (#1944).
+        if can_reveal_app_secrets(info, app=app):
+            identical = text == (app.manifest_raw or "")
+        else:
+            identical = (input.raw_manifest or "") == redact_env_values(app.manifest_raw or "")
+        if identical:
             app.manifest_raw_staged = ""
         else:
             app.manifest_raw_staged = text

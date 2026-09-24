@@ -459,3 +459,54 @@ def test_apps_list_checks_elevation_once_per_query(monkeypatch):
     assert len(result.data["astroliftMyApps"]) == 2
     assert all(_SECRET_VALUE in item["rawManifest"] for item in result.data["astroliftMyApps"])
     assert len(calls) == 1
+
+
+# ---- updateManifest identity check must not become a guess oracle (#1944 review) ----
+
+
+def test_update_manifest_does_not_confirm_a_guessed_secret_via_staged_clearing(seed_cluster):
+    """A caller without secret.read must not learn whether a guessed
+    [env] value is correct from whether the staging buffer clears.
+
+    The old check compared the *restored* submission (real [env]
+    literals, put back by resolve_masked_env_values) against
+    manifest_raw: true exactly when a guess happened to match the
+    stored value, even though the response itself is masked either
+    way -- an oracle a caller could use to confirm a secret one guess
+    at a time without ever being shown it."""
+    from astrolift_manifest.env_edit import redact_env_values
+
+    org, app = _scaffold()
+    seed_cluster(org)
+    caller = _make_user("guess-oracle")
+    _grant(caller, org, "app.update")
+
+    masked = redact_env_values(_BASE_TOML)
+    assert masked.count(REDACTED_ENV_VALUE) == 2  # API_KEY, LOG_LEVEL
+    correct_guess = masked.replace(REDACTED_ENV_VALUE, _SECRET_VALUE, 1)  # API_KEY comes first
+
+    result = _save(org, app, caller, correct_guess)
+
+    assert result.ok is True, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged != "", "a correct guess must not clear the staging buffer"
+
+
+def test_update_manifest_still_clears_staged_for_an_unchanged_masked_resubmission(seed_cluster):
+    """The oracle fix above must not break the legitimate case: a
+    non-revealing caller who resubmits their own masked view of the
+    synced manifest completely unchanged still clears staged, same as
+    before."""
+    from astrolift_manifest.env_edit import redact_env_values
+
+    org, app = _scaffold()
+    seed_cluster(org)
+    _stage(app, _BASE_TOML.replace('LOG_LEVEL = "info"', 'LOG_LEVEL = "debug"'))
+    caller = _make_user("unchanged-resubmit")
+    _grant(caller, org, "app.update")
+
+    result = _save(org, app, caller, redact_env_values(_BASE_TOML))
+
+    assert result.ok is True, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
