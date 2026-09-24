@@ -1790,8 +1790,8 @@ def gateway(cluster, org, monkeypatch):
     )
     cluster.secrets.store.update(
         {
-            "agents/claude-dev/anthropic": {"value": "sk-ant-stored-provider-key"},
-            "agents/claude-dev/github": {"value": "ghp_stored_github_token"},
+            f"agents/{org.guid}/anthropic": {"value": "sk-ant-stored-provider-key"},
+            f"agents/{org.guid}/github": {"value": "ghp_stored_github_token"},
         }
     )
     with override_config(ZENTINELLE_GATEWAY_ENABLED=True):
@@ -1805,8 +1805,8 @@ def _gateway_spec(org, **kwargs):
     spec = _spec(
         org,
         refs=[
-            {"uri": "agents/claude-dev/anthropic", "env_var": "ANTHROPIC_API_KEY"},
-            {"uri": "agents/claude-dev/github", "env_var": "GITHUB_TOKEN"},
+            {"uri": f"agents/{org.guid}/anthropic", "env_var": "ANTHROPIC_API_KEY"},
+            {"uri": f"agents/{org.guid}/github", "env_var": "GITHUB_TOKEN"},
         ],
         env_vars={"ANTHROPIC_BASE_URL": "https://api.anthropic.com", "LOG_LEVEL": "debug"},
         **kwargs,

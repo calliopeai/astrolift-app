@@ -54,10 +54,19 @@ TASK_GUID = uuid.UUID("0199a1b2-c3d4-7e5f-8a6b-1c2d3e4f5a6b")
 BRIEF_GUID = uuid.UUID("0199a1b2-c3d4-7e5f-8a6b-000000001851")
 AGENT_ID = f"astrolift-task-{TASK_GUID.hex}"
 GATEWAY = "http://zentinelle-gateway.astrolift-system.svc:8742"
+# Fixed so each org's stored refs can sit in its own secret namespace (#1921).
+ORG_GUIDS = {
+    "gw-acme": uuid.UUID("0199a1b2-c3d4-7e5f-8a6b-00000000a001"),
+    "gw-globex": uuid.UUID("0199a1b2-c3d4-7e5f-8a6b-00000000a002"),
+}
 STORE = {
-    "agents/claude-dev/anthropic": {"value": "sk-ant-stored-provider-key"},
-    "agents/claude-dev/openai": {"value": "sk-openai-stored-provider-key"},
-    "agents/claude-dev/github": {"value": "ghp_stored_github_token"},
+    f"agents/{guid}/{name}": {"value": value}
+    for guid in ORG_GUIDS.values()
+    for name, value in (
+        ("anthropic", "sk-ant-stored-provider-key"),
+        ("openai", "sk-openai-stored-provider-key"),
+        ("github", "ghp_stored_github_token"),
+    )
 }
 
 
@@ -304,7 +313,7 @@ def logs():
 
 
 def _org(slug):
-    return Organization.objects.create(name=slug.title(), slug=slug)
+    return Organization.objects.create(name=slug.title(), slug=slug, guid=ORG_GUIDS[slug])
 
 
 @pytest.fixture
@@ -400,8 +409,8 @@ def _spec(organization, **fields):
         "image_tag": "docker.io/calliopeai/astrolift-agent-claude:1.0",
         "env_vars": {"LOG_LEVEL": "debug"},
         "secret_refs": [
-            {"uri": "agents/claude-dev/anthropic", "env_var": "ANTHROPIC_API_KEY"},
-            {"uri": "agents/claude-dev/github", "env_var": "GITHUB_TOKEN"},
+            {"uri": f"agents/{organization.guid}/anthropic", "env_var": "ANTHROPIC_API_KEY"},
+            {"uri": f"agents/{organization.guid}/github", "env_var": "GITHUB_TOKEN"},
         ],
     }
     values.update(fields)
@@ -518,7 +527,7 @@ def test_a_gateway_task_gets_its_own_key_and_no_provider_key(
     ]
 
     # The provider key was never even read, and appears nowhere.
-    assert "agents/claude-dev/anthropic" not in store.reads
+    assert f"agents/{org.guid}/anthropic" not in store.reads
     rendered = json.dumps(batch)
     for provider_value in ("sk-ant-stored-provider-key", "sk-openai-in-the-brief", "sk_agent_someone-elses"):
         assert provider_value not in rendered
@@ -1002,7 +1011,7 @@ def test_a_spec_that_does_not_ask_is_spawned_exactly_as_before(
 
     assert zentinelle.calls == []
     [batch] = driver.applied
-    assert "agents/claude-dev/anthropic" in store.reads
+    assert f"agents/{org.guid}/anthropic" in store.reads
     assert _one(batch, "Secret")["stringData"]["ANTHROPIC_API_KEY"] == "sk-ant-stored-provider-key"
     assert _canonical_sha256(batch) == _OPT_OUT_BATCH_SHA256
 
@@ -1027,15 +1036,17 @@ def _bundle(organization, spec, keys: dict, *, slug="providers"):
     from astrolift_agents.models import AgentSecretBundleRef
     from astrolift_services.models import SecretBundle
 
+    # An org bundle lives in the org's own namespace (#1921).
+    location = f"agent-bundles/{organization.guid}/{slug}"
     bundle = SecretBundle.objects.create(
         organization=organization,
         name=slug.title(),
         slug=slug,
-        backend_ref=f"bundles/{slug}",
+        backend_ref=location,
         last_known_keys=sorted(keys),
     )
     AgentSecretBundleRef.objects.create(environment_spec=spec, secret_bundle=bundle)
-    return bundle, {f"bundles/{slug}": dict(keys)}
+    return bundle, {location: dict(keys)}
 
 
 def _app_binding(task, cluster, env_key, value_ref, *, secret):
@@ -1136,8 +1147,8 @@ def test_a_provider_endpoint_or_switch_in_the_spec_env_refuses_the_run(
 def test_another_providers_key_in_a_secret_ref_refuses_the_run(
     org, cluster, connection, zentinelle, driver, store, name
 ):
-    store.store["agents/claude-dev/other"] = {"value": "a-provider-key"}
-    spec = _spec(org, model_gateway=True, secret_refs=[{"uri": "agents/claude-dev/other", "env_var": name}])
+    store.store[f"agents/{org.guid}/other"] = {"value": "a-provider-key"}
+    spec = _spec(org, model_gateway=True, secret_refs=[{"uri": f"agents/{org.guid}/other", "env_var": name}])
 
     _assert_refused(_spawn(cluster, _task(org, spec)), zentinelle, driver, name)
 
