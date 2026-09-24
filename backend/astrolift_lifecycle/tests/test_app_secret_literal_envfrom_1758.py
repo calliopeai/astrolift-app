@@ -1166,6 +1166,7 @@ def test_an_applied_app_wide_scope_change_records_the_environments_it_did_not_re
     else:
         narrowing_id = str(_set_scope(app, "K", scope="production").data.pending_proposal_id)
     pinned = _set_scope(app, "K", environment_name=preview.name, scope="all")
+    assert pinned.data.pending_proposal_id is not None
     _approve(app, str(pinned.data.pending_proposal_id))
 
     captured: list = []
