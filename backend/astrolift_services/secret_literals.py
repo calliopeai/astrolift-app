@@ -53,27 +53,33 @@ def allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) 
 _BASE_STAMP_SALT = "astrolift.secret-proposal.base-raw"
 
 
-def _base_digest(value: str | None, secret: str | None = None) -> str:
+def _base_digest(app_guid: str, key: str, value: str | None, secret: str | None = None) -> str:
     # json.dumps keeps an absent key (null) apart from an empty value ("").
-    return salted_hmac(_BASE_STAMP_SALT, json.dumps(value), secret=secret, algorithm="sha256").hexdigest()
+    # The app and the key are in the message so a stamp vouches for one key
+    # of one app: the same value elsewhere hashes differently, so a stamp
+    # neither carries over nor shows that two keys share a value.
+    message = json.dumps([app_guid, key, value])
+    return salted_hmac(_BASE_STAMP_SALT, message, secret=secret, algorithm="sha256").hexdigest()
 
 
-def base_raw_digest(value: str | None) -> str:
+def base_raw_digest(app, key: str, value: str | None) -> str:
     """Stamp for a key's ``manifest_raw`` value when a proposal is applied.
 
     Keyed, because the proposal payload is readable through the GraphQL
     proposal type and a plain hash of a short old value could be
     brute-forced."""
-    return _base_digest(value)
+    return _base_digest(str(app.guid), key, value)
 
 
-def _base_raw_matches(stamp: str | None, value: str | None) -> bool:
+def _base_raw_matches(stamp: str | None, app, key: str, value: str | None) -> bool:
     if not stamp:
         return False
     # Fallback keys too, so a SECRET_KEY rotation done the Django way does
     # not quietly void every pending approval.
     secrets = (settings.SECRET_KEY, *getattr(settings, "SECRET_KEY_FALLBACKS", ()))
-    return any(constant_time_compare(stamp, _base_digest(value, secret)) for secret in secrets)
+    return any(
+        constant_time_compare(stamp, _base_digest(str(app.guid), key, value, secret)) for secret in secrets
+    )
 
 
 def _latest_applied_literal_changes(app) -> dict[str, tuple[str | None, str | None]]:
@@ -137,7 +143,11 @@ def _deployable_literals(app) -> dict[str, str]:
     unapproved: list[str] = []
     for key in pending:
         change = approved.get(key)
-        if change is None or change[0] != staged.get(key) or not _base_raw_matches(change[1], raw.get(key)):
+        if (
+            change is None
+            or change[0] != staged.get(key)
+            or not _base_raw_matches(change[1], app, key, raw.get(key))
+        ):
             unapproved.append(key)
         elif key in staged:
             out[key] = staged[key]

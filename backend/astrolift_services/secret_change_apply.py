@@ -70,7 +70,7 @@ def _stamp_base(proposal: SecretChangeProposal, app: RegisteredApp, key: str) ->
     applied against. The deploy path honours the approval only while the
     key still has that value there (#1758)."""
     base = read_app_env(app.manifest_raw or "").get(key)
-    proposal.payload = {**(proposal.payload or {}), "base_raw_digest": base_raw_digest(base)}
+    proposal.payload = {**(proposal.payload or {}), "base_raw_digest": base_raw_digest(app, key, base)}
     proposal.save(update_fields=["payload", "updated_at", "version"])
 
 

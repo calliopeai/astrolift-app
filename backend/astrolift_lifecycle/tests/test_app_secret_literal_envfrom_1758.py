@@ -43,6 +43,7 @@ from astrolift_services.schema.mutations.types import (
     SetAppSecretMetadataInput,
 )
 from astrolift_services.secret_change_apply import apply_proposal
+from astrolift_services.secret_literals import base_raw_digest
 from astrolift_workflows.activities.app_lifecycle import (
     _app_env_secret_name,
     _bindings_secret_name,
@@ -924,6 +925,49 @@ def test_under_approval_a_proposal_applied_without_a_base_stamp_vouches_for_noth
     _stage_via_update_manifest(app, set_app_env_keys(_MANIFEST, {"API_KEY": "approved-long-ago"}))
 
     assert _materialize(_deployment(app, env), monkeypatch) == {}
+
+
+# A stamp over the value alone vouched for any key, in any app, whose repo
+# value was the same, and equal stamps showed that two keys share a value
+# (#1758 re-review, L2).
+
+
+def test_a_base_stamp_vouches_only_for_the_key_it_was_applied_to(approver_grants, app, env, monkeypatch):
+    _seed_manifest(app)
+    _require_secret_approval(app)
+    _approved_set(app, key="A", value="same")
+    stamp = SecretChangeProposal.objects.get(registered_app=app, payload__key="A").payload["base_raw_digest"]
+    SecretChangeProposal.objects.create(
+        registered_app=app,
+        op=SecretChangeProposal.Op.SET.value,
+        payload={"key": "B", "value": "same", "base_raw_digest": stamp},
+        status=SecretChangeProposal.Status.APPLIED.value,
+        applied_at=timezone.now(),
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+
+    _stage_via_update_manifest(app, set_app_env_keys(app.manifest_raw_staged, {"B": "same"}))
+
+    assert _materialize(_deployment(app, env), monkeypatch) == {"A": "same"}
+
+
+def test_a_value_gets_a_different_stamp_under_another_key_or_app(app, org, project, team):
+    other = RegisteredApp.objects.create(
+        organization=org,
+        project=project,
+        team=team,
+        name="Other",
+        slug="other-app",
+        provisioning_status="ready",
+    )
+
+    stamps = {
+        base_raw_digest(app, "K", "same"),
+        base_raw_digest(app, "K2", "same"),
+        base_raw_digest(other, "K", "same"),
+    }
+
+    assert len(stamps) == 3
 
 
 # Under secret approval, a scope change through setAppSecretMetadata widened
