@@ -21,10 +21,18 @@ header variables a runner adds the key to (:data:`RESERVED_ENV_NAMES`, plus a
 runtime's own switches such as goose's provider) are dropped from the spec,
 its bindings, bundles and the Brief, and provider credentials under those
 names are not even read from the secret store. Any other name that carries a
-model provider's credential or endpoint (:data:`REFUSED_ENV_PATTERNS`) refuses
-the run, whichever source delivers it: the agent network fence (#1850) allows
-the public internet, so such a name would let the agent call a provider past
-the gateway. A secret under an unrelated name is still delivered.
+model provider's credential or endpoint, switches a runtime to another
+provider or points it at other config (:data:`REFUSED_ENV_PATTERNS`, and
+:data:`RUNTIME_REFUSED_ENV` for a name that is a model key to some runtimes
+only) refuses the run, whichever source delivers it. A secret under an
+unrelated name is still delivered.
+
+That check is a guardrail against misconfiguration, not a security boundary.
+It reads names only: a payload or the workspace can carry a runtime's own
+config file, a packet can name another provider's model for a multi-provider
+runtime, a secret can sit under any name, and the agent network fence (#1850)
+allows the public internet, so any of them reaches a provider past the
+gateway. Denying the providers' hosts at the network is #1950.
 
 A key lives as long as its run: a task's for its timeout plus a margin,
 renewed when a question extends its deadline, and a box's for its idle window,
@@ -121,30 +129,69 @@ RESERVED_ENV_NAMES = frozenset(
     }
 )
 
-_PROVIDERS = r"(?:ANTHROPIC|OPENAI|AZURE_OPENAI|OPENROUTER|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE|LLM)"
+_PROVIDERS = (
+    r"(?:ANTHROPIC|OPENAI|AZURE_OPENAI|OPENROUTER|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE|OLLAMA|LLM)"
+)
 
-#: Names that carry a model provider's credential or endpoint, or switch a
-#: runtime to a provider, other than the wiring the dispatcher writes. One of
-#: them anywhere in a gateway pod's env refuses the run: the agent network
-#: fence allows the public internet, so it would reach a provider past the
-#: gateway. Matched against the whole name.
+#: Model providers whose keys refuse the run under a prefix too
+#: (``MY_OPENAI_API_KEY``). A named list, not every ``*_API_KEY``: an app's
+#: Stripe or Sentry key is not a model key.
+_KEY_PROVIDERS = (
+    r"(?:ANTHROPIC|OPENAI|AZURE|OPENROUTER|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE_GENERATIVE_AI|VERTEX"
+    r"|COHERE|TOGETHER(?:AI)?|FIREWORKS(?:_?AI)?|PERPLEXITY|PPLX|HUGGINGFACE|REPLICATE|LLM)"
+)
+
+#: Names that carry a model provider's credential or endpoint, switch a
+#: runtime to another provider, or point a runtime at other config, other
+#: than the wiring the dispatcher writes. One of them anywhere in a gateway
+#: pod's env refuses the run. Matched against the whole name in any case,
+#: since case-insensitive settings loaders read ``openai_api_key`` as the key.
+#: Generic cloud credentials are not among them: AWS keys come with an app's
+#: object store binding and a Google credential serves tools, while the
+#: switches that would send a runtime to Bedrock or Vertex are.
 REFUSED_ENV_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
-    re.compile(pattern)
+    re.compile(pattern, re.IGNORECASE)
     for pattern in (
-        # Keys of the providers the gateway does not route, and litellm's generic one.
-        r"(?:OPENROUTER|AZURE_OPENAI|GROQ|XAI|MISTRAL|DEEPSEEK|GEMINI|GOOGLE|LLM)_API_KEY",
-        # aider's per-provider keys and endpoints.
-        r"AIDER_\w+_API_(?:KEY|BASE)",
-        # Bedrock and Vertex credentials. A gateway spec cannot also be a
-        # managed-model spec, which is what would bring AWS credentials legitimately.
-        r"AWS_BEARER_TOKEN_BEDROCK|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY",
-        r"GOOGLE_APPLICATION_CREDENTIALS",
+        # Provider keys, and Claude Code's OAuth token, under any prefix.
+        rf"(?:\w+_)?{_KEY_PROVIDERS}_(?:API_KEY|API_TOKEN|AUTH_TOKEN)",
+        r"(?:\w+_)?CLAUDE_CODE_OAUTH_TOKEN",
+        # Cohere's and Hugging Face's short names, and Bedrock's API key: whole names only.
+        r"CO_API_KEY|HF_TOKEN|AWS_BEARER_TOKEN_BEDROCK",
         # Provider endpoints. goose reads OPENAI_HOST ahead of OPENAI_BASE_URL.
         _PROVIDERS + r"_(?:BASE_URL|HOST|API_BASE|BASE_PATH|ENDPOINT)",
-        # Switches that send a runtime to another provider.
-        r"GOOSE_PROVIDER|CLAUDE_CODE_USE_BEDROCK|CLAUDE_CODE_USE_VERTEX",
+        r"AZURE_API_BASE",
+        # litellm, aider's model client: its keys, proxy and endpoints.
+        r"LITELLM_\w+",
+        # Claude Code: every provider switch (Bedrock, Vertex, Foundry, Mantle
+        # and whatever comes next) but its two tool switches, each provider's
+        # own settings, its federated identity token, its other transport, and
+        # its config directories.
+        r"CLAUDE_CODE_USE_(?!(?:POWERSHELL_TOOL|NATIVE_FILE_SEARCH)$)\w+",
+        r"ANTHROPIC_(?:FOUNDRY|BEDROCK|VERTEX|AWS|GOOGLE_CLOUD)_\w+",
+        r"ANTHROPIC_(?:IDENTITY_TOKEN(?:_FILE)?|UNIX_SOCKET|CONFIG_DIR|PROFILE)|CLAUDE_CONFIG_DIR",
+        # aider: per-provider keys and endpoints, the models it runs, keys and
+        # env it sets itself, and the files it reads them from.
+        r"AIDER_\w+_API_(?:KEY|BASE)",
+        r"AIDER_(?:(?:WEAK_|EDITOR_)?MODEL|API_KEY|SET_ENV|ENV_FILE|MODEL_SETTINGS_FILE)",
+        # goose: the providers it runs (its main one is the dispatcher's for
+        # the goose runtime), and its other config.
+        r"GOOSE_(?:PLANNER_|SUBAGENT_)?PROVIDER|GOOSE_ADDITIONAL_CONFIG_FILES|GOOSE_PATH_ROOT",
+        # opencode's and codex's config, and codex's own name for the OpenAI key.
+        r"OPENCODE_CONFIG(?:_CONTENT|_DIR)?|CODEX_HOME|CODEX_API_KEY",
     )
 )
+
+#: Names that are a model key to some runtimes only, and refuse the run for
+#: those. aider's litellm reads GOOGLE_API_KEY as the Gemini key (ahead of
+#: GEMINI_API_KEY) and opencode's Google provider reads it too, so either
+#: could call Gemini with it for a packet that names a Gemini model. To the
+#: other runtimes it is an ordinary Google API key (Maps, YouTube, search):
+#: none of them is a Gemini runtime, and goose runs only the provider the
+#: dispatcher sets.
+RUNTIME_REFUSED_ENV: dict[str, frozenset[str]] = {
+    "aider": frozenset({"GOOGLE_API_KEY"}),
+    "opencode": frozenset({"GOOGLE_API_KEY"}),
+}
 
 MODEL_GATEWAY_MANAGED_CONFLICT = (
     "this environment spec sends model traffic through the Zentinelle gateway, which does not proxy "
@@ -256,6 +303,7 @@ class ModelGateway:
     providers: tuple[str, ...]
     spec_slug: str
     runtime_env: tuple[tuple[str, str], ...] = ()
+    runtime_refused: frozenset[str] = frozenset()
 
     def env(self, secret_name: str) -> list[dict]:
         env: list[dict] = [
@@ -277,22 +325,27 @@ class ModelGateway:
         return RESERVED_ENV_NAMES | {name for name, _value in self.runtime_env}
 
     def wire_container(self, container: dict, *, secret_name: str) -> None:
-        """Refuse another provider's credential or endpoint, then write the wiring over every other source.
+        """Refuse what can send model traffic past the gateway, then write the wiring over every other source.
 
         Raises :class:`ModelGatewayError` naming the refused variables (never their values).
         """
         env = container.get("env") or []
         owned = self.owned_env_names
         refused = sorted(
-            {name for entry in env if (name := entry.get("name")) not in owned and refused_env_name(name)}
+            {
+                name
+                for entry in env
+                if (name := entry.get("name")) not in owned
+                and (refused_env_name(name) or name.upper() in self.runtime_refused)
+            }
         )
         if refused:
             raise _refusal(
                 self.spec_slug,
-                "its pod would also get another model provider's credential or endpoint, which reaches "
-                f"the provider past the gateway: {', '.join(refused)}. Remove them from the spec, its "
-                "secret bundles, its app's managed services and the agent's [environment], or turn off "
-                "model_gateway",
+                "its pod would also get another model provider's credential, endpoint or switch, or a "
+                "path to other config for its runtime, any of which can send model traffic past the "
+                f"gateway: {', '.join(refused)}. Remove them from the spec, its secret bundles, its app's "
+                "managed services and the agent's [environment], or turn off model_gateway",
             )
         container["env"] = [entry for entry in env if entry.get("name") not in owned] + self.env(secret_name)
 
@@ -317,11 +370,14 @@ class ModelGateway:
             ) from None
 
 
-def key_covers(key, seconds: int) -> bool:
-    """Whether a minted key still works ``seconds`` from now (Zentinelle may cap its lifetime)."""
+def key_covers(expires_at: datetime | None, seconds: float) -> bool:
+    """Whether a key expiring at ``expires_at`` still works ``seconds`` from now.
+
+    Zentinelle may cap a key's lifetime short of the TTL it was asked for.
+    """
     from django.utils import timezone
 
-    return key.expires_at is None or key.expires_at >= timezone.now() + timedelta(seconds=seconds)
+    return expires_at is None or expires_at >= timezone.now() + timedelta(seconds=seconds)
 
 
 def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
@@ -370,6 +426,7 @@ def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
         providers=providers,
         spec_slug=spec.slug,
         runtime_env=RUNTIME_WIRING.get(runtime, ()),
+        runtime_refused=RUNTIME_REFUSED_ENV.get(runtime, frozenset()),
     )
 
 

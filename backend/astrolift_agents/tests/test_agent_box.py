@@ -1959,6 +1959,8 @@ def test_the_reaper_renews_a_live_boxs_key_once_half_its_window_is_left(org, gat
     box.refresh_from_db()
     assert box.status == AgentBox.Status.RUNNING
     assert (box.model_gateway_expires_at - timezone.now()).total_seconds() > 4400
+    # A key that can still be renewed says nothing.
+    assert box.last_error == ""
 
 
 def test_a_failed_renewal_waits_for_the_next_sweep(org, gateway):
@@ -2082,8 +2084,9 @@ def test_the_reaper_stops_renewing_at_the_keys_lifetime_end(org, gateway):
     box = _box(org, environment_spec=_gateway_spec(org))
     box_service.start_agent_box(box)
     box.refresh_from_db()
-    # Zentinelle's lifetime cap comes before the box's window.
+    # Zentinelle's lifetime cap comes before the box's window, and the box says so from the start.
     assert box.model_gateway_expires_at == box.model_gateway_lifetime_ends_at
+    assert "reaches Zentinelle's key lifetime" in box.last_error
     gateway.zentinelle.calls.clear()
 
     box_service.reap_agent_boxes()
@@ -2129,6 +2132,12 @@ def test_a_renewal_that_reaches_the_lifetime_end_says_so(org, gateway, monkeypat
     box.refresh_from_db()
     assert box.model_gateway_expires_at == agent.lifetime_ends_at
     assert any("reaches Zentinelle's key lifetime" in record.getMessage() for record in records)
+    # The user attached to the box sees it, not only the log.
+    ends_at = agent.lifetime_ends_at.isoformat()
+    assert box.last_error == (
+        f"the box's gateway key reaches Zentinelle's key lifetime at {ends_at} and cannot be renewed past "
+        "it, so its model calls fail from then on; restart the box before then for a new key"
+    )
 
 
 def test_another_providers_key_refuses_the_box_before_anything_is_minted(org, gateway):
@@ -2142,7 +2151,7 @@ def test_another_providers_key_refuses_the_box_before_anything_is_minted(org, ga
 
     box.refresh_from_db()
     assert box.status == AgentBox.Status.FAILED
-    assert "another model provider's credential or endpoint" in box.last_error
+    assert "another model provider's credential, endpoint or switch" in box.last_error
     assert gateway.zentinelle.calls == []
     assert gateway.driver.applied == []
 

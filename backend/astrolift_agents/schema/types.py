@@ -306,8 +306,9 @@ class AgentBoxType:
     # whom cannot answer "can I destroy this one". Empty for a box ensured by
     # an API token, which has no human owner and is shared org-wide.
     owner_email: str
-    # Non-empty only on a box that failed to start or whose teardown did not
-    # complete; it is the sentence an operator needs, not a stack trace.
+    # Non-empty only on a box that failed to start, whose teardown did not
+    # complete, or whose gateway key cannot be renewed past Zentinelle's key
+    # lifetime (#1851); it is the sentence an operator needs, not a stack trace.
     last_error: str
     created_at: dt.datetime
     started_at: dt.datetime | None

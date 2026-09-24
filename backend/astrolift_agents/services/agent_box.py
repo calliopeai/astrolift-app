@@ -451,7 +451,9 @@ def start_agent_box(box) -> None:
     box.pod_name = ""
     box.started_at = timezone.now()
     box.ended_at = None
-    box.last_error = ""
+    # A key Zentinelle already capped at its lifetime is never renewed, so the
+    # box says so from the start.
+    box.last_error = _key_lifetime_note(box)
     box.save(
         update_fields=[
             "status",
@@ -556,13 +558,26 @@ def _renew_box_gateway_key_if_due(box) -> None:
     box.save(
         update_fields=["model_gateway_expires_at", "model_gateway_lifetime_ends_at", "updated_at", "version"]
     )
-    if lifetime_ends_at is not None and box.model_gateway_expires_at >= lifetime_ends_at:
-        log.warning(
-            "agent_box: the gateway key of box %s reaches Zentinelle's key lifetime at %s and cannot be "
-            "renewed past it; restart the box before then for a new key",
-            box.slug,
-            lifetime_ends_at.isoformat(),
-        )
+    if note := _key_lifetime_note(box):
+        log.warning("agent_box: box %s: %s", box.slug, note)
+        box.last_error = note
+        box.save(update_fields=["last_error", "updated_at", "version"])
+
+
+def _key_lifetime_note(box) -> str:
+    """What a live box says once its gateway key cannot be renewed past Zentinelle's key lifetime.
+
+    ``""`` while the key can still be renewed. It goes in ``last_error``, not
+    only the log, because the user attached to the box is the one whose model
+    calls fail.
+    """
+    ends_at = box.model_gateway_lifetime_ends_at
+    if ends_at is None or box.model_gateway_expires_at is None or box.model_gateway_expires_at < ends_at:
+        return ""
+    return (
+        f"the box's gateway key reaches Zentinelle's key lifetime at {ends_at.isoformat()} and cannot be "
+        "renewed past it, so its model calls fail from then on; restart the box before then for a new key"
+    )
 
 
 def box_payload_env(box) -> list[dict]:

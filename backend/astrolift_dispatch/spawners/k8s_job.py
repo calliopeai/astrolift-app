@@ -308,7 +308,7 @@ class K8sJobSpawner(ContainerSpawner):
                     )
                 return SpawnResult(external_id=job_name, ok=False, error=str(exc))
             timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
-            if not key_covers(gateway_key, timeout):
+            if not key_covers(gateway_key.expires_at, timeout):
                 revoke_run_key(connection_id=gateway.connection.pk, agent_id=agent_id)
                 error = (
                     f"Zentinelle caps the run's gateway key at {gateway_key.expires_at.isoformat()}, before "

@@ -848,43 +848,80 @@ def test_revocation_goes_through_the_install_that_minted_the_key_even_after_a_re
 # ---- the input-wait deadline carries the key with it -------------------------
 
 
-def _reserve(task, monkeypatch):
+def _reserve(task, monkeypatch, events, *, running_for=0):
+    """Reserve the input wait for the task's first question; the Job's deadline change lands in ``events``."""
     from astrolift_agents.services import task_target
     from astrolift_agents.services.task_timeout import reserve_input_wait
 
-    reserved = []
     monkeypatch.setattr(
         task_target,
         "spawner_for_task",
-        lambda t: SimpleNamespace(reserve_input_wait=lambda t, seconds: reserved.append(seconds)),
+        lambda t: SimpleNamespace(reserve_input_wait=lambda t, seconds: events.append(("reserve", seconds))),
     )
     AgentTask.objects.filter(pk=task.pk).update(
-        status=AgentTask.Status.RUNNING, started_at=timezone.now(), dispatch_target={"version": 1}
+        status=AgentTask.Status.RUNNING,
+        started_at=timezone.now() - timedelta(seconds=running_for),
+        dispatch_target={"version": 1},
     )
     task.refresh_from_db()
     reserve_input_wait(task, ([SimpleNamespace(request={"id": "q1"})],))
-    return reserved
 
 
-def test_a_question_renews_the_key_to_cover_the_longer_deadline(spawned, zentinelle, monkeypatch):
+_RENEW = ("zentinelle", "POST", f"{API}/agents/{AGENT_ID}/renew")
+
+
+def test_a_question_renews_the_key_before_the_jobs_deadline_moves(spawned, zentinelle, events, monkeypatch):
     from astrolift_agents.services.task_timeout import INPUT_WAIT_BUDGET_SECONDS
 
-    assert _reserve(spawned, monkeypatch) == [INPUT_WAIT_BUDGET_SECONDS]
+    _reserve(spawned, monkeypatch, events)
 
+    assert events == [_RENEW, ("reserve", INPUT_WAIT_BUDGET_SECONDS)]
     [renew] = zentinelle.calls
-    assert (renew.method, renew.path) == ("POST", f"{API}/agents/{AGENT_ID}/renew")
     assert renew.json == {"ttl_seconds": 600 + 900 + INPUT_WAIT_BUDGET_SECONDS}
     spawned.refresh_from_db()
     assert spawned.input_wait_budget_seconds == INPUT_WAIT_BUDGET_SECONDS
 
 
-def test_a_failed_renewal_refuses_the_question(spawned, zentinelle, monkeypatch):
+def test_a_failed_renewal_refuses_the_question_and_leaves_the_deadline(
+    spawned, zentinelle, events, monkeypatch
+):
     zentinelle.answer("POST", f"/agents/{AGENT_ID}/renew", FakeResponse(500))
 
     with pytest.raises(model_gateway.ModelGatewayError, match="did not renew"):
-        _reserve(spawned, monkeypatch)
+        _reserve(spawned, monkeypatch, events)
+
+    assert events == [_RENEW]
     spawned.refresh_from_db()
     assert spawned.input_wait_budget_seconds == 0
+
+
+def test_a_renewal_the_key_lifetime_cuts_short_refuses_the_question(spawned, zentinelle, events, monkeypatch):
+    # Zentinelle renews only up to the key's lifetime end: two hours, not the day the wait needs.
+    zentinelle.agents[AGENT_ID].lifetime_ends_at = timezone.now() + timedelta(hours=2)
+
+    with pytest.raises(model_gateway.ModelGatewayError, match="so the question was refused"):
+        _reserve(spawned, monkeypatch, events)
+
+    assert events == [_RENEW]
+    spawned.refresh_from_db()
+    assert spawned.input_wait_budget_seconds == 0
+
+
+def test_the_renewed_key_has_to_cover_only_what_the_tasks_clock_has_left(
+    spawned, zentinelle, events, monkeypatch
+):
+    from astrolift_agents.services.task_timeout import INPUT_WAIT_BUDGET_SECONDS
+
+    # 500 of the task's 600 s are spent, so it can run 86,500 s more at most:
+    # the key's lifetime end 86,700 s out covers that, though not 600 s plus
+    # the day from now.
+    zentinelle.agents[AGENT_ID].lifetime_ends_at = timezone.now() + timedelta(
+        seconds=INPUT_WAIT_BUDGET_SECONDS + 300
+    )
+
+    _reserve(spawned, monkeypatch, events, running_for=500)
+
+    assert events == [_RENEW, ("reserve", INPUT_WAIT_BUDGET_SECONDS)]
 
 
 # ---- tenancy ---------------------------------------------------------------------
@@ -1025,7 +1062,7 @@ def _app_binding(task, cluster, env_key, value_ref, *, secret):
 
 def _assert_refused(result, zentinelle, driver, *names):
     assert result.ok is False
-    assert "would also get another model provider's credential or endpoint" in result.error
+    assert "would also get another model provider's credential, endpoint or switch" in result.error
     assert f": {', '.join(names)}. Remove them" in result.error
     assert zentinelle.calls == []
     assert driver.applied == []
@@ -1041,10 +1078,18 @@ def _assert_refused(result, zentinelle, driver, *names):
         "OPENAI_BASE_PATH",
         "MISTRAL_BASE_URL",
         "AZURE_OPENAI_ENDPOINT",
+        "AZURE_API_BASE",
+        "OLLAMA_API_BASE",
+        "OLLAMA_HOST",
+        "LITELLM_PROXY_API_BASE",
         "GOOSE_PROVIDER",
+        "GOOSE_PLANNER_PROVIDER",
+        "AIDER_MODEL",
         "CLAUDE_CODE_USE_BEDROCK",
-        "GOOGLE_APPLICATION_CREDENTIALS",
-        "AWS_ACCESS_KEY_ID",
+        "CLAUDE_CODE_USE_FOUNDRY",
+        "ANTHROPIC_FOUNDRY_RESOURCE",
+        "ANTHROPIC_FOUNDRY_BASE_URL",
+        "ANTHROPIC_VERTEX_PROJECT_ID",
         "AWS_BEARER_TOKEN_BEDROCK",
     ],
 )
@@ -1069,10 +1114,23 @@ def test_a_provider_endpoint_or_switch_in_the_spec_env_refuses_the_run(
         "MISTRAL_API_KEY",
         "DEEPSEEK_API_KEY",
         "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
         "LLM_API_KEY",
         "AIDER_OPENROUTER_API_KEY",
-        "AWS_SECRET_ACCESS_KEY",
+        "ANTHROPIC_FOUNDRY_API_KEY",
+        "ANTHROPIC_IDENTITY_TOKEN",
+        "COHERE_API_KEY",
+        "CO_API_KEY",
+        "TOGETHERAI_API_KEY",
+        "TOGETHER_API_KEY",
+        "FIREWORKS_API_KEY",
+        "PERPLEXITY_API_KEY",
+        "PPLX_API_KEY",
+        "AZURE_API_KEY",
+        "HF_TOKEN",
+        "REPLICATE_API_TOKEN",
+        "CODEX_API_KEY",
+        "openai_api_key",
+        "MY_OPENAI_API_KEY",
     ],
 )
 def test_another_providers_key_in_a_secret_ref_refuses_the_run(
@@ -1082,6 +1140,27 @@ def test_another_providers_key_in_a_secret_ref_refuses_the_run(
     spec = _spec(org, model_gateway=True, secret_refs=[{"uri": "agents/claude-dev/other", "env_var": name}])
 
     _assert_refused(_spawn(cluster, _task(org, spec)), zentinelle, driver, name)
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True)
+@pytest.mark.parametrize(
+    "name",
+    [
+        "OPENCODE_CONFIG_CONTENT",
+        "OPENCODE_CONFIG",
+        "CODEX_HOME",
+        "CLAUDE_CONFIG_DIR",
+        "AIDER_SET_ENV",
+        "GOOSE_ADDITIONAL_CONFIG_FILES",
+    ],
+)
+def test_a_runtime_config_redirect_in_the_spec_env_refuses_the_run(
+    org, cluster, connection, zentinelle, driver, store, name
+):
+    # Any of them points a runtime at config that can name another provider.
+    task = _task(org, _spec(org, model_gateway=True, env_vars={name: "/workspace/.agent-config"}))
+
+    _assert_refused(_spawn(cluster, task), zentinelle, driver, name)
 
 
 @override_config(ZENTINELLE_GATEWAY_ENABLED=True)
@@ -1101,13 +1180,74 @@ def test_another_providers_credential_from_the_apps_managed_services_refuses_the
     org, cluster, connection, zentinelle, driver, store, secret
 ):
     task = _task(org, _spec(org, model_gateway=True, secret_refs=[]))
-    name = "AWS_ACCESS_KEY_ID" if secret else "GOOGLE_APPLICATION_CREDENTIALS"
+    name = "AWS_BEARER_TOKEN_BEDROCK" if secret else "OLLAMA_HOST"
     _app_binding(
-        task, cluster, name, "agents/claude-dev/aws" if secret else "/var/run/gcp.json", secret=secret
+        task, cluster, name, "agents/claude-dev/bedrock" if secret else "http://ollama:11434", secret=secret
     )
-    store.store["agents/claude-dev/aws"] = {"value": "AKIA-stored"}
+    store.store["agents/claude-dev/bedrock"] = {"value": "bedrock-api-key"}
 
     _assert_refused(_spawn(cluster, task), zentinelle, driver, name)
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True)
+def test_an_apps_cloud_credentials_still_reach_a_gateway_pod(
+    org, cluster, connection, zentinelle, driver, store
+):
+    # An existing-S3 binding brings AWS keys (object_store_existing_s3), and a
+    # Google credential or API key serves tools; none of them is a model key
+    # for the claude runtime, and the switches that would make it one refuse.
+    task = _task(
+        org,
+        _spec(
+            org,
+            model_gateway=True,
+            secret_refs=[],
+            env_vars={"GOOGLE_APPLICATION_CREDENTIALS": "/var/run/gcp.json", "GOOGLE_API_KEY": "maps"},
+        ),
+    )
+    _app_binding(task, cluster, "AWS_ACCESS_KEY_ID", "agents/claude-dev/s3-id", secret=True)
+    _app_binding(task, cluster, "AWS_SECRET_ACCESS_KEY", "agents/claude-dev/s3-secret", secret=True)
+    store.store["agents/claude-dev/s3-id"] = {"value": "AKIA-stored"}
+    store.store["agents/claude-dev/s3-secret"] = {"value": "s3-secret-stored"}
+
+    result = _spawn(cluster, task)
+
+    assert result.ok, result.error
+    [batch] = driver.applied
+    assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"} <= set(_one(batch, "Secret")["stringData"])
+    env = _env(_one(batch, "Job"))
+    assert {
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_API_KEY",
+    } <= set(env)
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True)
+@pytest.mark.parametrize(
+    ("runtime", "refused"),
+    [
+        ("aider", True),
+        ("opencode", True),
+        ("claude", False),
+        ("codex", False),
+        ("goose", False),
+        ("base", False),
+    ],
+)
+def test_google_api_key_refuses_only_the_runtimes_that_read_it_as_the_gemini_key(
+    org, cluster, connection, zentinelle, driver, store, runtime, refused
+):
+    spec = _spec(org, model_gateway=True, runtime=runtime, env_vars={"GOOGLE_API_KEY": "AIza-key"})
+
+    result = _spawn(cluster, _task(org, spec))
+
+    if refused:
+        _assert_refused(result, zentinelle, driver, "GOOGLE_API_KEY")
+    else:
+        assert result.ok, result.error
+        assert _env(_one(driver.applied[0], "Job"))["GOOGLE_API_KEY"]["value"] == "AIza-key"
 
 
 @override_config(ZENTINELLE_GATEWAY_ENABLED=True)
@@ -1159,8 +1299,83 @@ def test_the_refused_patterns_match_whole_names_only():
     assert refused("OPENAI_HOST") and refused("AIDER_ANTHROPIC_API_KEY") and refused("LLM_BASE_URL")
     assert not refused("MY_OPENAI_HOST_NOTE") and not refused("OPENAI_HOSTNAME_LABEL")
     assert not refused("GITHUB_TOKEN") and not refused("INVENTORY_BASE_URL")
-    # These two match, but are the gateway's own and dropped before the check.
-    assert {name for name in RESERVED_ENV_NAMES if refused(name)} == {"ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"}
+    # These match, but are the gateway's own and dropped before the check.
+    assert {name for name in RESERVED_ENV_NAMES if refused(name)} == RESERVED_ENV_NAMES - {
+        GATEWAY_KEY_ENV,
+        "ANTHROPIC_CUSTOM_HEADERS",
+        "OPENAI_CUSTOM_HEADERS",
+    }
+
+
+def test_provider_keys_refuse_under_a_prefix_or_in_lower_case():
+    refused = model_gateway.refused_env_name
+
+    for name in (
+        "openai_api_key",
+        "MY_OPENAI_API_KEY",
+        "my_anthropic_api_key",
+        "anthropic_auth_token",
+        "TEAM_CLAUDE_CODE_OAUTH_TOKEN",
+        "AZURE_OPENAI_API_KEY",
+        "GOOGLE_VERTEX_API_KEY",
+        "GOOGLE_GENERATIVE_AI_API_KEY",
+    ):
+        assert refused(name), name
+
+
+def test_ordinary_app_keys_and_cloud_credentials_pass():
+    refused = model_gateway.refused_env_name
+
+    for name in (
+        "STRIPE_API_KEY",
+        "SENTRY_AUTH_TOKEN",
+        "DATADOG_API_KEY",
+        "ACME_CO_API_KEY",
+        "TELCO_API_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_API_KEY",
+    ):
+        assert not refused(name), name
+
+
+def test_every_claude_code_provider_switch_refuses_but_its_tool_switches():
+    refused = model_gateway.refused_env_name
+    # CLAUDE_CODE_USE_* in Claude Code 2.1.281, plus one it does not have yet:
+    # a new provider switch refuses until someone decides it is harmless.
+    switches = {
+        "BEDROCK": True,
+        "VERTEX": True,
+        "FOUNDRY": True,
+        "MANTLE": True,
+        "ANTHROPIC_AWS": True,
+        "ANTHROPIC_GOOGLE_CLOUD": True,
+        "GATEWAY": True,
+        "CCR_V2": True,
+        "COWORK_PLUGINS": True,
+        "SOME_FUTURE_CLOUD": True,
+        "POWERSHELL_TOOL": False,
+        "NATIVE_FILE_SEARCH": False,
+    }
+
+    assert {name: refused(f"CLAUDE_CODE_USE_{name}") for name in switches} == switches
+    assert not refused("claude_code_use_powershell_tool")
+    assert refused("CLAUDE_CODE_USE_POWERSHELL_TOOL_AND_BEDROCK")
+    for name in (
+        "ANTHROPIC_FOUNDRY_API_KEY",
+        "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
+        "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
+        "ANTHROPIC_VERTEX_BASE_URL",
+        "ANTHROPIC_AWS_API_KEY",
+        "ANTHROPIC_GOOGLE_CLOUD_PROJECT",
+        "ANTHROPIC_IDENTITY_TOKEN_FILE",
+        "ANTHROPIC_UNIX_SOCKET",
+    ):
+        assert refused(name), name
+    # Model choice stays the spec's.
+    assert not refused("ANTHROPIC_MODEL") and not refused("ANTHROPIC_SMALL_FAST_MODEL")
 
 
 # ---- the gateway's own names are dropped, from bundles and app bindings too ----------
