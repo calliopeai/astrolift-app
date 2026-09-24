@@ -44,10 +44,13 @@ def upsert_app_secret_metadata(
     one UPDATE per literal write is negligible against the platform's
     overall throughput.
 
-    ``scope=None`` is "don't touch" as well, and ``all`` only on create:
-    writing a default on every update let a rotate or a bulk import
-    silently widen a key restricted to ``production`` back to ``all``
-    (#1758).
+    ``scope=None`` is "don't touch" as well: writing a default on every
+    update let a rotate or a bulk import silently widen a key restricted
+    to ``production`` back to ``all`` (#1758). On create it means the
+    scope already in force, the app-wide row's for a per-environment row
+    and otherwise ``all``. The deploy prefers the per-environment row, so
+    one created as ``all`` to record an expiry widened a production-only
+    key into that environment (#1946).
     """
     if set_via is not None and set_via not in VALID_SECRET_SOURCES:
         # Reject unknown sources up front so a typo doesn't silently
@@ -66,7 +69,7 @@ def upsert_app_secret_metadata(
             key=key,
             expires_at=expires_at,
             source=(set_via or AppSecretMetadata.Source.WEB.value),
-            scope=scope if scope is not None else "all",
+            scope=scope if scope is not None else current_secret_scope(app, key, environment_name or ""),
             set_at=timezone.now(),
             created_by=actor,
             updated_by=actor,

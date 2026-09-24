@@ -969,3 +969,23 @@ def test_under_approval_a_metadata_edit_that_keeps_the_scope_applies_directly(ap
     row = _live_metadata(app, "PROD_ONLY").get()
     assert (row.scope, row.source) == ("production", "cli")
     assert not SecretChangeProposal.objects.filter(registered_app=app).exists()
+
+
+def test_under_approval_a_new_per_environment_row_does_not_widen_the_key(
+    approver_grants, app, env, monkeypatch
+):
+    """The deploy prefers a key's per-environment row to its app-wide one.
+    Created as "all", a row that only set an expiry for one preview put a
+    production-only key in that preview, without a proposal."""
+    _repo_secret_restricted_to_production(app)
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-expiry", status=PreviewEnvironment.Status.RUNNING)
+
+    result = _set_scope(
+        app, "PROD_ONLY", environment_name=preview.name, expires_at=timezone.now() + timedelta(days=30)
+    )
+
+    assert result.ok, result.errors
+    assert result.data.pending_proposal_id is None
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}
+    assert result.data.scope == "production"

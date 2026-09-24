@@ -340,6 +340,30 @@ def test_set_metadata_without_a_scope_keeps_the_stored_scope(permission_resolver
     assert _scope_of(app, "META_K") == "production"
 
 
+def test_a_new_per_environment_row_without_a_scope_takes_the_scope_in_force(permission_resolver):
+    """The deploy and the secrets list prefer a key's per-environment row
+    to its app-wide one. Created as "all", a row that only recorded how a
+    key was set for one preview widened a production-only key into it."""
+    org, app, cluster, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    _add_preview_env(app, cluster, env_name="pr-env-row", branch="feat/env-row")
+    _restrict_to_production(org, app, "ENV_ROW_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(
+                app_slug=app.slug, key="ENV_ROW_K", environment_name="pr-env-row", set_via="cli"
+            ),
+        )
+        secrets = ServicesQuery().astrolift_app_secrets(
+            _info(), app_slug=app.slug, environment_name="pr-env-row"
+        )
+    assert result.ok, result.errors
+    assert result.data.scope == "production"
+    assert "ENV_ROW_K" not in [s.key for s in secrets if s.source == "literal"]
+
+
 # An explicit "" matches no environment's allowed scopes, so storing it
 # would stop the key deploying anywhere without an error.
 
