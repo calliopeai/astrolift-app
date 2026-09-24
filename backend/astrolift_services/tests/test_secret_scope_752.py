@@ -392,7 +392,7 @@ def test_a_per_environment_row_without_a_scope_follows_the_app_wide_scope_in_the
         after = listed()
     assert annotated.ok, annotated.errors
     assert narrowed.ok, narrowed.errors
-    assert before["SHARED_KEY"] == ("all", "cli")
+    assert before.get("SHARED_KEY") == ("all", "cli")
     assert "SHARED_KEY" not in after
 
 
