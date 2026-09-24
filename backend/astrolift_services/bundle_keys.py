@@ -82,15 +82,16 @@ def refresh_bundle_known_keys(
     ``NotImplementedError`` from :py:meth:`list_keys`) is handled
     specially: the cache is *not* mutated so the prior snapshot
     survives a partial-rotate against a fall-back driver.
-    """
-    from astrolift_dispatch.agent_secrets import unscoped_bundle_reason
 
-    # Even key names are not read from a location outside the bundle's own
-    # org namespace (#1921).
+    A bundle whose location is outside its org's secret namespace raises
+    :class:`~astrolift_dispatch.agent_secrets.SecretRefNamespaceError`
+    before the store is touched (#1921): even its key names are not read.
+    """
+    from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, unscoped_bundle_reason
+
     unscoped = unscoped_bundle_reason(bundle, organization=bundle.organization)
     if unscoped is not None:
-        log.warning("bundle %s: %s -- keeping prior snapshot", bundle.guid, unscoped)
-        return list(bundle.last_known_keys or [])
+        raise SecretRefNamespaceError(f"secret bundle {bundle.slug!r}: {unscoped}")
     list_keys = getattr(secrets_backend, "list_keys", None)
     if not callable(list_keys):
         # Driver predates #441's protocol bump.  Treat as

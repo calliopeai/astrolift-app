@@ -563,12 +563,26 @@ def _load_spec_and_ref(env_spec_slug: str, env_var: str):
     return spec, ref, None
 
 
-def _refuse_unscoped_ref(spec, env_var: str):
-    """A failure envelope when ``env_var``'s effective ref points outside the
-    spec's org namespace (#1921), else ``None``. Removing the binding stays
-    allowed: it never touches the store, and it is how such a ref is cleared."""
-    from astrolift_dispatch.agent_secrets import unscoped_secret_refs
+def _refuse_ref_value_access(spec, env_var: str):
+    """A failure envelope when setting, deleting or revealing ``env_var``'s
+    value must not reach the store, else ``None`` (#1921).
 
+    Only a ref typed on the spec is the spec's to manage. One derived from a
+    project managed-service binding names a secret the service minted, or one
+    its config names, so writing, deleting or reading it here would act on
+    the service's credential. A typed ref outside the org namespace is refused
+    too. Removing the binding stays allowed for both: it never touches the
+    store, and it is how such a ref is cleared.
+    """
+    from astrolift_dispatch.agent_secrets import platform_managed_secret_env_vars, unscoped_secret_refs
+
+    if env_var in platform_managed_secret_env_vars(spec):
+        return gql_failure(
+            ErrorCode.PRECONDITION.value,
+            f"{env_var} is managed by the platform: it comes from a managed-service binding, "
+            "so its value belongs to that service",
+            field="envVar",
+        )
     reason = unscoped_secret_refs(spec).get(env_var)
     if reason is None:
         return None
@@ -1014,7 +1028,7 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
-        refused = _refuse_unscoped_ref(spec, env_var)
+        refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
         if value == "":
@@ -1054,7 +1068,7 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
-        refused = _refuse_unscoped_ref(spec, env_var)
+        refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
         backend, berr = _agent_secrets_backend(spec)
@@ -1188,7 +1202,7 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
-        refused = _refuse_unscoped_ref(spec, env_var)
+        refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
         backend, berr = _agent_secrets_backend(spec)
@@ -1234,7 +1248,7 @@ class AgentsMutation:
     ) -> MutationResultType[AgentSecretBundleType]:
         from astrolift_dispatch.agent_secrets import (
             SecretRefNamespaceError,
-            assert_org_scoped_secret_ref,
+            assert_org_scoped_bundle_ref,
             secret_backend_capabilities,
         )
         from astrolift_services.models import SecretBundle
@@ -1254,7 +1268,7 @@ class AgentsMutation:
                 field="backendRef",
             )
         try:
-            assert_org_scoped_secret_ref(path, organization=spec.organization)
+            assert_org_scoped_bundle_ref(path, organization=spec.organization)
         except SecretRefNamespaceError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
         try:
@@ -1287,7 +1301,7 @@ class AgentsMutation:
     ) -> MutationResultType[AgentSecretBundleType]:
         from astrolift_dispatch.agent_secrets import (
             SecretRefNamespaceError,
-            assert_org_scoped_secret_ref,
+            assert_org_scoped_bundle_ref,
             secret_backend_capabilities,
             unscoped_bundle_reason,
         )
@@ -1315,7 +1329,7 @@ class AgentsMutation:
                 field="backendRef",
             )
         try:
-            assert_org_scoped_secret_ref(backend_ref, organization=spec.organization)
+            assert_org_scoped_bundle_ref(backend_ref, organization=spec.organization)
         except SecretRefNamespaceError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="backendRef")
         backend = None

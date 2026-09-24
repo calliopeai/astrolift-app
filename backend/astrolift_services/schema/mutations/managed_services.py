@@ -86,6 +86,19 @@ def _requested_isolation(value: str | None) -> str:
     return mode.value if mode is not None else ""
 
 
+def _refuse_unscoped_config_secret_refs(config, *, organization, code: str = ErrorCode.VALIDATION.value):
+    """A failure envelope naming the first secret ref in ``config`` outside
+    ``organization``'s secret namespace (#1921), else ``None``."""
+    from astrolift_dispatch.agent_secrets import SecretRefNamespaceError
+    from astrolift_services.secret_ref_config import assert_config_secret_refs_scoped
+
+    try:
+        assert_config_secret_refs_scoped(dict(config or {}), organization=organization)
+    except SecretRefNamespaceError as exc:
+        return gql_failure(code, str(exc), field="config")
+    return None
+
+
 def _project_service_rows_for_caller(service_id):
     rows = (
         ManagedService.objects.select_related("project", "tenant_cluster")
@@ -278,6 +291,9 @@ class ManagedServiceMutations:
                 validate_config(catalog_item, dict(input.config or {}))
         except CatalogResolutionError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        refused = _refuse_unscoped_config_secret_refs(input.config, organization=project.organization)
+        if refused is not None:
+            return refused
         if catalog_item is None:
             valid_kinds = {kind for kind, _label in ManagedService.Kind.choices}
             if input.kind not in valid_kinds:
@@ -518,6 +534,9 @@ class ManagedServiceMutations:
             if incoming is not None and incoming != (svc.config or {}):
                 from astrolift_services.schema.types import _editable_fields_for
 
+                refused = _refuse_unscoped_config_secret_refs(incoming, organization=svc.project.organization)
+                if refused is not None:
+                    return refused
                 editable = _editable_fields_for(svc)
                 if editable != ["*"]:
                     changed = {
@@ -668,6 +687,9 @@ class ManagedServiceMutations:
                 validate_config(catalog_item, dict(input.config or {}))
         except CatalogResolutionError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        refused = _refuse_unscoped_config_secret_refs(input.config, organization=app.organization)
+        if refused is not None:
+            return refused
         if catalog_item is None:
             valid_kinds = {k for k, _ in ManagedService.Kind.choices}
             if input.kind not in valid_kinds:
@@ -772,6 +794,11 @@ class ManagedServiceMutations:
             if incoming is not None and incoming != (svc.config or {}):
                 from astrolift_services.schema.types import _editable_fields_for
 
+                refused = _refuse_unscoped_config_secret_refs(
+                    incoming, organization=svc.registered_app.organization
+                )
+                if refused is not None:
+                    return refused
                 editable = _editable_fields_for(svc)
                 if editable != ["*"]:
                     changed_keys = {
@@ -1023,6 +1050,16 @@ class ManagedServiceMutations:
         svc = _managed_service_for_caller(input.id)
         if svc is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed service not found")
+        # Adoption builds the provision spec from the stored config and binds
+        # the adopted resource to it, so a config stored before #1921 carrying
+        # a secret ref outside the org namespace is fixed first, not adopted.
+        from astrolift_services.secret_ref_config import service_organization
+
+        refused = _refuse_unscoped_config_secret_refs(
+            svc.config, organization=service_organization(svc), code=ErrorCode.PRECONDITION.value
+        )
+        if refused is not None:
+            return refused
 
         request = info.context.request  # type: ignore[attr-defined]
         user = getattr(request, "user", None)

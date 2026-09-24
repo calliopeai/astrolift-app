@@ -311,9 +311,11 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
     When environments do not exist yet registration calls this again after
     bootstrap; returning an empty result here is therefore intentional.
     """
+    from astrolift_dispatch.agent_secrets import SecretRefNamespaceError
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_services.managed_service_catalog import resolve_variant, validate_config
     from astrolift_services.models import ManagedService, ManagedServiceAttachment
+    from astrolift_services.secret_ref_config import assert_config_secret_refs_scoped
 
     result = PersistResult()
     environments = {
@@ -345,6 +347,10 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
         )
         if item is not None:
             validate_config(item, config)
+        try:
+            assert_config_secret_refs_scoped(config, organization=app.organization)
+        except SecretRefNamespaceError as exc:
+            raise ValueError(f"managed service {service.name or service.kind!r}: {exc}") from exc
         variant = item.variant if item is not None else (service.variant or "")
         name = (service.name or service.kind).strip()
         lifecycle = _lifecycle_policy(service)

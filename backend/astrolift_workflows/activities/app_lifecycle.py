@@ -1284,6 +1284,11 @@ def _update_secrets_sync(deployment_id: int) -> int:
                     # or path); resolve via the cluster's secrets driver.
                     from _sdk.secrets import SecretReferenceError, resolve_secret_reference
 
+                    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+
+                    unscoped = managed_binding_ref_reason(svc, binding.env_value_ref)
+                    if unscoped is not None:
+                        raise AppDeployError(f"binding {svc.kind}/{svc.name}#{env_key}: {unscoped}")
                     try:
                         raw_value = resolve_secret_reference(
                             secrets_backend,

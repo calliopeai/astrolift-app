@@ -103,62 +103,87 @@ def valid_agent_env_var(value: str) -> bool:
 # cluster), and nothing in the root is per org: ``managed/<instance>/url`` and
 # ``astrolift/managed/<instance>/url`` both name another tenant's database URL.
 # The only per-org part a path can carry is the org guid the platform itself puts
-# there, as the default agent bundle location does, so a location an operator or
-# a manifest typed must sit under one of these roots. The guid rather than the
-# slug: slugs are unique only among live orgs, and a slug may spell another org's
-# guid.
-ORG_SECRET_ROOTS = ("agents", "agent-bundles")
+# there, as the default agent bundle location does, so a location an operator, a
+# manifest or a managed-service config typed must sit under one of these roots.
+# The guid rather than the slug: slugs are unique only among live orgs, and a
+# slug may spell another org's guid.
+ORG_SECRET_ROOTS = ("agents", "agent-bundles", "services")
+# A secret bundle is one store location holding many keys, so it gets the one
+# root whose locations are bundles.
+BUNDLE_SECRET_ROOTS = ("agent-bundles",)
 _SECRET_STORE_SCHEMES = ("sm:", "ssm:")
 # The Secrets Manager name alphabet. It also keeps out what a path-joining
 # driver could normalize away (Vault builds an HTTP path from the ref).
 _SECRET_SEGMENT_RE = re.compile(r"[A-Za-z0-9_+=.@-]+")
-_SECRETS_MANAGER_ARN_RE = re.compile(r"arn:[a-z-]+:secretsmanager:[a-z0-9-]*:[0-9]*:secret:(?P<name>.+)")
 
 
 class SecretRefNamespaceError(ValueError):
     """A typed secret location falls outside its organization's namespace (#1921)."""
 
 
-def _inside_org_secret_roots(path: str, organization) -> bool:
+def _inside_org_secret_roots(path: str, organization, roots: tuple[str, ...]) -> bool:
     segments = path.split("/")
     return (
         len(segments) >= 3
-        and segments[0] in ORG_SECRET_ROOTS
+        and segments[0] in roots
         and segments[1] == str(organization.guid)
         and all(_SECRET_SEGMENT_RE.fullmatch(s) and s not in (".", "..") for s in segments[2:])
     )
 
 
-def assert_org_scoped_secret_ref(uri: str, *, organization) -> None:
-    """Raise :class:`SecretRefNamespaceError` unless ``uri`` names a location
-    inside ``organization``'s own secret namespace.
+def in_org_secret_namespace(uri: str, *, organization, roots: tuple[str, ...] = ORG_SECRET_ROOTS) -> bool:
+    """Whether ``uri`` names a location inside ``organization``'s own secret
+    namespace: ``<root>/<org guid>/...`` for one of ``roots``.
 
-    Accepted: ``agents/<org guid>/...`` or ``agent-bundles/<org guid>/...``,
-    optionally behind a ``secret://`` or ``sm:``/``ssm:`` scheme, leading
-    slashes or the ``astrolift/`` install root, with a ``#field`` selector, or
-    as a Secrets Manager ARN of such a name. Everything else is refused, never
-    rewritten.
+    The location may carry a ``secret://`` or ``sm:``/``ssm:`` scheme, leading
+    slashes or the ``astrolift/`` install root, and a ``#field`` selector.
+    Nothing else is accepted and nothing is rewritten. That includes an ARN: it
+    names a secret in whatever account and region it spells, while the relative
+    form always resolves in the driver's own store.
     """
     path, separator, field = uri.partition("#")
     path = path.removeprefix("secret://")
-    arn = _SECRETS_MANAGER_ARN_RE.fullmatch(path)
-    if arn:
-        path = arn.group("name")
-    else:
-        for scheme in _SECRET_STORE_SCHEMES:
-            if path.startswith(scheme):
-                path = path[len(scheme) :]
-                break
-        path = path.lstrip("/")
-    path = path.removeprefix("astrolift/")
+    for scheme in _SECRET_STORE_SCHEMES:
+        if path.startswith(scheme):
+            path = path[len(scheme) :]
+            break
+    path = path.lstrip("/").removeprefix("astrolift/")
     field_ok = not separator or bool(_SECRET_SEGMENT_RE.fullmatch(field))
-    if field_ok and _inside_org_secret_roots(path, organization):
+    return field_ok and _inside_org_secret_roots(path, organization, roots)
+
+
+def assert_org_scoped_secret_ref(uri: str, *, organization) -> None:
+    """Raise :class:`SecretRefNamespaceError` unless the agent secret ref
+    ``uri`` names a location inside ``organization``'s own secret namespace
+    (see :func:`in_org_secret_namespace`)."""
+    if in_org_secret_namespace(uri, organization=organization):
         return
     guid = organization.guid
     raise SecretRefNamespaceError(
-        f"{uri!r} is outside this organization's secret namespace; "
-        f"an agent secret must live under agents/{guid}/ or agent-bundles/{guid}/"
+        f"{uri!r} is outside this organization's secret namespace; an agent secret must live "
+        f"under agents/{guid}/, agent-bundles/{guid}/ or services/{guid}/"
     )
+
+
+def assert_org_scoped_bundle_ref(backend_ref: str, *, organization) -> None:
+    """Raise :class:`SecretRefNamespaceError` unless a secret bundle's
+    ``backend_ref`` is a store location under ``agent-bundles/<org guid>/``.
+
+    A bundle location is handed to the driver as it is, so the ``secret://``
+    reference scheme is refused rather than accepted here and left for a driver
+    to read as part of the name.
+    """
+    guid = organization.guid
+    if backend_ref.startswith("secret://"):
+        raise SecretRefNamespaceError(
+            f"backendRef {backend_ref!r} is a secret:// reference, but a secret bundle names a "
+            f"store location; drop the scheme and keep it under agent-bundles/{guid}/"
+        )
+    if not in_org_secret_namespace(backend_ref, organization=organization, roots=BUNDLE_SECRET_ROOTS):
+        raise SecretRefNamespaceError(
+            f"backendRef {backend_ref!r} is outside this organization's secret namespace; "
+            f"a secret bundle must live under agent-bundles/{guid}/"
+        )
 
 
 def unscoped_bundle_reason(bundle, *, organization) -> str | None:
@@ -172,22 +197,24 @@ def unscoped_bundle_reason(bundle, *, organization) -> str | None:
     if bundle.project_id is not None or bundle.team_id is not None:
         return None
     try:
-        assert_org_scoped_secret_ref(bundle.backend_ref, organization=organization)
+        assert_org_scoped_bundle_ref(bundle.backend_ref, organization=organization)
     except SecretRefNamespaceError as exc:
         return str(exc)
     return None
 
 
-def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], bool]]:
-    """``env_var -> (ref, typed)`` for :func:`effective_secret_refs`, where
-    ``typed`` says an operator or a manifest wrote the uri rather than the
-    platform deriving it from a project managed-service binding."""
+def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], Any]]:
+    """``env_var -> (ref, binding)`` for :func:`effective_secret_refs`.
+    ``binding`` is the project managed-service binding row the platform
+    derived the ref from, or ``None`` when an operator or a manifest typed it."""
     # Project-resource bindings are defaults. Manifest refs and persistent
     # operator overrides win on collisions so attaching a shared database can
     # never silently replace an explicitly configured credential.
-    refs = {row["env_var"]: (row, False) for row in project_managed_service_secret_refs(spec)}
+    refs: dict[str, tuple[dict[str, str], Any]] = dict(
+        _managed_binding_secret_refs(_project_managed_service_bindings(spec))
+    )
     refs.update(
-        {row["env_var"]: (row, True) for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
+        {row["env_var"]: (row, None) for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
     )
     if spec is None or not getattr(spec, "pk", None):
         return refs
@@ -199,27 +226,44 @@ def _effective_secret_ref_sources(spec) -> dict[str, tuple[dict[str, str], bool]
         if override.removed:
             refs.pop(override.env_var, None)
         elif override.uri:
-            refs[override.env_var] = ({"env_var": override.env_var, "uri": override.uri}, True)
+            refs[override.env_var] = ({"env_var": override.env_var, "uri": override.uri}, None)
     return refs
 
 
 def effective_secret_refs(spec) -> list[dict[str, str]]:
     """Merge manifest refs with persistent operator overrides/tombstones."""
-    return [ref for ref, _typed in _effective_secret_ref_sources(spec).values()]
+    return [ref for ref, _binding in _effective_secret_ref_sources(spec).values()]
+
+
+def platform_managed_secret_env_vars(spec) -> frozenset[str]:
+    """The env vars whose effective ref comes from a project managed-service
+    binding rather than from anything typed on the spec (#1921). Their values
+    belong to the service that minted them."""
+    return frozenset(
+        env_var
+        for env_var, (_ref, binding) in _effective_secret_ref_sources(spec).items()
+        if binding is not None
+    )
 
 
 def unscoped_secret_refs(spec) -> dict[str, str]:
-    """``env_var -> reason`` for each typed effective ref outside the spec's
-    org namespace (#1921): one stored before write-time validation existed,
-    or written straight to the row. Every path that would take it to the store
-    refuses it instead. Project managed-service bindings are derived by the
-    platform and live under the service's own root, so they are not checked.
+    """``env_var -> reason`` for each effective ref that must not be read
+    (#1921): a typed ref outside the spec's org namespace, stored before
+    write-time validation existed or written straight to the row, and a
+    managed-service binding ref copied out of the service's config that falls
+    outside it (see :func:`astrolift_services.secret_ref_config.managed_binding_ref_reason`).
+    Every path that would take such a ref to the store refuses it instead.
     """
+    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+
     if spec is None or not getattr(spec, "pk", None):
         return {}
     unscoped: dict[str, str] = {}
-    for env_var, (ref, typed) in _effective_secret_ref_sources(spec).items():
-        if not typed:
+    for env_var, (ref, binding) in _effective_secret_ref_sources(spec).items():
+        if binding is not None:
+            reason = managed_binding_ref_reason(binding.managed_service, ref["uri"])
+            if reason is not None:
+                unscoped[env_var] = reason
             continue
         try:
             assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization)
@@ -253,15 +297,21 @@ def _project_managed_service_bindings(spec):
     return rows
 
 
-def project_managed_service_secret_refs(spec) -> list[dict[str, str]]:
-    refs: dict[str, dict[str, str]] = {}
-    for binding in _project_managed_service_bindings(spec):
+def _managed_binding_secret_refs(bindings) -> dict[str, tuple[dict[str, str], Any]]:
+    """``env_var -> (ref, binding)`` for the secret rows among ``bindings``;
+    a later row wins on a shared env var."""
+    refs: dict[str, tuple[dict[str, str], Any]] = {}
+    for binding in bindings:
         if binding.is_secret and valid_agent_env_var(binding.env_key):
-            refs[binding.env_key] = {
-                "env_var": binding.env_key,
-                "uri": binding.env_value_ref,
-            }
-    return list(refs.values())
+            refs[binding.env_key] = ({"env_var": binding.env_key, "uri": binding.env_value_ref}, binding)
+    return refs
+
+
+def project_managed_service_secret_refs(spec) -> list[dict[str, str]]:
+    return [
+        ref
+        for ref, _binding in _managed_binding_secret_refs(_project_managed_service_bindings(spec)).values()
+    ]
 
 
 def project_managed_service_env_vars(spec) -> dict[str, str]:
@@ -324,14 +374,9 @@ def app_managed_service_bindings(workload) -> list[Any]:
 
 def app_managed_service_secret_refs(workload) -> list[dict[str, str]]:
     """The secret half of :func:`app_managed_service_bindings`."""
-    refs: dict[str, dict[str, str]] = {}
-    for binding in app_managed_service_bindings(workload):
-        if binding.is_secret and valid_agent_env_var(binding.env_key):
-            refs[binding.env_key] = {
-                "env_var": binding.env_key,
-                "uri": binding.env_value_ref,
-            }
-    return list(refs.values())
+    return [
+        ref for ref, _binding in _managed_binding_secret_refs(app_managed_service_bindings(workload)).values()
+    ]
 
 
 def app_managed_service_env_vars(workload) -> dict[str, str]:
@@ -602,9 +647,14 @@ def resolve_task_secret_manifest(
     the same per-task Secret (#1700), because the app's own binding Secret
     lives in another namespace and cannot be mounted from here.
     """
+    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+
     refs = effective_secret_refs(spec)
     bundle_refs = agent_bundle_refs(spec)
-    app_refs = app_managed_service_secret_refs(workload) if workload is not None else []
+    app_sources = (
+        _managed_binding_secret_refs(app_managed_service_bindings(workload)) if workload is not None else {}
+    )
+    app_refs = [ref for ref, _binding in app_sources.values()]
     if not refs and not bundle_refs and not app_refs:
         return None
 
@@ -657,9 +707,13 @@ def resolve_task_secret_manifest(
             bundle.last_key_enum_at = timezone.now()
             bundle.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
     unscoped = unscoped_secret_refs(spec)
-    # App bindings first, so a spec's own ref still wins on a collision. They
-    # are derived by the platform, so only the spec's own refs are checked.
-    candidates = [(ref, None) for ref in app_refs] + [(ref, unscoped.get(ref["env_var"])) for ref in refs]
+    # App bindings first, so a spec's own ref still wins on a collision. A
+    # binding ref the driver minted resolves where the driver put it; one it
+    # copied from the service config is held to the namespace like a typed ref.
+    candidates = [
+        (ref, managed_binding_ref_reason(binding.managed_service, ref["uri"]))
+        for ref, binding in app_sources.values()
+    ] + [(ref, unscoped.get(ref["env_var"])) for ref in refs]
     for ref, unscoped_reason in candidates:
         uri, env_var = ref["uri"], ref["env_var"]
         if not valid_agent_env_var(env_var):

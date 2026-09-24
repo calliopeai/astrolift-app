@@ -71,6 +71,7 @@ def _list_targets_sync(secret_bundle_id: int) -> list[dict[str, Any]]:
         out.append(
             {
                 "ref_id": ref.pk,
+                "secret_bundle_id": ref.secret_bundle_id,
                 "registered_app_id": ref.registered_app_id,
                 "app_environment_id": ref.app_environment_id,
                 "tenant_cluster_id": cluster.pk,
@@ -170,11 +171,7 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     summary dict the workflow rolls up.
     """
     from astrolift_clusters.models import TenantCluster
-    from astrolift_dispatch.agent_secrets import (
-        SecretRefNamespaceError,
-        assert_org_scoped_secret_ref,
-        unscoped_bundle_reason,
-    )
+    from astrolift_dispatch.agent_secrets import unscoped_bundle_reason
     from astrolift_registry.models import RegisteredApp
     from astrolift_services.models import SecretBundle
     from core.app_deploy import (
@@ -195,29 +192,25 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     ctx = _context_for_cluster(cluster)
     secrets_backend = driver_for_capability(cluster, "secrets")
     # #441: hand the bundle row to the materialiser so the
-    # last-known-keys cache is refreshed off the same fetch. Scoped to the
-    # app's org: another org's bundle can carry the same slug and ref, and
-    # would be handed this bundle's key names (#1921).
+    # last-known-keys cache is refreshed off the same fetch. The row is the one
+    # the target was listed from, in the app's org: looking it up again by slug
+    # and ref could land on another org's bundle that carries both (#1921).
     bundle = SecretBundle.all_objects.filter(
+        pk=target.get("secret_bundle_id"),
         organization_id=app.organization_id,
-        backend_ref=target["bundle_backend_ref"],
-        slug=target["bundle_slug"],
     ).first()
-    # Never read a location outside the app's org namespace (#1921). Without
-    # a row to say what kind of bundle this is, judge the ref as typed.
-    if bundle is not None:
-        unscoped = unscoped_bundle_reason(bundle, organization=app.organization)
-    else:
-        try:
-            assert_org_scoped_secret_ref(target["bundle_backend_ref"], organization=app.organization)
-            unscoped = None
-        except SecretRefNamespaceError as exc:
-            unscoped = str(exc)
+    if bundle is None:
+        raise AppDeployError(
+            f"rotation target for secret bundle {target['bundle_slug']!r} names no bundle of this app's organization"
+        )
+    # Never read a location outside the app's org namespace (#1921), and read
+    # the location that was checked.
+    unscoped = unscoped_bundle_reason(bundle, organization=app.organization)
     if unscoped is not None:
-        raise AppDeployError(f"secret bundle {target['bundle_slug']!r}: {unscoped}")
+        raise AppDeployError(f"secret bundle {bundle.slug!r}: {unscoped}")
     manifest = _materialize_secret_manifest(
         bundle_slug=target["bundle_slug"],
-        bundle_backend_ref=target["bundle_backend_ref"],
+        bundle_backend_ref=bundle.backend_ref,
         prefix=target["prefix"],
         namespace=namespace,
         secrets_backend=secrets_backend,
