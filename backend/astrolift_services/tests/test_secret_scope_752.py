@@ -5,10 +5,11 @@ Covers:
 - setAppSecret with explicit scope persists it on the metadata row
 - rotateAppSecret with explicit scope persists it
 - setAppSecretMetadata standalone persists scope
-- re-set resets scope to the supplied value (always written)
+- a write that names a scope overwrites it; set / rotate / bulk import /
+  metadata writes that omit it keep the stored scope (#1758)
 - resolver projects scope onto AppSecretType
-- _allowed_scopes_for_env: production env gets {all, production}
-- _allowed_scopes_for_env: preview env gets {all, preview, preview:<branch>}
+- allowed_scopes_for_env: production env gets {all, production}
+- allowed_scopes_for_env: preview env gets {all, preview, preview:<branch>}
 - scope filtering: production-scoped secret hidden in preview env
 - scope filtering: preview-scoped secret hidden in production env
 - scope filtering: preview:<branch> secret visible only in matching branch env
@@ -20,6 +21,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from constance.test import override_config
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -33,7 +35,9 @@ from astrolift_services.schema.mutations import (
     SetAppSecretInput,
     SetAppSecretMetadataInput,
 )
-from astrolift_services.schema.queries import ServicesQuery, _allowed_scopes_for_env
+from astrolift_services.schema.mutations.types import BulkImportAppSecretsInput, ProposeSecretChangeInput
+from astrolift_services.schema.queries import ServicesQuery
+from astrolift_services.secret_literals import allowed_scopes_for_env
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -134,18 +138,18 @@ def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
-# ---- _allowed_scopes_for_env unit tests ---------------------------
+# ---- allowed_scopes_for_env unit tests ---------------------------
 
 
 def test_allowed_scopes_production_env():
-    scopes = _allowed_scopes_for_env("production", {})
+    scopes = allowed_scopes_for_env("production", {})
     assert "all" in scopes
     assert "production" in scopes
     assert "preview" not in scopes
 
 
 def test_allowed_scopes_preview_env():
-    scopes = _allowed_scopes_for_env("preview-feat", {"preview-feat": "feat/login"})
+    scopes = allowed_scopes_for_env("preview-feat", {"preview-feat": "feat/login"})
     assert "all" in scopes
     assert "preview" in scopes
     assert "preview:feat/login" in scopes
@@ -154,7 +158,7 @@ def test_allowed_scopes_preview_env():
 
 def test_allowed_scopes_unknown_env_treated_as_production():
     # An env_name not in preview_env_branches → treated as non-preview.
-    scopes = _allowed_scopes_for_env("staging", {})
+    scopes = allowed_scopes_for_env("staging", {})
     assert "all" in scopes
     assert "production" in scopes
     assert "preview" not in scopes
@@ -246,10 +250,8 @@ def test_set_metadata_standalone_persists_scope(permission_resolver):
     assert row.scope == "preview:feat/new-ui"
 
 
-def test_reset_overwrites_existing_scope(permission_resolver):
-    """Re-calling setAppSecret always writes the supplied scope, resetting
-    any previously set value (FE pre-fills from metadata to preserve scope
-    across edits)."""
+def test_reset_with_an_explicit_scope_overwrites_it(permission_resolver):
+    """An operator who names a scope on a re-set gets it written."""
     org, app, _, _ = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)
     with _ctx(org):
@@ -259,11 +261,222 @@ def test_reset_overwrites_existing_scope(permission_resolver):
         )
         ServicesMutation().set_app_secret(
             _info(),
-            input=SetAppSecretInput(app_slug=app.slug, key="RESET_K", value="v2"),
+            input=SetAppSecretInput(app_slug=app.slug, key="RESET_K", value="v2", scope="all"),
         )
     row = AppSecretMetadata.objects.get(registered_app=app, key="RESET_K")
-    # Second write had no explicit scope → default "all" was written.
     assert row.scope == "all"
+
+
+def _restrict_to_production(org, app, key: str) -> None:
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key=key, value="v1", scope="production"),
+        )
+    assert result.ok, result.errors
+
+
+def _scope_of(app, key: str) -> str:
+    return AppSecretMetadata.objects.get(registered_app=app, key=key, deleted_at__isnull=True).scope
+
+
+# A write that omits the scope used to write the "all" default over the
+# stored one, so a routine rotate, re-set, bulk import or metadata edit
+# widened a production-only key to every environment, previews included
+# (#1758 review, H3).
+
+
+def test_reset_without_a_scope_keeps_the_stored_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "RESET_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="RESET_K", value="v2"),
+        )
+    assert result.ok, result.errors
+    assert _scope_of(app, "RESET_K") == "production"
+
+
+def test_rotate_without_a_scope_keeps_the_stored_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "ROT_K")
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(app_slug=app.slug, key="ROT_K", value="v2"),
+        )
+    assert result.ok, result.errors
+    assert _scope_of(app, "ROT_K") == "production"
+
+
+def test_bulk_import_keeps_the_stored_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "BULK_K")
+    with _ctx(org):
+        result = ServicesMutation().bulk_import_app_secrets(
+            _info(),
+            input=BulkImportAppSecretsInput(app_slug=app.slug, dotenv_text="BULK_K=v2\nNEW_K=v3\n"),
+        )
+    assert result.ok, result.errors
+    assert _scope_of(app, "BULK_K") == "production"
+    assert _scope_of(app, "NEW_K") == "all"
+
+
+def test_set_metadata_without_a_scope_keeps_the_stored_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "META_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="META_K", set_via="cli"),
+        )
+    assert result.ok, result.errors
+    assert result.data.scope == "production"
+    assert _scope_of(app, "META_K") == "production"
+
+
+def test_a_new_per_environment_row_without_a_scope_takes_the_scope_in_force(permission_resolver):
+    """The deploy and the secrets list prefer a key's per-environment row
+    to its app-wide one. Created as "all", a row that only recorded how a
+    key was set for one preview widened a production-only key into it."""
+    org, app, cluster, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    _add_preview_env(app, cluster, env_name="pr-env-row", branch="feat/env-row")
+    _restrict_to_production(org, app, "ENV_ROW_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(
+                app_slug=app.slug, key="ENV_ROW_K", environment_name="pr-env-row", set_via="cli"
+            ),
+        )
+        secrets = ServicesQuery().astrolift_app_secrets(
+            _info(), app_slug=app.slug, environment_name="pr-env-row"
+        )
+    assert result.ok, result.errors
+    assert result.data.scope == "production"
+    assert "ENV_ROW_K" not in [s.key for s in secrets if s.source == "literal"]
+
+
+def test_a_per_environment_row_without_a_scope_follows_the_app_wide_scope_in_the_list(permission_resolver):
+    """Stored as a copy of the app-wide scope, the row kept showing the key
+    in its environment after the app-wide scope was narrowed."""
+    org, app, cluster, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    _add_preview_env(app, cluster, env_name="pr-follow", branch="feat/follow")
+
+    def listed():
+        secrets = ServicesQuery().astrolift_app_secrets(
+            _info(), app_slug=app.slug, environment_name="pr-follow"
+        )
+        return {s.key: (s.scope, s.set_via) for s in secrets if s.source == "literal"}
+
+    with _ctx(org):
+        annotated = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(
+                app_slug=app.slug, key="SHARED_KEY", environment_name="pr-follow", set_via="cli"
+            ),
+        )
+        before = listed()
+        narrowed = ServicesMutation().set_app_secret_metadata(
+            _info(), input=SetAppSecretMetadataInput(app_slug=app.slug, key="SHARED_KEY", scope="production")
+        )
+        after = listed()
+    assert annotated.ok, annotated.errors
+    assert narrowed.ok, narrowed.errors
+    assert before.get("SHARED_KEY") == ("all", "cli")
+    assert "SHARED_KEY" not in after
+
+
+# An explicit "" matches no environment's allowed scopes, so storing it
+# would stop the key deploying anywhere without an error.
+
+
+def _refused_as_empty_scope(result) -> bool:
+    return result.ok is False and result.errors[0].code == "VALIDATION" and result.errors[0].field == "scope"
+
+
+def test_set_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope=""),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_rotate_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope="  "),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_set_metadata_refuses_an_empty_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="EMPTY_K", scope=""),
+        )
+    assert _refused_as_empty_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+# Scope decides which environments receive a value, so changing it is a
+# secret write: it needs the same fresh elevation as set/rotate (#1946).
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_set_metadata_requires_a_fresh_elevation(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "ELEV_K")
+    unelevated = SimpleNamespace(
+        context=SimpleNamespace(user=None, request=SimpleNamespace(user=None, session={}, META={}))
+    )
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            unelevated,
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="ELEV_K", scope="all"),
+        )
+    assert result.ok is False
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    assert _scope_of(app, "ELEV_K") == "production"
+
+
+def test_propose_secret_change_does_not_take_set_metadata(permission_resolver):
+    """set_metadata proposals come only from setAppSecretMetadata, which
+    checks that the scope really changes."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with _ctx(org):
+        result = ServicesMutation().propose_secret_change(
+            _info(),
+            input=ProposeSecretChangeInput(app_slug=app.slug, op="set_metadata", key="ANY_K"),
+        )
+    assert result.ok is False
+    assert (result.errors[0].code, result.errors[0].field) == ("VALIDATION", "op")
 
 
 # ---- setAppSecretMetadata return payload carries scope ------------

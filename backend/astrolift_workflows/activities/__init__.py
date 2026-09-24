@@ -138,6 +138,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
 from astrolift_workflows.activities.migration import (
     apply_to_target_cluster,
     drain_source_cluster,
+    materialize_secrets_on_target,
     poll_rollout_on_target,
     switch_app_env_binding,
     validate_migration_target,
@@ -314,6 +315,7 @@ __all__ = [
     "mark_preview_torn_down",
     "mark_running",
     "mark_workflow_run",
+    "materialize_secrets_on_target",
     "plan_app_domain_sync",
     "poll_agent_run_status",
     "poll_agent_run_progress",
