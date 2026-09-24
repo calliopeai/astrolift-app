@@ -37,7 +37,6 @@ vi.mock("@apollo/client/react", async () => {
   const React = await import("react");
   return {
     useQuery: (query: unknown) => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       const app = React.useSyncExternalStore(server.subscribe, server.get);
       if (query === GET_APP) return { data: { astroliftApp: app }, loading: false };
       return { data: undefined, loading: false };
@@ -122,7 +121,12 @@ describe("ConfigEditorClient save round trip (#1920)", () => {
           updateManifest: {
             ok: true,
             errors: [],
-            data: { id: "app-1", syncState: "db_ahead", rawManifest: "", rawManifestStaged: echoed },
+            data: {
+              id: "app-1",
+              syncState: "db_ahead",
+              rawManifest: "",
+              rawManifestStaged: echoed,
+            },
           },
         },
       });
