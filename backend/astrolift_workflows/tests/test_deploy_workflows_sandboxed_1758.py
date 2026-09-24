@@ -10,18 +10,56 @@ workflow scheduled them in.
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
+import pytest
 from temporalio import activity
-from temporalio.worker import Worker
+from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowHistory
+from temporalio.worker import Replayer, Worker
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import NondeterminismError
 
-from astrolift_workflows.inputs import Actor, PromoteInput
+from astrolift_workflows.inputs import Actor, DeployAppInput, PromoteInput, RollbackInput
+from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
+from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
 
 TASK_QUEUE = "astrolift-test"
 
+FIXTURES = Path(__file__).parent / "fixtures"
+
 _ACTOR = Actor(kind="system")
+
+# Per workflow that applies workloads: (class, input, workflow id, history
+# captured before the secrets moved ahead of the workloads).
+CASES = {
+    "deploy": (
+        DeployAppWorkflow,
+        DeployAppInput(
+            registered_app_id=1,
+            app_environment_id=2,
+            deployment_id=3,
+            image_tags={},
+            trigger_kind="manual",
+            actor=_ACTOR,
+        ),
+        "deploy-secrets-before-apply",
+        "legacy-deploy-app-secrets-after-apply.json",
+    ),
+    "promote": (
+        PromoteDeploymentWorkflow,
+        PromoteInput(source_deployment_id=3, target_app_environment_id=4, actor=_ACTOR),
+        "promote-secrets-before-apply",
+        "legacy-promote-deployment-secrets-after-apply.json",
+    ),
+    "rollback": (
+        RollbackDeploymentWorkflow,
+        RollbackInput(deployment_id=3, actor=_ACTOR),
+        "rollback-secrets-before-apply",
+        "legacy-rollback-deployment-secrets-after-apply.json",
+    ),
+}
 
 
 def fake_activities(calls: list[str]) -> list:
@@ -201,3 +239,47 @@ async def test_a_promotion_runs_to_completion_on_the_sandboxed_runner(temporal_e
 
     assert result.ok is True, result.message
     assert calls[-1] == "mark_running"
+
+
+def _scheduled(history: WorkflowHistory) -> list[str]:
+    """Activity names, in the order the workflow scheduled them."""
+    return [
+        event.activity_task_scheduled_event_attributes.activity_type.name.rsplit(".", 1)[-1]
+        for event in history.events
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+    ]
+
+
+async def _replay(workflow_cls, history: WorkflowHistory) -> None:
+    await Replayer(workflows=[workflow_cls], workflow_runner=SandboxedWorkflowRunner()).replay_workflow(
+        history
+    )
+
+
+@pytest.mark.parametrize("case", sorted(CASES))
+async def test_the_secrets_are_applied_before_the_workloads_that_read_them(temporal_env, case):
+    """A rotated literal changes the pod-template digest, so apply rolls the
+    pods, and a new pod reads its Secret once, at start. With update_secrets
+    after apply, a pod could start on the old value and then never roll
+    again, because its digest already matched."""
+    workflow_cls, workflow_input, workflow_id, _legacy = CASES[case]
+
+    result, calls, handle = await run_sandboxed(temporal_env, workflow_cls, workflow_input, workflow_id)
+
+    assert result.ok is True, result.message
+    assert calls.count("update_secrets") == 1
+    assert calls.index("update_secrets") < calls.index("apply_manifests")
+    await _replay(workflow_cls, await handle.fetch_history())
+
+
+@pytest.mark.parametrize("case", sorted(CASES))
+async def test_a_run_started_before_the_reorder_still_replays(case):
+    """Captured at 1eabedfa, from the workflows before the reorder, on the
+    Temporal test server (SDK 1.27.2). A worker on this code must replay a
+    run that was in flight when it rolled out, in that run's order."""
+    workflow_cls, _input, workflow_id, legacy = CASES[case]
+    history = WorkflowHistory.from_json(workflow_id, (FIXTURES / legacy).read_text())
+    scheduled = _scheduled(history)
+    assert scheduled.index("apply_manifests") < scheduled.index("update_secrets")
+
+    await _replay(workflow_cls, history)
