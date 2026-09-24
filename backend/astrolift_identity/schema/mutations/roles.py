@@ -97,9 +97,9 @@ class RoleMutations:
                 "; ".join(f"{k}: {v[0]}" for k, v in exc.message_dict.items()),
                 field="permissions" if "permissions" in exc.message_dict else None,
             )
-        # A custom slug may repeat a stock role's, and invitations and the
-        # domain allowlist pick roles by slug, so a role wider than its author
-        # could reach someone the author could never grant it to (#1964).
+        # Whoever grants this role later trusts the name and slug its author
+        # chose, so a role wider than its author would hand out, through that
+        # grant, permissions the author could never grant (#1964).
         require_grantable(
             role.permissions,
             scope_kind="ORG",

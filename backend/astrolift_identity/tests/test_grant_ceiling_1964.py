@@ -431,7 +431,8 @@ def test_allowlist_default_role_is_capped(world, stock):
 
 
 def test_a_new_role_cannot_carry_more_than_its_author_holds(world):
-    """Custom slugs may repeat a stock one and invitations pick roles by slug."""
+    """Whoever grants a role trusts the name and slug its author chose; here
+    the author even reuses a stock role's slug."""
     actor = _member_manager(world)
 
     def create(slug: str, permissions: list[str]):
