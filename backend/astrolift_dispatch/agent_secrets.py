@@ -472,6 +472,7 @@ def resolve_task_secret_manifest(
     namespace: str,
     task_guid: str,
     workload=None,
+    exclude: frozenset[str] = frozenset(),
 ) -> dict | None:
     """Preflight + materialize a spec's secret refs into a K8s Secret manifest.
 
@@ -485,10 +486,18 @@ def resolve_task_secret_manifest(
     that belongs to an app carries that app's managed-service secrets into
     the same per-task Secret (#1700), because the app's own binding Secret
     lives in another namespace and cannot be mounted from here.
+
+    ``exclude`` names env vars this run must not receive, such as provider
+    keys in model gateway mode (#1851): they are neither read from the store
+    nor required to exist there.
     """
-    refs = effective_secret_refs(spec)
+    refs = [ref for ref in effective_secret_refs(spec) if ref["env_var"] not in exclude]
     bundle_refs = agent_bundle_refs(spec)
-    app_refs = app_managed_service_secret_refs(workload) if workload is not None else []
+    app_refs = [
+        ref
+        for ref in (app_managed_service_secret_refs(workload) if workload is not None else [])
+        if ref["env_var"] not in exclude
+    ]
     if not refs and not bundle_refs and not app_refs:
         return None
 
@@ -524,6 +533,12 @@ def resolve_task_secret_manifest(
                 missing.append(f"bundle:{bundle.slug} invalid or dispatcher-owned env var {env_var!r}")
                 continue
             value = str(value)
+            if env_var in exclude:
+                # Still one of the bundle's keys, so the key list stays the
+                # same whichever run enumerated it.
+                if value:
+                    keys.append(str(key))
+                continue
             if not value:
                 missing.append(f"bundle:{bundle.slug} empty value for {key}")
                 continue

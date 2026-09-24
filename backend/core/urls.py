@@ -6,8 +6,8 @@ from django.views.generic import TemplateView
 urlpatterns = [
     path('core/user-permissions-report/', views.user_permissions_tree, name='user_permissions_report'),
     path('core/user-permissions-tree-view/',
-         TemplateView.as_view(
-             template_name='core/user_permissions_report.html'),
+         views.admin_tooling('auth.view_user', 'auth.view_group')(TemplateView.as_view(
+             template_name='core/user_permissions_report.html')),
          name='user_permissions_tree_view'
          ),
     path('core/compare-user-permissions/', views.compare_user_permissions, name='compare_user_permissions'),
