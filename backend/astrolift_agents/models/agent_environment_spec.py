@@ -54,6 +54,10 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # Boot the agent's payload in a box before its session starts, with the
     # runner's workspace setup ([workspace] repos, deps, MCP) (#1877).
     box_workspace = models.BooleanField(default=False)
+    # Send model traffic through the Zentinelle gateway in the pod's cluster
+    # with a per-run agent key; no provider key reaches the pod (#1851).
+    # Excludes ``managed_model``: the gateway does not proxy Bedrock or Vertex.
+    model_gateway = models.BooleanField(default=False)
     # Secret URIs only — values resolved by the dispatcher at launch time.
     # Never store values.  Format:
     #   [{"uri": "arn:aws:secretsmanager:...", "env_var": "GITHUB_TOKEN"}]

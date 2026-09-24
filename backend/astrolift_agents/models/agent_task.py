@@ -145,6 +145,19 @@ class AgentTask(BaseCoreModel):
     )
     # Pod/container name assigned by the dispatcher backend.
     pod_name = models.CharField(max_length=255, blank=True, default="")
+    # The Zentinelle agent whose key a model-gateway run holds (#1851), so
+    # stop and finish revoke it; its usage is metered under this id. Empty
+    # for a run without the gateway.
+    model_gateway_agent_id = models.CharField(max_length=100, blank=True, default="")
+    # The connection whose install minted that key: the only one Zentinelle
+    # lets renew or revoke it, even after the organization reconnects.
+    model_gateway_connection = models.ForeignKey(
+        "astrolift_operations.ZentinelleConnection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     # K8s namespace the dispatcher actually spawned the Job in, frozen at
     # spawn. The log resolver reads this back rather than recomputing the
     # namespace — different dispatch paths land in different namespaces, so
