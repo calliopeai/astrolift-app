@@ -75,6 +75,7 @@ from astrolift_agents.services.agent_package import (
 from astrolift_agents.visibility import agent_by_slug
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
+from astrolift_dispatch.model_gateway import MODEL_GATEWAY_MANAGED_CONFLICT
 from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
@@ -143,6 +144,9 @@ class CreateAgentEnvironmentSpecInput:
     run_as_non_root: bool = False
     # Boxes set up the agent's payload workspace before the session (#1877).
     box_workspace: bool = False
+    # Model traffic goes through the Zentinelle gateway with a per-run key and
+    # no provider key in the pod (#1851); excludes managed_model.
+    model_gateway: bool = False
     config_repo: str = ""
     config_branch: str = "main"
     config_manifest_path: str = ""
@@ -168,6 +172,7 @@ class UpdateAgentEnvironmentSpecInput:
     managed_model: bool | None = None
     run_as_non_root: bool | None = None
     box_workspace: bool | None = None
+    model_gateway: bool | None = None
     config_repo: str | None = None
     config_branch: str | None = None
     config_manifest_path: str | None = None
@@ -874,6 +879,10 @@ class AgentsMutation:
 
         if input.run_as_non_root and input.allow_install:
             return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
+        if input.model_gateway and input.managed_model:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, MODEL_GATEWAY_MANAGED_CONFLICT, field="modelGateway"
+            )
 
         slug = input.slug.strip()[:128]
         if AgentEnvironmentSpec.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).exists():
@@ -897,6 +906,7 @@ class AgentsMutation:
                 managed_model=bool(input.managed_model),
                 run_as_non_root=bool(input.run_as_non_root),
                 box_workspace=bool(input.box_workspace),
+                model_gateway=bool(input.model_gateway),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
@@ -970,6 +980,12 @@ class AgentsMutation:
             return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
         if input.box_workspace is not None:
             spec.box_workspace = bool(input.box_workspace)
+        if input.model_gateway is not None:
+            spec.model_gateway = bool(input.model_gateway)
+        if spec.model_gateway and spec.managed_model:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, MODEL_GATEWAY_MANAGED_CONFLICT, field="modelGateway"
+            )
         if input.config_repo is not None:
             spec.config_repo = input.config_repo.strip()[:512]
         if input.config_branch is not None:

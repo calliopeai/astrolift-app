@@ -29,7 +29,7 @@ def restricted_serializer_mutate(
 
     Replaces RestrictedSerializerMutation.mutate_and_get_payload().
 
-    1. Checks model-level add/change permissions
+    1. Checks the model's add/change hook (platform operator only, #1864)
     2. Runs the serializer
     3. Returns ok/errors MutationResult
     """
@@ -37,9 +37,9 @@ def restricted_serializer_mutate(
 
     # Permission check
     if instance:
-        model_class.p('model').change.check(user)
+        model_class.can_change(user)
     else:
-        model_class.p('model').add.check(user)
+        model_class.can_add(user)
 
     kwargs = {
         'data': data,

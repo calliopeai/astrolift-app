@@ -7,21 +7,20 @@ checks. Each test asserts the OWNER is allowed and a NON-owner (other
 user / other org) is denied — mirroring the safe sibling in the same
 module (``notification_read`` / ``astrolift_deployment_lifecycle_stream``).
 
-PRE-EXISTING breakage unrelated to this change (flagged for follow-up,
-NOT fixed here): the ``notification`` mutation looks up by a ``guid``
-field that ``Notification`` does not define (``filter(guid=...)`` raises
-``FieldError``) and ``NotificationSerializer`` imports ``UserType`` from a
-path that no longer exports it. We patch the lookup / serializer to
-exercise ONLY the ownership branch this change adds — the same way the
-sibling ``notification_read`` test patches its broken ``get_object``
-import via ``_patch_get_object``.
+``notification`` upsert is the exception (#1949): a ``guid`` in the input
+names an existing row for an update, and ``NotificationSerializer`` is a
+plain ModelSerializer with ``user``/``subject``/``message`` all writable,
+so an ownership check alone would still let the OWNER re-address or
+rewrite a notification they only own as its recipient. Every ``guid``
+input is refused outright now, owner included, so those two cases are
+covered together below rather than as an owner/non-owner pair.
 """
 
 from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -45,58 +44,54 @@ def _info(user):
 
 
 # ---------------------------------------------------------------------------
-# notification upsert — owner check (mirrors notification_read)
+# notification upsert (#1949: any `guid` update is refused, owner included)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_notification_upsert_denies_other_users_notification():
+def test_notification_upsert_with_guid_is_refused_even_for_the_owner():
+    user_a = User.objects.create_user(username="n1193-o", email="n1193o@t.local")
+    notif_a = Notification.objects.create(user=user_a, subject="mine", message="m", created_by=user_a)
+
+    result = NotificationMutations().notification(
+        info=_info(user_a), input={"guid": str(notif_a.pk), "subject": "hijacked"}
+    )
+
+    assert result.ok is False
+    assert result.errors[0].field == "guid"
+    notif_a.refresh_from_db()
+    assert notif_a.subject == "mine"
+
+
+@pytest.mark.django_db
+def test_notification_upsert_with_guid_is_refused_for_another_users_notification():
     user_a = User.objects.create_user(username="n1193-a", email="n1193a@t.local")
     user_b = User.objects.create_user(username="n1193-b", email="n1193b@t.local")
     notif_b = Notification.objects.create(
         user=user_b, subject="B-private", message="secret", created_by=user_b
     )
-    # `guid` is not a real Notification field (pre-existing); patch the lookup
-    # so the ownership branch is reached with another user's row.
-    fake_qs = MagicMock()
-    fake_qs.first.return_value = notif_b
-    with patch("core.models.Notification.objects") as mgr:
-        mgr.filter.return_value = fake_qs
-        with pytest.raises(ValueError, match="does not belong to user"):
-            NotificationMutations().notification(
-                info=_info(user_a),
-                input={"guid": "any", "subject": "hijacked"},
-            )
+
+    result = NotificationMutations().notification(
+        info=_info(user_a), input={"guid": str(notif_b.pk), "subject": "hijacked"}
+    )
+
+    assert result.ok is False
     notif_b.refresh_from_db()
     assert notif_b.subject == "B-private"
 
 
 @pytest.mark.django_db
-def test_notification_upsert_owner_allowed():
-    user_a = User.objects.create_user(username="n1193-o", email="n1193o@t.local")
-    notif_a = Notification.objects.create(
-        user=user_a, subject="mine", message="m", created_by=user_a
+def test_notification_create_without_guid_still_works():
+    """Creates (no `guid` in the input) are unaffected by the #1949 fix."""
+    user_a = User.objects.create_user(username="n1193-c", email="n1193c@t.local")
+
+    result = NotificationMutations().notification(
+        info=_info(user_a),
+        input={"user": str(user_a.pk), "subject": "hello", "message": "world"},
     )
-    fake_qs = MagicMock()
-    fake_qs.first.return_value = notif_a
-    fake_serializer = MagicMock()
-    fake_serializer.is_valid.return_value = True
-    with (
-        patch("core.models.Notification.objects") as mgr,
-        patch(
-            "core.serializers.notification.NotificationSerializer",
-            return_value=fake_serializer,
-        ) as ser_cls,
-    ):
-        mgr.filter.return_value = fake_qs
-        result = NotificationMutations().notification(
-            info=_info(user_a),
-            input={"guid": "any", "subject": "x"},
-        )
-    assert result.ok is True
-    # The owner's own row was passed through to the upsert — the gate allowed it.
-    assert ser_cls.call_args.kwargs["instance"] is notif_a
-    fake_serializer.save.assert_called_once()
+
+    assert result.ok is True, result.errors
+    assert Notification.objects.filter(user=user_a, subject="hello", message="world").exists()
 
 
 # ---------------------------------------------------------------------------

@@ -7,10 +7,9 @@ from strawberry.types import Info
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 
-from config.permissions import AbstractPermissions
+from core.permissions import require_platform_operator
 from core.serializers.permissions import UserGroupSerializer
 from core.schema.common import GlobalIDUtils, MutationResult, ValidationError
-from core.systems import Action
 
 
 @strawberry.input
@@ -25,11 +24,9 @@ class PermissionMutations:
 
     @strawberry.mutation(description="Add or remove users from a permission group.")
     def permission_group_operation(self, info: Info, input: GroupOperationInput) -> MutationResult:
-        user = info.context.user
-
-        # Permission checks (mirrors RestrictedSerializerMutation.has_model_permissions)
-        AbstractPermissions.check_django_auth_permission(user, 'user', Action.CHANGE, True)
-        AbstractPermissions.check_django_auth_permission(user, 'group', Action.CHANGE, True)
+        # Django groups only authorize the Django admin now (#1864); editing
+        # them from the app API is the platform operator's job.
+        require_platform_operator(info.context.user)
 
         # Global IDs -> PKs.
         #

@@ -115,6 +115,20 @@ class AgentBox(NamedBaseCoreModel):
     # control plane cannot see that from out here.
     last_attached_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True, default="")
+    # The Zentinelle agent whose key a model-gateway box holds (#1851), and
+    # when that key expires unless the reaper renews it first.
+    model_gateway_agent_id = models.CharField(max_length=100, blank=True, default="")
+    model_gateway_expires_at = models.DateTimeField(null=True, blank=True)
+    # When Zentinelle stops honouring renewals of that key: its lifetime cap.
+    model_gateway_lifetime_ends_at = models.DateTimeField(null=True, blank=True)
+    # The connection whose install minted the key, as on AgentTask.
+    model_gateway_connection = models.ForeignKey(
+        "astrolift_operations.ZentinelleConnection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     class Meta:
         constraints = [

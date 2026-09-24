@@ -492,8 +492,7 @@ class UploadMutations:
         )
 
     @strawberry.mutation(
-        description="Upload an image for a specific profile image field (avatar, signature). "
-        "Supports the approval request workflow for non-whitelisted fields."
+        description="Upload an image for a specific profile image field (avatar, signature)."
     )
     def profile_image_field_upload(
         self,
@@ -503,17 +502,6 @@ class UploadMutations:
         field: Optional[ProfileImageFieldEnum] = None,
         metadata: Optional[strawberry.scalars.JSON] = None,
     ) -> ProfileImageFieldUploadResult:
-        # Optional import - Domain-specific functionality
-        try:
-            from domain_app.models import ApprovalRequest
-
-            has_domain_app = True
-        except ImportError:
-            ApprovalRequest = None
-            has_domain_app = False
-
-        from config.roles_gen import P
-
         model_name, pk = GlobalIDUtils.from_global_id(global_id)
         assert model_name != Profile._meta.model_name
         profile_original: Profile = Profile.objects.get(pk=pk)
@@ -541,32 +529,16 @@ class UploadMutations:
 
         original, draft = Profile.objects.get_draft(profile_original)
 
-        if has_domain_app:
-            with ApprovalRequest.objects.for_instance(
-                instance=draft,
-                permission=P.PROFILE_APPROVE_CHANGES.perm(),
-                created_by=info.context.user,
-            ):
-                profile = draft
-                profile.document_option = Profile.DocumentOptions.DRAFTED
-                upload = self._save_profile_upload(
-                    field,
-                    global_id,
-                    info,
-                    metadata,
-                    mimetype,
-                    profile,
-                )
-        else:
-            profile = draft
-            upload = self._save_profile_upload(
-                field,
-                global_id,
-                info,
-                metadata,
-                mimetype,
-                profile,
-            )
+        # ``domain_app`` (the scaffold's approval workflow) is not part of
+        # Astrolift, so the draft takes the upload directly.
+        upload = self._save_profile_upload(
+            field,
+            global_id,
+            info,
+            metadata,
+            mimetype,
+            draft,
+        )
 
         return ProfileImageFieldUploadResult(upload=upload)
 
