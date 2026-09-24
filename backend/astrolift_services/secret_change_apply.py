@@ -143,6 +143,11 @@ def apply_proposal(
             key = (payload.get("key") or "").strip()
             if not key:
                 return ApplyResult(ok=False, error="payload.key is required for set_metadata")
+            # setAppSecretMetadata checks the scope in force under this lock
+            # before it writes; holding it here keeps that check from reading
+            # the scope this apply is changing. Set and delete hold it
+            # through _stage_manifest.
+            RegisteredApp.objects.select_for_update(no_key=True).filter(pk=app.pk).first()
             expires_at = payload.get("expires_at")
             upsert_app_secret_metadata(
                 app=app,

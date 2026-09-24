@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import base64
 import itertools
+import threading
+import time
 from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import close_old_connections, connection, transaction
 from django.utils import timezone
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment
@@ -39,6 +42,7 @@ from astrolift_services.schema.mutations.types import (
     SetAppSecretInput,
     SetAppSecretMetadataInput,
 )
+from astrolift_services.secret_change_apply import apply_proposal
 from astrolift_workflows.activities.app_lifecycle import (
     _app_env_secret_name,
     _bindings_secret_name,
@@ -1113,3 +1117,84 @@ def test_an_app_wide_scope_proposal_lists_the_environments_that_keep_their_own_s
         assert (diff["before"]["scope"], diff["after"]["scope"]) == ("all", "production")
         assert diff["after"]["overrides"] == "preview-pinned (all)"
         assert diff["summary"].endswith("; preview-pinned keeps all")
+
+
+# setAppSecretMetadata decides between writing and proposing from the scope
+# in force. Read outside a lock, that scope could be one an approved change
+# was committing at that moment: a preview pinned to "all" then kept a key
+# the approval had just restricted to production, without a proposal.
+
+
+def _lock_waiters() -> int:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'"
+        )
+        return cursor.fetchone()[0]
+
+
+def _on_own_connection(fn) -> tuple[threading.Thread, dict]:
+    box: dict = {}
+
+    def run():
+        close_old_connections()
+        try:
+            box["result"] = fn()
+        except BaseException as exc:
+            box["error"] = exc
+        finally:
+            close_old_connections()
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread, box
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("change", ["metadata", "metadata-over-an-app-wide-row", "rotation"])
+def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
+    approver_grants, app, env, monkeypatch, change
+):
+    _repo_change(app, set_app_env_keys(_MANIFEST, {"K": "repo-value"}))
+    if change == "metadata-over-an-app-wide-row":
+        assert _set_scope(app, "K", set_via="cli").ok
+    _require_secret_approval(app)
+    preview = _preview_environment(app, env, name="preview-race", status=PreviewEnvironment.Status.RUNNING)
+    if change == "rotation":
+        proposal_id = _propose(
+            app,
+            lambda info: ServicesMutation().rotate_app_secret(
+                info, input=RotateAppSecretInput(app_slug=app.slug, key="K", value="v2", scope="production")
+            ),
+        )
+    else:
+        proposal_id = str(_set_scope(app, "K", scope="production").data.pending_proposal_id)
+    proposal = SecretChangeProposal.objects.select_related("registered_app").get(guid=proposal_id)
+    applied, release = threading.Event(), threading.Event()
+
+    def apply_and_hold():
+        with transaction.atomic():
+            assert apply_proposal(proposal).ok
+            applied.set()
+            release.wait(timeout=30)
+
+    applier, applier_box = _on_own_connection(apply_and_hold)
+    assert applied.wait(timeout=30)
+    pinner, pinner_box = _on_own_connection(
+        lambda: _set_scope(app, "K", environment_name=preview.name, scope="all")
+    )
+    deadline = time.monotonic() + 30
+    while pinner.is_alive() and not _lock_waiters() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    release.set()
+    applier.join(timeout=30)
+    pinner.join(timeout=30)
+
+    assert "error" not in applier_box, applier_box
+    assert "error" not in pinner_box, pinner_box
+    pinned = pinner_box["result"]
+    assert pinned.ok, pinned.errors
+    assert pinned.data.pending_proposal_id is not None
+    assert pinned.data.scope == "production"
+    assert not _live_metadata(app, "K").filter(environment_name=preview.name).exists()
+    assert _materialize(_deployment(app, preview), monkeypatch) == {}

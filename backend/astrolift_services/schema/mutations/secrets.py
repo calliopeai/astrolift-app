@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db import transaction
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -346,43 +347,56 @@ class SecretMutations:
                 f"environment {environment_name!r} not found",
                 field="environmentName",
             )
-        if app.requires_secret_approval and input.scope is not None:
-            current_scope = current_secret_scope(app, input.key, environment_name)
-            if input.scope != current_scope:
-                proposal = _maybe_create_proposal_for_write(
-                    app=app,
-                    op=SecretChangeProposal.Op.SET_METADATA.value,
-                    payload={"key": input.key, **_metadata_fields(input)},
-                    environment_name=environment_name,
-                    info=info,
-                )
-                existing = AppSecretMetadata.objects.filter(
-                    registered_app=app,
-                    environment_name=environment_name,
-                    key=input.key,
-                    deleted_at__isnull=True,
-                ).first()
-                return gql_success(
-                    _AppSecretMetadataPayload(
-                        app_slug=app.slug,
-                        key=input.key,
+        with transaction.atomic():
+            # The scope check below and the write it decides must see one
+            # state. An approved scope change holds this row lock while it
+            # applies: a set or delete through its staged-manifest write, a
+            # set_metadata in apply_proposal. Locking the key's app-wide
+            # metadata row would miss a key only the repo has set, which
+            # has no such row until the change creates it.
+            app = RegisteredApp.objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            if app.requires_secret_approval and input.scope is not None:
+                current_scope = current_secret_scope(app, input.key, environment_name)
+                if input.scope != current_scope:
+                    proposal = _maybe_create_proposal_for_write(
+                        app=app,
+                        op=SecretChangeProposal.Op.SET_METADATA.value,
+                        payload={"key": input.key, **_metadata_fields(input)},
                         environment_name=environment_name,
-                        expires_at=existing.expires_at if existing else None,
-                        set_via=existing.source if existing else "",
-                        set_at=existing.set_at if existing else None,
-                        scope=current_scope,
-                        pending_proposal_id=GUID(str(proposal.guid)),
+                        info=info,
                     )
-                )
-        row = _upsert_app_secret_metadata(
-            app=app,
-            key=input.key,
-            environment_name=environment_name,
-            expires_at=input.expires_at,
-            set_via=input.set_via,
-            scope=input.scope,
-            actor=_actor_user(info),
-        )
+                    existing = AppSecretMetadata.objects.filter(
+                        registered_app=app,
+                        environment_name=environment_name,
+                        key=input.key,
+                        deleted_at__isnull=True,
+                    ).first()
+                    return gql_success(
+                        _AppSecretMetadataPayload(
+                            app_slug=app.slug,
+                            key=input.key,
+                            environment_name=environment_name,
+                            expires_at=existing.expires_at if existing else None,
+                            set_via=existing.source if existing else "",
+                            set_at=existing.set_at if existing else None,
+                            scope=current_scope,
+                            pending_proposal_id=GUID(str(proposal.guid)),
+                        )
+                    )
+            row = _upsert_app_secret_metadata(
+                app=app,
+                key=input.key,
+                environment_name=environment_name,
+                expires_at=input.expires_at,
+                set_via=input.set_via,
+                scope=input.scope,
+                actor=_actor_user(info),
+            )
+            # A per-environment row may store no scope and follow the
+            # app-wide one; report the scope the key actually has here.
+            scope = current_secret_scope(app, row.key, row.environment_name)
         return gql_success(
             _AppSecretMetadataPayload(
                 app_slug=app.slug,
@@ -391,9 +405,7 @@ class SecretMutations:
                 expires_at=row.expires_at,
                 set_via=row.source,
                 set_at=row.set_at,
-                # A per-environment row may store no scope and follow the
-                # app-wide one; report the scope the key actually has here.
-                scope=current_secret_scope(app, row.key, row.environment_name),
+                scope=scope,
             )
         )
 
