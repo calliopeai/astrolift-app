@@ -114,6 +114,7 @@ type Appsecretmetadatapayload {
   setVia: String!
   setAt: DateTime
   scope: String!
+  pendingProposalId: GUID
 }
 
 type AppsecretmetadatapayloadMutationResult {
@@ -6703,7 +6704,7 @@ input RotateAppSecretInput {
   ifMatchVersion: Int = null
   expiresAt: DateTime = null
   setVia: String = null
-  scope: String! = "all"
+  scope: String = null
 }
 
 input RotateDeployTokenInput {
@@ -6792,7 +6793,7 @@ input SetAppSecretInput {
   ifMatchVersion: Int = null
   expiresAt: DateTime = null
   setVia: String = null
-  scope: String! = "all"
+  scope: String = null
 }
 
 input SetAppSecretMetadataInput {
@@ -6801,7 +6802,7 @@ input SetAppSecretMetadataInput {
   environmentName: String = null
   expiresAt: DateTime = null
   setVia: String = null
-  scope: String! = "all"
+  scope: String = null
 }
 
 input SetAppSubdomainInput {

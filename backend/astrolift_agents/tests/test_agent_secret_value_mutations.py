@@ -268,6 +268,73 @@ def test_delete_denied_without_secret_write(permission_resolver, info, org, with
 
 
 # ---------------------------------------------------------------------------
+# secret:// scheme normalization (#1761)
+#
+# The CLI reference and agent-packages.md document a ref's uri in the
+# ``secret://path`` form. AWS Secrets Manager's name validator has no colon
+# in its allowed character set, so a ref stored that way always failed
+# ValidationException on write, and (before this fix) would have failed
+# resolving on read too had a value ever gotten in another way.
+# ---------------------------------------------------------------------------
+
+
+def test_set_strips_scheme_before_writing_to_the_store(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org, refs=[{"uri": "secret://agents/calliope/anthropic", "env_var": "GITHUB_TOKEN"}])
+    with with_tenant_org(org):
+        result = AgentsMutation().set_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN", value="ghp_secret"
+        )
+    assert result.ok is True, result.errors
+    # The ref keeps the documented scheme in what's echoed back...
+    assert result.data.uri == "secret://agents/calliope/anthropic"
+    # ...but the store never sees it, since no backend's name validator
+    # accepts a colon.
+    assert fake_store.upserts == [("agents/calliope/anthropic", {"value": "ghp_secret"})]
+
+
+def test_delete_strips_scheme_in_the_presence_probe_and_the_delete_call(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """Regression for the one direct ``backend.get`` bypass (#1761).
+
+    ``deleteAgentSecretValue`` probes presence with ``backend.get`` directly
+    rather than through ``read_secret_value`` -- without normalizing that
+    call too, the probe looks up a key the store never uses (the scheme is
+    stripped everywhere else), always reads back None, and silently skips
+    the delete instead of removing the value.
+    """
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    fake_store.store = {"agents/calliope/anthropic": {"value": "ghp_x"}}
+    spec = _spec(org, refs=[{"uri": "secret://agents/calliope/anthropic", "env_var": "GITHUB_TOKEN"}])
+    with with_tenant_org(org):
+        result = AgentsMutation().delete_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+    assert result.ok is True, result.errors
+    assert result.data.exists is False
+    assert fake_store.deletes == ["agents/calliope/anthropic"]
+
+
+def test_ref_stored_with_the_scheme_before_this_fix_still_resolves(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """Backward compatibility: a ref persisted with the scheme intact (from
+    before this fix shipped) must keep working -- no data migration."""
+    permission_resolver.grant(Permission.SECRET_READ)
+    fake_store.store = {"legacy/path": {"value": "still-here"}}
+    spec = _spec(org, refs=[{"uri": "secret://legacy/path", "env_var": "LEGACY_TOKEN"}])
+    with with_tenant_org(org):
+        result = AgentsMutation().reveal_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="LEGACY_TOKEN"
+        )
+    assert result.ok is True, result.errors
+    assert result.data.value == "still-here"
+
+
+# ---------------------------------------------------------------------------
 # agentEnvironmentSpecSecretStatus
 # ---------------------------------------------------------------------------
 

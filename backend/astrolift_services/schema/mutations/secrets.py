@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db import transaction
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -31,10 +32,13 @@ from astrolift_services.schema.mutations.helpers import (
     _caller_org_id,
     _client_ip,
     _maybe_create_proposal_for_write,
+    _metadata_fields,
+    _secret_write_payload,
     _stage_manifest,
     _upsert_app_secret_metadata,
     _validate_env_key,
     _validate_env_value,
+    _validate_scope,
 )
 from astrolift_services.schema.mutations.types import (
     BulkImportAppSecretsInput,
@@ -50,6 +54,7 @@ from astrolift_services.schema.mutations.types import (
 from astrolift_services.schema.types import (
     RevealedSecretType,
 )
+from astrolift_services.secret_metadata_ops import current_secret_scope
 from astrolift_services.secret_visibility import redacted_manifest_text
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
@@ -80,6 +85,9 @@ class SecretMutations:
         validation_msg = _validate_env_value(input.key, input.value)
         if validation_msg:
             return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -99,7 +107,7 @@ class SecretMutations:
         proposal = _maybe_create_proposal_for_write(
             app=app,
             op=SecretChangeProposal.Op.SET.value,
-            payload={"key": input.key, "value": input.value},
+            payload=_secret_write_payload(input),
             info=info,
         )
         if proposal is not None:
@@ -173,6 +181,9 @@ class SecretMutations:
         validation_msg = _validate_env_value(input.key, input.value)
         if validation_msg:
             return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -182,7 +193,7 @@ class SecretMutations:
         proposal = _maybe_create_proposal_for_write(
             app=app,
             op=SecretChangeProposal.Op.SET.value,
-            payload={"key": input.key, "value": input.value},
+            payload=_secret_write_payload(input),
             info=info,
         )
         if proposal is not None:
@@ -294,6 +305,7 @@ class SecretMutations:
 
     @strawberry.field
     @mutation_audit(action="app.secret.metadata.set", target=_app_secret_target_from_input)
+    @requires_elevation(action_label="app.secret.metadata.set")
     @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
     @tenant_scoped()
     def set_app_secret_metadata(
@@ -314,10 +326,21 @@ class SecretMutations:
         deadline.  To clear the deadline pass a value of ``None`` with
         ``set_via='clear'`` — reserved for future expansion when an
         explicit clear semantics is needed (current FE only sets +
-        refreshes; it never clears)."""
+        refreshes; it never clears).
+
+        Scope decides which environments receive the value, so this is a
+        secret write, not just an annotation: it needs a fresh elevation
+        like set/rotate, and with secret approval on a scope change waits
+        on a proposal (#1946). So does any explicit per-environment scope,
+        even one equal to the scope in force: it pins the environment, and
+        later app-wide changes stop reaching it. An edit that names no
+        scope leaves it as it is and applies directly."""
         msg = _validate_env_key(input.key)
         if msg:
             return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
+        scope_msg = _validate_scope(input.scope)
+        if scope_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -327,15 +350,72 @@ class SecretMutations:
                 f"unknown set_via value {input.set_via!r}; allowed: {sorted(_VALID_SECRET_SOURCES)}",
                 field="setVia",
             )
-        row = _upsert_app_secret_metadata(
-            app=app,
-            key=input.key,
-            environment_name=(input.environment_name or ""),
-            expires_at=input.expires_at,
-            set_via=input.set_via,
-            scope=input.scope,
-            actor=_actor_user(info),
-        )
+        environment_name = input.environment_name or ""
+        if (
+            environment_name
+            and not AppEnvironment.objects.filter(
+                registered_app=app, name=environment_name, deleted_at__isnull=True
+            ).exists()
+        ):
+            # A row for a name the app does not have would govern whatever
+            # environment later takes that name, a preview included.
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"environment {environment_name!r} not found",
+                field="environmentName",
+            )
+        with transaction.atomic():
+            # The scope check below and the write it decides must see one
+            # state. An approved scope change holds this row lock while it
+            # applies: a set or delete through its staged-manifest write, a
+            # set_metadata in apply_proposal. Locking the key's app-wide
+            # metadata row would miss a key only the repo has set, which
+            # has no such row until the change creates it.
+            app = RegisteredApp.objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            if app.requires_secret_approval and input.scope is not None:
+                current_scope = current_secret_scope(app, input.key, environment_name)
+                # A per-environment scope pins the environment even when it
+                # equals the scope in force, so it is always a scope change.
+                if environment_name or input.scope != current_scope:
+                    proposal = _maybe_create_proposal_for_write(
+                        app=app,
+                        op=SecretChangeProposal.Op.SET_METADATA.value,
+                        payload={"key": input.key, **_metadata_fields(input)},
+                        environment_name=environment_name,
+                        info=info,
+                    )
+                    existing = AppSecretMetadata.objects.filter(
+                        registered_app=app,
+                        environment_name=environment_name,
+                        key=input.key,
+                        deleted_at__isnull=True,
+                    ).first()
+                    return gql_success(
+                        _AppSecretMetadataPayload(
+                            app_slug=app.slug,
+                            key=input.key,
+                            environment_name=environment_name,
+                            expires_at=existing.expires_at if existing else None,
+                            set_via=existing.source if existing else "",
+                            set_at=existing.set_at if existing else None,
+                            scope=current_scope,
+                            pending_proposal_id=GUID(str(proposal.guid)),
+                        )
+                    )
+            row = _upsert_app_secret_metadata(
+                app=app,
+                key=input.key,
+                environment_name=environment_name,
+                expires_at=input.expires_at,
+                set_via=input.set_via,
+                scope=input.scope,
+                actor=_actor_user(info),
+            )
+            # A per-environment row may store no scope and follow the
+            # app-wide one; report the scope the key actually has here.
+            scope = current_secret_scope(app, row.key, row.environment_name)
         return gql_success(
             _AppSecretMetadataPayload(
                 app_slug=app.slug,
@@ -344,7 +424,7 @@ class SecretMutations:
                 expires_at=row.expires_at,
                 set_via=row.source,
                 set_at=row.set_at,
-                scope=row.scope,
+                scope=scope,
             )
         )
 
@@ -358,6 +438,14 @@ class SecretMutations:
         info: Info,
         input: BulkImportAppSecretsInput,
     ) -> MutationResultType[_BulkImportPayload]:
+        """Parse a .env paste and stage every key at once.
+
+        Creates no secret-change proposal, even when the app requires
+        secret approval. The deploy path
+        (``astrolift_services.secret_literals``) is what keeps imported
+        keys out of workloads until an applied proposal matches each
+        one (#1758).
+        """
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")

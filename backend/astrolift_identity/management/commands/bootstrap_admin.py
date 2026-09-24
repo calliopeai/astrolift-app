@@ -8,7 +8,7 @@ Brings a fresh production install to a usable state in one shot:
 * Member row at ORG scope so TenantContextMiddleware resolves cleanly
 * RoleBinding(user, org_owner, ORG=org)
 
-The 16 system roles (``org_owner``, ``org_admin``, ``team_developer``,
+The system roles (``org_owner``, ``org_admin``, ``team_developer``,
 ``app_viewer``, …) are already upserted by data migration
 ``astrolift_identity.0002_system_roles``; this command does NOT
 re-define roles, it just wires the first human into the platform's
