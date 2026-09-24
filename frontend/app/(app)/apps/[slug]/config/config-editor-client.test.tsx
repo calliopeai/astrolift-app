@@ -27,7 +27,7 @@ is_primary = true
 // Container env only: the top-level [env] table is untouched.
 const STAGED = BEFORE.replace(
   "is_primary = true",
-  'is_primary = true\nenv = { DATABASE_URL = "postgres://evil" }',
+  'is_primary = true\nenv = { DATABASE_URL = "postgres://evil" }'
 );
 
 const state = vi.hoisted(() => ({ stagedEnvChanges: [] as string[] }));

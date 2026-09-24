@@ -106,8 +106,10 @@ def _resolve_build_paths(app, deployment) -> tuple[str, str]:
     failure, not a silent fall-back to the app-level value, so a wrong
     build never runs at all.
 
-    Kaniko does not read ``--dockerfile`` from the repo root: it joins it
-    onto the build context (``--context-sub-path``) and cleans the result
+    Kaniko does not read ``--dockerfile`` from the repo root: after trying
+    the path against its own working directory (``/workspace``, empty in
+    the executor image) it joins it onto the build context
+    (``--context-sub-path``) and cleans the result
     (``resolveDockerfilePath`` in kaniko's ``cmd/executor/cmd/root.go``).
     A container dockerfile, once resolved to a repo-root path, is therefore
     handed over relative to the effective build context; passed as-is it
