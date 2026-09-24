@@ -672,7 +672,21 @@ def require_platform_operator(user) -> None:
 
     Raises Django's ``PermissionDenied``, as the Django permission checks it
     replaces did, so callers and error handling see the same failure.
+
+    A bearer token additionally needs the ``admin`` scope (#1949). These
+    legacy surfaces (generic hard delete, editing another user's profile,
+    Django group membership) have no ``Permission`` of their own, so
+    ``check_permission``'s api-token ceiling never applies to them; without
+    this, a read-only token minted for the operator (e.g. a mobile
+    enrollment token) could still reach them. Session-authenticated callers
+    carry no API token and are unaffected.
     """
 
     if not is_platform_operator(user):
+        raise DjangoPermissionDenied("Only the platform operator may do this.")
+
+    from astrolift_identity.api_tokens import SCOPE_ADMIN, get_current_api_token, has_scope
+
+    api_token = get_current_api_token()
+    if api_token is not None and not has_scope(api_token, SCOPE_ADMIN):
         raise DjangoPermissionDenied("Only the platform operator may do this.")
