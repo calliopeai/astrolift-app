@@ -49,6 +49,41 @@ log = logging.getLogger(__name__)
 _DEFAULT_MESSAGE = "Sensitive operation requires recent authentication."
 
 
+def is_elevated_and_attested(info: Any) -> bool:
+    """True when ``info``'s call satisfies the gate ``@requires_elevation`` enforces.
+
+    The same four rules, in order: an API-token call passes (issuing the
+    token was the authentication; step-up is a session recency check);
+    the Constance ``REQUIRE_STEP_UP_AUTH`` switch (default off) passes
+    everything until an install opts in; a call with no request/session
+    (a unit test bypassing HTTP) passes; otherwise the session must be
+    freshly elevated and, when the install requires device attestation,
+    attested too.
+
+    A side-effect-free boolean, for a read path that must mask rather
+    than refuse (#1920). It is not wired into the decorator itself:
+    #1945 moves the decorator's body into ``check_elevation``, and that
+    function should return None exactly when this returns True.
+    ``test_is_elevated_and_attested_agrees_with_requires_elevation``
+    holds the two together until then.
+    """
+    request = getattr(getattr(info, "context", None), "request", None)
+    if request is not None and getattr(request, "_api_token", None) is not None:
+        return True
+    try:
+        from constance import config as constance_config
+
+        if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
+            return True
+    except Exception:  # noqa: BLE001 -- as in requires_elevation: fall through to the gate
+        pass
+    if request is None or not hasattr(request, "session"):
+        return True
+    session = request.session
+    status = get_status(session)
+    return status.elevated and not _attestation_gate_active(request)
+
+
 def requires_elevation(
     *,
     action_label: str | None = None,
@@ -372,6 +407,7 @@ def _candidate_mutation_classes() -> list[type]:
 __all__ = [
     "SESSION_KEY_ELEVATED_UNTIL",  # re-export for callers that want the raw key
     "StepUpProbe",
+    "is_elevated_and_attested",
     "list_gated_resolvers",
     "requires_elevation",
 ]

@@ -115,10 +115,10 @@ Mutation = strawberry.type(
 # Schema instance
 # ---------------------------------------------------------------------------
 
-from core.schema.audit import MutationAuditExtension
+from core.schema.audit import MutationAuditExtension, SecretSafeSchema
 from core.schema.subscriptions import Subscription
 
-schema = strawberry.Schema(
+schema = SecretSafeSchema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
@@ -158,7 +158,7 @@ class AuthMutation:
         return True
 
 
-schema_auth = strawberry.Schema(
+schema_auth = SecretSafeSchema(
     query=AuthQuery,
     mutation=AuthMutation,
 )

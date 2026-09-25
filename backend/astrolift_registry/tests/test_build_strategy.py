@@ -61,12 +61,12 @@ def test_build_strategy_persists_nixpacks():
 
 def test_graphql_type_exposes_build_strategy():
     app = _make_app(build_strategy="dockerfile")
-    gql_type = app_to_type(app)
+    gql_type = app_to_type(app, info=None)
     assert hasattr(gql_type, "build_strategy")
     assert gql_type.build_strategy == "dockerfile"
 
 
 def test_graphql_type_build_strategy_defaults_to_off():
     app = _make_app()
-    gql_type = app_to_type(app)
+    gql_type = app_to_type(app, info=None)
     assert gql_type.build_strategy == "off"
