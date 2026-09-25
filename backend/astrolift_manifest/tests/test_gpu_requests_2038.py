@@ -86,3 +86,13 @@ def test_a_workload_without_gpus_renders_as_before():
     pod = _pod(_render((_deployment_workload(),)))
     assert "affinity" not in pod
     assert not any(k.startswith("nvidia.com/") for k in pod["containers"][0]["resources"].get("limits", {}))
+
+
+def test_only_gpu_workloads_tolerate_the_gpu_pool_taints():
+    """#2039: GPU pools are tainted so CPU workloads never land there; a GPU
+    workload tolerates the taint GKE sets and the platform's own."""
+    gpu_pod = _pod(_render((_gpu_workload(gpu=1),)))
+    cpu_pod = _pod(_render((_deployment_workload(),)))
+    assert {t["key"] for t in gpu_pod["tolerations"]} == {"nvidia.com/gpu", "astrolift.io/gpu"}
+    assert all(t["operator"] == "Exists" and t["effect"] == "NoSchedule" for t in gpu_pod["tolerations"])
+    assert "tolerations" not in cpu_pod

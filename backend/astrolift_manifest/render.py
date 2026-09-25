@@ -677,21 +677,34 @@ def gpu_resource_name(w: WorkloadManifest) -> str:
     return f"nvidia.com/mig-{w.mig_profile}" if w.mig_profile else "nvidia.com/gpu"
 
 
+# Taints that keep everything but GPU work off GPU nodes (#2039). GKE puts
+# ``nvidia.com/gpu=present:NoSchedule`` on GPU pools itself and the AKS / EKS
+# GPU guides use the same key; ``astrolift.io/gpu`` is the platform's own, for
+# pools an operator taints by hand. Only a workload that requests a GPU
+# tolerates them, so CPU workloads and platform pods never land there.
+GPU_POOL_TAINT_KEYS = ("nvidia.com/gpu", "astrolift.io/gpu")
+
+
 def gpu_scheduling(w: WorkloadManifest) -> dict[str, Any]:
-    """Pod-spec scheduling fields for a GPU workload (#2038): node affinity on
-    the GPU type when one is pinned. #2039 adds the GPU-pool toleration here.
-    Empty for a workload without GPUs."""
-    if not w.gpu or not w.gpu_type:
+    """Pod-spec scheduling fields for a GPU workload: tolerations for the
+    GPU-pool taints (#2039) and, when a GPU type is pinned, node affinity on
+    it (#2038). Empty for a workload without GPUs."""
+    if not w.gpu:
         return {}
-    terms = [
-        {"matchExpressions": [{"key": key, "operator": "In", "values": [w.gpu_type]}]}
-        for key in ("nvidia.com/gpu.product", "cloud.google.com/gke-accelerator")
-    ]
-    return {
-        "affinity": {
+    out: dict[str, Any] = {
+        "tolerations": [
+            {"key": key, "operator": "Exists", "effect": "NoSchedule"} for key in GPU_POOL_TAINT_KEYS
+        ],
+    }
+    if w.gpu_type:
+        terms = [
+            {"matchExpressions": [{"key": key, "operator": "In", "values": [w.gpu_type]}]}
+            for key in ("nvidia.com/gpu.product", "cloud.google.com/gke-accelerator")
+        ]
+        out["affinity"] = {
             "nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": terms}}
         }
-    }
+    return out
 
 
 def _pod_spec(
