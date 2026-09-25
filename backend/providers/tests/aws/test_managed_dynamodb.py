@@ -74,6 +74,12 @@ class FakeDDB:
             )
         return {"Table": self.tables[TableName]}
 
+    def list_tags_of_resource(self, ResourceArn: str) -> dict[str, Any]:  # noqa: N803
+        for table in self.tables.values():
+            if table["TableArn"] == ResourceArn:
+                return {"Tags": table.get("Tags", [])}
+        return {"Tags": []}
+
     def create_table(self, **kwargs: Any) -> dict[str, Any]:
         self._record("create_table", **kwargs)
         name = kwargs["TableName"]
@@ -557,3 +563,14 @@ def test_plugin_registers_dynamodb_under_kv_store() -> None:
     from aws.plugin import PLUGIN
 
     assert PLUGIN.managed_service_drivers[("kv_store", "dynamodb")] is (DynamoDBDriver)
+
+
+def test_provision_does_not_adopt_another_services_table(driver: DynamoDBDriver, fake: FakeDDB) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    first = driver.provision(_spec(managed_service_id="svc-a"))
+    second = driver.provision(_spec(managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == ""
+    assert "refusing to adopt" in second.message
+    assert fake.count("create_table") == 1
