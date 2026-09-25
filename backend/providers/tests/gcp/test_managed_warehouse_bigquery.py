@@ -713,3 +713,14 @@ def test_rest_client_maps_not_found_and_provider_errors() -> None:
     )
     with pytest.raises(BigQueryWarehouseError, match="permission denied"):
         denied.get_dataset("acme", "events")
+
+
+def test_provision_does_not_adopt_another_services_resource(harness) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message

@@ -58,6 +58,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "kv_store"
 
@@ -144,6 +145,11 @@ class BigtableDriver(ManagedServiceDriver):
 
         existing = self._describe_instance(instance_id)
         if existing is not None:
+            refusal = label_adoption_refusal(
+                dict(_get(existing, "labels", None) or {}), spec, resource=f"bigtable instance {instance_id}"
+            )
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
