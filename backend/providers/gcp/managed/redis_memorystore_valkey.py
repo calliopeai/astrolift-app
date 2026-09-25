@@ -30,6 +30,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "redis"
@@ -335,7 +336,7 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
                 self._reconcile(current, cfg)
                 current = self._valkey.get_instance(self._instance_name(instance_id))
             else:
-                self._assert_owned(current, cfg)
+                self._assert_owned(current, cfg, spec=spec)
                 if restore_hash and (current.get("labels") or {}).get("astrolift-restore-source") != restore_hash:
                     raise MemorystoreValkeyError("restore target exists but was created from a different source")
                 self._assert_immutable_compatible(current, cfg)
@@ -1215,8 +1216,17 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
             if actual is not None and not _contains_desired(actual, value):
                 raise MemorystoreValkeyError(f"immutable {field} mismatch ({actual!r} != {value!r})")
 
-    def _assert_owned(self, current: dict[str, Any], cfg: dict[str, Any]) -> None:
+    def _assert_owned(self, current: dict[str, Any], cfg: dict[str, Any], *, spec: ProvisionSpec | None = None) -> None:
         owned = (current.get("labels") or {}).get("astrolift-managed-by") == "platform"
+        # Provision: a platform instance must be this service's, whatever
+        # adopt_existing_instance says; the instance id is tenant-settable (#1961).
+        refusal = (
+            label_adoption_refusal(current.get("labels") or {}, spec, resource="Valkey instance")
+            if spec and owned
+            else None
+        )
+        if refusal:
+            raise MemorystoreValkeyError(refusal)
         adopted = bool(cfg.get("adopt_existing_instance", self._config.adopt_existing_instance))
         if not owned and not adopted:
             raise MemorystoreValkeyError(

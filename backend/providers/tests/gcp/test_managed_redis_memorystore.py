@@ -7,7 +7,7 @@ canned responses. Test surface mirrors AWS ElastiCache (#352).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, ClassVar
 
@@ -38,6 +38,7 @@ class FakeRedisInstance:
     state: str = "READY"
     transit_encryption_mode: str = "SERVER_AUTHENTICATION"
     auth_enabled: bool = True
+    labels: dict = field(default_factory=dict)
 
 
 class FakeRedisClient:
@@ -60,6 +61,7 @@ class FakeRedisClient:
                 "DISABLED",
             ),
             auth_enabled=bool(inst_body.get("auth_enabled", False)),
+            labels=dict(inst_body.get("labels") or {}),
         )
 
     def get_instance(self, *, request):
@@ -435,3 +437,14 @@ def test_binding_schema_lists_all_env_vars(driver):
         "REDIS_RESOURCE_ARN",
     ):
         assert key in schema.env_vars
+
+
+def test_provision_does_not_adopt_another_services_resource(driver) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message

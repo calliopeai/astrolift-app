@@ -836,3 +836,14 @@ def test_binding_schema_matches_cloud_neutral_contract(driver: CloudSQLServerDri
         "GCP_CLOUDSQL_CONNECTION_NAME",
     ):
         assert name in schema.env_vars
+
+
+def test_provision_does_not_adopt_another_services_resource(driver) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message

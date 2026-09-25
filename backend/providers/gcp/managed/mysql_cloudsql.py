@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "mysql"
@@ -151,6 +152,14 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is not None:
+            settings = _get(existing, "settings", None)
+            refusal = label_adoption_refusal(
+                _get(settings, "user_labels", None) or _get(settings, "userLabels", None) or {},
+                spec,
+                resource=f"cloudsql-mysql {instance_id}",
+            )
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             if self._secret_store.get(self._master_secret_for(instance_id=instance_id)) is None:
                 return ProvisionResult(
                     ok=False,
