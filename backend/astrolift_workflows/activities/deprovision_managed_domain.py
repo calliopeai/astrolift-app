@@ -41,7 +41,14 @@ def _deprovision_sync(cluster_id: int, zone: str) -> dict[str, Any]:
 
     # _base_manager on purpose: the row is soft-deleted before this workflow
     # starts, and the default manager would hide the certificate id.
-    row = ManagedDomain._base_manager.filter(zone=zone).order_by("-created_at").first()
+    # The row being torn down is a soft-deleted one: a live row for the same
+    # name is someone who registered the zone since, and its certificate is
+    # not this teardown's to revoke (#1931).
+    row = (
+        ManagedDomain._base_manager.filter(zone=zone, deleted_at__isnull=False)
+        .order_by("-deleted_at", "-created_at")
+        .first()
+    )
 
     cert_revoked = False
     cert_id = getattr(row, "provision_cert_id", "") if row else ""

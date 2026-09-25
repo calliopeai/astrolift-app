@@ -171,6 +171,11 @@ def _caller(info: Info):
     return getattr(request, "user", None) or getattr(info.context, "user", None)
 
 
+def canonical_zone(zone: str) -> str:
+    """A DNS zone name in the one form rows store: lowercase, no trailing dot."""
+    return (zone or "").strip().lower().rstrip(".")
+
+
 def _actor_from_request(info: Info) -> Actor:
     """Same shape as ``astrolift_lifecycle.schema.mutations``. Inlined
     rather than imported to keep the lifecycle/cluster apps free of
@@ -1253,10 +1258,21 @@ class ClustersMutation:
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
-        if ManagedDomain.objects.filter(zone=input.zone, deleted_at__isnull=True).exists():
+        # One spelling per DNS zone (#1931): the DNS driver resolves a zone by
+        # canonical name, so ``Globex.example.`` and ``globex.example`` are one
+        # zone. Stored canonical, and unique on that form, so a variant can't
+        # register a second row over another org's zone.
+        zone = canonical_zone(input.zone)
+        if not zone:
+            return gql_failure(ErrorCode.VALIDATION.value, "zone is required", field="zone")
+        input.zone = zone
+        taken = ManagedDomain.objects.filter(deleted_at__isnull=True).filter(
+            Q(zone__iexact=zone) | Q(zone__iexact=f"{zone}.")
+        )
+        if taken.exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
-                f"zone {input.zone!r} already registered",
+                f"zone {zone!r} already registered",
                 field="zone",
             )
         if input.default_for not in {"tenant_apps", "preview_envs", "both", "none"}:
