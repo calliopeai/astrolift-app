@@ -38,6 +38,12 @@ class WorkloadManifest:
     cpu_limit: str | None = None
     memory_request: str | None = None
     memory_limit: str | None = None
+    # GPU request (#2038): whole GPUs, or MIG slices of ``mig_profile``
+    # (e.g. ``3g.47gb``), on the primary container only. ``gpu_type`` pins
+    # the GPU product / accelerator label (``nvidia-l4``, a GFD product).
+    gpu: int = 0
+    gpu_type: str | None = None
+    mig_profile: str | None = None
     hpa_min: int | None = None
     hpa_max: int | None = None
     hpa_target_cpu_pct: int = 80
