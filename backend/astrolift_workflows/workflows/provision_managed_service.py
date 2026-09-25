@@ -30,6 +30,7 @@ Workflow id pattern: ``ProvisionManagedServiceWorkflow-<svc-guid>``.
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from temporalio import workflow
@@ -74,6 +75,32 @@ def _truncate(message: str, *, limit: int = 4000) -> str:
     return message[: limit - 3] + "..."
 
 
+def _cause(exc: BaseException) -> str:
+    """The activity's own error; ``str(ActivityError)`` is only "Activity
+    task failed" (#1916) -- same unwrap ``DeployPromotedAppWorkflow`` uses."""
+    while getattr(exc, "cause", None) is not None:
+        exc = exc.cause  # type: ignore[attr-defined]
+    return str(exc)
+
+
+# Driver messages can echo the config they were given, and an operator can
+# type a credential into a field the platform's secret-ref convention
+# doesn't recognize as one (#1916). Mask anything that looks like a
+# credential assignment or a URI with embedded creds before it reaches the
+# row or the operator. A password containing an unescaped ``@`` defeats the
+# URI pattern -- accepted gap, real connection strings percent-encode it.
+_SECRET_LIKE_KEY = r"(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|credential|private[_-]?key)"
+_SECRET_ASSIGNMENT_RE = re.compile(
+    rf"(?i)(\b{_SECRET_LIKE_KEY}\b[\"']?\s*[:=]\s*)([\"']?)([^\s,\"'&]+)\2",
+)
+_URI_CREDENTIAL_RE = re.compile(r"([a-zA-Z][a-zA-Z0-9+.\-]*://[^\s/:@]+:)([^\s/@]+)(@)")
+
+
+def _redact(message: str) -> str:
+    redacted = _SECRET_ASSIGNMENT_RE.sub(r"\1\2***redacted***\2", message)
+    return _URI_CREDENTIAL_RE.sub(r"\1***redacted***\3", redacted)
+
+
 @workflow.defn(name="ProvisionManagedServiceWorkflow")
 class ProvisionManagedServiceWorkflow:
     @workflow.run
@@ -95,7 +122,10 @@ class ProvisionManagedServiceWorkflow:
                 retry_policy=_PROVISION_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
-            message = _truncate(f"provision_managed_service failed: {exc}")
+            # #1916: str(exc) on the ActivityError Temporal raises here is
+            # the generic "Activity task failed" -- the driver's own reason
+            # lives on the innermost cause.
+            message = _truncate(f"provision_managed_service failed: {_redact(_cause(exc))}")
             await workflow.execute_activity(
                 mark_managed_service_failed,
                 args=[svc_id, message],
