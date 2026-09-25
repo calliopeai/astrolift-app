@@ -710,3 +710,14 @@ def test_provider_native_documents_and_update_masks_match_current_sdk(harness: H
             paths=["enable_exactly_once_delivery", "bigtable_config"],
         ),
     )
+
+
+def test_provision_does_not_adopt_another_services_resource(harness) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message

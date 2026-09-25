@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "topic"
 _MUTABLE_TOPIC_FIELDS = {
@@ -103,6 +104,13 @@ class PubSubTopicDriver(ManagedServiceDriver):
             except Exception as exc:
                 if not _already_exists(exc):
                     raise
+                # Reconciling relabels the topic as this service's: only
+                # adopt one that already is (#1961).
+                existing = self._topic(topic_path)
+                labels = existing.get("labels") if isinstance(existing, dict) else getattr(existing, "labels", None)
+                refusal = label_adoption_refusal(dict(labels or {}), spec, resource=f"Pub/Sub topic {topic_id}")
+                if refusal is not None:
+                    return ProvisionResult(False, "", refusal, [refusal])
             self._reconcile_topic(topic_path, cfg, labels=_labels_for(spec, cfg))
             self._reconcile_subscriptions(topic_id, cfg)
         except Exception as exc:

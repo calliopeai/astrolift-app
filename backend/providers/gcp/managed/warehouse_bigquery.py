@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "warehouse"
 _BQ_API_ROOT = "https://bigquery.googleapis.com/bigquery/v2"
@@ -335,6 +336,12 @@ class BigQueryWarehouseDriver(ManagedServiceDriver):
                     self._dataset_document(dataset_id, cfg, spec=spec),
                 )
             else:
+                # Reconciling rewrites the dataset's labels and access (#1961).
+                refusal = label_adoption_refusal(
+                    dict(current.get("labels") or {}), spec, resource=f"BigQuery dataset {dataset_id}"
+                )
+                if refusal is not None:
+                    return ProvisionResult(False, "", refusal, [refusal])
                 self._reconcile_dataset(dataset_id, cfg, spec=spec, current=current)
             self._reconcile_capacity_commitments(dataset_id, cfg)
             self._reconcile_reservations(dataset_id, cfg)
