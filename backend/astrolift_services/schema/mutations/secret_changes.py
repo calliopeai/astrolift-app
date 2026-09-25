@@ -30,6 +30,7 @@ from astrolift_services.schema.mutations.helpers import (
     _proposal_ttl_seconds,
     _self_approve_secrets_allowed,
     _validate_env_key,
+    _validate_env_value,
 )
 from astrolift_services.schema.mutations.types import (
     ApproveSecretChangeInput,
@@ -107,6 +108,9 @@ class SecretChangeMutations:
                     "value is required for op=set",
                     field="value",
                 )
+            msg = _validate_env_value(input.key, input.value)
+            if msg:
+                return gql_failure(ErrorCode.VALIDATION.value, msg, field="value")
             payload: dict = {"key": input.key, "value": input.value}
         elif input.op == SecretChangeProposal.Op.DELETE.value:
             if not input.key:
@@ -203,7 +207,7 @@ class SecretChangeMutations:
             created_by=actor,
             updated_by=actor,
         )
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -302,7 +306,7 @@ class SecretChangeMutations:
                     )
 
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -402,7 +406,7 @@ class SecretChangeMutations:
             proposal.transition_to(SecretChangeProposal.Status.REJECTED)
 
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))
 
     @strawberry.field
     @mutation_audit(
@@ -449,4 +453,4 @@ class SecretChangeMutations:
         with transaction.atomic():
             proposal.transition_to(SecretChangeProposal.Status.WITHDRAWN)
         proposal.refresh_from_db()
-        return gql_success(secret_change_proposal_to_type(proposal))
+        return gql_success(secret_change_proposal_to_type(proposal, info=info))

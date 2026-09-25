@@ -326,6 +326,7 @@ def _paginate_apps(
 def _build_apps_page(
     qs,
     *,
+    info: Info,
     cursor: str | None,
     limit: int,
     include_freshness: bool,
@@ -366,13 +367,16 @@ def _build_apps_page(
         freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
         preview_counts = _active_preview_counts(items)
         managed_hostnames = _managed_hostnames_for_apps(items)
+        viewer_perms = _viewer_permissions_for_apps(items)
         return RegisteredAppPageType(
             items=[
                 app_to_type(
                     a,
+                    info=info,
                     freshness=freshness_by_app.get(a.pk) if include_freshness else None,
                     active_preview_count=preview_counts.get(a.pk, 0),
                     managed_hostname=managed_hostnames.get(a.pk, ""),
+                    viewer_permissions=viewer_perms.get(a.pk),
                 )
                 for a in items
             ],
@@ -404,13 +408,16 @@ def _build_apps_page(
         next_cursor = None
     preview_counts = _active_preview_counts(items)
     managed_hostnames = _managed_hostnames_for_apps(items)
+    viewer_perms = _viewer_permissions_for_apps(items)
     return RegisteredAppPageType(
         items=[
             app_to_type(
                 a,
+                info=info,
                 freshness=freshness_by_app.get(a.pk) if include_freshness else None,
                 active_preview_count=preview_counts.get(a.pk, 0),
                 managed_hostname=managed_hostnames.get(a.pk, ""),
+                viewer_permissions=viewer_perms.get(a.pk),
             )
             for a in items
         ],
@@ -938,6 +945,7 @@ class RegistryQuery:
             return [
                 app_to_type(
                     a,
+                    info=info,
                     active_preview_count=preview_counts.get(a.pk, 0),
                     managed_hostname=managed_hostnames.get(a.pk, ""),
                     viewer_permissions=viewer_perms.get(a.pk),
@@ -947,6 +955,7 @@ class RegistryQuery:
         return [
             app_to_type(
                 a,
+                info=info,
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
                 managed_hostname=managed_hostnames.get(a.pk, ""),
@@ -1031,6 +1040,7 @@ class RegistryQuery:
         )
         return _build_apps_page(
             qs,
+            info=info,
             cursor=cursor,
             limit=limit,
             include_freshness=include_freshness,
@@ -1113,6 +1123,7 @@ class RegistryQuery:
             return [
                 app_to_type(
                     a,
+                    info=info,
                     active_preview_count=preview_counts.get(a.pk, 0),
                     managed_hostname=managed_hostnames.get(a.pk, ""),
                     viewer_permissions=viewer_perms.get(a.pk),
@@ -1122,6 +1133,7 @@ class RegistryQuery:
         return [
             app_to_type(
                 a,
+                info=info,
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
                 managed_hostname=managed_hostnames.get(a.pk, ""),
@@ -1182,6 +1194,7 @@ class RegistryQuery:
         )
         return _build_apps_page(
             qs,
+            info=info,
             cursor=cursor,
             limit=limit,
             include_freshness=include_freshness,
@@ -1233,6 +1246,7 @@ class RegistryQuery:
         ci_workflow_sync = build_ci_workflow_sync_status(app)
         return app_to_type(
             app,
+            info=info,
             freshness=_freshness_for_apps([app]).get(app.pk),
             drift=drift,
             autowire=autowire,

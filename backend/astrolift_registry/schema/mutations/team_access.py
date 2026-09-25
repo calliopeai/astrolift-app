@@ -105,7 +105,7 @@ class TeamAccessMutations:
             # No-op when already on the target team — but still ensure
             # an OWNER row exists for it.
             _ensure_owner_access(app, target.id, actor=_actor())
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         app.team = target
         app.save(update_fields=["team", "updated_at", "version"])
@@ -113,7 +113,7 @@ class TeamAccessMutations:
         _ensure_owner_access(app, target.id, actor=_actor())
         _downgrade_to_deployer(app, previous_team_id, actor=_actor())
 
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.grant_team_access")

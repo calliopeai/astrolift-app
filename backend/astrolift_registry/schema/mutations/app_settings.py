@@ -224,7 +224,7 @@ class AppSettingMutations:
             if app.project_id is not None:
                 app.project = None
                 app.save(update_fields=["project", "updated_at", "version"])
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         project = (
             Project.objects.select_related("organization", "team")
@@ -254,7 +254,7 @@ class AppSettingMutations:
         # Idempotent: re-assigning to the current project is a no-op
         # and we don't gratuitously bump updated_at.
         if app.project_id == project.id and app.team_id == project.team_id:
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         app.project = project
         # Follow the project's team so the tree stays coherent — an app
@@ -262,7 +262,7 @@ class AppSettingMutations:
         # never dangle under a different team's branch.
         app.team = project.team
         app.save(update_fields=["project", "team", "updated_at", "version"])
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.security_policy.update")
@@ -318,7 +318,7 @@ class AppSettingMutations:
             ),
         }
         app.save(update_fields=["security_policy", "updated_at", "version"])
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.webhook_deploys.pause")
@@ -363,7 +363,7 @@ class AppSettingMutations:
         if app.webhook_deploys_paused:
             # Already paused — keep the original actor / timestamp /
             # reason so the UI's "paused 3h ago" copy stays accurate.
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         actor = _actor()
         reason = (input.reason or "").strip()[:512]
@@ -381,7 +381,7 @@ class AppSettingMutations:
                 "version",
             ]
         )
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.webhook_deploys.resume")
@@ -414,7 +414,7 @@ class AppSettingMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
         if not app.webhook_deploys_paused:
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         app.webhook_deploys_paused = False
         app.webhook_deploys_paused_at = None
@@ -430,7 +430,7 @@ class AppSettingMutations:
                 "version",
             ]
         )
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.mutation
     @mutation_audit(action="app.retention_policy.set")

@@ -293,6 +293,7 @@ def test_last_bootstrap_run_returns_most_recent(cluster, org, permission_resolve
     started = dt.datetime(2026, 5, 16, 9, 0, 0, tzinfo=dt.UTC)
     older = ClusterBootstrapRun.objects.create(
         tenant_cluster=cluster,
+        organization=org,
         status="failed",
         chart_version="astrolift-0.41.0",
         installed_releases=[],
@@ -304,6 +305,7 @@ def test_last_bootstrap_run_returns_most_recent(cluster, org, permission_resolve
     )
     newer = ClusterBootstrapRun.objects.create(
         tenant_cluster=cluster,
+        organization=org,
         status="succeeded",
         chart_version="astrolift-0.42.0",
         installed_releases=[{"name": "cert-manager", "version": "1.15.0"}],
@@ -344,6 +346,7 @@ def test_bootstrap_runs_respects_limit(cluster, org):
     for i in range(5):
         ClusterBootstrapRun.objects.create(
             tenant_cluster=cluster,
+            organization=org,
             status="succeeded",
             chart_version=f"astrolift-0.{i}.0",
             installed_releases=[],
