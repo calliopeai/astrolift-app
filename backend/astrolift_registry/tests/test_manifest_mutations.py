@@ -1995,3 +1995,36 @@ def test_apply_staged_manifest_refuses_a_staged_buffer_holding_the_masked_placeh
     assert result.errors[0].field == "rawManifest"
     app.refresh_from_db()
     assert app.manifest_raw == _TOML_WITH_SECRET
+
+
+# --- #1947's owner-namespace check on config secret refs, through apply --
+
+
+def test_apply_staged_manifest_refuses_a_service_config_naming_another_apps_secret(
+    permission_resolver, monkeypatch
+):
+    """reconcile_managed_services holds each service's config secret refs
+    to its owner's namespace (#1947). Through applyStagedManifest that
+    refusal is a VALIDATION envelope from the dry run, with nothing
+    persisted and no gate reached."""
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    org, app = _scaffold(manifest_raw=_TOML_WITH_CONTAINER, manifest_hash="abc", source_repo="")
+    _add_environment(app)
+    foreign = f"services/{org.guid}/00000000-0000-0000-0000-000000000000/pw"
+    app.manifest_raw_staged = (
+        _TOML_WITH_CONTAINER + _APP_SERVICE + f'config = {{ password_secret_ref = "{foreign}" }}\n'
+    )
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "rawManifest"
+    assert f"services/{org.guid}/{app.guid}/" in result.errors[0].message
+    assert not ManagedService.objects.filter(registered_app=app).exists()
+    app.refresh_from_db()
+    assert app.manifest_raw == _TOML_WITH_CONTAINER
