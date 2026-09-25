@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Cluster and deployment history no longer shows one org another org's rows.
+  `astroliftClusterLifecycleAudit` returns only mutations run in the caller's
+  org, and matches the cluster by whole value instead of by a substring of the
+  variables. `MutationAuditLog` now records the org; rows written before this
+  change appear in no tenant's timeline (superusers still read them through
+  `auditLogs`). `bootstrapRuns` / `lastBootstrapRun` return only the runs the
+  caller's org recorded; legacy runs on an org-owned cluster take that
+  cluster's org. `astroliftDeploymentApprovalHistory` and `approvedBy` ignore
+  audit rows another org wrote against the deployment. Both audit writers file
+  a mutation under the tenant org only when the actor is an active member of
+  it (or an active superuser), so a session that names another org in
+  `X-Astrolift-Organization` no longer lands its refused mutations in that
+  org's views. `approvedBy` lists only allowed approvals from eligible
+  approvers. `astroliftClusterLifecycleAudit` caps `limit` at 200. Migration
+  `core.0014` builds the new audit-log index concurrently (#1955).
+
 - Every install now carries the stock role catalogue (#1864). Three system
   roles are new. Team Operator and Project Operator run, attach to and cancel
   the apps, agents and workflows in their scope, and change no configuration.

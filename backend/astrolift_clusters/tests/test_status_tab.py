@@ -548,6 +548,7 @@ def test_helper_sorts_by_namespace_then_name():
 
 def _mkaudit(
     *,
+    organization,
     operation: str,
     variables: dict,
     success: bool = True,
@@ -556,10 +557,12 @@ def _mkaudit(
     """Insert one ``MutationAuditLog`` row directly. The audit
     extension normally writes these inside ``on_operation``; tests
     bypass the extension and write rows that simulate what the
-    extension would produce for a given mutation."""
+    extension would produce for a given mutation, including the org
+    whose session ran it (#1955)."""
     from core.schema.audit import MutationAuditLog
 
     MutationAuditLog.objects.create(
+        organization=organization,
         operation=operation,
         variables=variables,
         success=success,
@@ -610,6 +613,7 @@ def test_lifecycle_audit_matches_dot_notation_operation(
     matches on the ``cluster.`` prefix."""
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _mkaudit(
+        organization=org,
         operation="cluster.install_prereqs",
         variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
     )
@@ -638,10 +642,12 @@ def test_lifecycle_audit_matches_pascal_case_operation(
     side; the resolver now tolerates both formats."""
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _mkaudit(
+        organization=org,
         operation="InstallClusterPrereqs",
         variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
     )
     _mkaudit(
+        organization=org,
         operation="BringClusterIntoManagement",
         variables={"input": {"clusterId": str(cluster.guid)}},
     )
@@ -665,6 +671,7 @@ def test_lifecycle_audit_matches_register_by_slug_not_guid(
     registration appears in its lifecycle timeline."""
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _mkaudit(
+        organization=org,
         operation="cluster.register",
         variables={"input": {"slug": cluster.slug, "name": cluster.name}},
     )
@@ -688,10 +695,12 @@ def test_lifecycle_audit_skips_other_clusters(
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     other_guid = str(uuid.uuid4())
     _mkaudit(
+        organization=org,
         operation="cluster.install_prereqs",
         variables={"input": {"clusterId": other_guid}},
     )
     _mkaudit(
+        organization=org,
         operation="cluster.install_prereqs",
         variables={"input": {"clusterId": str(cluster.guid)}},
     )
@@ -713,10 +722,12 @@ def test_lifecycle_audit_skips_unrelated_operations(
     when the cluster's guid happens to appear in their variables."""
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _mkaudit(
+        organization=org,
         operation="app.deploy",
         variables={"input": {"appId": "x", "clusterRef": str(cluster.guid)}},
     )
     _mkaudit(
+        organization=org,
         operation="cluster.register",
         variables={"input": {"slug": cluster.slug, "name": cluster.name}},
     )
@@ -740,6 +751,7 @@ def test_lifecycle_audit_respects_limit_and_newest_first(
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for _ in range(5):
         _mkaudit(
+            organization=org,
             operation="cluster.install_prereqs",
             variables={"input": {"clusterId": str(cluster.guid)}},
         )

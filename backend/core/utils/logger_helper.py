@@ -27,7 +27,26 @@ def dump_json(query):
     return dump
 
 
-def gql_logger(view_func):
+def _loggable_variables(query, schema):
+    """Variables masked the way the mutation audit log masks them, by the
+    schema position each one fills rather than its client-chosen name
+    (#1920), plus whether the operation touched anything sensitive."""
+    from graphql import GraphQLError, parse
+
+    from core.schema.audit import redact_operation_variables
+
+    try:
+        document = parse(query.get('query') or '')
+    except GraphQLError:
+        document = None
+    return redact_operation_variables(
+        query.get('variables'),
+        document=document,
+        schema=getattr(schema, '_schema', None),
+    )
+
+
+def gql_logger(view_func, *, schema=None):
     """
     Temporal solution for login user.
     """
@@ -37,11 +56,13 @@ def gql_logger(view_func):
     # if they don't have side effects, so return a new function.
     def wrapped_view(*args, **kwargs):
         query = {}
+        sensitive = True
         if settings.DEBUG:
             try:
                 query = json.loads(args[0].body)
+                redacted, sensitive = _loggable_variables(query, schema)
                 dump = f'>>>---request---------->>> {query["operationName"]}  ------------------------\n'
-                variables = '\n      '.join(sorted([f'{n} = {v}' for n, v in query['variables'].items()]))
+                variables = '\n      '.join(sorted([f'{n} = {v}' for n, v in redacted.items()]))
                 dump += f'  query: {query["operationName"]} \n    variables:\n      {variables}\n'
                 logger.warning(dump)
             except Exception as e:
@@ -53,8 +74,13 @@ def gql_logger(view_func):
             try:
                 response = json.loads(result.content)
                 dump = f'  ---response-----------  {query["operationName"]}  -------------------------\n'
-                if 'errors' in response:
-                    dump += dump_json(response)
+                # Errors only, never ``data``: a revealAppSecret payload is
+                # plaintext. A sensitive operation's errors can quote the
+                # values it was sent, so those are counted, not printed.
+                if 'errors' in response and sensitive:
+                    dump += f'    {len(response["errors"])} error(s), not logged: sensitive operation\n'
+                elif 'errors' in response:
+                    dump += dump_json({'errors': response['errors']})
                     if hasattr(args[0], 'django_debug'):
                         for e in args[0].django_debug.object.exceptions:
                             dump += f'    {e.stack}\n'
