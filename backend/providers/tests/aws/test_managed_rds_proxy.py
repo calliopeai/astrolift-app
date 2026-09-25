@@ -29,6 +29,36 @@ class FakeRDS:
         self.modifies: list[dict] = []
         self.target_group_modifies: list[dict] = []
         self.deletes: list[dict] = []
+        acme = [{"Key": "astrolift.io/organization", "Value": "acme"}]
+        self.clusters = {"aurora-primary": {"DbClusterResourceId": "cluster-123", "TagList": acme}}
+        self.instances = {"db-primary": {"DbiResourceId": "db-ABC", "TagList": acme}}
+
+    def describe_db_clusters(self, **kwargs):
+        name = kwargs["DBClusterIdentifier"]
+        if name not in self.clusters:
+            raise NotFound("DBClusterNotFoundFault")
+        return {"DBClusters": [self.clusters[name]]}
+
+    def describe_db_instances(self, **kwargs):
+        name = kwargs["DBInstanceIdentifier"]
+        if name not in self.instances:
+            raise NotFound("DBInstanceNotFound")
+        return {"DBInstances": [self.instances[name]]}
+
+    def describe_db_proxy_targets(self, **kwargs):
+        rows = []
+        for target in self.targets:
+            if target["DBProxyName"] != kwargs["DBProxyName"]:
+                continue
+            rows += [{"Type": "TRACKED_CLUSTER", "RdsResourceId": c} for c in target.get("DBClusterIdentifiers", [])]
+            rows += [{"Type": "RDS_INSTANCE", "RdsResourceId": i} for i in target.get("DBInstanceIdentifiers", [])]
+        return {"Targets": rows}
+
+    def list_tags_for_resource(self, **kwargs):
+        for proxy in self.proxies.values():
+            if proxy["DBProxyArn"] == kwargs["ResourceName"]:
+                return {"TagList": proxy.get("Tags", [])}
+        return {"TagList": []}
 
     def describe_db_proxies(self, **kwargs):
         name = kwargs["DBProxyName"]
@@ -412,3 +442,56 @@ def test_current_botocore_accepts_all_rds_proxy_request_shapes():
         ("ModifyDBProxyTargetGroup", rds.target_group_modifies[-1]),
     ):
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+# ---- #1960: the target and its dbusers are this org's -------------------
+
+
+def test_a_target_database_of_another_org_is_refused():
+    subject, rds, iam = driver()
+    rds.clusters["globex-db"] = {
+        "DbClusterResourceId": "cluster-999",
+        "TagList": [{"Key": "astrolift.io/organization", "Value": "globex"}],
+    }
+
+    result = subject.provision(spec(db_cluster_identifier="globex-db"))
+
+    assert not result.ok
+    assert rds.creates == [] and rds.targets == [] and iam.policies == []
+
+
+def test_an_untagged_target_database_is_refused():
+    subject, rds, _ = driver()
+    rds.instances["platform-db"] = {"DbiResourceId": "db-PLAT", "TagList": []}
+
+    result = subject.provision(spec(db_cluster_identifier="", db_instance_identifier="platform-db"))
+
+    assert not result.ok and rds.creates == []
+
+
+def test_dbuser_arns_of_another_database_are_refused_and_never_granted():
+    subject, rds, iam = driver()
+    foreign = "arn:aws:rds-db:us-west-2:123456789012:dbuser:cluster-999/admin"
+
+    refused = subject.provision(spec(default_auth_scheme="IAM_AUTH", secret_arn="", iam_dbuser_arns=[foreign]))
+    assert not refused.ok and rds.creates == [] and iam.policies == []
+
+    own = "arn:aws:rds-db:us-west-2:123456789012:dbuser:cluster-123/app_user"
+    result = subject.provision(spec(default_auth_scheme="IAM_AUTH", secret_arn="", iam_dbuser_arns=[own]))
+    assert result.ok
+    updated = subject.update(UpdateSpec(handle=result.handle, config={"iam_dbuser_arns": [foreign]}))
+    assert not updated.ok
+    binding = subject.binding(ServiceHandle(result.handle), config={"iam_dbuser_arns": [own, foreign]})
+    assert [g.resource for g in binding.iam_grants if "rds-db:connect" in g.actions] == [own]
+
+
+def test_an_existing_proxy_of_another_org_is_not_adopted():
+    subject, rds, _ = driver()
+    first = subject.provision(spec())
+    assert first.ok
+    name = next(iter(rds.proxies))
+    rds.proxies[name]["Tags"] = [{"Key": "astrolift.io/organization", "Value": "globex"}]
+
+    again = subject.provision(spec())
+
+    assert not again.ok and "refusing to adopt" in again.message

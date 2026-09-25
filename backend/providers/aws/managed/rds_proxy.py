@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "database_proxy"
@@ -84,6 +84,20 @@ class RDSProxyDriver(ManagedServiceDriver):
             return ProvisionResult(False, "", error, ["invalid_proxy_config"])
         proxy_name = self._proxy_name(spec)
         existing = self._describe(proxy_name)
+        try:
+            refusal = self._target_refusal(cfg, spec.organization_slug)
+            if existing is not None and not refusal:
+                refusal = adoption_refusal(
+                    self._rds.list_tags_for_resource(ResourceName=str(existing.get("DBProxyArn", ""))).get(
+                        "TagList", []
+                    ),
+                    spec,
+                    resource=f"RDS Proxy {proxy_name}",
+                )
+        except Exception as exc:
+            return ProvisionResult(False, "", f"describe proxy target: {exc}", [str(exc)])
+        if refusal:
+            return ProvisionResult(False, "", refusal, ["invalid_proxy_config"])
         if existing is None:
             try:
                 auth = self._auth_configs(cfg)
@@ -155,6 +169,11 @@ class RDSProxyDriver(ManagedServiceDriver):
         _, proxy_name = parse_handle(spec.handle)
         cfg = spec.config or {}
         error = self._validate_update_config(cfg)
+        if not error and cfg.get("iam_dbuser_arns"):
+            try:
+                error = self._dbuser_refusal(cfg["iam_dbuser_arns"], self._registered_target_resource_id(proxy_name))
+            except Exception as exc:
+                return UpdateResult(False, spec.handle, f"describe proxy target: {exc}", [str(exc)])
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_proxy_config"])
         kwargs: dict[str, Any] = {"DBProxyName": proxy_name}
@@ -345,6 +364,13 @@ class RDSProxyDriver(ManagedServiceDriver):
             dict.fromkeys(str(auth.get("SecretArn", "")) for auth in auth_rows if auth.get("SecretArn")),
         )
         dbuser_arns = [str(value) for value in cfg.get("iam_dbuser_arns", [])]
+        if dbuser_arns:
+            # Only users of the database this proxy fronts (#1960).
+            try:
+                target = self._registered_target_resource_id(proxy_name)
+            except Exception:  # no target we can verify, no grant
+                target = ""
+            dbuser_arns = [arn for arn in dbuser_arns if target and not self._dbuser_refusal([arn], target)]
         default_auth = str(proxy.get("DefaultAuthScheme") or "NONE")
         env_vars = {
             "DATABASE_PROXY_HOST": ValueRef(literal=host),
@@ -508,6 +534,50 @@ class RDSProxyDriver(ManagedServiceDriver):
                 return None
             raise
         return rows[0] if rows else None
+
+    def _target_db(self, *, instance: str = "", cluster: str = "") -> tuple[str, list[dict[str, str]]]:
+        """``(resource id, tags)`` of an RDS instance or cluster."""
+        if instance:
+            [row] = self._rds.describe_db_instances(DBInstanceIdentifier=instance)["DBInstances"]
+            return str(row.get("DbiResourceId", "")), list(row.get("TagList") or [])
+        [row] = self._rds.describe_db_clusters(DBClusterIdentifier=cluster)["DBClusters"]
+        return str(row.get("DbClusterResourceId", "")), list(row.get("TagList") or [])
+
+    def _target_refusal(self, cfg: dict[str, Any], organization_slug: str) -> str:
+        """Why the configured target may not sit behind this org's proxy (#1960).
+
+        The identifiers are tenant-set and resolve in the platform's account,
+        so a proxy (and ``rds-db:connect``) could front another org's
+        database. The target must carry this org's organization tag, and
+        every dbuser ARN must name a user of that target.
+        """
+        resource_id, tags = self._target_db(
+            instance=str(cfg.get("db_instance_identifier") or ""),
+            cluster=str(cfg.get("db_cluster_identifier") or ""),
+        )
+        owner = {str(t.get("Key")): str(t.get("Value")) for t in tags}.get("astrolift.io/organization")
+        if owner != organization_slug:
+            return "the proxy target database is not tagged as this organization's"
+        return self._dbuser_refusal(cfg.get("iam_dbuser_arns") or [], resource_id)
+
+    def _registered_target_resource_id(self, proxy_name: str) -> str:
+        """Resource id of the database registered behind ``proxy_name``."""
+        targets = self._rds.describe_db_proxy_targets(DBProxyName=proxy_name).get("Targets", [])
+        for kind, key in (("TRACKED_CLUSTER", "cluster"), ("RDS_INSTANCE", "instance")):
+            for target in targets:
+                if target.get("Type") == kind and target.get("RdsResourceId"):
+                    return self._target_db(**{key: str(target["RdsResourceId"])})[0]
+        return ""
+
+    @staticmethod
+    def _dbuser_refusal(dbuser_arns: list[str], resource_id: str) -> str:
+        """``arn:...:rds-db:<region>:<account>:dbuser:<resource id>/<user>`` only."""
+        for arn in dbuser_arns:
+            _, _, rest = str(arn).partition(":dbuser:")
+            owner, sep, user = rest.partition("/")
+            if not resource_id or owner != resource_id or not sep or not user:
+                return f"iam_dbuser_arns may only name users of the proxy's target database: {arn}"
+        return ""
 
     def _register_target(self, proxy_name: str, cfg: dict[str, Any]) -> None:
         kwargs: dict[str, Any] = {"DBProxyName": proxy_name, "TargetGroupName": "default"}
