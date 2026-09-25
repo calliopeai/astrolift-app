@@ -333,13 +333,15 @@ def test_redact_env_values_masks_a_json_env_key() -> None:
     """An imported agent's ``manifest_raw`` is JSON (#1944): the
     [env]-table equivalent is a top-level "env" key and must be masked
     deliberately, not by accident because a sibling key like
-    "environment" happens to contain the substring "env"."""
+    "environment" happens to contain the substring "env". Structure and
+    key names stay, mirroring the TOML ``[env]`` rule -- only the leaf
+    values are secret-shaped (#1944 review)."""
     text = json.dumps({"agent": {"name": "demo"}, "env": {"API_KEY": "sk-live-json-env-1"}})
     out = redact_env_values(text)
     assert "sk-live-json-env-1" not in out
     parsed = json.loads(out)
     assert parsed["agent"]["name"] == "demo"
-    assert parsed["env"] == REDACTED_ENV_VALUE
+    assert parsed["env"] == {"API_KEY": REDACTED_ENV_VALUE}
 
 
 def test_redact_env_values_masks_json_secret_looking_keys_without_an_env_key() -> None:
@@ -348,19 +350,77 @@ def test_redact_env_values_masks_json_secret_looking_keys_without_an_env_key() -
     assert "sk-live-json-2" not in out
 
 
-def test_redact_env_values_masks_json_even_without_the_substring_env() -> None:
-    """Before #1944 this depended on the accident of the substring
-    "env" appearing anywhere and tripping the unparseable-text scan's
-    regex; a payload naming its secrets only "secret_refs" used to come
-    back unmasked."""
-    text = json.dumps({"agent": {"name": "demo"}, "secret_refs": {"API_KEY": "sk-live-json-3"}})
-    out = redact_env_values(text)
-    assert "sk-live-json-3" not in out
-
-
 def test_redact_env_values_json_without_env_or_secret_keys_unchanged() -> None:
     text = json.dumps({"agent": {"name": "demo"}, "runtime": {"image": "demo:latest"}})
     assert json.loads(redact_env_values(text)) == json.loads(text)
+
+
+# ---- redact_env_values: imported-agent package "environment" shape (#1944 review) ----
+#
+# astrolift_agents.services.imported_agent_registration stores an
+# imported agent's whole package (agent_package.py's canonical
+# projection) as JSON manifest_raw. Its "environment" object holds
+# "values" (a flat name -> scalar map, documented non-secret, and the
+# direct JSON equivalent of an [env] table) and "secret_refs" (a list of
+# {env_var, uri} pointers the dispatcher resolves at launch -- never a
+# literal, and already shown unmasked on AgentEnvironmentSpecType).
+# Round 3 masked the whole "environment" value as one string, which
+# collapsed this structure and hid the (non-secret) refs along with it.
+
+_IMPORTED_AGENT_PACKAGE = {
+    "agent": {"name": "demo-agent"},
+    "runtime": {"image": "demo:latest"},
+    "environment": {
+        "values": {"LOG_LEVEL": "info", "RETRY_COUNT": 3, "DEBUG": False, "NOTE": None},
+        "secret_refs": [
+            {"env_var": "API_KEY", "uri": "agents/acme/11111111-1111-1111-1111-111111111111"},
+            {"env_var": "DB_PASSWORD", "uri": "agents/acme/22222222-2222-2222-2222-222222222222"},
+        ],
+    },
+}
+
+
+def test_redact_env_values_masks_environment_values_leaves_only() -> None:
+    """Every leaf under ``environment.values`` is masked -- including
+    non-string scalars and null, same as a TOML [env] value -- but the
+    variable names and the dict shape stay."""
+    out = redact_env_values(json.dumps(_IMPORTED_AGENT_PACKAGE))
+    values = json.loads(out)["environment"]["values"]
+    assert set(values.keys()) == {"LOG_LEVEL", "RETRY_COUNT", "DEBUG", "NOTE"}
+    assert all(v == REDACTED_ENV_VALUE for v in values.values())
+
+
+def test_redact_env_values_keeps_secret_refs_visible() -> None:
+    """``secret_refs`` entries are references, not literals, and must
+    not be swept into masking just because the key's name contains
+    "secret"."""
+    out = redact_env_values(json.dumps(_IMPORTED_AGENT_PACKAGE))
+    assert (
+        json.loads(out)["environment"]["secret_refs"] == _IMPORTED_AGENT_PACKAGE["environment"]["secret_refs"]
+    )
+
+
+def test_redact_env_values_does_not_mask_the_word_environment_itself() -> None:
+    """ "environment" contains the substring "env" -- the shape that made
+    round 2's TOML-fallback masking accidental -- but the key itself is
+    not a value holder and must not be replaced wholesale."""
+    text = json.dumps({"agent": {"name": "demo"}, "environment": {"values": {}, "secret_refs": []}})
+    parsed = json.loads(redact_env_values(text))
+    assert parsed["environment"] == {"values": {}, "secret_refs": []}
+
+
+def test_redact_env_values_imported_agent_shape_round_trips_as_json() -> None:
+    """The masked document is still valid JSON, with the same top-level
+    keys and the same container types throughout -- never a string
+    sentinel standing in for a dict or list."""
+    parsed = json.loads(redact_env_values(json.dumps(_IMPORTED_AGENT_PACKAGE)))
+    assert set(parsed.keys()) == set(_IMPORTED_AGENT_PACKAGE.keys())
+    assert parsed["agent"] == _IMPORTED_AGENT_PACKAGE["agent"]
+    assert parsed["runtime"] == _IMPORTED_AGENT_PACKAGE["runtime"]
+    assert isinstance(parsed["environment"], dict)
+    assert isinstance(parsed["environment"]["values"], dict)
+    assert isinstance(parsed["environment"]["secret_refs"], list)
+    assert isinstance(parsed["environment"]["secret_refs"][0], dict)
 
 
 # ---- redact_env_values: text tomllib rejects ----------------------

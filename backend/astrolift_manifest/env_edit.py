@@ -121,8 +121,18 @@ _COMMENT_MARKER_RE = re.compile(r"# \[ASTROLIFT_REDACTED_ENV_COMMENT:([1-9][0-9]
 # such as "environment" usually contains the substring "env" and trips
 # that scan's conservative regex. A payload that never spells "env" came
 # back unmasked. JSON gets its own explicit, deliberate rule instead.
+#
+# ``environment`` itself is not one of these: an agent package's
+# ``environment`` object holds ``values`` (a flat name -> scalar map,
+# the JSON shape of an ``[env]`` table) *and* ``secret_refs`` (a list of
+# ``{env_var, uri}`` pointers -- never a literal, resolved by the
+# dispatcher at launch, and already shown unmasked everywhere else this
+# app surfaces a spec's secret_refs, e.g. AgentEnvironmentSpecType). A
+# key ending in "_ref"/"_refs" is a pointer, not a value holder, and is
+# never treated as sensitive here even if its name also contains one of
+# these tokens (``secret_refs`` contains "secret").
+_JSON_ENV_CONTAINER_KEYS = frozenset({"env", "values", "value", "env_vars", "envvars", "plaintext"})
 _JSON_SECRET_NAME_TOKENS = (
-    "env",
     "secret",
     "password",
     "token",
@@ -131,6 +141,31 @@ _JSON_SECRET_NAME_TOKENS = (
     "privatekey",
     "pin",
 )
+_JSON_REFERENCE_NAME_SUFFIXES = ("_ref", "_refs")
+
+
+def _is_json_reference_name(name: str) -> bool:
+    return name.endswith(_JSON_REFERENCE_NAME_SUFFIXES)
+
+
+def _is_json_secret_name(name: str) -> bool:
+    if _is_json_reference_name(name):
+        return False
+    return name in _JSON_ENV_CONTAINER_KEYS or any(token in name for token in _JSON_SECRET_NAME_TOKENS)
+
+
+def _mask_json_leaves(value: object) -> object:
+    """``value`` with every scalar leaf replaced by the sentinel.
+
+    Dict keys and list length are kept, mirroring how every ``[env]``
+    value is masked in place while its keys stay put (#1944): once a
+    key is judged sensitive, everything under it is secret-shaped,
+    regardless of what its own children happen to be named."""
+    if isinstance(value, dict):
+        return {key: _mask_json_leaves(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_mask_json_leaves(item) for item in value]
+    return REDACTED_ENV_VALUE
 
 
 def _redact_json_value(value: object) -> object:
@@ -138,8 +173,8 @@ def _redact_json_value(value: object) -> object:
         redacted = {}
         for key, child in value.items():
             name = str(key).lower()
-            if any(token in name for token in _JSON_SECRET_NAME_TOKENS):
-                redacted[key] = REDACTED_ENV_VALUE
+            if _is_json_secret_name(name):
+                redacted[key] = _mask_json_leaves(child)
             else:
                 redacted[key] = _redact_json_value(child)
         return redacted
@@ -150,8 +185,9 @@ def _redact_json_value(value: object) -> object:
 
 def _redact_json_manifest(text: str) -> str | None:
     """``text`` masked as JSON, or None when it is not JSON (the caller
-    falls back to the TOML path). Any key named ``env`` or that looks
-    like it holds a secret is masked whole, at any depth."""
+    falls back to the TOML path). A key named ``env`` or that looks
+    secret-shaped has its scalar leaves masked, structure kept, at any
+    depth; a reference (``*_ref``/``*_refs``) is left visible."""
     stripped = text.lstrip()
     if not stripped or stripped[0] not in "{[":
         return None
