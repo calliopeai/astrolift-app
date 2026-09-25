@@ -29,6 +29,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "cdn"
 VARIANT = "cloud_cdn"
@@ -1522,7 +1523,12 @@ class CloudCdnDriver(ManagedServiceDriver):
             "forwarding_rule": _FORWARDING_OWNED_FIELDS,
         }
         for key, owned_fields in raw_fields.items():
-            reserved = sorted(set(cfg.get(key) or {}).intersection(owned_fields | _OUTPUT_FIELDS))
+            # Google's JSON parser accepts a field's proto name as well as its
+            # lowerCamelCase JSON name, so a raw field spelled in proto form
+            # bypassed the exact-match check below (#1981).
+            proto_names, reserved = raw_field_conflicts(cfg.get(key) or {}, owned_fields | _OUTPUT_FIELDS)
+            if proto_names:
+                return f"{key} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
             if reserved:
                 return f"{key} cannot override Astrolift-owned fields: {', '.join(reserved)}"
         if cfg.get("security_policy") and not cfg.get("backends"):
@@ -1615,7 +1621,11 @@ class CloudCdnDriver(ManagedServiceDriver):
 
 def _safe_raw(cfg: dict[str, Any], key: str, owned_fields: set[str]) -> dict[str, Any]:
     raw = dict(cfg.get(key) or {})
-    reserved = sorted(set(raw).intersection(owned_fields | _OUTPUT_FIELDS))
+    # Backstop for _validate_config: body assembly must never merge a raw
+    # field _validate_config would have refused (#1981).
+    proto_names, reserved = raw_field_conflicts(raw, owned_fields | _OUTPUT_FIELDS)
+    if proto_names:
+        raise CloudCdnError(f"{key} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}")
     if reserved:
         raise CloudCdnError(f"{key} cannot override Astrolift-owned fields: {', '.join(reserved)}")
     return raw

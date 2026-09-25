@@ -491,6 +491,12 @@ def test_compatible_immutable_address_can_be_reused_but_is_not_claimed(
         ({"origin_bucket": "", "backends": [{"group": "neg"}], "spa": True}, "origin_bucket"),
         ({"backend_bucket": {"enableCdn": False}}, "cannot override"),
         ({"forwarding_rule": {"IPAddress": "1.2.3.4"}}, "cannot override"),
+        # Google's JSON parser accepts a field's proto name as well as its
+        # lowerCamelCase JSON name, so a raw field spelled in proto form must
+        # be refused outright rather than compared to the owned set (#1981).
+        ({"backend_bucket": {"enable_cdn": False}}, "lowerCamelCase JSON field names"),
+        ({"forwarding_rule": {"ip_address": "1.2.3.4"}}, "lowerCamelCase JSON field names"),
+        ({"backend_bucket": {"EnableCdn": False}}, "cannot override Astrolift-owned fields: EnableCdn"),
         (
             {
                 "origin_bucket": "",
@@ -510,6 +516,15 @@ def test_validation_rejects_unsafe_or_ambiguous_shapes(
     result = driver.provision(request)
     assert not result.ok
     assert message in result.message
+
+
+def test_a_json_named_raw_field_the_driver_does_not_model_still_passes(
+    driver: CloudCdnDriver,
+    fake: FakeCompute,
+) -> None:
+    result = driver.provision(spec(backend_bucket={"futureKnob": "beta"}))
+    assert result.ok, result.message
+    assert fake.resources["backendBuckets"]["portal-cdn-bucket"]["futureKnob"] == "beta"
 
 
 def test_binding_emits_portable_contract_and_project_role(
