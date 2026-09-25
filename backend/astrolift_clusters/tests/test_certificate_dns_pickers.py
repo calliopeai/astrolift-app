@@ -48,6 +48,14 @@ def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
 
 
+def _operator_info():
+    """The DNS pickers list the platform account, so they are the operator's (#1932)."""
+    from django.contrib.auth import get_user_model
+
+    root = get_user_model().objects.create(username=f"root-{uuid.uuid4().hex[:6]}", is_superuser=True)
+    return SimpleNamespace(context=SimpleNamespace(user=root, request=None))
+
+
 @pytest.fixture
 def org():
     return Organization.objects.create(
@@ -224,7 +232,7 @@ def test_dns_zones_denied_without_provider_plugin_read(org, permission_resolver)
     domains admin surface). No grant -> denied."""
     with tenant_context(TenantContext(organization_id=org.id)):
         with pytest.raises(PermissionDenied):
-            ClustersQuery().astrolift_dns_zones(_info(), dns_driver="route53")
+            ClustersQuery().astrolift_dns_zones(_operator_info(), dns_driver="route53")
 
 
 def test_dns_zones_unsupported_driver(org, permission_resolver):
@@ -233,7 +241,7 @@ def test_dns_zones_unsupported_driver(org, permission_resolver):
     leaves the textarea editable."""
     permission_resolver.grant(Permission.PROVIDER_PLUGIN_READ)
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = ClustersQuery().astrolift_dns_zones(_info(), dns_driver="cloud_dns")
+        result = ClustersQuery().astrolift_dns_zones(_operator_info(), dns_driver="cloud_dns")
     assert result.supported is False
     assert result.zones == []
 
@@ -254,7 +262,7 @@ def test_dns_zones_happy_path(org, permission_resolver):
     try:
         permission_resolver.grant(Permission.PROVIDER_PLUGIN_READ)
         with tenant_context(TenantContext(organization_id=org.id)):
-            result = ClustersQuery().astrolift_dns_zones(_info(), dns_driver="route53")
+            result = ClustersQuery().astrolift_dns_zones(_operator_info(), dns_driver="route53")
     finally:
         dns_discovery.reset_dns_driver_for_tests()
 
@@ -279,7 +287,7 @@ def test_dns_zones_list_error_keeps_supported(org, permission_resolver):
     try:
         permission_resolver.grant(Permission.PROVIDER_PLUGIN_READ)
         with tenant_context(TenantContext(organization_id=org.id)):
-            result = ClustersQuery().astrolift_dns_zones(_info(), dns_driver="route53")
+            result = ClustersQuery().astrolift_dns_zones(_operator_info(), dns_driver="route53")
     finally:
         dns_discovery.reset_dns_driver_for_tests()
 
@@ -293,13 +301,13 @@ def test_dns_zones_list_error_keeps_supported(org, permission_resolver):
 def test_dns_certificates_denied_without_provider_plugin_read(org, permission_resolver):
     with tenant_context(TenantContext(organization_id=org.id)):
         with pytest.raises(PermissionDenied):
-            ClustersQuery().astrolift_dns_certificates(_info(), dns_driver="route53")
+            ClustersQuery().astrolift_dns_certificates(_operator_info(), dns_driver="route53")
 
 
 def test_dns_certificates_unsupported_driver(org, permission_resolver):
     permission_resolver.grant(Permission.PROVIDER_PLUGIN_READ)
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = ClustersQuery().astrolift_dns_certificates(_info(), dns_driver="azure_dns")
+        result = ClustersQuery().astrolift_dns_certificates(_operator_info(), dns_driver="azure_dns")
     assert result.supported is False
     assert result.certificates == []
 
@@ -321,7 +329,7 @@ def test_dns_certificates_happy_path(org, permission_resolver):
     try:
         permission_resolver.grant(Permission.PROVIDER_PLUGIN_READ)
         with tenant_context(TenantContext(organization_id=org.id)):
-            result = ClustersQuery().astrolift_dns_certificates(_info(), dns_driver="route53")
+            result = ClustersQuery().astrolift_dns_certificates(_operator_info(), dns_driver="route53")
     finally:
         dns_discovery.reset_dns_driver_for_tests()
 
