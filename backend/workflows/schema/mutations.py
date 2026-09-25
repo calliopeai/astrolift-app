@@ -10,7 +10,16 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.decorators import tenant_scoped
-from core.permissions import Permission, is_platform_operator, require_permission, require_platform_operator
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    check_permission,
+    is_platform_operator,
+    require_permission,
+    require_platform_operator,
+)
 from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
@@ -150,6 +159,20 @@ def _definition_for_write(slug):
     return qs.filter(organization_id=org_pk).first() or qs.first()
 
 
+def _object_scope(obj) -> PermissionScope:
+    """The narrowest scope a workflow target object reports: its app, else its
+    project, else its team, else its org (#1982)."""
+    for attr, kind in (
+        ("registered_app_id", ScopeKind.APP),
+        ("project_id", ScopeKind.PROJECT),
+        ("team_id", ScopeKind.TEAM),
+    ):
+        value = getattr(obj, attr, None)
+        if value:
+            return PermissionScope(kind=kind, id=value)
+    return PermissionScope(kind=ScopeKind.ORG, id=obj.organization_id)
+
+
 def _unique_clone_slug(base_slug, org):
     """First free slug for ``org`` derived from ``base_slug`` (spec 40 §9 Q2)."""
     candidate = base_slug
@@ -212,12 +235,16 @@ class Mutation:
         if not org_scoped:
             raise GraphQLError(f"Object not found: {model_label}:{object_id}")
 
-        obj = model.objects.filter(
-            Q(organization_id=_caller_org_pk()) | Q(organization_id__isnull=True),
-            pk=object_id,
-        ).first()
+        # The caller's org only: an org-less row belongs to no tenant (#1965's
+        # rule), and a row of another team or project in the same org needs
+        # workflow.trigger at that object's own scope (#1982).
+        obj = model.objects.filter(organization_id=_caller_org_pk(), pk=object_id).first()
         if obj is None:
             raise GraphQLError(f"Object not found: {model_label}:{object_id}")
+        try:
+            check_permission(Permission.WORKFLOW_TRIGGER, scope=_object_scope(obj))
+        except PermissionDenied as exc:
+            raise GraphQLError(f"Object not found: {model_label}:{object_id}") from exc
 
         try:
             instance = WorkflowInstance.start(workflow, obj, user, organization_id=_caller_org_pk())

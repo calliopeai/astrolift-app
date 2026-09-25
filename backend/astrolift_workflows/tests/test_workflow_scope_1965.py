@@ -663,3 +663,54 @@ def test_lists_and_the_run_gate_agree_on_deleted_owners(world):
                     continue
                 gated.add(wid)
         assert listed == gated == set(expected), name
+
+
+# ---------------------------------------------------------------------------
+# gate approver identity (#1982)
+# ---------------------------------------------------------------------------
+
+
+def test_a_gate_decision_records_the_caller_not_a_supplied_approver(world, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        temporal_mutations, "signal_workflow", lambda wid, name, *args: sent.append(args) or True
+    )
+    developer = _holder("team_developer", "TEAM", world.medops.pk, "gate-who")
+
+    with _as(world, developer):
+        result = TemporalWorkflowsMutation().signal_workflow_instance(
+            make_info(developer),
+            "wf-intake",
+            "human_gate_decision",
+            {
+                "execution_id": str(world.intake.execution.guid),
+                "decision": "approved",
+                "decided_by_user_id": 1,
+            },
+        )
+
+    assert result.ok, result.errors
+    [(payload,)] = sent
+    assert payload["decided_by_user_id"] == developer.pk
+
+
+def test_a_gate_with_named_approvers_is_decided_only_by_them(world, delivered):
+    stage = world.intake.execution.stage
+    stage.approvers = ["lead-wf1965@acme.test"]
+    stage.save(update_fields=["approvers"])
+    developer = _holder("team_developer", "TEAM", world.medops.pk, "gate-other")
+    lead = _holder("team_developer", "TEAM", world.medops.pk, "lead")
+    payload = {"execution_id": str(world.intake.execution.guid), "decision": "approved"}
+
+    with _as(world, developer):
+        refused = TemporalWorkflowsMutation().signal_workflow_instance(
+            make_info(developer), "wf-intake", "human_gate_decision", dict(payload)
+        )
+    with _as(world, lead):
+        allowed = TemporalWorkflowsMutation().signal_workflow_instance(
+            make_info(lead), "wf-intake", "human_gate_decision", dict(payload)
+        )
+
+    assert refused.ok is False
+    assert allowed.ok is True
+    assert delivered == ["wf-intake"]
