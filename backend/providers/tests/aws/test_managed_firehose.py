@@ -121,8 +121,10 @@ def _destination(destination_type: str) -> dict:
             "RoleARN": ROLE_ARN,
             "ClusterJDBCURL": "jdbc:redshift://warehouse.example:5439/dev",
             "CopyCommand": {"DataTableName": "events"},
-            "Username": "firehose",
-            "Password": "not-a-real-secret",
+            "SecretsManagerConfiguration": {
+                "Enabled": True,
+                "SecretARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:firehose",
+            },
             "S3Configuration": _s3(),
         },
         "elasticsearch": {
@@ -146,7 +148,10 @@ def _destination(destination_type: str) -> dict:
         "splunk": {
             "HECEndpoint": "https://splunk.example.com:8088",
             "HECEndpointType": "Raw",
-            "HECToken": "not-a-real-token",
+            "SecretsManagerConfiguration": {
+                "Enabled": True,
+                "SecretARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:firehose",
+            },
             "S3Configuration": _s3(),
         },
         "http_endpoint": {
@@ -156,8 +161,10 @@ def _destination(destination_type: str) -> dict:
         },
         "snowflake": {
             "AccountUrl": "https://account.snowflakecomputing.com",
-            "PrivateKey": "x" * 256,
-            "User": "firehose",
+            "SecretsManagerConfiguration": {
+                "Enabled": True,
+                "SecretARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:firehose",
+            },
             "Database": "EVENTS",
             "Schema": "PUBLIC",
             "Table": "TRIAGE",
@@ -582,3 +589,20 @@ def test_a_platform_stream_of_another_org_is_not_adopted():
 
     assert not result.ok and "outside this resource declaration" in result.message
     client.tag_delivery_stream.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("destination_type", "field", "value"),
+    [("redshift", "Password", "hunter2"), ("splunk", "HECToken", "t"), ("snowflake", "PrivateKey", "k" * 256)],
+)
+def test_plaintext_destination_credentials_are_refused_on_create_and_update(destination_type, field, value):
+    """They would sit in the stored service config (#1953)."""
+    destination = _destination(destination_type)
+    destination["configuration"][field] = value
+    driver = FirehoseDriver(config=_config(), client=_client(), sleep=lambda _seconds: None)
+
+    created = driver.provision(_spec(config={"destination": destination}))
+    updated = driver.update(UpdateSpec(f"stream/{STREAM_ARN}", config={"destination_update": destination}))
+
+    assert not created.ok and field in created.message and "SecretsManagerConfiguration" in created.message
+    assert not updated.ok and field in updated.message

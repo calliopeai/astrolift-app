@@ -805,3 +805,19 @@ def test_a_platform_broker_of_another_org_is_not_adopted():
 
     assert not result.ok
     client.create_broker.assert_not_called()
+
+
+def test_a_plaintext_ldap_password_is_refused_in_broker_update():
+    """broker_update reaches UpdateBroker as-is (#1953)."""
+    client = _client()
+    driver = AmazonMQRabbitMQDriver(config=_config(), client=client, secrets_client=_secrets({}))
+
+    result = driver.update(
+        UpdateSpec(
+            f"mq/{BROKER_ARN}",
+            config={"broker_update": {"LdapServerMetadata": {"ServiceAccountPassword": "hunter2"}}},
+        )
+    )
+
+    assert not result.ok and "ServiceAccountPassword" in result.message
+    client.update_broker.assert_not_called()
