@@ -33,6 +33,15 @@ def _info():
     )
 
 
+def _operator_info():
+    """The platform operator, an active superuser: the only caller the
+    fleet-wide viewer path admits (#1965). The permission pair alone is
+    held by every org owner and admin."""
+    info = _info()
+    info.context.user = SimpleNamespace(is_authenticated=True, is_active=True, is_superuser=True)
+    return info
+
+
 @contextmanager
 def _tenant():
     """Bind a minimal tenant snapshot for the duration of a resolver call.
@@ -70,7 +79,7 @@ def test_list_workflow_instances_returns_empty_page_when_disabled(permission_res
 def test_list_workflow_instances_passes_filters(permission_resolver, settings, monkeypatch):
     settings.ASTROLIFT_TEMPORAL_ENABLED = True
     # The viewer list is org-scoped (#1183); this filter-passthrough test
-    # uses the fleet-wide elevated pair so the monkeypatched (unowned) row
+    # uses the fleet-wide platform operator so the monkeypatched (unowned) row
     # isn't filtered out — tenancy scoping is covered in test_viewer_tenancy_1183.
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
@@ -98,7 +107,7 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
     q = TemporalWorkflowsQuery()
     with _tenant():
         page = q.astrolift_workflow_instances(
-            _info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10
+            _operator_info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10
         )
     assert captured == {
         "workflow_type": "DeployAppWorkflow",
@@ -181,7 +190,7 @@ def test_instance_detail_returns_none_for_empty_workflow_id(permission_resolver,
 
 def test_instance_detail_shapes_history(permission_resolver, settings, monkeypatch):
     settings.ASTROLIFT_TEMPORAL_ENABLED = True
-    # History-shaping test: use the fleet-wide elevated pair so the
+    # History-shaping test: use the fleet-wide platform operator so the
     # org-scoping gate (#1183) doesn't hide the monkeypatched (unowned) run.
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
@@ -213,7 +222,7 @@ def test_instance_detail_shapes_history(permission_resolver, settings, monkeypat
 
     q = TemporalWorkflowsQuery()
     with _tenant():
-        detail = q.astrolift_workflow_instance_detail(_info(), "DeployAppWorkflow-x")
+        detail = q.astrolift_workflow_instance_detail(_operator_info(), "DeployAppWorkflow-x")
     assert detail is not None
     assert detail.instance.status == "COMPLETED"
     assert detail.instance.duration_seconds == 60.0
@@ -239,7 +248,7 @@ def test_cancel_rejects_empty_id(permission_resolver):
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     m = TemporalWorkflowsMutation()
-    result = m.cancel_workflow_instance(_info(), "")
+    result = m.cancel_workflow_instance(_operator_info(), "")
     assert result.ok is False
     assert result.errors[0].field == "workflow_id"
 
@@ -249,7 +258,7 @@ def test_cancel_returns_error_when_undeliverable(permission_resolver, settings):
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     m = TemporalWorkflowsMutation()
-    result = m.cancel_workflow_instance(_info(), "wf-1")
+    result = m.cancel_workflow_instance(_operator_info(), "wf-1")
     assert result.ok is False
     assert "cancel" in result.errors[0].messages[0]
 
@@ -259,7 +268,7 @@ def test_cancel_succeeds(permission_resolver, monkeypatch):
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
     m = TemporalWorkflowsMutation()
-    result = m.cancel_workflow_instance(_info(), "wf-1")
+    result = m.cancel_workflow_instance(_operator_info(), "wf-1")
     assert result.ok is True
     assert result.errors == []
 
@@ -268,7 +277,7 @@ def test_terminate_requires_reason(permission_resolver):
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     m = TemporalWorkflowsMutation()
-    result = m.terminate_workflow_instance(_info(), "wf-1", "")
+    result = m.terminate_workflow_instance(_operator_info(), "wf-1", "")
     assert result.ok is False
     assert result.errors[0].field == "reason"
 
@@ -285,7 +294,7 @@ def test_terminate_succeeds(permission_resolver, monkeypatch):
 
     monkeypatch.setattr("astrolift_workflows.schema.mutations.terminate_workflow", _fake_term)
     m = TemporalWorkflowsMutation()
-    result = m.terminate_workflow_instance(_info(), "wf-1", "stuck-on-step-3")
+    result = m.terminate_workflow_instance(_operator_info(), "wf-1", "stuck-on-step-3")
     assert result.ok is True
     assert captured == {"wid": "wf-1", "reason": "stuck-on-step-3"}
 
@@ -294,7 +303,7 @@ def test_signal_requires_name(permission_resolver):
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     m = TemporalWorkflowsMutation()
-    result = m.signal_workflow_instance(_info(), "wf-1", "")
+    result = m.signal_workflow_instance(_operator_info(), "wf-1", "")
     assert result.ok is False
     assert result.errors[0].field == "signal_name"
 
@@ -312,7 +321,7 @@ def test_signal_passes_payload_when_present(permission_resolver, monkeypatch):
 
     monkeypatch.setattr("astrolift_workflows.schema.mutations.signal_workflow", _fake_sig)
     m = TemporalWorkflowsMutation()
-    result = m.signal_workflow_instance(_info(), "wf-1", "abort", payload={"x": 1})
+    result = m.signal_workflow_instance(_operator_info(), "wf-1", "abort", payload={"x": 1})
     assert result.ok is True
     assert captured["args"] == ({"x": 1},)
 
@@ -328,7 +337,7 @@ def test_signal_omits_payload_when_none(permission_resolver, monkeypatch):
 
     monkeypatch.setattr("astrolift_workflows.schema.mutations.signal_workflow", _fake_sig)
     m = TemporalWorkflowsMutation()
-    result = m.signal_workflow_instance(_info(), "wf-1", "abort", payload=None)
+    result = m.signal_workflow_instance(_operator_info(), "wf-1", "abort", payload=None)
     assert result.ok is True
     assert captured["args"] == ()
 
@@ -375,15 +384,14 @@ def test_cancel_org_owned_run_with_workflow_trigger(permission_resolver, monkeyp
 
 
 def test_cancel_org_owned_run_with_elevated_pair(permission_resolver, monkeypatch, org):
-    """Own-org run: the legacy AUDIT_LOG_READ + ADMIN_ELEVATE platform
-    operator still works — both paths are valid."""
+    """Own-org run: the platform operator still works; both paths are valid."""
     _org_run(org, "wf-own-2")
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
     m = TemporalWorkflowsMutation()
     with _org_tenant(org):
-        result = m.cancel_workflow_instance(_info(), "wf-own-2")
+        result = m.cancel_workflow_instance(_operator_info(), "wf-own-2")
     assert result.ok is True
     assert result.errors == []
 
@@ -424,15 +432,15 @@ def test_cancel_foreign_org_run_reads_as_not_found(permission_resolver, monkeypa
 
 
 def test_cancel_foreign_org_run_allowed_for_elevated_pair(permission_resolver, monkeypatch, org, other_org):
-    """The elevated platform operator reaches foreign-org runs — the
-    fleet-wide Running tab admin actions must keep working."""
+    """The platform operator reaches foreign-org runs: the fleet-wide
+    Running tab admin actions must keep working."""
     _org_run(other_org, "wf-foreign-elevated")
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
     m = TemporalWorkflowsMutation()
     with _org_tenant(org):
-        result = m.cancel_workflow_instance(_info(), "wf-foreign-elevated")
+        result = m.cancel_workflow_instance(_operator_info(), "wf-foreign-elevated")
     assert result.ok is True
     assert result.errors == []
 
@@ -499,8 +507,7 @@ def test_cancel_org_less_run_not_found_for_workflow_trigger_holder(permission_re
 
 
 def test_cancel_org_less_run_allowed_for_elevated_pair(permission_resolver, monkeypatch):
-    """Legacy org-less runs remain reachable via AUDIT_LOG_READ +
-    ADMIN_ELEVATE, as before."""
+    """Legacy org-less runs remain reachable by the platform operator."""
     from workflows.models import WorkflowInstance
 
     WorkflowInstance.objects.create(
@@ -510,6 +517,6 @@ def test_cancel_org_less_run_allowed_for_elevated_pair(permission_resolver, monk
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
     m = TemporalWorkflowsMutation()
-    result = m.cancel_workflow_instance(_info(), "wf-legacy-2")
+    result = m.cancel_workflow_instance(_operator_info(), "wf-legacy-2")
     assert result.ok is True
     assert result.errors == []

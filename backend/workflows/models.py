@@ -252,13 +252,16 @@ class WorkflowInstance(Tracking):
         configured_workflow: "Workflow | None" = None,
         temporal_workflow_id: str | None = None,
         temporal_run_id: str | None = None,
+        organization_id: int | None = None,
     ) -> "WorkflowInstance":
         """Start a new workflow instance.
 
         ``configured_workflow``-first path (spec 40 §2.3): agent runs start
         from a tier-2 Workflow; the org is denormalized off it and the legacy
         GFK is left null. The legacy forms state-machine path (positional
-        ``workflow`` + ``obj``) is unchanged.
+        ``workflow`` + ``obj``) records ``organization_id`` when the caller
+        passes one: tenants read and transition only their own org's
+        instances (#1965).
         """
         if configured_workflow is not None:
             instance = cls.objects.create(
@@ -295,6 +298,7 @@ class WorkflowInstance(Tracking):
         ct = ContentType.objects.get_for_model(obj)
         instance = cls.objects.create(
             workflow=workflow,
+            organization_id=organization_id,
             content_type=ct,
             object_id=obj.pk,
             current_state=initial_state,

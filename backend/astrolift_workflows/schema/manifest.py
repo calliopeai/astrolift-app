@@ -161,7 +161,11 @@ class WorkflowManifestQuery:
         else:
             tenant = get_current_tenant()
             org_pk = tenant.organization_id if tenant else None
-            visible = WorkflowDefinition.visible_to_org(org_pk).filter(slug=definition_slug)
+            # Live rows only: a deleted same-slug definition is not the one the
+            # permission scope was resolved from.
+            visible = WorkflowDefinition.visible_to_org(org_pk).filter(
+                slug=definition_slug, deleted_at__isnull=True
+            )
             definition = visible.filter(organization_id=org_pk).first() or visible.first()
 
         if definition is None:

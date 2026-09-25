@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from graphql import GraphQLError
 
+from core.decorators import TenantRequired
 from core.permissions import Permission
 from core.tenancy import TenantContext
 from core.tenancy import tenant_context as _tenant_ctx
@@ -397,7 +398,14 @@ def _query():
     return Query()
 
 
-def test_workflow_stages_cross_org_returns_empty(member, org, other_org):
+@pytest.fixture
+def reader(permission_resolver):
+    """The readers check workflow.read at the object's scope (#1965); these
+    tests are about the org filter behind that gate."""
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+
+
+def test_workflow_stages_cross_org_returns_empty(reader, member, org, other_org):
     """A foreign org's definition slug must be byte-identical to a
     nonexistent one — stages carry prompt/approvers/role, so an unscoped
     read leaks gate config cross-tenant."""
@@ -407,7 +415,7 @@ def test_workflow_stages_cross_org_returns_empty(member, org, other_org):
     assert list(stages) == []
 
 
-def test_workflow_stages_own_org_and_global_visible(member, org, other_org):
+def test_workflow_stages_own_org_and_global_visible(reader, member, org, other_org):
     own = _make_def("own-stages", organization=org)
     glob = _make_def("global-stages", organization=None)
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
@@ -417,7 +425,7 @@ def test_workflow_stages_own_org_and_global_visible(member, org, other_org):
     assert [s.definition_id for s in glob_stages] == [glob.id]
 
 
-def test_workflow_stages_org_row_preferred_on_slug_collision(member, org):
+def test_workflow_stages_org_row_preferred_on_slug_collision(reader, member, org):
     """On an (org, global) slug collision the org-owned definition wins —
     same preference as _definition_for_write."""
     _make_def("collide-stages", organization=None)
@@ -427,7 +435,7 @@ def test_workflow_stages_org_row_preferred_on_slug_collision(member, org):
     assert {s.definition_id for s in stages} == {own.id}
 
 
-def test_workflow_instance_cross_org_returns_none(member, org, other_org):
+def test_workflow_instance_cross_org_returns_none(reader, member, org, other_org):
     from django.contrib.contenttypes.models import ContentType
 
     from workflows.models import WorkflowInstance
@@ -447,7 +455,7 @@ def test_workflow_instance_cross_org_returns_none(member, org, other_org):
     assert inst.pk not in {i.pk for i in listed}
 
 
-def test_workflow_stage_executions_cross_org_returns_empty(member, org, other_org):
+def test_workflow_stage_executions_cross_org_returns_empty(reader, member, org, other_org):
     from astrolift_operations.models import WorkflowRun
 
     WorkflowRun.objects.create(
@@ -483,7 +491,7 @@ def _seed_stage_execution(definition, *, workflow_id, run_id, organization):
     )
 
 
-def test_workflow_stage_executions_cross_org_hides_a_seeded_row(member, org, other_org):
+def test_workflow_stage_executions_cross_org_hides_a_seeded_row(reader, member, org, other_org):
     """The empty-run assertion above passes with or without scoping. Seed the
     foreign run with a stage execution that an unscoped read WOULD return, and
     prove the owning org still sees it (astrolift-cli#69: the rows now carry
@@ -510,29 +518,26 @@ def test_workflow_stage_executions_cross_org_hides_a_seeded_row(member, org, oth
     assert [e.pk for e in owner] == [execution.pk]
 
 
-def test_workflow_stage_executions_without_tenant_returns_empty(member, org):
-    """Fail closed with no tenant. The read scope is org ∪ platform-global, so
-    a null org compiles to "IS NULL OR IS NULL" and would return every org-less
-    run's stage detail in the install."""
+def test_workflow_stage_executions_without_tenant_or_org_is_refused(reader, member, org):
+    """Fail closed with no tenant: the reader refuses rather than compile a null
+    org into "IS NULL" and hand back every org-less run's stage detail. A run
+    that belongs to no org is not a tenant's to read either (#1965): unlike a
+    template, a run is an execution, not shared platform content."""
     definition = _make_def("orgless-exec-def", organization=None)
     _seed_stage_execution(
         definition, workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec", organization=None
     )
 
     with _tenant_ctx(None):
-        rows = list(
+        with pytest.raises(TenantRequired):
             _query().workflow_stage_executions(
                 _info(member), workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec"
             )
-        )
-    assert rows == []
 
-    # Same org-less run stays readable to a real tenant (the platform-global
-    # carve-out this guard must not break).
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
         scoped = list(
             _query().workflow_stage_executions(
                 _info(member), workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec"
             )
         )
-    assert len(scoped) == 1
+    assert scoped == []
