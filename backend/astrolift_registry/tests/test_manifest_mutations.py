@@ -1740,7 +1740,12 @@ def test_a_project_binding_applied_to_an_app_with_no_environment_is_gated_before
     # The first ci_deploy of an app with no environment bootstraps one and
     # reconciles manifest_raw.
     app.refresh_from_db()
-    _bootstrap_app_environments(app, [])
+    # A user-driven bootstrap runs with the actor's project authority (#1966);
+    # the CI path has no actor and withholds project attachments.
+    from astrolift_manifest.persist import allow_project_attach
+
+    with allow_project_attach(project_update):
+        _bootstrap_app_environments(app, [])
 
     attached = ManagedServiceAttachment.objects.filter(
         managed_service=shared, app_environment__registered_app=app, deleted_at__isnull=True

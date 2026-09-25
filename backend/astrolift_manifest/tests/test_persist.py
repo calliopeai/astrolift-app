@@ -336,7 +336,10 @@ owner_scope = "project"
 environment = "production"
 """
 
-    result = persist_manifest(app, _normalize(toml), raw_text=toml)
+    from astrolift_manifest.persist import allow_project_attach
+
+    with allow_project_attach():
+        result = persist_manifest(app, _normalize(toml), raw_text=toml)
 
     private = ManagedService.objects.get(registered_app=app, name="private-db")
     assert private.app_environment == env
@@ -580,3 +583,56 @@ def test_a_project_scoped_service_on_an_app_with_no_project_is_refused_before_an
 
     assert not ManagedServiceAttachment.objects.exists()
     assert ManagedService.objects.count() == 1
+
+
+def test_project_services_are_withheld_unless_the_caller_may_attach_them(monkeypatch):
+    """A repo sync, webhook or CI bootstrap has no actor to check, so a
+    manifest cannot create, attach or rebind a project managed service there
+    (#1966); an authorized caller opts in with ``allow_project_attach``."""
+    from types import SimpleNamespace
+
+    from astrolift_manifest.persist import allow_project_attach
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+
+    monkeypatch.setattr(
+        "astrolift_services.managed_service_catalog.resolve_variant",
+        lambda **kwargs: SimpleNamespace(variant=kwargs.get("requested_variant") or "resolved-default"),
+    )
+    monkeypatch.setattr("astrolift_services.managed_service_catalog.validate_config", lambda *_: None)
+    app = _scaffold()
+    env = _add_environment(app)
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+  [[workloads.containers]]
+  name = "web"
+
+[[managed_services]]
+kind = "redis"
+name = "shared-cache"
+owner_scope = "project"
+environment = "production"
+bind_workloads = ["web"]
+"""
+
+    withheld = persist_manifest(app, _normalize(toml), raw_text=toml)
+
+    assert withheld.project_changes_withheld == ["create project:redis/shared-cache"]
+    assert not ManagedService.objects.filter(project=app.project).exists()
+
+    with allow_project_attach():
+        persist_manifest(app, _normalize(toml), raw_text=toml)
+    shared = ManagedService.objects.get(project=app.project, name="shared-cache")
+    attachment = ManagedServiceAttachment.objects.get(managed_service=shared, app_environment=env)
+    assert attachment.workload_names == ["web"]
+
+    rebind = toml.replace('bind_workloads = ["web"]', 'bind_workloads = ["*"]')
+    result = persist_manifest(app, _normalize(rebind), raw_text=rebind)
+
+    assert result.project_changes_withheld == [f"rebind project:redis/shared-cache@{env.name}"]
+    attachment.refresh_from_db()
+    assert attachment.workload_names == ["web"]
+    assert attachment.deleted_at is None

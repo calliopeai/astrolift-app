@@ -15,6 +15,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
 from astrolift_identity.scopes import project_scope_by_guid
+from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations.helpers import (
@@ -309,7 +310,8 @@ class RegistrationMutations:
                     parse_raw(eff_manifest_raw),
                     defaults=NormalizationDefaults(),
                 )
-                persist_manifest(app, _manifest, raw_text=eff_manifest_raw)
+                with allow_project_attach(actor_may_attach_project_services(app)):
+                    persist_manifest(app, _manifest, raw_text=eff_manifest_raw)
                 _bootstrap_status = "applied"
             except Exception as exc:  # noqa: BLE001 — registration must survive
                 _bootstrap_status = "parse_failed"
@@ -337,7 +339,8 @@ class RegistrationMutations:
                     resync_app_manifest_from_repo,
                 )
 
-                _resync = resync_app_manifest_from_repo(app)
+                with allow_project_attach(actor_may_attach_project_services(app)):
+                    _resync = resync_app_manifest_from_repo(app)
                 _bootstrap_status = _resync.status
                 _bootstrap_error = _resync.error or ""
             except Exception as exc:  # noqa: BLE001 — registration must survive
@@ -359,7 +362,8 @@ class RegistrationMutations:
             ]
         )
 
-        _bootstrap_app_environments(app, [])
+        with allow_project_attach(actor_may_attach_project_services(app)):
+            _bootstrap_app_environments(app, [])
 
         # Seed the default alert rule set (spec 08 §10.2) for the new app.
         # There is no ``app.created`` platform Event to subscribe to, so we
@@ -603,16 +607,17 @@ class RegistrationMutations:
                 field=None,
             )
 
-        result = _register_app_repo(
-            project=project,
-            source_kind=input.source_kind or "github",
-            source_repo=input.source_repo,
-            ref=input.ref or "main",
-            source_url=input.source_url or "",
-            default_branch=input.default_branch or "main",
-            deploy_branch=input.deploy_branch or "",
-            default_cluster=managed_cluster,
-        )
+        with allow_project_attach(actor_may_attach_project_services(project_id=project.pk)):
+            result = _register_app_repo(
+                project=project,
+                source_kind=input.source_kind or "github",
+                source_repo=input.source_repo,
+                ref=input.ref or "main",
+                source_url=input.source_url or "",
+                default_branch=input.default_branch or "main",
+                deploy_branch=input.deploy_branch or "",
+                default_cluster=managed_cluster,
+            )
 
         if result.status == "fetch_failed":
             return gql_failure(ErrorCode.PRECONDITION.value, result.error or "repo fetch failed")
@@ -636,7 +641,8 @@ class RegistrationMutations:
             if app is None:
                 continue
             try:
-                _bootstrap_app_environments(app, [])
+                with allow_project_attach(actor_may_attach_project_services(app)):
+                    _bootstrap_app_environments(app, [])
             except Exception:  # noqa: BLE001 — one app's bootstrap must not unwind the rest
                 import logging
 

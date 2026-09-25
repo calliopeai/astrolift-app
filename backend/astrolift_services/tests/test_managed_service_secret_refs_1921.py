@@ -811,7 +811,10 @@ def test_manifest_persist_holds_each_service_to_its_owners_namespace():
         persist("app", f"{project_ns}/kafka")
     assert not ManagedService.objects.filter(project=world.project).exists()
 
-    persist("project", f"{project_ns}/kafka")
+    from astrolift_manifest.persist import allow_project_attach
+
+    with allow_project_attach():
+        persist("project", f"{project_ns}/kafka")
 
     assert (
         ManagedService.objects.get(project=world.project, name="events-project").config["password_secret_ref"]
