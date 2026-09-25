@@ -271,10 +271,31 @@ def _account_is_org_local(user, org_id: int) -> bool:
     membership, active or not, in another org.
     """
 
-    if user.is_superuser:
+    if user.is_superuser or user.is_staff:
         return False
-    elsewhere = Member.objects.filter(user=user, scope_kind=Member.ScopeKind.ORG).exclude(scope_id=org_id)
-    return not elsewhere.exists()
+    elsewhere = Member.all_objects.filter(user=user, scope_kind=Member.ScopeKind.ORG).exclude(scope_id=org_id)
+    if elsewhere.exists():
+        return False
+    # The account must be one this org's SCIM created, not a pre-existing
+    # account POST attached by userName or email (#1986 review): an attach
+    # followed by an email rewrite would let this IdP sign in as someone
+    # else, because login matches by email. SCIM creates the account with
+    # no usable password in the same step as the membership.
+    if user.has_usable_password():
+        return False
+    first = (
+        Member.all_objects.filter(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org_id)
+        .order_by("pk")
+        .first()
+    )
+    joined = getattr(user, "date_joined", None)
+    created = getattr(first, "created_at", None) if first is not None else None
+    return bool(joined and created and abs((created - joined).total_seconds()) < 60)
+
+
+def _email_taken(email: str, user) -> bool:
+    """Another account already uses ``email`` (case-insensitive)."""
+    return get_user_model().objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
 
 
 def _deprovision(member: Member, user) -> None:
@@ -484,11 +505,12 @@ def _provision_user(request: HttpRequest, org: Organization) -> HttpResponse:
             status=409,
             scim_type="uniqueness",
         )
-    if member is None and user is not None and user.is_superuser:
-        # Attaching would hand the platform operator's account to this
-        # org's IdP (#1979).
+    if member is None and user is not None and (user.is_superuser or user.is_staff):
+        # Attaching would hand a platform account to this org's IdP
+        # (#1979). Same message as any other taken identity, so the
+        # response doesn't say which accounts are platform accounts.
         return _error(
-            "userName or email belongs to an account this organization cannot provision",
+            "userName or email is already in use",
             status=409,
             scim_type="uniqueness",
         )
@@ -587,6 +609,8 @@ def scim_user_detail(request: HttpRequest, member_guid: str) -> HttpResponse:
         # Refused before anything is written, so a refusal changes nothing.
         if (rewrite or revive) and not _account_is_org_local(user, org.pk):
             return _error(SHARED_ACCOUNT_REFUSAL, status=403)
+        if incoming.email != user.email and _email_taken(incoming.email, user):
+            return _error("email is already in use", status=409, scim_type="uniqueness")
         if rewrite:
             user.email = incoming.email
             user.first_name, user.last_name = given, family

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -21,6 +22,7 @@ from astrolift_graphql import (
 from astrolift_identity.grants import REFUSAL, GrantCeiling, grant_ceiling, require_grantable
 from astrolift_identity.models import (
     Member,
+    Organization,
     Role,
     RoleBinding,
 )
@@ -64,22 +66,44 @@ def _removes_last_owner(binding: RoleBinding) -> bool:
     """Whether revoking ``binding`` leaves its org with no live owner.
 
     Only the stock ``org_owner`` at org scope counts, since a custom role's
-    slug proves nothing. A binding that is expired or held by a deactivated
-    account is no owner, so revoking one never trips this.
+    slug proves nothing. A binding that is expired, held by a deactivated
+    account, or held by someone without an active ORG membership (who
+    cannot act in the org at all) is no owner. Callers hold
+    :func:`_lock_org` so two concurrent revokes can't each see the other
+    owner and leave none.
     """
 
     role = binding.role
     if binding.scope_kind != RoleBinding.ScopeKind.ORG or not (role.is_system and role.slug == "org_owner"):
         return False
+    return set(_live_owner_binding_pks(binding.scope_id, limit=2)) == {binding.pk}
+
+
+def _live_owner_binding_pks(org_id: int, *, limit: int | None = None) -> list[int]:
+    membership = Member.objects.filter(
+        user_id=OuterRef("user_id"),
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=org_id,
+        is_active=True,
+        deleted_at__isnull=True,
+    )
     live = RoleBinding.objects.filter(
         Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
+        Exists(membership),
         role__is_system=True,
         role__slug="org_owner",
         scope_kind=RoleBinding.ScopeKind.ORG,
-        scope_id=binding.scope_id,
+        scope_id=org_id,
         user__is_active=True,
-    )
-    return set(live.values_list("pk", flat=True)[:2]) == {binding.pk}
+    ).values_list("pk", flat=True)
+    return list(live[:limit] if limit else live)
+
+
+def _lock_org(org_id: int) -> None:
+    """Serialize owner-removing writes in one org (#1986 review): take the
+    org row lock inside the caller's transaction before counting owners."""
+
+    Organization.all_objects.select_for_update().filter(pk=org_id).first()
 
 
 def _revoke_refusal(
@@ -239,14 +263,16 @@ class RoleBindingMutations:
         )
         if binding is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
-        refusal = _revoke_refusal(binding, org_id, {})
-        if refusal is not None:
-            raise PermissionDenied(
-                Permission.ORG_MANAGE_MEMBERS,
-                PermissionScope(kind=ScopeKind(binding.scope_kind), id=binding.scope_id),
-                refusal,
-            )
-        binding.soft_delete(by=_actor())
+        with transaction.atomic():
+            _lock_org(org_id)
+            refusal = _revoke_refusal(binding, org_id, {})
+            if refusal is not None:
+                raise PermissionDenied(
+                    Permission.ORG_MANAGE_MEMBERS,
+                    PermissionScope(kind=ScopeKind(binding.scope_kind), id=binding.scope_id),
+                    refusal,
+                )
+            binding.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
     # ---- Bulk RBAC ---------------------------------------------------
@@ -320,55 +346,89 @@ class RoleBindingMutations:
         failed = 0
         ceilings: dict[tuple[str, int], GrantCeiling] = {}
 
-        for gid_s in ordered_unique:
-            binding = bindings_by_guid.get(gid_s)
-            if binding is None:
-                failed += 1
-                results.append(
-                    _BulkOpItemResult(
-                        id=GUID(gid_s),
-                        ok=False,
-                        errors=[
-                            MutationErrorType(
-                                code=ErrorCode.NOT_FOUND.value,
-                                message="role binding not found or already revoked",
-                                field=None,
-                            )
-                        ],
+        # One lock for the whole batch: the last-owner check below must see
+        # every revoke that lands before it, including concurrent ones.
+        with transaction.atomic():
+            if org_id is not None:
+                _lock_org(org_id)
+            for gid_s in ordered_unique:
+                binding = bindings_by_guid.get(gid_s)
+                if binding is None:
+                    failed += 1
+                    results.append(
+                        _BulkOpItemResult(
+                            id=GUID(gid_s),
+                            ok=False,
+                            errors=[
+                                MutationErrorType(
+                                    code=ErrorCode.NOT_FOUND.value,
+                                    message="role binding not found or already revoked",
+                                    field=None,
+                                )
+                            ],
+                        )
                     )
-                )
-                continue
+                    continue
 
-            # Checked per binding and after the earlier ones in this batch
-            # are revoked, so a batch cannot remove every owner at once.
-            refusal = _revoke_refusal(binding, org_id, ceilings)
-            if refusal is not None:
-                failed += 1
-                results.append(
-                    _BulkOpItemResult(
-                        id=GUID(gid_s),
-                        ok=False,
-                        errors=[
-                            MutationErrorType(
-                                code=ErrorCode.PERMISSION_DENIED.value,
-                                message=refusal,
-                                field=None,
-                            )
-                        ],
+                # Checked per binding and after the earlier ones in this batch
+                # are revoked, so a batch cannot remove every owner at once.
+                refusal = _revoke_refusal(binding, org_id, ceilings)
+                if refusal is not None:
+                    failed += 1
+                    results.append(
+                        _BulkOpItemResult(
+                            id=GUID(gid_s),
+                            ok=False,
+                            errors=[
+                                MutationErrorType(
+                                    code=ErrorCode.PERMISSION_DENIED.value,
+                                    message=refusal,
+                                    field=None,
+                                )
+                            ],
+                        )
                     )
-                )
+                    emit_audit(
+                        AuditEntry(
+                            actor_user_id=actor.pk if actor else None,
+                            organization_id=org_id,
+                            action="role_binding.revoke",
+                            decision="DENY",
+                            target_kind="role_binding",
+                            target_id=str(binding.guid),
+                            duration_ms=0,
+                            permissions=(Permission.ORG_MANAGE_MEMBERS.value,),
+                            error_code=ErrorCode.PERMISSION_DENIED.value,
+                            error_message=refusal,
+                            extra={
+                                "bulk": True,
+                                "user_id": binding.user_id,
+                                "role_id": binding.role_id,
+                                "scope_kind": binding.scope_kind,
+                                "scope_id": binding.scope_id,
+                            },
+                        )
+                    )
+                    continue
+
+                binding.soft_delete(by=actor)
+                revoked += 1
+                results.append(_BulkOpItemResult(id=GUID(gid_s), ok=True, errors=[]))
+
+                # Per-binding audit row so the trail names *which* subject /
+                # role lost access, not just "50 bindings revoked".
                 emit_audit(
                     AuditEntry(
                         actor_user_id=actor.pk if actor else None,
                         organization_id=org_id,
                         action="role_binding.revoke",
-                        decision="DENY",
+                        decision="ALLOW",
                         target_kind="role_binding",
                         target_id=str(binding.guid),
                         duration_ms=0,
                         permissions=(Permission.ORG_MANAGE_MEMBERS.value,),
-                        error_code=ErrorCode.PERMISSION_DENIED.value,
-                        error_message=refusal,
+                        error_code=None,
+                        error_message=None,
                         extra={
                             "bulk": True,
                             "user_id": binding.user_id,
@@ -378,35 +438,6 @@ class RoleBindingMutations:
                         },
                     )
                 )
-                continue
-
-            binding.soft_delete(by=actor)
-            revoked += 1
-            results.append(_BulkOpItemResult(id=GUID(gid_s), ok=True, errors=[]))
-
-            # Per-binding audit row so the trail names *which* subject /
-            # role lost access, not just "50 bindings revoked".
-            emit_audit(
-                AuditEntry(
-                    actor_user_id=actor.pk if actor else None,
-                    organization_id=org_id,
-                    action="role_binding.revoke",
-                    decision="ALLOW",
-                    target_kind="role_binding",
-                    target_id=str(binding.guid),
-                    duration_ms=0,
-                    permissions=(Permission.ORG_MANAGE_MEMBERS.value,),
-                    error_code=None,
-                    error_message=None,
-                    extra={
-                        "bulk": True,
-                        "user_id": binding.user_id,
-                        "role_id": binding.role_id,
-                        "scope_kind": binding.scope_kind,
-                        "scope_id": binding.scope_id,
-                    },
-                )
-            )
 
         return gql_success(
             _BulkRevokeRoleBindingsPayload(

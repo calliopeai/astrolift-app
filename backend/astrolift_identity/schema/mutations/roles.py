@@ -31,6 +31,7 @@ from astrolift_identity.schema.types import (
     RoleType,
     role_to_type,
 )
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -111,6 +112,7 @@ class RoleMutations:
 
     @strawberry.field
     @mutation_audit(action="role.update")
+    @requires_elevation(action_label="role.update")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def update_role(self, info: Info, input: UpdateRoleInput) -> MutationResultType[RoleType]:
@@ -170,6 +172,7 @@ class RoleMutations:
 
     @strawberry.field
     @mutation_audit(action="role.delete")
+    @requires_elevation(action_label="role.delete")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def soft_delete_role(self, info: Info, input: DeleteRoleInput) -> MutationResultType[_SoftDeletePayload]:
