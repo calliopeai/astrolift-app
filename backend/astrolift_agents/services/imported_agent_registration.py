@@ -21,6 +21,7 @@ from django.utils.text import slugify
 from astrolift_agents.models import AgentEnvironmentSpec, Brief
 from astrolift_agents.services.agent_package import compatibility_snapshot, validate_agent_package
 from astrolift_clusters.models import TenantCluster
+from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
 from astrolift_registry.models import Container, RegisteredApp, Workload
 
 
@@ -89,6 +90,11 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     timeout = int((package.get("execution") or {}).get("timeout_seconds") or 300)
     if timeout < 1 or timeout > 604800:
         raise ImportedAgentRegistrationError("execution.timeout_seconds must be between 1 and 604800")
+    for ref in (package.get("environment") or {}).get("secret_refs") or []:
+        try:
+            assert_org_scoped_secret_ref(ref["uri"], organization=organization)
+        except SecretRefNamespaceError as exc:
+            raise ImportedAgentRegistrationError(str(exc)) from exc
 
     content_hash = _package_hash(organization, package)
     source_repo = f"import://{organization.guid}/{content_hash[:32]}"

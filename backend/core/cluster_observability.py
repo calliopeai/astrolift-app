@@ -389,6 +389,9 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("cloud_functions_operation_poll_interval_seconds", 5),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("cloud_functions_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("api_gateway", "api_gateway") or (kind == "api_gateway" and not variant):

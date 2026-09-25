@@ -193,6 +193,7 @@ def test_cloud_functions_operator_controls_are_exposed() -> None:
         "cloud_functions_api_endpoint",
         "cloud_functions_operation_timeout_seconds",
         "cloud_functions_operation_poll_interval_seconds",
+        "cloud_functions_allowed_service_accounts",
     ):
         assert field in properties
 
