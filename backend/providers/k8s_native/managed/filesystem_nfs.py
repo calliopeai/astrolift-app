@@ -41,6 +41,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import shared_namespace_owner_refusal
 
 KIND = "filesystem"
 
@@ -94,6 +95,9 @@ class NFSDriver(ManagedServiceDriver):
                 handle=handle,
                 message="PVC manifest rendered",
             )
+        refusal = shared_namespace_owner_refusal(self._config.namespace, self._config.cluster_driver, spec, [manifest])
+        if refusal:
+            return ProvisionResult(ok=False, handle="", message=refusal, errors=["resource_not_owned"])
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
             namespace,
@@ -307,6 +311,7 @@ class NFSDriver(ManagedServiceDriver):
                 "namespace": self._namespace_for(spec=spec),
                 "labels": {
                     "astrolift.io/managed-by": "platform",
+                    "astrolift.io/organization": spec.organization_slug,
                     "astrolift.io/app": spec.app_slug,
                 },
             },
