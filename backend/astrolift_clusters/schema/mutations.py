@@ -55,7 +55,7 @@ from astrolift_workflows.inputs import (
 from core.decorators import tenant_scoped
 from core.events import Event
 from core.mutations import ErrorCode, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.tenancy import get_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -151,6 +151,24 @@ def _first_dns_cluster():
         .order_by("pk")
         .first()
     )
+
+
+def _require_operator_for_shared(info: Info, row, gate: Permission) -> None:
+    """Writes to a shared (org-NULL) cluster or managed zone are the platform
+    operator's (#1918, #1929).
+
+    Tenants still resolve shared rows so they can deploy onto them, but every
+    org trusts a shared row, so one org's ``cluster.manage`` or
+    ``provider_plugin.configure`` must not rotate its agent key, reconfigure,
+    decommission or delete it.
+    """
+    if row is not None and row.organization_id is None:
+        check_platform_operator(_caller(info), gate=gate)
+
+
+def _caller(info: Info):
+    request = getattr(info.context, "request", None)
+    return getattr(request, "user", None) or getattr(info.context, "user", None)
 
 
 def _actor_from_request(info: Info) -> Actor:
@@ -558,6 +576,9 @@ class ClustersMutation:
             tenant = get_current_tenant()
             org_id = tenant.organization_id if tenant else None
             org = Organization.objects.filter(pk=org_id).first() if org_id else None
+        if org is None:
+            # A row with no org is shared: every org trusts it (#1918).
+            check_platform_operator(_caller(info), gate=Permission.CLUSTER_REGISTER)
 
         cluster = TenantCluster.objects.create(
             organization=org,
@@ -603,6 +624,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -676,6 +698,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -729,6 +752,7 @@ class ClustersMutation:
             Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.id),
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_UPDATE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
         if input.is_active is not None:
@@ -846,6 +870,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         from core.ingress_reconcile import reconcile_cluster_ingresses
@@ -878,6 +903,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if not cluster.is_active:
@@ -922,6 +948,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if not cluster.is_active:
@@ -966,6 +993,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONED.value:
@@ -1019,6 +1047,7 @@ class ClustersMutation:
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1199,6 +1228,7 @@ class ClustersMutation:
             Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.id),
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
 
@@ -1241,6 +1271,9 @@ class ClustersMutation:
             tenant = get_current_tenant()
             org_id = tenant.organization_id if tenant else None
             org = Organization.objects.filter(pk=org_id).first() if org_id else None
+        if org is None:
+            # A row with no org is shared: every org trusts it (#1918).
+            check_platform_operator(_caller(info), gate=Permission.PROVIDER_PLUGIN_CONFIGURE)
 
         domain = ManagedDomain.objects.create(
             organization=org,
@@ -1287,6 +1320,7 @@ class ClustersMutation:
             Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.id),
         ).first()
+        _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         if input.default_for is not None:
@@ -1310,6 +1344,7 @@ class ClustersMutation:
             Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.id),
         ).first()
+        _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain.soft_delete()
@@ -1378,6 +1413,7 @@ class ClustersMutation:
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if managed_domain_for_zone(zone, tenant.organization_id) is None:
@@ -1436,6 +1472,7 @@ class ClustersMutation:
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         # The signal, or the restart below, drives the provisioning run for
@@ -1508,6 +1545,7 @@ class ClustersMutation:
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         # A reissue revokes the zone's certificate (#1909).
@@ -1565,6 +1603,9 @@ class ClustersMutation:
             tenant = get_current_tenant()
             org_id = tenant.organization_id if tenant else None
             org = Organization.objects.filter(pk=org_id).first() if org_id else None
+        if org is None:
+            # A row with no org is shared: every org trusts it (#1918).
+            check_platform_operator(_caller(info), gate=Permission.PROVIDER_PLUGIN_CONFIGURE)
 
         ProviderPluginConfig.objects.update_or_create(
             organization=org,
