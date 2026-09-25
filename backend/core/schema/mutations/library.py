@@ -17,6 +17,16 @@ from core.schema.types.upload import UploadType as StrawberryUploadType
 # Helpers — resolve objects using the Graphene registry (same as originals)
 # ---------------------------------------------------------------------------
 
+def _require_operator(info: Info) -> None:
+    """The shared library tree is install-wide, so only the platform operator
+    may change it (#1990). Nothing in the web app, CLI or mobile app calls
+    these legacy mutations."""
+    from core.permissions import require_platform_operator
+
+    request = getattr(info.context, "request", None)
+    require_platform_operator(getattr(request, "user", None) or getattr(info.context, "user", None))
+
+
 def _get_shared_directory(info, global_id: str, raise_not_found: bool = True) -> SharedDirectory:
     """Resolve a SharedDirectory from a relay global ID.
 
@@ -104,6 +114,7 @@ class LibraryMutations:
         parent_guid: Optional[strawberry.ID] = None,
         icon: Optional[strawberry.ID] = None,
     ) -> LibraryMkdirResult:
+        _require_operator(info)
         parent: Optional[SharedDirectory] = None
         match parent_guid:
             case str() | int():
@@ -124,6 +135,7 @@ class LibraryMutations:
 
     @strawberry.mutation(description="Remove a directory from the library.")
     def library_rmdir(self, info: Info, directory_guid: strawberry.ID) -> bool:
+        _require_operator(info)
         directory: Optional[SharedDirectory] = None
         match directory_guid:
             case str() | int():
@@ -141,6 +153,7 @@ class LibraryMutations:
         name: str,
         guid: strawberry.ID,
     ) -> LibraryRenameDirectoryResult:
+        _require_operator(info)
         directory = _get_shared_directory(info, guid, raise_not_found=True)
         directory = SharedDirectory.objects.rename(directory=directory, name=name)
         return LibraryRenameDirectoryResult(ok=True, directory=directory)
@@ -152,6 +165,7 @@ class LibraryMutations:
         name: str,
         guid: strawberry.ID,
     ) -> LibraryRenameFileResult:
+        _require_operator(info)
         upload = _get_upload(info, guid, raise_not_found=True)
         upload.name = name
         upload.save()
@@ -167,6 +181,7 @@ class LibraryMutations:
         directory: strawberry.ID,
         file: strawberry.ID,
     ) -> LibraryRmFileResult:
+        _require_operator(info)
         upload: Upload = _get_upload(info, file, raise_not_found=True)
         dir_obj: SharedDirectory = _get_shared_directory(info, directory, raise_not_found=True)
 
@@ -188,6 +203,7 @@ class LibraryMutations:
         directory: strawberry.ID,
         file: strawberry.ID,
     ) -> LibrarySetIconResult:
+        _require_operator(info)
         upload: Upload = _get_upload(info, file, raise_not_found=True)
         dir_obj: SharedDirectory = _get_shared_directory(info, directory, raise_not_found=True)
 
