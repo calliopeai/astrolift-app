@@ -32,6 +32,7 @@ const NO_CAPS: Readonly<Omit<ModuleEntitlement, "key">> = Object.freeze({
   canCreate: false,
   canManage: false,
   canRun: false,
+  enabled: false,
 });
 
 /**

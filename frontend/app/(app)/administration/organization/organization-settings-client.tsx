@@ -29,6 +29,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 
 import { HouseThemeCard } from "./house-theme-card";
+import { ModulesCard } from "./modules-card";
 import { TrustedDomainsCard } from "./trusted-domains-card";
 
 export function OrganizationSettingsClient() {
@@ -235,6 +236,8 @@ export function OrganizationSettingsClient() {
       {org && <HouseThemeCard org={org} />}
 
       <TrustedDomainsCard />
+
+      <ModulesCard />
 
       <Card>
         <CardHeader>

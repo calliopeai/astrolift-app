@@ -722,6 +722,27 @@ export const REMOVE_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
   }
 `;
 
+// Org admins turn a per-org module on/off (#1859/#1880). Turning one on
+// while the install admin has forced it off (`astroliftServerInfo.featureFlags`,
+// `modules.*_allowed`) is refused with PRECONDITION; turning one off always
+// succeeds.
+export const SET_ORGANIZATION_MODULE = gql`
+  mutation SetOrganizationModule($input: SetOrganizationModuleInput!) {
+    setOrganizationModule(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        key
+        enabled
+      }
+    }
+  }
+`;
+
 export const ACCEPT_INVITATION = gql`
   mutation AcceptInvitation($input: AcceptInvitationInput!) {
     acceptInvitation(input: $input) {
