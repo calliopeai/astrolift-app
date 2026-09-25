@@ -45,11 +45,13 @@ class ManifestMutations:
         edit out of workloads until an applied proposal matches it
         (#1758).
         """
+        from astrolift_manifest.env_edit import redact_env_values, resolve_masked_env_values
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.sync_state import (
             SyncSnapshot,
             classify_state,
         )
+        from astrolift_services.secret_visibility import can_reveal_app_secrets, redacted_manifest_text
 
         # Org-scope the by-guid lookup to the caller's tenant before staging
         # the manifest edit. Fails closed (NOT_FOUND) when org_id is
@@ -60,7 +62,21 @@ class ManifestMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
-        text = input.raw_manifest or ""
+        # A caller without secret.read + elevation reads [env] masked and the
+        # editor saves the whole document back, so every masked value must be
+        # put back from the text that read came from (staged, else raw) or the
+        # save would replace each secret with the placeholder (#1920).
+        text, unresolved_keys = resolve_masked_env_values(
+            input.raw_manifest or "",
+            fallback_text=app.manifest_raw_staged or app.manifest_raw or "",
+        )
+        if unresolved_keys:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "rawManifest contains a masked placeholder for key(s) with no stored value "
+                f"to restore: {', '.join(unresolved_keys)}",
+                field="rawManifest",
+            )
         if text.strip():
             try:
                 parse_raw(text)
@@ -73,8 +89,20 @@ class ManifestMutations:
 
         # Identity: if the staged content matches the synced content,
         # clear the staging buffer rather than carrying a redundant
-        # copy.
-        if text == (app.manifest_raw or ""):
+        # copy. A caller who cannot reveal secrets must not learn
+        # anything from whether this clears: comparing the *restored*
+        # text (real [env] literals) against manifest_raw would confirm
+        # a guessed value the instant it happened to match the stored
+        # one, even though the response itself is masked either way.
+        # Such a caller only gets the shortcut when their own
+        # submission -- before restoration -- is byte-identical to
+        # their masked view of the synced manifest; that proves nothing
+        # changed without ever comparing a guess to a real value (#1944).
+        if can_reveal_app_secrets(info, app=app):
+            identical = text == (app.manifest_raw or "")
+        else:
+            identical = (input.raw_manifest or "") == redact_env_values(app.manifest_raw or "")
+        if identical:
             app.manifest_raw_staged = ""
         else:
             app.manifest_raw_staged = text
@@ -97,8 +125,10 @@ class ManifestMutations:
             _ManifestStagePayload(
                 id=input.id,
                 sync_state=sync_state.value,
-                raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged=app.manifest_raw_staged or "",
+                raw_manifest=redacted_manifest_text(info, app=app, raw_text=app.manifest_raw or ""),
+                raw_manifest_staged=redacted_manifest_text(
+                    info, app=app, raw_text=app.manifest_raw_staged or ""
+                ),
             )
         )
 
@@ -131,6 +161,7 @@ class ManifestMutations:
         from astrolift_registry.services.manifest_sync import (
             resync_app_manifest_from_repo,
         )
+        from astrolift_services.secret_visibility import redacted_manifest_text
 
         # Org-scope the by-guid lookup to the caller's tenant before the
         # repo re-fetch + apply (SCM call). Fails closed (NOT_FOUND) when
@@ -172,8 +203,10 @@ class ManifestMutations:
             _ManifestStagePayload(
                 id=input.id,
                 sync_state=sync_state.value,
-                raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged=app.manifest_raw_staged or "",
+                raw_manifest=redacted_manifest_text(info, app=app, raw_text=app.manifest_raw or ""),
+                raw_manifest_staged=redacted_manifest_text(
+                    info, app=app, raw_text=app.manifest_raw_staged or ""
+                ),
             )
         )
 

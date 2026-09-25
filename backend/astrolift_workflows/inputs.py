@@ -185,6 +185,11 @@ class InstallClusterPrereqsInput:
     actor: Actor
     selected_components: tuple[str, ...]
     option_overrides: dict[str, dict[str, str]]
+    # The org that asked for the install, stamped on the bootstrap-run row
+    # (#1955). A shared cluster has no org of its own to fall back to.
+    # Defaulted so a workflow started before the field existed still
+    # decodes.
+    organization_id: int | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

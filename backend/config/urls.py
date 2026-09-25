@@ -81,7 +81,8 @@ urls = [
                             key="user_or_ip",
                             rate=settings.RATELIMIT_GRAPHQL_RATE,
                             block=True,
-                        )(strawberry_view)
+                        )(strawberry_view),
+                        schema=schema,
                     )
                 )
             )
@@ -96,7 +97,8 @@ urls = [
                         key="ip",
                         rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE,
                         block=True,
-                    )(strawberry_auth_view)
+                    )(strawberry_auth_view),
+                    schema=schema_auth,
                 )
             )
         ),
