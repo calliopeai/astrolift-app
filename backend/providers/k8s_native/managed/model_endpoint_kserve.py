@@ -30,6 +30,7 @@ from _sdk.managed_service import (
 from k8s_native.managed._handle import ParsedHandle
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
 KIND = "model_endpoint"
 VARIANT = "kserve"
@@ -542,6 +543,7 @@ class KServeDriver(ManagedServiceDriver):
         cfg["storage_read_only"] = bool(cfg.get("storage_read_only", True))
         cfg["enable_prometheus_scraping"] = bool(cfg.get("enable_prometheus_scraping", True))
         cfg["use_local_model_cache"] = bool(cfg.get("use_local_model_cache", False))
+        refuse_shared_namespace_secrets(self._config.namespace, cfg)
         return cfg
 
     def _validate_inference_spec(self, inference_spec: dict[str, Any]) -> None:

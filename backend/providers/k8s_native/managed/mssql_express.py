@@ -44,6 +44,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
 KIND = "mssql"
 VARIANT = "sqlserver_express"
@@ -756,6 +757,7 @@ class SQLServerExpressDriver(ManagedServiceDriver):
         tls_secret_name = str(cfg.get("tls_secret_name") or "")
         if tls_secret_name and (len(tls_secret_name) > 63 or not _DNS_LABEL.fullmatch(tls_secret_name)):
             raise ValueError("tls_secret_name must be a Kubernetes DNS label")
+        refuse_shared_namespace_secrets(self._config.namespace, None, extra=[tls_secret_name])
         extra_env = dict(cfg.get("extra_env") or {})
         denied = sorted(_RESERVED_ENV & extra_env.keys())
         if denied:
