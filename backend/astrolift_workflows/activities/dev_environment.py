@@ -159,13 +159,19 @@ def _render_runtime(
     # key when the file tree is empty so subsequent syncs flip in
     # actual content without re-creating the resource. Binary files
     # (#1858) go under ``binaryData``, which takes base64 as uploaded.
+    # ConfigMap keys are flat (``[-._a-zA-Z0-9]+``), so a path with a
+    # directory is stored under a generated key and the volume's ``items``
+    # put it back at its path; the kubelet creates the directories (#1873).
     text_files: dict[str, Any] = {}
     binary_files: dict[str, str] = {}
-    for path, value in (dev.files or {}).items():
+    items: list[dict[str, str]] = []
+    for index, (path, value) in enumerate(sorted((dev.files or {}).items())):
+        key = f"f{index:04d}"
+        items.append({"key": key, "path": path})
         if isinstance(value, dict):
-            binary_files[path] = value["content"]
+            binary_files[key] = value["content"]
         else:
-            text_files[path] = value
+            text_files[key] = value
     cm_manifest: dict[str, Any] = {
         "apiVersion": "v1",
         "kind": "ConfigMap",
@@ -179,7 +185,7 @@ def _render_runtime(
     env_vars_list.append({"name": "PORT", "value": str(port)})
     app_mounts: list[dict[str, Any]] = [{"name": "app-files", "mountPath": "/app"}]
     volumes: list[dict[str, Any]] = [
-        {"name": "app-files", "configMap": {"name": "builder-files"}},
+        {"name": "app-files", "configMap": {"name": "builder-files", **({"items": items} if items else {})}},
         {"name": "deps-cache", "emptyDir": {}},
     ]
 

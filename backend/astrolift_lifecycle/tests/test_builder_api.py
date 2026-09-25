@@ -452,6 +452,38 @@ def test_sync_absolute_path_rejected(org, cluster, user, auth_headers, workflow_
     assert r.status_code == 400
 
 
+@pytest.mark.parametrize(
+    ("files", "needle"),
+    [
+        ({"static//logo.png": "x"}, "segments"),
+        ({"./main.py": "x"}, "segments"),
+        ({"static/": "x"}, "segments"),
+        ({"static": "x", "static/logo.png": "y"}, "also a directory"),
+    ],
+)
+def test_sync_rejects_a_tree_that_cannot_be_laid_out(
+    org, cluster, user, auth_headers, workflow_starts, files, needle
+):
+    dev = _running_dev_env(org, cluster, user)
+    r = _put_json(
+        Client(), f"/api/builder/v1/dev-environments/{dev.guid}/files/", {"files": files}, auth_headers
+    )
+    assert r.status_code == 400
+    assert needle in r.json()["detail"]
+    assert workflow_starts == []
+
+
+def test_sync_accepts_a_tree_with_directories(org, cluster, user, auth_headers, workflow_starts):
+    dev = _running_dev_env(org, cluster, user)
+    files = {"main.py": "x", "static/css/site.css": "body{}"}
+    r = _put_json(
+        Client(), f"/api/builder/v1/dev-environments/{dev.guid}/files/", {"files": files}, auth_headers
+    )
+    assert r.status_code == 200, r.content
+    dev.refresh_from_db()
+    assert dev.files == files
+
+
 def test_sync_too_large_rejected(org, cluster, user, auth_headers, workflow_starts):
     dev = _running_dev_env(org, cluster, user)
     # 600 KiB single file > 512 KiB cap

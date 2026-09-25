@@ -220,6 +220,20 @@ def _path_error(path) -> str:
         return "file paths must be non-empty strings"
     if path.startswith("/") or ".." in path:
         return f"path {path!r} must be relative and must not contain .."
+    if any(part in ("", ".") for part in path.split("/")):
+        return f"path {path!r} must not have empty or '.' segments"
+    return ""
+
+
+def _tree_error(paths) -> str:
+    """A path that is also another path's directory cannot be laid out (#1873)."""
+    files = set(paths)
+    for path in files:
+        parts = path.split("/")
+        for depth in range(1, len(parts)):
+            parent = "/".join(parts[:depth])
+            if parent in files:
+                return f"path {parent!r} is a file and also a directory of {path!r}"
     return ""
 
 
@@ -505,6 +519,9 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
         else:
             total_bytes += len(str(value).encode("utf-8"))
 
+    tree_err = _tree_error(files)
+    if tree_err:
+        return JsonResponse({"detail": tree_err}, status=400)
     if total_bytes > _FILE_SIZE_LIMIT:
         return JsonResponse(
             {"detail": f"total file size exceeds {_FILE_SIZE_LIMIT // 1024}KiB limit"},
