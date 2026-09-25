@@ -180,7 +180,7 @@ class TemporalWorkflowsQuery:
         holder below the org sees only the runs of the apps and projects
         their grant covers (#1965); the platform operator sees the whole
         namespace. The namespace list is fetched then filtered, so a scoped
-        page can return fewer than ``limit`` rows — including zero while
+        page can return fewer than ``limit`` rows, including zero while
         ``next_cursor`` is still non-null. Callers page until the cursor
         is null rather than until a page comes back short.
 

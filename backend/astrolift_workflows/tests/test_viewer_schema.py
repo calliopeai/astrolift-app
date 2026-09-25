@@ -384,7 +384,7 @@ def test_cancel_org_owned_run_with_workflow_trigger(permission_resolver, monkeyp
 
 
 def test_cancel_org_owned_run_with_elevated_pair(permission_resolver, monkeypatch, org):
-    """Own-org run: the platform operator still works — both paths are valid."""
+    """Own-org run: the platform operator still works; both paths are valid."""
     _org_run(org, "wf-own-2")
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
@@ -432,7 +432,7 @@ def test_cancel_foreign_org_run_reads_as_not_found(permission_resolver, monkeypa
 
 
 def test_cancel_foreign_org_run_allowed_for_elevated_pair(permission_resolver, monkeypatch, org, other_org):
-    """The platform operator reaches foreign-org runs — the fleet-wide
+    """The platform operator reaches foreign-org runs: the fleet-wide
     Running tab admin actions must keep working."""
     _org_run(other_org, "wf-foreign-elevated")
     permission_resolver.grant(Permission.AUDIT_LOG_READ)

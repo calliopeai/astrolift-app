@@ -7,8 +7,8 @@ superuser holding ``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``, so a bearer
 token also needs the admin scope) reaches every run (own-org,
 foreign-org, legacy org-less) and acts fleet-wide. Otherwise the tenant
 path applies: ``WORKFLOW_TRIGGER`` at the run's own scope (#1965), with
-everything outside the caller's org — a foreign org's run, a legacy
-org-less run, a nonexistent id — answered by one identical not-found
+everything outside the caller's org (a foreign org's run, a legacy
+org-less run, a nonexistent id) answered by one identical not-found
 envelope (oracle closure).
 """
 
@@ -131,11 +131,11 @@ def _gate_instance_op(user, workflow_id: str) -> MutationResult | None:
 
     The branch depends on the looked-up run, so it cannot live in a static
     ``@require_permission`` stack. The platform operator reaches every
-    run — own-org, foreign-org, legacy org-less. Otherwise the tenant path
+    run: own-org, foreign-org and legacy org-less. Otherwise the tenant path
     applies: ``WORKFLOW_TRIGGER`` at the run's own scope (its app, else its
     definition's project, else the org; never the selected team or
-    project), reaching only the caller org's runs. Anything else — a
-    foreign org's run, an org-less run, a nonexistent id — is answered
+    project), reaching only the caller org's runs. Anything else (a
+    foreign org's run, an org-less run, a nonexistent id) is answered
     with one identical not-found envelope, never a forbidden that
     confirms the id exists (oracle closure). Raises ``PermissionDenied``
     / ``TenantRequired`` exactly like the decorator stack; returns a
