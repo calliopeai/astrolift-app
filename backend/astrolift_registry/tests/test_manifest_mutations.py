@@ -1873,3 +1873,52 @@ def test_apply_staged_manifest_writes_no_allow_audit_for_an_apply_that_did_not_l
     assert not any(e.action == "app.manifest.apply_secret_change" for e in audit_capture)
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _TOML_WITH_ENV.strip()
+
+
+# --- an approval only authorizes the change it was approved against -----
+# (#1915's base stamp, now shared with applyStagedManifest)
+
+
+def test_apply_staged_manifest_refuses_an_old_approval_after_a_direct_rotation(permission_resolver):
+    """Approval off, a direct rotation, approval back on: re-staging the
+    value an earlier approval set is not covered by it. That approval was
+    made against a manifest_raw value the key no longer has."""
+    from astrolift_manifest.env_edit import read_app_env
+    from astrolift_services.schema.mutations import ServicesMutation, SetAppSecretInput
+
+    org, app = _approval_required_app()
+    _approve_secret_change(org, app, permission_resolver, key="FOO", value="first")
+    approved_first = app.manifest_raw_staged
+    assert _apply(org, app).ok
+    app.refresh_from_db()
+    assert read_app_env(app.manifest_raw)["FOO"] == "first"
+
+    app.requires_secret_approval = False
+    app.save(update_fields=["requires_secret_approval"])
+    rotator = _user("rotator")
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=rotator.pk)):
+        rotated = ServicesMutation().set_app_secret(
+            _user_info(rotator), input=SetAppSecretInput(app_slug=app.slug, key="FOO", value="second")
+        )
+    assert rotated.ok, rotated.errors
+    assert rotated.data.pending_proposal_id is None
+    app.refresh_from_db()
+    assert _apply(org, app).ok
+    app.refresh_from_db()
+    assert read_app_env(app.manifest_raw)["FOO"] == "second"
+
+    app.requires_secret_approval = True
+    app.save(update_fields=["requires_secret_approval"])
+    with _ctx(org):
+        restaged = RegistryMutation().update_manifest(
+            _info(), input=UpdateManifestInput(id=str(app.guid), raw_manifest=approved_first)
+        )
+    assert restaged.ok, restaged.errors
+    app.refresh_from_db()
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
+    app.refresh_from_db()
+    assert read_app_env(app.manifest_raw)["FOO"] == "second"

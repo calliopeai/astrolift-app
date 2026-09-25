@@ -138,7 +138,10 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
       checks. APP_UPDATE alone would otherwise put a shared project
       database's credentials in a pod whose command the caller controls;
     * when the app requires secret approval, each changed ``[env]`` key
-      needs a matching applied proposal. Container env, any
+      needs an applied proposal that produced exactly that change from the
+      value the key still has in ``manifest_raw`` (#1758's base stamp, via
+      ``secret_literals.approved_literal_changes``, the rule the deploy
+      path applies to staged literals). Container env, any
       managed-service change that isn't a release (remove / detach) and
       any deferred declaration are refused, since no proposal can carry
       them and every one of them can put a service's credentials in front
@@ -148,7 +151,7 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
     """
     from astrolift_identity.step_up import check_elevation
     from astrolift_manifest.persist import RELEASE_ACTIONS
-    from astrolift_services.secret_proposal_match import match_applied_proposals
+    from astrolift_services.secret_literals import approved_literal_changes
 
     services = [f"{action} {target}" for action, target in persisted.managed_service_changes]
     declared = [
@@ -200,7 +203,7 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
 
     needs_elevation = True
     if app.requires_secret_approval:
-        match = match_applied_proposals(
+        match = approved_literal_changes(
             app,
             {change.key: change.after for change in env if change.app_wide},
         )
