@@ -113,14 +113,17 @@ def test_single_membership_inference_needs_exactly_one_live_org():
     assert _tenant(two).organization_id is None
 
 
-def test_websocket_pinned_org_needs_membership_and_never_picks_the_first_of_many():
+def test_websocket_pinned_org_needs_membership_and_inference_counts_live_orgs_only():
     a, b = _org("a"), _org("b")
     user = _member(a, _user("u"))
     pinned_foreign = async_to_sync(_resolve_tenant_for_user)(user, {"astrolift_active_org": str(b.guid)})
     pinned_own = async_to_sync(_resolve_tenant_for_user)(user, {"astrolift_active_org": str(a.guid)})
-    multi = _member(b, _member(a, _user("multi")))
-    inferred = async_to_sync(_resolve_tenant_for_user)(multi, {})
+    left = _user("left")
+    _member(a, left, deleted=True)
+    _member(b, left)
+    inferred = async_to_sync(_resolve_tenant_for_user)(left, {})
 
     assert pinned_foreign is None
     assert pinned_own.organization_id == a.pk
-    assert inferred is None
+    # The removed membership in ``a`` is never inferred.
+    assert inferred.organization_id == b.pk

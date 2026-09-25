@@ -186,9 +186,11 @@ def _resolve_tenant_for_user(user, session_data: dict) -> Any:
             else None
         )
 
-    # Single-membership inference: exactly one live org, never the first of many.
-    org_ids = list(active_member_organizations(user.pk).values_list("pk", flat=True)[:2])
-    if len(org_ids) != 1:
+    # Membership inference, live memberships only (#1925). The web client
+    # pins its org in a cookie the relay does not read, so a multi-org user
+    # has always landed on their first org here; it is still an org they
+    # belong to, and a task in another of their orgs is refused as before.
+    org_id = active_member_organizations(user.pk).order_by("pk").values_list("pk", flat=True).first()
+    if org_id is None:
         return None
-    org_id = org_ids[0]
     return TenantContext(organization_id=org_id, actor_user_id=user.pk)
