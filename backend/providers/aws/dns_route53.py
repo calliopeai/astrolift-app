@@ -577,6 +577,27 @@ class Route53Driver(DnsDriver):
         return "unknown"
 
     @driver_op(cloud="aws", driver="dns")
+    def zone_created_by_platform(self, zone: str, zone_id: str) -> bool:
+        """Whether hosted zone ``zone_id`` is ``zone`` and was created by ``provision_zone`` (#1931).
+
+        ``provision_zone`` sets ``CallerReference`` to ``astrolift-<zone>-<ts>``,
+        which only the creating call can choose: it is the proof a backfill of
+        ``provision_zone_id`` needs, since a zone id in ``dns_config`` is
+        tenant-editable.
+        """
+        canonical = zone.rstrip(".") + "."
+        try:
+            hosted = self._r53.get_hosted_zone(Id=zone_id)["HostedZone"]
+        except Exception as exc:
+            mapped = map_client_error(exc)
+            if isinstance(mapped, NotFoundError):
+                return False
+            raise mapped from exc
+        return hosted.get("Name") == canonical and str(hosted.get("CallerReference", "")).startswith(
+            f"astrolift-{zone.rstrip('.')}-"
+        )
+
+    @driver_op(cloud="aws", driver="dns")
     def pin_zone(self, zone: str, zone_id: str) -> None:
         """Bind ``zone`` to the hosted zone the platform created for it (#1931).
 

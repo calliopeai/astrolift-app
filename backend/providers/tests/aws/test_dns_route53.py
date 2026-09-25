@@ -335,3 +335,15 @@ def test_a_pinned_zone_gets_the_write_even_when_a_twin_exists(driver_with_zone, 
 
     assert names(twin_id) == {"api.acme.platform.example."}
     assert names(original) == set()
+
+
+def test_only_a_zone_provision_zone_created_verifies_as_platform_made(route53_client) -> None:
+    driver = Route53Driver(config=Route53Config(), client=route53_client)
+    ours = driver.provision_zone("shop.example")["zone_id"]
+    foreign = route53_client.create_hosted_zone(Name="corp.example.", CallerReference="someone-else")
+    foreign_id = foreign["HostedZone"]["Id"].rsplit("/", 1)[-1]
+
+    assert driver.zone_created_by_platform("shop.example", ours) is True
+    assert driver.zone_created_by_platform("corp.example", foreign_id) is False
+    assert driver.zone_created_by_platform("other.example", ours) is False  # name must match
+    assert driver.zone_created_by_platform("shop.example", "ZNOSUCHZONE") is False
