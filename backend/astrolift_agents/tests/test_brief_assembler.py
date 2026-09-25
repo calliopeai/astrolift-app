@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import stat
+import time
 import zipfile
 
 import pytest
@@ -82,6 +83,39 @@ def _make_zipball(toml_bytes: bytes | None, *, top_dir: str = "owner-repo-abc123
         if toml_bytes is not None:
             zf.writestr(f"{top_dir}/astrolift.toml", toml_bytes)
     return buf.getvalue()
+
+
+class _SteppingClock:
+    """Deterministic stand-in for ``zipfile``'s module-level ``time`` (#1884).
+
+    ``ZipFile.writestr`` stamps each entry with ``time.localtime(time.time())``
+    at DOS 2-second resolution when it is not given an explicit ``ZipInfo``.
+    Two independent ``_make_zipball`` builds only disagreed on those bytes
+    when real wall-clock work between them happened to straddle a tick --
+    flaky by construction. Advancing a fake clock forces the same divergence
+    every run instead of leaving it to timing luck.
+    """
+
+    def __init__(self, start: float = 1_700_000_000.0, step: float = 5.0):
+        self._now = start
+        self._step = step
+
+    def time(self) -> float:
+        self._now += self._step
+        return self._now
+
+    def localtime(self, secs: float | None = None):
+        return time.localtime(self._now if secs is None else secs)
+
+    def gmtime(self, secs: float | None = None):
+        return time.gmtime(self._now if secs is None else secs)
+
+
+def _zip_members(data: bytes) -> dict[str, bytes]:
+    """Member name -> payload, ignoring container metadata (e.g. per-entry
+    mtimes) that two independent zip builds cannot reproduce byte-for-byte."""
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        return {name: zf.read(name) for name in zf.namelist()}
 
 
 class _FakeResponse:
@@ -371,6 +405,10 @@ def test_source_connection_provider_error_propagates(monkeypatch, org):
 
 
 def test_bundle_uploaded_when_blob_store_available(monkeypatch, org):
+    # Force the two `_make_zipball` builds below onto different DOS
+    # timestamps every run -- see _SteppingClock.
+    monkeypatch.setattr(zipfile, "time", _SteppingClock())
+
     _patch_get(monkeypatch, _FakeResponse(_make_zipball(_FULL_TOML)))
 
     uploads: list[dict] = []
@@ -391,8 +429,15 @@ def test_bundle_uploaded_when_blob_store_available(monkeypatch, org):
     assert up["content_type"] == "application/zip"
     assert up["key"] == f"{org.slug}/payloads/{brief.content_hash}/bundle.zip"
     assert brief.storage_key == up["key"]
-    # The exact zipball bytes are what get stored.
-    assert up["data"] == _make_zipball(_FULL_TOML)
+    # Compare contents, not raw bytes. The assembler never rebuilds the
+    # archive -- _store_bundle uploads the exact bytes it downloaded -- so
+    # the real invariant is "the upload holds the same files as the
+    # download," not bytewise identity with a *second*, independently built
+    # zipball. Raw-byte equality was flaky (#1884): _make_zipball stamps
+    # each entry with the wall-clock time at build, at DOS 2-second
+    # resolution, so two builds diverge whenever they land on different
+    # ticks -- forced deterministically here by _SteppingClock.
+    assert _zip_members(up["data"]) == _zip_members(_make_zipball(_FULL_TOML))
 
 
 # ---------------------------------------------------------------------------
