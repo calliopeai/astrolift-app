@@ -393,6 +393,7 @@ class ClustersQuery:
             .order_by("-timestamp", "-pk")
         )
         cluster_guid = uuid.UUID(str(cluster.guid))
+        limit = max(1, min(limit, 200))
         out: list[ClusterLifecycleAuditEntryType] = []
         for log in qs.iterator(chunk_size=200):
             slug = cluster.slug if log.operation in _SLUG_ADDRESSED_CLUSTER_OPERATIONS else None

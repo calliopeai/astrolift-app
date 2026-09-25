@@ -26,7 +26,9 @@ from types import SimpleNamespace
 
 import pytest
 from django.apps import apps as django_apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import Client
 
 from astrolift_clusters.models import ClusterBootstrapRun, ProviderPlugin, TenantCluster
 from astrolift_clusters.schema.mutations import (
@@ -37,7 +39,7 @@ from astrolift_clusters.schema.mutations import (
 from astrolift_clusters.schema.queries import ClustersQuery
 from astrolift_clusters.schema.types import cluster_to_type
 from astrolift_graphql import GUID
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from astrolift_workflows.activities.install_prereqs import _record_bootstrap_run_sync
 from core.events import register_event_writer
 from core.permissions import Permission
@@ -50,6 +52,7 @@ REGISTER = (
     "mutation Register($input: RegisterTenantClusterInput!) { "
     "registerTenantCluster(input: $input) { ok errors { code message } } }"
 )
+GQL = f"/{settings.BASE_URL}gql/config/"
 UPDATE = (
     "mutation Update($input: UpdateTenantClusterInput!) { "
     "updateTenantCluster(input: $input) { ok errors { code message } } }"
@@ -71,9 +74,10 @@ def _no_opensearch_profile_index(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _cluster_permissions(permission_resolver):
-    """Every caller here holds the cluster permissions, so each result is
-    decided by the org scoping under test, not by RBAC."""
-    for permission in (Permission.CLUSTER_REGISTER, Permission.CLUSTER_UPDATE, Permission.CLUSTER_MANAGE):
+    """Every caller here can read and manage clusters, so each result is
+    decided by the org scoping under test, not by RBAC. ``cluster.update``
+    is left out: the forged-header test needs that mutation refused."""
+    for permission in (Permission.CLUSTER_REGISTER, Permission.CLUSTER_MANAGE):
         permission_resolver.grant(permission)
 
 
@@ -147,6 +151,10 @@ def shared(plugin):
     return _cluster(None, plugin)
 
 
+def _member(user, org) -> Member:
+    return Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
+
+
 def _ctx(org, user=None):
     return tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id if user else None))
 
@@ -181,11 +189,16 @@ def _timeline(org, cluster) -> list:
 # ---- astroliftClusterLifecycleAudit -------------------------------
 
 
-def test_each_org_sees_only_its_own_mutations_on_a_shared_cluster(org_a, org_b, user_a, user_b, plugin):
+def test_each_org_sees_only_its_own_mutations_on_a_shared_cluster(
+    org_a, org_b, user_a, user_b, plugin, permission_resolver
+):
     """The issue's scenario, end to end through the schema and the audit
     extension: org A registers a shared cluster, org B updates it. Without
     the fix org A gets B's update (the guid is in its variables) and org B
     gets A's registration (the slug is in its variables)."""
+    permission_resolver.grant(Permission.CLUSTER_UPDATE)
+    _member(user_a, org_a)
+    _member(user_b, org_b)
     slug = f"shared-{uuid.uuid4().hex[:6]}"
 
     with _ctx(org_a, user_a):
@@ -215,6 +228,31 @@ def test_each_org_sees_only_its_own_mutations_on_a_shared_cluster(org_a, org_b, 
     as_b = _timeline(org_b, cluster)
     assert [(e.operation, e.actor) for e in as_a] == [("cluster.register", user_a.username)]
     assert [(e.operation, e.actor) for e in as_b] == [("cluster.update", user_b.username)]
+
+
+def test_an_outsider_naming_the_org_by_header_stays_out_of_its_timeline(org_a, org_b, plugin):
+    """Review PoC: a session names org B in ``X-Astrolift-Organization``,
+    which the middleware accepts without a membership check, and tries to
+    update B's cluster. RBAC refuses it, but the audit extension still
+    wrote the row, and filed it under B."""
+    theirs = _cluster(org_b, plugin)
+    outsider = get_user_model().objects.create(username=f"mallory-{uuid.uuid4().hex[:6]}")
+    _member(outsider, org_a)
+    client = Client()
+    client.force_login(outsider)
+
+    response = client.post(
+        GQL,
+        data=json.dumps({"query": UPDATE, "variables": {"input": {"id": str(theirs.guid), "region": "x"}}}),
+        content_type="application/json",
+        HTTP_X_PLATFORM="web",
+        HTTP_X_ASTROLIFT_ORGANIZATION=str(org_b.guid),
+    )
+
+    assert response.status_code == 200, response.content
+    assert response.json()["data"]["updateTenantCluster"]["ok"] is False
+    assert MutationAuditLog.objects.get(operation="cluster.update").organization_id is None
+    assert _timeline(org_b, theirs) == []
 
 
 def test_other_org_rows_stay_out_by_guid_slug_substring_and_prefix(org_a, org_b, shared):
@@ -271,6 +309,21 @@ def test_guid_matches_whatever_spelling_the_caller_sent(org_a, shared):
     _log(org_a, "cluster.update", {"input": {"id": str(shared.guid).upper()}})
 
     assert [e.operation for e in _timeline(org_a, shared)] == ["cluster.update"]
+
+
+def test_limit_is_clamped_to_200(org_a, shared):
+    MutationAuditLog.objects.bulk_create(
+        MutationAuditLog(
+            organization=org_a, operation="cluster.update", variables={"input": {"id": str(shared.guid)}}
+        )
+        for _ in range(201)
+    )
+    with _ctx(org_a):
+        rows = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(), cluster_id=GUID(str(shared.guid)), limit=10_000
+        )
+
+    assert len(rows) == 200
 
 
 # ---- bootstrapRuns / lastBootstrapRun -----------------------------

@@ -30,7 +30,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 from core.permissions import Permission, PermissionDenied
-from core.tenancy import get_current_tenant
+from core.tenancy import TenantContext, get_current_tenant
 
 log = logging.getLogger(__name__)
 
@@ -129,6 +129,30 @@ def emit_audit(entry: AuditEntry) -> None:
     _audit_writer(entry)
 
 
+def attributable_organization_id(tenant: TenantContext | None) -> int | None:
+    """The tenant org, if the actor may be filed under it; otherwise ``None``.
+
+    ``X-Astrolift-Organization`` names the tenant by guid with no membership
+    check, so an outsider's refused mutation would otherwise land in that
+    org's own audit views (#1955). The actor has to be an active member of
+    the org (the rule bearer tokens follow, #1910) or an active superuser.
+    Both audit writers ask this before the mutation runs: its answer is the
+    actor's standing when they made the request, not after, say, deleting
+    the org.
+    """
+    if tenant is None or tenant.organization_id is None or tenant.actor_user_id is None:
+        return None
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.api_tokens import is_active_org_member
+
+    if is_active_org_member(tenant.actor_user_id, tenant.organization_id):
+        return tenant.organization_id
+    if get_user_model().objects.filter(pk=tenant.actor_user_id, is_superuser=True, is_active=True).exists():
+        return tenant.organization_id
+    return None
+
+
 # ---- Decorator -------------------------------------------------------
 
 
@@ -167,6 +191,11 @@ def mutation_audit(
             _mutation_action_local.action = action
 
             tenant = get_current_tenant()
+            try:
+                organization_id = attributable_organization_id(tenant)
+            except Exception:  # noqa: BLE001 — audit must never raise
+                log.warning("mutation %s: could not attribute the audit row", action, exc_info=True)
+                organization_id = None
             target_kind: str | None = None
             target_id: int | str | None = None
             if target is not None:
@@ -214,7 +243,7 @@ def mutation_audit(
 
             entry = AuditEntry(
                 actor_user_id=tenant.actor_user_id if tenant else None,
-                organization_id=tenant.organization_id if tenant else None,
+                organization_id=organization_id,
                 action=action,
                 decision=decision,
                 target_kind=target_kind,

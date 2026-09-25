@@ -8,6 +8,11 @@ one: a failed attempt from another org carries the same cluster guid as
 the owner's own mutation. A guess is exactly the leak this closes, so
 legacy rows stay NULL; no tenant view shows them, and superusers still
 read them through ``auditLogs``.
+
+The column carries no index here. 0014 builds its index concurrently: this
+migration's transaction holds ACCESS EXCLUSIVE on the table until it
+commits, and a plain index build on a large, never-pruned log would keep
+every mutation's audit insert (and every read) waiting for its duration.
 """
 
 import django.db.models.deletion
@@ -25,6 +30,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='mutationauditlog',
             name='organization',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='mutation_audit_logs', to='astrolift_identity.organization'),
+            field=models.ForeignKey(blank=True, db_index=False, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='mutation_audit_logs', to='astrolift_identity.organization'),
         ),
     ]

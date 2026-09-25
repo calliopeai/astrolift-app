@@ -1,14 +1,22 @@
-"""Deployment approval reads keep other orgs' audit rows out (#1955).
+"""Deployment approval reads keep refused and foreign audit rows out (#1955).
 
 ``astroliftDeploymentApprovalHistory`` and ``AstroliftDeployment.approvedBy``
-read ``AuditEvent`` rows by the deployment guid. ``@mutation_audit`` records
-that guid as the target from the input, before the resolver's org check, so
-another org's refused ``approveDeployment`` on the guid leaves a row that
-targets this deployment. Without the org filter it showed up in this org's
-approval history, and its actor was listed as an approver by name and email.
+read ``AuditEvent`` rows by the deployment guid. ``@mutation_audit`` writes
+one for every approve attempt, refused or not, and records the target from
+the input before any check runs. Three ways an attempt that did not count
+reached these reads:
+
+* another org's refused attempt, filed under that org (round 1: the reads
+  filter by org);
+* an outsider naming this org in ``X-Astrolift-Organization``, which the
+  middleware accepts without a membership check, so the refusal was filed
+  under this org (the writers now attribute only to members);
+* this org's own members refused, either by RBAC (a DENY row) or by the
+  approver list (an ALLOW row, #1968): ``approvedBy`` now lists only ALLOW
+  rows from eligible approvers.
 
 Both routes take only a deployment guid: no slug, and the target match was
-already exact, so the other org's row is the whole leak.
+already exact, so these rows are the whole leak.
 """
 
 from __future__ import annotations
@@ -18,7 +26,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from astrolift_lifecycle.models import Deployment
 from astrolift_lifecycle.schema.mutations import (
     DeploymentByIdInput,
@@ -48,16 +56,28 @@ def persistent_audit_writer():
     register_audit_writer(previous)
 
 
+def _member(user, org) -> Member:
+    return Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
+
+
 @pytest.fixture
 def other_org():
     return Organization.objects.create(name="Other", slug="other-1955")
 
 
 @pytest.fixture
-def outsider():
-    return get_user_model().objects.create(
+def outsider(other_org):
+    user = get_user_model().objects.create(
         username="olga@other", email="olga@other", first_name="Olga", last_name="Outsider"
     )
+    _member(user, other_org)
+    return user
+
+
+def _user_in(org, name: str):
+    user = get_user_model().objects.create(username=f"{name}@test", email=f"{name}@test")
+    _member(user, org)
+    return user
 
 
 def _info(user):
@@ -70,10 +90,24 @@ def _tenant_for(org, user):
 
 @pytest.fixture
 def pending(
-    org, app, env_requires_approval, actor, permission_resolver, persistent_audit_writer, no_temporal
+    org,
+    app,
+    env_requires_approval,
+    actor,
+    other_actor,
+    permission_resolver,
+    persistent_audit_writer,
+    no_temporal,
 ):
-    """A deployment awaiting approval in ``org``."""
-    for permission in (Permission.APP_DEPLOY, Permission.APP_APPROVE_DEPLOY, Permission.APP_READ):
+    """A deployment awaiting approval in ``org``, triggered by ``actor``, with
+    ``other_actor`` its one listed approver; both are org members.
+    ``app.approve_deploy`` is granted only where a test says so."""
+    _member(actor, org)
+    _member(other_actor, org)
+    app.requires_approval = True
+    app.save(update_fields=["requires_approval"])
+    app.approver_users.set([other_actor])
+    for permission in (Permission.APP_DEPLOY, Permission.APP_READ):
         permission_resolver.grant(permission)
     with _tenant_for(org, actor):
         start = LifecycleMutation().start_deployment(
@@ -86,45 +120,80 @@ def pending(
     return start.data.id
 
 
-def _refused_approve_from(other_org, outsider, deployment_id) -> None:
-    with _tenant_for(other_org, outsider):
-        result = LifecycleMutation().approve_deployment(
-            _info(outsider), input=DeploymentByIdInput(id=deployment_id)
+def _approve(org, user, deployment_id):
+    with _tenant_for(org, user):
+        return LifecycleMutation().approve_deployment(
+            _info(user), input=DeploymentByIdInput(id=deployment_id)
         )
-    assert result.ok is False
+
+
+def _history(org, user, deployment_id) -> list:
+    with _tenant_for(org, user):
+        rows = LifecycleQuery().astrolift_deployment_approval_history(
+            _info(user), deployment_id=str(deployment_id)
+        )
+    return [(h.action, h.actor_id) for h in rows]
+
+
+def _approved_by(deployment_id) -> list:
+    deployment = Deployment.objects.select_related("registered_app", "app_environment", "workload").get(
+        guid=str(deployment_id)
+    )
+    return [(a.user_id, a.email) for a in deployment_to_type(deployment).approved_by]
+
+
+def test_another_orgs_refused_approve_stays_out_of_the_approval_history(
+    org, actor, other_org, outsider, pending, permission_resolver
+):
+    permission_resolver.grant(Permission.APP_APPROVE_DEPLOY)
+    assert _approve(other_org, outsider, pending).ok is False
     # The refused attempt is on file in the other org, targeting this guid.
     assert AuditEvent.objects.filter(
-        action="deployment.approve", target_id=str(deployment_id), organization_id=other_org.id
+        action="deployment.approve", target_id=str(pending), organization_id=other_org.id
     ).exists()
 
+    assert _history(org, actor, pending) == [("deployment.start", str(actor.pk))]
 
-def test_other_orgs_refused_approve_stays_out_of_the_approval_history(
-    org, actor, other_org, outsider, pending
+
+def test_an_outsider_naming_the_org_stays_out_of_the_approval_history(org, actor, outsider, pending):
+    """Review PoC: the outsider's session names ``org`` as its tenant. RBAC
+    refuses the approve, and the row used to be filed under ``org``."""
+    assert _approve(org, outsider, pending).ok is False
+    assert AuditEvent.objects.get(action="deployment.approve", target_id=str(pending)).organization_id is None
+
+    assert _history(org, actor, pending) == [("deployment.start", str(actor.pk))]
+
+
+def test_an_outsider_naming_the_org_is_not_listed_as_an_approver(
+    org, other_actor, outsider, pending, permission_resolver
 ):
-    _refused_approve_from(other_org, outsider, pending)
+    assert _approve(org, outsider, pending).ok is False
+    permission_resolver.grant(Permission.APP_APPROVE_DEPLOY)
+    assert _approve(org, other_actor, pending).ok
 
-    with _tenant_for(org, actor):
-        history = LifecycleQuery().astrolift_deployment_approval_history(
-            _info(actor), deployment_id=str(pending)
-        )
-
-    assert [h.action for h in history] == ["deployment.start"]
-    assert str(outsider.pk) not in {h.actor_id for h in history}
+    assert _approved_by(pending) == [(str(other_actor.pk), other_actor.email)]
 
 
-def test_other_orgs_refused_approve_is_not_listed_as_an_approver(
-    org, other_actor, other_org, outsider, pending
-):
-    _refused_approve_from(other_org, outsider, pending)
-    with _tenant_for(org, other_actor):
-        approved = LifecycleMutation().approve_deployment(
-            _info(other_actor), input=DeploymentByIdInput(id=pending)
-        )
-    assert approved.ok, approved.errors
+def test_a_member_refused_by_the_approver_list_is_not_listed(org, other_actor, pending, permission_resolver):
+    """The refusal comes back as an envelope, which ``@mutation_audit``
+    records as ALLOW (#1968), and the member's row is filed under the org:
+    only eligibility keeps it out."""
+    permission_resolver.grant(Permission.APP_APPROVE_DEPLOY)
+    bystander = _user_in(org, "bystander")
+    assert _approve(org, bystander, pending).ok is False
+    assert _approve(org, other_actor, pending).ok
 
-    deployment = Deployment.objects.select_related("registered_app", "app_environment", "workload").get(
-        guid=str(pending)
-    )
-    rendered = deployment_to_type(deployment)
+    assert _approved_by(pending) == [(str(other_actor.pk), other_actor.email)]
 
-    assert [(a.user_id, a.email) for a in rendered.approved_by] == [(str(other_actor.pk), other_actor.email)]
+
+def test_a_listed_approver_refused_by_rbac_is_not_listed(org, app, other_actor, pending, permission_resolver):
+    """A DENY row from someone on the approver list: only the decision keeps
+    it out."""
+    unbound = _user_in(org, "unbound")
+    app.approver_users.add(unbound)
+    assert _approve(org, unbound, pending).ok is False
+    assert AuditEvent.objects.get(action="deployment.approve", actor_id=str(unbound.pk)).decision == "DENY"
+    permission_resolver.grant(Permission.APP_APPROVE_DEPLOY)
+    assert _approve(org, other_actor, pending).ok
+
+    assert _approved_by(pending) == [(str(other_actor.pk), other_actor.email)]

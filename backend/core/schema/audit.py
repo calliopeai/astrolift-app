@@ -65,16 +65,19 @@ class MutationAuditLog(models.Model):
         on_delete=models.SET_NULL,
         related_name="mutation_audit_logs",
     )
-    # The org whose session ran the mutation. Tenant-facing readers must
-    # filter on it: the variables alone cannot say whose row it is (#1955).
-    # NULL for rows written without a tenant, including every row written
-    # before the column existed; no tenant view shows those.
+    # The org the mutation is filed under: the tenant org, when the actor
+    # belonged to it (``core.mutations.attributable_organization_id``).
+    # Tenant-facing readers must filter on it: the variables alone cannot
+    # say whose row it is (#1955). NULL otherwise, including every row
+    # written before the column existed; no tenant view shows those. The
+    # index is the composite one below, built concurrently (core.0014).
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="mutation_audit_logs",
+        db_index=False,
     )
     operation = models.CharField(max_length=200, db_index=True)
     variables = models.JSONField(default=dict, blank=True)
@@ -88,6 +91,7 @@ class MutationAuditLog(models.Model):
         indexes = [
             models.Index(fields=["user", "-timestamp"]),
             models.Index(fields=["operation", "-timestamp"]),
+            models.Index(fields=["organization", "-timestamp"], name="core_mal_org_time_idx"),
         ]
 
     def __str__(self):
@@ -98,6 +102,8 @@ class MutationAuditExtension(SchemaExtension):
     """Strawberry schema extension that logs mutations to the database."""
 
     def on_operation(self):
+        # Judged before the mutation runs, as @mutation_audit does (#1955).
+        organization_id = self._attributable_organization_id()
         yield  # Let the operation execute
         # After execution, log if it was a mutation
         try:
@@ -150,10 +156,9 @@ class MutationAuditExtension(SchemaExtension):
                 secret_operation=_is_secret_operation(operation_name),
             )
 
-            tenant = get_current_tenant()
             MutationAuditLog.objects.create(
                 user=user,
-                organization_id=tenant.organization_id if tenant else None,
+                organization_id=organization_id,
                 operation=operation_name,
                 variables=variables,
                 success=not has_errors,
@@ -162,6 +167,22 @@ class MutationAuditExtension(SchemaExtension):
             )
         except Exception as e:
             logger.warning(f"Mutation audit log failed: {e}")
+
+    def _attributable_organization_id(self) -> int | None:
+        """The org this mutation's row may carry; see
+        ``core.mutations.attributable_organization_id``. ``None`` for a
+        query, which is never logged."""
+        try:
+            request = self.execution_context
+            query = (request.query or "").strip().lower() if request else ""
+            if not query.startswith("mutation"):
+                return None
+            from core.mutations import attributable_organization_id
+
+            return attributable_organization_id(get_current_tenant())
+        except Exception as e:
+            logger.warning("Mutation audit attribution failed: %s", e)
+            return None
 
 
 def _get_client_ip(request) -> str | None:

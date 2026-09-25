@@ -18,7 +18,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
-from astrolift_identity.models import Organization, Project, Team
+from astrolift_identity.models import Member, Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_operations.models import AuditEvent
 from astrolift_registry.models import RegisteredApp
@@ -113,6 +113,9 @@ def _scaffold():
 
 def _ctx(org, user=None):
     actor_id = user.id if user is not None else None
+    if user is not None:
+        # Audit rows are filed under the org only for its members (#1955).
+        Member.objects.get_or_create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
     return tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor_id))
 
 
