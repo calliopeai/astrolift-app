@@ -299,3 +299,39 @@ def test_request_wildcard_cert_defaults_without_sans(driver_with_zone, acm_clien
     assert "acme.platform.example" in sans
     assert "*.acme.platform.example" in sans
     assert "*.pr.acme.platform.example" not in sans
+
+
+# ---- #1931: zones by id, never by guess -----------------------------------
+
+
+def test_provision_zone_refuses_a_name_that_already_exists(driver_with_zone, route53_client) -> None:
+    from aws._errors import ConflictError
+
+    driver, _ = driver_with_zone
+    with pytest.raises(ConflictError):
+        driver.provision_zone("acme.platform.example")
+    zones = route53_client.list_hosted_zones_by_name(DNSName="acme.platform.example.")["HostedZones"]
+    assert [z["Name"] for z in zones].count("acme.platform.example.") == 1
+
+
+def test_a_pinned_zone_gets_the_write_even_when_a_twin_exists(driver_with_zone, route53_client) -> None:
+    from aws._errors import ConflictError
+
+    driver, original = driver_with_zone
+    twin = route53_client.create_hosted_zone(Name="acme.platform.example.", CallerReference="twin")
+    twin_id = twin["HostedZone"]["Id"].rsplit("/", 1)[-1]
+
+    with pytest.raises(ConflictError):
+        Route53Driver(config=Route53Config(), client=route53_client).ensure_record(
+            zone="acme.platform.example", name="api", type="A", value="192.0.2.1"
+        )
+
+    driver.pin_zone("acme.platform.example", twin_id)
+    driver.ensure_record(zone="acme.platform.example", name="api", type="A", value="192.0.2.9")
+
+    def names(zone_id):
+        rows = route53_client.list_resource_record_sets(HostedZoneId=zone_id)["ResourceRecordSets"]
+        return {r["Name"] for r in rows if r["Type"] == "A"}
+
+    assert names(twin_id) == {"api.acme.platform.example."}
+    assert names(original) == set()

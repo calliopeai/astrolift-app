@@ -16,7 +16,7 @@ from typing import Any
 from _sdk import UnsupportedOperationError  # noqa: F401 (re-exported via raises)
 from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, DnsRecord, Record
-from aws._errors import NotFoundError, map_client_error
+from aws._errors import ConflictError, NotFoundError, map_client_error
 
 
 @dataclass
@@ -340,6 +340,15 @@ class Route53Driver(DnsDriver):
 
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.provision_zone")
     def provision_zone(self, zone: str) -> dict[str, Any]:
+        canonical = zone.rstrip(".") + "."
+        # Route53 allows two hosted zones with one name, and everything after
+        # this resolves zones by name: never create a second one (#1931).
+        taken = self._zone_ids_named(canonical)
+        if taken:
+            raise ConflictError(
+                f"hosted zone {zone} already exists in this account ({', '.join(taken)}); refusing to create a "
+                "duplicate the platform could not tell apart from it",
+            )
         caller_ref = f"astrolift-{zone}-{int(time.time())}"
         try:
             response = self._r53.create_hosted_zone(
@@ -352,7 +361,6 @@ class Route53Driver(DnsDriver):
         zone_id = raw_id.rsplit("/", 1)[-1]
         nameservers: list[str] = response.get("DelegationSet", {}).get("NameServers", [])
         # Seed the zone cache so subsequent calls skip the lookup.
-        canonical = zone.rstrip(".") + "."
         self._zone_cache[canonical] = zone_id
         return {"zone_id": zone_id, "nameservers": nameservers}
 
@@ -568,26 +576,34 @@ class Route53Driver(DnsDriver):
         del zone_id
         return "unknown"
 
+    def pin_zone(self, zone: str, zone_id: str) -> None:
+        """Bind ``zone`` to the hosted zone the platform created for it (#1931).
+
+        Later calls act on ``zone_id`` rather than on whichever hosted zone
+        carries the name.
+        """
+        self._zone_cache[zone.rstrip(".") + "."] = zone_id
+
+    def _zone_ids_named(self, canonical: str) -> list[str]:
+        try:
+            response = self._r53.list_hosted_zones_by_name(DNSName=canonical, MaxItems="100")
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        zones = response.get("HostedZones", []) or []
+        return [z["Id"].rsplit("/", 1)[-1] for z in zones if z.get("Name") == canonical]
+
     def _resolve_zone(self, zone: str) -> str:
         canonical = zone.rstrip(".") + "."
         if canonical in self._zone_cache:
             return self._zone_cache[canonical]
-        try:
-            response = self._r53.list_hosted_zones_by_name(
-                DNSName=canonical,
-                MaxItems="1",
-            )
-        except Exception as exc:
-            raise map_client_error(exc) from exc
-
-        zones = response.get("HostedZones", []) or []
-        match = next(
-            (z for z in zones if z.get("Name") == canonical),
-            None,
-        )
-        if match is None:
+        matches = self._zone_ids_named(canonical)
+        if not matches:
             raise NotFoundError(f"hosted zone {zone} not found")
-        zone_id = match["Id"].rsplit("/", 1)[-1]
+        if len(matches) > 1:
+            raise ConflictError(
+                f"{len(matches)} hosted zones are named {zone}; refusing to guess which one to act on",
+            )
+        zone_id = matches[0]
         self._zone_cache[canonical] = zone_id
         return zone_id
 

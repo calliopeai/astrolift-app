@@ -85,6 +85,18 @@ def _wildcard_cert_sans(zone: str, domain: Any) -> list[str]:
     return list(scope.sans)
 
 
+def pin_managed_zone(dns_driver: Any, domain: Any) -> None:
+    """Bind ``dns_driver`` to the hosted zone the platform created for ``domain`` (#1931).
+
+    Without this the driver acts on whichever hosted zone carries the name.
+    Only ``provision_zone_id`` counts: ``dns_config`` is tenant-editable.
+    """
+    zone_id = str(getattr(domain, "provision_zone_id", "") or "")
+    pin = getattr(dns_driver, "pin_zone", None)
+    if zone_id and pin is not None:
+        pin(domain.zone, zone_id)
+
+
 def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
     from astrolift_clusters.dns_layout import ZoneRegistrationStep
     from astrolift_clusters.models import ManagedDomain
@@ -96,7 +108,8 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
     # second hosted zone and changes the nameserver delegation underneath
     # the operator. This also makes retries idempotent for every provider.
     existing_config = dict(existing.dns_config or {}) if existing is not None else {}
-    existing_zone_id = str(existing_config.get("zone_id", ""))
+    existing_zone_id = str(getattr(existing, "provision_zone_id", "") or existing_config.get("zone_id", ""))
+    created_zone_id = ""
     if existing is not None and existing_zone_id:
         zone_id = existing_zone_id
         nameservers = list(existing.provision_nameservers or [])
@@ -104,6 +117,7 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         result = dns_driver.provision_zone(zone)
         zone_id = result.get("zone_id", "")
         nameservers = result.get("nameservers", [])
+        created_zone_id = zone_id
 
     plugin_slug = cluster.provider_plugin.slug
     if existing is not None:
@@ -112,9 +126,11 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         existing.provision_state = ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value
         existing.provision_nameservers = nameservers
         existing.dns_config = config
-        existing.save(
-            update_fields=["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"]
-        )
+        fields = ["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"]
+        if created_zone_id:
+            existing.provision_zone_id = created_zone_id
+            fields.append("provision_zone_id")
+        existing.save(update_fields=fields)
     else:
         ManagedDomain.objects.create(
             zone=zone,
@@ -124,6 +140,7 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
             default_for=ManagedDomain.DefaultFor.NONE,
             provision_state=ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value,
             provision_nameservers=nameservers,
+            provision_zone_id=created_zone_id,
         )
 
     return {"zone_id": zone_id, "nameservers": nameservers}
@@ -154,6 +171,7 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
 
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
     domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    pin_managed_zone(dns_driver, domain)
     result = dns_driver.request_wildcard_cert(
         zone,
         zone_id,
@@ -217,7 +235,10 @@ async def request_wildcard_cert_for_zone(cluster_id: int, zone: str, zone_id: st
 
 
 def _poll_cert_issuance_sync(cluster_id: int, zone: str, cert_id: str) -> dict[str, Any]:
+    from astrolift_clusters.models import ManagedDomain
+
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
+    pin_managed_zone(dns_driver, ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first())
     return dns_driver.poll_cert_status(zone, cert_id)
 
 
@@ -462,11 +483,11 @@ def _reissue_cert_sync(
     from astrolift_clusters.models import ManagedDomain
 
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    pin_managed_zone(dns_driver, domain)
 
     # Delete the old cert so the CA slot is freed.
     dns_driver.revoke_cert(zone, cert_id)
-
-    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
 
     # Request a new wildcard cert over the same SAN set as the original — a
     # reissue that narrowed the scope would silently drop preview hostnames.

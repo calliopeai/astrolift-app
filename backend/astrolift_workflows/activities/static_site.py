@@ -768,6 +768,9 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
         cdn_domain = _cdn_domain_for(cdn_row, cluster)
         if not cdn_domain:
             continue
+        from astrolift_workflows.activities.provision_managed_domain import pin_managed_zone
+
+        pin_managed_zone(dns_driver, managed_domain)
         dns_driver.ensure_record(zone=managed_domain.zone, name=host, type="CNAME", value=cdn_domain, ttl=300)
         records.append({"host": host, "value": cdn_domain})
     return {"stub": False, "records": records}
@@ -838,6 +841,9 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
             if not host:
                 continue
             try:
+                from astrolift_workflows.activities.provision_managed_domain import pin_managed_zone
+
+                pin_managed_zone(dns_driver, managed_domain)
                 dns_driver.delete_record(managed_domain.zone, host, "CNAME")
                 deleted.append(host)
             except NotFoundError:
