@@ -25,7 +25,11 @@ Permission model:
   guard surfaces on the affordance and the same gate the rest of the
   member-management mutations in this module use; introducing a brand
   new ``USER_ANONYMIZE`` perm would duplicate it without adding
-  segregation.
+  segregation. The gate is held in the active org, and the user row it
+  acts on is global, so the target must also be that org's to erase
+  (#1979): a member of the active org, not the platform operator, not
+  an active member of any other org, and holding nothing there the
+  caller could not grant. The platform operator skips the last three.
 
 Idempotency:
 
@@ -57,15 +61,21 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import Member
+from astrolift_identity.permission_resolver import _org_confined_bindings
+from astrolift_identity.step_up import requires_elevation
 from core.models import Profile
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import (
     Permission,
     PermissionDenied,
+    PermissionScope,
+    ScopeKind,
     check_permission,
+    is_platform_operator,
 )
-from core.tenancy import get_current_tenant
+from core.tenancy import TenantContext, get_current_tenant
 
 # Marker substring written into ``user.email`` by
 # ``Profile.anonymize_user`` (see ``core/models/user.py``). Used here
@@ -152,6 +162,46 @@ def _is_already_anonymized(user) -> bool:
     return bool(user.email and _ANON_EMAIL_MARKER in user.email) and not user.is_active
 
 
+def _require_may_anonymize(viewer, target) -> None:
+    """Refuse erasing ``target`` on behalf of the active org (#1979).
+
+    ``org.manage_members`` is held in one org, and the row this erases is
+    the install-wide user. Every refusal raises :class:`PermissionDenied`
+    so ``@mutation_audit`` records a DENY rather than an ALLOW (#1968).
+    """
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        raise PermissionDenied(Permission.ORG_MANAGE_MEMBERS, None, "no active organization")
+    scope = PermissionScope(kind=ScopeKind.ORG, id=org_id)
+    # At org scope: a binding on one team, with that team selected, would
+    # satisfy a targetless check, and erasing reaches the whole org.
+    check_permission(Permission.ORG_MANAGE_MEMBERS, scope=scope)
+
+    def refuse(reason: str) -> PermissionDenied:
+        return PermissionDenied(Permission.ORG_MANAGE_MEMBERS, scope, reason)
+
+    # A deactivated membership still counts: erasure after offboarding is
+    # the usual right-to-delete request.
+    org_memberships = Member.objects.filter(user_id=target.pk, scope_kind=Member.ScopeKind.ORG)
+    if not org_memberships.filter(scope_id=org_id).exists():
+        raise refuse("user is not a member of this organization")
+
+    if is_platform_operator(viewer):
+        return
+    if target.is_superuser:
+        raise refuse("only the platform operator can anonymize a platform operator account")
+    if org_memberships.filter(is_active=True).exclude(scope_id=org_id).exists():
+        raise refuse("user is also an active member of another organization")
+    held: set[str] = set()
+    for binding in _org_confined_bindings(TenantContext(organization_id=org_id, actor_user_id=target.pk)):
+        held.update(binding.role.permissions or ())
+    # Erasing someone ends every access they hold here, so it is capped
+    # like handing that access out (#1964).
+    require_grantable(held, scope_kind="ORG", scope_id=org_id, gate=Permission.ORG_MANAGE_MEMBERS)
+
+
 # ---------------------------------------------------------------------------
 # Mutation
 # ---------------------------------------------------------------------------
@@ -160,7 +210,11 @@ def _is_already_anonymized(user) -> bool:
 @strawberry.type
 class IdentityAnonymizeUserMutation:
     @strawberry.field
-    @mutation_audit(action="identity.user.anonymized")
+    @mutation_audit(
+        action="identity.user.anonymized",
+        target=lambda self, info, input: ("user", str(input.user_gid)),
+    )
+    @requires_elevation(action_label="identity.user.anonymize")
     def astrolift_anonymize_user(
         self, info: Info, input: AstroliftAnonymizeUserInput
     ) -> MutationResultType[AstroliftAnonymizeUserPayload]:
@@ -191,13 +245,7 @@ class IdentityAnonymizeUserMutation:
         # because it would enforce the check on the self path too,
         # which we explicitly want to allow.
         if not is_self:
-            try:
-                check_permission(Permission.ORG_MANAGE_MEMBERS)
-            except PermissionDenied as exc:
-                return gql_failure(
-                    ErrorCode.PERMISSION_DENIED.value,
-                    exc.reason,
-                )
+            _require_may_anonymize(viewer, target)
 
         # Idempotency: if the user is already anonymized, return the
         # current state with ``requires_logout=False``. Don't run the
@@ -249,10 +297,3 @@ __all__ = [
     "AstroliftAnonymizeUserPayload",
     "IdentityAnonymizeUserMutation",
 ]
-
-
-# Keep an import-side reference to the tenant context helper so the
-# audit decorator can record the active organization without us having
-# to thread it through manually — the @mutation_audit wrapper reads
-# ``get_current_tenant()`` internally.
-_ = get_current_tenant
