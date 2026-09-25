@@ -32,6 +32,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "event_bus"
 _API_ROOT = "https://eventarc.googleapis.com/v1"
@@ -925,12 +926,30 @@ class EventarcDriver(ManagedServiceDriver):
                 resource_id = str(declaration.get("id") or "")
                 if not _ID_RE.fullmatch(resource_id):
                     return f"invalid Eventarc {collection} ID {resource_id!r}"
-                raw_fields = declaration.get("raw_fields") or {}
-                forbidden = sorted(set(raw_fields) & _PROTECTED_PROVIDER_FIELDS)
+                # Google's JSON parser accepts a field's proto name as well as
+                # its lowerCamelCase JSON name, so a raw or cleared field
+                # spelled in proto form bypassed the exact-match checks below
+                # (#1981).
+                proto_names, forbidden = raw_field_conflicts(
+                    declaration.get("raw_fields") or {},
+                    _PROTECTED_PROVIDER_FIELDS,
+                )
+                if proto_names:
+                    return (
+                        "Eventarc raw_fields must use the API's lowerCamelCase JSON field names, "
+                        f"not {', '.join(proto_names)}"
+                    )
                 if forbidden:
                     return f"Eventarc raw_fields cannot set output-only fields: {', '.join(forbidden)}"
-                clear_fields = {str(item) for item in declaration.get("clear_fields") or []}
-                forbidden_clear = sorted(clear_fields & _PROTECTED_PROVIDER_FIELDS)
+                proto_names, forbidden_clear = raw_field_conflicts(
+                    declaration.get("clear_fields") or [],
+                    _PROTECTED_PROVIDER_FIELDS,
+                )
+                if proto_names:
+                    return (
+                        "Eventarc clear_fields must use the API's lowerCamelCase JSON field names, "
+                        f"not {', '.join(proto_names)}"
+                    )
                 if forbidden_clear:
                     return f"Eventarc clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
         for pipeline in cfg.get("pipelines") or []:
@@ -1024,12 +1043,22 @@ class EventarcDriver(ManagedServiceDriver):
         for channel in cfg.get("channels") or []:
             if not channel.get("provider"):
                 return f"Eventarc channel {channel.get('id')} requires provider"
-        raw_fields = cfg.get("raw_fields") or {}
-        forbidden = sorted(set(raw_fields) & _PROTECTED_PROVIDER_FIELDS)
+        # Google's JSON parser accepts a field's proto name as well as its
+        # lowerCamelCase JSON name, so a raw or cleared field spelled in proto
+        # form bypassed the exact-match checks below (#1981).
+        proto_names, forbidden = raw_field_conflicts(cfg.get("raw_fields") or {}, _PROTECTED_PROVIDER_FIELDS)
+        if proto_names:
+            return (
+                f"Eventarc raw_fields must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
+            )
         if forbidden:
             return f"Eventarc raw_fields cannot set output-only fields: {', '.join(forbidden)}"
-        clear_fields = {str(item) for item in cfg.get("clear_fields") or []}
-        forbidden_clear = sorted(clear_fields & _PROTECTED_PROVIDER_FIELDS)
+        proto_names, forbidden_clear = raw_field_conflicts(cfg.get("clear_fields") or [], _PROTECTED_PROVIDER_FIELDS)
+        if proto_names:
+            return (
+                "Eventarc clear_fields must use the API's lowerCamelCase JSON field names, "
+                f"not {', '.join(proto_names)}"
+            )
         if forbidden_clear:
             return f"Eventarc clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
         return ""

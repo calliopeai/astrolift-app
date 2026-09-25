@@ -605,6 +605,13 @@ def test_status_and_delete_are_idempotent_when_bus_is_gone(driver: EventarcDrive
             {"google_api_sources": [{"id": "one"}, {"id": "two"}]},
             "one Google API source",
         ),
+        # Google's JSON parser accepts a field's proto name as well as its
+        # lowerCamelCase JSON name, so a raw or cleared field spelled in proto
+        # form must be refused outright rather than compared to the protected
+        # set (#1981).
+        ({"raw_fields": {"activation_token": "forbidden"}}, "lowerCamelCase JSON field names"),
+        ({"raw_fields": {"Etag": "forbidden"}}, "raw_fields cannot set output-only fields: Etag"),
+        ({"clear_fields": ["create_time"]}, "lowerCamelCase JSON field names"),
     ],
 )
 def test_invalid_configs_are_rejected(
