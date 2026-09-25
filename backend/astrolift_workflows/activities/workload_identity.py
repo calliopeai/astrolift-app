@@ -134,11 +134,25 @@ def _refuse_unscoped_secret_grants(services: list[Any], bindings: list[Any]) -> 
     The grant would let the app's own role read that secret, so it is held to
     the namespace the binding rows are.
     """
-    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+    from astrolift_services.secret_ref_config import (
+        _role_arn_reason,
+        managed_binding_ref_reason,
+        service_owner,
+    )
 
     for svc, binding in zip(services, bindings, strict=True):
         for grant in getattr(binding, "iam_grants", None) or []:
-            if not any(str(action).startswith("secretsmanager:") for action in grant.actions or ()):
+            actions = [str(action) for action in grant.actions or ()]
+            if "iam:PassRole" in actions:
+                # A pass-role grant on a role the tenant named lets the app's
+                # role hand that role to an AWS service; only the org's own
+                # roles, as at config write (#1960).
+                reason = _role_arn_reason(str(grant.resource or ""), service_owner(svc))
+                if reason is not None:
+                    raise ValueError(
+                        f"managed service {svc.name or svc.kind!r} grant on {grant.resource!r}: {reason}"
+                    )
+            if not any(action.startswith("secretsmanager:") for action in actions):
                 continue
             reason = managed_binding_ref_reason(svc, str(grant.resource or ""))
             if reason is not None:
