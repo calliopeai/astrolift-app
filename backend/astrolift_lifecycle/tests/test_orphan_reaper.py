@@ -338,6 +338,56 @@ def test_reap_refuses_iam_role_of_live_app(app, cluster, monkeypatch):
     assert deleted == []  # never deleted a live app's role
 
 
+def test_reap_refuses_a_role_no_cluster_reports_as_owned(app, cluster, monkeypatch):
+    """A name outside list_owned_roles() (a cluster or node role, say) is
+    refused and never deleted (#1985)."""
+    _managed(cluster)
+    deleted: list[str] = []
+    driver = _FakeIdentityDriver(["astrolift-ghost-org-ghost-app"], deleted=deleted)
+    monkeypatch.setattr("core.app_deploy.driver_for_capability", lambda *a, **k: driver)
+
+    result = reaper.reap_orphan(
+        kind=reaper.KIND_IAM_ROLE, reap_key="eks-node-role", cluster_slug=cluster.slug
+    )
+
+    assert not result.ok
+    assert result.refused
+    assert deleted == []
+
+
+def test_reap_deletes_through_the_cluster_that_owns_the_role(app, cluster, monkeypatch):
+    """Without a clusterSlug the reaper used to stop at the first cluster whose
+    delete did not raise, and NoSuchEntity counts as success there (#1985)."""
+    from astrolift_clusters.models import TenantCluster
+
+    _managed(cluster)
+    second = TenantCluster.objects.create(
+        organization=cluster.organization,
+        slug=f"{cluster.slug}-2",
+        name="second",
+        provider_plugin=cluster.provider_plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=cluster.auth_method,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    orphan_name = "astrolift-ghost-org-ghost-app"
+    first_deleted: list[str] = []
+    second_deleted: list[str] = []
+    drivers = {
+        cluster.slug: _FakeIdentityDriver([], deleted=first_deleted),
+        second.slug: _FakeIdentityDriver([orphan_name], deleted=second_deleted),
+    }
+    monkeypatch.setattr("core.app_deploy.driver_for_capability", lambda c, *a, **k: drivers[c.slug])
+
+    result = reaper.reap_orphan(kind=reaper.KIND_IAM_ROLE, reap_key=orphan_name, cluster_slug="")
+
+    assert result.ok, result.message
+    assert first_deleted == []
+    assert second_deleted == [orphan_name]
+
+
 # ---- permission gate (mutation surface) ----------------------------
 
 
