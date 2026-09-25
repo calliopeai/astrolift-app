@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  CheckIcon,
   CodeIcon,
   ExternalLinkIcon,
   GitPullRequestIcon,
@@ -30,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
+  APPLY_STAGED_MANIFEST,
   PUSH_MANIFEST_TO_REPO,
   SYNC_MANIFEST_FROM_REPO,
   UPDATE_MANIFEST,
@@ -301,9 +303,20 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   const [pushManifest, pushState] = useMutation<{
     pushManifestToRepo: MutationResult<ManifestPushPayload>;
   }>(PUSH_MANIFEST_TO_REPO, { refetchQueries: refetch, awaitRefetchQueries: true });
+  const [applyManifest, applyState] = useMutation<{
+    applyStagedManifest: MutationResult<ManifestStagePayload>;
+  }>(APPLY_STAGED_MANIFEST, { refetchQueries: refetch, awaitRefetchQueries: true });
 
-  const busy = updateState.loading || syncState.loading || pushState.loading;
+  const busy = updateState.loading || syncState.loading || pushState.loading || applyState.loading;
   const [confirmSync, setConfirmSync] = React.useState(false);
+  const [confirmApply, setConfirmApply] = React.useState(false);
+
+  // Key NAMES only (never values) that applying the staged buffer would
+  // change, across [env] and every container/job/task env table --
+  // computed by the server with the same diff applyStagedManifest gates
+  // on, so the confirm dialog lists what the server treats as a secret
+  // change (#1759 adversarial review).
+  const changedEnvKeys = a?.stagedEnvChanges ?? [];
 
   async function handleSave() {
     if (!a) return;
@@ -345,6 +358,24 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       toast.success("Pulled from repo");
     } else {
       throw new Error(data?.syncManifestFromRepo.errors?.[0]?.message ?? "Couldn't pull from the repo");
+    }
+  }
+
+  async function handleApply() {
+    if (!a) return;
+    const { data } = await applyManifest({
+      variables: {
+        input: { id: a.id, expectedStagedHash: a.rawManifestStagedHash },
+      },
+    });
+    if (data?.applyStagedManifest.ok) {
+      const next = data.applyStagedManifest.data;
+      const text = next?.rawManifest || "";
+      setDraft(text);
+      baselineRef.current = text;
+      toast.success("Applied");
+    } else {
+      throw new Error(data?.applyStagedManifest.errors?.[0]?.message ?? "Apply failed");
     }
   }
 
@@ -496,19 +527,34 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             <SaveIcon className="size-4" />
             {updateState.loading ? t("saving") : t("saveDraft")}
           </Button>
-          <Button
-            variant="outline"
-            onClick={handlePush}
-            disabled={busy}
-            title={
-              a.manifestSyncState === "in_sync"
-                ? "In sync with the repo — edit and Save draft first"
-                : undefined
-            }
-          >
-            <GitPullRequestIcon className="size-4" />
-            {t("pushToRepo")}
-          </Button>
+          {a.sourceRepo ? (
+            <Button
+              variant="outline"
+              onClick={handlePush}
+              disabled={busy}
+              title={
+                a.manifestSyncState === "in_sync"
+                  ? "In sync with the repo — edit and Save draft first"
+                  : undefined
+              }
+            >
+              <GitPullRequestIcon className="size-4" />
+              {t("pushToRepo")}
+            </Button>
+          ) : (
+            // No source connection to push a PR through (#1759), so apply
+            // the staged draft directly rather than leaving it frozen in
+            // manifest_raw_staged forever.
+            <Button
+              variant="outline"
+              onClick={() => setConfirmApply(true)}
+              disabled={busy || !a.rawManifestStaged || isDirty}
+              title={isDirty ? "Save or discard your local edits first" : undefined}
+            >
+              <CheckIcon className="size-4" />
+              {applyState.loading ? t("applying") : t("applyStaged")}
+            </Button>
+          )}
         </>
       }
     >
@@ -563,6 +609,11 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
               {isDirty && (
                 <Badge variant="outline" className="ml-2 text-2xs">
                   {t("editor.unsaved")}
+                </Badge>
+              )}
+              {!a.sourceRepo && a.rawManifestStaged && (
+                <Badge variant="outline" className="ml-2 text-2xs">
+                  {t("editor.stagedNotApplied")}
                 </Badge>
               )}
             </CardTitle>
@@ -655,6 +706,19 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         confirmLabel={t("confirmSync.confirm")}
         destructive
         onConfirm={handleSync}
+      />
+
+      <ConfirmDialog
+        open={confirmApply}
+        onOpenChange={setConfirmApply}
+        title={t("confirmApply.title")}
+        description={
+          changedEnvKeys.length > 0
+            ? t("confirmApply.descriptionWithEnv", { keys: changedEnvKeys.join(", ") })
+            : t("confirmApply.description")
+        }
+        confirmLabel={t("confirmApply.confirm")}
+        onConfirm={handleApply}
       />
     </PageShell>
   );

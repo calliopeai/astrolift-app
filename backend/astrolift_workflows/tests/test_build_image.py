@@ -193,6 +193,248 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
     assert deployment.image_digest == _GOOD_DIGEST
 
 
+# --- container-level dockerfile_path / build_context (#1756) ----------
+#
+# [[workloads.containers]] accepts dockerfile_path/build_context and
+# persist.py writes them onto the Container row, but the build only ever
+# read RegisteredApp.dockerfile_path/build_context -- a manifest that set
+# a container's build_context to reach a Dockerfile above its own
+# directory (the ConflictHQ/bdr#139 monorepo shape) passed validation and
+# was silently ignored.
+
+
+def _capture_build_spec(monkeypatch):
+    """Install a FakeDriver that records the BuildSpec it was called
+    with, and wire it up as the prepared build for _build_image_sync."""
+    from providers._sdk.build import BuildResult
+
+    captured: dict = {}
+
+    class FakeDriver:
+        def build(self, spec, repo, tag):
+            captured["spec"] = spec
+            return BuildResult(success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0)
+
+    prepared = _PreparedBuild(
+        driver=FakeDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+    return captured
+
+
+def test_build_image_honors_the_primary_containers_dockerfile_and_context(monkeypatch):
+    """A container's build_context is resolved against the manifest's own
+    directory, not passed through verbatim (#1756 adversarial review, H3):
+    "../.." from a manifest two directories deep reaches the repo root,
+    same shape as the issue's own example."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.save(update_fields=["manifest_path"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(
+        name="web",
+        is_primary=True,
+        dockerfile_path="services/web/Dockerfile",
+        build_context="../..",
+    )
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "apps/web/services/web/Dockerfile"
+    assert captured["spec"].context_path == "."
+
+
+def test_build_image_rejects_a_container_build_context_that_escapes_the_repo_root(monkeypatch):
+    """A build_context of ../../../etc from the same two-deep manifest
+    climbs above the repo root -- a hard failure, not a silent
+    pass-through or a silent fall-back to the app-level default (#1756
+    adversarial review, H3)."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.save(update_fields=["manifest_path"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True, build_context="../../../etc")
+
+    _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="escapes the repository root"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+
+def test_build_image_falls_back_to_app_level_fields_when_container_is_default(monkeypatch):
+    """A container whose manifest never set dockerfile_path/build_context
+    reads back as the parser's own default -- indistinguishable from an
+    explicit default -- and must not clobber the app-level fields set by
+    `astro app register --dockerfile-path/--build-context` or monorepo
+    discovery."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.dockerfile_path = "custom/Dockerfile"
+    app.build_context = "apps/web"
+    app.save(update_fields=["dockerfile_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True)
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "custom/Dockerfile"
+    assert captured["spec"].context_path == "apps/web"
+
+
+def test_build_image_with_no_workloads_yet_uses_app_level_fields(monkeypatch):
+    """Before the manifest has materialized any Workload rows (or for an
+    app that never will), the build must behave exactly as before."""
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.dockerfile_path = "Dockerfile.prod"
+    app.build_context = "services/api"
+    app.save(update_fields=["dockerfile_path", "build_context"])
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "Dockerfile.prod"
+    assert captured["spec"].context_path == "services/api"
+
+
+def test_build_image_prefers_the_deployments_own_workload_over_the_apps_first(monkeypatch):
+    """Task / static-site / cron deploys scope ``Deployment.workload`` to
+    one specific workload -- that one wins over "the app's first"."""
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    first = Workload.objects.create(registered_app=app, name="migrate", slug="migrate", kind="task")
+    first.containers.create(name="migrate", is_primary=True, dockerfile_path="Dockerfile.migrate")
+    target = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    target.containers.create(name="web", is_primary=True, dockerfile_path="Dockerfile.web")
+    deployment.workload = target
+    deployment.save(update_fields=["workload"])
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert captured["spec"].dockerfile_path == "Dockerfile.web"
+
+
+# Kaniko tries --dockerfile against its own working directory, then joins it
+# onto --context-sub-path (resolveDockerfilePath in its
+# cmd/executor/cmd/root.go). So the Dockerfile has to reach it relative to
+# the build context (#1756 re-review: as a repo-root path, any context but
+# "." doubled the prefix), and inside it: a ../ path is tried against the
+# working directory first, where ../../var/run/secrets/... is the build
+# pod's own service-account token.
+
+
+def _container_build(app_dockerfile, app_context, container_dockerfile, container_context):
+    from astrolift_registry.models import Workload
+
+    deployment = _make_deployment()
+    app = deployment.registered_app
+    app.manifest_path = "apps/web/astrolift.toml"
+    app.dockerfile_path = app_dockerfile
+    app.build_context = app_context
+    app.save(update_fields=["manifest_path", "dockerfile_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(
+        name="web",
+        is_primary=True,
+        dockerfile_path=container_dockerfile,
+        build_context=container_context,
+    )
+    return deployment
+
+
+@pytest.mark.parametrize(
+    ("app_dockerfile", "app_context", "container_dockerfile", "container_context", "expected"),
+    [
+        pytest.param(
+            "Dockerfile",
+            "apps/web",
+            "Dockerfile.prod",
+            ".",
+            ("Dockerfile.prod", "apps/web"),
+            id="container-dockerfile-app-context",
+        ),
+        pytest.param(
+            "Dockerfile",
+            ".",
+            "docker/Dockerfile",
+            "docker",
+            ("Dockerfile", "apps/web/docker"),
+            id="container-dockerfile-container-context",
+        ),
+        pytest.param(
+            "apps/web/docker/Dockerfile.web",
+            ".",
+            "Dockerfile",
+            "docker",
+            ("Dockerfile.web", "apps/web/docker"),
+            id="app-dockerfile-container-context",
+        ),
+    ],
+)
+def test_build_image_passes_the_dockerfile_relative_to_the_build_context(
+    monkeypatch, app_dockerfile, app_context, container_dockerfile, container_context, expected
+):
+    deployment = _container_build(app_dockerfile, app_context, container_dockerfile, container_context)
+
+    captured = _capture_build_spec(monkeypatch)
+    _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+    assert (captured["spec"].dockerfile_path, captured["spec"].context_path) == expected
+
+
+@pytest.mark.parametrize(
+    ("app_dockerfile", "app_context", "container_dockerfile", "container_context"),
+    [
+        pytest.param("Dockerfile", "apps/web", "../../docker/web.Dockerfile", ".", id="above-the-context"),
+        pytest.param(
+            "Dockerfile",
+            "apps/web",
+            "../../var/run/secrets/kubernetes.io/serviceaccount/token",
+            ".",
+            id="service-account-token",
+        ),
+        pytest.param(
+            "Dockerfile.prod", ".", "Dockerfile", "sub", id="app-dockerfile-above-a-container-context"
+        ),
+    ],
+)
+def test_build_image_refuses_a_dockerfile_outside_the_build_context(
+    monkeypatch, app_dockerfile, app_context, container_dockerfile, container_context
+):
+    deployment = _container_build(app_dockerfile, app_context, container_dockerfile, container_context)
+
+    captured = _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="outside the build context"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+    assert "spec" not in captured
+
+
+def test_build_image_rejects_a_container_dockerfile_that_escapes_the_repo_root(monkeypatch):
+    """Rebasing onto the context happens after the inside-the-repo check,
+    so a dockerfile above the repo root still fails the build."""
+    deployment = _container_build("Dockerfile", "apps/web", "../../../Dockerfile", ".")
+
+    _capture_build_spec(monkeypatch)
+    with pytest.raises(RuntimeError, match="escapes the repository root"):
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
+
+
 def test_build_image_sync_ignores_a_malformed_registry_digest(monkeypatch):
     """The render pins containers to whatever lands in ``image_digest``, so a
     registry that answers with something other than ``sha256:<64 hex>`` must

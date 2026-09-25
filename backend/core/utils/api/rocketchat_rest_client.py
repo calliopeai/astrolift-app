@@ -94,15 +94,3 @@ class RocketchatRestClient:
             logger.error(f'{msg}. {response}')
             raise Exception(f'{msg}. {response}') if settings.DEBUG else Exception(msg)
         return response['data']['authToken']
-
-    def read_channel(self, chat_identifier: str):
-        response = self.request_handler.make_request(
-            method='GET',
-            url=self.server_url + 'channels.history',
-            headers=self.admin_headers,
-            params={
-                'roomName': chat_identifier
-            }
-        )
-
-        return response.get('messages', [])

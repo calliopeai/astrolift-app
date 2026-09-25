@@ -13,7 +13,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     ReapCloudOrphanPayload,
 )
 from core.mutations import ErrorCode, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 
 
 @strawberry.type
@@ -29,8 +29,10 @@ class MaintenanceMutations:
     ) -> MutationResultType[ReapCloudOrphanPayload]:
         """Reap one detected cloud orphan THROUGH the provider drivers (#995).
 
-        Install-wide operator action (orphans have no org owner) — gated on
-        ``CLUSTER_MANAGE`` and deliberately NOT ``@tenant_scoped``. The reaper
+        Install-wide operator action (orphans have no org owner), deliberately
+        NOT ``@tenant_scoped``. It deletes through any org's managed cluster,
+        so only the platform operator may run it: ``CLUSTER_MANAGE`` alone is
+        held by every org's admins and cluster owners (#1978). The reaper
         re-checks ownership and refuses anything that still has a live owner;
         only detection-proven orphans are reapable. Idempotent: an already-gone
         resource returns success so a re-run converges. ``force_destroy``
@@ -39,6 +41,7 @@ class MaintenanceMutations:
         Reaping never issues a raw cloud API delete — it reuses the same
         idempotent driver deprovision path teardown uses (#1034).
         """
+        check_platform_operator(info.context.request.user, gate=Permission.CLUSTER_MANAGE)
         from astrolift_operations.services.orphan_reaper import ALL_KINDS, reap_orphan
 
         kind = (input.kind or "").strip()

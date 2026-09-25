@@ -36,6 +36,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "event_stream"
 _API_ROOT = "https://managedkafka.googleapis.com/v1"
@@ -1717,21 +1718,17 @@ def _secret_version_in_project(secret_path: str, project_id: str) -> bool:
 def _raw_fields_error(cfg: dict[str, Any], *, protected: set[str] | None = None) -> str:
     """Why ``cfg``'s raw or cleared field names may not reach the API, or ``""``.
 
-    Google's JSON parser takes a field's proto name (``gcp_config``) as well as
-    its JSON name (``gcpConfig``), so a guard that knows one spelling is
-    bypassed by the other: a Connect cluster's ``gcp_config`` would carry
-    ``secretPaths`` past the project check (#1921). A name must be the API's
-    lowerCamelCase JSON name, and it meets the protected set case-blind.
+    See ``gcp._raw_fields.raw_field_conflicts`` for why both spellings matter
+    (#1921, #1947).
     """
-    guarded = {name.casefold() for name in _PROTECTED_RAW_FIELDS | (protected or set())}
+    guarded = _PROTECTED_RAW_FIELDS | (protected or set())
     for label, verb, names in (
-        ("raw_fields", "set", [str(key) for key in cfg.get("raw_fields") or {}]),
-        ("clear_fields", "clear", [str(item) for item in cfg.get("clear_fields") or []]),
+        ("raw_fields", "set", cfg.get("raw_fields") or {}),
+        ("clear_fields", "clear", cfg.get("clear_fields") or []),
     ):
-        proto_names = sorted(name for name in names if "_" in name)
+        proto_names, forbidden = raw_field_conflicts(names, guarded)
         if proto_names:
             return f"{label} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
-        forbidden = sorted(name for name in names if name.casefold() in guarded)
         if forbidden:
             return f"{label} cannot {verb} protected fields: {', '.join(forbidden)}"
     return ""

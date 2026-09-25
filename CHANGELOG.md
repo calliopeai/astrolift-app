@@ -31,6 +31,65 @@
   app's), else the definition's. They used to record none, so no tenant
   could reach them, and their agent stages resolved workloads and picked a
   dispatcher across every organization (#1984).
+- Add an `applyStagedManifest` mutation for apps that have no source repo to
+  push a staged edit through: it applies `manifest_raw_staged` straight to
+  `manifest_raw` via the same parse-and-persist path `registerApp` uses.
+  Previously `updateManifest` only ever wrote the staging buffer, and the
+  only paths that moved a draft into `manifest_raw` (`syncManifestFromRepo`,
+  `pushManifestToRepo`) required a source repo, so an app registered with
+  `--manifest-raw` could never change its manifest after the first edit. A
+  repo-backed app always goes through `pushManifestToRepo` for review,
+  whatever its connection health: this mutation is reachable only for an
+  app with no `source_repo` at all. Runs under `select_for_update()`, and
+  the caller's last-known `rawManifestStagedHash` (a keyed digest bound to
+  the app, never a bare hash of the text) is checked against the live
+  staged buffer (`CONFLICT` on a stale read) so an apply never lands a
+  draft the caller never actually reviewed; it is required whenever the
+  edit changes env or a managed-service binding. An edit that changes env
+  (the top-level `[env]` table or any container, job or task `env` table)
+  or a managed-service binding (read off a rolled-back dry run of the
+  reconcile, or declared on an app that has no environment yet, which the
+  first deploy's environment bootstrap would reconcile unchecked) is gated
+  the same way `setAppSecret` gates a direct secret write: a fresh session
+  elevation, or, when the app requires secret approval, every changed
+  `[env]` key must match an applied secret-change proposal, and anything
+  else is refused except a managed-service release (remove or detach).
+  Attaching or rebinding a project managed service
+  also needs `project.update` on the project, the permission
+  `attachProjectManagedService` checks; `registerApp` applies the same
+  check to an inline manifest. A manifest the reconcile rejects returns
+  `VALIDATION`, including a project-scoped service on an app that belongs
+  to no project. The audit entry names the changed keys and bindings, never
+  values or digests, and the returned manifest text masks `[env]` values for
+  a caller who can't reveal secrets, as every other manifest response does
+  (#1920). The manifest editor now shows an "Apply" button
+  (disabled while the draft has unsaved local edits) and a "Staged, not
+  applied" badge instead of "Push to repo" when the app has no source repo,
+  and confirms before applying, listing the env key names (never values)
+  the server reports the draft changes (`stagedEnvChanges`) (#1759).
+
+- Honour per-container `dockerfile_path` / `build_context` from
+  `[[workloads.containers]]` when building an app's image. The build
+  previously only ever read the app-level `RegisteredApp.dockerfile_path` /
+  `build_context`, so a manifest that set a container's `build_context` to
+  reach a Dockerfile outside its own directory (the monorepo shape where one
+  image serves two registrations of the same repo) passed validation and
+  was silently ignored (#1756). An explicit app-level value (an
+  `--dockerfile-path`/`--build-context` register flag, or monorepo
+  discovery) wins outright; a container's field only applies on whichever
+  of the two the app hasn't itself customized, resolved against the
+  manifest's own directory and rejected (parse time for an absolute path,
+  build time for a resolved result that climbs above the repo root) rather
+  than silently falling back. Kaniko reads `--dockerfile` relative to the
+  build context, so the Dockerfile (a container's, or an app-level one under
+  a container's build context) is passed relative to the effective context,
+  and a Dockerfile outside that context is refused: kaniko tries such a
+  path against its own working directory first, which reaches the build
+  pod's filesystem. A manifest with more than one distinct non-default
+  `dockerfile_path` or `build_context` across its containers is rejected at
+  parse time, since exactly one image is ever built for an app, so a
+  second, different value would just be the same silent drop this feature
+  closes.
 
 - Confine agent and managed-service secret locations to the organization's own
   secret namespace (#1921). Every driver files a relative ref under the
@@ -115,6 +174,20 @@
   and operators get usage and policy view. The organization viewer gets
   status. No existing role loses a permission. Migration
   `astrolift_identity.0034` applies the catalogue to existing installs.
+
+- Install-wide operations need the platform operator: an active superuser,
+  whose bearer token also needs the `admin` scope. The stock organization
+  owner and admin roles hold every permission, `admin.elevate` included, so
+  the permission gates on these admitted every organization's admins.
+  `setFeatureFlag` flipped a runtime flag for every tenant,
+  `resyncAllAstroliftCiWorkflows` swept every organization's managed apps,
+  `scanCloudOrphans` listed every organization's orphaned cloud resources
+  (a team owner with its team selected got there too), and `reapCloudOrphan`
+  deleted IAM roles and managed services through any organization's cluster.
+  Django staff who are not superusers lose the shortcuts that reached across
+  organizations: the `dispatchers` list, every organization in
+  `astroliftOrganizations`, editing platform workflow templates, and creating
+  templates and workflow triggers (#1978).
 
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the

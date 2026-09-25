@@ -16,6 +16,7 @@ from astrolift_registry.schema.mutations.helpers import (
     _normalize_build_args,
     _resolve_approval_inputs,
     _validate_build_mode,
+    _validate_build_path_field,
     _validate_build_strategy,
     _validate_effective_approval_policy,
 )
@@ -143,6 +144,20 @@ class AppMutations:
         build_strategy, build_strategy_err = _validate_build_strategy(input.build_strategy)
         if build_strategy_err is not None:
             return build_strategy_err
+        # #1756 adversarial review: dockerfile_path/build_context are
+        # already relative to the repo root directly (no further base to
+        # combine with, unlike a container-level offset), so an absolute
+        # path or a leading ".." is always wrong here.
+        dockerfile_path, dockerfile_path_err = _validate_build_path_field(
+            input.dockerfile_path, field="dockerfilePath"
+        )
+        if dockerfile_path_err is not None:
+            return dockerfile_path_err
+        build_context, build_context_err = _validate_build_path_field(
+            input.build_context, field="buildContext"
+        )
+        if build_context_err is not None:
+            return build_context_err
 
         for field in (
             "name",
@@ -151,8 +166,6 @@ class AppMutations:
             "manifest_path",
             "default_branch",
             "deploy_branch",
-            "dockerfile_path",
-            "build_context",
             "preview_enabled",
             "is_active",
             "cron_paused",
@@ -160,6 +173,10 @@ class AppMutations:
             new_value = getattr(input, field)
             if new_value is not None:
                 setattr(app, field, new_value)
+        if dockerfile_path is not None:
+            app.dockerfile_path = dockerfile_path
+        if build_context is not None:
+            app.build_context = build_context
         if build_mode is not None:
             app.build_mode = build_mode
         if build_strategy is not None:

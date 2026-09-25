@@ -10,7 +10,7 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, is_platform_operator, require_permission, require_platform_operator
 from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
@@ -58,12 +58,16 @@ class CreateWorkflowTriggerResult(MutationResult):
     signing_secret: str | None = None
 
 
-def _require_staff(user):
-    """Raise GraphQLError if user is not authenticated staff/superuser."""
+def _require_platform_operator(user):
+    """Refuse anyone but the platform operator.
+
+    The callers write install-wide rows: a platform template that every org
+    sees, or a trigger on a definition looked up across every org. Django
+    staff is not the platform operator (#1978).
+    """
     if not user or not user.is_authenticated:
         raise GraphQLError("Authentication required")
-    if not (user.is_staff or user.is_superuser):
-        raise GraphQLError("Staff or superuser access required")
+    require_platform_operator(user)
 
 
 def _caller_org_pk():
@@ -76,13 +80,14 @@ def _definition_write_error(user, definition):
 
     Returns ``(field, message)`` describing why ``user`` may not write
     ``definition``, or ``None`` if allowed. Platform-global (null-org)
-    templates are read-only to tenants — superuser/staff exempt (the seeding
-    path). Org-authored definitions are writable only by their owning org
-    (superuser/staff bypass). The org match is the actual scoping (#1042 —
+    templates are read-only to tenants; the platform operator is exempt (the
+    seeding path). Org-authored definitions are writable only by their owning
+    org (the platform operator bypasses; Django staff does not, #1978). The
+    org match is the actual scoping (#1042 —
     ``@tenant_scoped`` only asserts a context exists)."""
     if user is None or not getattr(user, "is_authenticated", False):
         return ("permission", "Authentication required")
-    if user.is_superuser or user.is_staff:
+    if is_platform_operator(user):
         return None
     if definition.organization_id is None:
         return ("permission", "PERMISSION_DENIED: platform template — clone to edit")
@@ -375,7 +380,7 @@ class Mutation:
 
         return MutationResult.success()
 
-    @strawberry.mutation(description="Create a new workflow definition (staff only).")
+    @strawberry.mutation(description="Create a new workflow definition (platform operator only).")
     def create_workflow_definition(
         self,
         info: Info,
@@ -389,7 +394,7 @@ class Mutation:
         pattern_kind: str | None = None,
     ) -> MutationResult:
         user = info.context.user
-        _require_staff(user)
+        _require_platform_operator(user)
 
         # pattern_kind drives the executor's composition (single / chained /
         # fan_out / ...). It existed on the model but had no creation arg, so
@@ -751,7 +756,7 @@ class Mutation:
         return CreateWorkflowStageResult(ok=True, stage=stage)
 
     @strawberry.mutation(
-        description="Create an inbound webhook trigger for a workflow definition (staff only)."
+        description="Create an inbound webhook trigger for a workflow definition (platform operator only)."
     )
     def create_workflow_trigger(self, info: Info, workflow_slug: str) -> CreateWorkflowTriggerResult:
         """Register a ``WorkflowWebhook`` that fires *workflow_slug* on inbound
@@ -769,7 +774,7 @@ class Mutation:
         from core.tenancy import get_current_tenant
 
         user = info.context.user
-        _require_staff(user)
+        _require_platform_operator(user)
 
         workflow = WorkflowDefinition.objects.filter(slug=workflow_slug, deleted_at__isnull=True).first()
         if not workflow:

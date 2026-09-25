@@ -9,8 +9,8 @@ Four concerns, kept separate:
 * The fleet sweep fans out over the managed apps (excluding unmanaged /
   unstamped ones), tallies counts by resulting state, and one app's fetch error
   doesn't fail the whole sweep.
-* The ``resyncAllAstroliftCiWorkflows`` mutation is platform-admin gated
-  (``admin.elevate``) — a non-admin is denied before the sweep runs.
+* The ``resyncAllAstroliftCiWorkflows`` mutation is the platform operator's
+  alone (#1978): anyone else is denied before the sweep runs.
 
 Plus a guard that ``ScheduleKind.CI_WORKFLOW_RESYNC`` ships HELD (present in the
 catalog + enum, but absent from ``PHASE_3A_ACTIVE_KINDS``).
@@ -25,6 +25,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp
@@ -41,6 +42,8 @@ from astrolift_scm.services.workflow_sync import render_astrolift_bitbucket_pipe
 from core.permissions import Permission
 
 pytestmark = pytest.mark.django_db
+
+User = get_user_model()
 
 
 @pytest.fixture
@@ -276,12 +279,12 @@ def test_sweep_limit_bounds_fan_out(monkeypatch, org):
 
 
 # ---------------------------------------------------------------------------
-# Mutation: platform-admin gated (admin.elevate), fleet-wide
+# Mutation: platform operator only, fleet-wide
 # ---------------------------------------------------------------------------
 
 
-def _info():
-    return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
+def _info(user=None):
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=None))
 
 
 def test_resync_all_mutation_denied_for_non_admin(monkeypatch):
@@ -307,8 +310,10 @@ def test_resync_all_mutation_admin_runs_the_sweep(monkeypatch, org, permission_r
     _seed(app, version=TEMPLATE_VERSION - 1, synced_hash=content_hash(body))
     monkeypatch.setattr(drift, "fetch_repo_ci_workflow", lambda a, **kw: body)
     pushed = _spy_push(monkeypatch)
+    # The fleet-wide sweep is the platform operator's alone (#1978).
+    operator = User.objects.create(username="resync-operator", is_superuser=True, is_active=True)
 
-    result = ScmMutation().resync_all_astrolift_ci_workflows(_info())
+    result = ScmMutation().resync_all_astrolift_ci_workflows(_info(operator))
 
     assert result.ok, result.errors
     assert result.data.scanned == 1
