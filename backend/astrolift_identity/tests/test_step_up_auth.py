@@ -52,6 +52,7 @@ from core.mutations import (
     AuditEntry,
     ErrorCode,
     MutationResult,
+    mutation_audit,
     register_audit_writer,
 )
 from core.permissions import Permission
@@ -453,6 +454,107 @@ def test_decorator_marks_resolver_with_introspection_attribute():
 
     assert getattr(_resolver, "__astrolift_step_up_required__", False) is True
     assert getattr(_resolver, "__astrolift_step_up_label__", None) == "test.thing"
+
+
+# ---- decorator: requires_elevation must not re-run on error (#1963) ---
+
+
+class _StepUpRegressionError(RuntimeError):
+    """The resolver's own failure -- must never be confused with the
+    decorator's STEP_UP_REQUIRED deny."""
+
+
+class _GatedCounter:
+    """A mutation-shaped resolver that counts its own invocations and
+    always raises. Composed exactly like a real mutation
+    (``@mutation_audit`` outermost, ``@requires_elevation`` innermost)
+    so the regression exercises the full decorator stack, not a bare
+    call to ``requires_elevation`` alone."""
+
+    def __init__(self):
+        self.calls = 0
+
+    @mutation_audit(action="test.step_up_regression")
+    @requires_elevation(action_label="test.thing")
+    def run(self, info):
+        self.calls += 1
+        raise _StepUpRegressionError("boom")
+
+
+def test_raising_mutation_runs_once_on_direct_call_no_session(audit_capture):
+    """#1963: the direct-call path every existing resolver unit test
+    takes (no ``request.session``) must not run the resolver twice
+    when it raises. Before the fix, the swallowed first exception fell
+    through to this same bypass branch, which called it again."""
+    gated = _GatedCounter()
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=None), user=None))
+
+    result = gated.run(info)
+
+    assert gated.calls == 1
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.INTERNAL.value
+    assert result.errors[0].message == "boom"
+    assert len(audit_capture) == 1  # mutation_audit's own outer entry, exactly once
+
+
+def test_raising_mutation_runs_once_when_elevated(audit_capture):
+    """#1963: an elevated HTTP-shaped session hits the second bypass
+    branch (``status.elevated``). Before the fix, the swallowed first
+    call plus this one ran the resolver twice."""
+    gated = _GatedCounter()
+    admin = _admin_user(password="pw")
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    result = gated.run(_info(admin, session=session))
+
+    assert gated.calls == 1
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.INTERNAL.value
+    assert result.errors[0].message == "boom"
+    assert len(audit_capture) == 1  # mutation_audit's own outer entry, exactly once
+
+
+def test_raising_mutation_surfaces_real_error_when_not_elevated(audit_capture):
+    """#1963: an un-elevated HTTP-shaped session never reaches a second
+    ``fn`` call, but before the fix the first (swallowed) call's real
+    error was replaced by STEP_UP_REQUIRED -- the caller never learned
+    the mutation actually failed."""
+    gated = _GatedCounter()
+    admin = _admin_user(password="pw")
+    session = _FakeSession()  # not elevated
+
+    result = gated.run(_info(admin, session=session))
+
+    assert gated.calls == 1
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.INTERNAL.value
+    assert result.errors[0].message == "boom"
+    # Before the fix this scenario also emitted a second, spurious
+    # ``auth.step_up.denied`` row from the swallowed-then-denied first
+    # call, on top of mutation_audit's own entry for the real failure.
+    assert len(audit_capture) == 1
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_raising_mutation_runs_once_when_elevated_and_step_up_on(audit_capture):
+    """Sanity check: the fix must not change behavior when step-up is
+    on. This path was never actually buggy -- the swallowed ``try``
+    only ever ran ``fn`` when the flag read returned "off" -- so this
+    guards against a future regression rather than proving today's."""
+    gated = _GatedCounter()
+    admin = _admin_user(password="pw")
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    result = gated.run(_info(admin, session=session))
+
+    assert gated.calls == 1
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.INTERNAL.value
+    assert result.errors[0].message == "boom"
+    assert len(audit_capture) == 1
 
 
 # ---- bulk mutation path -----------------------------------------------

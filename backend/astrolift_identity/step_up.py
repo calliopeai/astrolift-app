@@ -84,16 +84,24 @@ def requires_elevation(
             # small / SSO-only / single-operator installs don't trip on
             # every sensitive mutation — they opt in when their
             # compliance posture demands it.
+            #
+            # The flag read is the only thing this ``try`` may guard.
+            # ``fn(...)`` must run outside it: #1963 -- an earlier
+            # version called ``fn`` from inside this ``try``, so an
+            # exception the resolver itself raised (while step-up was
+            # off, the default) was caught by this ``except`` and the
+            # resolver ran a second time via the gate below.
             try:
                 from constance import config as constance_config
 
-                if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
-                    return fn(self, info, *args, **kwargs)
+                step_up_on = bool(getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False))
             except Exception:
-                # Constance unavailable (early-boot test path) — fall
-                # through to the existing gate so prod behavior isn't
+                # Constance unavailable (early-boot test path) — fail
+                # closed to the existing gate so prod behavior isn't
                 # silently disabled by a config-load failure.
-                pass
+                step_up_on = True
+            if not step_up_on:
+                return fn(self, info, *args, **kwargs)
             # Direct-call path (pytest mutations bypassing HTTP).
             # A real HTTP request always carries a session attribute
             # because SessionMiddleware runs before the GraphQL view
