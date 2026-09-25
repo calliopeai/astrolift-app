@@ -147,7 +147,13 @@ def resolve_binding_secret_manifests(
     namespace: str,
     consumer_key: str,
 ) -> list[dict[str, Any]]:
-    """Resolve CSI credential references into consumer-scoped Secrets."""
+    """Resolve CSI credential references into consumer-scoped Secrets.
+
+    A credential ref copied out of the service config (FSx's
+    ``mount_username_secret_ref``) is refused unless it sits in the owning
+    org's secret namespace (#1921).
+    """
+    from astrolift_services.secret_ref_config import managed_binding_ref_reason
 
     resources: list[dict[str, Any]] = []
     for binding in bindings:
@@ -157,6 +163,12 @@ def resolve_binding_secret_manifests(
             continue
         volume_data: dict[str, str] = {str(key): str(value) for key, value in secret_literals.items()}
         for secret_key, backend_ref in sorted(secret_refs.items()):
+            unscoped = managed_binding_ref_reason(binding.managed_service, str(backend_ref))
+            if unscoped is not None:
+                raise FilesystemBindingError(
+                    f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
+                    f"{binding.name} {secret_key}: {unscoped}",
+                )
             try:
                 raw_value = resolve_secret_reference(
                     secrets_backend,

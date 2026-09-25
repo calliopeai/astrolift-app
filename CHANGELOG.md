@@ -2,6 +2,60 @@
 
 ## Unreleased
 
+- Confine agent and managed-service secret locations to the organization's own
+  secret namespace (#1921). Every driver files a relative ref under the
+  install-wide root that every org without its own cluster shares, so
+  `managed/<instance>/url` named another tenant's database secret.
+  - **Agent refs.** An env spec's `secretRefs`, `upsertAgentSecretRef`, a
+    manifest's `[secrets]` table, the direct-upload importer and the
+    `upsert_agent_environment_spec` command accept only a location under
+    `agents/<org guid>/`. `secret://` is allowed and stripped once before the
+    check and the store, so `secret://agents/<org guid>/x` is the secret at
+    `agents/<org guid>/x`. An ARN is refused; use the relative form. A bundle
+    location and a managed-service secret are refused: attach the bundle or
+    the service instead.
+  - **Bundles.** An agent bundle's `backendRef` must sit under
+    `agent-bundles/<org guid>/`, may not use `secret://`, and must not name a
+    location another live bundle of the org holds, in any spelling. Deleting
+    a bundle leaves a location another bundle still holds.
+  - **Managed services.** Every secret ref a managed-service config names
+    (`*_secret_ref`, `*_secret_arn`, the AWS-native `SecretArn` and
+    `DomainJoinServiceAccountSecret`, the existing-S3 `credential_bundle`)
+    must sit under `services/<org guid>/<owner guid>/`, where the owner is the
+    service's app, or its project for a project service, and may not use
+    `secret://`. Google Secret Manager references (Cloud Functions
+    `secret_environment` and `secret_volumes`, Managed Kafka Connect
+    `secret_paths`) must be in the install's project and carry the id the GCP
+    secrets driver gives that namespace. That applies at provision, update,
+    manifest persist and adopt, and again before a driver runs. A binding the
+    driver copied from the config is refused when it is synced, deployed,
+    mounted, granted to the app's role or injected into an agent. Refs the
+    driver mints itself keep resolving.
+  - **Cloud Functions identities.** A config's `service_account_email`,
+    `build_service_account` or `event_trigger.service_account_email` must be
+    listed in the new install policy `cloud_functions_allowed_service_accounts`.
+    Empty, the default, refuses every one; omitting the field still runs the
+    function as Google's default runtime account.
+  - **GCP raw fields.** Cloud Functions and Managed Kafka `raw_fields` (and the
+    build, service and event-trigger variants) and `clear_fields` must use the
+    API's lowerCamelCase JSON field names. Google also accepts a field's proto
+    name, which carried a service account or a Secret Manager project past the
+    checks above. A config may not spell one field two ways.
+  - **Value mutations.** `setAgentSecretValue`, `deleteAgentSecretValue` and
+    `revealAgentSecretValue` act only on refs typed on the spec. An env var
+    that comes from a managed-service binding is refused as managed by the
+    platform.
+  - **Stored locations fail closed.** A location stored before this change is
+    never read, written or deleted. Spawn, agent-box start, app deploy and
+    hourly rotation fail with a readable error, and so do the status probe,
+    value and bundle key operations, and bundle key refresh. Removing a binding,
+    deleting such a bundle (the stored value is left alone) and moving a bundle
+    into the namespace still work.
+  - **Migrate before upgrading.** Run the read-only
+    `manage.py audit_agent_secret_namespace` to list what stops resolving,
+    including the `agents/<org slug>/...` convention and bare names. Move each
+    value into the namespace and point the ref there before upgrading.
+
 - Cluster and deployment history no longer shows one org another org's rows.
   `astroliftClusterLifecycleAudit` returns only mutations run in the caller's
   org, and matches the cluster by whole value instead of by a substring of the

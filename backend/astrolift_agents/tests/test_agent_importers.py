@@ -4,9 +4,22 @@ import pytest
 
 from astrolift_agents.models import Brief
 from astrolift_agents.services.agent_importers import AgentImportError, import_agent_spec
-from astrolift_agents.services.imported_agent_registration import persist_imported_agent_package
+from astrolift_agents.services.imported_agent_registration import (
+    ImportedAgentRegistrationError,
+    persist_imported_agent_package,
+)
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
+
+
+def _native_package(*, secret_refs=None, image="example/agent:1"):
+    return {
+        "schema": "astrolift.agent.package/v1",
+        "agent": {"name": "importable"},
+        "source": {"root": ".", "manifest_path": "agent.json", "path_mode": "chroot"},
+        "runtime": {"image": image},
+        "environment": {"secret_refs": secret_refs or []},
+    }
 
 
 def _langflow():
@@ -153,3 +166,36 @@ def test_runnable_import_persists_and_reconciles_one_direct_upload_agent():
     assert updated.brief.pk != first_brief_id
     assert Brief.objects.filter(organization=org).count() == 2
     assert updated.workload.containers.get(is_primary=True).image_ref == "example/agent:sha-2"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("template", ["astrolift/agents/{other}/gh", "managed/rds-orders/url"])
+def test_persist_imported_agent_rejects_secret_ref_outside_org_namespace(template):
+    """A direct-upload package whose environment.secret_refs names a
+    location outside this org's own secret namespace is refused; nothing
+    persists (#1921)."""
+    org = Organization.objects.create(name="Import Org", slug="import-org-1921")
+    other_org = Organization.objects.create(name="Other Import Org", slug="other-import-org-1921")
+    team = Team.objects.create(organization=org, name="Team", slug="team-1921")
+    project = Project.objects.create(organization=org, team=team, name="Project", slug="project-1921")
+    package = _native_package(
+        secret_refs=[{"env_var": "GITHUB_TOKEN", "uri": template.format(other=other_org.guid)}]
+    )
+
+    with pytest.raises(ImportedAgentRegistrationError, match="secret namespace"):
+        persist_imported_agent_package(project=project, package=package, slug="importable")
+
+    assert not RegisteredApp.objects.filter(organization=org).exists()
+
+
+@pytest.mark.django_db
+def test_persist_imported_agent_accepts_secret_ref_inside_own_org_namespace():
+    org = Organization.objects.create(name="Import Org", slug="import-org-1921-ok")
+    team = Team.objects.create(organization=org, name="Team", slug="team-1921-ok")
+    project = Project.objects.create(organization=org, team=team, name="Project", slug="project-1921-ok")
+    uri = f"astrolift/agents/{org.guid}/gh"
+    package = _native_package(secret_refs=[{"env_var": "GITHUB_TOKEN", "uri": uri}])
+
+    registration = persist_imported_agent_package(project=project, package=package, slug="importable")
+
+    assert registration.environment_spec.secret_refs == [{"env_var": "GITHUB_TOKEN", "uri": uri}]
