@@ -66,6 +66,46 @@ def _unreachable_reason(endpoint: str) -> str:
     return "cluster_internal_endpoint" if is_cluster_internal_endpoint(endpoint) else "unreachable"
 
 
+def _operator(info: Info) -> bool:
+    """The platform operator, bearer admin scope included (#1949)."""
+    from core.permissions import require_platform_operator
+
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) or getattr(info.context, "user", None)
+    try:
+        require_platform_operator(user)
+    except Exception:  # noqa: BLE001 - Django PermissionDenied, or no user
+        return False
+    return True
+
+
+def _tenant_view_of_shared(info: Info, cluster) -> bool:
+    """A tenant (not the operator) looking at a shared, org-NULL cluster.
+
+    Such a cluster runs every org's workloads and sits in the platform's
+    cloud account, so a tenant's live reads are confined to its own app
+    namespaces and never list account-wide resources (#1967).
+    """
+    return cluster.organization_id is None and not _operator(info)
+
+
+def _org_app_namespaces(cluster, organization_id) -> list[str]:
+    """Namespaces of ``organization_id``'s apps bound to ``cluster``."""
+    from astrolift_lifecycle.models.app_environment import AppEnvironment
+    from core.cluster_observability import namespace_for_app
+
+    envs = (
+        AppEnvironment.objects.filter(
+            tenant_cluster=cluster,
+            registered_app__deleted_at__isnull=True,
+            registered_app__organization_id=organization_id,
+        )
+        .select_related("registered_app__organization")
+        .only("registered_app__slug", "registered_app__k8s_namespace", "registered_app__organization__slug")
+    )
+    return sorted({namespace_for_app(env.registered_app) for env in envs})
+
+
 def _primary_app_namespace(cluster) -> str:
     """Alphabetically-first app namespace bound to *cluster*, or
     ``astrolift-system`` when the cluster hosts no managed apps yet.
@@ -438,7 +478,9 @@ class ClustersQuery:
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
-        if cluster is None:
+        if cluster is None or _tenant_view_of_shared(info, cluster):
+            # A shared cluster's install and bootstrap workflows are the
+            # platform's, and name other orgs' activity (#1967).
             return []
         rows = list_workflows_for_cluster(str(cluster.guid), limit=limit)
         return [
@@ -634,6 +676,10 @@ class ClustersQuery:
         )
         if cluster is None:
             return []
+        if _tenant_view_of_shared(info, cluster):
+            # Account-wide cloud resources of the platform's account list
+            # every org's pools and certificate domains (#1967).
+            return []
         try:
             rows = cognito_user_pools_dispatch(cluster=cluster)
         except ClusterManagementError:
@@ -682,6 +728,10 @@ class ClustersQuery:
             .first()
         )
         if cluster is None:
+            return []
+        if _tenant_view_of_shared(info, cluster):
+            # Account-wide cloud resources of the platform's account list
+            # every org's pools and certificate domains (#1967).
             return []
         try:
             rows = cognito_user_pool_clients_dispatch(cluster=cluster, pool_id=pool_id)
@@ -1149,6 +1199,23 @@ class ClustersQuery:
             )
 
         namespace = (app_namespace or "").strip() or _primary_app_namespace(cluster)
+        if _tenant_view_of_shared(info, cluster):
+            # A tenant measures only its own app's ingress on a shared
+            # cluster: an explicit namespace must be one of its apps', and
+            # the default is its own first app, not the cluster's (#1967).
+            own = _org_app_namespaces(cluster, get_current_tenant().organization_id)
+            requested = (app_namespace or "").strip()
+            namespace = requested if requested in own else (own[0] if own and not requested else "")
+            if not namespace:
+                return ClusterSystemMetricsType(
+                    available=False,
+                    reason="namespace_not_found",
+                    source="",
+                    app_namespace="",
+                    range_seconds=range_seconds,
+                    step_seconds=step_seconds,
+                    series=[],
+                )
 
         # Clamp: range 5m–7d, step 60s–3600s. CloudWatch bills per datapoint
         # and rejects requests over its per-call datapoint ceiling.
@@ -1282,11 +1349,20 @@ class ClustersQuery:
             )
         )
         app_namespaces = list({namespace_for_app(ae.registered_app) for ae in app_envs})
+        if _tenant_view_of_shared(info, cluster):
+            # Only this org's own namespaces on a shared cluster, never the
+            # platform's or another org's; and never "all namespaces" (the
+            # driver's meaning of ``None``) for an org with no app there.
+            namespaces = _org_app_namespaces(cluster, tenant.organization_id)
+            if not namespaces:
+                return []
+        else:
+            namespaces = ["astrolift-system", *app_namespaces] if app_namespaces else None
 
         try:
             rows = cluster_workload_health_dispatch(
                 cluster=cluster,
-                namespaces=["astrolift-system", *app_namespaces] if app_namespaces else None,
+                namespaces=namespaces,
             )
         except ClusterManagementError:
             return []
@@ -1344,6 +1420,10 @@ class ClustersQuery:
             .first()
         )
         if cluster is None:
+            return ClusterCertificatesType(supported=False, certificates=[])
+        if _tenant_view_of_shared(info, cluster):
+            # Account-wide cloud resources of the platform's account list
+            # every org's pools and certificate domains (#1967).
             return ClusterCertificatesType(supported=False, certificates=[])
         try:
             payload = cluster_certificates_dispatch(cluster=cluster)
