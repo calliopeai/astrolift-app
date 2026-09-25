@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- One organization can no longer act on a person's account past its own
+  reach (#1979, #1977). Anonymizing someone else now needs them to be a
+  member of the active organization, not the platform operator, not an
+  active member of another organization, and holding nothing the caller
+  could not grant, and it asks for step-up. Revoking a role binding, and
+  renaming, trimming or deleting a custom role, are capped at what the
+  caller could grant. An organization keeps its last owner unless the
+  platform operator removes it. SCIM no longer attaches or switches off the
+  platform operator's account. It answers 403 to a PUT that would change
+  the email or name of an account another organization shares, and to
+  reactivating such an account while it is switched off. The legacy
+  `organizationMemberStatus` mutation switches off the whole account, so
+  only the platform operator may call it.
 - Workflow routes check their permission at the object's own scope (#1965).
   Cancelling, terminating or signalling a run needs `workflow.trigger` on the
   run's app, else on its definition's project, else on the organization.

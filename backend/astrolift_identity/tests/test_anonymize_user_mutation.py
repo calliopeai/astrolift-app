@@ -242,8 +242,10 @@ def test_unauthenticated_caller_denied(target, org):
 
 
 def test_unknown_user_returns_not_found(actor, org, permission_resolver):
-    """A user_gid that doesn't resolve to a row returns NOT_FOUND, not
-    INTERNAL, even when the operator has perms."""
+    """A user_gid that doesn't resolve to a row is refused as "user not
+    found", not INTERNAL, even when the caller has perms. It is the same
+    refusal a user outside the org gets (#1986 review: no pk oracle), and a
+    refusal so the audit records a DENY."""
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
     m = IdentityAnonymizeUserMutation()
@@ -255,12 +257,12 @@ def test_unknown_user_returns_not_found(actor, org, permission_resolver):
 
     assert result.ok is False
     [err] = result.errors
-    assert err.code == "NOT_FOUND"
-    assert err.field == "userGid"
+    assert err.code == "PERMISSION_DENIED"
+    assert err.message == "user not found"
 
 
 def test_malformed_user_gid_returns_not_found(actor, org, permission_resolver):
-    """Non-numeric user_gid is treated as NOT_FOUND, not as a 500."""
+    """Non-numeric user_gid is refused as "user not found", not a 500."""
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
     m = IdentityAnonymizeUserMutation()
@@ -271,7 +273,8 @@ def test_malformed_user_gid_returns_not_found(actor, org, permission_resolver):
         )
 
     assert result.ok is False
-    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert result.errors[0].message == "user not found"
 
 
 def test_already_anonymized_user_is_idempotent(actor, target, org, permission_resolver):

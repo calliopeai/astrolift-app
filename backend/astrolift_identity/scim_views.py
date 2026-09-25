@@ -258,6 +258,45 @@ def _name_parts(body: dict[str, Any], projected: ScimUser) -> tuple[str, str]:
 
 # ---- lifecycle ------------------------------------------------------
 
+SHARED_ACCOUNT_REFUSAL = "the account is shared beyond this organization, so this credential cannot change it"
+
+
+def _account_is_org_local(user, org_id: int) -> bool:
+    """Whether this org's credential may rewrite or revive the account (#1979).
+
+    The user row is install-wide while the token speaks for one org, and
+    POST attaches any existing account that matches by userName or email.
+    So the account itself is the org's to change only when nothing else
+    relies on it: it is not the platform operator's, and it has no
+    membership, active or not, in another org.
+    """
+
+    if user.is_superuser or user.is_staff:
+        return False
+    elsewhere = Member.all_objects.filter(user=user, scope_kind=Member.ScopeKind.ORG).exclude(scope_id=org_id)
+    if elsewhere.exists():
+        return False
+    # The account must be one this org's SCIM created, not a pre-existing
+    # account POST attached by userName or email (#1986 review): an attach
+    # followed by an email rewrite would let this IdP sign in as someone
+    # else, because login matches by email. SCIM creates the account with
+    # no usable password in the same step as the membership.
+    if user.has_usable_password():
+        return False
+    first = (
+        Member.all_objects.filter(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org_id)
+        .order_by("pk")
+        .first()
+    )
+    joined = getattr(user, "date_joined", None)
+    created = getattr(first, "created_at", None) if first is not None else None
+    return bool(joined and created and abs((created - joined).total_seconds()) < 60)
+
+
+def _email_taken(email: str, user) -> bool:
+    """Another account already uses ``email`` (case-insensitive)."""
+    return get_user_model().objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
+
 
 def _deprovision(member: Member, user) -> None:
     """Deactivate, never delete (spec 04 §11).
@@ -277,18 +316,23 @@ def _deprovision(member: Member, user) -> None:
     inactive and live sessions are cut — without that, a browser
     session opened before the IdP removed them would keep working
     until it expired. A person who is still active in another
-    organization keeps both their account and those sessions.
+    organization keeps both their account and those sessions, and so
+    does the platform operator: one org's IdP cannot lock out the
+    install (#1979).
     """
     member.is_active = False
     member.lifecycle = Member.Lifecycle.DEACTIVATED
     member.save(update_fields=["is_active", "lifecycle", "updated_at", "version"])
     _revoke_org_credentials(user, member.scope_id)
 
-    if Member.objects.filter(
-        user=user,
-        scope_kind=Member.ScopeKind.ORG,
-        is_active=True,
-    ).exists():
+    if (
+        user.is_superuser
+        or Member.objects.filter(
+            user=user,
+            scope_kind=Member.ScopeKind.ORG,
+            is_active=True,
+        ).exists()
+    ):
         return
 
     if user.is_active:
@@ -331,7 +375,14 @@ def _revoke_org_credentials(user, organization_id: int) -> None:
     )
 
 
-def _reactivate(member: Member, user) -> None:
+def _reactivate(member: Member, user) -> bool:
+    """Reactivate the membership, and the account if it is inactive.
+
+    Returns False, changing nothing, when the account is inactive and not
+    this org's to revive: another org or the operator switched it off.
+    """
+    if not user.is_active and not _account_is_org_local(user, member.scope_id):
+        return False
     member.is_active = True
     member.lifecycle = Member.Lifecycle.ACTIVE
     if member.joined_at is None:
@@ -340,6 +391,7 @@ def _reactivate(member: Member, user) -> None:
     if not user.is_active:
         user.is_active = True
         user.save(update_fields=["is_active"])
+    return True
 
 
 def _reactivation_requested(body: dict[str, Any]) -> bool:
@@ -453,6 +505,15 @@ def _provision_user(request: HttpRequest, org: Organization) -> HttpResponse:
             status=409,
             scim_type="uniqueness",
         )
+    if member is None and user is not None and (user.is_superuser or user.is_staff):
+        # Attaching would hand a platform account to this org's IdP
+        # (#1979). Same message as any other taken identity, so the
+        # response doesn't say which accounts are platform accounts.
+        return _error(
+            "userName or email is already in use",
+            status=409,
+            scim_type="uniqueness",
+        )
 
     given, family = _name_parts(body, incoming)
     with transaction.atomic():
@@ -482,7 +543,8 @@ def _provision_user(request: HttpRequest, org: Organization) -> HttpResponse:
             # POSTs rather than PATCHing an id it has forgotten, so
             # reuse the membership row — a second one would collide
             # with ``member_unique_active`` anyway.
-            _reactivate(member, user)
+            if not _reactivate(member, user):
+                return _error(SHARED_ACCOUNT_REFUSAL, status=403)
 
     return _ok(_resource(member, user), status=201)
 
@@ -541,15 +603,25 @@ def scim_user_detail(request: HttpRequest, member_guid: str) -> HttpResponse:
         # identity every session and audit row already references, so a
         # rename arrives as a no-op on that field rather than stranding
         # them.
-        user.email = incoming.email
-        user.first_name, user.last_name = _name_parts(body, incoming)
-        user.save(update_fields=["email", "first_name", "last_name"])
+        given, family = _name_parts(body, incoming)
+        rewrite = (incoming.email, given, family) != (user.email, user.first_name, user.last_name)
+        revive = not member.is_active and not user.is_active
+        # Refused before anything is written, so a refusal changes nothing.
+        if (rewrite or revive) and not _account_is_org_local(user, org.pk):
+            return _error(SHARED_ACCOUNT_REFUSAL, status=403)
+        if incoming.email != user.email and _email_taken(incoming.email, user):
+            return _error("email is already in use", status=409, scim_type="uniqueness")
+        if rewrite:
+            user.email = incoming.email
+            user.first_name, user.last_name = given, family
+            user.save(update_fields=["email", "first_name", "last_name"])
         if not member.is_active:
             _reactivate(member, user)
         return _ok(_resource(member, user))
 
     if _reactivation_requested(body):
-        _reactivate(member, user)
+        if not _reactivate(member, user):
+            return _error(SHARED_ACCOUNT_REFUSAL, status=403)
         return _ok(_resource(member, user))
 
     return _error(

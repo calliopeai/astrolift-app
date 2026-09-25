@@ -5,6 +5,10 @@ them looked at *what* was handed out, so a custom role carrying that one
 permission could grant ``org_owner``. Everything here runs through the real
 resolver and real bindings, so the gate and the ceiling both read RoleBinding
 rows; no permission stub is installed.
+
+Taking access away is capped the same way (#1977): revoking a binding, or
+renaming, trimming or deleting a role, needs the role's permissions within
+the caller's reach, and an org keeps its last owner.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from astrolift_graphql import GUID
-from astrolift_identity.grants import grant_ceiling
+from astrolift_identity.grants import REFUSAL, grant_ceiling
 from astrolift_identity.models import (
     Invitation,
     Member,
@@ -35,13 +39,17 @@ from astrolift_identity.permission_resolver import resolve
 from astrolift_identity.schema.mutations import (
     AddOrganizationAllowlistDomainInput,
     BulkAssignTeamMemberRolesInput,
+    BulkRevokeRoleBindingsInput,
     CreateInvitationInput,
     CreateRoleInput,
+    DeleteRoleInput,
     GrantRoleInput,
     IdentityMutation,
     ResendInvitationInput,
+    RevokeRoleBindingInput,
     UpdateRoleInput,
 )
+from astrolift_identity.schema.mutations.role_bindings import LAST_OWNER_REFUSAL
 from astrolift_identity.schema.queries import IdentityQuery
 from astrolift_identity.system_roles import SYSTEM_ROLES
 from core.mutations import AuditEntry, register_audit_writer
@@ -471,22 +479,189 @@ def test_editing_your_own_role_cannot_add_what_you_lack(world):
     )
 
 
-def test_editing_a_role_may_remove_rename_or_add_what_you_hold(world):
+def test_a_role_you_could_grant_may_be_renamed_trimmed_or_given_what_you_hold(world):
     actor = _member_manager(world, Permission.APP_READ)
-    other = _custom_role(world, Permission.ORG_MANAGE_MEMBERS, Permission.APP_DEPLOY)
+    within = _custom_role(world, Permission.ORG_MANAGE_MEMBERS)
 
     def update(**changes):
         with _as(world, actor):
             return IdentityMutation().update_role(
-                _info(actor), input=UpdateRoleInput(id=other.guid, **changes)
+                _info(actor), input=UpdateRoleInput(id=within.guid, **changes)
             )
 
     assert update(name="Renamed").ok
-    # Removing app.deploy, which the editor lacks, takes nothing it could not grant.
-    assert update(permissions=[Permission.ORG_MANAGE_MEMBERS.value]).ok
     assert update(permissions=[Permission.ORG_MANAGE_MEMBERS.value, Permission.APP_READ.value]).ok
-    other.refresh_from_db()
-    assert (other.name, other.permissions) == (
-        "Renamed",
-        [Permission.ORG_MANAGE_MEMBERS.value, Permission.APP_READ.value],
+    assert update(permissions=[Permission.APP_READ.value]).ok
+    within.refresh_from_db()
+    assert (within.name, within.permissions) == ("Renamed", [Permission.APP_READ.value])
+
+
+def test_a_role_carrying_what_you_lack_cannot_be_renamed_trimmed_or_deleted(world, stock):
+    """Renaming changes what later granters read and trimming takes access
+    from everyone bound, so each needs the whole role within reach, as a
+    delete does. #1975 capped only what an edit added."""
+    actor = _member_manager(world, Permission.APP_READ)
+    above = _custom_role(world, Permission.ORG_MANAGE_MEMBERS, Permission.APP_DEPLOY)
+    before = (above.name, list(above.permissions))
+
+    with _as(world, actor):
+        outcomes = [
+            IdentityMutation().update_role(
+                _info(actor), input=UpdateRoleInput(id=above.guid, name="Renamed")
+            ),
+            IdentityMutation().update_role(
+                _info(actor),
+                input=UpdateRoleInput(id=above.guid, permissions=[Permission.ORG_MANAGE_MEMBERS.value]),
+            ),
+            IdentityMutation().soft_delete_role(_info(actor), input=DeleteRoleInput(id=above.guid)),
+        ]
+
+    assert all(_denied(result) for result in outcomes), outcomes
+    above.refresh_from_db()
+    assert above.deleted_at is None
+    assert (above.name, above.permissions) == before
+
+    owner = _stock_holder(world, stock, "org_owner")
+    with _as(world, owner):
+        assert IdentityMutation().soft_delete_role(_info(owner), input=DeleteRoleInput(id=above.guid)).ok
+
+
+# ---------------------------------------------------------------------------
+# Revoking (#1977)
+# ---------------------------------------------------------------------------
+
+
+def _revoke(world: _World, actor: User, binding: RoleBinding, **selected):
+    with _as(world, actor, **selected):
+        return IdentityMutation().revoke_role_binding(
+            _info(actor), input=RevokeRoleBindingInput(id=GUID(str(binding.guid)))
+        )
+
+
+def _bulk_revoke(world: _World, actor: User, *bindings: RoleBinding):
+    with _as(world, actor):
+        return IdentityMutation().bulk_revoke_astrolift_role_bindings(
+            _info(actor),
+            input=BulkRevokeRoleBindingsInput(binding_ids=[GUID(str(b.guid)) for b in bindings]),
+        )
+
+
+def _live(binding: RoleBinding) -> bool:
+    return RoleBinding.objects.filter(pk=binding.pk).exists()
+
+
+def _owner_binding(stock, user: User) -> RoleBinding:
+    return RoleBinding.objects.get(user=user, role=stock["org_owner"])
+
+
+@pytest.mark.parametrize("slug", ["org_owner", "org_admin"])
+def test_manage_members_alone_cannot_revoke_an_owner_or_an_admin(world, stock, audit_capture, slug):
+    _stock_holder(world, stock, "org_owner")  # another owner, so the ceiling is the only reason
+    actor = _member_manager(world)
+    binding = _bind(_member(world, _user(slug)), stock[slug], "ORG", world.org.id)
+
+    single = _revoke(world, actor, binding)
+    bulk = _bulk_revoke(world, actor, binding)
+
+    assert _denied(single)
+    assert single.errors[0].message == REFUSAL
+    assert (bulk.ok, bulk.data.revoked_count, bulk.data.failed_count) == (True, 0, 1)
+    assert bulk.data.results[0].errors[0].code == "PERMISSION_DENIED"
+    assert _live(binding)
+    revokes = [e for e in audit_capture if e.action == "role_binding.revoke"]
+    assert [(e.decision, e.target_id) for e in revokes] == [("DENY", None), ("DENY", str(binding.guid))]
+
+
+def test_manage_members_revokes_what_it_could_grant(world):
+    actor = _member_manager(world, Permission.APP_READ)
+    within = _custom_role(world, Permission.APP_READ)
+    one, two = (_bind(_member(world, _user("t")), within, "ORG", world.org.id) for _ in range(2))
+
+    assert _revoke(world, actor, one).ok
+    assert _bulk_revoke(world, actor, two).data.revoked_count == 1
+    assert not _live(one) and not _live(two)
+
+
+def test_a_bulk_revoke_refuses_only_the_bindings_out_of_reach(world, stock):
+    actor = _member_manager(world, Permission.APP_READ)
+    above = _bind(_member(world, _user("admin")), stock["org_admin"], "ORG", world.org.id)
+    within = _bind(_member(world, _user("t")), _custom_role(world, Permission.APP_READ), "ORG", world.org.id)
+
+    result = _bulk_revoke(world, actor, above, within)
+
+    outcome = {str(r.id): r.ok for r in result.data.results}
+    assert outcome == {str(above.guid): False, str(within.guid): True}
+    assert _live(above) and not _live(within)
+
+
+def test_the_revoke_ceiling_is_where_the_binding_is(world):
+    """org.manage_members held on a team passes the gate while that team is
+    selected; it reaches that team's bindings, not the org's."""
+    actor = _member(world, _user("team-mm"))
+    _bind(
+        actor,
+        _custom_role(world, Permission.ORG_MANAGE_MEMBERS, Permission.APP_READ),
+        "TEAM",
+        world.team.id,
     )
+    within = _custom_role(world, Permission.APP_READ)
+    at_org = _bind(_member(world, _user("t")), within, "ORG", world.org.id)
+    at_team = _bind(_member(world, _user("t")), within, "TEAM", world.team.id)
+
+    assert _denied(_revoke(world, actor, at_org, team_id=world.team.id))
+    assert _revoke(world, actor, at_team, team_id=world.team.id).ok
+
+
+def test_a_binding_left_on_a_deleted_team_is_cleared_at_the_orgs_reach(world, stock):
+    """The deleted team has no ancestry to compute a ceiling on, so the
+    org's decides: its owner may clear the binding, a member manager may not."""
+    owner = _stock_holder(world, stock, "org_owner")
+    binding = _bind(_member(world, _user("t")), stock["team_admin"], "TEAM", world.team.id)
+    world.team.soft_delete()
+
+    assert _denied(_revoke(world, _member_manager(world), binding))
+    assert _revoke(world, owner, binding).ok
+
+
+def test_the_last_owner_stays(world, stock):
+    first, second = _stock_holder(world, stock, "org_owner"), _stock_holder(world, stock, "org_owner")
+
+    assert _revoke(world, first, _owner_binding(stock, second)).ok
+    refused = _revoke(world, first, _owner_binding(stock, first))
+
+    assert _denied(refused)
+    assert refused.errors[0].message == LAST_OWNER_REFUSAL
+    assert _live(_owner_binding(stock, first))
+
+
+def test_a_bulk_revoke_cannot_remove_every_owner_at_once(world, stock):
+    owners = [_stock_holder(world, stock, "org_owner") for _ in range(2)]
+
+    result = _bulk_revoke(world, owners[0], *(_owner_binding(stock, u) for u in owners))
+
+    assert (result.data.revoked_count, result.data.failed_count) == (1, 1)
+    assert RoleBinding.objects.filter(role=stock["org_owner"], scope_id=world.org.id).count() == 1
+
+
+def test_an_expired_or_deactivated_owner_is_no_owner(world, stock):
+    owner = _stock_holder(world, stock, "org_owner")
+    lapsed = _bind(
+        _member(world, _user("lapsed")),
+        stock["org_owner"],
+        "ORG",
+        world.org.id,
+        expires_at=timezone.now() - timedelta(minutes=1),
+    )
+    gone = _stock_holder(world, stock, "org_owner")
+    User.objects.filter(pk=gone.pk).update(is_active=False)
+
+    assert _denied(_revoke(world, owner, _owner_binding(stock, owner)))
+    # Neither is an owner to lose, so clearing them is not blocked.
+    assert _revoke(world, owner, lapsed).ok
+    assert _revoke(world, owner, _owner_binding(stock, gone)).ok
+
+
+def test_the_platform_operator_may_remove_the_last_owner(world, stock):
+    owner = _stock_holder(world, stock, "org_owner")
+
+    assert _revoke(world, _user("root", is_superuser=True), _owner_binding(stock, owner)).ok

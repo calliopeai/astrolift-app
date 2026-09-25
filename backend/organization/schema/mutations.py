@@ -162,12 +162,19 @@ class Mutation:
         self, info: Info, input: OrganizationMemberStatusInput
     ) -> MutationResult:
         """Activate or deactivate an organization member."""
+        from core.permissions import require_platform_operator
         from organization.models import OrganizationMember
         from organization.serializers.organization_member import OrganizationMemberSerializer
 
         user = info.context.user
         if not getattr(user, 'is_authenticated', False):
             raise GraphQLError('Authentication required')
+        # #1979: the serializer flips the global ``User.is_active``, which
+        # ends the person's access in every Astrolift org, and nothing but
+        # co-membership of this legacy org gated it. No org owns that
+        # switch, so only the platform operator throws it, as #1864 made
+        # ``profile``'s ``is_active`` path.
+        require_platform_operator(user)
 
         # Resolve user_id from global ID
         user_pk = GlobalIDUtils.get_pk_flexible(input.user_id)

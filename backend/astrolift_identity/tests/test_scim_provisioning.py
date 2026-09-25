@@ -19,6 +19,9 @@ Covers:
 * DELETE and ``active=false`` deactivate (never delete), cut live
   sessions when it was the person's last org, and leave a person who
   is still in another org alone.
+* The platform operator's account is never attached or switched off,
+  and an account another org shares is never rewritten or revived from
+  here (#1979).
 """
 
 from __future__ import annotations
@@ -502,3 +505,137 @@ def test_a_malformed_id_is_a_404_not_a_crash():
     resp = Client().get(f"{USERS_PATH}/not-a-uuid", **_auth(token))
 
     assert resp.status_code == 404
+
+
+# ---- accounts shared beyond the org (#1979) ----------------------------
+#
+# The user row is install-wide and POST attaches any account that matches
+# by userName or email, so the org check on /Users/<id> alone let one
+# org's IdP rewrite or switch off another org's person, or the operator.
+
+
+def _shared(acme: Organization, other: Organization, username: str, **user_kwargs) -> Member:
+    """A member of ``acme`` who is also a member of ``other``."""
+    member = _member(acme, username, **user_kwargs)
+    Member.objects.create(
+        user=member.user,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=other.id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+    )
+    return member
+
+
+def _put(client: Client, member: Member, token: str, *, email: str):
+    return client.put(
+        f"{USERS_PATH}/{member.guid}",
+        data=json.dumps(
+            _payload(
+                member.user.username,
+                emails=[{"value": email, "primary": True}],
+                name={"givenName": "Carol", "familyName": "Ng"},
+            )
+        ),
+        content_type="application/scim+json",
+        **_auth(token),
+    )
+
+
+def test_post_never_attaches_the_platform_operator():
+    acme = _org("acme")
+    root = User.objects.create_user(username="root@acme.test", email="root@acme.test", is_superuser=True)
+    token = _issue_token(acme)
+    client = Client()
+
+    by_username = _post(client, USERS_PATH, _payload("root@acme.test"), token)
+    by_email = _post(
+        client,
+        USERS_PATH,
+        _payload("someone-else", emails=[{"value": "ROOT@acme.test", "primary": True}]),
+        token,
+    )
+
+    assert [r.status_code for r in (by_username, by_email)] == [409, 409]
+    assert not Member.objects.filter(user=root).exists()
+
+
+def test_an_account_attached_from_another_org_cannot_be_rewritten():
+    """Attach another org's person by email, then PUT a new email."""
+    acme, other = _org("acme"), _org("globex")
+    theirs = _member(other, "carol", email="carol@globex.test", first_name="Carol", last_name="Ng")
+    token = _issue_token(acme)
+    client = Client()
+    attached = _post(
+        client,
+        USERS_PATH,
+        _payload(
+            "carol",
+            emails=[{"value": "carol@globex.test", "primary": True}],
+            name={"givenName": "Carol", "familyName": "Ng"},
+        ),
+        token,
+    )
+    # One person in two orgs is by design; the account stays theirs.
+    assert attached.status_code == 201
+    member = Member.objects.get(guid=attached.json()["id"])
+
+    rewrite = _put(client, member, token, email="attacker@evil.test")
+    unchanged = _put(client, member, token, email="carol@globex.test")
+
+    assert (rewrite.status_code, unchanged.status_code) == (403, 200)
+    theirs.user.refresh_from_db()
+    assert (theirs.user.email, theirs.user.first_name) == ("carol@globex.test", "Carol")
+
+
+def test_deprovisioning_never_switches_off_the_operators_account():
+    acme = _org("acme")
+    member = _member(acme, "root", is_superuser=True)
+    session = AstroliftSession.objects.create(user=member.user, session_key="sk-root")
+    token = _issue_token(acme)
+
+    resp = Client().delete(f"{USERS_PATH}/{member.guid}", **_auth(token))
+
+    assert resp.status_code == 204
+    member.refresh_from_db()
+    # The org's own membership still goes.
+    assert member.is_active is False
+    member.user.refresh_from_db()
+    assert member.user.is_active is True
+    session.refresh_from_db()
+    assert session.revoked_at is None
+
+
+def test_an_account_switched_off_elsewhere_is_not_revived_from_here():
+    acme, other = _org("acme"), _org("globex")
+    member = _shared(acme, other, "dana")
+    Member.objects.filter(user=member.user).update(is_active=False, lifecycle=Member.Lifecycle.DEACTIVATED)
+    User.objects.filter(pk=member.user.pk).update(is_active=False)
+    token = _issue_token(acme)
+    client = Client()
+
+    patch = _patch(client, f"{USERS_PATH}/{member.guid}", {"active": True}, token)
+    repost = _post(
+        client,
+        USERS_PATH,
+        _payload("dana", emails=[{"value": member.user.email, "primary": True}]),
+        token,
+    )
+
+    assert (patch.status_code, repost.status_code) == (403, 403)
+    member.refresh_from_db()
+    member.user.refresh_from_db()
+    assert (member.is_active, member.user.is_active) == (False, False)
+
+
+def test_a_shared_membership_still_comes_back_while_the_account_is_active():
+    acme, other = _org("acme"), _org("globex")
+    member = _shared(acme, other, "erin")
+    Member.objects.filter(pk=member.pk).update(is_active=False, lifecycle=Member.Lifecycle.DEACTIVATED)
+    token = _issue_token(acme)
+
+    resp = _patch(Client(), f"{USERS_PATH}/{member.guid}", {"active": True}, token)
+
+    assert resp.status_code == 200
+    member.refresh_from_db()
+    assert member.is_active is True
