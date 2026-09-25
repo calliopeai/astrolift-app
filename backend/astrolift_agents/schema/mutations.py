@@ -1320,6 +1320,11 @@ class AgentsMutation:
         normalized_slug = slugify(slug or name)[:200]
         if not name or not normalized_slug:
             return gql_failure(ErrorCode.VALIDATION.value, "name and slug are required")
+        from astrolift_services.models.secret_bundle import reserved_bundle_slug_error
+
+        reserved = reserved_bundle_slug_error(normalized_slug)
+        if reserved:
+            return gql_failure(ErrorCode.VALIDATION.value, reserved, field="slug")
         path = (backend_ref or "").strip() or (f"agent-bundles/{spec.organization.guid}/{normalized_slug}")
         if len(path) > 512:
             return gql_failure(

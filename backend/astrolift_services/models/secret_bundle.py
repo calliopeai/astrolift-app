@@ -14,6 +14,19 @@ from django.db import models
 
 from core.models.base import BaseCoreModel, NamedBaseCoreModel
 
+# A bundle materializes as a Kubernetes Secret named by its slug, in the same
+# namespace as the platform's own Secrets (``astrolift-app-env-<app>-<env>``,
+# ``astrolift-bindings-<app>``), so a bundle slugged like one of those would
+# overwrite it (#1923). The prefix is the platform's.
+RESERVED_BUNDLE_SLUG_PREFIX = "astrolift-"
+
+
+def reserved_bundle_slug_error(slug: str) -> str | None:
+    """Why ``slug`` may not name a bundle, or ``None``."""
+    if (slug or "").lower().startswith(RESERVED_BUNDLE_SLUG_PREFIX):
+        return f"bundle slugs may not start with {RESERVED_BUNDLE_SLUG_PREFIX!r}; that prefix names platform Secrets"
+    return None
+
 
 class SecretBundle(NamedBaseCoreModel):
     organization = models.ForeignKey(

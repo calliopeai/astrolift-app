@@ -1271,6 +1271,12 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
             unscoped = unscoped_bundle_reason(bundle, organization=d.registered_app.organization)
             if unscoped is not None:
                 raise AppDeployError(f"secret bundle {bundle.slug!r}: {unscoped}")
+            from astrolift_services.models.secret_bundle import reserved_bundle_slug_error
+
+            reserved = reserved_bundle_slug_error(bundle.slug)
+            if reserved:
+                # A row created before the create-time check (#1923).
+                raise AppDeployError(f"secret bundle {bundle.slug!r}: {reserved}")
             kvs = secrets_backend.get(bundle.backend_ref)
             if kvs is None:
                 raise AppDeployError(
