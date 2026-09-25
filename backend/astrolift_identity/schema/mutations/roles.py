@@ -14,6 +14,7 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
+from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import (
     Role,
 )
@@ -96,6 +97,15 @@ class RoleMutations:
                 "; ".join(f"{k}: {v[0]}" for k, v in exc.message_dict.items()),
                 field="permissions" if "permissions" in exc.message_dict else None,
             )
+        # Whoever grants this role later trusts the name and slug its author
+        # chose, so a role wider than its author would hand out, through that
+        # grant, permissions the author could never grant (#1964).
+        require_grantable(
+            role.permissions,
+            scope_kind="ORG",
+            scope_id=org_id,
+            gate=Permission.ORG_MANAGE_MEMBERS,
+        )
         role.save()
         return gql_success(role_to_type(role))
 
@@ -126,6 +136,7 @@ class RoleMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role not found")
 
         fields_to_update = ["updated_at", "version"]
+        added: set[str] = set()
         if input.name is not None:
             role.name = input.name.strip()
             fields_to_update.append("name")
@@ -133,6 +144,7 @@ class RoleMutations:
             role.description = input.description
             fields_to_update.append("description")
         if input.permissions is not None:
+            added = set(input.permissions) - set(role.permissions or ())
             role.permissions = list(input.permissions)
             fields_to_update.append("permissions")
 
@@ -144,6 +156,15 @@ class RoleMutations:
                 "; ".join(f"{k}: {v[0]}" for k, v in exc.message_dict.items()),
                 field="permissions" if "permissions" in exc.message_dict else None,
             )
+        # Everyone bound to the role gains what is added, the editor included
+        # when bound to it, so adding is granting org-wide (#1964). Removing
+        # is not.
+        require_grantable(
+            added,
+            scope_kind="ORG",
+            scope_id=org_id,
+            gate=Permission.ORG_MANAGE_MEMBERS,
+        )
         role.save(update_fields=fields_to_update)
         return gql_success(role_to_type(role))
 

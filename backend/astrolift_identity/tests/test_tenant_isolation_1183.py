@@ -248,6 +248,8 @@ def test_grant_role_same_org_succeeds(permission_resolver):
     target = _user()
     _org_member(org, target)
     role = _null_org_role("dev-1183-legit")
+    # #1964: the granter must hold the permissions of the role granted.
+    RoleBinding.objects.create(user=admin, role=role, scope_kind="ORG", scope_id=org.id)
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=admin.id)):
@@ -290,6 +292,8 @@ def test_grant_role_app_scope_succeeds_in_org(permission_resolver):
     _org_member(org, target)
     app = _app(org)
     role = _null_org_role("app-dev-1227")
+    # #1964: the granter must hold the permissions of the role granted.
+    RoleBinding.objects.create(user=admin, role=role, scope_kind="ORG", scope_id=org.id)
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=admin.id)):

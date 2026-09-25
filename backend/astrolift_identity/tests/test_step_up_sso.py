@@ -41,6 +41,7 @@ from astrolift_identity.models import (
     Member,
     Organization,
     Role,
+    RoleBinding,
 )
 from astrolift_identity.schema.mutations import (
     ElevateAdminSessionInput,
@@ -314,6 +315,8 @@ def test_sso_elevation_satisfies_step_up_gate(permission_resolver):
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    # #1964: the granter must hold the permissions of the role granted.
+    RoleBinding.objects.create(user=admin, role=role, scope_kind="ORG", scope_id=org.id)
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     session = _FakeSession()
     session[SESSION_LOGIN_METHOD_KEY] = "sso"

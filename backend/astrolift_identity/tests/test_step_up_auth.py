@@ -365,6 +365,8 @@ def test_sensitive_mutation_with_elevation_runs_resolver(permission_resolver):
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    # #1964: the granter must hold the permissions of the role granted.
+    RoleBinding.objects.create(user=admin, role=role, scope_kind="ORG", scope_id=org.id)
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     session = _FakeSession()
     elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
