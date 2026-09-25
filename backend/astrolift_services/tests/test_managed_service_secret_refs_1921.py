@@ -206,6 +206,26 @@ def test_gcp_walker_finds_every_google_secret_manager_reference():
     assert config_secret_refs(config) == []
 
 
+def test_gcp_walker_reads_every_spelling_google_accepts():
+    """Google's JSON parser takes a field's proto name as well as its JSON
+    name, and a raw-field passthrough can carry either (#1921)."""
+    config = {
+        "service_raw_fields": {
+            "secret_environment_variables": [{"key": "A", "secret": "a", "version": "1", "project_id": "p"}],
+            "SecretVolumes": [{"mountPath": "/s", "Secret": "b", "projectId": "q", "versions": []}],
+        },
+        "connect_clusters": [
+            {"id": "c", "raw_fields": {"gcpConfig": {"secret_paths": ["projects/p/secrets/c/versions/1"]}}}
+        ],
+    }
+
+    assert [(ref.path, ref.secret_id, ref.project) for ref in gcp_secret_refs(config)] == [
+        ("service_raw_fields.secret_environment_variables[0].secret", "a", "p"),
+        ("service_raw_fields.SecretVolumes[0].secret", "b", "q"),
+        ("connect_clusters[0].raw_fields.gcpConfig.secret_paths[0]", "c", "p"),
+    ]
+
+
 def _function_secret(secret, **extra):
     return {"secret_environment": [{"key": "API_TOKEN", "secret": secret, "version": "1", **extra}]}
 
@@ -246,6 +266,29 @@ def test_accepts_a_google_secret_in_the_owners_namespace(config):
             _function_secret(_OWN_GCP_ID, project_id="victim-project"),
             "install project",
             id="another-project",
+        ),
+        pytest.param(
+            _function_secret(_OWN_GCP_ID, projectId="victim-project"),
+            "install project",
+            id="another-project-json-name",
+        ),
+        # A driver sends the entry in its JSON spelling, where one spelling
+        # would win while the other was checked.
+        pytest.param(
+            _function_secret(_OWN_GCP_ID, project_id=None, projectId="victim-project"),
+            "as one field",
+            id="project-spelled-twice",
+        ),
+        pytest.param(
+            {
+                "service_raw_fields": {
+                    "secret_environment_variables": [
+                        {"key": "T", "secret": _OWN_GCP_ID, "version": "1", "project_id": "victim-project"}
+                    ]
+                }
+            },
+            "install project",
+            id="proto-named-raw-field",
         ),
         pytest.param(
             _function_secret(_OWN_GCP_ID, project_id="123456789012"), "install project", id="project-number"

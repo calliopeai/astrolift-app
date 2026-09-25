@@ -70,12 +70,12 @@ _SECRET_REFERENCE_SCHEME = "secret://"
 # secrets driver: a Cloud Functions ``secret_environment[]`` or
 # ``secret_volumes[]`` entry names a secret id (and optionally the project
 # holding it), and a Managed Kafka Connect cluster's ``secret_paths[]`` names
-# ``projects/<p>/secrets/<id>/versions/<n>``. The camelCase API spellings are
-# matched too, so a raw-field passthrough cannot carry one past the walker.
-_GCP_SECRET_ENTRY_KEYS = frozenset(
-    {"secret_environment", "secret_volumes", "secretEnvironmentVariables", "secretVolumes"}
-)
-_GCP_SECRET_VERSION_KEYS = frozenset({"secret_paths", "secretPaths"})
+# ``projects/<p>/secrets/<id>/versions/<n>``. Keys are matched in their JSON
+# (lowerCamelCase) spelling, case-blind: Google's parser takes a field's proto
+# name (``secret_environment_variables``) as well as its JSON name, so a walker
+# that knew one spelling would miss the other in a raw-field passthrough.
+_GCP_SECRET_ENTRY_KEYS = frozenset({"secretenvironment", "secretenvironmentvariables", "secretvolumes"})
+_GCP_SECRET_VERSION_KEYS = frozenset({"secretpaths"})
 _GCP_SECRET_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,255}")
 _GCP_SECRET_VERSION_RE = re.compile(r"projects/(?P<project>[^/]+)/secrets/(?P<secret>[^/]+)/versions/[0-9]+")
 
@@ -129,6 +129,17 @@ class GcpSecretRef:
     project: str
     """The project the entry names, or empty when it names none: then Google
     reads the secret from the consuming resource's own project."""
+    problem: str = ""
+    """Why the entry cannot be judged as written, such as a field spelled two
+    ways; such a reference is refused."""
+
+
+def _json_name(key: Any) -> str:
+    """``key`` in its JSON (lowerCamelCase) spelling, case-blind:
+    ``secret_environment_variables`` and ``secretEnvironmentVariables`` are one
+    name to Google's parser, so they are one name here."""
+    parts = str(key).split("_")
+    return (parts[0] + "".join(part[:1].upper() + part[1:] for part in parts[1:])).casefold()
 
 
 def gcp_secret_refs(config: Any) -> list[GcpSecretRef]:
@@ -140,10 +151,28 @@ def gcp_secret_refs(config: Any) -> list[GcpSecretRef]:
         if not isinstance(value, dict):
             found.append(GcpSecretRef(path=path, ref=str(value), secret_id="", project=""))
             return
-        secret = value.get("secret")
+        # A driver sends the entry in its JSON spelling, and one of two
+        # spellings of a field (project_id: null beside projectId) would win
+        # there while the other was checked here (#1921).
+        fields: dict[str, Any] = {}
+        for key, item in value.items():
+            name = _json_name(key)
+            if name in fields:
+                found.append(
+                    GcpSecretRef(
+                        path=path,
+                        ref=str(value),
+                        secret_id="",
+                        project="",
+                        problem=f"spells {key!r} and another key as one field",
+                    )
+                )
+                return
+            fields[name] = item
+        secret = fields.get("secret")
         if secret is None or (isinstance(secret, str) and not secret.strip()):
             return
-        project = value.get("project_id", value.get("projectId"))
+        project = fields.get("projectid")
         found.append(
             GcpSecretRef(
                 path=f"{path}.secret",
@@ -171,10 +200,10 @@ def gcp_secret_refs(config: Any) -> list[GcpSecretRef]:
         if isinstance(value, dict):
             for key, item in value.items():
                 child = f"{path}.{key}" if path else str(key)
-                if key in _GCP_SECRET_ENTRY_KEYS and isinstance(item, list):
+                if _json_name(key) in _GCP_SECRET_ENTRY_KEYS and isinstance(item, list):
                     for index, value_item in enumerate(item):
                         entry(value_item, f"{child}[{index}]")
-                elif key in _GCP_SECRET_VERSION_KEYS and isinstance(item, list):
+                elif _json_name(key) in _GCP_SECRET_VERSION_KEYS and isinstance(item, list):
                     for index, value_item in enumerate(item):
                         version(value_item, f"{child}[{index}]")
                 else:
@@ -277,6 +306,8 @@ def _gcp_ref_reason(item: GcpSecretRef, *, owner, store: GcpSecretStore | None) 
     guid>/<name>``, mapped by the driver's own ``secret_id_for``.
     """
     where = f"config.{item.path} {item.ref!r}"
+    if item.problem:
+        return f"{where} {item.problem}"
     if owner is None:
         return f"{where} is {_namespace_message(owner)}"
     if store is None:
