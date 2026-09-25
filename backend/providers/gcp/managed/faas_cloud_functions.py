@@ -30,6 +30,7 @@ from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 KIND = "faas"
 _API_ROOT = "https://cloudfunctions.googleapis.com/v2"
 _FUNCTION_ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,61}[a-z0-9]$")
+_SECRET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,255}$")
 _OUTPUT_ONLY = {
     "createTime",
     "name",
@@ -112,6 +113,13 @@ class CloudFunctionsConfig:
     deletion_protection_default: bool = True
     operation_timeout_seconds: float = 1800
     poll_interval_seconds: float = 5
+    allowed_service_accounts: tuple[str, ...] = ()
+    """Service account emails a config may run the function or its build as.
+
+    The function's code and its build steps come from the tenant and run as
+    that identity, so they can read whatever it can read, Secret Manager
+    included. Empty refuses every config-supplied account, which leaves
+    Google's default runtime service account, as when the field is omitted."""
 
 
 class CloudFunctionsRestClient:
@@ -623,23 +631,59 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         max_instances = int(cfg.get("max_instances") or 0)
         if max_instances and min_instances > max_instances:
             return "min_instances cannot exceed max_instances"
+        allowed_accounts = {account.strip().casefold() for account in self._config.allowed_service_accounts}
+        for field, value in (
+            ("service_account_email", cfg.get("service_account_email")),
+            ("build_service_account", cfg.get("build_service_account")),
+            ("event_trigger.service_account_email", (cfg.get("event_trigger") or {}).get("service_account_email")),
+        ):
+            account = str(value or "").strip()
+            # The build account is a resource name,
+            # projects/<project or ->/serviceAccounts/<email>; the email names it.
+            email = account.rsplit("/serviceAccounts/", 1)[-1]
+            if account and email.casefold() not in allowed_accounts:
+                return (
+                    f"{field} {email!r} is not allowed by the cluster install policy "
+                    "cloud_functions_allowed_service_accounts"
+                )
+        # _body sends these in the API's JSON spelling (_camelize). A dict that
+        # spells one field two ways (project_id and projectId) would reach
+        # Google as whichever came last, so it is refused, and the checks below
+        # read each entry in the spelling Google gets (#1921).
+        for field in ("storage_source", "repo_source", "secret_environment", "secret_volumes"):
+            twice = _spelled_twice(cfg.get(field))
+            if twice:
+                return f"{field} spells {twice} more than one way"
+        twice = _spelled_twice(cfg.get("direct_vpc_network_interface")) or _spelled_twice(
+            (cfg.get("event_trigger") or {}).get("event_filters")
+        )
+        if twice:
+            return f"a config field spells {twice} more than one way"
         environment = set((cfg.get("environment") or {}).keys())
         secret_keys: set[str] = set()
         allow_latest = bool(cfg.get("allow_latest_secret_versions"))
-        for item in cfg.get("secret_environment") or []:
+        for item in _camelize(cfg.get("secret_environment") or []):
+            if not isinstance(item, dict):
+                return "secret_environment entries must be objects"
             key = str(item.get("key") or "")
             if not key or key in secret_keys:
                 return "secret_environment keys must be non-empty and unique"
             if not str(item.get("secret") or "") or not str(item.get("version") or ""):
                 return "secret_environment entries require secret and version"
+            if not self._secret_in_function_project(item):
+                return (
+                    f"secret_environment secrets must be secret ids in the function project {self._config.project_id}"
+                )
             secret_keys.add(key)
             if str(item.get("version") or "") == "latest" and not allow_latest:
                 return "latest secret_environment versions require allow_latest_secret_versions=true"
         if environment & secret_keys:
             return "environment and secret_environment cannot declare the same key"
         volume_mounts: set[str] = set()
-        for volume in cfg.get("secret_volumes") or []:
-            mount_path = str(volume.get("mount_path") or "")
+        for volume in _camelize(cfg.get("secret_volumes") or []):
+            if not isinstance(volume, dict):
+                return "secret_volumes entries must be objects"
+            mount_path = str(volume.get("mountPath") or "")
             if not mount_path.startswith("/"):
                 return "secret volume mount_path must be absolute"
             if mount_path in volume_mounts:
@@ -647,6 +691,8 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             volume_mounts.add(mount_path)
             if not str(volume.get("secret") or "") or not list(volume.get("versions") or []):
                 return "secret volumes require secret and at least one version"
+            if not self._secret_in_function_project(volume):
+                return f"secret volume secrets must be secret ids in the function project {self._config.project_id}"
             for version in volume.get("versions") or []:
                 version_path = str(version.get("path") or "")
                 if not str(version.get("version") or "") or not version_path:
@@ -673,30 +719,50 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         )
         if reserved_labels:
             return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved_labels)}"
-        for values, protected, label in (
-            (cfg.get("raw_fields"), _OUTPUT_ONLY | _STRUCTURED_TOP_LEVEL, "raw_fields"),
-            (cfg.get("build_raw_fields"), _STRUCTURED_BUILD | {"build", "sourceProvenance"}, "build_raw_fields"),
+        for values, protected, label, verb in (
+            (cfg.get("raw_fields"), _OUTPUT_ONLY | _STRUCTURED_TOP_LEVEL, "raw_fields", "set"),
+            (
+                cfg.get("build_raw_fields"),
+                _STRUCTURED_BUILD | {"build", "sourceProvenance"},
+                "build_raw_fields",
+                "set",
+            ),
             (
                 cfg.get("service_raw_fields"),
                 _STRUCTURED_SERVICE | {"service", "uri", "revision", "securityLevel"},
                 "service_raw_fields",
+                "set",
             ),
             (
                 (cfg.get("event_trigger") or {}).get("raw_fields"),
                 _STRUCTURED_EVENT | {"trigger", "service"},
                 "event_trigger.raw_fields",
+                "set",
+            ),
+            (
+                cfg.get("clear_fields"),
+                _OUTPUT_ONLY | {"name", "labels", "environment", "buildConfig", "serviceConfig"},
+                "clear_fields",
+                "clear",
             ),
         ):
-            forbidden = sorted(set(values or {}) & protected)
-            if forbidden:
-                return f"{label} cannot set structured or output fields: {', '.join(forbidden)}"
-        forbidden_clear = sorted(
-            {str(item) for item in cfg.get("clear_fields") or []}
-            & (_OUTPUT_ONLY | {"name", "labels", "environment", "buildConfig", "serviceConfig"})
-        )
-        if forbidden_clear:
-            return f"clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
+            error = _raw_names_error(values, protected, label, verb=verb)
+            if error:
+                return error
         return ""
+
+    def _secret_in_function_project(self, entry: dict[str, Any]) -> bool:
+        """Whether a secret entry, in the JSON spelling ``_body`` sends, names a
+        secret id in the function's project.
+
+        Google reads the secret with the function's runtime identity, so a
+        ``project_id`` naming any other project, or a resource path in
+        ``secret``, points that read outside the install (#1921). A project
+        number cannot be matched against the configured id, so it is refused.
+        """
+        project = str(entry.get("projectId") or "").strip()
+        secret = str(entry.get("secret") or "")
+        return bool(_SECRET_ID_RE.fullmatch(secret)) and (not project or project == self._config.project_id)
 
     def _body(
         self,
@@ -951,8 +1017,53 @@ def _camelize(value: Any) -> Any:
     if isinstance(value, list):
         return [_camelize(item) for item in value]
     if isinstance(value, dict):
-        return {_camel_key(str(key)): _camelize(item) for key, item in value.items()}
+        out: dict[str, Any] = {}
+        for key, item in value.items():
+            name = _camel_key(str(key))
+            if name in out:
+                # Refused, not "last one wins": the checks and Google must see
+                # one value (#1921). _validate says so first.
+                raise CloudFunctionsError(f"{name} is spelled more than one way")
+            out[name] = _camelize(item)
+        return out
     return value
+
+
+def _spelled_twice(value: Any) -> str:
+    """The first field ``value`` spells two ways, such as ``project_id`` and
+    ``projectId``, in its JSON spelling, or ``""``."""
+    if isinstance(value, list):
+        return next((found for found in map(_spelled_twice, value) if found), "")
+    if isinstance(value, dict):
+        seen: set[str] = set()
+        for key, item in value.items():
+            name = _camel_key(str(key))
+            if name in seen:
+                return name
+            seen.add(name)
+            found = _spelled_twice(item)
+            if found:
+                return found
+    return ""
+
+
+def _raw_names_error(names: Any, protected: set[str], label: str, *, verb: str) -> str:
+    """Why the raw field names ``names`` may not reach the API, or ``""``.
+
+    Google's JSON parser takes a field's proto name (``service_account_email``)
+    as well as its JSON name (``serviceAccountEmail``), so a check that knows
+    only one spelling is bypassed by the other (#1921). A raw name must be the
+    API's lowerCamelCase JSON name, and it meets the protected set case-blind.
+    """
+    listed = [str(name) for name in names or ()]
+    proto_names = sorted(name for name in listed if "_" in name)
+    if proto_names:
+        return f"{label} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
+    guarded = {name.casefold() for name in protected}
+    forbidden = sorted(name for name in listed if name.casefold() in guarded)
+    if forbidden:
+        return f"{label} cannot {verb} structured or output fields: {', '.join(forbidden)}"
+    return ""
 
 
 def _camel_key(value: str) -> str:

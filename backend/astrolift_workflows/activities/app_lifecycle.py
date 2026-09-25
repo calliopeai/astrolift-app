@@ -1260,12 +1260,17 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
 
     # ---- operator-authored secret bundles --------------------------
     if refs:
+        from astrolift_dispatch.agent_secrets import unscoped_bundle_reason
+
         secrets_backend = driver_for_capability(
             d.app_environment.tenant_cluster,
             "secrets",
         )
         for ref in refs:
             bundle = ref.secret_bundle
+            unscoped = unscoped_bundle_reason(bundle, organization=d.registered_app.organization)
+            if unscoped is not None:
+                raise AppDeployError(f"secret bundle {bundle.slug!r}: {unscoped}")
             kvs = secrets_backend.get(bundle.backend_ref)
             if kvs is None:
                 raise AppDeployError(
@@ -1331,6 +1336,11 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
                     # or path); resolve via the cluster's secrets driver.
                     from _sdk.secrets import SecretReferenceError, resolve_secret_reference
 
+                    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+
+                    unscoped = managed_binding_ref_reason(svc, binding.env_value_ref)
+                    if unscoped is not None:
+                        raise AppDeployError(f"binding {svc.kind}/{svc.name}#{env_key}: {unscoped}")
                     try:
                         raw_value = resolve_secret_reference(
                             secrets_backend,

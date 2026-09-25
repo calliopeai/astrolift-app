@@ -127,6 +127,26 @@ def _permissions_for_binding(
     return permissions
 
 
+def _refuse_unscoped_secret_grants(services: list[Any], bindings: list[Any]) -> None:
+    """Refuse a Secrets Manager grant a driver built from a secret its
+    service's config names outside the owning org's namespace (#1921).
+
+    The grant would let the app's own role read that secret, so it is held to
+    the namespace the binding rows are.
+    """
+    from astrolift_services.secret_ref_config import managed_binding_ref_reason
+
+    for svc, binding in zip(services, bindings, strict=True):
+        for grant in getattr(binding, "iam_grants", None) or []:
+            if not any(str(action).startswith("secretsmanager:") for action in grant.actions or ()):
+                continue
+            reason = managed_binding_ref_reason(svc, str(grant.resource or ""))
+            if reason is not None:
+                raise ValueError(
+                    f"managed service {svc.name or svc.kind!r} grant on {grant.resource!r}: {reason}"
+                )
+
+
 def _azure_role_assignments(
     *,
     actions: list[str],
@@ -250,6 +270,7 @@ def _ensure_workload_identity_sync(
 
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
     bindings = [_managed_binding_for(svc) for svc in services]
+    _refuse_unscoped_secret_grants(services, bindings)
     permissions = _permissions_from_bindings(bindings, plugin_slug=plugin_slug)
     # A service with no ``backend_ref`` has no binding, so it contributes no
     # grants -- and the role is then created authorised for nothing, which

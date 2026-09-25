@@ -37,10 +37,14 @@ def _binding(**overrides):
         "access_modes": ["ReadWriteMany"],
         "workload_names": [],
         "container_names": [],
+        # The credential resolver reads the service config to tell a ref the
+        # driver minted from one copied out of the config (#1921).
         "managed_service": SimpleNamespace(
             guid="019fffff-2222-7222-8222-222222222222",
             kind="filesystem",
             name="shared",
+            config={},
+            applied_config=None,
         ),
     }
     values.update(overrides)

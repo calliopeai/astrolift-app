@@ -365,6 +365,40 @@ def test_active_project_service_bindings_feed_agent_without_overriding_manifest(
     assert database_host_entries == [{"name": "DATABASE_HOST", "value": "manifest.internal"}]
 
 
+def test_project_service_binding_resolves_for_an_agent_outside_its_typed_ref_namespace(monkeypatch):
+    """#1921 confines the refs an operator or a manifest types to the org's
+    agent namespace. A project managed-service binding is derived by the
+    platform under the service's own root, so it keeps resolving into the
+    agent's task Secret."""
+    import core.app_deploy as app_deploy
+    from astrolift_dispatch.agent_secrets import resolve_task_secret_manifest, unscoped_secret_refs
+
+    graph = _graph("binding-scope")
+    service = ManagedService.objects.create(
+        project=graph.project,
+        tenant_cluster=graph.cluster,
+        kind=ManagedService.Kind.POSTGRES,
+        name="shared-db",
+        status=ManagedService.Status.ACTIVE,
+    )
+    ManagedServiceAttachment.objects.create(managed_service=service, agent_environment_spec=graph.spec)
+    ManagedServiceBinding.objects.create(
+        managed_service=service,
+        env_key="DATABASE_URL",
+        env_value_ref="astrolift/managed/shared-db/url",
+        is_secret=True,
+    )
+    store = {"astrolift/managed/shared-db/url": {"value": "postgres://shared"}}
+    monkeypatch.setattr(app_deploy, "driver_for_capability", lambda _c, _cap: SimpleNamespace(get=store.get))
+
+    manifest = resolve_task_secret_manifest(
+        cluster=object(), spec=graph.spec, secret_name="task-secrets", namespace="ns", task_guid="t"
+    )
+
+    assert manifest["stringData"] == {"DATABASE_URL": "postgres://shared"}
+    assert unscoped_secret_refs(graph.spec) == {}
+
+
 def test_project_service_attachment_feeds_app_lifecycle_selection():
     graph = _graph("app-binding")
     project_service = ManagedService.objects.create(
