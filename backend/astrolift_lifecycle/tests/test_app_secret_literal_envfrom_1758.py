@@ -849,7 +849,16 @@ def test_under_approval_discarding_an_approved_delete_keeps_the_key_scoped(
         ),
     )
 
-    _stage_via_update_manifest(app, app.manifest_raw)
+    # Discard, the way a real client does it: an empty rawManifest always
+    # clears the staging buffer (updateManifest's documented behaviour),
+    # regardless of the caller's ability to reveal secrets. Resubmitting
+    # manifest_raw itself would either require the caller to reveal
+    # secrets (to compare it literal-for-literal) or, resubmitted masked,
+    # would be refused: the approved delete already staged a draft
+    # without PROD_ONLY, so a masked PROD_ONLY placeholder in this
+    # resubmission would have no staged value left to restore it from
+    # (#1944).
+    _stage_via_update_manifest(app, "")
 
     assert app.manifest_raw_staged == ""
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
