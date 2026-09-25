@@ -78,7 +78,7 @@ def test_app_type_exposes_ecr_repo_uri_and_push_role_arn():
     secrets without a second query."""
 
     app = _scaffold_app()
-    t = app_to_type(app)
+    t = app_to_type(app, info=None)
     assert t.ecr_repo_uri == "123456789012.dkr.ecr.us-west-2.amazonaws.com/acme/web"
     assert t.ecr_push_role_arn == "arn:aws:iam::123456789012:role/astrolift-acme-web-push"
     # Compatibility: the legacy ``registry_repo_uri`` field stays
@@ -105,7 +105,7 @@ def test_app_type_blank_push_role_when_not_yet_bootstrapped():
         registry_repo_uri="",
         push_role_ref="",
     )
-    t = app_to_type(app)
+    t = app_to_type(app, info=None)
     assert t.ecr_repo_uri == ""
     assert t.ecr_push_role_arn == ""
 
@@ -145,7 +145,7 @@ def test_app_type_exposes_provider_plugin_slug_from_default_cluster():
 
     app = _scaffold_app()
     _bind_cluster(app, provider_slug="gcp")
-    t = app_to_type(app)
+    t = app_to_type(app, info=None)
     assert t.provider_plugin_slug == "gcp"
 
 
@@ -156,7 +156,7 @@ def test_app_type_provider_plugin_slug_blank_without_default_cluster():
 
     app = _scaffold_app()
     assert app.default_tenant_cluster_id is None
-    t = app_to_type(app)
+    t = app_to_type(app, info=None)
     assert t.provider_plugin_slug == ""
 
 
