@@ -1133,6 +1133,7 @@ def _upsert_agent_environment_spec(
     """
     from astrolift_agents.models import AgentEnvironmentSpec
     from astrolift_agents.services.agent_package import project_manifest_environment
+    from astrolift_dispatch.agent_secrets import assert_org_scoped_secret_ref
 
     workload = app.workloads.filter(
         slug=workload_slug,
@@ -1154,6 +1155,11 @@ def _upsert_agent_environment_spec(
         env_section,
         raw_manifest.raw.get("secrets"),
     )
+    # A ref outside the org's secret namespace (#1921) is a source error like
+    # any other malformed [secrets] entry: raise, so the registration
+    # transaction rolls back instead of persisting a spec that cannot spawn.
+    for ref in secret_refs:
+        assert_org_scoped_secret_ref(ref["uri"], organization=app.organization)
 
     spec = AgentEnvironmentSpec.objects.filter(
         organization=app.organization,

@@ -287,6 +287,8 @@ def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(db, m
             guid="019fffff-2222-7222-8222-222222222222",
             kind="filesystem",
             name="shared",
+            config={},
+            applied_config=None,
         ),
     )
     monkeypatch.setattr(filesystem_bindings, "agent_volume_bindings", lambda _spec: [binding])
@@ -365,6 +367,8 @@ def test_agent_existing_claim_is_referenced_but_never_deleted(db, monkeypatch):
             guid="019fffff-2222-7222-8222-222222222222",
             kind="filesystem",
             name="existing",
+            config={},
+            applied_config=None,
         ),
     )
     monkeypatch.setattr(filesystem_bindings, "agent_volume_bindings", lambda _spec: [binding])
