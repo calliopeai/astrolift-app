@@ -248,6 +248,15 @@ class TemporalWorkflowsMutation:
                     "or guid from workflowStageExecutions",
                 )
             payload = {**payload, "execution_id": resolved}
+            if signal_name == "human_gate_decision":
+                # The approver is who is calling, never a user id the caller
+                # supplies; and a gate that names its approvers by address is
+                # decided only by one of them (or the platform operator)
+                # (#1982).
+                refusal = _gate_approver_refusal(info.context.user, resolved)
+                if refusal is not None:
+                    return _failure("payload", refusal)
+                payload = {**payload, "decided_by_user_id": getattr(info.context.user, "pk", None)}
         args: list = [payload] if payload is not None else []
         delivered = signal_workflow(workflow_id, signal_name, *args)
         if not delivered:
@@ -260,6 +269,31 @@ class TemporalWorkflowsMutation:
 # signal carrying the execution's ``guid`` was accepted by Temporal and then
 # ignored forever (#1786). Resolve either spelling here and refuse the rest.
 _EXECUTION_SIGNALS = frozenset({"human_gate_decision", "escalation_cleared"})
+
+
+def _gate_approver_refusal(user, execution_id: str) -> str | None:
+    """Why ``user`` may not decide the human gate ``execution_id``, or ``None``.
+
+    ``WorkflowStage.approvers`` holds approver references: addresses, or team
+    / role slugs the notification service resolves. When the stage names
+    addresses, only a caller whose email is one of them may decide; slug
+    references are not resolved here (anyone with ``workflow.trigger`` at the
+    run's scope, as before). The platform operator may always decide.
+    """
+    from core.permissions import is_platform_operator
+    from workflows.models import WorkflowStageExecution
+
+    if is_platform_operator(user):
+        return None
+    row = WorkflowStageExecution.objects.select_related("stage").filter(pk=int(execution_id)).first()
+    approvers = list(getattr(getattr(row, "stage", None), "approvers", None) or [])
+    addresses = {a.strip().casefold() for a in approvers if isinstance(a, str) and "@" in a}
+    if not addresses:
+        return None
+    email = (getattr(user, "email", "") or "").strip().casefold()
+    if email and email in addresses:
+        return None
+    return "only one of this gate's named approvers may decide it"
 
 
 def _resolve_execution_id(raw: object, workflow_id: str) -> str | None:
