@@ -379,6 +379,109 @@ def _role_arn_reason(arn: str, owner) -> str | None:
     return None
 
 
+_KEY_VAULT_REFERENCE_RE = re.compile(r"@Microsoft\.KeyVault\((?P<body>[^)]*)\)", re.IGNORECASE)
+_KEY_VAULT_ID_KEYS = frozenset({"keyvaultsecretid", "keyvaultid", "secreturi"})
+
+
+@dataclass(frozen=True)
+class AzureKeyVaultRef:
+    """A Key Vault secret a config hands to an Azure service identity to read (#1958)."""
+
+    path: str
+    ref: str
+    vault_host: str
+    secret_name: str
+
+
+def _key_vault_uri_parts(uri: str) -> tuple[str, str]:
+    """``(vault host, secret name)`` of ``https://<vault>/secrets/<name>[/<version>]``, else empty strings."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(uri.strip())
+    parts = [part for part in parsed.path.split("/") if part]
+    if parsed.scheme != "https" or not parsed.hostname or len(parts) < 2 or parts[0].lower() != "secrets":
+        return "", ""
+    return parsed.hostname.lower(), parts[1]
+
+
+def azure_key_vault_refs(config: Any, path: str = "") -> list[AzureKeyVaultRef]:
+    """Every Key Vault secret ``config`` names: App Service / Functions
+    ``@Microsoft.KeyVault(...)`` settings and ``key_vault_secret_id``-style URIs."""
+    found: list[AzureKeyVaultRef] = []
+    if isinstance(config, dict):
+        for key, value in config.items():
+            child = f"{path}.{key}" if path else str(key)
+            if (
+                isinstance(value, str)
+                and _json_name(key).lower().replace("_", "") in _KEY_VAULT_ID_KEYS
+                and value
+            ):
+                host, name = _key_vault_uri_parts(value)
+                found.append(AzureKeyVaultRef(path=child, ref=value, vault_host=host, secret_name=name))
+            else:
+                found.extend(azure_key_vault_refs(value, child))
+    elif isinstance(config, list):
+        for index, value in enumerate(config):
+            found.extend(azure_key_vault_refs(value, f"{path}[{index}]"))
+    elif isinstance(config, str):
+        for match in _KEY_VAULT_REFERENCE_RE.finditer(config):
+            fields = {
+                part.split("=", 1)[0].strip().lower(): part.split("=", 1)[1].strip()
+                for part in match.group("body").split(";")
+                if "=" in part
+            }
+            if "secreturi" in fields:
+                host, name = _key_vault_uri_parts(fields["secreturi"])
+            else:
+                vault = fields.get("vaultname", "")
+                host = f"{vault.lower()}.vault.azure.net" if vault else ""
+                name = fields.get("secretname", "")
+            found.append(AzureKeyVaultRef(path=path, ref=match.group(0), vault_host=host, secret_name=name))
+    return found
+
+
+def azure_key_vault_store(cluster) -> tuple[str, str] | None:
+    """``(vault host, secret name prefix)`` of an Azure cluster's secrets
+    driver, or ``None``. Read from the driver's own config builder."""
+    if cluster is None or getattr(getattr(cluster, "provider_plugin", None), "slug", "") != "azure":
+        return None
+    from urllib.parse import urlparse
+
+    from core.app_deploy import AppDeployError, _config_for_capability_uncredentialed
+
+    try:
+        config = _config_for_capability_uncredentialed("azure", cluster, "secrets")
+    except AppDeployError:
+        return None
+    host = (urlparse(str(getattr(config, "vault_url", "") or "")).hostname or "").lower()
+    return (host, str(getattr(config, "secret_name_prefix", "astrolift"))) if host else None
+
+
+def _azure_ref_reason(item: AzureKeyVaultRef, *, owner, store: tuple[str, str] | None) -> str | None:
+    """Why a Key Vault reference must not be handed to Azure, or ``None``.
+
+    Azure resolves it with the platform's (shared) managed identity, so it
+    must name the install's vault and a secret the Key Vault driver files
+    under the owner's namespace: ``<prefix>-services--<org>--<owner>--...``.
+    """
+    where = f"config.{item.path} {item.ref!r}"
+    if not item.vault_host or not item.secret_name:
+        return f"{where} is not a Key Vault secret reference Astrolift can verify"
+    if owner is None:
+        return f"{where} is {_namespace_message(owner)}"
+    if store is None:
+        return (
+            f"{where} names an Azure Key Vault secret, but the service's cluster has no Key Vault to hold one"
+        )
+    vault_host, prefix = store
+    if item.vault_host != vault_host:
+        return f"{where} names vault {item.vault_host!r}; a managed service may only name the install vault {vault_host!r}"
+    root = f"{prefix}-{owner_secret_namespace(owner).rstrip('/').replace('/', '--')}--"
+    if item.secret_name.startswith(root) and item.secret_name != root:
+        return None
+    return f"{where} is {_namespace_message(owner)}; in Key Vault its name must start {root!r}"
+
+
 def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[str, str, str]]:
     """``(path, ref, reason)`` for each secret reference in ``config`` that
     sits outside the namespace of ``owner`` (the app or project owning the
@@ -400,6 +503,13 @@ def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[st
             reason = _gcp_ref_reason(item, owner=owner, store=store)
             if reason is not None:
                 found.append((item.path, item.ref, reason))
+    vault_refs = azure_key_vault_refs(config)
+    if vault_refs:
+        vault = azure_key_vault_store(cluster)
+        for vault_ref in vault_refs:
+            reason = _azure_ref_reason(vault_ref, owner=owner, store=vault)
+            if reason is not None:
+                found.append((vault_ref.path, vault_ref.ref, reason))
     return found
 
 
