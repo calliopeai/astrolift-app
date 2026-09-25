@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "stream"
@@ -93,7 +93,7 @@ class KinesisDriver(ManagedServiceDriver):
             self._await_active(name)
             summary = self._summary(arn)
             arn = str(summary.get("StreamARN") or arn)
-            if not created and not self._is_managed_resource(arn):
+            if not created and not self._is_own_stream(arn, spec):
                 raise ManagedServiceError(
                     f"stream {name} already exists outside this resource declaration",
                 )
@@ -606,6 +606,13 @@ class KinesisDriver(ManagedServiceDriver):
             return False
         tags = self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags") or []
         return any(tag.get("Key") == "astrolift.io/managed-by" and tag.get("Value") == "platform" for tag in tags)
+
+    def _is_own_stream(self, arn: str, spec: ProvisionSpec) -> bool:
+        """Platform-made is not enough to adopt: it must be this service's (#1961)."""
+        if not self._is_managed_resource(arn):
+            return False
+        tags = self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags") or []
+        return adoption_refusal(tags, spec, resource="Kinesis stream") is None
 
     def _summary(self, arn: str) -> dict[str, Any]:
         response = self._kinesis.describe_stream_summary(StreamARN=arn)

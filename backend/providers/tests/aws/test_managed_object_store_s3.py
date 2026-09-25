@@ -357,3 +357,12 @@ def test_binding_mount_prefix_scopes_the_mount(driver: S3Driver) -> None:
 
 def test_mount_keys_are_editable_without_reprovision(driver: S3Driver) -> None:
     assert set(driver.editable_fields()) == {"mount_path", "mount_prefix", "mount_read_only"}
+
+
+def test_provision_does_not_adopt_or_retag_another_services_resource(driver) -> None:
+    """The platform account "owns" every org's resources; only this service's is adopted (#1961)."""
+    first = driver.provision(_spec(managed_service_id="svc-a"))
+    second = driver.provision(_spec(managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message

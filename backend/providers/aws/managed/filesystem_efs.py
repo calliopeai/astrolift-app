@@ -34,7 +34,7 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "filesystem"
@@ -95,7 +95,9 @@ class EFSDriver(ManagedServiceDriver):
         try:
             if file_system_id:
                 file_system = self._await_file_system(file_system_id, {"available"})
-                if not self._is_managed(file_system):
+                if not self._is_managed(file_system) or adoption_refusal(
+                    file_system.get("Tags") or [], spec, resource="EFS filesystem"
+                ):  # platform-made is not enough: it must be this service's (#1961)
                     raise ManagedServiceError(
                         f"EFS creation token {token!r} belongs to a filesystem outside this declaration",
                     )

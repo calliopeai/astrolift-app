@@ -27,7 +27,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws._naming import iam_role_name
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "encryption_key"
@@ -469,6 +469,12 @@ class KMSDriver(ManagedServiceDriver):
             metadata = self._kms.describe_key(KeyId=str(alias["TargetKeyId"]))["KeyMetadata"]
             if not self._is_owned(self._kms, str(metadata["KeyId"])):
                 raise ManagedServiceError(f"alias {alias_name!r} points to a key not owned by Astrolift")
+            # Platform-made is not enough: it must be this service's (#1961).
+            refusal = adoption_refusal(
+                self._tags(self._kms, str(metadata["KeyId"])), spec, resource=f"alias {alias_name!r}"
+            )
+            if refusal is not None:
+                raise ManagedServiceError(refusal)
             return dict(metadata)
         marker = {
             "astrolift.io/managed-by": "platform",

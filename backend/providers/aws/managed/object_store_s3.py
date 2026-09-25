@@ -38,6 +38,7 @@ from _sdk.managed_service import (
 from aws._errors import map_client_error
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -89,6 +90,13 @@ class S3Driver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         bucket_name = self._bucket_name_for(spec=spec)
+        # The platform account "owns" every org's buckets, and create_bucket
+        # succeeds on an owned one (us-east-1), so the tagging below would take
+        # another service's bucket over. Only this service's is adopted (#1961).
+        if self._bucket_exists(bucket_name):
+            refusal = adoption_refusal(self._bucket_tags(bucket_name), spec, resource=f"bucket {bucket_name}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
         try:
             create_kwargs: dict[str, Any] = {"Bucket": bucket_name}
             if self._config.region != "us-east-1":
@@ -99,7 +107,7 @@ class S3Driver(ManagedServiceDriver):
                 }
             self._s3.create_bucket(**create_kwargs)
         except self._s3.exceptions.BucketAlreadyOwnedByYou:
-            # Idempotent — operator already has this bucket
+            # Idempotent — this service's bucket (checked above)
             pass
         except self._s3.exceptions.BucketAlreadyExists:
             return ProvisionResult(
@@ -510,6 +518,21 @@ class S3Driver(ManagedServiceDriver):
         ]
 
     # ---- internals ------------------------------------------------
+
+    def _bucket_exists(self, bucket_name: str) -> bool:
+        """This account holds ``bucket_name`` (another account's answers 403, handled by create)."""
+        try:
+            self._s3.head_bucket(Bucket=bucket_name)
+            return True
+        except Exception:  # 404, or 403 for another account's bucket
+            return False
+
+    def _bucket_tags(self, bucket_name: str) -> list[dict[str, str]]:
+        """An existing bucket's tags; none, or unreadable, counts as untagged (#1961)."""
+        try:
+            return list(self._s3.get_bucket_tagging(Bucket=bucket_name).get("TagSet") or [])
+        except Exception:  # NoSuchTagSet or unverifiable: not adopted
+            return []
 
     def _bucket_name_for(self, *, spec: ProvisionSpec) -> str:
         """S3 bucket names are GLOBAL across AWS — collisions on

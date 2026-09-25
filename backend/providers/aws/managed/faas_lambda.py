@@ -67,6 +67,7 @@ from aws._errors import map_client_error
 from aws._naming import iam_role_name
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -149,6 +150,13 @@ class LambdaDriver(ManagedServiceDriver):
 
         function_name = self._function_name(spec)
         role_name = self._role_name_for(function_name)
+
+        # Ownership before the exec role and code, both keyed by name (#1961).
+        existing_tags = self._function_tags(function_name)
+        if existing_tags is not None:
+            refusal = adoption_refusal(existing_tags, spec, resource=f"function {function_name}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
 
         try:
             role_arn = self._ensure_exec_role(
@@ -585,6 +593,13 @@ class LambdaDriver(ManagedServiceDriver):
             conf_args["Handler"] = str(cfg["handler"])
         self._lambda.update_function_configuration(**conf_args)
         self._wait_updated(function_name)
+
+    def _function_tags(self, function_name: str) -> dict[str, str] | None:
+        """An existing function's tags, or ``None`` when there is no function."""
+        try:
+            return dict(self._lambda.get_function(FunctionName=function_name).get("Tags") or {})
+        except self._lambda.exceptions.ResourceNotFoundException:
+            return None
 
     def _function_exists(self, function_name: str) -> bool:
         try:
