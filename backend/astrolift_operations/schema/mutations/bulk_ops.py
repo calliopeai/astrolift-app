@@ -5,6 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_operations.schema.mutations.helpers import (
     _BULK_APP_CAP,
 )
@@ -249,7 +250,8 @@ class BulkOpsMutations:
                 continue
 
             try:
-                result = resync_app_manifest_from_repo(app)
+                with allow_project_attach(actor_may_attach_project_services(app)):
+                    result = resync_app_manifest_from_repo(app)
             except Exception as exc:  # noqa: BLE001
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
                 continue

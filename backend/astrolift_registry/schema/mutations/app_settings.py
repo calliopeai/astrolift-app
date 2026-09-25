@@ -11,6 +11,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
 from astrolift_identity.step_up import requires_elevation
+from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_registry.models import RegisteredApp, RetentionPolicy
 from astrolift_registry.schema.mutations.helpers import (
     _actor,
@@ -125,7 +126,8 @@ class AppSettingMutations:
                 )
             )
 
-        result = resync_app_manifest_from_repo(app)
+        with allow_project_attach(actor_may_attach_project_services(app)):
+            result = resync_app_manifest_from_repo(app)
         # ``fetch_failed`` and ``diverged`` are envelope-level errors —
         # nothing was applied, the UI should surface the message in
         # an error toast.
@@ -153,7 +155,8 @@ class AppSettingMutations:
         # The function's own cluster guard and ``provisioning_pending`` flag
         # make it safe to call unconditionally on a successful sync.
         if result.status in ("applied", "in_sync"):
-            _bootstrap_app_environments(app, result.env_names)
+            with allow_project_attach(actor_may_attach_project_services(app)):
+                _bootstrap_app_environments(app, result.env_names)
 
         summary = "Already in sync." if result.status == "in_sync" else summarize_changes(result.changes)
         return gql_success(

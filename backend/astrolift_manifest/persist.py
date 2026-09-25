@@ -25,6 +25,8 @@ What this module does NOT do (deliberately):
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import dataclasses
 
 from astrolift_manifest.normalize import manifest_hash
@@ -38,6 +40,45 @@ from astrolift_manifest.types import (
 # Reconcile actions that only take a binding away: nothing new can read a
 # service's credentials through one (applyStagedManifest's approval rule).
 RELEASE_ACTIONS = frozenset({"remove", "detach"})
+
+
+# Who may create, attach or rebind a project managed service from an app
+# manifest (#1966). Attaching one puts a shared project service's credentials
+# in front of an app's workloads, which attachProjectManagedService gates on
+# project.update. Manifest text reaches the reconcile from many paths (repo
+# sync, webhooks, CI bootstrap, registration, staged apply), so the default is
+# to withhold those changes; a caller that has checked the actor opts in.
+_PROJECT_ATTACH_ALLOWED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "astrolift_project_attach_allowed", default=False
+)
+
+
+@contextlib.contextmanager
+def allow_project_attach(allowed: bool = True):
+    """Let reconciles inside this block create, attach and rebind project
+    managed services. Pass the result of an authorization check."""
+    token = _PROJECT_ATTACH_ALLOWED.set(bool(allowed))
+    try:
+        yield
+    finally:
+        _PROJECT_ATTACH_ALLOWED.reset(token)
+
+
+def actor_may_attach_project_services(app=None, *, project_id: int | None = None) -> bool:
+    """Does the current actor hold project.update on ``app``'s project (or
+    on ``project_id``)?"""
+    from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
+
+    project_id = project_id if project_id is not None else getattr(app, "project_id", None)
+    if project_id is None:
+        return False
+    try:
+        check_permission(
+            Permission.PROJECT_UPDATE, scope=PermissionScope(kind=ScopeKind.PROJECT, id=project_id)
+        )
+    except PermissionDenied:
+        return False
+    return True
 
 
 @dataclasses.dataclass(slots=True)
@@ -69,6 +110,9 @@ class PersistResult:
     # later with no caller to check, so a caller that gates bindings has to
     # gate these now (applyStagedManifest, #1759).
     managed_services_deferred: tuple[ManagedServiceManifest, ...] = ()
+    # Project-service creates, attachments and rebinds the reconcile held
+    # back because the caller may not make them (#1966).
+    project_changes_withheld: list[str] = dataclasses.field(default_factory=list)
     hash_changed: bool = False
 
     @property
@@ -191,6 +235,7 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
     result.managed_services_updated += managed.managed_services_updated
     result.managed_services_removed += managed.managed_services_removed
     result.managed_service_attachments_created += managed.managed_service_attachments_created
+    result.project_changes_withheld.extend(managed.project_changes_withheld)
     result.managed_service_attachments_updated += managed.managed_service_attachments_updated
     result.managed_service_attachments_removed += managed.managed_service_attachments_removed
     result.managed_service_changes += managed.managed_service_changes
@@ -466,6 +511,9 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                 name=name,
                 deleted_at__isnull=True,
             ).first()
+            if row is None and not _PROJECT_ATTACH_ALLOWED.get():
+                result.project_changes_withheld.append(f"create project:{service.kind}/{name}")
+                continue
             if row is None:
                 row = ManagedService.objects.create(
                     project=app.project,
@@ -501,6 +549,9 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
             app_environment=env,
             deleted_at__isnull=True,
         ).first()
+        if attachment is None and not _PROJECT_ATTACH_ALLOWED.get():
+            result.project_changes_withheld.append(f"attach project:{service.kind}/{name}@{env.name}")
+            continue
         if attachment is None:
             attachment = ManagedServiceAttachment.objects.create(
                 managed_service=row,
@@ -510,6 +561,13 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
             )
             result.managed_service_attachments_created += 1
             result.managed_service_changes.append(("attach", f"project:{service.kind}/{name}@{env.name}"))
+        elif (
+            attachment.manifest_managed
+            and attachment.workload_names != list(service.bind_workloads)
+            and not _PROJECT_ATTACH_ALLOWED.get()
+        ):
+            # Keep the existing binding; only the rebind is withheld.
+            result.project_changes_withheld.append(f"rebind project:{service.kind}/{name}@{env.name}")
         elif attachment.manifest_managed and attachment.workload_names != list(service.bind_workloads):
             attachment.workload_names = list(service.bind_workloads)
             attachment.save(update_fields=["workload_names", "updated_at", "version"])

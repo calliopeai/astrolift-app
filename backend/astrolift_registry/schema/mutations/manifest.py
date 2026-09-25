@@ -10,6 +10,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations.types import (
     ApplyStagedManifestInput,
@@ -108,7 +109,8 @@ def _dry_run_persist(app: RegisteredApp, manifest, *, raw_text: str):
 
     try:
         with transaction.atomic():
-            raise _RollBack(persist_manifest(app, manifest, raw_text=raw_text))
+            with allow_project_attach(True):
+                raise _RollBack(persist_manifest(app, manifest, raw_text=raw_text))
     except _RollBack as rolled_back:
         # persist_manifest updated the in-memory row too.
         app.refresh_from_db()
@@ -520,7 +522,8 @@ class ManifestMutations:
 
             try:
                 with transaction.atomic():
-                    persisted = persist_manifest(app, manifest, raw_text=staged)
+                    with allow_project_attach(True):
+                        persisted = persist_manifest(app, manifest, raw_text=staged)
                     # The gate cleared the dry run's effects; a write that
                     # landed in between must not widen them unchecked.
                     if (
@@ -599,7 +602,8 @@ class ManifestMutations:
         # re-reading the repo. Replaced with a real fetch via the SCM
         # provider so the manifest_raw + hash actually mirror the
         # repo's content. Issue #536.
-        result = resync_app_manifest_from_repo(app)
+        with allow_project_attach(actor_may_attach_project_services(app)):
+            result = resync_app_manifest_from_repo(app)
         if result.status == "fetch_failed":
             return gql_failure(
                 "SCM_FETCH_FAILED",
