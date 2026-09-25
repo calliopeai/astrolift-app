@@ -269,3 +269,30 @@ def test_form_submission_subscription_scopes_to_caller_org():
     # Sanity: the org-B submission really exists — the empty stream above is
     # org scoping, not an empty table.
     assert FormSubmission.objects.filter(organization=org_b).count() == 1
+
+
+@pytest.mark.django_db
+def test_notification_to_another_user_is_the_operators_1990():
+    """A notification names its recipient across orgs; addressing someone
+    else is the platform operator's (#1990)."""
+    from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+
+    sender = User.objects.create_user(username="n1990-s", email="n1990s@t.local")
+    victim = User.objects.create_user(username="n1990-v", email="n1990v@t.local")
+    with pytest.raises(DjangoPermissionDenied):
+        NotificationMutations().notification(
+            info=_info(sender),
+            input={"user": str(victim.pk), "subject": "reset your password", "message": "click here"},
+        )
+    assert not Notification.objects.filter(user=victim).exists()
+
+
+@pytest.mark.django_db
+def test_library_mutations_are_the_operators_1990():
+    from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+
+    from core.schema.mutations.library import LibraryMutations
+
+    user = User.objects.create_user(username="l1990", email="l1990@t.local")
+    with pytest.raises(DjangoPermissionDenied):
+        LibraryMutations().library_mkdir(info=_info(user), name="x")

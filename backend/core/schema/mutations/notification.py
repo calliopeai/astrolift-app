@@ -37,6 +37,15 @@ class NotificationMutations:
                 errors=[ValidationError(field='guid', messages=['Updating a notification is not supported.'])],
             )
 
+        # A notification names its recipient (`user`), across orgs: a caller
+        # may address only themselves, and addressing someone else is the
+        # platform operator's (#1990). Nothing in the web app calls this.
+        from core.permissions import require_platform_operator
+
+        request = getattr(info.context, 'request', None)
+        caller = getattr(request, 'user', None) or getattr(info.context, 'user', None)
+        if str(input.get('user') or '') != str(getattr(caller, 'pk', '')):
+            require_platform_operator(caller)
         serializer = NotificationSerializer(
             data=input, partial=True, context={'request': info.context.request}
         )
