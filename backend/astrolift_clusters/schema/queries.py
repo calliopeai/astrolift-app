@@ -1471,6 +1471,10 @@ class ClustersQuery:
         """
         from core.dns_discovery import dns_zones_dispatch
 
+        if not _operator(info):
+            # The listing runs on the platform's ambient credentials, whose
+            # account holds every tenant's zones; a tenant enters its own (#1932).
+            return DnsZonesType(supported=False, zones=[])
         payload = dns_zones_dispatch(dns_driver=dns_driver)
         return DnsZonesType(
             supported=bool(payload["supported"]),
@@ -1504,6 +1508,9 @@ class ClustersQuery:
         """
         from core.dns_discovery import dns_certificates_dispatch
 
+        if not _operator(info):
+            # Same account as the zone picker: every tenant's certificates (#1932).
+            return ClusterCertificatesType(supported=False, certificates=[])
         payload = dns_certificates_dispatch(dns_driver=dns_driver)
         return ClusterCertificatesType(
             supported=bool(payload["supported"]),
