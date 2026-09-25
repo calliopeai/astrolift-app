@@ -971,7 +971,7 @@ def app_to_type(
         SyncSnapshot,
         classify_state,
     )
-    from astrolift_registry.services.staged_manifest import staged_manifest_hash
+    from astrolift_registry.services.staged_manifest import public_manifest_hash, staged_manifest_hash
 
     sync_state = classify_state(
         SyncSnapshot(
@@ -1020,7 +1020,7 @@ def app_to_type(
         dockerfile_path=app.dockerfile_path or "",
         build_context=app.build_context or "",
         build_args=dict(app.build_args or {}),
-        manifest_hash=app.manifest_hash,
+        manifest_hash=public_manifest_hash(app, app.manifest_hash or ""),
         raw_manifest=raw_manifest,
         raw_manifest_staged=raw_manifest_staged,
         # Both from the unmasked model fields: the digest must match what
@@ -1032,7 +1032,7 @@ def app_to_type(
             if app.manifest_raw_staged
             else []
         ),
-        last_synced_hash=app.last_synced_hash or "",
+        last_synced_hash=public_manifest_hash(app, app.last_synced_hash or ""),
         manifest_sync_state=sync_state.value,
         registry_repo_uri=app.registry_repo_uri,
         ecr_repo_uri=app.registry_repo_uri,
