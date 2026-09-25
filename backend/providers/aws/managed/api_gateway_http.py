@@ -53,6 +53,7 @@ from aws._errors import map_client_error
 from aws._naming import iam_role_name
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -122,6 +123,12 @@ class ApiGatewayHttpDriver:
         api_name = self._api_name(spec)
         try:
             api = self._find_api(api_name)
+            if api is not None:
+                # Routes, integration and invoke permission would be rewired
+                # onto another service's API otherwise (#1961).
+                refusal = adoption_refusal(api.get("Tags") or {}, spec, resource=f"HTTP API {api_name}")
+                if refusal is not None:
+                    return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             if api is None:
                 api = self._create_api(api_name, spec)
             api_id = api["ApiId"]

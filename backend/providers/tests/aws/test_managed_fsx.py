@@ -106,7 +106,11 @@ def _file_system(file_system_type: str, *, managed: bool = True, lifecycle: str 
         },
     ]
     if managed:
-        tags.append({"Key": "astrolift.io/managed-by", "Value": "platform"})
+        tags += [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "steadymd"},
+            {"Key": "astrolift.io/app", "Value": "triage"},
+        ]
     return {
         "FileSystemId": FS_ID,
         "FileSystemType": file_system_type,
@@ -767,3 +771,18 @@ def test_config_plugin_cost_encryption_and_catalogue_are_wired():
         entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == variant)
         assert entry.status == "preview"
         assert "FILESYSTEM_MOUNT_SOURCE" in entry.binding_envs
+
+
+def test_a_platform_filesystem_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client("LUSTRE", existing=True)
+    client.store["fs"]["Tags"] = [
+        {"Key": t["Key"], "Value": "globex" if t["Key"] == "astrolift.io/organization" else t["Value"]}
+        for t in client.store["fs"]["Tags"]
+    ]
+    driver = FSxLustreDriver(config=_config(), client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    client.tag_resource.assert_not_called()

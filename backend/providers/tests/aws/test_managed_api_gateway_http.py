@@ -64,11 +64,14 @@ class FakeApiGateway:
         self._seq += 1
         return f"{prefix}{self._seq}"
 
-    def seed_api(self, *, name: str) -> str:
+    def seed_api(self, *, name: str, tags: dict[str, str] | None = None) -> str:
         api_id = self._next("api-")
         self._apis[api_id] = {
             "ApiId": api_id,
             "Name": name,
+            "Tags": dict(tags)
+            if tags is not None
+            else {"astrolift.io/organization": "acme", "astrolift.io/app": "api"},
             "ProtocolType": "HTTP",
             "ApiEndpoint": f"https://{api_id}.execute-api.us-east-1.amazonaws.com",
         }
@@ -83,7 +86,7 @@ class FakeApiGateway:
 
     def create_api(self, **kwargs):
         self._record("create_api", kwargs)
-        api_id = self.seed_api(name=kwargs["Name"])
+        api_id = self.seed_api(name=kwargs["Name"], tags=kwargs.get("Tags"))
         return self._apis[api_id]
 
     def get_api(self, **kwargs):
@@ -398,3 +401,14 @@ def test_managed_config_for_api_gateway_returns_config():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_provision_does_not_rewire_another_orgs_api():
+    """HTTP APIs are matched by name; only this service's is reused (#1961)."""
+    drv, api, _ = _driver()
+    api.seed_api(name=drv._api_name(_spec()), tags={"astrolift.io/organization": "globex", "astrolift.io/app": "api"})
+
+    result = drv.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    assert "create_integration" not in api.names() and "create_route" not in api.names()
