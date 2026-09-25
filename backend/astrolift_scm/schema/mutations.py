@@ -31,7 +31,7 @@ from astrolift_scm.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import get_current_tenant
 
@@ -1267,11 +1267,11 @@ class ScmMutation:
     # ----------------------------------------------------------------
     # Fleet-wide managed-CI-workflow resync (#1211, Phase 3)
     #
-    # The platform-admin "run the outbound sweep now" trigger. Unlike the
+    # The platform operator's "run the outbound sweep now" trigger. Unlike the
     # per-app Phase 2 actions above (org-scoped, ``app.update``), this is a
-    # FLEET-WIDE operator action gated on ``admin.elevate`` — the dedicated
-    # platform-admin grant (granted to no org role; superusers bypass in the
-    # resolver) — so it is deliberately NOT ``@tenant_scoped``. It reuses the
+    # FLEET-WIDE action, so it is deliberately NOT ``@tenant_scoped`` and only
+    # the platform operator may run it. ``admin.elevate`` alone is not that
+    # gate: the stock org owner and admin roles hold it (#1978). It reuses the
     # same sweep the held ``CI_WORKFLOW_RESYNC`` schedule wraps.
     # ----------------------------------------------------------------
 
@@ -1281,14 +1281,16 @@ class ScmMutation:
     def resync_all_astrolift_ci_workflows(self, info: Info) -> MutationResultType[CiWorkflowResyncAllResult]:
         """Kick the outbound CI-workflow resync sweep across the WHOLE fleet.
 
-        Platform-admin only (``admin.elevate``, fleet-wide — NOT a per-org
-        permission). Runs the same sweep the held ``CI_WORKFLOW_RESYNC``
-        schedule wraps, but on demand and inline so it works while the schedule
-        is held: for every managed app it recomputes drift and auto-pushes ONLY
-        the safe states (``template_stale`` / ``absent``), never clobbering
-        ``repo_drift`` / ``conflict``. Bounded to ``RESYNC_ALL_INLINE_LIMIT``
-        apps per call; returns counts by resulting state.
+        Platform operator only: it reaches every org, so a per-org grant,
+        ``admin.elevate`` included, is not enough. Runs the same sweep the
+        held ``CI_WORKFLOW_RESYNC`` schedule wraps, but on demand and inline
+        so it works while the schedule is held: for every managed app it
+        recomputes drift and auto-pushes ONLY the safe states
+        (``template_stale`` / ``absent``), never clobbering ``repo_drift`` /
+        ``conflict``. Bounded to ``RESYNC_ALL_INLINE_LIMIT`` apps per call;
+        returns counts by resulting state.
         """
+        check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
         from astrolift_scm.services.ci_workflow_drift import sweep_ci_workflows
 
         summary = sweep_ci_workflows(limit=RESYNC_ALL_INLINE_LIMIT)

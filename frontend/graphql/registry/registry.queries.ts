@@ -60,6 +60,7 @@ const APP_FIELDS = gql`
     previewScreenshotUrl
     rawManifest
     rawManifestStaged
+    rawManifestStagedHash
     lastSyncedHash
     manifestSyncState
     lastResyncAt
@@ -184,6 +185,7 @@ export const GET_APP = gql`
   query GetApp($slug: String!, $includeDrift: Boolean = false) {
     astroliftApp(slug: $slug, includeDrift: $includeDrift) {
       ...AppFields
+      stagedEnvChanges
       configDrift {
         hasDrift
         fields

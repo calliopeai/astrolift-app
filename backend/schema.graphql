@@ -91,6 +91,11 @@ type AppdomainremovedpayloadMutationResult {
   data: Appdomainremovedpayload
 }
 
+input ApplyStagedManifestInput {
+  id: GUID!
+  expectedStagedHash: String = null
+}
+
 input ApproveByTokenInput {
   token: String!
 }
@@ -3179,6 +3184,8 @@ type AstroliftRegisteredApp {
   manifestHash: String!
   rawManifest: String!
   rawManifestStaged: String!
+  rawManifestStagedHash: String!
+  stagedEnvChanges: [String!]!
   lastSyncedHash: String!
   manifestSyncState: String!
   registryRepoUri: String!
@@ -5472,6 +5479,7 @@ type Mutation {
   tearDownApp(input: TearDownAppInput!): SoftdeletepayloadMutationResult!
   transferApp(input: TransferAppInput!): AstroliftRegisteredAppMutationResult!
   updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
+  applyStagedManifest(input: ApplyStagedManifestInput!): ManifeststagepayloadMutationResult!
   syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
   pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
   moveAppToTeam(input: MoveAppToTeamInput!): AstroliftRegisteredAppMutationResult!
@@ -5711,7 +5719,7 @@ type Mutation {
   """Force a workflow instance to a specific state (admin override)."""
   overrideWorkflowState(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
 
-  """Create a new workflow definition (staff only)."""
+  """Create a new workflow definition (platform operator only)."""
   createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null): MutationResult!
 
   """Update an org-owned workflow definition (globals are read-only)."""
@@ -5726,7 +5734,7 @@ type Mutation {
   createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, agentRef: String = null, workflowRef: String = null, environmentSpecSlug: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, outputKey: String = null, approvers: JSON = null): CreateWorkflowStageResult!
 
   """
-  Create an inbound webhook trigger for a workflow definition (staff only).
+  Create an inbound webhook trigger for a workflow definition (platform operator only).
   """
   createWorkflowTrigger(workflowSlug: String!): CreateWorkflowTriggerResult!
 

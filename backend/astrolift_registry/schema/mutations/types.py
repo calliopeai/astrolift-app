@@ -295,6 +295,30 @@ class SyncManifestFromRepoInput:
 
 
 @strawberry.input
+class ApplyStagedManifestInput:
+    """Apply ``manifest_raw_staged`` directly to ``manifest_raw`` (#1759).
+
+    Only for an app with no ``source_repo`` at all -- a repo-backed app
+    always goes through ``pushManifestToRepo`` for review, whatever its
+    connection health (#1759 adversarial review).
+
+    ``expected_staged_hash`` is the caller's last-known
+    ``AstroliftRegisteredApp.rawManifestStagedHash`` -- a mismatch means
+    the staged buffer changed since the caller loaded it, and the
+    mutation refuses with ``CONFLICT`` rather than applying a draft the
+    operator never reviewed. A digest, not the raw text, so a manifest
+    carrying literal secrets (#1758) never has to round-trip through a
+    mutation input variable (and so an audit log of mutation variables).
+    Required when the staged edit changes env (``VALIDATION`` without
+    it); omitted (or empty) skips the check for any other edit, so a
+    caller written before the field existed keeps working.
+    """
+
+    id: GUID
+    expected_staged_hash: str | None = None
+
+
+@strawberry.input
 class TransferAppInput:
     """Move a registered app to a different team or project.
 
