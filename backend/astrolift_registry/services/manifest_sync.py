@@ -1048,6 +1048,11 @@ def _register_one_agent(
         )
         if _ns_refusal is not None:
             raise ValueError(_ns_refusal)
+        from astrolift_registry.hostname_claims import hostname_label_refusal
+
+        _host_refusal = hostname_label_refusal(app_slug, organization=org)
+        if _host_refusal is not None:
+            raise ValueError(_host_refusal)
         app = RegisteredApp.objects.create(
             organization=org,
             team=project.team,
@@ -1871,6 +1876,11 @@ def _register_one_app(
         )
         if _ns_refusal is not None:
             raise ValueError(_ns_refusal)
+        from astrolift_registry.hostname_claims import hostname_label_refusal
+
+        _host_refusal = hostname_label_refusal(app_slug, organization=org)
+        if _host_refusal is not None:
+            raise ValueError(_host_refusal)
         app = RegisteredApp.objects.create(
             organization=org,
             team=project.team,
