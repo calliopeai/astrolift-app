@@ -40,6 +40,7 @@ class FakeRDS:
             "Endpoint": {"Address": "sql.example", "Port": 1433},
             "MasterUsername": kwargs["MasterUsername"],
             "DeletionProtection": kwargs["DeletionProtection"],
+            "TagList": kwargs.get("Tags", []),
         }
 
     def modify_db_instance(self, **kwargs):
