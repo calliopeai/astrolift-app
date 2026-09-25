@@ -119,6 +119,23 @@ def test_gcp_managed_credentials_share_cluster_secret_prefix(
     assert config.secret_id_prefix == "smd"
 
 
+def test_cloud_functions_config_carries_the_install_service_account_allowlist() -> None:
+    """The driver refuses a config-supplied runtime or build account outside
+    this list (#1921); an install that sets none refuses every one."""
+    from core.cluster_observability import managed_config_for
+
+    allowed = managed_config_for(
+        "gcp",
+        _cluster(cloud_functions_allowed_service_accounts=["fn@acme-prod.iam.gserviceaccount.com"]),
+        kind="faas",
+        variant="cloud_functions_gen2",
+    )
+    unset = managed_config_for("gcp", _cluster(), kind="faas", variant="cloud_functions_gen2")
+
+    assert allowed.allowed_service_accounts == ("fn@acme-prod.iam.gserviceaccount.com",)
+    assert unset.allowed_service_accounts == ()
+
+
 def test_alloydb_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 
