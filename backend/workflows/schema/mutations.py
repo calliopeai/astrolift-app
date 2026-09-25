@@ -19,7 +19,6 @@ from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 from workflows.scopes import (
     definition_scope_by_slug,
     instance_scope_by_id,
-    workflow_scope_by_slug,
 )
 
 
@@ -166,7 +165,7 @@ def _unique_clone_slug(base_slug, org):
 @strawberry.type
 class Mutation:
     @strawberry.mutation(description="Start a workflow for an object.")
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug"))
     @tenant_scoped()
     def start_workflow(
         self,
@@ -221,7 +220,7 @@ class Mutation:
             raise GraphQLError(f"Object not found: {model_label}:{object_id}")
 
         try:
-            instance = WorkflowInstance.start(workflow, obj, user)
+            instance = WorkflowInstance.start(workflow, obj, user, organization_id=_caller_org_pk())
             return StartWorkflowResult(ok=True, instance_id=str(instance.pk))
         except ValidationError as e:
             raise GraphQLError(str(e)) from e
@@ -233,7 +232,12 @@ class Mutation:
             "WorkflowRun mirror rows and enqueues the stage executor."
         )
     )
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
+    # The slug names a definition, not a configured Workflow. The handler
+    # skips a disabled definition of the org's for an enabled template, so
+    # the scope resolves the same row it runs (#1965).
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug", enabled_only=True)
+    )
     @tenant_scoped()
     def run_workflow_definition(
         self,
@@ -327,14 +331,10 @@ class Mutation:
         note: str = "",
     ) -> MutationResult:
         user = info.context.user
-        # Caller-org instances plus legacy org-less rows (pre-denormalization
-        # forms instances carry organization=NULL — spec 40 §2.3/§8); another
-        # org's instance is not found.
-        instance = (
-            WorkflowInstance.objects.filter(pk=instance_id)
-            .filter(Q(organization_id=_caller_org_pk()) | Q(organization__isnull=True))
-            .first()
-        )
+        # The caller's own org only. A legacy org-less instance
+        # (pre-denormalization forms rows, spec 40 §2.3/§8) belongs to no
+        # tenant, so it reads as not found like another org's (#1965).
+        instance = WorkflowInstance.objects.filter(pk=instance_id, organization_id=_caller_org_pk()).first()
         if not instance:
             raise GraphQLError(f"Workflow instance {instance_id} not found")
 

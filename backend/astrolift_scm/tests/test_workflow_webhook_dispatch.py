@@ -333,10 +333,10 @@ def test_one_failing_webhook_does_not_break_ingest_or_siblings(stack, monkeypatc
 
     real_start = WorkflowInstance.start.__func__
 
-    def _flaky_start(cls, workflow, obj, user=None):
+    def _flaky_start(cls, workflow, obj, user=None, **kwargs):
         if workflow.pk == bad.pk:
             raise RuntimeError("boom")
-        return real_start(cls, workflow, obj, user=user)
+        return real_start(cls, workflow, obj, user=user, **kwargs)
 
     monkeypatch.setattr(WorkflowInstance, "start", classmethod(_flaky_start))
 

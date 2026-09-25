@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "faas"
 _API_ROOT = "https://cloudfunctions.googleapis.com/v2"
@@ -1050,17 +1051,12 @@ def _spelled_twice(value: Any) -> str:
 def _raw_names_error(names: Any, protected: set[str], label: str, *, verb: str) -> str:
     """Why the raw field names ``names`` may not reach the API, or ``""``.
 
-    Google's JSON parser takes a field's proto name (``service_account_email``)
-    as well as its JSON name (``serviceAccountEmail``), so a check that knows
-    only one spelling is bypassed by the other (#1921). A raw name must be the
-    API's lowerCamelCase JSON name, and it meets the protected set case-blind.
+    See ``gcp._raw_fields.raw_field_conflicts`` for why both spellings matter
+    (#1921, #1947).
     """
-    listed = [str(name) for name in names or ()]
-    proto_names = sorted(name for name in listed if "_" in name)
+    proto_names, forbidden = raw_field_conflicts(names, protected)
     if proto_names:
         return f"{label} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
-    guarded = {name.casefold() for name in protected}
-    forbidden = sorted(name for name in listed if name.casefold() in guarded)
     if forbidden:
         return f"{label} cannot {verb} structured or output fields: {', '.join(forbidden)}"
     return ""

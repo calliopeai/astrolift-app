@@ -99,7 +99,9 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
             )
             task_id = str(run.workflow_id)
         else:
-            trigger_workflow_instance(definition, payload, trigger_kind="webhook")
+            trigger_workflow_instance(
+                definition, payload, trigger_kind="webhook", organization_id=webhook.organization_id
+            )
         dispatched = True
 
     webhook.last_triggered_at = timezone.now()

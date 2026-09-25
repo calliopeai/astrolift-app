@@ -36,11 +36,21 @@ from astrolift_workflows.schema.workflow_config_types import (
     workflow_to_type,
 )
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    check_permission,
+    granted_scopes,
+    require_permission,
+)
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
+    covered_project_ids,
     definition_scope_by_slug,
     execution_scope_by_id,
+    visible_runs,
+    workflow_run_scope,
+    workflow_run_scope_by_id,
     workflow_scope_by_guid,
     workflow_scope_by_slug,
 )
@@ -102,43 +112,53 @@ def _triggered_by_for(workflow_id: str, org_id: int | None = None) -> str:
     return ""
 
 
-def _viewer_scope() -> tuple[bool, int | None]:
+def _viewer_scope(user) -> tuple[bool, int | None]:
     """Access scope for the Temporal viewer reads (#1183).
 
-    Mirrors the write gate in ``mutations._gate_instance_op``: the elevated
-    platform-operator pair (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``) sees
-    every run fleet-wide; any other ``AUDIT_LOG_READ`` holder — a per-org
-    permission — is scoped to runs their own org owns. Returns
-    ``(elevated, caller_org_pk)``; ``caller_org_pk`` is ``None`` only for a
-    non-elevated caller with no resolved org (fail closed to no rows)."""
+    Mirrors the write gate in ``mutations._gate_instance_op``: the platform
+    operator sees every run fleet-wide; any other ``AUDIT_LOG_READ`` holder
+    is scoped to runs their own org owns, at each run's own scope (#1965).
+    Returns ``(elevated, caller_org_pk)``; ``caller_org_pk`` is ``None``
+    only for a non-elevated caller with no resolved org (fail closed to no
+    rows)."""
     from astrolift_workflows.schema.mutations import _has_elevated_viewer_access
 
-    if _has_elevated_viewer_access():
+    if _has_elevated_viewer_access(user):
         return True, None
     return False, _caller_org_pk()
 
 
-def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None) -> bool:
+def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None, org_wide: bool = True) -> bool:
     """Read-side ownership check paired with :func:`_viewer_scope`.
 
     Reuses the write gate's ownership resolution
     (``mutations._run_owner_org_id`` — tier-3 ``WorkflowInstance`` then the
     ops ``WorkflowRun`` mirror) so reads and writes agree on who owns a run.
-    A legacy org-less run (no mirror org) is visible only to the elevated
-    pair; a scoped viewer sees nothing for it."""
+    A legacy org-less run (no mirror org) is visible only to the platform
+    operator; a scoped viewer sees nothing for it. A caller whose
+    ``AUDIT_LOG_READ`` is not org-wide (``org_wide=False``) also needs it at
+    the run's own scope; the single-run readers check that in their gate."""
     if elevated:
         return True
     if caller is None:
         return False
     from astrolift_workflows.schema.mutations import _run_owner_org_id
 
-    return _run_owner_org_id(workflow_id) == caller
+    if _run_owner_org_id(workflow_id) != caller:
+        return False
+    if org_wide:
+        return True
+    try:
+        check_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope(workflow_id, caller))
+    except PermissionDenied:
+        return False
+    return True
 
 
 @strawberry.type
 class TemporalWorkflowsQuery:
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_workflow_instances(
         self,
@@ -156,19 +176,21 @@ class TemporalWorkflowsQuery:
         token — and ``next_cursor`` is ``null`` on the last page (#1236).
 
         Scoped to the caller's org (#1183): a non-elevated
-        ``AUDIT_LOG_READ`` holder sees only runs their own org owns; the
-        elevated platform-operator pair sees the whole namespace. The
-        namespace list is fetched then filtered, so a scoped page can
-        return fewer than ``limit`` rows — including zero while
+        ``AUDIT_LOG_READ`` holder sees only runs their own org owns, and a
+        holder below the org sees only the runs of the apps and projects
+        their grant covers (#1965); the platform operator sees the whole
+        namespace. The namespace list is fetched then filtered, so a scoped
+        page can return fewer than ``limit`` rows, including zero while
         ``next_cursor`` is still non-null. Callers page until the cursor
         is null rather than until a page comes back short.
 
         Returns an empty page when Temporal is disabled — the UI's
         empty state copy handles "no temporal" and "no runs"
         indistinguishably."""
-        elevated, caller = _viewer_scope()
+        elevated, caller = _viewer_scope(info.context.user)
         if not elevated and caller is None:
             return WorkflowInstancePageType(items=[], next_cursor=None)
+        org_wide = granted_scopes(get_current_tenant(), Permission.AUDIT_LOG_READ).org
         rows, next_cursor = list_workflow_instances(
             workflow_type=workflow_type,
             status=status,
@@ -178,13 +200,13 @@ class TemporalWorkflowsQuery:
         items = []
         for r in rows:
             wid = r.get("workflow_id", "") or ""
-            if not _viewer_can_see(wid, elevated=elevated, caller=caller):
+            if not _viewer_can_see(wid, elevated=elevated, caller=caller, org_wide=org_wide):
                 continue
             items.append(instance_to_type(r, _triggered_by_for(wid, None if elevated else caller)))
         return WorkflowInstancePageType(items=items, next_cursor=next_cursor)
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
     @tenant_scoped()
     def astrolift_workflow_instance_detail(
         self,
@@ -199,10 +221,11 @@ class TemporalWorkflowsQuery:
         Ownership-gated (#1183): a workflow the caller's org doesn't own
         answers ``None`` — the same as a nonexistent id — so an
         ``AUDIT_LOG_READ`` holder can't read another org's full Temporal
-        history payload. The elevated platform-operator pair sees any run."""
+        history payload. The gate checks the run's own scope (#1965). The
+        platform operator sees any run."""
         if not workflow_id:
             return None
-        elevated, caller = _viewer_scope()
+        elevated, caller = _viewer_scope(info.context.user)
         if not _viewer_can_see(workflow_id, elevated=elevated, caller=caller):
             return None
         row = describe_workflow_instance(workflow_id)
@@ -215,7 +238,7 @@ class TemporalWorkflowsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
     @tenant_scoped()
     def astrolift_workflow_instance(
         self,
@@ -228,10 +251,10 @@ class TemporalWorkflowsQuery:
 
         Ownership-gated (#1183) exactly like
         :meth:`astrolift_workflow_instance_detail`: a run the caller's org
-        doesn't own answers ``None``; the elevated pair sees any run."""
+        doesn't own answers ``None``; the platform operator sees any run."""
         if not workflow_id:
             return None
-        elevated, caller = _viewer_scope()
+        elevated, caller = _viewer_scope(info.context.user)
         if not _viewer_can_see(workflow_id, elevated=elevated, caller=caller):
             return None
         row = describe_workflow_instance(workflow_id)
@@ -252,13 +275,17 @@ def _workflows_qs(*, org_pk: int | None, search: str | None = None):
     supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
     matches no rows: ``Workflow.organization`` is a non-null FK, so
     ``organization_id=None`` is an ``IS NULL`` that can never hit
-    (#1042 deny-by-default).
+    (#1042 deny-by-default). A ``WORKFLOW_READ`` grant below the org
+    narrows the stream to the workflows of the projects it covers (#1965).
     """
     from workflows.models import Workflow
 
     qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
         "definition", "organization"
     )
+    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
+    if projects is not None:
+        qs = qs.filter(definition__project_id__in=projects)
     if search:
         qs = qs.filter(
             search_q(
@@ -292,7 +319,9 @@ def _workflow_definitions_qs(
     matches nothing — note this one cannot rely on an ``IS NULL``
     never hitting: ``visible_to_org(None)`` would return every
     platform-global template, so the empty case is explicit (#1042
-    deny-by-default).
+    deny-by-default). A ``WORKFLOW_READ`` grant below the org narrows the
+    catalogue to the definitions of the projects it covers; templates and
+    project-less definitions are org-level (#1965).
     """
     from workflows.models import WorkflowDefinition, WorkflowStage
 
@@ -311,6 +340,9 @@ def _workflow_definitions_qs(
             )
         )
     )
+    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
+    if projects is not None:
+        qs = qs.filter(project_id__in=projects)
     if project_id is not None:
         try:
             qs = qs.filter(
@@ -364,7 +396,7 @@ class WorkflowsQuery:
             "Unbounded — returns every Workflow the org owns in one response. Use workflowsPage."
         ),
     )
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def workflows(self, info: Info, org_id: strawberry.ID | None = None) -> list[ConfiguredWorkflowType]:
         caller, ok = _org_pk_matches(org_id)
@@ -374,7 +406,7 @@ class WorkflowsQuery:
         return [workflow_to_type(w) for w in qs]
 
     @strawberry.field(description="Cursor-paginated page of the org's configured Workflows (tier 2).")
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def workflows_page(
         self,
@@ -428,7 +460,7 @@ class WorkflowsQuery:
             "Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage."
         ),
     )
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def workflow_definitions(
         self,
@@ -452,7 +484,7 @@ class WorkflowsQuery:
             "Cursor-paginated page of the workflow definitions visible to the caller, by name (A→Z)."
         )
     )
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def workflow_definitions_page(
         self,
@@ -548,7 +580,7 @@ class WorkflowsQuery:
         return [run_to_type(r) for r in runs]
 
     @strawberry.field(description="Recent runs of workflow definitions visible in the caller's organization.")
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def workflow_definition_runs(
         self,
@@ -587,6 +619,7 @@ class WorkflowsQuery:
                 )
             )
         )
+        qs = visible_runs(qs, caller, Permission.WORKFLOW_READ)
         if project_id is not None:
             try:
                 qs = qs.filter(

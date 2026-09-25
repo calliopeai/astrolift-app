@@ -2,14 +2,13 @@
 configured-Workflow write surface (spec 40 §3/§6, #967/#968).
 
 Cancel / terminate / signal are gated per run ownership (the tier-2
-re-gate). Two paths are valid. The legacy elevated viewer pair —
-reads are scoped to ``AUDIT_LOG_READ``; these writes layer
-``ADMIN_ELEVATE`` on top so an operator with read access doesn't
-accidentally fire a terminate — reaches every run (own-org,
-foreign-org, legacy org-less): platform operators act fleet-wide.
-Otherwise the tenant path applies: ``WORKFLOW_TRIGGER`` scoped to the
-caller's org, with everything else — a foreign org's run, a legacy
-org-less run, a nonexistent id — answered by one identical not-found
+re-gate). Two paths are valid. The platform operator (an active
+superuser holding ``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``, so a bearer
+token also needs the admin scope) reaches every run (own-org,
+foreign-org, legacy org-less) and acts fleet-wide. Otherwise the tenant
+path applies: ``WORKFLOW_TRIGGER`` at the run's own scope (#1965), with
+everything outside the caller's org (a foreign org's run, a legacy
+org-less run, a nonexistent id) answered by one identical not-found
 envelope (oracle closure).
 """
 
@@ -34,6 +33,7 @@ from core.permissions import (
     Permission,
     PermissionDenied,
     check_permission,
+    is_platform_operator,
     require_permission,
 )
 from core.schema.common import MutationResult, ValidationError
@@ -42,6 +42,7 @@ from workflows.scopes import (
     definition_scope_by_slug,
     definition_scope_by_stage_guid,
     execution_scope_by_id,
+    workflow_run_scope,
     workflow_scope_by_guid,
     workflow_scope_by_slug,
 )
@@ -106,10 +107,17 @@ def _run_owner_org_id(workflow_id: str) -> int | None:
     )
 
 
-def _has_elevated_viewer_access() -> bool:
-    """True when the caller holds the legacy platform-operator pair
-    (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``) that gates the viewer's
-    writes."""
+def _has_elevated_viewer_access(user) -> bool:
+    """True for the platform operator, who reads and acts fleet-wide.
+
+    The permission pair alone is not enough: ``org_owner`` and
+    ``org_admin`` carry the whole permission enum, ``ADMIN_ELEVATE``
+    included, so on its own it would hand every org admin every other
+    org's runs (#1965). Checking the pair on top keeps the bearer-token
+    ceiling: a token reaches ``ADMIN_ELEVATE`` only with the admin scope.
+    """
+    if not is_platform_operator(user):
+        return False
     try:
         check_permission(Permission.AUDIT_LOG_READ)
         check_permission(Permission.ADMIN_ELEVATE)
@@ -118,24 +126,24 @@ def _has_elevated_viewer_access() -> bool:
     return True
 
 
-def _gate_instance_op(workflow_id: str) -> MutationResult | None:
+def _gate_instance_op(user, workflow_id: str) -> MutationResult | None:
     """Data-dependent permission gate for cancel / terminate / signal.
 
     The branch depends on the looked-up run, so it cannot live in a static
-    ``@require_permission`` stack. The elevated platform-operator pair
-    (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``, the legacy viewer gate)
-    reaches every run — own-org, foreign-org, legacy org-less. Otherwise
-    the tenant path applies: ``WORKFLOW_TRIGGER`` plus a resolved tenant
-    context, reaching only the caller org's runs; anything else — a
-    foreign org's run, an org-less run, a nonexistent id — is answered
+    ``@require_permission`` stack. The platform operator reaches every
+    run: own-org, foreign-org and legacy org-less. Otherwise the tenant path
+    applies: ``WORKFLOW_TRIGGER`` at the run's own scope (its app, else its
+    definition's project, else the org; never the selected team or
+    project), reaching only the caller org's runs. Anything else (a
+    foreign org's run, an org-less run, a nonexistent id) is answered
     with one identical not-found envelope, never a forbidden that
     confirms the id exists (oracle closure). Raises ``PermissionDenied``
     / ``TenantRequired`` exactly like the decorator stack; returns a
     failure envelope only for the not-found case."""
-    if _has_elevated_viewer_access():
+    if _has_elevated_viewer_access(user):
         return None
-    check_permission(Permission.WORKFLOW_TRIGGER)
     caller = _caller_org_pk()
+    check_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_run_scope(workflow_id, caller))
     if caller is None:
         raise TenantRequired("instance ops on org-owned runs require a resolved tenant context")
     if _run_owner_org_id(workflow_id) != caller:
@@ -173,7 +181,7 @@ class TemporalWorkflowsMutation:
         external resources (deploys, migrations) so they teardown
         cleanly. Returns ``ok=False`` with a non-empty errors list when
         Temporal is disabled or the handle is missing."""
-        gate = _gate_instance_op(workflow_id)
+        gate = _gate_instance_op(info.context.user, workflow_id)
         if gate is not None:
             return gate
         if not workflow_id:
@@ -194,7 +202,7 @@ class TemporalWorkflowsMutation:
         no cleanup runs. Reserve for wedged workflows that the
         cooperative cancel can't unstick. ``reason`` is required and
         stored on the Temporal record so the next operator sees why."""
-        gate = _gate_instance_op(workflow_id)
+        gate = _gate_instance_op(info.context.user, workflow_id)
         if gate is not None:
             return gate
         if not workflow_id:
@@ -223,7 +231,7 @@ class TemporalWorkflowsMutation:
         signals that take no args. Returns ``ok=False`` when Temporal
         is disabled or the signal couldn't be delivered (workflow
         already complete, handle missing)."""
-        gate = _gate_instance_op(workflow_id)
+        gate = _gate_instance_op(info.context.user, workflow_id)
         if gate is not None:
             return gate
         if not workflow_id:
@@ -232,7 +240,7 @@ class TemporalWorkflowsMutation:
         if not signal_name:
             return _failure("signal_name", "signal_name is required")
         if signal_name in _EXECUTION_SIGNALS and isinstance(payload, dict):
-            resolved = _resolve_execution_id(payload.get("execution_id"))
+            resolved = _resolve_execution_id(payload.get("execution_id"), workflow_id)
             if resolved is None:
                 return _failure(
                     "payload",
@@ -254,13 +262,15 @@ class TemporalWorkflowsMutation:
 _EXECUTION_SIGNALS = frozenset({"human_gate_decision", "escalation_cleared"})
 
 
-def _resolve_execution_id(raw: object) -> str | None:
+def _resolve_execution_id(raw: object, workflow_id: str) -> str | None:
     from workflows.models import WorkflowStageExecution
 
     value = str(raw or "").strip()
     if not value:
         return None
-    rows = WorkflowStageExecution.objects
+    # tenancy: confined to the signalled run, whose ownership the gate
+    # already checked; any other run's execution, in any org, is refused.
+    rows = WorkflowStageExecution.objects.filter(workflow_run__workflow_id=workflow_id)
     row = rows.filter(pk=int(value)).first() if value.isdigit() else rows.filter(guid=value).first()
     return str(row.pk) if row is not None else None
 
@@ -308,7 +318,7 @@ class WorkflowsMutation:
     # ── tier-2 Workflow CRUD ────────────────────────────────────────────
 
     @strawberry.mutation(description="Create a configured Workflow from a visible definition (spec 40 §2.2).")
-    @require_permission(Permission.WORKFLOW_CREATE)
+    @require_permission(Permission.WORKFLOW_CREATE, scope=definition_scope_by_slug("definition_slug"))
     @tenant_scoped()
     def create_workflow(
         self,
@@ -341,11 +351,12 @@ class WorkflowsMutation:
             )
 
         # Definition must be visible to the org (its own UNION global) — §2.1.
-        definition = (
-            WorkflowDefinition.visible_to_org(org.pk)
-            .filter(slug=definition_slug, deleted_at__isnull=True)
-            .first()
+        # The org's own wins a slug it shares with a template: that is the
+        # row the permission scope was checked against.
+        visible = WorkflowDefinition.visible_to_org(org.pk).filter(
+            slug=definition_slug, deleted_at__isnull=True
         )
+        definition = visible.filter(organization_id=org.pk).first() or visible.first()
         if definition is None:
             return CreateWorkflowResult(
                 ok=False,
