@@ -61,6 +61,7 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -177,6 +178,9 @@ class OpenSearchVectorDriver(ManagedServiceDriver):
 
         existing = self._describe(domain_name)
         if existing is not None:
+            refusal = adoption_refusal(self._existing_tags(existing), spec, resource=f"opensearch domain {domain_name}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=domain_name),
@@ -606,6 +610,13 @@ class OpenSearchVectorDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
+        """Tags of a resource found under this service's name; unreadable counts as untagged (#1961)."""
+        try:
+            return list(self._os.list_tags(ARN=str(existing.get("ARN", ""))).get("TagList", []) or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe(self, domain_name: str) -> dict[str, Any] | None:
         try:
