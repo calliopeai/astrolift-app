@@ -215,7 +215,7 @@ class Mutation:
             raise GraphQLError(f"Object not found: {model_label}:{object_id}")
 
         try:
-            instance = WorkflowInstance.start(workflow, obj, user)
+            instance = WorkflowInstance.start(workflow, obj, user, organization_id=_caller_org_pk())
             return StartWorkflowResult(ok=True, instance_id=str(instance.pk))
         except ValidationError as e:
             raise GraphQLError(str(e)) from e
@@ -326,14 +326,10 @@ class Mutation:
         note: str = "",
     ) -> MutationResult:
         user = info.context.user
-        # Caller-org instances plus legacy org-less rows (pre-denormalization
-        # forms instances carry organization=NULL — spec 40 §2.3/§8); another
-        # org's instance is not found.
-        instance = (
-            WorkflowInstance.objects.filter(pk=instance_id)
-            .filter(Q(organization_id=_caller_org_pk()) | Q(organization__isnull=True))
-            .first()
-        )
+        # The caller's own org only. A legacy org-less instance
+        # (pre-denormalization forms rows, spec 40 §2.3/§8) belongs to no
+        # tenant, so it reads as not found like another org's (#1965).
+        instance = WorkflowInstance.objects.filter(pk=instance_id, organization_id=_caller_org_pk()).first()
         if not instance:
             raise GraphQLError(f"Workflow instance {instance_id} not found")
 

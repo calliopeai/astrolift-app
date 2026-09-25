@@ -25,14 +25,16 @@ import pytest
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from graphql import GraphQLError
 
-from astrolift_identity.models import Organization, Project, Role, RoleBinding
+from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
 from astrolift_operations.models import WorkflowRun
 from astrolift_operations.schema.queries import OperationsQuery
+from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.schema import mutations as temporal_mutations
 from astrolift_workflows.schema.mutations import TemporalWorkflowsMutation, WorkflowsMutation
 from astrolift_workflows.schema.queries import TemporalWorkflowsQuery, WorkflowsQuery
-from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
 from core.tenancy import TenantContext, tenant_context
 from core.tests.utils.scope_world import ScopeWorld, bind_role, make_info
 from workflows.models import (
@@ -44,7 +46,7 @@ from workflows.models import (
 )
 from workflows.schema.mutations import Mutation as LegacyMutation
 from workflows.schema.queries import Query as LegacyQuery
-from workflows.scopes import definition_scope_by_slug
+from workflows.scopes import definition_scope_by_slug, visible_runs, workflow_run_scope
 
 pytestmark = pytest.mark.django_db
 
@@ -557,3 +559,107 @@ def test_legacy_triggers_check_the_definition_they_run(world, monkeypatch):
             )
 
     assert started == ["intake-flow"]
+
+
+def _forms_definition(org, slug):
+    return WorkflowDefinition.objects.create(
+        organization=org,
+        name=slug,
+        slug=slug,
+        model_label="astrolift_registry.RegisteredApp",
+        states=[{"name": "draft", "is_initial": True}, {"name": "done", "is_final": True}],
+        transitions=[{"from_state": "draft", "to_state": "done", "label": "Finish"}],
+        is_enabled=True,
+    )
+
+
+def test_legacy_instances_are_read_and_moved_by_their_own_org_only(world):
+    """A legacy instance with no org (the 0004 backfill, and every one the
+    legacy start path created) belonged to every org's readers and
+    transitioners. It now belongs to none, and the start path records the
+    caller's org so a tenant still reaches the instances it starts."""
+    forms = _forms_definition(world.org, "intake-form")
+    orphan = WorkflowInstance.objects.create(
+        organization=None, workflow=forms, current_state="draft", object_id=world.medops_app.pk
+    )
+    admin = _holder("org_admin", "ORG", world.org.pk, "forms-admin")
+    beta_admin = _holder("org_admin", "ORG", world.beta.pk, "forms-beta")
+    info, beta_info = make_info(admin), make_info(beta_admin)
+
+    with _as(world, admin):
+        started = LegacyMutation().start_workflow(
+            info, "intake-form", "astrolift_registry.RegisteredApp", world.medops_app.pk
+        )
+    own = WorkflowInstance.objects.get(pk=int(started.instance_id))
+    assert own.organization_id == world.org.pk
+
+    with _as(world, beta_admin, org=world.beta):
+        assert LegacyQuery().workflow_instance(beta_info, str(own.pk)) is None
+        with pytest.raises(GraphQLError, match="not found"):
+            LegacyMutation().transition_workflow(beta_info, str(own.pk), "done")
+
+    with _as(world, admin):
+        assert LegacyQuery().workflow_instance(info, str(own.pk)) == own
+        assert LegacyQuery().workflow_instance(info, str(orphan.pk)) is None
+        assert [i.pk for i in LegacyQuery().workflow_instances(info, world.medops_app.pk)] == [own.pk]
+        with pytest.raises(GraphQLError, match="not found"):
+            LegacyMutation().transition_workflow(info, str(orphan.pk), "done")
+        assert LegacyMutation().transition_workflow(info, str(own.pk), "done").ok
+
+    orphan.refresh_from_db()
+    assert orphan.current_state == "draft"
+
+
+def test_lists_and_the_run_gate_agree_on_deleted_owners(world):
+    """``visible_runs`` and the single-run gate resolve a soft-deleted
+    project, app or team the same way: it covers nothing. A project binding
+    still covers a live project whose team was deleted, on both sides."""
+    now = timezone.now()
+    gone_project = Project.objects.create(
+        organization=world.org, team=world.medops, name="Gone", slug="gone-wf1965"
+    )
+    _definition_run(world.org, _definition(world.org, "gone-flow", gone_project), "wf-gone-project")
+    gone_app = RegisteredApp.objects.create(
+        organization=world.org,
+        team=world.medops,
+        project=world.medops_project,
+        name="Gone app",
+        slug="gone-app-wf1965",
+        k8s_namespace="acme-gone-app-wf1965",
+        provisioning_status="ready",
+    )
+    _app_run(world.org, gone_app, "wf-gone-app")
+    gone_team = Team.objects.create(organization=world.org, name="Gone team", slug="gone-team-wf1965")
+    stranded = Project.objects.create(
+        organization=world.org, team=gone_team, name="Stranded", slug="stranded-wf1965"
+    )
+    _definition_run(world.org, _definition(world.org, "stranded-flow", stranded), "wf-stranded")
+    Project.all_objects.filter(pk=gone_project.pk).update(deleted_at=now)
+    RegisteredApp.all_objects.filter(pk=gone_app.pk).update(deleted_at=now)
+    Team.all_objects.filter(pk=gone_team.pk).update(deleted_at=now)
+
+    holders = {
+        "team": (_holder("team_developer", "TEAM", world.medops.pk, "alive-team"), MEDOPS_RUNS),
+        "stranded-project": (
+            _holder("project_developer", "PROJECT", stranded.pk, "stranded"),
+            ["wf-stranded"],
+        ),
+        "deleted-team": (_holder("team_developer", "TEAM", gone_team.pk, "gone-team"), []),
+    }
+    wids = sorted(WorkflowRun.objects.filter(organization=world.org).values_list("workflow_id", flat=True))
+
+    for name, (holder, expected) in holders.items():
+        with _as(world, holder):
+            listed = set(
+                visible_runs(
+                    WorkflowRun.objects.filter(organization=world.org), world.org.pk, Permission.WORKFLOW_READ
+                ).values_list("workflow_id", flat=True)
+            )
+            gated = set()
+            for wid in wids:
+                try:
+                    check_permission(Permission.WORKFLOW_READ, scope=workflow_run_scope(wid, world.org.pk))
+                except PermissionDenied:
+                    continue
+                gated.add(wid)
+        assert listed == gated == set(expected), name

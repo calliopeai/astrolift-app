@@ -55,9 +55,10 @@ class Query:
     @require_permission(Permission.WORKFLOW_READ, scope=instance_scope_by_id("id"))
     @tenant_scoped()
     def workflow_instance(self, info: Info, id: strawberry.ID) -> Optional[WorkflowInstanceType]:
-        # Org-scoped: a foreign org's instance id resolves to nothing,
-        # same closure as the definition readers (#968 follow-up).
-        return WorkflowInstance.objects.filter(pk=id).filter(_org_scope_q(_caller_org_pk())).first()
+        # The caller's own org only: a foreign org's instance, and a legacy
+        # org-less one, resolve to nothing. Unlike a definition, an instance
+        # is not shared platform content (#1965).
+        return WorkflowInstance.objects.filter(pk=id, organization_id=_caller_org_pk()).first()
 
     @strawberry.field(description="List workflow instances for a specific object.")
     @require_permission(Permission.WORKFLOW_READ, any_scope=True)
@@ -69,10 +70,10 @@ class Query:
         model_label: Optional[str] = None,
     ) -> list[WorkflowInstanceType]:
         org_pk = _caller_org_pk()
-        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(_org_scope_q(org_pk))
+        qs = WorkflowInstance.objects.filter(object_id=object_id, organization_id=org_pk)
         projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
         if projects is not None:
-            qs = qs.filter(organization_id=org_pk, workflow__project_id__in=projects)
+            qs = qs.filter(workflow__project_id__in=projects)
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 

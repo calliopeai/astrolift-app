@@ -19,9 +19,13 @@
   without selecting anything. Only the platform operator acts fleet-wide on
   the viewer and on cancel, terminate and signal: the stock organization
   owner and admin roles hold `admin.elevate`, and through it they reached
-  other organizations' runs. `workflowStageExecutions` no longer returns
-  runs that belong to no organization, and `createWorkflow` binds the
-  organization's own definition over a platform template with the same slug.
+  other organizations' runs. `workflowStageExecutions`, `workflowInstance`
+  and `workflowInstances` no longer return rows that belong to no
+  organization. `createWorkflow` now prefers the organization's own
+  definition over a platform template with the same slug. A team-scoped
+  import (`importWorkflowManifest`, `importWorkflowFlow`) can still create a
+  disabled, project-less definition with a template's slug; enabling it, or
+  configuring a workflow from it, needs an organization grant.
 
 - Cluster and deployment history no longer shows one org another org's rows.
   `astroliftClusterLifecycleAudit` returns only mutations run in the caller's

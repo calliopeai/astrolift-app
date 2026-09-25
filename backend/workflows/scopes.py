@@ -228,29 +228,45 @@ def covered_project_ids(org_id: int | None, permission: Permission):
 
     ``None`` means the grant is org-wide and nothing needs narrowing.
     Project-less and template rows are org-level, so a narrowed list
-    leaves them out.
+    leaves them out. The liveness checks mirror the resolver's ancestry
+    walk (``_scope_ancestry``): a deleted project is covered by nothing,
+    and a team covers its projects only while the team itself is live. A
+    project binding still covers a live project whose team was deleted,
+    exactly as the single-object gate allows.
     """
     from astrolift_identity.models import Project
-    from astrolift_identity.scope_visibility import visible_projects
 
-    if granted_scopes(get_current_tenant(), permission).org:
+    scopes = granted_scopes(get_current_tenant(), permission)
+    if scopes.org:
         return None
-    return visible_projects(Project.objects.filter(organization_id=org_id), permission).values("pk")
+    return Project.objects.filter(
+        Q(pk__in=scopes.project_ids) | Q(team_id__in=scopes.team_ids, team__deleted_at__isnull=True),
+        organization_id=org_id,
+        deleted_at__isnull=True,
+    ).values("pk")
 
 
 def visible_runs(qs, org_id: int | None, permission: Permission):
     """Narrow ``WorkflowRun`` rows to the runs whose owner the caller covers.
 
     Same precedence as :func:`run_scope`: a run that records an app is
-    covered through that app alone.
+    covered through that app alone, and a deleted app covers nothing. The
+    app's project and team cover it only while they are live, as in the
+    resolver's ``_app_scope_chains``.
     """
-    from astrolift_identity.scope_visibility import visible_apps
     from astrolift_registry.models import RegisteredApp
 
     projects = covered_project_ids(org_id, permission)
     if projects is None:
         return qs
-    apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), permission)
+    scopes = granted_scopes(get_current_tenant(), permission)
+    apps = RegisteredApp.objects.filter(
+        Q(pk__in=scopes.app_ids)
+        | Q(project_id__in=scopes.project_ids, project__deleted_at__isnull=True)
+        | Q(team_id__in=scopes.team_ids, team__deleted_at__isnull=True),
+        organization_id=org_id,
+        deleted_at__isnull=True,
+    )
     return qs.filter(
         Q(registered_app_id__in=apps.values("pk"))
         | Q(registered_app__isnull=True, workflow_definition__project_id__in=projects)
