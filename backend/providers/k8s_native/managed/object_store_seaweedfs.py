@@ -137,6 +137,16 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
                 errors=["seaweedfs_preflight_failed"],
             )
 
+        # The bucket name is tenant-settable and every tenant's buckets share
+        # one namespace: the Bucket, its S3 identity, Secret and credential
+        # path are all keyed by it, so only this service's may be reapplied.
+        try:
+            refusal = self._existing_owner_refusal(spec, bucket_name)
+        except Exception as exc:
+            refusal = f"could not verify ownership of SeaweedFS bucket {bucket_name}: {exc}"
+        if refusal:
+            return ProvisionResult(ok=False, handle="", message=refusal, errors=["resource_not_owned"])
+
         manifests = self._manifests(
             spec=spec,
             bucket_name=bucket_name,
@@ -903,6 +913,27 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
             "S3Policy": dns_label(bucket_name, "policy"),
             "S3PolicyBinding": dns_label(bucket_name, "policy", "binding"),
         }
+
+    def _existing_owner_refusal(self, spec: ProvisionSpec, bucket_name: str) -> str:
+        """Why an existing Bucket named ``bucket_name`` is not this service's, or ``""`` (#1959)."""
+        bucket = self._config.cluster_driver.get_manifest(
+            spec.tenant_cluster_id,
+            self._config.namespace,
+            _RESOURCE_KINDS["Bucket"],
+            bucket_name,
+        )
+        if bucket is None:
+            return ""
+        labels = (bucket.get("metadata") or {}).get("labels") or {}
+        refusal = f"SeaweedFS bucket {bucket_name} already exists and is not this service's; refusing to adopt it"
+        if labels.get("app.kubernetes.io/managed-by") != "astrolift":
+            return refusal
+        expected = self._labels(spec)
+        owner = labels.get("astrolift.io/managed-service")
+        if owner and spec.managed_service_id:
+            return "" if owner == expected["astrolift.io/managed-service"] else refusal
+        same = all(labels.get(key) == expected[key] for key in ("astrolift.io/organization", "astrolift.io/app"))
+        return "" if same else refusal
 
     def _labels(self, spec: ProvisionSpec) -> dict[str, str]:
         labels = {
