@@ -721,6 +721,17 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
                 status=404,
             )
 
+    from _sdk.k8s_naming import app_namespace
+
+    from astrolift_registry.hostname_claims import hostname_label_refusal
+    from astrolift_registry.namespaces import namespace_refusal
+
+    refusal = namespace_refusal(
+        app_namespace(organization_slug=org.slug, app_slug=app_slug), organization_id=org.pk
+    ) or hostname_label_refusal(app_slug, organization=org, managed_domain=managed_domain)
+    if refusal is not None:
+        return JsonResponse({"detail": refusal}, status=409)
+
     storage_class = _persistent_storage_class(cluster) if dev.data_file_path else ""
 
     app = RegisteredApp.objects.create(
