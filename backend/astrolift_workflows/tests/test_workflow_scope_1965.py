@@ -714,3 +714,43 @@ def test_a_gate_with_named_approvers_is_decided_only_by_them(world, delivered):
     assert refused.ok is False
     assert allowed.ok is True
     assert delivered == ["wf-intake"]
+
+
+def test_the_viewer_list_costs_the_same_for_one_row_or_a_full_page(world, temporal_reads, monkeypatch):
+    """#1983: ownership, scope and actor were resolved per row, so a page cost
+    a few queries per run; they are now resolved for the page at once."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    auditor = User.objects.create(username="team-auditor-wf1983")
+    bind_role(
+        auditor,
+        permissions=[Permission.AUDIT_LOG_READ],
+        kind="TEAM",
+        scope_id=world.medops.pk,
+        slug="auditor-wf1983",
+    )
+    info = make_info(auditor)
+    viewer = TemporalWorkflowsQuery()
+    row = {
+        "workflow_type": "DeployAppWorkflow",
+        "status": "RUNNING",
+        "started_at": "",
+        "closed_at": "",
+        "run_id": "r1",
+    }
+
+    def page(wids):
+        monkeypatch.setattr(
+            "astrolift_workflows.schema.queries.list_workflow_instances",
+            lambda **kw: ([{**row, "workflow_id": wid} for wid in wids], None),
+        )
+        with _as(world, auditor), CaptureQueriesContext(connection) as queries:
+            items = viewer.astrolift_workflow_instances(info).items
+        return len(queries.captured_queries), sorted(item.workflow_id for item in items)
+
+    one, _ = page(MEDOPS_RUNS[:1])
+    full, listed = page([*ORG_RUNS, "wf-beta"])
+
+    assert listed == MEDOPS_RUNS
+    assert full == one

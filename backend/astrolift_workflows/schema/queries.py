@@ -90,12 +90,21 @@ def _triggered_by_for(workflow_id: str, org_id: int | None = None) -> str:
     ``org_id`` scopes the mirror lookup so a per-org viewer can't read a
     foreign org's actor identity (#1183); a fleet-wide (elevated) caller
     passes ``None`` to resolve the label across orgs."""
-    qs = WorkflowRun.objects.filter(workflow_id=workflow_id)
+    return _triggered_by_map([workflow_id], org_id).get(workflow_id, "")
+
+
+def _triggered_by_map(workflow_ids: list[str], org_id: int | None = None) -> dict[str, str]:
+    """:func:`_triggered_by_for` for a whole page in one query (#1983)."""
+    qs = WorkflowRun.objects.filter(workflow_id__in=[wid for wid in workflow_ids if wid])
     if org_id is not None:
         qs = qs.filter(organization_id=org_id)
-    run = qs.select_related("trigger_actor_user").order_by("-started_at").first()
-    if run is None:
-        return ""
+    latest: dict[str, WorkflowRun] = {}
+    for run in qs.select_related("trigger_actor_user").order_by("-started_at"):
+        latest.setdefault(run.workflow_id, run)
+    return {wid: _actor_label(run) for wid, run in latest.items()}
+
+
+def _actor_label(run) -> str:
     user = run.trigger_actor_user
     if user is not None:
         first = (user.first_name or "").strip()
@@ -155,6 +164,52 @@ def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None, org
     return True
 
 
+def _visible_workflow_ids(
+    workflow_ids: list[str], *, elevated: bool, caller: int | None, org_wide: bool
+) -> set[str]:
+    """The page-wide form of :func:`_viewer_can_see` (#1983), in a fixed
+    number of queries instead of an ownership lookup and a permission check
+    per row. Same rules: the owner is the ``WorkflowInstance`` org, else the
+    newest ``WorkflowRun`` mirror's; below the org a run is visible through
+    the app it records (``visible_runs``), else through its definition's
+    project; an org-less legacy run only to the operator."""
+    ids = {wid for wid in workflow_ids if wid}
+    if elevated:
+        return ids
+    if caller is None or not ids:
+        return set()
+    from workflows.models import WorkflowInstance
+
+    owners: dict[str, int] = {}
+    for wid, org_id in (
+        WorkflowRun.objects.filter(workflow_id__in=ids, organization__isnull=False, deleted_at__isnull=True)
+        .order_by("pk")
+        .values_list("workflow_id", "organization_id")
+    ):
+        owners[wid] = org_id  # ascending pk: the newest mirror wins
+    for wid, org_id in WorkflowInstance.objects.filter(
+        temporal_workflow_id__in=ids, organization__isnull=False, deleted_at__isnull=True
+    ).values_list("temporal_workflow_id", "organization_id"):
+        owners[wid] = org_id  # the tier-3 instance outranks the mirror
+    owned = {wid for wid in ids if owners.get(wid) == caller}
+    if org_wide or not owned:
+        return owned
+
+    runs = WorkflowRun.objects.filter(workflow_id__in=owned, organization_id=caller)
+    with_run = set(runs.values_list("workflow_id", flat=True))
+    visible = set(visible_runs(runs, caller, Permission.AUDIT_LOG_READ).values_list("workflow_id", flat=True))
+    instance_only = owned - with_run
+    if instance_only:
+        projects = covered_project_ids(caller, Permission.AUDIT_LOG_READ)
+        instances = WorkflowInstance.objects.filter(
+            temporal_workflow_id__in=instance_only, organization_id=caller, deleted_at__isnull=True
+        )
+        if projects is not None:
+            instances = instances.filter(workflow__project_id__in=projects)
+        visible |= set(instances.values_list("temporal_workflow_id", flat=True))
+    return visible
+
+
 @strawberry.type
 class TemporalWorkflowsQuery:
     @strawberry.field
@@ -197,12 +252,19 @@ class TemporalWorkflowsQuery:
             limit=limit,
             after=after,
         )
+        visible = _visible_workflow_ids(
+            [r.get("workflow_id", "") or "" for r in rows],
+            elevated=elevated,
+            caller=caller,
+            org_wide=org_wide,
+        )
+        actors = _triggered_by_map(sorted(visible), None if elevated else caller)
         items = []
         for r in rows:
             wid = r.get("workflow_id", "") or ""
-            if not _viewer_can_see(wid, elevated=elevated, caller=caller, org_wide=org_wide):
+            if wid not in visible:
                 continue
-            items.append(instance_to_type(r, _triggered_by_for(wid, None if elevated else caller)))
+            items.append(instance_to_type(r, actors.get(wid, "")))
         return WorkflowInstancePageType(items=items, next_cursor=next_cursor)
 
     @strawberry.field
