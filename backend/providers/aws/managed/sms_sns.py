@@ -26,7 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "sms"
@@ -92,6 +92,12 @@ class SNSSmsDriver(ManagedServiceDriver):
             existing = self._topic(expected_arn)
             if existing is not None:
                 self._assert_owned(expected_arn, topic_name)
+                # topic_name is tenant-settable: the SMS marker alone lets one
+                # tenant retag another's topic as its own (#1961).
+                owned = self._sns.list_tags_for_resource(ResourceArn=expected_arn).get("Tags") or []
+                refusal = adoption_refusal(owned, spec, resource=f"SNS SMS topic {topic_name!r}")
+                if refusal is not None:
+                    raise ManagedServiceError(refusal)
                 topic_arn = expected_arn
                 self._sns.tag_resource(ResourceArn=topic_arn, Tags=self._tags(spec, topic_name))
             else:

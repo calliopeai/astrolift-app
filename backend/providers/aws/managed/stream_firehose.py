@@ -35,7 +35,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 
 KIND = "stream"
 _SOURCE_TYPES = {
@@ -124,7 +124,7 @@ class FirehoseDriver(ManagedServiceDriver):
         try:
             description = self._await_delivery_state(name, {"ACTIVE"})
             arn = str(description.get("DeliveryStreamARN") or arn)
-            if not created and not self._is_managed(arn):
+            if not created and not self._is_own_stream(arn, spec):
                 raise ManagedServiceError(
                     f"delivery stream {name} already exists outside this resource declaration",
                 )
@@ -541,6 +541,24 @@ class FirehoseDriver(ManagedServiceDriver):
         raise ManagedServiceError(
             f"Firehose encryption did not reach {desired}",
         )
+
+    def _is_own_stream(self, arn: str, spec: ProvisionSpec) -> bool:
+        """Platform-made is not enough to adopt: it must be this service's (#1961)."""
+        if not self._is_managed(arn):
+            return False
+        tags: list[dict[str, Any]] = []
+        token = ""
+        while True:
+            request: dict[str, Any] = {"DeliveryStreamName": _stream_name_from_arn(arn)}
+            if token:
+                request["ExclusiveStartTagKey"] = token
+            response = self._firehose.list_tags_for_delivery_stream(**request)
+            page = response.get("Tags") or []
+            tags.extend(page)
+            if not response.get("HasMoreTags") or not page:
+                break
+            token = str(page[-1].get("Key") or "")
+        return adoption_refusal(tags, spec, resource="Firehose delivery stream") is None
 
     def _is_managed(self, arn: str) -> bool:
         token = ""
