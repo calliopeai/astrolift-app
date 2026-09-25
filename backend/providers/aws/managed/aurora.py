@@ -357,7 +357,7 @@ class AuroraDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="aws", driver="aurora")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         _, cluster_id = parse_handle(handle.handle)
         cluster = self._describe_cluster(cluster_id)
         if cluster is None:

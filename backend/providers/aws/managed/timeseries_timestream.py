@@ -512,7 +512,7 @@ class TimestreamDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="aws", driver="timeseries_timestream")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         database_name, table_name = self._split_handle(handle.handle)
         existing_db = self._describe_database(database_name)
         if existing_db is None:

@@ -399,6 +399,7 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     ),
     ("gcp", "warehouse", "bigquery"): frozenset(
         {
+            "WAREHOUSE_CREDENTIALS",
             "WAREHOUSE_CREDENTIALS_REF",
             "WAREHOUSE_NAMESPACE",
             "WAREHOUSE_PORT",

@@ -323,7 +323,7 @@ class RDSSqlServerDriver(ManagedServiceDriver):
         return ServiceStatus(handle.handle, _STATE.get(aws_state, "updating"), f"RDS reports {aws_state}")
 
     @driver_op(cloud="aws", driver="mssql_rds")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         _, instance_id = parse_handle(handle.handle)
         instance = self._describe(instance_id)
         if instance is None:
