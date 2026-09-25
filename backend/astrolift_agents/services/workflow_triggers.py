@@ -62,14 +62,23 @@ def trigger_workflow_instance(
     *,
     trigger_kind: str = "manual",
     triggered_by_user=None,
+    organization_id: int | None = None,
 ) -> WorkflowInstance:
     """Create a WorkflowInstance and start the Temporal workflow.
 
     This is the canonical inner entry point. Callers (schedule fired,
     webhook received, manual UI button) all converge here.
 
+    ``organization_id`` is the org that owns the trigger (a webhook's
+    org); without one, the definition's own org owns it. The instance and
+    its run record that org (#1984). An org-less instance is reachable by
+    no tenant, and an org-less run resolves its agents and picks its
+    dispatcher across every org. A platform template has no org of its
+    own, so a template-backed trigger has to pass its org.
+
     Returns the created ``WorkflowInstance``.
     """
+    owner = organization_id if organization_id is not None else definition.organization_id
     with transaction.atomic():
         # WorkflowInstance.start() requires a content_object. For
         # definition-level triggers there is no domain object; we attach
@@ -78,6 +87,7 @@ def trigger_workflow_instance(
             workflow=definition,
             obj=definition,
             user=triggered_by_user,
+            organization_id=owner,
         )
 
     # Enqueue Temporal workflow (best-effort; instance row is already
@@ -486,6 +496,7 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
                 hook.workflow_definition,
                 input_data=input_data,
                 trigger_kind=f"scm_{event.event_kind}",
+                organization_id=hook.organization_id,
             )
         except Exception:
             log.exception(
@@ -547,6 +558,7 @@ def _enqueue_temporal(
         _run, workflow_id = start_workflow_definition_run(
             instance.workflow,
             trigger_payload=input_data,
+            organization_id=instance.organization_id,
             actor=Actor(kind="system", user_id=None, display=trigger_kind),
         )
         # Store the Temporal workflow_id + run_id on the instance — the latter
@@ -597,6 +609,9 @@ def _create_temporal_schedule(
     _run, run_input, run_workflow_id = build_workflow_definition_run_input(
         definition,
         trigger_payload=input_template,
+        # A schedule has no org of its own; its runs belong to the
+        # definition's (#1984).
+        organization_id=definition.organization_id,
         actor=Actor(kind="system", user_id=None, display="scheduled"),
     )
     task_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")

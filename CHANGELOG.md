@@ -25,7 +25,12 @@
   definition over a platform template with the same slug. A team-scoped
   import (`importWorkflowManifest`, `importWorkflowFlow`) can still create a
   disabled, project-less definition with a template's slug; enabling it, or
-  configuring a workflow from it, needs an organization grant.
+  configuring a workflow from it, needs an organization grant. Workflows
+  started by an SCM push, an inbound webhook or a definition schedule now
+  record the organization that owns the trigger: the webhook's (or its
+  app's), else the definition's. They used to record none, so no tenant
+  could reach them, and their agent stages resolved workloads and picked a
+  dispatcher across every organization (#1984).
 
 - Confine agent and managed-service secret locations to the organization's own
   secret namespace (#1921). Every driver files a relative ref under the

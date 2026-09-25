@@ -268,6 +268,9 @@ def _dispatch_workflow_webhooks(event_kind: str, app, payload: dict) -> int:
                     wh.workflow_definition,
                     payload,
                     trigger_kind=f"scm_{event_kind}",
+                    # An app-bound webhook may predate the org column; the
+                    # app it is bound to is the owner then (#1984).
+                    organization_id=wh.organization_id or app.organization_id,
                 )
         except Exception:
             # Never let one bad workflow trigger break SCM ingest, and
