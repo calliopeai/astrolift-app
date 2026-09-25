@@ -86,6 +86,20 @@
   status. No existing role loses a permission. Migration
   `astrolift_identity.0034` applies the catalogue to existing installs.
 
+- Install-wide operations need the platform operator: an active superuser,
+  whose bearer token also needs the `admin` scope. The stock organization
+  owner and admin roles hold every permission, `admin.elevate` included, so
+  the permission gates on these admitted every organization's admins.
+  `setFeatureFlag` flipped a runtime flag for every tenant,
+  `resyncAllAstroliftCiWorkflows` swept every organization's managed apps,
+  `scanCloudOrphans` listed every organization's orphaned cloud resources
+  (a team owner with its team selected got there too), and `reapCloudOrphan`
+  deleted IAM roles and managed services through any organization's cluster.
+  Django staff who are not superusers lose the shortcuts that reached across
+  organizations: the `dispatchers` list, every organization in
+  `astroliftOrganizations`, editing platform workflow templates, and creating
+  templates and workflow triggers (#1978).
+
 - Django model permissions (`config/roles_gen.py`) no longer authorize app
   code. The legacy scaffold surfaces that read them now admit only the
   platform operator (an active superuser), the only caller they admitted in
