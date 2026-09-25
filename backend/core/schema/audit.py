@@ -371,17 +371,40 @@ class MutationAuditExtension(SchemaExtension):
     """Strawberry schema extension that logs mutations to the database."""
 
     def on_operation(self):
+        from core.mutations import _mutation_action_local
+
+        # The action name is published per thread by @mutation_audit. Start
+        # every operation without one, so a request whose mutation never
+        # reaches a decorated resolver (a validation failure, say) is not
+        # filed under the previous request's action (#1956).
+        _mutation_action_local.action = None
         # Judged before the mutation runs, as @mutation_audit does (#1955).
         organization_id = self._attributable_organization_id()
-        yield  # Let the operation execute
+        try:
+            yield  # Let the operation execute
+            self._log(organization_id)
+        finally:
+            _mutation_action_local.action = None
+
+    def _is_mutation(self) -> bool:
+        """By the parsed operation type, not by the query text's first word
+        (an anonymous ``{...}`` or a document with a leading comment or a
+        fragment is still a mutation when it says so) (#1956)."""
+        request = self.execution_context
+        if not request or not request.query:
+            return False
+        try:
+            from strawberry.types.graphql import OperationType
+
+            return request.operation_type == OperationType.MUTATION
+        except Exception:  # noqa: BLE001 - unparseable document
+            return request.query.strip().lower().startswith("mutation")
+
+    def _log(self, organization_id):
         # After execution, log if it was a mutation
         try:
             request = self.execution_context
-            if not request or not request.query:
-                return
-
-            query = request.query.strip()
-            if not query.lower().startswith("mutation"):
+            if not self._is_mutation():
                 return
 
             # Prefer the dot-notation action set by @mutation_audit (e.g.
@@ -420,12 +443,22 @@ class MutationAuditExtension(SchemaExtension):
                 schema=getattr(request.schema, "_schema", None),
             )
 
-            # Check for errors
+            # Check for errors: execution errors on the result, and parse or
+            # validation errors, which never reach a result (#1956); and a
+            # resolver's own envelope failure (``ok: false``) when the
+            # document selected it.
             result = request.result
-            has_errors = bool(result and result.errors)
-            error_messages = []
-            if has_errors and result.errors:
-                error_messages = [str(e) for e in result.errors[:5]]
+            graphql_errors = list(
+                (result.errors if result else None) or getattr(request, "pre_execution_errors", None) or []
+            )
+            error_messages = [str(e) for e in graphql_errors[:5]]
+            envelope_failed = any(
+                isinstance(value, dict) and value.get("ok") is False
+                for value in (
+                    (result.data or {}).values() if result and isinstance(result.data, dict) else ()
+                )
+            )
+            has_errors = bool(graphql_errors) or envelope_failed
             # Error messages quote variable values and print source
             # excerpts, literals included (#1920).
             if sensitive or _is_secret_operation(operation_name):
@@ -449,8 +482,8 @@ class MutationAuditExtension(SchemaExtension):
         query, which is never logged."""
         try:
             request = self.execution_context
-            query = (request.query or "").strip().lower() if request else ""
-            if not query.startswith("mutation"):
+            query = (request.query or "").strip() if request else ""
+            if not query or query.lower().startswith(("query", "subscription")):
                 return None
             from core.mutations import attributable_organization_id
 
