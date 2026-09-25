@@ -31,7 +31,9 @@
   check to an inline manifest. A manifest the reconcile rejects returns
   `VALIDATION`, including a project-scoped service on an app that belongs
   to no project. The audit entry names the changed keys and bindings, never
-  values or digests. The manifest editor now shows an "Apply" button
+  values or digests, and the returned manifest text masks `[env]` values for
+  a caller who can't reveal secrets, as every other manifest response does
+  (#1920). The manifest editor now shows an "Apply" button
   (disabled while the draft has unsaved local edits) and a "Staged, not
   applied" badge instead of "Push to repo" when the app has no source repo,
   and confirms before applying, listing the env key names (never values)
