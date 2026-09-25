@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "model_endpoint"
 
@@ -150,6 +151,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
 
         existing = self._describe_endpoint(base_name)
         if existing is not None:
+            labels = existing.get("labels") if isinstance(existing, dict) else getattr(existing, "labels", None)
+            refusal = label_adoption_refusal(dict(labels or {}), spec, resource=f"vertex endpoint {base_name}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(base_name=base_name),

@@ -27,6 +27,7 @@ class _AlreadyExists(Exception):
 class FakePublisher:
     project_id: str
     topics: set[str] = field(default_factory=set)
+    topic_labels: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def topic_path(self, project: str, topic: str) -> str:
         return f"projects/{project}/topics/{topic}"
@@ -36,6 +37,7 @@ class FakePublisher:
         if topic_id in self.topics:
             raise _AlreadyExists(topic_id)
         self.topics.add(topic_id)
+        self.topic_labels[topic_id] = dict(request.get("labels") or {})
         return None
 
     def delete_topic(self, *, request: dict[str, Any]) -> None:
@@ -48,7 +50,7 @@ class FakePublisher:
         topic_id = request["topic"].rsplit("/", 1)[-1]
         if topic_id not in self.topics:
             raise _NotFound(topic_id)
-        return object()
+        return {"labels": self.topic_labels.get(topic_id, {})}
 
 
 @dataclass
@@ -304,3 +306,21 @@ def test_deprovision_already_gone_is_idempotent(
     )
     assert deprov.ok
     assert "already gone" in deprov.message
+
+
+def test_provision_does_not_adopt_another_services_topic(driver) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message
+
+
+def test_an_unlabeled_legacy_topic_is_still_adopted(driver, fake_pub) -> None:
+    topic_id = driver._topic_id(spec=_spec())
+    fake_pub.topics.add(topic_id)  # created before topics were labeled
+
+    assert driver.provision(_spec()).ok
