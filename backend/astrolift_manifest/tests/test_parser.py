@@ -1271,3 +1271,34 @@ kind = "deployment"
     containers = raw.workloads[0].containers
     assert containers[0].dockerfile_path == "Dockerfile.a"
     assert containers[1].dockerfile_path == "Dockerfile"
+
+
+# ---- the masked-read placeholder (#1920) ---------------------------
+
+_STAGED_WITH_PLACEHOLDER = """\
+name = "hello"
+
+[env]
+API_KEY = "[ASTROLIFT_REDACTED_ENV_VALUE]"
+LOG_LEVEL = "info"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+"""
+
+
+def test_parse_raw_refuses_the_masked_env_placeholder() -> None:
+    """A staged draft saved from a masked read with its values never put
+    back must not be applied or deployed: applyStagedManifest, repo sync
+    and the deploy renderer all parse through here, and applying it would
+    replace the stored secret with the placeholder."""
+    with pytest.raises(ManifestError) as exc_info:
+        parse_raw(_STAGED_WITH_PLACEHOLDER)
+    assert exc_info.value.path == "env.API_KEY"
+    assert "masked placeholder" in str(exc_info.value)
+
+
+def test_parse_raw_takes_the_placeholder_text_inside_a_real_value() -> None:
+    raw = parse_raw(_STAGED_WITH_PLACEHOLDER.replace('"[ASTROLIFT', '"prefix-[ASTROLIFT'))
+    assert raw.raw["env"]["API_KEY"] == "prefix-[ASTROLIFT_REDACTED_ENV_VALUE]"

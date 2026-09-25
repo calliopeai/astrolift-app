@@ -310,6 +310,30 @@ def with_active_org_member(queryset, *, user: str, organization: str):
     )
 
 
+def is_active_org_member(user_id: int, organization_id: int) -> bool:
+    """Does ``user_id`` belong to ``organization_id``, by the rule
+    :func:`with_active_org_member` applies to credentials? The audit writers
+    use it to decide whether a mutation may be filed under the tenant org
+    (#1955)."""
+    from django.db.models import Exists, OuterRef
+
+    from astrolift_identity.models import Member, Organization
+
+    membership = Member.objects.filter(
+        user_id=user_id,
+        user__is_active=True,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=OuterRef("pk"),
+        is_active=True,
+        deleted_at__isnull=True,
+    )
+    return (
+        Organization.objects.filter(pk=organization_id, deleted_at__isnull=True)
+        .filter(Exists(membership))
+        .exists()
+    )
+
+
 def verify_token(plaintext: str):
     """Hash-lookup a presented plaintext bearer.
 

@@ -376,8 +376,12 @@ def test_bootstrap_runs_field_does_not_leak_other_org_history(org_a, org_b):
 
 def test_bootstrap_runs_field_reaches_shared_cluster_history(org_a):
     shared = _cluster(None)
+    # Recorded by org_a, as recordClusterBootstrapRun stamps it. Another
+    # org's run on the same shared cluster stays out (#1955, see
+    # test_cluster_history_tenancy_1955).
     run = ClusterBootstrapRun.objects.create(
         tenant_cluster=shared,
+        organization=org_a,
         status="succeeded",
         chart_version="astrolift-0.42.0",
         installed_releases=[],

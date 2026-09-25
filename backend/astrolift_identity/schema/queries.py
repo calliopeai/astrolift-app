@@ -1196,11 +1196,13 @@ class IdentityQuery:
 
         A role is grantable iff its permission set is a (non-strict)
         subset of the viewer's effective permissions at the active
-        org scope. Rationale: an operator who lacks ``app.deploy``
-        can't legitimately promote someone else into a role that
-        carries it — the deferred grant would just be rejected by
-        the resolver chain at use time, and surfacing it in the
-        picker is misleading. Django superusers see every role.
+        org scope, the scope an invitation binds at. Rationale: an
+        operator who lacks ``app.deploy`` can't legitimately promote
+        someone else into a role that carries it. The mutations that
+        hand out roles enforce the same ceiling
+        (``astrolift_identity.grants``, #1964), so this list is exactly
+        what ``createInvitation`` and an org-scope ``grantRole`` accept.
+        Django superusers see every role.
 
         Empty list is a legitimate result and tells the FE to disable
         the picker with an explainer; not the same as
@@ -1211,10 +1213,9 @@ class IdentityQuery:
         Soft-deleted roles are skipped. Bound to the org scope of the
         active tenant; cross-tenant custom roles are excluded.
         """
-        from django.contrib.auth import get_user_model
         from django.db.models import Q
 
-        from core.permissions import Permission as _Permission
+        from astrolift_identity.grants import grant_ceiling
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
@@ -1222,9 +1223,6 @@ class IdentityQuery:
         actor_id = tenant.actor_user_id if tenant else None
         if org_id is None or actor_id is None:
             return []
-
-        User = get_user_model()
-        is_superuser = User.objects.filter(pk=actor_id, is_superuser=True, is_active=True).exists()
 
         # System roles have ``organization_id is null``; custom roles
         # are bound to the org. Either is a candidate.
@@ -1234,51 +1232,8 @@ class IdentityQuery:
             .order_by("scope_level", "slug")
         )
 
-        if is_superuser:
-            return [role_to_type(r) for r in candidates]
-
-        # Compute the viewer's effective permission set once; mirrors
-        # the logic in ``astrolift_my_permissions`` but kept inline so
-        # this resolver is self-contained.
-        from django.utils import timezone
-
-        now = timezone.now()
-        candidate_scopes: list[tuple[str, int]] = []
-        if tenant.project_id is not None:
-            candidate_scopes.append(("PROJECT", tenant.project_id))
-        if tenant.team_id is not None:
-            candidate_scopes.append(("TEAM", tenant.team_id))
-        candidate_scopes.append(("ORG", org_id))
-        scope_kinds = {k for k, _ in candidate_scopes}
-        scope_ids_by_kind: dict[str, set[int]] = {}
-        for k, sid in candidate_scopes:
-            scope_ids_by_kind.setdefault(k, set()).add(sid)
-
-        bindings = RoleBinding.objects.select_related("role").filter(
-            user_id=actor_id, scope_kind__in=scope_kinds, deleted_at__isnull=True
-        )
-        effective: set[str] = set()
-        for binding in bindings:
-            if binding.expires_at is not None and binding.expires_at <= now:
-                continue
-            ids = scope_ids_by_kind.get(binding.scope_kind, set())
-            if binding.scope_id not in ids:
-                continue
-            for slug in binding.role.permissions or ():
-                effective.add(slug)
-
-        # Reject roles that name a permission not in the catalog so a
-        # corrupt role row can never be promoted; a strict subset
-        # check on a smaller-than-catalog effective set is meaningless.
-        catalog = {p.value for p in _Permission}
-        grantable: list[Role] = []
-        for r in candidates:
-            perms = set(r.permissions or ())
-            if not perms.issubset(catalog):
-                continue
-            if perms.issubset(effective):
-                grantable.append(r)
-        return [role_to_type(r) for r in grantable]
+        ceiling = grant_ceiling(tenant, scope_kind="ORG", scope_id=org_id)
+        return [role_to_type(r) for r in candidates if ceiling.allows(r.permissions)]
 
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage."

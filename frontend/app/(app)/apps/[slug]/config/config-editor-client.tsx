@@ -233,6 +233,14 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   // server's current effective text AND (b) the server's effective text
   // also differs from the snapshot — meaning both sides moved.
   const baselineRef = React.useRef<string>("");
+  // True while our own Save is in flight. awaitRefetchQueries delivers the
+  // refetched app before updateManifest resolves, and the server echoes the
+  // text back with [env] values masked for a viewer who can't reveal them
+  // (#1920). Without this, the effect below reads that masked echo of our
+  // own save as someone else's edit. saveSettled re-runs the check once
+  // the save is done, against the baseline it left behind.
+  const savingRef = React.useRef(false);
+  const [saveSettled, setSaveSettled] = React.useState(0);
   const [conflict, setConflict] = React.useState<{
     theirs: string;
     serverUpdatedAt: string;
@@ -254,7 +262,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   // editor (different tab / different user) shows up as: server text
   // moved away from our baseline, and our draft also moved away.
   React.useEffect(() => {
-    if (!a || !draftLoaded) return;
+    if (!a || !draftLoaded || savingRef.current) return;
     const serverEffective = a.rawManifestStaged?.length
       ? a.rawManifestStaged
       : (a.rawManifest ?? "");
@@ -277,7 +285,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       serverUpdatedAt: a.updatedAt ?? new Date().toISOString(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a?.rawManifest, a?.rawManifestStaged, a?.updatedAt]);
+  }, [a?.rawManifest, a?.rawManifestStaged, a?.updatedAt, saveSettled]);
 
   const rendered = useQuery<RenderedResp>(GET_RENDERED_MANIFEST, {
     variables: { appSlug: slug, environmentName: null, imageTag: null },
@@ -312,14 +320,29 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   async function handleSave() {
     if (!a) return;
-    const { data } = await updateManifest({
-      variables: { input: { id: a.id, rawManifest: draft } },
-    });
-    if (data?.updateManifest.ok) {
-      baselineRef.current = draft;
-      toast.success("Draft saved");
-    } else {
-      toast.error(data?.updateManifest.errors?.[0]?.message ?? "Save failed");
+    const submitted = draft;
+    savingRef.current = true;
+    try {
+      const { data } = await updateManifest({
+        variables: { input: { id: a.id, rawManifest: submitted } },
+      });
+      if (data?.updateManifest.ok) {
+        // Adopt the server's copy of what we saved, which masks [env] values
+        // this viewer can't reveal. Saving that masked text again keeps the
+        // stored values, and anything typed during the save is left alone.
+        const saved = data.updateManifest.data;
+        const echoed = saved?.rawManifestStaged?.length
+          ? saved.rawManifestStaged
+          : (saved?.rawManifest ?? submitted);
+        baselineRef.current = echoed;
+        setDraft((current) => (current === submitted ? echoed : current));
+        toast.success("Draft saved");
+      } else {
+        toast.error(data?.updateManifest.errors?.[0]?.message ?? "Save failed");
+      }
+    } finally {
+      savingRef.current = false;
+      setSaveSettled((n) => n + 1);
     }
   }
 

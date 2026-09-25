@@ -202,7 +202,7 @@ class AppMutations:
         app.save()
         if approval["user_ids"] is not None:
             app.approver_users.set(approval["user_ids"])
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.set_subdomain")
@@ -283,7 +283,7 @@ class AppMutations:
                 ],
                 workflow_id=f"SyncAppDomainWorkflow-{app.guid}",
             )
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(action="app.delete")
@@ -464,9 +464,9 @@ class AppMutations:
         if app.team_id == next_team.id and app.project_id == next_project.id:
             # No-op: nothing to do. Return success so callers can
             # treat the mutation as idempotent.
-            return gql_success(app_to_type(app))
+            return gql_success(app_to_type(app, info=info))
 
         app.team = next_team
         app.project = next_project
         app.save(update_fields=["team", "project", "updated_at", "version"])
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))

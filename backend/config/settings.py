@@ -24,6 +24,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.utils.encoding import force_str
 from dotenv import load_dotenv
 from import_export.formats.base_formats import CSV, JSON, TSV, XLSX
+from sentry_sdk.integrations.strawberry import StrawberryIntegration
 
 
 def _strtobool(val: str) -> int:
@@ -1067,6 +1068,40 @@ logger.warning(f"DJANGO_CONFIGURATION: {CONFIGURATION}")
 
 SENTRY_DSN = env_str("SENTRY_DSN")
 
+
+# An error event must not carry what the request or the stack held
+# (#1920). A GraphQL request body is the mutation's variables (secret
+# values, whole manifests, the step-up credential), and a frame's locals
+# include the resolver's ``input``. The SDK's own scrubbing matches key
+# names such as "password"; "rawManifest", "value" and "input" pass.
+#
+# sentry-sdk auto-enables ``StrawberryIntegration`` the moment
+# strawberry-graphql is importable -- true here always -- and it patches
+# ``SyncBaseHTTPView._handle_errors`` to ``capture_event(event_from_exception(error))``
+# for every GraphQL error, variable-coercion failures included. That
+# bypasses ``SecretSafeSchema.process_errors`` (core/schema/audit.py)
+# entirely: coercion never reaches the schema, so a request such as
+# ``setAgentSecretValue(..., value: $v)`` with ``$v`` given the wrong
+# shape puts the rejected literal straight in the error message and into
+# Sentry (#1944). Disabling the integration stops the patch; ``before_send``
+# is a second line of defense in case some other path ever reports a
+# GraphQL/strawberry-shaped exception without going through it.
+def _scrub_graphql_exception_values(event: dict, hint: dict) -> dict:
+    for value in (event.get("exception") or {}).get("values") or []:
+        mechanism_type = ((value.get("mechanism") or {}).get("type") or "").lower()
+        exc_type = value.get("type") or ""
+        if "graphql" in mechanism_type or "strawberry" in mechanism_type or "graphql" in exc_type.lower():
+            value["value"] = exc_type or "GraphQLError"
+    return event
+
+
+SENTRY_PRIVACY_OPTIONS = {
+    "max_request_body_size": "never",
+    "include_local_variables": False,
+    "disabled_integrations": [StrawberryIntegration()],
+    "before_send": _scrub_graphql_exception_values,
+}
+
 match CONFIGURATION.lower():
     case "stg" | "dev" | "prd" | "prod":
         if SENTRY_DSN:
@@ -1075,6 +1110,7 @@ match CONFIGURATION.lower():
                 traces_sample_rate=1.0,
                 profiles_sample_rate=1.0,
                 environment=CONFIGURATION,
+                **SENTRY_PRIVACY_OPTIONS,
             )
         else:
             logger.info("Sentry DSN not configured; skipping Sentry init")

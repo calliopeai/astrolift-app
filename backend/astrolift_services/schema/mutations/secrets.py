@@ -37,6 +37,7 @@ from astrolift_services.schema.mutations.helpers import (
     _stage_manifest,
     _upsert_app_secret_metadata,
     _validate_env_key,
+    _validate_env_value,
     _validate_scope,
 )
 from astrolift_services.schema.mutations.types import (
@@ -54,6 +55,7 @@ from astrolift_services.schema.types import (
     RevealedSecretType,
 )
 from astrolift_services.secret_metadata_ops import current_secret_scope
+from astrolift_services.secret_visibility import redacted_manifest_text
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -80,6 +82,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        validation_msg = _validate_env_value(input.key, input.value)
+        if validation_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
         scope_msg = _validate_scope(input.scope)
         if scope_msg:
             return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
@@ -110,7 +115,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -141,7 +148,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -171,6 +178,9 @@ class SecretMutations:
                 validation_msg,
                 field="key",
             )
+        validation_msg = _validate_env_value(input.key, input.value)
+        if validation_msg:
+            return gql_failure(ErrorCode.VALIDATION.value, validation_msg, field="value")
         scope_msg = _validate_scope(input.scope)
         if scope_msg:
             return gql_failure(ErrorCode.VALIDATION.value, scope_msg, field="scope")
@@ -191,7 +201,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -219,7 +231,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -258,7 +270,9 @@ class SecretMutations:
                 _AppSecretWritePayload(
                     app_slug=app.slug,
                     key=input.key,
-                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=app, raw_text=app.manifest_raw_staged or ""
+                    ),
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
@@ -285,7 +299,7 @@ class SecretMutations:
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 
@@ -444,8 +458,8 @@ class SecretMutations:
             )
         # Validate all keys before staging so a single bad name
         # doesn't write a half-applied result.
-        for key in kvs:
-            msg = _validate_env_key(key)
+        for key, value in kvs.items():
+            msg = _validate_env_key(key) or _validate_env_value(key, value)
             if msg:
                 return gql_failure(
                     ErrorCode.VALIDATION.value,
@@ -479,7 +493,7 @@ class SecretMutations:
             _BulkImportPayload(
                 app_slug=app.slug,
                 keys_set=sorted(kvs.keys()),
-                raw_manifest_staged=staged,
+                raw_manifest_staged=redacted_manifest_text(info, app=app, raw_text=staged),
             )
         )
 

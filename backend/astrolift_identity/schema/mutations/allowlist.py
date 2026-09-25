@@ -15,6 +15,7 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
+from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import (
     OrganizationAllowlistedDomain,
     Role,
@@ -83,6 +84,14 @@ class AllowlistMutations:
                     "role not found",
                     field="defaultRoleSlug",
                 )
+            # Every sign-in from the domain is bound to this role at org
+            # scope, so setting it is granting it there (#1964).
+            require_grantable(
+                role.permissions,
+                scope_kind="ORG",
+                scope_id=org_id,
+                gate=Permission.ORG_MANAGE_MEMBERS,
+            )
 
         if OrganizationAllowlistedDomain.objects.filter(
             organization_id=org_id,

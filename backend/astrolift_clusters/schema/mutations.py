@@ -1046,6 +1046,7 @@ class ClustersMutation:
                     actor=actor,
                     selected_components=tuple(input.selected_components),
                     option_overrides=overrides,
+                    organization_id=tenant.organization_id,
                 ),
             ],
             workflow_id=f"InstallClusterPrereqsWorkflow-{cluster.guid}",
@@ -1148,6 +1149,7 @@ class ClustersMutation:
         with transaction.atomic():
             run = ClusterBootstrapRun.objects.create(
                 tenant_cluster=cluster,
+                organization_id=tenant.organization_id,
                 triggered_by=triggered_by,
                 status=status,
                 chart_version=input.chart_version or "",

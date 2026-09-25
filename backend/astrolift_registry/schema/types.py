@@ -10,6 +10,7 @@ from collections.abc import Iterable
 import strawberry
 from _sdk.k8s_naming import app_namespace
 from django.db import models
+from strawberry.types import Info
 
 from astrolift_graphql import GUID
 
@@ -435,6 +436,9 @@ class RegisteredAppType:
     build_args: JSON
 
     manifest_hash: str
+    # ``[env]`` values are masked (keys kept) unless the viewer holds
+    # ``secret.read`` and is step-up elevated; see ``app_to_type`` /
+    # ``can_reveal_app_secrets`` (#1920).
     raw_manifest: str
     raw_manifest_staged: str
     # Keyed digest of raw_manifest_staged -- never the text itself, so a
@@ -949,6 +953,7 @@ def _provider_plugin_slug(app) -> str:
 def app_to_type(
     app,
     *,
+    info: Info,
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
     autowire: AppAutowireStatusType | None = None,
@@ -975,6 +980,22 @@ def app_to_type(
     )
     reprovision = build_reprovision_state(app)
     project = app.project if app.project_id else None
+    # #1920: ``raw_manifest`` / ``raw_manifest_staged`` carry the app's
+    # ``[env]`` table in the clear. Anyone with ``app.read`` can reach
+    # this type, but those are the values ``revealAppSecret`` requires
+    # ``secret.read`` + a fresh step-up elevation for; apply the identical
+    # gate here or that mutation's guard is decorative.
+    from astrolift_services.secret_visibility import can_reveal_app_secrets
+
+    raw_manifest = app.manifest_raw or ""
+    raw_manifest_staged = app.manifest_raw_staged or ""
+    if (raw_manifest or raw_manifest_staged) and not can_reveal_app_secrets(
+        info, app=app, known_permissions=viewer_permissions
+    ):
+        from astrolift_manifest.env_edit import redact_env_values
+
+        raw_manifest = redact_env_values(raw_manifest)
+        raw_manifest_staged = redact_env_values(raw_manifest_staged)
     return RegisteredAppType(
         id=GUID(str(app.guid)),
         slug=app.slug,
@@ -998,8 +1019,11 @@ def app_to_type(
         build_context=app.build_context or "",
         build_args=dict(app.build_args or {}),
         manifest_hash=app.manifest_hash,
-        raw_manifest=app.manifest_raw or "",
-        raw_manifest_staged=app.manifest_raw_staged or "",
+        raw_manifest=raw_manifest,
+        raw_manifest_staged=raw_manifest_staged,
+        # Both from the unmasked model fields: the digest must match what
+        # applyStagedManifest compares, and the change list carries key
+        # names only, which a masked read shows anyway.
         raw_manifest_staged_hash=staged_manifest_hash(app),
         staged_env_changes=(
             changed_env_key_names(app.manifest_raw or "", app.manifest_raw_staged)

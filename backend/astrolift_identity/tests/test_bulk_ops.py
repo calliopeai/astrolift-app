@@ -62,6 +62,18 @@ def _org_role(slug: str = "developer", scope_level: str = "TEAM") -> Role:
     )
 
 
+def _holds_everything(user, org: Organization) -> None:
+    """A granter may hand out only what they hold (#1964)."""
+    role = Role.objects.create(
+        organization=org,
+        slug=f"holds-all-{uuid.uuid4().hex[:6]}",
+        name="Holds all",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=[p.value for p in Permission],
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
+
+
 # ---- bulk revoke -----------------------------------------------------
 
 
@@ -222,6 +234,7 @@ def _team_with_members(org: Organization, n: int = 3) -> tuple[Team, list[Member
 def test_bulk_assign_team_happy_path(permission_resolver):
     org = Organization.objects.create(name="X", slug="bulk-assign-happy")
     actor = _user()
+    _holds_everything(actor, org)
     permission_resolver.grant(Permission.TEAM_MANAGE_MEMBERS)
     role = _org_role("team-dev-happy", scope_level="TEAM")
     team, members = _team_with_members(org)
@@ -251,6 +264,7 @@ def test_bulk_assign_team_idempotent(permission_resolver):
     """Re-running with the same input is a no-op — flips already_existed."""
     org = Organization.objects.create(name="X", slug="bulk-assign-idem")
     actor = _user()
+    _holds_everything(actor, org)
     permission_resolver.grant(Permission.TEAM_MANAGE_MEMBERS)
     role = _org_role("team-dev-idem", scope_level="TEAM")
     team, members = _team_with_members(org, n=2)
@@ -278,6 +292,7 @@ def test_bulk_assign_team_partial_failure_unknown_member(permission_resolver):
     """An unknown member guid is reported per-id without blocking real ones."""
     org = Organization.objects.create(name="X", slug="bulk-assign-partial")
     actor = _user()
+    _holds_everything(actor, org)
     permission_resolver.grant(Permission.TEAM_MANAGE_MEMBERS)
     role = _org_role("team-dev-partial", scope_level="TEAM")
     team, members = _team_with_members(org, n=1)
@@ -306,6 +321,7 @@ def test_bulk_assign_team_rejects_other_team_member(permission_resolver):
     silently bound into team-B's scope."""
     org = Organization.objects.create(name="X", slug="bulk-assign-cross-team")
     actor = _user()
+    _holds_everything(actor, org)
     permission_resolver.grant(Permission.TEAM_MANAGE_MEMBERS)
     role = _org_role("team-dev-cross-team", scope_level="TEAM")
     team_a, members = _team_with_members(org, n=1)

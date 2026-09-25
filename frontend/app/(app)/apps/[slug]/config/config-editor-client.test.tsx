@@ -1,79 +1,71 @@
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { UPDATE_MANIFEST } from "@/graphql/registry/registry.mutations";
+import { GET_APP } from "@/graphql/registry/registry.queries";
 
 import { ConfigEditorClient } from "./config-editor-client";
 
-/**
- * The Apply confirm dialog names the env keys the staged draft changes
- * (#1759). The server computes that list with the same diff
- * applyStagedManifest gates on, across [env] and every container, job and
- * task env table. The dialog used to parse [env] itself, line by line, and
- * so said nothing when the change sat on a container.
- */
+const MASKED_VALUE = "[ASTROLIFT_REDACTED_ENV_VALUE]";
+const STORED_VIEW = `name = "demo"\n\n[env]\nAPI_KEY = "${MASKED_VALUE}"\n`;
 
-const BEFORE = `name = "hello"
-
-[[workloads]]
-name = "web"
-kind = "deployment"
-
-[[workloads.containers]]
-name = "web"
-is_primary = true
-`;
-
-// Container env only: the top-level [env] table is untouched.
-const STAGED = BEFORE.replace(
-  "is_primary = true",
-  'is_primary = true\nenv = { DATABASE_URL = "postgres://evil" }'
-);
-
-const state = vi.hoisted(() => ({ stagedEnvChanges: [] as string[] }));
-
-function app() {
+// The "server": the app GET_APP returns, plus a way for the test to land a
+// refetch while a save is still in flight, which is what
+// awaitRefetchQueries does in the real client.
+const server = vi.hoisted(() => {
+  let app: Record<string, unknown> | null = null;
+  const listeners = new Set<() => void>();
   return {
-    id: "app-1",
-    slug: "hello",
-    name: "Hello",
-    manifestPath: "astrolift.toml",
-    deployBranch: "main",
-    manifestSyncState: "db_ahead",
-    updatedAt: "2026-09-24T00:00:00Z",
-    sourceRepo: "",
-    sourceUrl: "",
-    rawManifest: BEFORE,
-    rawManifestStaged: STAGED,
-    rawManifestStagedHash: "digest",
-    stagedEnvChanges: state.stagedEnvChanges,
+    get: () => app,
+    set(next: Record<string, unknown>) {
+      app = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    resolveSave: null as null | ((value: unknown) => void),
   };
-}
+});
 
-vi.mock("@apollo/client/react", () => ({
-  useQuery: (doc: { definitions?: { kind: string; name?: { value: string } }[] }) => {
-    const op = doc.definitions?.find((d) => d.kind === "OperationDefinition")?.name?.value ?? "";
-    return {
-      data: op === "GetApp" ? { astroliftApp: app() } : undefined,
-      loading: false,
-    };
-  },
-  useMutation: () => [vi.fn(), { loading: false }],
-}));
+vi.mock("@apollo/client/react", async () => {
+  const React = await import("react");
+  return {
+    useQuery: (query: unknown) => {
+      const app = React.useSyncExternalStore(server.subscribe, server.get);
+      if (query === GET_APP) return { data: { astroliftApp: app }, loading: false };
+      return { data: undefined, loading: false };
+    },
+    useMutation: (mutation: unknown) => {
+      if (mutation !== UPDATE_MANIFEST) return [vi.fn(), { loading: false }];
+      const save = () =>
+        new Promise((resolve) => {
+          server.resolveSave = resolve;
+        });
+      return [save, { loading: false }];
+    },
+  };
+});
 
-// Keys verbatim, with any interpolation values appended, so assertions can
-// read which message was chosen and what went into it.
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    values ? `${key} ${JSON.stringify(values)}` : key,
+  useTranslations: () => (key: string) => key,
 }));
 
 vi.mock("@/lib/i18n/formatters", () => ({
   useFormatters: () => ({ formatRelativeTime: () => "just now" }),
 }));
 
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), message: vi.fn() }),
+}));
+
 vi.mock("@/components/PageShell", () => ({
-  PageShell: ({ actions, children }: { actions?: ReactNode; children?: ReactNode }) => (
+  PageShell: ({ children, actions }: { children?: ReactNode; actions?: ReactNode }) => (
     <div>
       {actions}
       {children}
@@ -81,52 +73,66 @@ vi.mock("@/components/PageShell", () => ({
   ),
 }));
 
-vi.mock("@/components/ConfirmDialog", () => ({
-  ConfirmDialog: ({
-    open,
-    title,
-    description,
-  }: {
-    open: boolean;
-    title: ReactNode;
-    description?: ReactNode;
-  }) =>
-    open ? (
-      <div role="dialog" aria-label={String(title)}>
-        {description}
-      </div>
-    ) : null,
-}));
-
+vi.mock("@/components/ConfirmDialog", () => ({ ConfirmDialog: () => null }));
 vi.mock("../components/app-tabs", () => ({ AppTabs: () => null }));
 vi.mock("./manifest-form-pane", () => ({ ManifestFormPane: () => null }));
 vi.mock("./agent-config-form-pane", () => ({ AgentConfigFormPane: () => null }));
 
-beforeEach(() => {
-  state.stagedEnvChanges = [];
-});
-
-function openApplyDialog() {
-  render(<ConfigEditorClient slug="hello" />);
-  fireEvent.click(screen.getByRole("button", { name: "applyStaged" }));
-  return screen.getByRole("dialog", { name: "confirmApply.title" });
+function appWithStaged(rawManifestStaged: string, updatedAt: string) {
+  return {
+    id: "app-1",
+    slug: "demo",
+    name: "Demo",
+    rawManifest: "",
+    rawManifestStaged,
+    manifestSyncState: "db_ahead",
+    manifestPath: "astrolift.toml",
+    deployBranch: "main",
+    sourceUrl: "",
+    sourceRepo: "",
+    updatedAt,
+  };
 }
 
-describe("ConfigEditorClient apply confirmation", () => {
-  it("names the env keys the server reports, container env included", () => {
-    state.stagedEnvChanges = ["workloads.web.containers.web.env.DATABASE_URL"];
+beforeEach(() => {
+  server.set(appWithStaged(STORED_VIEW, "2026-09-24T00:00:00Z"));
+  server.resolveSave = null;
+});
 
-    const dialog = openApplyDialog();
+describe("ConfigEditorClient save round trip (#1920)", () => {
+  it("adopts the masked echo of its own save instead of raising a conflict", async () => {
+    render(<ConfigEditorClient slug="demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "view.code" }));
 
-    expect(dialog).toHaveTextContent("confirmApply.descriptionWithEnv");
-    expect(dialog).toHaveTextContent("workloads.web.containers.web.env.DATABASE_URL");
-    expect(dialog).not.toHaveTextContent("postgres://evil");
-  });
+    // A viewer who can't reveal secrets types a brand-new value.
+    const typed = `${STORED_VIEW}NEW_KEY = "typed-secret"\n`;
+    const echoed = `${STORED_VIEW}NEW_KEY = "${MASKED_VALUE}"\n`;
+    fireEvent.change(screen.getByPlaceholderText("# astrolift.toml"), { target: { value: typed } });
 
-  it("uses the plain description when the server reports no env change", () => {
-    const dialog = openApplyDialog();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "saveDraft" }));
+    });
+    // The refetch lands before updateManifest resolves, with the new value
+    // masked the way the server masks it for this viewer.
+    act(() => server.set(appWithStaged(echoed, "2026-09-24T00:00:05Z")));
+    await act(async () => {
+      server.resolveSave?.({
+        data: {
+          updateManifest: {
+            ok: true,
+            errors: [],
+            data: {
+              id: "app-1",
+              syncState: "db_ahead",
+              rawManifest: "",
+              rawManifestStaged: echoed,
+            },
+          },
+        },
+      });
+    });
 
-    expect(dialog).toHaveTextContent("confirmApply.description");
-    expect(dialog).not.toHaveTextContent("descriptionWithEnv");
+    expect(screen.queryByText("conflict.banner")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("# astrolift.toml")).toHaveValue(echoed);
   });
 });

@@ -49,6 +49,40 @@ log = logging.getLogger(__name__)
 _DEFAULT_MESSAGE = "Sensitive operation requires recent authentication."
 
 
+def is_elevated_and_attested(info: Any) -> bool:
+    """True when ``info``'s call satisfies the gate ``@requires_elevation`` enforces.
+
+    The same four rules, in order: an API-token call passes (issuing the
+    token was the authentication; step-up is a session recency check);
+    the Constance ``REQUIRE_STEP_UP_AUTH`` switch (default off) passes
+    everything until an install opts in; a call with no request/session
+    (a unit test bypassing HTTP) passes; otherwise the session must be
+    freshly elevated and, when the install requires device attestation,
+    attested too.
+
+    A side-effect-free boolean, for a read path that must mask rather
+    than refuse (#1920). It is also the only pass/refuse decision the
+    write side makes: ``check_elevation`` (and so ``@requires_elevation``)
+    returns None exactly when this returns True, and only builds and
+    audits the refusal otherwise.
+    """
+    request = getattr(getattr(info, "context", None), "request", None)
+    if request is not None and getattr(request, "_api_token", None) is not None:
+        return True
+    try:
+        from constance import config as constance_config
+
+        if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
+            return True
+    except Exception:  # noqa: BLE001 -- as in requires_elevation: fall through to the gate
+        pass
+    if request is None or not hasattr(request, "session"):
+        return True
+    session = request.session
+    status = get_status(session)
+    return status.elevated and not _attestation_gate_active(request)
+
+
 def requires_elevation(
     *,
     action_label: str | None = None,
@@ -70,6 +104,9 @@ def requires_elevation(
             deny = check_elevation(info, action_label=action_label, resolver_name=fn.__qualname__)
             if deny is not None:
                 return deny
+            # The resolver runs once, here, outside any try: when it ran
+            # inside the Constance-read try, its own exception re-ran it
+            # through the gate (#1963).
             return fn(self, info, *args, **kwargs)
 
         wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
@@ -103,57 +140,27 @@ def check_elevation(
     ``resolver_name`` is what lands in the audit row's ``target_id`` and
     would otherwise be ``fn.__qualname__`` when called from the decorator;
     a direct caller passes its own ``ClassName.method_name``.
+
+    Whether the caller passes is ``is_elevated_and_attested``'s answer and
+    nothing else, so this write gate and the read paths that mask secrets
+    on the same question can't drift apart (#1920). This function only
+    builds the refusal and audits it. It never calls the resolver, so a
+    resolver's own exception can't be mistaken for a failed config read
+    and run it twice (#1963).
     """
-    request = getattr(getattr(info, "context", None), "request", None)
-    # API-token-authenticated calls bypass step-up — the token issuance
-    # ceremony (operator + password + MFA in the UI) is the
-    # authentication; step-up is a session-scoped recency concept that
-    # doesn't translate. CI runners holding a scoped token would
-    # otherwise be locked out of every gated mutation. The token's scope
-    # set still gates *what* it can do — step-up is about session
-    # freshness, not authorization.
-    if request is not None and getattr(request, "_api_token", None) is not None:
+    if is_elevated_and_attested(info):
         return None
-    # Global step-up off-switch (default OFF). Installs that want the
-    # SOC2 / SOX recency gate flip ``REQUIRE_STEP_UP_AUTH = True`` in
-    # Constance. Default-off so small / SSO-only / single-operator
-    # installs don't trip on every sensitive mutation — they opt in
-    # when their compliance posture demands it.
-    try:
-        from constance import config as constance_config
-
-        if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
-            return None
-    except Exception:
-        # Constance unavailable (early-boot test path) — fall through to
-        # the existing gate so prod behavior isn't silently disabled by
-        # a config-load failure.
-        pass
-    # Direct-call path (pytest mutations bypassing HTTP). A real HTTP
-    # request always carries a session attribute because
-    # SessionMiddleware runs before the GraphQL view — so the only way
-    # ``request`` lacks ``session`` is a unit test calling the resolver
-    # directly. Bypass with a warning rather than failing every existing
-    # test; the security gate at the HTTP layer is unaffected.
-    if request is None or not hasattr(request, "session"):
-        log.debug(
-            "step_up: no request/session on info (direct test call?); bypassing %s",
-            resolver_name,
-        )
-        return None
+    # Only a call with a session gets here: the predicate passes an
+    # API-token call, a disabled gate and a call with no session.
+    request = info.context.request
     session = request.session
-    status = get_status(session)
-
+    supported = _supported_step_up_methods(session)
     # #496 — when the install requires attestation for sensitive ops,
     # the attestation gate runs in *addition* to the standard step-up
     # freshness gate. A session that is freshly elevated but not
     # attested still gets the deny, with ``requires_attestation: true``
     # so the FE opens the attest-prompt instead of the password-prompt.
-    attest_required = _attestation_gate_active(request)
-    if status.elevated and not attest_required:
-        return None
-    supported = _supported_step_up_methods(session)
-    if attest_required:
+    if _attestation_gate_active(request):
         _emit_deny_audit(
             resolver_name=resolver_name,
             action="auth.attestation.required",
@@ -388,6 +395,7 @@ __all__ = [
     "SESSION_KEY_ELEVATED_UNTIL",  # re-export for callers that want the raw key
     "StepUpProbe",
     "check_elevation",
+    "is_elevated_and_attested",
     "list_gated_resolvers",
     "requires_elevation",
 ]

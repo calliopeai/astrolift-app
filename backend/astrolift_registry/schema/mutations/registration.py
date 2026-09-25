@@ -203,6 +203,22 @@ class RegistrationMutations:
         if attach_denial is not None:
             return attach_denial
 
+        # manifestRaw can be copied from a masked read of another app. A new
+        # app has no stored value to put back, so a masked placeholder would
+        # become the secret itself (#1920).
+        from astrolift_manifest.env_edit import resolve_masked_env_values
+
+        eff_manifest_raw, unresolved_keys = resolve_masked_env_values(
+            input.manifest_raw or "", fallback_text=""
+        )
+        if unresolved_keys:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "manifestRaw contains a masked placeholder for key(s) with no value to "
+                f"restore (a new app has nothing to fall back to): {', '.join(unresolved_keys)}",
+                field="manifestRaw",
+            )
+
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
@@ -214,7 +230,7 @@ class RegistrationMutations:
             source_repo=input.source_repo or "",
             source_url=input.source_url or "",
             manifest_path=input.manifest_path or "astrolift.toml",
-            manifest_raw=input.manifest_raw or "",
+            manifest_raw=eff_manifest_raw,
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or input.default_branch or "main",
             build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
@@ -280,27 +296,36 @@ class RegistrationMutations:
         # must survive a bad manifest. The difference is that it now says so.
         _bootstrap_status = "no_source"
         _bootstrap_error = ""
-        if (input.manifest_raw or "").strip():
+        if eff_manifest_raw.strip():
             try:
                 from astrolift_manifest.normalize import (
                     NormalizationDefaults,
                     normalize,
                 )
-                from astrolift_manifest.parser import parse_raw
+                from astrolift_manifest.parser import ManifestError, parse_raw
                 from astrolift_manifest.persist import persist_manifest
 
                 _manifest = normalize(
-                    parse_raw(input.manifest_raw),
+                    parse_raw(eff_manifest_raw),
                     defaults=NormalizationDefaults(),
                 )
-                persist_manifest(app, _manifest, raw_text=input.manifest_raw)
+                persist_manifest(app, _manifest, raw_text=eff_manifest_raw)
                 _bootstrap_status = "applied"
             except Exception as exc:  # noqa: BLE001 — registration must survive
                 _bootstrap_status = "parse_failed"
-                _bootstrap_error = str(exc) or exc.__class__.__name__
-                logging.getLogger(__name__).exception(
-                    "register_app: manifest workload persist failed for %s",
+                # Only a ManifestError's text is known to be free of [env]
+                # values. Anything else (a database error's "Failing row
+                # contains ..." detail, say) can quote the manifest, and this
+                # string is shown to app.read callers and logged, so it keeps
+                # the exception type and no traceback (#1920).
+                if isinstance(exc, ManifestError):
+                    _bootstrap_error = str(exc) or exc.__class__.__name__
+                else:
+                    _bootstrap_error = exc.__class__.__name__
+                logging.getLogger(__name__).warning(
+                    "register_app: manifest workload persist failed for %s: %s",
                     app.slug,
+                    _bootstrap_error,
                 )
         elif app.source_repo:
             # Fetch it from the repo instead of leaving the app manifest-less.
@@ -374,7 +399,7 @@ class RegistrationMutations:
                 app.slug,
             )
 
-        return gql_success(app_to_type(app))
+        return gql_success(app_to_type(app, info=info))
 
     @strawberry.field
     @mutation_audit(

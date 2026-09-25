@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pytest
 
+from astrolift_identity.models import Member
 from astrolift_lifecycle.models import Deployment
 from astrolift_lifecycle.schema.mutations import (
     AbortDeploymentInput,
@@ -67,6 +68,8 @@ def _grant_all(resolver):
 
 
 def _tenant_for(org, actor):
+    # Audit rows are filed under the org only for its members (#1955).
+    Member.objects.get_or_create(user=actor, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
     return tenant_context(
         TenantContext(organization_id=org.id, actor_user_id=actor.id),
     )
