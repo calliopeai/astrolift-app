@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "graph_db"
@@ -87,6 +87,12 @@ class NeptuneDriver(ManagedServiceDriver):
         cluster_id = self._cluster_id(spec)
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
+        if cluster is not None:
+            refusal = adoption_refusal(
+                self._tags_of(str(cluster.get("DBClusterArn", ""))), spec, resource=f"Neptune cluster {cluster_id}"
+            )
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         try:
             if cluster is None:
                 if cfg.get("snapshot_identifier"):
@@ -623,6 +629,14 @@ class NeptuneDriver(ManagedServiceDriver):
         ):
             if key in cfg:
                 kwargs[aws_key] = cast(cfg[key])
+
+    def _tags_of(self, arn: str) -> list[dict[str, str]]:
+        """Tags of an existing resource; unreadable counts as untagged (#1961)."""
+        try:
+            resp = self._neptune.list_tags_for_resource(ResourceName=arn)
+            return list(resp.get("TagList") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe_cluster(self, cluster_id: str) -> dict[str, Any] | None:
         try:

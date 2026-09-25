@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "warehouse"
@@ -102,6 +102,10 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
         cluster_id = self._cluster_id(spec)
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
+        if cluster is not None:
+            refusal = adoption_refusal(cluster.get("Tags"), spec, resource=f"Redshift cluster {cluster_id}")
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         try:
             if cluster is None:
                 if cfg.get("snapshot_identifier") or cfg.get("snapshot_arn"):

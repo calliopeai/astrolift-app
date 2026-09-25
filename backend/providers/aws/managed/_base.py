@@ -66,7 +66,11 @@ def adoption_refusal(existing_tags, spec: ProvisionSpec, *, resource: str) -> st
     if isinstance(existing_tags, dict):
         tags = {str(k): str(v) for k, v in existing_tags.items()}
     else:
-        tags = {str(t.get("Key")): str(t.get("Value")) for t in existing_tags or [] if isinstance(t, dict)}
+        tags = {
+            str(t.get("Key", t.get("key"))): str(t.get("Value", t.get("value")))
+            for t in existing_tags or []
+            if isinstance(t, dict)
+        }
     owner_id = tags.get("astrolift.io/managed_service_id")
     if owner_id and spec.managed_service_id:
         if owner_id == spec.managed_service_id:

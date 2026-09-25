@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "wide_column"
@@ -81,9 +81,21 @@ class KeyspacesDriver(ManagedServiceDriver):
         keyspace_name, table_name = self._coordinates(spec)
         handle = self._handle(keyspace_name, table_name)
         try:
-            if self._get_keyspace(keyspace_name) is None:
+            keyspace = self._get_keyspace(keyspace_name)
+            table = self._get_table(keyspace_name, table_name) if keyspace is not None else None
+            for existing, label in (
+                (keyspace, f"keyspace {keyspace_name}"),
+                (table, f"table {keyspace_name}.{table_name}"),
+            ):
+                if existing is not None:
+                    refusal = adoption_refusal(
+                        self._tags_of(str(existing.get("resourceArn", ""))), spec, resource=label
+                    )
+                    if refusal is not None:
+                        return ProvisionResult(False, "", refusal, [refusal])
+            if keyspace is None:
                 self._create_keyspace(keyspace_name, spec, cfg)
-            table = self._get_table(keyspace_name, table_name)
+                table = None
             if table is None:
                 self._create_table(keyspace_name, table_name, spec, cfg)
                 return ProvisionResult(
@@ -530,6 +542,14 @@ class KeyspacesDriver(ManagedServiceDriver):
                 "kmsKeyIdentifier": kms_key,
             }
         return {"type": "AWS_OWNED_KMS_KEY"}
+
+    def _tags_of(self, arn: str) -> list[dict[str, str]]:
+        """Tags of an existing resource; unreadable counts as untagged (#1961)."""
+        try:
+            resp = self._keyspaces.list_tags_for_resource(resourceArn=arn)
+            return list(resp.get("tags") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _get_keyspace(self, keyspace_name: str) -> dict[str, Any] | None:
         try:

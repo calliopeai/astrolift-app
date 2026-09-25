@@ -29,6 +29,12 @@ class FakeKeyspaces:
             raise NotFound()
         return self.keyspaces[name]
 
+    def list_tags_for_resource(self, **kwargs):
+        for row in [*self.keyspaces.values(), *self.tables.values()]:
+            if row["resourceArn"] == kwargs["resourceArn"]:
+                return {"tags": row.get("tags", [])}
+        return {"tags": []}
+
     def create_keyspace(self, **kwargs):
         self.calls.append(("CreateKeyspace", kwargs))
         name = kwargs["keyspaceName"]
@@ -309,3 +315,18 @@ def test_current_botocore_accepts_all_keyspaces_request_shapes():
     service = Session().get_service_model("keyspaces")
     for operation, request in client.calls:
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+def test_provision_does_not_adopt_another_services_resource():
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    subject, client = driver()[:2]
+    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    calls = len(client.calls)
+
+    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert not any(name.startswith(("Create", "Update", "Modify")) for name, _ in client.calls[calls:])

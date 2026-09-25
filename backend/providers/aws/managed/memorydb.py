@@ -26,7 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "redis"
@@ -91,11 +91,19 @@ class MemoryDBDriver(ManagedServiceDriver):
             return ProvisionResult(False, "", error, ["invalid_memorydb_config"])
         name = self._cluster_name(spec)
         handle = handle_for(kind=KIND, resource_id=name)
+        # Ownership before the access resources, which are keyed by name (#1961).
+        existing = self._describe_cluster(name)
+        if existing is not None:
+            refusal = adoption_refusal(
+                self._tags_of(str(existing.get("ARN", ""))), spec, resource=f"MemoryDB cluster {name}"
+            )
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         try:
             acl_name = self._ensure_access(name, spec, cfg)
         except Exception as exc:
             return ProvisionResult(False, handle, f"create MemoryDB access resources: {exc}", [str(exc)])
-        if self._describe_cluster(name) is not None:
+        if existing is not None:
             updated = self.update(UpdateSpec(handle=handle, size=spec.size, config=cfg))
             return ProvisionResult(updated.ok, handle, updated.message, updated.errors)
 
@@ -405,6 +413,14 @@ class MemoryDBDriver(ManagedServiceDriver):
             "ip_discovery",
             "acl_name",
         ]
+
+    def _tags_of(self, arn: str) -> list[dict[str, str]]:
+        """Tags of an existing resource; unreadable counts as untagged (#1961)."""
+        try:
+            resp = self._memorydb.list_tags(ResourceArn=arn)
+            return list(resp.get("TagList") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe_cluster(self, name: str) -> dict[str, Any] | None:
         try:

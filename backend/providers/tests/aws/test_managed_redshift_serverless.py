@@ -423,3 +423,21 @@ def test_schemas_expose_capacity_network_security_and_auth_controls():
         "WAREHOUSE_RESOURCE_ARN",
         "WAREHOUSE_CREDENTIALS_REF",
     } <= driver.binding_schema().env_vars.keys()
+
+
+def test_an_existing_namespace_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client(namespace=_namespace(), workgroup=_workgroup())
+    client.list_tags_for_resource.return_value = {
+        "tags": [
+            {"key": "astrolift.io/managed-by", "value": "platform"},
+            {"key": "astrolift.io/organization", "value": "globex"},
+        ],
+    }
+    driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    client.update_namespace.assert_not_called()
+    client.update_workgroup.assert_not_called()
