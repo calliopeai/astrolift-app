@@ -36,6 +36,12 @@ class FakeDocumentDB:
         rows = [instance for instance in self.instances.values() if instance["DBClusterIdentifier"] == cluster_id]
         return {"DBInstances": rows}
 
+    def list_tags_for_resource(self, **kwargs):
+        for cluster in self.clusters.values():
+            if cluster["DBClusterArn"] == kwargs["ResourceName"]:
+                return {"TagList": cluster.get("Tags", [])}
+        return {"TagList": []}
+
     def create_db_cluster(self, **kwargs):
         self.calls.append(("CreateDBCluster", kwargs))
         self._add_cluster(kwargs, restored=False)
@@ -315,3 +321,18 @@ def test_current_botocore_accepts_all_documentdb_request_shapes():
     service = Session().get_service_model("docdb")
     for operation, request in docdb.calls:
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+def test_provision_does_not_adopt_another_services_resource():
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    subject, client = driver()[:2]
+    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    calls = len(client.calls)
+
+    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert not any(name.startswith(("Create", "Update", "Modify")) for name, _ in client.calls[calls:])

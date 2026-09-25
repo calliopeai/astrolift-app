@@ -346,3 +346,21 @@ def test_schemas_expose_capacity_security_data_api_and_snapshot_controls():
         "WAREHOUSE_RESOURCE_ARN",
         "WAREHOUSE_CREDENTIALS_REF",
     } <= driver.binding_schema().env_vars.keys()
+
+
+def test_an_existing_cluster_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client(
+        _cluster(
+            Tags=[
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/organization", "Value": "globex"},
+            ]
+        )
+    )
+    driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    client.modify_cluster.assert_not_called()

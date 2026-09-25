@@ -452,3 +452,21 @@ def test_schemas_expose_protocol_identity_and_operational_controls():
         "GRAPH_DB_AUTH_MODE",
         "GRAPH_DB_RESOURCE_ARN",
     } <= driver.binding_schema().env_vars.keys()
+
+
+def test_an_existing_cluster_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client(cluster=_cluster())
+    client.list_tags_for_resource.return_value = {
+        "TagList": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "globex"},
+        ],
+    }
+    driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    client.modify_db_cluster.assert_not_called()
+    client.create_db_instance.assert_not_called()

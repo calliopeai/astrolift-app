@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.managed.redshift import _data_api_grants
 from aws.session import aws_client
 
@@ -79,6 +79,14 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
         handle = handle_for(kind=KIND, resource_id=resource_id)
         namespace = self._get_namespace(resource_id)
         workgroup = self._get_workgroup(resource_id)
+        for existing, arn_key, label in (
+            (namespace, "namespaceArn", f"Redshift Serverless namespace {resource_id}"),
+            (workgroup, "workgroupArn", f"Redshift Serverless workgroup {resource_id}"),
+        ):
+            if existing is not None:
+                refusal = adoption_refusal(self._tags_of(str(existing.get(arn_key, ""))), spec, resource=label)
+                if refusal is not None:
+                    return ProvisionResult(False, "", refusal, [refusal])
         try:
             if namespace is None:
                 self._create_namespace(resource_id, spec, cfg)
@@ -554,6 +562,14 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
         if "price_performance_target" in cfg:
             kwargs["pricePerformanceTarget"] = dict(cfg["price_performance_target"])
         self._serverless.create_workgroup(**kwargs)
+
+    def _tags_of(self, arn: str) -> list[dict[str, str]]:
+        """Tags of an existing resource; unreadable counts as untagged (#1961)."""
+        try:
+            resp = self._serverless.list_tags_for_resource(resourceArn=arn)
+            return list(resp.get("tags") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _get_namespace(self, resource_id: str) -> dict[str, Any] | None:
         try:
