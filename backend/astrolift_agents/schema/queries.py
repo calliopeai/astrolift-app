@@ -2,7 +2,7 @@
 
 Skills, ToolDefs, Briefs, and AgentTasks are org-scoped; the
 ``dispatchers`` resolver is platform-level (the routing fabric spans
-tenants) and is staff/superuser-only.
+tenants) and is the platform operator's alone (#1978).
 
 Every resolver carries ``@require_permission`` + ``@tenant_scoped`` per
 the tenancy guardrail. ``@tenant_scoped`` only asserts a tenant context

@@ -23,9 +23,9 @@ permission resolver. The install-wide side effects are recorded, not run.
 from __future__ import annotations
 
 import importlib
-import sys
 from types import SimpleNamespace
 
+import constance
 import pytest
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
@@ -75,8 +75,15 @@ def effects(monkeypatch):
     """Record each install-wide side effect in place of running it."""
 
     ran: list[str] = []
+    real_config = constance.config
 
-    class _Constance:
+    class _Flags:
+        # A flag write is recorded, not applied: the Constance cache is shared
+        # by concurrent test runs. Reads still reach the real config, which a
+        # new user's post_save hook reads.
+        def __getattr__(self, name):
+            return getattr(real_config, name)
+
         def __setattr__(self, name, value):
             ran.append("setFeatureFlag")
 
@@ -94,7 +101,7 @@ def effects(monkeypatch):
         ran.append("reapCloudOrphan")
         return orphan_reaper.ReapResult(ok=True, kind=kind, identifier=reap_key, message="reaped")
 
-    monkeypatch.setitem(sys.modules, "constance", SimpleNamespace(config=_Constance()))
+    monkeypatch.setattr(constance, "config", _Flags())
     monkeypatch.setattr(ci_workflow_drift, "sweep_ci_workflows", _sweep)
     monkeypatch.setattr(orphan_reaper, "scan_orphans", _scan)
     monkeypatch.setattr(orphan_reaper, "reap_orphan", _reap)
