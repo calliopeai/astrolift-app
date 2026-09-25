@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "queue"
 
@@ -101,7 +102,7 @@ class PubSubDriver(ManagedServiceDriver):
             sub_id,
         )
         try:
-            self._pub.create_topic(request={"name": topic_path})
+            self._pub.create_topic(request={"name": topic_path, "labels": _labels_for(spec)})
         except Exception as exc:
             if type(exc).__name__ != "AlreadyExists":
                 return ProvisionResult(
@@ -110,6 +111,18 @@ class PubSubDriver(ManagedServiceDriver):
                     message=f"create_topic: {exc}",
                     errors=[str(exc)],
                 )
+            # Topics created before labels carry none and are adopted as
+            # before; one labeled for another service or org is refused (#1961).
+            try:
+                existing = self._pub.get_topic(request={"topic": topic_path})
+            except Exception as lookup_exc:
+                return ProvisionResult(False, "", f"get_topic: {lookup_exc}", [str(lookup_exc)])
+            labels = existing.get("labels") if isinstance(existing, dict) else getattr(existing, "labels", None)
+            refusal = (
+                label_adoption_refusal(dict(labels), spec, resource=f"Pub/Sub topic {topic_id}") if labels else None
+            )
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         try:
             self._sub.create_subscription(
                 request={"name": sub_path, "topic": topic_path},
@@ -345,3 +358,20 @@ class PubSubDriver(ManagedServiceDriver):
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:255]
+
+
+def _labels_for(spec: ProvisionSpec) -> dict[str, str]:
+    """Pub/Sub labels: lowercase [a-z0-9_-] keys and values, at most 63 chars."""
+
+    def _clean(value: str) -> str:
+        return "".join(c if c.isalnum() or c in "-_" else "-" for c in str(value).lower())[:63]
+
+    labels = {
+        "astrolift-managed-by": "platform",
+        "astrolift-organization": _clean(spec.organization_slug),
+        "astrolift-app": _clean(spec.app_slug),
+        "astrolift-environment": _clean(spec.environment_name),
+    }
+    if spec.managed_service_id:
+        labels["astrolift-managed-service-id"] = _clean(spec.managed_service_id)
+    return labels
