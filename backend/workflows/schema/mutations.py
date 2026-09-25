@@ -339,7 +339,16 @@ class Mutation:
             updated_by=user,
         )
         instance.temporal_workflow_id = workflow_id
-        instance.save(update_fields=["temporal_workflow_id"])
+        # The completion sync matches the instance by run id (#1774).
+        instance.temporal_run_id = run.run_id or None
+        instance.save(update_fields=["temporal_workflow_id", "temporal_run_id"])
+        # A short run may already have settled before this mirror existed.
+        from astrolift_operations.models import WorkflowRun
+        from workflows.run_status import synchronize_workflow_instances
+
+        settled = WorkflowRun.objects.filter(pk=run.pk).first()
+        if settled is not None:
+            synchronize_workflow_instances(settled)
 
         return RunWorkflowDefinitionResult(
             ok=True,

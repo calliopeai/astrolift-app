@@ -20,15 +20,25 @@ def synchronize_workflow_instances(run, *, authoritative: bool = False) -> bool:
     if not authoritative:
         instances = instances.filter(completed_at__isnull=True)
     if run.run_id:
-        instances = instances.filter(temporal_run_id=run.run_id)
+        # An instance recorded before its run id was known (the
+        # runWorkflowDefinition mirror, #1774) is this run's: same org, same
+        # workflow id, no run id yet. It is claimed and stamped below.
+        instances = instances.filter(
+            Q(temporal_run_id=run.run_id) | Q(temporal_run_id="") | Q(temporal_run_id__isnull=True)
+        )
     else:
         instances = instances.filter(Q(temporal_run_id="") | Q(temporal_run_id__isnull=True))
     changed = False
     for instance in instances:
-        if instance.current_state == run.status and instance.completed_at == run.ended_at:
+        claim = bool(run.run_id) and not instance.temporal_run_id
+        if not claim and instance.current_state == run.status and instance.completed_at == run.ended_at:
             continue
         changed = True
         instance.current_state = run.status
         instance.completed_at = run.ended_at
-        instance.save(update_fields=["current_state", "completed_at", "updated_at", "version"])
+        fields = ["current_state", "completed_at", "updated_at", "version"]
+        if claim:
+            instance.temporal_run_id = run.run_id
+            fields.append("temporal_run_id")
+        instance.save(update_fields=fields)
     return changed

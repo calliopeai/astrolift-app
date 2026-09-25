@@ -541,7 +541,7 @@ def test_legacy_triggers_check_the_definition_they_run(world, monkeypatch):
 
     def _start(definition, **_kwargs):
         started.append(definition.slug)
-        return SimpleNamespace(pk=1), f"WorkflowDefinitionRunWorkflow-{definition.slug}"
+        return SimpleNamespace(pk=1, run_id=""), f"WorkflowDefinitionRunWorkflow-{definition.slug}"
 
     monkeypatch.setattr("workflows.run_service.start_workflow_definition_run", _start)
     developer = _holder("team_developer", "TEAM", world.medops.pk, "trigger-dev")
