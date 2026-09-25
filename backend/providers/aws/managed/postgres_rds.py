@@ -409,7 +409,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="aws", driver="postgres_rds")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         _, instance_id = parse_handle(handle.handle)
         existing = self._describe(instance_id)
         if existing is None:

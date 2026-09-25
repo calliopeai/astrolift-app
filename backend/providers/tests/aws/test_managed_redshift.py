@@ -211,6 +211,7 @@ def test_binding_can_explicitly_expose_managed_admin_secret_reference():
     secret = "arn:aws:secretsmanager:us-west-2:123456789012:secret:redshift"
     assert binding.env_vars["WAREHOUSE_AUTH_MODE"].literal == "admin_secret"
     assert binding.env_vars["WAREHOUSE_CREDENTIALS_REF"].literal == secret
+    assert binding.env_vars["WAREHOUSE_CREDENTIALS"].secret_ref == secret  # #1954
     assert binding.env_vars["WAREHOUSE_USER"].literal == "astrolift"
     assert any(grant.resource == secret for grant in binding.iam_grants)
 

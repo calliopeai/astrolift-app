@@ -268,6 +268,7 @@ def test_binding_can_expose_managed_admin_secret_but_never_plaintext_password():
 
     secret = "arn:aws:secretsmanager:us-west-2:123456789012:secret:redshift"
     assert binding.env_vars["WAREHOUSE_CREDENTIALS_REF"].literal == secret
+    assert binding.env_vars["WAREHOUSE_CREDENTIALS"].secret_ref == secret  # #1954
     assert "WAREHOUSE_PASSWORD" not in binding.env_vars
     assert any(grant.resource == secret for grant in binding.iam_grants)
 

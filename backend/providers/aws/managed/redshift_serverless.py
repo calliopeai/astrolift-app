@@ -322,6 +322,9 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
                     f"Redshift Serverless namespace {resource_id} has no managed admin secret",
                 )
             env_vars["WAREHOUSE_AUTH_MODE"] = ValueRef(literal="admin_secret")
+            # The ARN, for SDK use, and the credential document itself, which
+            # the platform materializes like every other driver's secret (#1954).
+            env_vars["WAREHOUSE_CREDENTIALS"] = ValueRef(secret_ref=secret_arn)
             env_vars["WAREHOUSE_CREDENTIALS_REF"] = ValueRef(literal=secret_arn)
             env_vars["WAREHOUSE_USER"] = ValueRef(
                 literal=str(namespace.get("adminUsername") or self._config.admin_username),
@@ -467,6 +470,7 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
                 "WAREHOUSE_DATABASE": "Default database",
                 "WAREHOUSE_URL": "Credential-free PostgreSQL-compatible URL",
                 "WAREHOUSE_USER": "Admin user when admin_secret auth is explicitly selected",
+                "WAREHOUSE_CREDENTIALS": "Managed admin credential document (admin_secret auth mode)",
                 "WAREHOUSE_CREDENTIALS_REF": "Managed Secrets Manager credential document ARN",
                 "WAREHOUSE_ENGINE": "redshift",
                 "WAREHOUSE_DEPLOYMENT": "serverless",

@@ -250,6 +250,7 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "WAREHOUSE_USER",
         "WAREHOUSE_PASSWORD",
         "WAREHOUSE_URL",
+        "WAREHOUSE_CREDENTIALS",
         "WAREHOUSE_CREDENTIALS_REF",
         "WAREHOUSE_ENGINE",
         "WAREHOUSE_DEPLOYMENT",
