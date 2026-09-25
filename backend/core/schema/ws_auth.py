@@ -119,9 +119,46 @@ def _bearer_from_scope(scope_or_request: Any) -> str:
     return ""
 
 
+def _bearer_from_connection_params(payload: Any) -> str:
+    """Pull a plaintext bearer out of a graphql-ws / graphql-transport-ws
+    ``connection_init`` payload — the wire form of the client's
+    ``connectionParams``. Empty string when absent or malformed.
+
+    The mobile app never sends the ``sessionid`` cookie
+    ``CookieAwareGraphQLWs`` reads its identity from — it has no cookie
+    jar — so it carries its ``alft_`` bearer in ``connectionParams``
+    instead: ``{"authorization": "Bearer <token>"}`` (astrolift-mobile's
+    Apollo client factory, #1943). The key is matched case-insensitively
+    because ``connectionParams`` is a client-chosen JSON object, not real
+    HTTP headers."""
+    if not isinstance(payload, dict):
+        return ""
+    for key, value in payload.items():
+        if not isinstance(key, str) or key.lower() != "authorization":
+            continue
+        if isinstance(value, str) and value[:7].lower() == "bearer ":
+            return value[7:].strip()
+    return ""
+
+
 @sync_to_async
 def _resolve_user_and_tenant_from_bearer(token: str, organization_guid: str = ""):
-    """Resolve ``(user, TenantContext)`` from an ``alft_`` API token.
+    """``(user, TenantContext)`` from an ``alft_`` API token; see
+    :func:`_resolve_bearer_identity`."""
+    user, tenant, _row = _resolve_bearer_identity(token, organization_guid)
+    return user, tenant
+
+
+_resolve_bearer_identity_async = sync_to_async(lambda token: _resolve_bearer_identity(token))
+
+
+def _resolve_bearer_identity(token: str, organization_guid: str = ""):
+    """Resolve ``(user, TenantContext, token row)`` from an ``alft_`` API token.
+
+    The row is what carries the token's scope ceiling: HTTP pins it on the
+    ``current_api_token`` contextvar so ``check_permission`` caps the user's
+    grants at the token's scopes, and a WS subscription must do the same
+    (#1943) or a scoped-down token would act with the user's full grants.
 
     Mirrors ``ApiTokenMiddleware`` for the WS path: the token's user +
     organization become the authenticated, tenant-scoped identity.
@@ -130,7 +167,7 @@ def _resolve_user_and_tenant_from_bearer(token: str, organization_guid: str = ""
     organization returns the authenticated user with no tenant, so the
     relay rejects the target instead of retargeting the credential."""
     if not token:
-        return AnonymousUser(), None
+        return AnonymousUser(), None, None
     try:
         from astrolift_identity.api_tokens import (
             token_matches_organization,
@@ -141,23 +178,40 @@ def _resolve_user_and_tenant_from_bearer(token: str, organization_guid: str = ""
 
         row = verify_token(token)
         if row is None:
-            return AnonymousUser(), None
+            return AnonymousUser(), None, None
         user = row.user
         if user is None or not getattr(user, "is_active", True):
-            return AnonymousUser(), None
+            return AnonymousUser(), None, None
         if not token_matches_organization(row, organization_guid):
-            return user, None
+            return user, None, row
         try:
             touch_token(row)
         except Exception:  # noqa: BLE001
             pass
-        return user, TenantContext(
-            organization_id=row.organization_id,
-            actor_user_id=user.pk,
+        return (
+            user,
+            TenantContext(organization_id=row.organization_id, actor_user_id=user.pk),
+            row,
         )
     except Exception:  # noqa: BLE001
         logger.exception("ws bearer resolution failed")
-        return AnonymousUser(), None
+        return AnonymousUser(), None, None
+
+
+def pin_ws_identity(context) -> None:
+    """Pin what the WS handshake resolved onto this task's contextvars: the
+    tenant, and the API token whose scopes cap every permission check
+    (#1943). Subscription resolvers call it first, as HTTP middleware does
+    for a request."""
+    from astrolift_identity.api_tokens import set_current_api_token
+    from core.tenancy import set_current_tenant
+
+    tenant = getattr(context, "_ws_tenant", None)
+    if tenant is not None:
+        set_current_tenant(tenant)
+    token = getattr(context, "_ws_api_token", None)
+    if token is not None:
+        set_current_api_token(token)
 
 
 @sync_to_async

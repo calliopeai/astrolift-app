@@ -77,6 +77,9 @@ class _CoreSubscription:
         ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
         if ws_tenant is not None:
             set_current_tenant(ws_tenant)
+        from core.schema.ws_auth import pin_ws_identity
+
+        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -161,6 +164,9 @@ class _CoreSubscription:
         ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
         if ws_tenant is not None:
             set_current_tenant(ws_tenant)
+        from core.schema.ws_auth import pin_ws_identity
+
+        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
