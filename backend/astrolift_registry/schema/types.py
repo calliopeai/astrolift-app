@@ -752,6 +752,8 @@ class ContainerType:
     port: int
     command: list[str]
     args: list[str]
+    # Values masked (keys kept) unless the viewer holds ``secret.read`` and
+    # is step-up elevated; see ``container_to_type`` (#1948).
     env: JSON
     healthcheck_kind: str
     healthcheck_value: str
@@ -1719,7 +1721,13 @@ class RegisteredAppPageType:
     total_count: int
 
 
-def container_to_type(container) -> ContainerType:
+def container_to_type(container, *, env_revealed: bool) -> ContainerType:
+    """``env_revealed`` is ``can_reveal_app_secrets`` for the container's
+    app: env holds the same literals the manifest text masks, so a caller
+    who cannot reveal them gets the keys with masked values (#1948)."""
+    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+
+    env = container.env or {}
     return ContainerType(
         id=GUID(str(container.guid)),
         name=container.name,
@@ -1730,7 +1738,7 @@ def container_to_type(container) -> ContainerType:
         port=container.port,
         command=list(container.command or []),
         args=list(container.args or []),
-        env=container.env or {},
+        env=env if env_revealed else dict.fromkeys(env, REDACTED_ENV_VALUE),
         healthcheck_kind=container.healthcheck_kind,
         healthcheck_value=container.healthcheck_value or "",
         healthcheck_port=container.healthcheck_port,

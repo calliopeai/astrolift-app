@@ -1166,24 +1166,26 @@ def _reject_inline_secrets(value: dict[str, Any], path: str) -> None:
 
 
 def _reject_masked_env_values(data: dict[str, Any]) -> None:
-    """The masked-read placeholder is never a real ``[env]`` value (#1920).
+    """The masked-read placeholder is never a real env value (#1920, #1948).
 
-    A document still carrying it came from a masked read whose values
-    were never put back. Applying, syncing, or deploying it would replace
-    each stored secret with the placeholder, so it is refused here, on the
-    path every one of those takes. The message names keys, never values."""
-    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+    A document still carrying it, in ``[env]`` or in a container, job or
+    task ``env``, came from a masked read whose values were never put
+    back. Applying, syncing, or deploying it would replace each stored
+    secret with the placeholder, so it is refused here, on the path every
+    one of those takes. The message names keys, never values."""
+    from astrolift_manifest.env_edit import masked_env_positions
 
-    env = data.get("env")
-    if not isinstance(env, dict):
+    masked = masked_env_positions(data)
+    if not masked:
         return
-    masked = sorted(str(key) for key, value in env.items() if value == REDACTED_ENV_VALUE)
-    if masked:
-        raise ManifestError(
-            f"[env] {', '.join(masked)} holds the masked placeholder from a masked read "
-            "instead of a value; set the real value",
-            path=f"env.{masked[0]}",
-        )
+    app_wide = sorted(p.key for p in masked if not p.scope and p.key is not None)
+    elsewhere = [p for p in masked if p.scope or p.key is None]
+    where = ([f"[env] {', '.join(app_wide)}"] if app_wide else []) + [p.label for p in elsewhere]
+    raise ManifestError(
+        f"{'; '.join(where)} holds the masked placeholder from a masked read instead of a value; "
+        "set the real value",
+        path=f"env.{app_wide[0]}" if app_wide else elsewhere[0].error_path,
+    )
 
 
 def _require_str(d: dict[str, Any], key: str, path: str) -> str:

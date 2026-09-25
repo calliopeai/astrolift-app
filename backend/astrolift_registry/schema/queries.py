@@ -1488,15 +1488,25 @@ class RegistryQuery:
     @require_permission(Permission.APP_READ, scope=app_scope_by_workload_slug("workload_slug"))
     @tenant_scoped()
     def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
+        from astrolift_services.secret_visibility import can_reveal_app_secrets
+
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        qs = Container.objects.select_related("workload").filter(
+        qs = Container.objects.select_related("workload__registered_app").filter(
             workload__registered_app__organization_id=org_id
         )
         if workload_slug:
             qs = qs.filter(workload__slug=workload_slug)
-        return [container_to_type(c) for c in qs[:500]]
+        containers = list(qs[:500])
+        # One RBAC query for the page, however many apps it spans (#1948).
+        apps = {c.workload.registered_app_id: c.workload.registered_app for c in containers}
+        viewer_perms = _viewer_permissions_for_apps(apps.values())
+        revealed = {
+            pk: can_reveal_app_secrets(info, app=app, known_permissions=viewer_perms.get(pk))
+            for pk, app in apps.items()
+        }
+        return [container_to_type(c, env_revealed=revealed[c.workload.registered_app_id]) for c in containers]
 
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
@@ -1612,8 +1622,10 @@ class RegistryQuery:
                 error_column=None,
             )
 
+        from astrolift_services.secret_visibility import redacted_render_input
+
         resources = render_manifests(
-            normalized,
+            redacted_render_input(info, app=app, manifest=normalized),
             namespace=namespace,
             image_tag=image,
             image_repository=app.registry_repo_uri or app.slug,
@@ -1773,6 +1785,9 @@ class RegistryQuery:
                 error_column=None,
             )
 
+        from astrolift_services.secret_visibility import redacted_render_input
+
+        normalized = redacted_render_input(info, app=app, manifest=normalized)
         rendered = render_manifests(
             normalized,
             namespace=namespace,

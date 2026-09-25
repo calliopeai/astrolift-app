@@ -281,7 +281,14 @@ class ScmQuery:
         ``content`` null + ``error_code`` null = "file genuinely
         doesn't exist on this ref" — the UI shows the manual paste
         affordance. ``error_code`` non-null = recoverable auth /
-        transient API failure; render a reconnect affordance."""
+        transient API failure; render a reconnect affordance.
+
+        A manifest's env values come back masked unless the caller can
+        reveal secrets org-wide (#1948): Push to Repo writes them into
+        the repo, and this field would otherwise hand them to any
+        ``scm.read`` holder. See ``redacted_repo_file``."""
+        from astrolift_services.secret_visibility import redacted_repo_file
+
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
@@ -335,7 +342,7 @@ class ScmQuery:
             repo_full_name=repo_full_name,
             path=path,
             ref=ref,
-            content=content,
+            content=None if content is None else redacted_repo_file(info, path=path, content=content),
             error_code=None,
             error_message=None,
             recoverable=False,

@@ -20,6 +20,7 @@ import { isCiPushableKind } from "./ci-pushable";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { WizardShell, type WizardStep } from "./components/WizardShell";
+import { manifestRawForSubmit } from "./manifest-submit";
 import { AppDetailsStep } from "./steps/AppDetailsStep";
 import { DeployStrategyStep } from "./steps/DeployStrategyStep";
 import { ManifestPreviewStep } from "./steps/ManifestPreviewStep";
@@ -321,8 +322,9 @@ export function WizardClient() {
             // "Set up manifest later" registers the app with no manifest —
             // send an explicit null rather than relying on the empty-string
             // coalesce (#1172). The app page surfaces the missing manifest and
-            // the Manifest tab is where the operator adds it.
-            manifestRaw: state.manifestLater ? null : state.manifestRaw.trim() || null,
+            // the Manifest tab is where the operator adds it. A repo manifest
+            // with masked env values is also sent as null (#1948).
+            manifestRaw: manifestRawForSubmit(state),
             defaultBranch: state.defaultBranch.trim() || "main",
             deployBranch: state.deployBranch.trim() || "main",
             // "skip" timing forces manual trigger so the app registers
