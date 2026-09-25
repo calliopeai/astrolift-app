@@ -12,8 +12,11 @@ import re
 import tomllib
 from typing import Any
 
+from astrolift_manifest.path_safety import is_absolute_path
 from astrolift_manifest.security_volumes import parse_volume
 from astrolift_manifest.types import (
+    DEFAULT_BUILD_CONTEXT,
+    DEFAULT_DOCKERFILE_PATH,
     BriefRef,
     ContainerManifest,
     EdgeIdentityConfig,
@@ -132,6 +135,46 @@ _VALID_AGENT_RUN_FAMILY = {"task", "service"}
 _TOML_POS_RE = __import__("re").compile(r"line\s+(\d+),\s+column\s+(\d+)")
 
 
+def _reject_conflicting_container_build_fields(workloads: tuple[WorkloadManifest, ...]) -> None:
+    """At most one distinct non-default value per field, across every
+    container in the manifest (#1756).
+
+    Exactly one image is ever built for an app -- from the primary
+    container of whichever workload the deployment resolves
+    (``build_image._resolve_build_paths``); every other container's
+    dockerfile_path/build_context is never read. Two containers declaring
+    *different* non-default values would have one silently ignored, the
+    same silent-drop class this feature exists to close, so it is
+    rejected at parse time instead.
+    """
+    dockerfile_paths = {
+        c.dockerfile_path
+        for w in workloads
+        for c in w.containers
+        if c.dockerfile_path and c.dockerfile_path != DEFAULT_DOCKERFILE_PATH
+    }
+    if len(dockerfile_paths) > 1:
+        raise ManifestError(
+            "containers declare conflicting dockerfile_path values "
+            f"{sorted(dockerfile_paths)} -- only one image is ever built for the "
+            "app, from the primary container of the resolved workload",
+            path="workloads",
+        )
+    build_contexts = {
+        c.build_context
+        for w in workloads
+        for c in w.containers
+        if c.build_context and c.build_context != DEFAULT_BUILD_CONTEXT
+    }
+    if len(build_contexts) > 1:
+        raise ManifestError(
+            "containers declare conflicting build_context values "
+            f"{sorted(build_contexts)} -- only one image is ever built for the "
+            "app, from the primary container of the resolved workload",
+            path="workloads",
+        )
+
+
 def parse_raw(toml_text: str) -> RawManifest:
     try:
         data: dict[str, Any] = tomllib.loads(toml_text)
@@ -232,6 +275,8 @@ def parse_raw(toml_text: str) -> RawManifest:
             # Allowed by spec, but only with the multi-workload hostname
             # template. Validation here is tolerant — caller decides.
             pass
+
+    _reject_conflicting_container_build_fields(workloads)
 
     return RawManifest(
         name=name,
@@ -800,6 +845,21 @@ _CONTAINER_KEYS = frozenset(
 )
 
 
+def _reject_absolute_build_path(value: str, *, path: str, field: str) -> None:
+    """A container's dockerfile_path/build_context is resolved relative to
+    the manifest's own directory at build time (#1756) -- an absolute path
+    is never valid input to that resolution, whatever the base ends up
+    being, so reject it here rather than let it reach the build unchecked.
+    The escape-above-repo-root check (a resolved ``..``-leading result)
+    needs the actual base directory and runs at build time instead
+    (``build_image._resolve_build_paths``)."""
+    if is_absolute_path(value):
+        raise ManifestError(
+            f"{field} must be a repo-relative path, got an absolute path {value!r}",
+            path=path,
+        )
+
+
 def _parse_container(d: dict[str, Any], path: str) -> ContainerManifest:
     unknown = sorted(set(d) - _CONTAINER_KEYS)
     if unknown:
@@ -819,12 +879,17 @@ def _parse_container(d: dict[str, Any], path: str) -> ContainerManifest:
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
 
+    dockerfile_path = str(d.get("dockerfile_path", DEFAULT_DOCKERFILE_PATH))
+    build_context = str(d.get("build_context", DEFAULT_BUILD_CONTEXT))
+    _reject_absolute_build_path(dockerfile_path, path=f"{path}.dockerfile_path", field="dockerfile_path")
+    _reject_absolute_build_path(build_context, path=f"{path}.build_context", field="build_context")
+
     return ContainerManifest(
         name=name,
         is_primary=bool(d.get("is_primary", False)),
         image_ref=d.get("image_ref"),
-        dockerfile_path=str(d.get("dockerfile_path", "Dockerfile")),
-        build_context=str(d.get("build_context", ".")),
+        dockerfile_path=dockerfile_path,
+        build_context=build_context,
         port=int(d.get("port", 0)),
         command=tuple(map(str, d.get("command", []) or ())),
         args=tuple(map(str, d.get("args", []) or ())),
@@ -856,12 +921,17 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
 
+    dockerfile_path = str(d.get("dockerfile_path", d.get("dockerfile", DEFAULT_DOCKERFILE_PATH)))
+    build_context = str(d.get("build_context", DEFAULT_BUILD_CONTEXT))
+    _reject_absolute_build_path(dockerfile_path, path=f"{path}.dockerfile_path", field="dockerfile_path")
+    _reject_absolute_build_path(build_context, path=f"{path}.build_context", field="build_context")
+
     container = ContainerManifest(
         name=name,
         is_primary=True,
         image_ref=d.get("image_ref"),
-        dockerfile_path=str(d.get("dockerfile_path", d.get("dockerfile", "Dockerfile"))),
-        build_context=str(d.get("build_context", ".")),
+        dockerfile_path=dockerfile_path,
+        build_context=build_context,
         port=0,  # jobs don't expose ports
         command=tuple(map(str, d.get("command", []) or ())),
         args=tuple(map(str, d.get("args", []) or ())),
@@ -907,12 +977,17 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
 
+    dockerfile_path = str(d.get("dockerfile_path", d.get("dockerfile", DEFAULT_DOCKERFILE_PATH)))
+    build_context = str(d.get("build_context", DEFAULT_BUILD_CONTEXT))
+    _reject_absolute_build_path(dockerfile_path, path=f"{path}.dockerfile_path", field="dockerfile_path")
+    _reject_absolute_build_path(build_context, path=f"{path}.build_context", field="build_context")
+
     container = ContainerManifest(
         name=name,
         is_primary=True,
         image_ref=d.get("image_ref"),
-        dockerfile_path=str(d.get("dockerfile_path", d.get("dockerfile", "Dockerfile"))),
-        build_context=str(d.get("build_context", ".")),
+        dockerfile_path=dockerfile_path,
+        build_context=build_context,
         port=0,  # tasks don't expose ports
         command=tuple(map(str, d.get("command", []) or ())),
         args=tuple(map(str, d.get("args", []) or ())),

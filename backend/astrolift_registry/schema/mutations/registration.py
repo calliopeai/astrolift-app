@@ -22,8 +22,10 @@ from astrolift_registry.schema.mutations.helpers import (
     _ensure_owner_access,
     _generate_unique_app_slug,
     _normalize_build_args,
+    _project_service_attach_denial,
     _resolve_approval_inputs,
     _validate_build_mode,
+    _validate_build_path_field,
     _validate_build_strategy,
     _validate_effective_approval_policy,
 )
@@ -186,6 +188,20 @@ class RegistrationMutations:
         build_args, build_args_err = _normalize_build_args(input.build_args)
         if build_args_err is not None:
             return build_args_err
+        dockerfile_path, dockerfile_path_err = _validate_build_path_field(
+            input.dockerfile_path, field="dockerfilePath"
+        )
+        if dockerfile_path_err is not None:
+            return dockerfile_path_err
+        build_context, build_context_err = _validate_build_path_field(
+            input.build_context, field="buildContext"
+        )
+        if build_context_err is not None:
+            return build_context_err
+        # Before the app exists: a refusal must leave nothing half-registered.
+        attach_denial = _project_service_attach_denial(input.manifest_raw or "", project)
+        if attach_denial is not None:
+            return attach_denial
 
         # manifestRaw can be copied from a masked read of another app. A new
         # app has no stored value to put back, so a masked placeholder would
@@ -219,8 +235,8 @@ class RegistrationMutations:
             deploy_branch=input.deploy_branch or input.default_branch or "main",
             build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
             build_strategy=build_strategy or RegisteredApp.BuildStrategy.OFF.value,
-            dockerfile_path=input.dockerfile_path or "Dockerfile",
-            build_context=input.build_context or ".",
+            dockerfile_path=dockerfile_path or "Dockerfile",
+            build_context=build_context or ".",
             build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,

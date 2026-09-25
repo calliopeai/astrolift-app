@@ -11,6 +11,15 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
+# Single source of truth for "no value declared" on a container's build
+# fields -- the parser fills these in on every container it parses, so a
+# manifest that never mentions dockerfile_path/build_context reads back
+# identically to one that explicitly set them to the default. Shared with
+# build_image.py (build-time field resolution) and parser.py (cross-
+# container validation) so the three call sites can't drift apart (#1756).
+DEFAULT_DOCKERFILE_PATH = "Dockerfile"
+DEFAULT_BUILD_CONTEXT = "."
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class WorkloadManifest:
@@ -150,8 +159,8 @@ class ContainerManifest:
     name: str
     is_primary: bool = False
     image_ref: str | None = None
-    dockerfile_path: str = "Dockerfile"
-    build_context: str = "."
+    dockerfile_path: str = DEFAULT_DOCKERFILE_PATH
+    build_context: str = DEFAULT_BUILD_CONTEXT
     port: int = 0
     command: tuple[str, ...] = ()
     args: tuple[str, ...] = ()

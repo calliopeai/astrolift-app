@@ -441,6 +441,19 @@ class RegisteredAppType:
     # ``can_reveal_app_secrets`` (#1920).
     raw_manifest: str
     raw_manifest_staged: str
+    # Keyed digest of raw_manifest_staged -- never the text itself, so a
+    # caller can detect "did the staged buffer change under me"
+    # (applyStagedManifest's optimistic-concurrency input) without a secret
+    # literal ever having to round-trip through a mutation input variable
+    # (#1759 adversarial review). HMAC, not a bare hash: see
+    # ``astrolift_registry.services.staged_manifest``.
+    raw_manifest_staged_hash: str
+    # Env key names (never values) that applying raw_manifest_staged would
+    # add, change or remove, across [env] and every container, job and task
+    # env table -- the same diff applyStagedManifest gates on, so the
+    # confirm dialog lists exactly what the server will treat as a secret
+    # change (``astrolift_manifest.env_diff``). Empty when nothing is staged.
+    staged_env_changes: list[str]
     last_synced_hash: str
     manifest_sync_state: str
 
@@ -951,10 +964,12 @@ def app_to_type(
     managed_hostname: str | None = None,
     include_retention_policies: bool = False,
 ) -> RegisteredAppType:
+    from astrolift_manifest.env_diff import changed_env_key_names
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
         classify_state,
     )
+    from astrolift_registry.services.staged_manifest import staged_manifest_hash
 
     sync_state = classify_state(
         SyncSnapshot(
@@ -1006,6 +1021,15 @@ def app_to_type(
         manifest_hash=app.manifest_hash,
         raw_manifest=raw_manifest,
         raw_manifest_staged=raw_manifest_staged,
+        # Both from the unmasked model fields: the digest must match what
+        # applyStagedManifest compares, and the change list carries key
+        # names only, which a masked read shows anyway.
+        raw_manifest_staged_hash=staged_manifest_hash(app),
+        staged_env_changes=(
+            changed_env_key_names(app.manifest_raw or "", app.manifest_raw_staged)
+            if app.manifest_raw_staged
+            else []
+        ),
         last_synced_hash=app.last_synced_hash or "",
         manifest_sync_state=sync_state.value,
         registry_repo_uri=app.registry_repo_uri,

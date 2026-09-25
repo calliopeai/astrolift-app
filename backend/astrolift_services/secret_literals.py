@@ -22,8 +22,10 @@ preview by identity rather than by build status (#1758 review, H1/H2).
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
+from collections.abc import Mapping
 
 from django.conf import settings
 from django.utils.crypto import constant_time_compare, salted_hmac
@@ -82,11 +84,12 @@ def _base_raw_matches(stamp: str | None, app, key: str, value: str | None) -> bo
     )
 
 
-def _latest_applied_literal_changes(app) -> dict[str, tuple[str | None, str | None]]:
+def _latest_applied_literal_changes(app) -> dict[str, tuple[str | None, str | None, str]]:
     """Per key, what the most recent applied SET/DELETE proposal made it
     (the value it set, or None when it deleted the key), with the stamp of
-    the ``manifest_raw`` value it was applied against."""
-    latest: dict[str, tuple[str | None, str | None]] = {}
+    the ``manifest_raw`` value it was applied against and the proposal's
+    guid."""
+    latest: dict[str, tuple[str | None, str | None, str]] = {}
     applied = (
         SecretChangeProposal.objects.filter(
             registered_app=app,
@@ -94,16 +97,51 @@ def _latest_applied_literal_changes(app) -> dict[str, tuple[str | None, str | No
             op__in=(SecretChangeProposal.Op.SET.value, SecretChangeProposal.Op.DELETE.value),
         )
         .order_by("-applied_at", "-pk")
-        .values_list("op", "payload")
+        .values_list("op", "payload", "guid")
     )
-    for op, payload in applied:
+    for op, payload, guid in applied:
         payload = payload or {}
         key = str(payload.get("key") or "").strip()
         if not key or key in latest:
             continue
         value = None if op == SecretChangeProposal.Op.DELETE.value else str(payload.get("value") or "")
-        latest[key] = (value, payload.get("base_raw_digest"))
+        latest[key] = (value, payload.get("base_raw_digest"), str(guid))
     return latest
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LiteralApproval:
+    # Keys no applied proposal authorizes, in the order they were asked about.
+    unapproved: list[str]
+    # Guids of the applied proposals that authorize the rest.
+    proposal_ids: list[str]
+
+
+def approved_literal_changes(app, changes: Mapping[str, object]) -> LiteralApproval:
+    """Which ``[env]`` changes applied secret-change proposals authorize.
+
+    ``changes`` maps each changed key to its value after the edit, None when
+    the edit removes it. The rule is the one ``_deployable_literals``
+    applies at deploy time: the latest applied SET/DELETE for the key
+    produced exactly that value, from the ``manifest_raw`` value the key
+    still has. So an approval authorizes only the change it was approved
+    against; re-staging a value the app has since rotated away from is not
+    covered by the approval that first set it. ``applyStagedManifest``
+    uses this to move approved changes into ``manifest_raw`` on an app
+    with no source repo (#1759). A value that isn't a string never matches:
+    a proposal only ever writes strings.
+    """
+    raw = read_app_env(app.manifest_raw or "")
+    approved = _latest_applied_literal_changes(app)
+    unapproved: list[str] = []
+    proposal_ids: list[str] = []
+    for key, after in changes.items():
+        change = approved.get(key)
+        if change is None or change[0] != after or not _base_raw_matches(change[1], app, key, raw.get(key)):
+            unapproved.append(key)
+        else:
+            proposal_ids.append(change[2])
+    return LiteralApproval(unapproved=unapproved, proposal_ids=proposal_ids)
 
 
 def _deployable_literals(app) -> dict[str, str]:

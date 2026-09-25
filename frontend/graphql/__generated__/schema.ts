@@ -116,6 +116,11 @@ export type AppdomainremovedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ApplyStagedManifestInput = {
+  expectedStagedHash: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+};
+
 export type ApproveByTokenInput = {
   token: Scalars['String']['input'];
 };
@@ -3190,6 +3195,7 @@ export type AstroliftRegisteredApp = {
   provisioningStatus: Scalars['String']['output'];
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
+  rawManifestStagedHash: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
@@ -3201,6 +3207,7 @@ export type AstroliftRegisteredApp = {
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
   sourceWebhookInstalledAt?: Maybe<Scalars['DateTime']['output']>;
+  stagedEnvChanges: Array<Scalars['String']['output']>;
   subdomain: Scalars['String']['output'];
   teamId?: Maybe<Scalars['GUID']['output']>;
   teamName: Scalars['String']['output'];
@@ -5236,6 +5243,7 @@ export type Mutation = {
   addWildcardDomain: AstroliftAppDomainMutationResult;
   adoptManagedResource: ManagedresourceadoptionpayloadMutationResult;
   adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
+  applyStagedManifest: ManifeststagepayloadMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
@@ -5662,6 +5670,11 @@ export type MutationAdoptManagedResourceArgs = {
 
 export type MutationAdoptRepoCiWorkflowArgs = {
   input: CiWorkflowSyncActionInput;
+};
+
+
+export type MutationApplyStagedManifestArgs = {
+  input: ApplyStagedManifestInput;
 };
 
 
