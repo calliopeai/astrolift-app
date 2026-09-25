@@ -460,3 +460,24 @@ def test_object_lock_retention_stops_teardown_before_iam_revocation() -> None:
 
 def test_plugin_registers_preview_seaweedfs_driver() -> None:
     assert PLUGIN.managed_service_drivers[("object_store", "seaweedfs_operator")] is SeaweedFSObjectStoreDriver
+
+
+def test_a_tenant_bucket_name_cannot_take_another_services_bucket() -> None:
+    """bucket_name is tenant-set and every bucket shares one namespace (#1959)."""
+    driver, cluster, _ = _driver()
+    first = driver.provision(_spec(config={"bucket_name": "shared-assets"}))
+    applied = len(cluster.applied)
+
+    other = _spec(organization_slug="globex", managed_service_id="service-2", config={"bucket_name": "shared-assets"})
+    second = driver.provision(other)
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message
+    assert len(cluster.applied) == applied
+
+
+def test_reprovisioning_this_services_bucket_still_reconciles() -> None:
+    driver, _, _ = _driver()
+    assert driver.provision(_spec()).ok
+    again = driver.provision(_spec())
+    assert again.ok, again.message
