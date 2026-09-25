@@ -1260,10 +1260,10 @@ def test_raw_manifest_staged_hash_is_keyed_and_bound_to_the_app(settings):
         manifest_raw_staged=_TOML_WITH_ENV_CHANGED,
     )
 
-    served = app_to_type(app).raw_manifest_staged_hash
+    served = app_to_type(app, info=None).raw_manifest_staged_hash
     assert served == staged_manifest_hash(app)
     assert served != hashlib.sha256(_TOML_WITH_ENV_CHANGED.encode("utf-8")).hexdigest()
-    assert served != app_to_type(other).raw_manifest_staged_hash
+    assert served != app_to_type(other, info=None).raw_manifest_staged_hash
     settings.SECRET_KEY = "a-different-server-key-for-this-test-only"
     assert staged_manifest_hash(app) != served
 
@@ -1281,11 +1281,11 @@ def test_app_type_lists_the_staged_env_changes_by_name_only():
         'env.LOG_LEVEL = "info"', 'env.LOG_LEVEL = "debug"\nenv.OPTS = { a = "x" }'
     ).replace("is_primary = true", 'is_primary = true\nenv = { DATABASE_URL = "postgres://evil" }')
     org, app = _scaffold(manifest_raw=before, manifest_hash="abc", source_repo="")
-    assert app_to_type(app).staged_env_changes == []
+    assert app_to_type(app, info=None).staged_env_changes == []
 
     app.manifest_raw_staged = after
     app.save(update_fields=["manifest_raw_staged"])
-    names = app_to_type(app).staged_env_changes
+    names = app_to_type(app, info=None).staged_env_changes
     assert names == ["LOG_LEVEL", "OPTS", "workloads.web.containers.web.env.DATABASE_URL"]
     assert not any("evil" in name or "debug" in name for name in names)
 
@@ -1922,3 +1922,76 @@ def test_apply_staged_manifest_refuses_an_old_approval_after_a_direct_rotation(p
     assert result.errors[0].code == "SECRET_APPROVAL_REQUIRED"
     app.refresh_from_db()
     assert read_app_env(app.manifest_raw)["FOO"] == "second"
+
+
+# --- #1920 masking on applyStagedManifest's echo (#1944 coordination) ---
+
+_ENV_SECRET = "sk-live-apply-secret-123"
+_TOML_WITH_SECRET = _TOML_WITH_ENV.replace('FOO = "bar"', f'FOO = "{_ENV_SECRET}"')
+
+
+def _grant_role(user, org, *permissions: str) -> None:
+    """A real Role + org RoleBinding: ``can_reveal_app_secrets`` resolves
+    effective permissions from RoleBinding rows, which a stubbed
+    permission resolver would not show it."""
+    from astrolift_identity.models import Role, RoleBinding
+
+    role = Role.objects.create(
+        name=f"role-{'-'.join(permissions)}-{user.pk}",
+        slug=f"role-{'-'.join(permissions)}-{user.pk}",
+        permissions=list(permissions),
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
+
+
+@pytest.mark.parametrize(
+    ("permissions", "revealed"),
+    [
+        pytest.param(("app.update",), False, id="app-update-only"),
+        pytest.param(("app.update", "app.read", "secret.read"), True, id="secret-read"),
+    ],
+)
+def test_apply_staged_manifest_masks_the_echoed_manifest_unless_the_caller_can_reveal(permissions, revealed):
+    """APP_UPDATE alone runs this mutation; its response must not become a
+    side door to the [env] values revealAppSecret guards, the same rule
+    updateManifest and syncManifestFromRepo follow (#1920)."""
+    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+
+    org, app = _scaffold(manifest_raw=_TOML_WITH_SECRET, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_SECRET.replace('name = "hello"', 'name = "hello-v2"')
+    app.save(update_fields=["manifest_raw_staged"])
+    caller = _user(f"caller-{'-'.join(permissions)}")
+    _grant_role(caller, org, *permissions)
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=caller.pk)):
+        result = RegistryMutation().apply_staged_manifest(
+            _info_with_session(_FakeSession()),
+            input=ApplyStagedManifestInput(id=str(app.guid), expected_staged_hash=staged_manifest_hash(app)),
+        )
+
+    assert result.ok, result.errors
+    assert 'name = "hello-v2"' in result.data.raw_manifest
+    assert (_ENV_SECRET in result.data.raw_manifest) is revealed
+    assert (REDACTED_ENV_VALUE in result.data.raw_manifest) is not revealed
+    app.refresh_from_db()
+    assert _ENV_SECRET in app.manifest_raw
+
+
+def test_apply_staged_manifest_refuses_a_staged_buffer_holding_the_masked_placeholder(permission_resolver):
+    """A draft saved from a masked read whose placeholder was never put back
+    must not be applied: it would replace the stored secret with the
+    placeholder. parse_raw refuses it (#1920); the apply surfaces that."""
+    from astrolift_manifest.env_edit import REDACTED_ENV_VALUE
+
+    org, app = _scaffold(manifest_raw=_TOML_WITH_SECRET, manifest_hash="abc", source_repo="")
+    app.manifest_raw_staged = _TOML_WITH_SECRET.replace(_ENV_SECRET, REDACTED_ENV_VALUE)
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _apply(org, app)
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "rawManifest"
+    app.refresh_from_db()
+    assert app.manifest_raw == _TOML_WITH_SECRET

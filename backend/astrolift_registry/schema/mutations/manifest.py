@@ -412,6 +412,7 @@ class ManifestMutations:
         from astrolift_manifest.persist import persist_manifest
         from astrolift_manifest.sync_state import SyncSnapshot, classify_state
         from astrolift_registry.services.staged_manifest import staged_manifest_hash
+        from astrolift_services.secret_visibility import redacted_manifest_text
 
         def _result(current: RegisteredApp) -> MutationResultType[_ManifestStagePayload]:
             sync_state = classify_state(
@@ -421,12 +422,19 @@ class ManifestMutations:
                     last_synced_hash=current.last_synced_hash or "",
                 )
             )
+            # Masked for a caller who can't reveal secrets, like every other
+            # manifest-text response: APP_UPDATE alone runs this mutation,
+            # and the echo must not hand back the [env] values (#1920).
             return gql_success(
                 _ManifestStagePayload(
                     id=input.id,
                     sync_state=sync_state.value,
-                    raw_manifest=current.manifest_raw or "",
-                    raw_manifest_staged=current.manifest_raw_staged or "",
+                    raw_manifest=redacted_manifest_text(
+                        info, app=current, raw_text=current.manifest_raw or ""
+                    ),
+                    raw_manifest_staged=redacted_manifest_text(
+                        info, app=current, raw_text=current.manifest_raw_staged or ""
+                    ),
                 )
             )
 
