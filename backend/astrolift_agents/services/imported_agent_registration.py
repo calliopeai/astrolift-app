@@ -113,6 +113,10 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
             app_namespace(organization_slug=organization.slug, app_slug=effective_slug),
             organization_id=organization.pk,
         )
+        if refusal is None:
+            from astrolift_registry.hostname_claims import hostname_label_refusal
+
+            refusal = hostname_label_refusal(effective_slug, organization=organization)
         if refusal is not None:
             raise ImportedAgentRegistrationError(refusal)
         app = RegisteredApp(

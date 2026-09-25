@@ -228,6 +228,11 @@ class RegistrationMutations:
         )
         if _ns_refusal is not None:
             return gql_failure(ErrorCode.VALIDATION.value, _ns_refusal, field="slug")
+        from astrolift_registry.hostname_claims import hostname_label_refusal
+
+        _host_refusal = hostname_label_refusal(eff_slug, organization=project.organization)
+        if _host_refusal is not None:
+            return gql_failure(ErrorCode.CONFLICT.value, _host_refusal, field="slug")
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
