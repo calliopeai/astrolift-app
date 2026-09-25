@@ -65,8 +65,8 @@ class TenantContextMiddleware(MiddlewareMixin):
             return JsonResponse({"detail": message, "errors": [{"message": message}]}, status=403)
 
         organization_id = self._resolve_organization_id(request)
-        team_id = self._resolve_team_id(request)
-        project_id = self._resolve_project_id(request)
+        team_id = self._resolve_team_id(request, organization_id)
+        project_id = self._resolve_project_id(request, organization_id)
         actor_user_id = (
             getattr(request, "user", None).pk
             if getattr(request, "user", None) is not None and getattr(request.user, "is_authenticated", False)
@@ -100,51 +100,65 @@ class TenantContextMiddleware(MiddlewareMixin):
         if api_token is not None:
             return api_token.organization_id
 
-        header = self._resolve_header_org(request)
-        if header is not None:
-            return header
+        from astrolift_identity.api_tokens import session_may_act_in
+
+        user = getattr(request, "user", None)
+        # The header and the session's saved org are caller-chosen: honour
+        # them only for an org the user is an active member of (or the
+        # platform operator), so a membership SCIM removed stops working
+        # at once (#1925). Anything else resolves to no tenant, never to a
+        # different org.
+        if request.META.get(ORG_HEADER):
+            header = self._resolve_header_org(request)
+            return header if session_may_act_in(user, header) else None
 
         session_id = request.session.get("organization_id") if hasattr(request, "session") else None
         if session_id is not None:
             try:
-                return int(session_id)
+                session_org = int(session_id)
             except (TypeError, ValueError):
-                pass
+                session_org = None
+            if session_org is not None:
+                return session_org if session_may_act_in(user, session_org) else None
 
         return _resolve_single_membership_org(request)
 
-    def _resolve_team_id(self, request) -> int | None:
+    def _resolve_team_id(self, request, organization_id: int | None) -> int | None:
         api_token = getattr(request, "_api_token", None)
         if api_token is not None and api_token.team_id is not None:
             return api_token.team_id
         team_id = _resolve_int(request.META, TEAM_HEADER)
-        if api_token is None or team_id is None:
-            return team_id
+        if team_id is None:
+            return None
+        # A selected team must belong to the resolved org, for a session as
+        # for a token (#1925): no tenant means no team either.
+        if organization_id is None:
+            return None
         from astrolift_identity.models import Team
 
         return (
             team_id
             if Team.objects.filter(
                 pk=team_id,
-                organization_id=api_token.organization_id,
+                organization_id=organization_id,
                 deleted_at__isnull=True,
             ).exists()
             else None
         )
 
-    def _resolve_project_id(self, request) -> int | None:
+    def _resolve_project_id(self, request, organization_id: int | None) -> int | None:
         project_id = _resolve_int(request.META, PROJECT_HEADER)
+        if project_id is None or organization_id is None:
+            return None
         api_token = getattr(request, "_api_token", None)
-        if api_token is None or project_id is None:
-            return project_id
         from astrolift_identity.models import Project
 
         scope = Project.objects.filter(
             pk=project_id,
-            organization_id=api_token.organization_id,
+            organization_id=organization_id,
             deleted_at__isnull=True,
         )
-        if api_token.team_id is not None:
+        if api_token is not None and api_token.team_id is not None:
             scope = scope.filter(team_id=api_token.team_id)
         return project_id if scope.exists() else None
 
@@ -172,19 +186,9 @@ def _resolve_single_membership_org(request) -> int | None:
     user = getattr(request, "user", None)
     if user is None or not getattr(user, "is_authenticated", False):
         return None
-    from django.apps import apps
+    from astrolift_identity.api_tokens import active_member_organizations
 
-    try:
-        Member = apps.get_model("astrolift_identity", "Member")
-    except LookupError:
-        return None
-
-    org_ids = (
-        Member.objects.filter(user_id=user.pk, scope_kind="ORG", is_active=True)
-        .values_list("scope_id", flat=True)
-        .distinct()
-    )
-    org_ids = list(org_ids[:2])
+    org_ids = list(active_member_organizations(user.pk).values_list("pk", flat=True)[:2])
     if len(org_ids) == 1:
         return org_ids[0]
     return None
