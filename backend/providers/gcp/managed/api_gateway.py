@@ -29,6 +29,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "api_gateway"
 _API_ROOT = "https://apigateway.googleapis.com/v1"
@@ -637,7 +638,12 @@ class APIGatewayDriver(ManagedServiceDriver):
             ("config_raw_fields", "config_raw_fields"),
             ("gateway_raw_fields", "gateway_raw_fields"),
         ):
-            forbidden = sorted(set(cfg.get(key) or {}) & _RESERVED_FIELDS)
+            # Google's JSON parser accepts a field's proto name as well as its
+            # lowerCamelCase JSON name, so a raw field spelled in proto form
+            # bypassed the exact-match check below (#1981).
+            proto_names, forbidden = raw_field_conflicts(cfg.get(key) or {}, _RESERVED_FIELDS)
+            if proto_names:
+                return f"{label} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
             if forbidden:
                 return f"{label} cannot set typed or output fields: {', '.join(forbidden)}"
         return ""

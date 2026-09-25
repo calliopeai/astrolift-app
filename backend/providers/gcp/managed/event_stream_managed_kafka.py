@@ -36,11 +36,13 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._raw_fields import raw_field_conflicts
 
 KIND = "event_stream"
 _API_ROOT = "https://managedkafka.googleapis.com/v1"
 _ID_RE = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _TOPIC_RE = re.compile(r"^[A-Za-z0-9._-]{1,249}$")
+_SECRET_VERSION_RE = re.compile(r"^projects/(?P<project>[^/]+)/secrets/[A-Za-z0-9_-]{1,255}/versions/[0-9]+$")
 _REGISTRY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]{0,62}$")
 _ACL_ID_RE = re.compile(
     r"^(?:cluster|allTopics|allConsumerGroups|allTransactionalIds|"
@@ -1088,6 +1090,14 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             for secret_path in connect.get("secret_paths") or []:
                 if not re.search(r"/versions/[0-9]+$", str(secret_path)):
                     return f"Connect cluster {connect_id} secret_paths require exact numeric versions"
+                # Google loads each secret into the workers with the Managed
+                # Kafka service identity, so one in another project would be
+                # read on the install's authority (#1921).
+                if not _secret_version_in_project(str(secret_path), self._config.project_id):
+                    return (
+                        f"Connect cluster {connect_id} secret_paths must name "
+                        f"projects/{self._config.project_id}/secrets/<id>/versions/<n>"
+                    )
             raw_error = _raw_fields_error(connect, protected=_CONNECT_STRUCTURED_FIELDS)
             if raw_error:
                 return f"Connect cluster {connect_id}: {raw_error}"
@@ -1695,14 +1705,32 @@ def _capacity_body(cfg: dict[str, Any], size: str, *, required: bool) -> dict[st
     return {"vcpuCount": str(vcpu), "memoryBytes": str(memory_bytes)}
 
 
+def _secret_version_in_project(secret_path: str, project_id: str) -> bool:
+    """Whether ``secret_path`` is ``projects/<project_id>/secrets/<id>/versions/<n>``.
+
+    The configured project id, not the project number: a number cannot be
+    matched here, so it is refused rather than trusted.
+    """
+    match = _SECRET_VERSION_RE.fullmatch(secret_path)
+    return match is not None and match.group("project") == project_id
+
+
 def _raw_fields_error(cfg: dict[str, Any], *, protected: set[str] | None = None) -> str:
-    protected_fields = _PROTECTED_RAW_FIELDS | (protected or set())
-    forbidden = sorted(set(cfg.get("raw_fields") or {}) & protected_fields)
-    if forbidden:
-        return f"raw_fields cannot set protected fields: {', '.join(forbidden)}"
-    forbidden_clear = sorted({str(item) for item in cfg.get("clear_fields") or []} & protected_fields)
-    if forbidden_clear:
-        return f"clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
+    """Why ``cfg``'s raw or cleared field names may not reach the API, or ``""``.
+
+    See ``gcp._raw_fields.raw_field_conflicts`` for why both spellings matter
+    (#1921, #1947).
+    """
+    guarded = _PROTECTED_RAW_FIELDS | (protected or set())
+    for label, verb, names in (
+        ("raw_fields", "set", cfg.get("raw_fields") or {}),
+        ("clear_fields", "clear", cfg.get("clear_fields") or []),
+    ):
+        proto_names, forbidden = raw_field_conflicts(names, guarded)
+        if proto_names:
+            return f"{label} must use the API's lowerCamelCase JSON field names, not {', '.join(proto_names)}"
+        if forbidden:
+            return f"{label} cannot {verb} protected fields: {', '.join(forbidden)}"
     return ""
 
 

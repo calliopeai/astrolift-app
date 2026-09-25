@@ -61,11 +61,10 @@ def is_elevated_and_attested(info: Any) -> bool:
     attested too.
 
     A side-effect-free boolean, for a read path that must mask rather
-    than refuse (#1920). It is not wired into the decorator itself:
-    #1945 moves the decorator's body into ``check_elevation``, and that
-    function should return None exactly when this returns True.
-    ``test_is_elevated_and_attested_agrees_with_requires_elevation``
-    holds the two together until then.
+    than refuse (#1920). It is also the only pass/refuse decision the
+    write side makes: ``check_elevation`` (and so ``@requires_elevation``)
+    returns None exactly when this returns True, and only builds and
+    audits the refusal otherwise.
     """
     request = getattr(getattr(info, "context", None), "request", None)
     if request is not None and getattr(request, "_api_token", None) is not None:
@@ -102,106 +101,13 @@ def requires_elevation(
 
         @functools.wraps(fn)
         def wrapper(self, info, *args, **kwargs):
-            request = getattr(getattr(info, "context", None), "request", None)
-            # API-token-authenticated calls bypass step-up — the
-            # token issuance ceremony (operator + password + MFA in
-            # the UI) is the authentication; step-up is a session-
-            # scoped recency concept that doesn't translate. CI
-            # runners holding a scoped token would otherwise be
-            # locked out of every gated mutation. The token's scope
-            # set still gates *what* it can do — step-up is about
-            # session freshness, not authorization.
-            if request is not None and getattr(request, "_api_token", None) is not None:
-                return fn(self, info, *args, **kwargs)
-            # Global step-up off-switch (default OFF). Installs that want
-            # the SOC2 / SOX recency gate flip
-            # ``REQUIRE_STEP_UP_AUTH = True`` in Constance. Default-off so
-            # small / SSO-only / single-operator installs don't trip on
-            # every sensitive mutation — they opt in when their
-            # compliance posture demands it.
-            #
-            # The flag read is the only thing this ``try`` may guard.
-            # ``fn(...)`` must run outside it: #1963 -- an earlier
-            # version called ``fn`` from inside this ``try``, so an
-            # exception the resolver itself raised (while step-up was
-            # off, the default) was caught by this ``except`` and the
-            # resolver ran a second time via the gate below.
-            try:
-                from constance import config as constance_config
-
-                step_up_on = bool(getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False))
-            except Exception:
-                # Constance unavailable (early-boot test path) — fail
-                # closed to the existing gate so prod behavior isn't
-                # silently disabled by a config-load failure.
-                step_up_on = True
-            if not step_up_on:
-                return fn(self, info, *args, **kwargs)
-            # Direct-call path (pytest mutations bypassing HTTP).
-            # A real HTTP request always carries a session attribute
-            # because SessionMiddleware runs before the GraphQL view
-            # — so the only way ``request`` lacks ``session`` is a
-            # unit test calling the resolver directly. Bypass with a
-            # warning rather than failing every existing test; the
-            # security gate at the HTTP layer is unaffected.
-            if request is None or not hasattr(request, "session"):
-                log.debug(
-                    "step_up: no request/session on info (direct test call?); bypassing %s",
-                    fn.__qualname__,
-                )
-                return fn(self, info, *args, **kwargs)
-            session = request.session
-            status = get_status(session)
-
-            # #496 — when the install requires attestation for
-            # sensitive ops, the attestation gate runs in *addition*
-            # to the standard step-up freshness gate. A session that
-            # is freshly elevated but not attested still gets the
-            # deny, with ``requires_attestation: true`` so the FE
-            # opens the attest-prompt instead of the password-prompt.
-            attest_required = _attestation_gate_active(request)
-            if status.elevated and not attest_required:
-                return fn(self, info, *args, **kwargs)
-            supported = _supported_step_up_methods(session)
-            if attest_required:
-                _emit_deny_audit(
-                    fn=fn,
-                    action="auth.attestation.required",
-                    action_label=action_label,
-                    extra={
-                        "resolver": fn.__qualname__,
-                        "action_label": action_label,
-                        "reason": "attestation_required",
-                        "supported_methods": supported,
-                    },
-                )
-                return gql_failure(
-                    ErrorCode.STEP_UP_REQUIRED.value,
-                    _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
-                    requires_attestation=True,
-                    supported_methods=supported,
-                )
-
-            # Audit the deny so security review can spot patterns
-            # (operator hammering a sensitive mutation without ever
-            # elevating, scripted callers that don't know about
-            # step-up, etc.).
-            _emit_deny_audit(
-                fn=fn,
-                action="auth.step_up.denied",
-                action_label=action_label,
-                extra={
-                    "resolver": fn.__qualname__,
-                    "action_label": action_label,
-                    "supported_methods": supported,
-                },
-            )
-
-            return gql_failure(
-                ErrorCode.STEP_UP_REQUIRED.value,
-                _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
-                supported_methods=supported,
-            )
+            deny = check_elevation(info, action_label=action_label, resolver_name=fn.__qualname__)
+            if deny is not None:
+                return deny
+            # The resolver runs once, here, outside any try: when it ran
+            # inside the Constance-read try, its own exception re-ran it
+            # through the gate (#1963).
+            return fn(self, info, *args, **kwargs)
 
         wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
         # Mark the resolver so introspection / docs tooling can list
@@ -213,9 +119,90 @@ def requires_elevation(
     return decorator
 
 
+def check_elevation(
+    info: Any,
+    *,
+    action_label: str | None = None,
+    resolver_name: str = "",
+) -> Any | None:
+    """The same gate ``@requires_elevation`` applies as a blanket
+    decorator, exposed as a plain function for a resolver that only
+    needs step-up *conditionally* -- e.g. only when a specific field in
+    the input actually changes a secret, rather than on every call
+    (``applyStagedManifest``, #1759 adversarial review: an env-literal
+    change is as sensitive as ``setAppSecret``, but most manifest applies
+    never touch ``[env]`` and step-up on every one would be needless
+    friction).
+
+    Returns ``None`` when the caller may proceed, or a ``gql_failure(...)``
+    envelope (``STEP_UP_REQUIRED``) when it may not -- same shape
+    ``@requires_elevation`` returns, so a caller does ``deny = check_elevation(...); if deny is not None: return deny``.
+    ``resolver_name`` is what lands in the audit row's ``target_id`` and
+    would otherwise be ``fn.__qualname__`` when called from the decorator;
+    a direct caller passes its own ``ClassName.method_name``.
+
+    Whether the caller passes is ``is_elevated_and_attested``'s answer and
+    nothing else, so this write gate and the read paths that mask secrets
+    on the same question can't drift apart (#1920). This function only
+    builds the refusal and audits it. It never calls the resolver, so a
+    resolver's own exception can't be mistaken for a failed config read
+    and run it twice (#1963).
+    """
+    if is_elevated_and_attested(info):
+        return None
+    # Only a call with a session gets here: the predicate passes an
+    # API-token call, a disabled gate and a call with no session.
+    request = info.context.request
+    session = request.session
+    supported = _supported_step_up_methods(session)
+    # #496 — when the install requires attestation for sensitive ops,
+    # the attestation gate runs in *addition* to the standard step-up
+    # freshness gate. A session that is freshly elevated but not
+    # attested still gets the deny, with ``requires_attestation: true``
+    # so the FE opens the attest-prompt instead of the password-prompt.
+    if _attestation_gate_active(request):
+        _emit_deny_audit(
+            resolver_name=resolver_name,
+            action="auth.attestation.required",
+            action_label=action_label,
+            extra={
+                "resolver": resolver_name,
+                "action_label": action_label,
+                "reason": "attestation_required",
+                "supported_methods": supported,
+            },
+        )
+        return gql_failure(
+            ErrorCode.STEP_UP_REQUIRED.value,
+            _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
+            requires_attestation=True,
+            supported_methods=supported,
+        )
+
+    # Audit the deny so security review can spot patterns (operator
+    # hammering a sensitive mutation without ever elevating, scripted
+    # callers that don't know about step-up, etc.).
+    _emit_deny_audit(
+        resolver_name=resolver_name,
+        action="auth.step_up.denied",
+        action_label=action_label,
+        extra={
+            "resolver": resolver_name,
+            "action_label": action_label,
+            "supported_methods": supported,
+        },
+    )
+
+    return gql_failure(
+        ErrorCode.STEP_UP_REQUIRED.value,
+        _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
+        supported_methods=supported,
+    )
+
+
 def _emit_deny_audit(
     *,
-    fn: Callable[..., Any],
+    resolver_name: str,
     action: str,
     action_label: str | None,
     extra: dict[str, Any],
@@ -230,7 +217,7 @@ def _emit_deny_audit(
                 action=action,
                 decision="DENY",
                 target_kind="resolver",
-                target_id=fn.__qualname__,
+                target_id=resolver_name,
                 duration_ms=0,
                 permissions=(),
                 error_code=ErrorCode.STEP_UP_REQUIRED.value,
@@ -239,7 +226,7 @@ def _emit_deny_audit(
             )
         )
     except Exception:  # noqa: BLE001 — audit emission must never break a deny
-        log.exception("step_up: audit emit failed on deny for %s", fn.__qualname__)
+        log.exception("step_up: audit emit failed on deny for %s", resolver_name)
 
 
 def _supported_step_up_methods(session: Any) -> list[str]:
@@ -407,6 +394,7 @@ def _candidate_mutation_classes() -> list[type]:
 __all__ = [
     "SESSION_KEY_ELEVATED_UNTIL",  # re-export for callers that want the raw key
     "StepUpProbe",
+    "check_elevation",
     "is_elevated_and_attested",
     "list_gated_resolvers",
     "requires_elevation",

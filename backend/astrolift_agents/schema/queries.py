@@ -2,7 +2,7 @@
 
 Skills, ToolDefs, Briefs, and AgentTasks are org-scoped; the
 ``dispatchers`` resolver is platform-level (the routing fabric spans
-tenants) and is staff/superuser-only.
+tenants) and is the platform operator's alone (#1978).
 
 Every resolver carries ``@require_permission`` + ``@tenant_scoped`` per
 the tenancy guardrail. ``@tenant_scoped`` only asserts a tenant context
@@ -83,7 +83,7 @@ from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, require_permission, require_platform_operator
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -990,7 +990,11 @@ class AgentsQuery:
             NoAgentClusterError,
             resolve_agent_cluster,
         )
-        from astrolift_dispatch.agent_secrets import effective_secret_refs, probe_ref_statuses
+        from astrolift_dispatch.agent_secrets import (
+            effective_secret_refs,
+            probe_ref_statuses,
+            unscoped_secret_refs,
+        )
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
@@ -1005,7 +1009,11 @@ class AgentsQuery:
             cluster = resolve_agent_cluster(spec.organization)
         except NoAgentClusterError:
             cluster = None
-        rows = probe_ref_statuses(cluster=cluster, refs=effective_secret_refs(spec))
+        rows = probe_ref_statuses(
+            cluster=cluster,
+            refs=effective_secret_refs(spec),
+            unscoped=unscoped_secret_refs(spec),
+        )
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field
@@ -1437,12 +1445,12 @@ class AgentsQuery:
         # Platform-level routing fabric: DispatcherInstances span tenants
         # (one per cluster/cloud/region), so this resolver intentionally
         # escapes @tenant_scoped — same shape as astrolift_provider_plugins.
-        # Staff/superuser only; the api_key_hash is never surfaced (the
+        # The whole fleet is the platform operator's to see; Django staff is
+        # not the operator (#1978). The api_key_hash is never surfaced (the
         # type omits it). See EXEMPT entry in test_tenancy_guardrail.py.
         user = getattr(getattr(info.context, "request", None), "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             raise GraphQLError("authentication required")
-        if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
-            raise GraphQLError("staff access required")
+        require_platform_operator(user)
         qs = DispatcherInstance.objects.filter(deleted_at__isnull=True).order_by("slug")[:200]
         return [dispatcher_to_type(d) for d in qs]

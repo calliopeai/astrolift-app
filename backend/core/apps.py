@@ -29,9 +29,6 @@ class CoreConfig(AppConfig):
 
         post_migrate.connect(self.register_objects, sender=self)
 
-        # Register core file exporters
-        self._register_file_exporters()
-
         # Register core processors
         self._register_processors()
 
@@ -54,14 +51,6 @@ class CoreConfig(AppConfig):
         from core.schema.vnc_ws import set_vnc_backend
 
         set_vnc_backend(K8sVncBackend())
-
-    @staticmethod
-    def _register_file_exporters():
-        """Register core file exporters."""
-        from core.utils.file_export_registry import register_file_exporter
-        from core.utils.file_processor.file_export import ChatHistory
-
-        register_file_exporter("rocket-channel-history", ChatHistory)
 
     @staticmethod
     def _register_processors():

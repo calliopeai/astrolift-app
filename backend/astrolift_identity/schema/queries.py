@@ -75,7 +75,7 @@ from astrolift_identity.scope_visibility import visible_projects, visible_teams
 from astrolift_identity.scopes import team_scope_by_guid
 from core.decorators import tenant_scoped
 from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
-from core.permissions import Permission, module_entitlements, require_permission
+from core.permissions import Permission, is_platform_operator, module_entitlements, require_permission
 
 
 @strawberry.type(name="AstroliftUserProfile")
@@ -435,7 +435,9 @@ class IdentityQuery:
         user = getattr(request, "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             return []
-        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        # Every org is the platform operator's list; Django staff is not the
+        # operator and sees its own memberships like anyone else (#1978).
+        if is_platform_operator(user):
             orgs = Organization.objects.filter(deleted_at__isnull=True)
         else:
             from astrolift_identity.models import Member

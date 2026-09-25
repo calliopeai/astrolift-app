@@ -44,6 +44,7 @@ import {
 } from "@/graphql/agents/agents.mutations";
 import { AGENT_ENV_SPEC_SECRET_STATUS } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 import { ManagedModelSection } from "./managed-model-section";
 import { AgentSecretBundles } from "./agent-secret-bundles";
@@ -102,6 +103,9 @@ export function AgentSecretsDialog({
     fetchPolicy: "cache-and-network",
   });
   const rows = data?.agentEnvironmentSpecSecretStatus ?? [];
+  // The backend refuses a ref outside agents/<org guid>/ (#1921).
+  const { org } = useActiveOrg();
+  const refNamespace = `agents/${org?.id ?? "<organization id>"}`;
 
   // Per-ref draft value (write-only; never seeded from the server).
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
@@ -296,7 +300,7 @@ export function AgentSecretsDialog({
         />
         <Input
           className="font-mono"
-          placeholder="Provider URI (for example sm:agents/emr/token)"
+          placeholder={`Provider URI (for example ${refNamespace}/token)`}
           value={refUri}
           onChange={(event) => setRefUri(event.target.value)}
         />

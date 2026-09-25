@@ -19,7 +19,10 @@ Example (run on a live container via smd-opscode
         --config-repo steadymd/smd-agents \\
         --manifest-path agents/emr-bug-triage/astrolift.toml \\
         --env EMR_SERVICE_BASE_URL=https://emr.prd.smdinfra.net \\
-        --secret EMR_AGENT_TOKEN=smd-emr-agent-token
+        --secret EMR_AGENT_TOKEN=agents/<org guid>/emr-agent-token
+
+A ``--secret`` location must sit under ``agents/<org guid>/`` (#1921); it may
+carry the ``secret://`` scheme.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from astrolift_agents.models import AgentEnvironmentSpec
+from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
 from astrolift_identity.models import Organization
 
 
@@ -94,6 +98,11 @@ class Command(BaseCommand):
             {"env_var": env_var, "uri": uri}
             for env_var, uri in _parse_pairs(options.get("secret"), what="secret")
         ]
+        for ref in secret_refs:
+            try:
+                assert_org_scoped_secret_ref(ref["uri"], organization=org)
+            except SecretRefNamespaceError as exc:
+                raise CommandError(str(exc)) from exc
 
         slug = options["slug"]
         spec = AgentEnvironmentSpec.objects.filter(

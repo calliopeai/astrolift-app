@@ -435,6 +435,49 @@ def test_deprovision_blocks_external_gateway_and_config_before_mutating(
             },
             "gateway_raw_fields",
         ),
+        # Google's JSON parser accepts a field's proto name as well as its
+        # lowerCamelCase JSON name, so a raw field spelled in proto form must
+        # be refused outright rather than compared to the reserved set (#1981).
+        (
+            {
+                "api_id": "billing-api",
+                "openapi_documents": [
+                    {"document": {"path": "openapi.yaml", "contents": "x"}},
+                ],
+                "api_raw_fields": {"managed_service": "attacker"},
+            },
+            "lowerCamelCase JSON field names",
+        ),
+        (
+            {
+                "api_id": "billing-api",
+                "openapi_documents": [
+                    {"document": {"path": "openapi.yaml", "contents": "x"}},
+                ],
+                "config_raw_fields": {"open_api_documents": []},
+            },
+            "lowerCamelCase JSON field names",
+        ),
+        (
+            {
+                "api_id": "billing-api",
+                "openapi_documents": [
+                    {"document": {"path": "openapi.yaml", "contents": "x"}},
+                ],
+                "gateway_raw_fields": {"api_config": "attacker"},
+            },
+            "lowerCamelCase JSON field names",
+        ),
+        (
+            {
+                "api_id": "billing-api",
+                "openapi_documents": [
+                    {"document": {"path": "openapi.yaml", "contents": "x"}},
+                ],
+                "gateway_raw_fields": {"ApiConfig": "attacker"},
+            },
+            "gateway_raw_fields cannot set typed or output fields: ApiConfig",
+        ),
         (
             {
                 "api_id": "billing-api",
@@ -454,6 +497,17 @@ def test_invalid_config_fails_closed(
 ) -> None:
     result = driver.provision(replace(SPEC, config=manifest_config))
     assert not result.ok and message in result.message
+
+
+def test_a_json_named_raw_field_the_driver_does_not_model_still_passes(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    cfg = {**_openapi_config(), "gateway_raw_fields": {"futureKnob": "beta"}}
+    result = driver.provision(replace(SPEC, config=cfg))
+    assert result.ok, result.message
+    _, gateway = _names()
+    assert client.resources[gateway]["futureKnob"] == "beta"
 
 
 def test_schema_exposes_revision_transport_and_safety_controls(driver: APIGatewayDriver) -> None:

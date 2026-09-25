@@ -1575,6 +1575,8 @@
       "saveDraft": "Save draft",
       "saving": "Saving…",
       "pushToRepo": "Push to repo",
+      "applyStaged": "Apply",
+      "applying": "Applying…",
       "syncStates": {
         "inSync": "In sync",
         "dbAhead": "Unsaved drafts in DB",
@@ -1603,6 +1605,7 @@
       },
       "editor": {
         "unsaved": "unsaved",
+        "stagedNotApplied": "Staged, not applied",
         "description": "Source TOML. Save stages the change in the platform; Push to repo opens a PR."
       },
       "rendered": {
@@ -1618,6 +1621,12 @@
         "title": "Sync from repo?",
         "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge.",
         "confirm": "Sync from repo"
+      },
+      "confirmApply": {
+        "title": "Apply staged manifest?",
+        "description": "Applies the staged draft straight to the live manifest; the next deploy uses it immediately.",
+        "descriptionWithEnv": "Applies the staged draft straight to the live manifest, changing these env values: {keys}. The next deploy uses it immediately.",
+        "confirm": "Apply"
       },
       "view": {
         "form": "Form",

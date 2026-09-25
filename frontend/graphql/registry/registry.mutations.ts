@@ -120,6 +120,27 @@ export const UPDATE_MANIFEST = gql`
   }
 `;
 
+/**
+ * Apply a staged manifest edit straight to manifest_raw (#1759). Only
+ * usable when the app cannot push through a source connection --
+ * pushManifestToRepo is the review-gated path for an app that can.
+ */
+export const APPLY_STAGED_MANIFEST = gql`
+  mutation ApplyStagedManifest($input: ApplyStagedManifestInput!) {
+    applyStagedManifest(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${MANIFEST_STAGE_FIELDS}
+      }
+    }
+  }
+`;
+
 export const SYNC_MANIFEST_FROM_REPO = gql`
   mutation SyncManifestFromRepo($input: SyncManifestFromRepoInput!) {
     syncManifestFromRepo(input: $input) {
