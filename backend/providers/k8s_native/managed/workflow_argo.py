@@ -32,6 +32,7 @@ from _sdk.managed_service import (
 from k8s_native.managed._handle import ParsedHandle
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
 KIND = "workflow_engine"
 VARIANT = "argo_workflows"
@@ -602,6 +603,7 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
         self._validate_metadata(cfg.get("labels"), cfg.get("annotations"))
         self._normalize_children(cfg, "cron_workflows", CRON_KIND)
         self._normalize_children(cfg, "event_bindings", EVENT_KIND)
+        refuse_shared_namespace_secrets(self._config.namespace, cfg)
         return cfg
 
     def _normalize_children(self, cfg: dict[str, Any], field: str, kind: str) -> None:

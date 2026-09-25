@@ -27,6 +27,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
 KIND = "faas"
 VARIANT = "knative_service"
@@ -489,6 +490,11 @@ class KnativeServiceDriver(ManagedServiceDriver):
                 raise ValueError(f"Knative runtime owns environment variable {key!r}")
         if set(env) & set(secret_env):
             raise ValueError("env and secret_env cannot define the same variable")
+        refuse_shared_namespace_secrets(
+            self._config.namespace,
+            {"image_pull_secrets": cfg.get("image_pull_secrets") or [], "volumes": cfg.get("volumes") or []},
+            extra=[str(value.get("secret_name")) for value in secret_env.values()],
+        )
         labels = cfg.get("labels") or {}
         if not isinstance(labels, dict):
             raise ValueError("labels must be an object")
