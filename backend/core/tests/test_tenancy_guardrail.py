@@ -281,21 +281,24 @@ EXEMPT: dict[str, str] = {
     ),
     "TemporalWorkflowsMutation.cancel_workflow_instance": (
         "data-dependent gate in the resolver body (_gate_instance_op): "
-        "org-owned runs need WORKFLOW_TRIGGER + caller-org scope (foreign "
-        "org reads as not-found); legacy org-less runs keep AUDIT_LOG_READ "
-        "+ ADMIN_ELEVATE. A static decorator can't branch on the row."
+        "org-owned runs need WORKFLOW_TRIGGER at the run's own app / "
+        "project / org scope (foreign org reads as not-found); foreign and "
+        "legacy org-less runs are the platform operator's alone (#1965). A "
+        "static decorator can't branch on the row."
     ),
     "TemporalWorkflowsMutation.terminate_workflow_instance": (
         "data-dependent gate in the resolver body (_gate_instance_op): "
-        "org-owned runs need WORKFLOW_TRIGGER + caller-org scope (foreign "
-        "org reads as not-found); legacy org-less runs keep AUDIT_LOG_READ "
-        "+ ADMIN_ELEVATE. A static decorator can't branch on the row."
+        "org-owned runs need WORKFLOW_TRIGGER at the run's own app / "
+        "project / org scope (foreign org reads as not-found); foreign and "
+        "legacy org-less runs are the platform operator's alone (#1965). A "
+        "static decorator can't branch on the row."
     ),
     "TemporalWorkflowsMutation.signal_workflow_instance": (
         "data-dependent gate in the resolver body (_gate_instance_op): "
-        "org-owned runs need WORKFLOW_TRIGGER + caller-org scope (foreign "
-        "org reads as not-found); legacy org-less runs keep AUDIT_LOG_READ "
-        "+ ADMIN_ELEVATE. A static decorator can't branch on the row."
+        "org-owned runs need WORKFLOW_TRIGGER at the run's own app / "
+        "project / org scope (foreign org reads as not-found); foreign and "
+        "legacy org-less runs are the platform operator's alone (#1965). A "
+        "static decorator can't branch on the row."
     ),
     # Forms (#453): conditional gate on a runtime row.
     "FormsMutation.submit_form": (

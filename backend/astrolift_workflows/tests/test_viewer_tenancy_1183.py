@@ -2,8 +2,9 @@
 
 ``AUDIT_LOG_READ`` is a per-org permission, so a non-elevated holder must
 only ever see Temporal runs their own org owns. The read gate mirrors the
-write gate in ``mutations._gate_instance_op``: the elevated platform-operator
-pair (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``) sees every run fleet-wide;
+write gate in ``mutations._gate_instance_op``: the platform operator (an
+active superuser holding ``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``, #1965) sees
+every run fleet-wide;
 everyone else is scoped to runs their org owns (resolved through the tier-3
 ``WorkflowInstance`` mirror, then the ops ``WorkflowRun`` mirror).
 
@@ -29,6 +30,14 @@ pytestmark = pytest.mark.django_db
 
 def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=SimpleNamespace(user=None)))
+
+
+def _operator_info():
+    """The platform operator (an active superuser), the only caller the
+    fleet-wide path admits (#1965)."""
+    info = _info()
+    info.context.user = SimpleNamespace(is_authenticated=True, is_active=True, is_superuser=True)
+    return info
 
 
 @pytest.fixture
@@ -143,7 +152,7 @@ def test_instance_detail_elevated_pair_reads_foreign_history(
     monkeypatch.setattr("astrolift_workflows.schema.queries.workflow_history", lambda wid: [])
     q = TemporalWorkflowsQuery()
     with _org_tenant(org):
-        detail = q.astrolift_workflow_instance_detail(_info(), "wf-foreign-elevated")
+        detail = q.astrolift_workflow_instance_detail(_operator_info(), "wf-foreign-elevated")
     assert detail is not None
     assert detail.instance.workflow_id == "wf-foreign-elevated"
 
@@ -182,7 +191,7 @@ def test_instances_list_elevated_pair_sees_all(permission_resolver, monkeypatch,
     )
     q = TemporalWorkflowsQuery()
     with _org_tenant(org):
-        page = q.astrolift_workflow_instances(_info())
+        page = q.astrolift_workflow_instances(_operator_info())
     ids = sorted(item.workflow_id for item in page.items)
     assert ids == ["wf-foreign-list-2", "wf-own-list-2"]
 

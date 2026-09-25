@@ -19,7 +19,6 @@ from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 from workflows.scopes import (
     definition_scope_by_slug,
     instance_scope_by_id,
-    workflow_scope_by_slug,
 )
 
 
@@ -161,7 +160,7 @@ def _unique_clone_slug(base_slug, org):
 @strawberry.type
 class Mutation:
     @strawberry.mutation(description="Start a workflow for an object.")
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
+    @require_permission(Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug"))
     @tenant_scoped()
     def start_workflow(
         self,
@@ -228,7 +227,12 @@ class Mutation:
             "WorkflowRun mirror rows and enqueues the stage executor."
         )
     )
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_slug("workflow_slug"))
+    # The slug names a definition, not a configured Workflow. The handler
+    # skips a disabled definition of the org's for an enabled template, so
+    # the scope resolves the same row it runs (#1965).
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug", enabled_only=True)
+    )
     @tenant_scoped()
     def run_workflow_definition(
         self,

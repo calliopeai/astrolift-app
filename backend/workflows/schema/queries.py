@@ -6,12 +6,20 @@ import strawberry
 from django.db.models import Q
 from strawberry.types import Info
 
+from core.decorators import tenant_scoped
+from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage, WorkflowStageExecution
 from workflows.schema.types import (
     WorkflowInstanceType,
     WorkflowStageExecutionType,
     WorkflowStageType,
+)
+from workflows.scopes import (
+    covered_project_ids,
+    definition_scope_by_slug,
+    instance_scope_by_id,
+    workflow_run_scope_by_id,
 )
 
 
@@ -44,19 +52,29 @@ class Query:
     # .WorkflowsQuery`` (spec 40 §6, #968).
 
     @strawberry.field(description="Get a workflow instance by ID.")
+    @require_permission(Permission.WORKFLOW_READ, scope=instance_scope_by_id("id"))
+    @tenant_scoped()
     def workflow_instance(self, info: Info, id: strawberry.ID) -> Optional[WorkflowInstanceType]:
         # Org-scoped: a foreign org's instance id resolves to nothing,
         # same closure as the definition readers (#968 follow-up).
         return WorkflowInstance.objects.filter(pk=id).filter(_org_scope_q(_caller_org_pk())).first()
 
     @strawberry.field(description="List workflow instances for a specific object.")
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
+    @tenant_scoped()
     def workflow_instances(
         self,
         info: Info,
         object_id: int,
         model_label: Optional[str] = None,
     ) -> list[WorkflowInstanceType]:
-        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(_org_scope_q(_caller_org_pk()))
+        org_pk = _caller_org_pk()
+        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(_org_scope_q(org_pk))
+        projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
+        if projects is not None:
+            qs = qs.filter(
+                organization_id=org_pk, workflow__organization_id=org_pk, workflow__project_id__in=projects
+            )
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 
@@ -69,6 +87,8 @@ class Query:
         return qs
 
     @strawberry.field(description="List stages for a workflow definition by slug.")
+    @require_permission(Permission.WORKFLOW_READ, scope=definition_scope_by_slug("workflow_slug"))
+    @tenant_scoped()
     def workflow_stages(
         self,
         info: Info,
@@ -87,6 +107,10 @@ class Query:
         )
 
     @strawberry.field(description="List stage executions for a WorkflowRun (by workflow_id + run_id).")
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=workflow_run_scope_by_id("workflow_id", run_field="run_id")
+    )
+    @tenant_scoped()
     def workflow_stage_executions(
         self,
         info: Info,
@@ -95,22 +119,18 @@ class Query:
     ) -> list[WorkflowStageExecutionType]:
         from astrolift_operations.models import WorkflowRun
 
-        # Org-scoped: a foreign org's run resolves to nothing (same
-        # closure as workflow_stages above).
-        #
-        # Fail closed with no tenant. The shared read scope is
-        # org ∪ platform-global, which for a null org compiles to
-        # "organization_id IS NULL OR organization IS NULL" and would hand
-        # back every org-less run in the install — including, since #69, its
-        # stage roles, declared approvers, and gate state.
+        # The caller's own org only: a foreign org's run resolves to nothing.
+        # A run is an execution, not a shared template, so the org ∪
+        # platform-global read scope of the definition readers does not
+        # apply. An org-less run carries its stage roles, declared approvers
+        # and gate state (#69) and belongs to no tenant (#1965). With no
+        # tenant, fail closed.
         org_pk = _caller_org_pk()
         if org_pk is None:
             return []
-        run = (
-            WorkflowRun.objects.filter(workflow_id=workflow_id, run_id=run_id)
-            .filter(_org_scope_q(org_pk))
-            .first()
-        )
+        run = WorkflowRun.objects.filter(
+            workflow_id=workflow_id, run_id=run_id, organization_id=org_pk
+        ).first()
         if not run:
             return []
         return (

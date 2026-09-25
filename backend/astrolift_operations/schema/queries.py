@@ -827,7 +827,7 @@ class OperationsQuery:
         return zentinelle_connection_to_type(connection) if connection is not None else None
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_workflow_runs(
         self,
@@ -838,14 +838,18 @@ class OperationsQuery:
         # nullable ``organization`` FK stamped from the tenant context
         # at reconcile time; org_id None → deny-by-default (empty), and
         # NULL-org platform runs stay out of every tenant's view. The
-        # (organization, -started_at) index backs this directly.
+        # (organization, -started_at) index backs this directly. A grant
+        # below the org sees only the runs whose app or project it covers
+        # (#1965).
+        from workflows.scopes import visible_runs
+
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        qs = WorkflowRun.objects.filter(organization_id=org_id).order_by("-started_at")[
-            : max(1, min(limit, 200))
-        ]
-        return [workflow_run_to_type(w) for w in qs]
+        qs = visible_runs(
+            WorkflowRun.objects.filter(organization_id=org_id), org_id, Permission.AUDIT_LOG_READ
+        )
+        return [workflow_run_to_type(w) for w in qs.order_by("-started_at")[: max(1, min(limit, 200))]]
 
     @strawberry.field(
         deprecation_reason=(

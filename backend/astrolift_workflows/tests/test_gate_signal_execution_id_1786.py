@@ -24,8 +24,11 @@ pytestmark = pytest.mark.django_db
 
 
 def _info():
+    # The platform operator: these tests exercise the signal payload, not
+    # the tenant gate (#1965 covers that).
+    operator = SimpleNamespace(is_authenticated=True, is_active=True, is_superuser=True)
     return SimpleNamespace(
-        context=SimpleNamespace(user=None, request=RequestFactory().get("/app/gql/config/"))
+        context=SimpleNamespace(user=operator, request=RequestFactory().get("/app/gql/config/"))
     )
 
 
@@ -64,12 +67,20 @@ def execution(db):
 
 
 def test_resolves_guid_and_pk_and_refuses_unknown(execution):
-    assert m._resolve_execution_id(str(execution.guid)) == str(execution.pk)
-    assert m._resolve_execution_id(str(execution.pk)) == str(execution.pk)
-    assert m._resolve_execution_id(execution.pk) == str(execution.pk)
-    assert m._resolve_execution_id("01a0ffff-0000-7000-8000-000000000000") is None
-    assert m._resolve_execution_id("999999") is None
-    assert m._resolve_execution_id("") is None
+    wid = "WorkflowDefinitionRunWorkflow-9"
+    assert m._resolve_execution_id(str(execution.guid), wid) == str(execution.pk)
+    assert m._resolve_execution_id(str(execution.pk), wid) == str(execution.pk)
+    assert m._resolve_execution_id(execution.pk, wid) == str(execution.pk)
+    assert m._resolve_execution_id("01a0ffff-0000-7000-8000-000000000000", wid) is None
+    assert m._resolve_execution_id("999999", wid) is None
+    assert m._resolve_execution_id("", wid) is None
+
+
+def test_an_execution_of_another_run_is_refused(execution):
+    """The execution must belong to the run being signalled (#1965): another
+    run's id, in any org, reads as unknown."""
+    assert m._resolve_execution_id(str(execution.guid), "WorkflowDefinitionRunWorkflow-10") is None
+    assert m._resolve_execution_id(str(execution.pk), "WorkflowDefinitionRunWorkflow-10") is None
 
 
 def _grant(permission_resolver):

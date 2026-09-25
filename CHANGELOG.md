@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Workflow routes check their permission at the object's own scope (#1965).
+  Cancelling, terminating or signalling a run needs `workflow.trigger` on the
+  run's app, else on its definition's project, else on the organization.
+  The check used to run with no target and then match only the organization,
+  so a team or project grant with that team or project selected (a
+  team-scoped API token, or an `X-Astrolift-Team` header) reached every run
+  in the organization. The same rule now covers the exact-execution reads and
+  controls, the Temporal viewer, `astroliftWorkflowRuns`, the configured
+  workflow and definition routes, and the legacy `workflowInstance(s)`,
+  `workflowStages` and `workflowStageExecutions` readers, which checked no
+  permission at all. A definition without a project, a platform template,
+  and anything that does not resolve are organization-level. Lists keep
+  every row for an organization grant and narrow to the covered projects and
+  apps otherwise, so team and project members see their own workflows
+  without selecting anything. Only the platform operator acts fleet-wide on
+  the viewer and on cancel, terminate and signal: the stock organization
+  owner and admin roles hold `admin.elevate`, and through it they reached
+  other organizations' runs. `workflowStageExecutions` no longer returns
+  runs that belong to no organization, and `createWorkflow` binds the
+  organization's own definition over a platform template with the same slug.
+
 - Every install now carries the stock role catalogue (#1864). Three system
   roles are new. Team Operator and Project Operator run, attach to and cancel
   the apps, agents and workflows in their scope, and change no configuration.
