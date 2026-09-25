@@ -1111,6 +1111,29 @@ def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
     return dns_label("astrolift", "app-env", app_slug, environment_name)
 
 
+def _dry_run_deploy_set(
+    cluster_driver, cluster_slug: str, namespace: str, d, secrets: list[dict[str, Any]]
+) -> None:
+    """Server-side dry-run of this deploy's Secrets *and* workloads before
+    any Secret is written (#1957).
+
+    Secrets go before apply (#1758), and the dry-run that gates a deploy
+    lived only in ``apply_manifests``. So a manifest set the apiserver
+    rejects still left its new Secret values behind, where the running
+    release's next restarted pod picked them up. Now a rejection stops
+    the deploy with nothing written; ``apply_manifests`` dry-runs again
+    against whatever changed in between.
+    """
+    from core.app_deploy import AppDeployError, render_resources_for_deployment
+
+    workloads = render_resources_for_deployment(d)
+    dry = cluster_driver.apply_manifests(cluster_slug, namespace, [*secrets, *workloads], dry_run=True)
+    if not dry.ok:
+        raise AppDeployError(
+            f"dry-run rejected deployment {d.pk} before any Secret was written: " + "; ".join(dry.summary()),
+        )
+
+
 def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: str, d) -> None:
     """Remove the environment's literal ``[env]`` Secret once it has no
     literals left (#1923). Nothing references it any more, but it still holds
@@ -1435,6 +1458,8 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         except FilesystemBindingError as exc:
             raise AppDeployError(str(exc)) from exc
 
+    if target_cluster_id is None:
+        _dry_run_deploy_set(cluster_driver, ctx.slug, namespace, d, resources)
     if not literals:
         _delete_stale_literal_secret(cluster_driver, ctx.slug, namespace, d)
     if not resources:
