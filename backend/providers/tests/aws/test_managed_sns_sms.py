@@ -458,3 +458,15 @@ def test_partition_is_derived_for_govcloud_and_china() -> None:
     china = SNSSmsDriver(config=SNSSmsConfig(region="cn-north-1", account_id="123456789012"), client=sns)
     assert gov._topic_arn("sms").startswith("arn:aws-us-gov:")
     assert china._topic_arn("sms").startswith("arn:aws-cn:")
+
+
+def test_another_tenants_sms_topic_cannot_be_named_and_retagged() -> None:
+    """topic_name is tenant-set; the SMS marker alone is not ownership (#1961)."""
+    driver, sns = _driver()
+    arn = sns.seed("sms-alerts", owned=True)
+    sns.tags[arn]["astrolift.io/organization"] = "globex"
+
+    result = driver.provision(_spec({"topic_name": "sms-alerts"}))
+
+    assert not result.ok and "refusing to adopt" in result.message
+    assert "tag_resource" not in sns.names()

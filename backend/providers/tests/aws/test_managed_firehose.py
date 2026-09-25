@@ -84,7 +84,11 @@ def _client(**description_overrides) -> MagicMock:
         "DeliveryStreamDescription": _description(**description_overrides),
     }
     client.list_tags_for_delivery_stream.return_value = {
-        "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+        "Tags": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "steadymd"},
+            {"Key": "astrolift.io/app", "Value": "triage"},
+        ],
         "HasMoreTags": False,
     }
     return client
@@ -559,3 +563,22 @@ def test_missing_stream_paths_and_snapshot_contract_are_honest():
         driver.snapshot(ServiceHandle(handle))
     assert "destination" not in driver.editable_fields()
     assert "destination_update" in driver.editable_fields()
+
+
+def test_a_platform_stream_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client()
+    client.create_delivery_stream.side_effect = _error("ResourceInUseException", "CreateDeliveryStream")
+    client.list_tags_for_delivery_stream.return_value = {
+        "Tags": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "globex"},
+        ],
+        "HasMoreTags": False,
+    }
+    driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "outside this resource declaration" in result.message
+    client.tag_delivery_stream.assert_not_called()

@@ -62,7 +62,11 @@ def _client() -> MagicMock:
     client.put_targets.return_value = {"FailedEntryCount": 0, "FailedEntries": []}
     client.remove_targets.return_value = {"FailedEntryCount": 0, "FailedEntries": []}
     client.list_tags_for_resource.return_value = {
-        "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+        "Tags": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "steadymd"},
+            {"Key": "astrolift.io/app", "Value": "triage"},
+        ],
     }
     client.describe_archive.side_effect = _not_found("DescribeArchive")
     return client
@@ -503,3 +507,22 @@ def test_missing_bus_status_and_update_do_not_claim_success():
 
     assert status.state == "deprovisioned"
     assert not update.ok and update.errors == ["not_found"]
+
+
+def test_an_existing_bus_of_another_org_is_not_reconciled():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client()
+    client.create_event_bus.side_effect = _already_exists("CreateEventBus")
+    client.list_tags_for_resource.return_value = {
+        "Tags": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "globex"},
+        ],
+    }
+    driver = EventBridgeDriver(config=_config(), client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "refusing to adopt" in result.message
+    client.tag_resource.assert_not_called()
+    client.put_rule.assert_not_called()

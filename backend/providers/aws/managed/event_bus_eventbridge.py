@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "event_bus"
@@ -96,6 +96,7 @@ class EventBridgeDriver(ManagedServiceDriver):
                 return ProvisionResult(False, "", f"create EventBridge bus: {exc}", [str(exc)])
             try:
                 bus_arn = str(self._bus(bus_name)["Arn"])
+                existing_tags = self._events.list_tags_for_resource(ResourceARN=bus_arn).get("Tags") or []
             except Exception as describe_exc:
                 return ProvisionResult(
                     False,
@@ -103,6 +104,10 @@ class EventBridgeDriver(ManagedServiceDriver):
                     f"EventBridge bus exists but lookup failed: {describe_exc}",
                     [str(describe_exc)],
                 )
+            # Reconcile (rules, policy, tags) only this service's bus (#1961).
+            refusal = adoption_refusal(existing_tags, spec, resource=f"EventBridge bus {bus_name}")
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         handle = handle_for(kind=KIND, resource_id=bus_arn)
         try:
             self._reconcile_bus(bus_name, bus_arn, cfg, spec=spec)
