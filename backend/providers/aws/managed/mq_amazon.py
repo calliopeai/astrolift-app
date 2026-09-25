@@ -884,6 +884,14 @@ class AmazonMQDriver(ManagedServiceDriver):
         update = cfg.get("broker_update")
         if update is not None and (not isinstance(update, dict) or not update):
             return "broker_update must be a non-empty object"
+        # The update passthrough reaches UpdateBroker as-is, so it gets the
+        # same guard as broker: LdapServerMetadata.ServiceAccountPassword (#1953).
+        sensitive_path = _sensitive_native_path(update) if update else ""
+        if sensitive_path:
+            return (
+                f"broker_update.{sensitive_path} is forbidden because plaintext passwords cannot be stored in "
+                "config; use secret-reference fields"
+            )
         try:
             if update:
                 _validate_request("UpdateBroker", {**update, "BrokerId": "broker-id"})

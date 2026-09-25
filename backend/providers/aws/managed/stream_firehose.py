@@ -602,6 +602,12 @@ class FirehoseDriver(ManagedServiceDriver):
                 return f"{key}.type must be one of {sorted(_DESTINATIONS)}"
             if not isinstance(value.get("configuration"), dict) or not value["configuration"]:
                 return f"{key}.configuration must be a non-empty object"
+            sensitive_path = _plaintext_credential_path(value["configuration"])
+            if sensitive_path:
+                return (
+                    f"{key}.configuration.{sensitive_path} is forbidden because plaintext credentials cannot be "
+                    "stored in config; use SecretsManagerConfiguration"
+                )
         if "encryption" in cfg:
             encryption = cfg["encryption"]
             if not isinstance(encryption, dict):
@@ -730,3 +736,28 @@ def _deprovision_error(handle: str, operation: str, exc: Exception) -> Deprovisi
         }
     )
     return DeprovisionResult(False, handle, f"{operation}: {exc}", [str(exc)], retryable=retryable)
+
+
+# Destination fields that carry a credential in plaintext: Redshift and
+# Snowflake passwords, HTTP endpoint access keys, the Splunk HEC token and
+# Snowflake private keys (#1953). Each destination has a
+# SecretsManagerConfiguration alternative.
+_PLAINTEXT_CREDENTIAL_KEYS = frozenset({"password", "accesskey", "hectoken", "privatekey", "keypassphrase"})
+
+
+def _plaintext_credential_path(value: Any, prefix: str = "") -> str:
+    """Dotted path of the first plaintext credential in a destination configuration, or ``""``."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if str(key).replace("_", "").lower() in _PLAINTEXT_CREDENTIAL_KEYS and child not in (None, ""):
+                return path
+            found = _plaintext_credential_path(child, path)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = _plaintext_credential_path(child, f"{prefix}[{index}]")
+            if found:
+                return found
+    return ""
