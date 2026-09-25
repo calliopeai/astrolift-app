@@ -27,6 +27,9 @@ from astrolift_workflows.workflows.command_run import (
     CommandRunWorkflow,
     RunScheduledJobWorkflow,
 )
+from astrolift_workflows.workflows.configured_workflow_schedule import (
+    ConfiguredWorkflowScheduleWorkflow,
+)
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
 from astrolift_workflows.workflows.decommission_cluster import (
     DecommissionClusterWorkflow,
@@ -116,6 +119,7 @@ __all__ = [
     "CertExpiryTickWorkflow",
     "ObservabilityRetentionTickWorkflow",
     "CiWorkflowResyncTickWorkflow",
+    "ConfiguredWorkflowScheduleWorkflow",
     "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",
     "DecommissionClusterWorkflow",

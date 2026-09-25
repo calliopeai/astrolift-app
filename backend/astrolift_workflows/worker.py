@@ -176,6 +176,10 @@ from astrolift_workflows.activities.command_run_exec import (
     poll_command_run,
     start_command_run,
 )
+from astrolift_workflows.activities.configured_workflow_schedule_fire import (
+    create_scheduled_workflow_run,
+    record_scheduled_workflow_start,
+)
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
@@ -198,6 +202,7 @@ from astrolift_workflows.workflows import (
     CertExpiryTickWorkflow,
     CiWorkflowResyncTickWorkflow,
     CommandRunWorkflow,
+    ConfiguredWorkflowScheduleWorkflow,
     CreateDevEnvironmentWorkflow,
     CronDeployTickWorkflow,
     DecommissionClusterWorkflow,
@@ -260,6 +265,7 @@ WORKFLOWS = (
     CertExpiryTickWorkflow,
     ObservabilityRetentionTickWorkflow,
     CiWorkflowResyncTickWorkflow,
+    ConfiguredWorkflowScheduleWorkflow,
     CreateDevEnvironmentWorkflow,
     CronDeployTickWorkflow,
     DecommissionClusterWorkflow,
@@ -316,6 +322,8 @@ ACTIVITIES = (
     probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
     create_scheduled_pipeline_run,
+    create_scheduled_workflow_run,
+    record_scheduled_workflow_start,
     deliver_webhook,
     finish_command_run,
     poll_command_run,
