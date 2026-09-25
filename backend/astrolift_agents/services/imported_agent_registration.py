@@ -107,6 +107,14 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     created = app is None
     previous_team_id = app.team_id if app is not None else None
     if app is None:
+        from astrolift_registry.namespaces import namespace_refusal
+
+        refusal = namespace_refusal(
+            app_namespace(organization_slug=organization.slug, app_slug=effective_slug),
+            organization_id=organization.pk,
+        )
+        if refusal is not None:
+            raise ImportedAgentRegistrationError(refusal)
         app = RegisteredApp(
             organization=organization,
             team=project.team,

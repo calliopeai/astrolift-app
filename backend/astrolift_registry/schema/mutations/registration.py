@@ -220,6 +220,14 @@ class RegistrationMutations:
                 field="manifestRaw",
             )
 
+        from astrolift_registry.namespaces import namespace_refusal
+
+        _ns_refusal = namespace_refusal(
+            app_namespace(organization_slug=project.organization.slug, app_slug=eff_slug),
+            organization_id=project.organization_id,
+        )
+        if _ns_refusal is not None:
+            return gql_failure(ErrorCode.VALIDATION.value, _ns_refusal, field="slug")
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
