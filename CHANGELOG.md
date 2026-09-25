@@ -31,11 +31,16 @@
     driver copied from the config is refused when it is synced, deployed,
     mounted, granted to the app's role or injected into an agent. Refs the
     driver mints itself keep resolving.
-  - **Cloud Functions identities.** A config's `service_account_email` or
-    `build_service_account` must be listed in the new install policy
-    `cloud_functions_allowed_service_accounts`. Empty, the default, refuses
-    every one; omitting the field still runs the function as Google's default
-    runtime account.
+  - **Cloud Functions identities.** A config's `service_account_email`,
+    `build_service_account` or `event_trigger.service_account_email` must be
+    listed in the new install policy `cloud_functions_allowed_service_accounts`.
+    Empty, the default, refuses every one; omitting the field still runs the
+    function as Google's default runtime account.
+  - **GCP raw fields.** Cloud Functions and Managed Kafka `raw_fields` (and the
+    build, service and event-trigger variants) and `clear_fields` must use the
+    API's lowerCamelCase JSON field names. Google also accepts a field's proto
+    name, which carried a service account or a Secret Manager project past the
+    checks above. A config may not spell one field two ways.
   - **Value mutations.** `setAgentSecretValue`, `deleteAgentSecretValue` and
     `revealAgentSecretValue` act only on refs typed on the spec. An env var
     that comes from a managed-service binding is refused as managed by the
