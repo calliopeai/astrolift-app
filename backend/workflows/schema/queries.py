@@ -72,9 +72,7 @@ class Query:
         qs = WorkflowInstance.objects.filter(object_id=object_id).filter(_org_scope_q(org_pk))
         projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
         if projects is not None:
-            qs = qs.filter(
-                organization_id=org_pk, workflow__organization_id=org_pk, workflow__project_id__in=projects
-            )
+            qs = qs.filter(organization_id=org_pk, workflow__project_id__in=projects)
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 

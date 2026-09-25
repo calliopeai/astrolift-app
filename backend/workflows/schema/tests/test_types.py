@@ -79,13 +79,17 @@ class WorkflowStageTypeGateFieldsTest(TestCase):
             approvers=['team-leads'],
         )
 
+        from core.tenancy import TenantContext, tenant_context
+
         request = RequestFactory().get('/app/gql/config/')
         request.user = self.user
         request.session = {}
-        result = schema.execute_sync(
-            '{ workflowStages(workflowSlug: "gate-def") { order kind role prompt approvers } }',
-            context_value=StrawberryContext(request),
-        )
+        # The reader checks workflow.read in a tenant context (#1965).
+        with tenant_context(TenantContext(organization_id=self.org.pk, actor_user_id=self.user.pk)):
+            result = schema.execute_sync(
+                '{ workflowStages(workflowSlug: "gate-def") { order kind role prompt approvers } }',
+                context_value=StrawberryContext(request),
+            )
         self.assertIsNone(result.errors, f'unexpected errors: {result.errors}')
         stages = result.data['workflowStages']
         self.assertEqual(len(stages), 1)
@@ -123,6 +127,15 @@ class WorkflowStageExecutionGateStateTest(TestCase):
         self.org = Organization.objects.create(name='Gate State Org', slug='gate-state-org')
         self.user = User.objects.create_user(
             username='wf_gate_state', email='wf_gate_state@test.com', password='testpass',
+        )
+        from core.permissions import Permission
+        from core.tests.utils.scope_world import bind_role
+
+        # The reader checks workflow.read at the run's scope (#1965); these
+        # runs belong to the org, so the reader holds it there.
+        bind_role(
+            self.user, permissions=[Permission.WORKFLOW_READ], kind='ORG', scope_id=self.org.pk,
+            slug='wf-gate-state-reader',
         )
         self.definition = WorkflowDefinition.objects.create(
             name='Gate State Def',

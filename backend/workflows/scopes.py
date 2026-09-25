@@ -44,10 +44,8 @@ def project_scope(project, org_id: int | None) -> PermissionScope:
 
 
 def definition_scope(definition, org_id: int | None) -> PermissionScope:
-    """A definition's project, when the org owns the definition."""
-    if definition is None or definition.organization_id != org_id:
-        return org_scope(org_id)
-    return project_scope(definition.project, org_id)
+    """A definition's project; :func:`project_scope` confines it to the org."""
+    return project_scope(definition.project if definition is not None else None, org_id)
 
 
 def run_scope(run, org_id: int | None) -> PermissionScope:
@@ -255,9 +253,5 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
     apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), permission)
     return qs.filter(
         Q(registered_app_id__in=apps.values("pk"))
-        | Q(
-            registered_app__isnull=True,
-            workflow_definition__organization_id=org_id,
-            workflow_definition__project_id__in=projects,
-        )
+        | Q(registered_app__isnull=True, workflow_definition__project_id__in=projects)
     )

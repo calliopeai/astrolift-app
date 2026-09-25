@@ -285,7 +285,7 @@ def _workflows_qs(*, org_pk: int | None, search: str | None = None):
     )
     projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
     if projects is not None:
-        qs = qs.filter(definition__organization_id=org_pk, definition__project_id__in=projects)
+        qs = qs.filter(definition__project_id__in=projects)
     if search:
         qs = qs.filter(
             search_q(
@@ -342,7 +342,7 @@ def _workflow_definitions_qs(
     )
     projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
     if projects is not None:
-        qs = qs.filter(organization_id=org_pk, project_id__in=projects)
+        qs = qs.filter(project_id__in=projects)
     if project_id is not None:
         try:
             qs = qs.filter(
