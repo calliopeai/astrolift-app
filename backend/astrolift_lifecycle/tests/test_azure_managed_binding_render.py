@@ -17,6 +17,15 @@ from providers.azure.secrets_keyvault import KeyVaultConfig, KeyVaultSecretsBack
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def _skip_the_deploy_dry_run(monkeypatch):
+    """These exercise Secret materialization on apps without a saved
+    manifest; the #1957 pre-write dry-run has its own tests."""
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.app_lifecycle._dry_run_deploy_set", lambda *args, **kwargs: None
+    )
+
+
 class _SecretClient:
     def __init__(self, values: dict[str, str]) -> None:
         self.values = values
@@ -36,7 +45,10 @@ class _ClusterDriver:
         cluster_slug: str,
         namespace: str,
         manifests: list[dict[str, object]],
+        dry_run: bool = False,
     ) -> ApplyResult:
+        if dry_run:  # the #1957 pre-write gate; only real applies are recorded
+            return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
         assert cluster_slug == "azure-prod"
         assert namespace == "apps"
         self.applied = manifests
