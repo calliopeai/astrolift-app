@@ -251,15 +251,29 @@ def _candidate_scopes(
         # additional grant on an explicit object (#1743).
         return _scope_ancestry(tenant, scope)
     out: list[tuple[str, int]] = []
-    if tenant.project_id is not None:
+    # The selected team and project count only when they belong to the
+    # active org (#1911): a binding on another org's team must never satisfy
+    # a check in this org, whatever the request selected.
+    if tenant.project_id is not None and _in_org("PROJECT", tenant.project_id, tenant.organization_id):
         out.append(("PROJECT", tenant.project_id))
-    if tenant.team_id is not None:
+    if tenant.team_id is not None and _in_org("TEAM", tenant.team_id, tenant.organization_id):
         out.append(("TEAM", tenant.team_id))
     if tenant.organization_id is not None:
         out.append(("ORG", tenant.organization_id))
     # Stable, dedupe-preserving order.
     seen: set[tuple[str, int]] = set()
     return [s for s in out if not (s in seen or seen.add(s))]
+
+
+def _in_org(kind: str, scope_id: int, organization_id: int | None) -> bool:
+    if organization_id is None:
+        return False
+    from astrolift_identity.models import Project, Team
+
+    model = Project if kind == "PROJECT" else Team
+    return model.objects.filter(
+        pk=scope_id, organization_id=organization_id, deleted_at__isnull=True
+    ).exists()
 
 
 def _scope_filter(scopes: list[tuple[str, int]]):
