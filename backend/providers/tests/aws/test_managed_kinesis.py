@@ -17,6 +17,13 @@ CONSUMER_ARN = f"{STREAM_ARN}/consumer/triage:1234"
 KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
 
 
+_OWNED_TAGS = [
+    {"Key": "astrolift.io/managed-by", "Value": "platform"},
+    {"Key": "astrolift.io/organization", "Value": "steadymd"},
+    {"Key": "astrolift.io/app", "Value": "triage"},
+]
+
+
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
@@ -70,9 +77,7 @@ def _client(**summary_overrides) -> MagicMock:
         "StreamDescriptionSummary": _summary(**summary_overrides),
     }
     client.list_stream_consumers.return_value = {"Consumers": []}
-    client.list_tags_for_resource.return_value = {
-        "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
-    }
+    client.list_tags_for_resource.return_value = {"Tags": _OWNED_TAGS}
     return client
 
 
@@ -318,7 +323,7 @@ def test_consumer_pruning_never_deletes_external_consumers():
 
     def tags(**request):
         if request["ResourceARN"] == managed_arn:
-            return {"Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}]}
+            return {"Tags": _OWNED_TAGS}
         return {"Tags": []}
 
     client.list_tags_for_resource.side_effect = tags
@@ -438,3 +443,21 @@ def test_missing_stream_paths_are_honest_and_snapshot_is_unsupported():
     assert not driver.update(UpdateSpec(handle, config={})).ok
     with pytest.raises(ManagedServiceError, match="no snapshot API"):
         driver.snapshot(ServiceHandle(handle))
+
+
+def test_a_platform_stream_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client()
+    client.create_stream.side_effect = _error("ResourceInUseException", "CreateStream")
+    client.list_tags_for_resource.return_value = {
+        "Tags": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/organization", "Value": "globex"},
+        ],
+    }
+    driver = KinesisDriver(config=_config(), client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "outside this resource declaration" in result.message
+    client.add_tags_to_stream.assert_not_called()

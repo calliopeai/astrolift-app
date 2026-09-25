@@ -20,6 +20,13 @@ SUBNETS = ("subnet-12345678", "subnet-23456789", "subnet-34567890")
 SECURITY_GROUPS = ("sg-12345678",)
 
 
+_OWNED_TAGS = [
+    {"Key": "astrolift.io/managed-by", "Value": "platform"},
+    {"Key": "astrolift.io/organization", "Value": "steadymd"},
+    {"Key": "astrolift.io/app", "Value": "triage"},
+]
+
+
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
@@ -80,7 +87,7 @@ def _client(*, existing: bool = False, managed: bool = True, state: str = "avail
         "FileSystemArn": FS_ARN,
         "LifeCycleState": state,
         "Encrypted": True,
-        "Tags": ([{"Key": "astrolift.io/managed-by", "Value": "platform"}] if managed else []),
+        "Tags": (_OWNED_TAGS if managed else []),
     }
     store = {
         "exists": existing,
@@ -658,3 +665,18 @@ def test_config_plugin_cost_and_catalogue_are_wired():
     entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == "efs")
     assert entry.status == "preview"
     assert "FILESYSTEM_HANDLE" in entry.binding_envs
+
+
+def test_a_platform_filesystem_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client(existing=True)
+    client.store["fs"]["Tags"] = [
+        {"Key": "astrolift.io/managed-by", "Value": "platform"},
+        {"Key": "astrolift.io/organization", "Value": "globex"},
+    ]
+    driver = EFSDriver(config=_config(), client=client)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "outside this declaration" in result.message
+    client.tag_resource.assert_not_called()

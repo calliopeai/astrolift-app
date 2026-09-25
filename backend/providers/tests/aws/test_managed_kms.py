@@ -678,3 +678,16 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
     assert config.alias_name_prefix == "alias/platform"
     assert config.deletion_protection_default is False
     assert config.pending_window_days_default == 21
+
+
+def test_an_alias_on_another_services_key_is_not_adopted() -> None:
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    import dataclasses
+
+    driver, client = _driver()
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message
+    assert client.names().count("create_key") == 1

@@ -59,6 +59,7 @@ class FakeLambda:
         self.calls: list[tuple] = []
         self.exceptions = _LambdaExceptions()
         self._functions: dict[str, dict] = {}
+        self._function_tags: dict[str, dict[str, str]] = {}
         self._urls: dict[str, str] = {}
         self._url_auth: dict[str, str] = {}
         self._permissions: set[tuple[str, str]] = set()
@@ -76,7 +77,18 @@ class FakeLambda:
                 return kw
         raise AssertionError(f"{name} was not called")
 
-    def seed_function(self, function_name: str, *, url: str | None = None, url_auth: str = "AWS_IAM") -> None:
+    def seed_function(
+        self,
+        function_name: str,
+        *,
+        url: str | None = None,
+        url_auth: str = "AWS_IAM",
+        tags: dict[str, str] | None = None,
+    ) -> None:
+        if tags is not None or function_name not in self._function_tags:
+            self._function_tags[function_name] = (
+                tags if tags is not None else {"astrolift.io/organization": "acme", "astrolift.io/app": "api"}
+            )
         self._functions[function_name] = {
             "FunctionArn": f"arn:aws:lambda:us-east-1:123456789012:function:{function_name}",
             "State": "Active",
@@ -95,7 +107,7 @@ class FakeLambda:
         name = kwargs["FunctionName"]
         if name not in self._functions:
             raise _ResourceNotFoundException(name)
-        return {"Configuration": self._functions[name]}
+        return {"Configuration": self._functions[name], "Tags": self._function_tags.get(name, {})}
 
     def get_function_configuration(self, **kwargs):
         self._record("get_function_configuration", kwargs)
@@ -664,3 +676,15 @@ def test_cdn_s3_origin_still_renders_oac():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_provision_does_not_rewrite_another_orgs_function():
+    """The exec role and code are keyed by name; ownership comes first (#1961)."""
+    lam = FakeLambda()
+    lam.seed_function(_FN, tags={"astrolift.io/organization": "globex", "astrolift.io/app": "api"})
+    drv, lam, _ = _driver(lam=lam)
+
+    result = drv.provision(_spec({"image_uri": "repo@sha256:new"}))
+
+    assert result.ok is False and "refusing to adopt" in result.message
+    assert not {"update_function_code", "update_function_configuration", "create_function"} & set(lam.names())

@@ -30,6 +30,7 @@ from _sdk.managed_service import (
 from aws._errors import map_client_error
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -121,6 +122,11 @@ class SQSDriver(ManagedServiceDriver):
             queue_name += ".fifo"
         attributes = self._attributes(cfg, size=spec.size, fifo=is_fifo, creating=True)
 
+        # create_queue returns an existing queue's URL when the attributes match,
+        # and the reconcile below re-tags it: only this service's is adopted (#1961).
+        refusal = self._queue_refusal(queue_name, spec)
+        if refusal is not None:
+            return ProvisionResult(False, "", refusal, [refusal])
         try:
             response = self._sqs.create_queue(
                 QueueName=queue_name,
@@ -157,6 +163,19 @@ class SQSDriver(ManagedServiceDriver):
             f"SQS {'FIFO' if is_fifo else 'standard'} queue {queue_name} available at {queue_url}",
             ready=True,
         )
+
+    def _queue_refusal(self, queue_name: str, spec: ProvisionSpec) -> str | None:
+        try:
+            queue_url = self._sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
+        except Exception as exc:
+            if "NonExistentQueue" in str(exc) or "QueueDoesNotExist" in f"{type(exc).__name__} {exc}":
+                return None  # no such queue: nothing to adopt
+            return f"queue {queue_name}: ownership could not be verified: {exc}"
+        try:
+            tags = self._sqs.list_queue_tags(QueueUrl=queue_url).get("Tags") or {}
+        except Exception:  # ownership unverifiable, so not adopted
+            tags = {}
+        return adoption_refusal(tags, spec, resource=f"queue {queue_name}")
 
     @driver_op(cloud="aws", driver="queue_sqs")
     def update(self, spec: UpdateSpec) -> UpdateResult:

@@ -128,6 +128,7 @@ def test_provision_explicit_visibility_in_config(
 
 def test_provision_exposes_full_fifo_encryption_redrive_and_long_poll_surface() -> None:
     client = MagicMock()
+    client.get_queue_url.side_effect = RuntimeError("AWS.SimpleQueueService.NonExistentQueue")
     client.create_queue.return_value = {
         "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/platform.fifo",
     }
@@ -357,3 +358,12 @@ def test_binding_schema(driver: SQSDriver) -> None:
 def test_config_schema_includes_fifo(driver: SQSDriver) -> None:
     schema = driver.config_schema()
     assert "fifo" in schema["properties"]
+
+
+def test_provision_does_not_adopt_or_retag_another_services_resource(driver) -> None:
+    """The platform account "owns" every org's resources; only this service's is adopted (#1961)."""
+    first = driver.provision(_spec(managed_service_id="svc-a"))
+    second = driver.provision(_spec(managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
