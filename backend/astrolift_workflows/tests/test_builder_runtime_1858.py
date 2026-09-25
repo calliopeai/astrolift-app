@@ -173,9 +173,38 @@ def test_binary_files_render_as_configmap_binary_data(org, cluster, actor):
     _, _, resources = _build_manifests(dev)
 
     config_map = _by_kind(resources, "ConfigMap")[0]
-    assert config_map["data"] == {"server.py": "print('hi')"}
-    assert config_map["binaryData"] == {"logo.png": png}
+    assert config_map["data"] == {"f0001": "print('hi')"}
+    assert config_map["binaryData"] == {"f0000": png}
     assert _by_kind(resources, "Secret") == []
+
+
+def test_a_file_tree_with_directories_maps_generated_keys_back_to_paths(org, cluster, actor):
+    """ConfigMap keys are flat, so ``static/logo.png`` needs ``items`` (#1873)."""
+    import re
+
+    png = base64.b64encode(b"\x89PNG").decode()
+    dev = _dev_env(
+        org,
+        cluster,
+        actor,
+        files={
+            "server.py": "print('hi')",
+            "static/css/site.css": "body{}",
+            "static/logo.png": {"content": png, "encoding": "base64"},
+        },
+    )
+
+    _, _, resources = _build_manifests(dev)
+
+    config_map = _by_kind(resources, "ConfigMap")[0]
+    keys = [*config_map["data"], *config_map.get("binaryData", {})]
+    assert all(re.fullmatch(r"[-._a-zA-Z0-9]+", key) for key in keys)
+    [deployment] = _by_kind(resources, "Deployment")
+    [volume] = [v for v in deployment["spec"]["template"]["spec"]["volumes"] if v["name"] == "app-files"]
+    by_path = {item["path"]: item["key"] for item in volume["configMap"]["items"]}
+    assert set(by_path) == {"server.py", "static/css/site.css", "static/logo.png"}
+    assert config_map["data"][by_path["static/css/site.css"]] == "body{}"
+    assert config_map["binaryData"][by_path["static/logo.png"]] == png
 
 
 # ---- data file ------------------------------------------------------------
