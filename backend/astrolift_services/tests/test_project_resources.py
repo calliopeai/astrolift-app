@@ -670,3 +670,29 @@ def test_project_resource_graphql_is_scoped_to_the_active_team(permission_resolv
     attachment.refresh_from_db()
     assert service.name == "other-team-bucket"
     assert attachment.deleted_at is None
+
+
+@pytest.mark.parametrize(
+    "slug", ["astrolift-app-env-web-prod", "astrolift-bindings-web", "Astrolift-anything"]
+)
+def test_a_bundle_slug_may_not_take_a_platform_secret_name(permission_resolver, monkeypatch, slug):
+    """A bundle's Secret is named by its slug, beside the platform's own
+    ``astrolift-*`` Secrets; the prefix is reserved (#1923)."""
+    graph = _graph("bundle-reserved")
+    monkeypatch.setattr("core.app_deploy.driver_for_capability", lambda _cluster, _cap: _SecretsBackend())
+    for permission in (Permission.PROJECT_UPDATE, Permission.SECRET_WRITE):
+        permission_resolver.grant(permission)
+
+    with _tenant(graph):
+        result = ServicesMutation().create_project_secret_bundle(
+            _info(),
+            input=CreateProjectSecretBundleInput(
+                project_id=GUID(str(graph.project.guid)),
+                cluster_id=GUID(str(graph.cluster.guid)),
+                name="Collides",
+                slug=slug,
+            ),
+        )
+
+    assert result.ok is False and result.errors[0].code == ErrorCode.VALIDATION.value
+    assert "astrolift-" in result.errors[0].message

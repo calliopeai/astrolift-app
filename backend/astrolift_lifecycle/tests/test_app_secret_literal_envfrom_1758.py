@@ -1332,3 +1332,52 @@ def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
     assert edited.data.scope == "production"
     assert _live_metadata(app, "K").get(environment_name="").scope == "production"
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
+
+
+def test_removing_the_last_literal_deletes_its_secret(permission_resolver, app, env, monkeypatch):
+    """#1923: with no literals left the old Secret, which still holds the last
+    plaintext values, is deleted rather than left in the namespace."""
+    deployment = _deployment(app, env)
+
+    class _Driver(_FakeClusterDriver):
+        def __init__(self):
+            super().__init__()
+            self.deleted: list[str] = []
+
+        def delete_manifests(self, cluster_slug, namespace, manifests, **_):
+            self.deleted.extend(m["metadata"]["name"] for m in manifests)
+
+    driver = _Driver()
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda d: (driver, SimpleNamespace(slug="test-cluster"), "acme-hello-app"),
+    )
+
+    _update_secrets_sync(deployment.pk)
+
+    assert driver.deleted == [_app_env_secret_name(app.slug, env.name)]
+
+
+def test_render_manifests_activity_lists_the_same_env_from_as_the_applied_render(
+    permission_resolver, app, env
+):
+    """#1923: the ``render_manifests`` activity built its own envFrom and left
+    out the literal Secret; both now come from ``deployment_env_from``."""
+    from asgiref.sync import async_to_sync
+
+    from astrolift_workflows.activities.app_lifecycle import render_manifests
+    from core.app_deploy import render_resources_for_deployment
+
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="API_KEY", value="v").ok
+    app.refresh_from_db()
+    deployment = _deployment(app, env)
+
+    from temporalio.testing import ActivityEnvironment
+
+    activity = async_to_sync(ActivityEnvironment().run)(render_manifests, deployment.pk)
+    applied = _env_from_list(render_resources_for_deployment(deployment))
+
+    assert _app_env_secret_name(app.slug, env.name) in activity["env_from_secret_refs"]
+    assert activity["env_from_secret_refs"] == applied

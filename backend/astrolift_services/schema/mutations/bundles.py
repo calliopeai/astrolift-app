@@ -125,6 +125,11 @@ class SecretBundleMutations:
         normalized_slug = slugify(input.slug or name)[:200]
         if not name or not normalized_slug:
             return gql_failure(ErrorCode.VALIDATION.value, "name and slug are required")
+        from astrolift_services.models.secret_bundle import reserved_bundle_slug_error
+
+        reserved = reserved_bundle_slug_error(normalized_slug)
+        if reserved:
+            return gql_failure(ErrorCode.VALIDATION.value, reserved, field="slug")
         backend_ref = _project_bundle_backend_ref(project, normalized_slug)
         requested_backend_ref = (input.backend_ref or "").strip()
         if requested_backend_ref and requested_backend_ref != backend_ref:

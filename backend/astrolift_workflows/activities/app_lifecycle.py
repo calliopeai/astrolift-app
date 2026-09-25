@@ -593,8 +593,6 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     activity.heartbeat()
 
     def _gather():
-        from astrolift_services.models import AppSecretBundleRef
-
         d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
         app = d.registered_app
         env = d.app_environment
@@ -607,17 +605,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         # synthesized bindings Secret so binding keys can shadow a
         # bundle on intentional collisions (e.g., operator overrides
         # DATABASE_URL).
-        bundle_secret_names = sorted(
-            AppSecretBundleRef.objects.filter(
-                registered_app=app,
-                app_environment=env,
-                deleted_at__isnull=True,
-            ).values_list("secret_bundle__slug", flat=True),
-        )
-        has_bindings, workload_env_from = _binding_secret_refs_for_environment(env)
-        env_from = list(bundle_secret_names)
-        if has_bindings:
-            env_from.append(_bindings_secret_name(app.slug))
+        from core.app_deploy import deployment_env_from
+
+        env_from, workload_env_from = deployment_env_from(app, env)
 
         # Resolve the namespace here, not after the await (#1577).
         # namespace_for_app reads app.organization.slug whenever
@@ -1121,6 +1111,28 @@ def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
     return dns_label("astrolift", "app-env", app_slug, environment_name)
 
 
+def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: str, d) -> None:
+    """Remove the environment's literal ``[env]`` Secret once it has no
+    literals left (#1923). Nothing references it any more, but it still holds
+    the last plaintext values. Best effort: a failed delete is logged, not
+    fatal, and the next deploy tries again."""
+    delete = getattr(cluster_driver, "delete_manifests", None)
+    if delete is None:
+        return
+    stale = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": _app_env_secret_name(d.registered_app.slug, d.app_environment.name),
+            "namespace": namespace,
+        },
+    }
+    try:
+        delete(cluster_slug, namespace, [stale])
+    except Exception:  # noqa: BLE001 - cleanup must not fail the deploy
+        log.warning("could not delete the stale literal Secret for deployment %s", d.pk, exc_info=True)
+
+
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     from astrolift_lifecycle.models import Deployment
     from astrolift_workflows.activities.direct_apply import DryRunFailed, apply_with_dry_run
@@ -1271,6 +1283,12 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
             unscoped = unscoped_bundle_reason(bundle, organization=d.registered_app.organization)
             if unscoped is not None:
                 raise AppDeployError(f"secret bundle {bundle.slug!r}: {unscoped}")
+            from astrolift_services.models.secret_bundle import reserved_bundle_slug_error
+
+            reserved = reserved_bundle_slug_error(bundle.slug)
+            if reserved:
+                # A row created before the create-time check (#1923).
+                raise AppDeployError(f"secret bundle {bundle.slug!r}: {reserved}")
             kvs = secrets_backend.get(bundle.backend_ref)
             if kvs is None:
                 raise AppDeployError(
@@ -1417,6 +1435,8 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         except FilesystemBindingError as exc:
             raise AppDeployError(str(exc)) from exc
 
+    if not literals:
+        _delete_stale_literal_secret(cluster_driver, ctx.slug, namespace, d)
     if not resources:
         return 0
     result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)
