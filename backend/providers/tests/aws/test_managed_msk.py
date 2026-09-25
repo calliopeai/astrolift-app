@@ -666,3 +666,19 @@ def test_plugin_cost_and_schema_surfaces_are_wired():
         .binding_schema()
         .env_vars
     )
+
+
+def test_a_platform_cluster_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client()
+    client.create_cluster_v2.side_effect = _error("ConflictException", "CreateClusterV2", "cluster already exists")
+    client.list_clusters_v2.return_value = {"ClusterInfoList": [_cluster()]}
+    client.list_tags_for_resource.return_value = {
+        "Tags": {"astrolift.io/managed-by": "platform", "astrolift.io/organization": "globex"}
+    }
+    driver = MSKProvisionedDriver(config=_config(), client=client, sleep=lambda _seconds: None)
+
+    result = driver.provision(_spec())
+
+    assert not result.ok and "outside this resource declaration" in result.message
+    client.tag_resource.assert_not_called()

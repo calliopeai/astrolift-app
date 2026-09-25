@@ -70,6 +70,7 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -174,6 +175,11 @@ class TimestreamDriver(ManagedServiceDriver):
             table_name=table_name,
         )
         if existing_db is not None and existing_table is not None:
+            refusal = adoption_refusal(
+                self._existing_tags(existing_table), spec, resource=f"timestream {database_name}/{table_name}"
+            )
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(
@@ -667,6 +673,13 @@ class TimestreamDriver(ManagedServiceDriver):
                 return None
             raise
         return resp.get("Database")
+
+    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
+        """Tags of a table found under this service's name; unreadable counts as untagged (#1961)."""
+        try:
+            return list(self._tsw.list_tags_for_resource(ResourceARN=str(existing.get("Arn", ""))).get("Tags") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe_table(
         self,

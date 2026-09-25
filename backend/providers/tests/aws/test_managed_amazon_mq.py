@@ -82,7 +82,11 @@ def _description(engine="RABBITMQ", **overrides) -> dict:
         "EngineVersion": "3.13",
         "HostInstanceType": "mq.t3.micro",
         "DeploymentMode": "SINGLE_INSTANCE",
-        "Tags": {"astrolift.io/managed-by": "platform"},
+        "Tags": {
+            "astrolift.io/managed-by": "platform",
+            "astrolift.io/organization": "steadymd",
+            "astrolift.io/app": "triage",
+        },
         "BrokerInstances": [
             {
                 "Endpoints": endpoints,
@@ -787,3 +791,17 @@ def test_managed_config_plugin_cost_and_catalogue_are_wired():
         entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == variant)
         assert entry.status == "preview"
         assert "MQ_ENDPOINT" in entry.binding_envs
+
+
+def test_a_platform_broker_of_another_org_is_not_adopted():
+    """Platform-made is not enough; it must be this service's (#1961)."""
+    client = _client(Tags={"astrolift.io/managed-by": "platform", "astrolift.io/organization": "globex"})
+    client.list_brokers.return_value = {
+        "BrokerSummaries": [{"BrokerId": BROKER_ID, "BrokerArn": BROKER_ARN, "BrokerName": BROKER_NAME}],
+    }
+    driver = AmazonMQRabbitMQDriver(config=_config(), client=client, secrets_client=_secrets({}))
+
+    result = driver.provision(_spec())
+
+    assert not result.ok
+    client.create_broker.assert_not_called()

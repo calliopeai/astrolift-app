@@ -30,6 +30,12 @@ class FakeAOSS:
         rows = [self.collections[name] for name in kwargs.get("names", []) if name in self.collections]
         return {"collectionDetails": rows, "collectionErrorDetails": []}
 
+    def list_tags_for_resource(self, **kwargs):
+        for collection in self.collections.values():
+            if collection["arn"] == kwargs["resourceArn"]:
+                return {"tags": collection.get("tags", [])}
+        return {"tags": []}
+
     def create_collection(self, **kwargs):
         self.calls.append(("CreateCollection", kwargs))
         name = kwargs["name"]
@@ -273,3 +279,20 @@ def test_current_botocore_accepts_all_request_shapes():
     service = Session().get_service_model("opensearchserverless")
     for operation, request in client.calls:
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+def test_provision_does_not_adopt_or_repolicy_another_services_collection():
+    """Ownership is checked before the name-keyed policies are rewritten (#1961)."""
+    import dataclasses
+
+    subject, client = driver()
+    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    policies = (dict(client.security_policies), dict(client.access_policies))
+    calls = len(client.calls)
+
+    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert (client.security_policies, client.access_policies) == policies
+    assert not any(name != "BatchGetCollection" for name, _ in client.calls[calls:])
