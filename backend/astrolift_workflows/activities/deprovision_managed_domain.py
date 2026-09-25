@@ -61,7 +61,19 @@ def _deprovision_sync(cluster_id: int, zone: str) -> dict[str, Any]:
             # the zone teardown below is the part that stops the billing.
             log.warning("revoke_cert failed for %s (%s); continuing", zone, cert_id, exc_info=True)
 
-    result = dns_driver.deprovision_zone(zone)
+    # Only the hosted zone the platform created for this row is deleted, and
+    # by id: by name it could be any same-named zone in the account, such as
+    # one the install itself serves (#1931). A row without one (registered,
+    # not provisioned) leaves the hosted zone to the operator.
+    zone_id = str(getattr(row, "provision_zone_id", "") or "")
+    if zone_id:
+        from astrolift_workflows.activities.provision_managed_domain import pin_managed_zone
+
+        pin_managed_zone(dns_driver, row)
+        result = dns_driver.deprovision_zone(zone)
+    else:
+        log.warning("managed domain %s has no platform-created hosted zone; leaving DNS untouched", zone)
+        result = {"deleted": False, "records_removed": 0, "skipped": "no platform-created hosted zone"}
     return {
         "zone": zone,
         "zone_deleted": bool(result.get("deleted")),

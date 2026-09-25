@@ -50,6 +50,15 @@ class ManagedDomain(BaseCoreModel):
         default="",
         help_text="Cloud cert ID/ARN — used for poll and reissue operations.",
     )
+    provision_zone_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Hosted zone the platform created for this row. Platform-written only, never from dns_config "
+            "(tenant-editable): DNS writes pin to it, and teardown deletes only it (#1931)."
+        ),
+    )
     provision_validation_records = models.JSONField(
         default=list,
         blank=True,
