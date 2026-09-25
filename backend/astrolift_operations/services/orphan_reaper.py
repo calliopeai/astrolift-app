@@ -387,6 +387,18 @@ def _reap_iam_role(role_name: str, *, cluster_slug: str) -> ReapResult:
         delete = getattr(driver, "delete_identity_role", None)
         if not callable(delete):
             continue
+        # Re-run detection on this cluster before deleting (#1985): only a role
+        # the cluster's identity driver reports as one it owns is an orphan
+        # candidate. Any other name (cluster or node roles, other accounts'
+        # roles the credentials can reach) is never deleted, and the delete
+        # goes through the cluster that actually owns the role.
+        try:
+            owned = set(driver.list_owned_roles())
+        except Exception as exc:  # noqa: BLE001 — cannot verify, do not delete here
+            last_err = exc
+            continue
+        if role_name not in owned:
+            continue
         attempted = True
         try:
             # delete_identity_role is idempotent — it swallows NoSuchEntity
@@ -404,6 +416,14 @@ def _reap_iam_role(role_name: str, *, cluster_slug: str) -> ReapResult:
             last_err = exc
             continue
 
+    if not attempted and last_err is None:
+        return ReapResult(
+            ok=False,
+            kind=KIND_IAM_ROLE,
+            identifier=role_name,
+            message=f"refusing to reap: no managed cluster reports {role_name!r} as an Astrolift-owned role",
+            refused=True,
+        )
     msg = f"no managed cluster could reap IAM role {role_name!r}"
     if last_err is not None:
         msg += f": {last_err}"
@@ -412,5 +432,4 @@ def _reap_iam_role(role_name: str, *, cluster_slug: str) -> ReapResult:
         kind=KIND_IAM_ROLE,
         identifier=role_name,
         message=msg,
-        already_gone=not attempted,
     )
