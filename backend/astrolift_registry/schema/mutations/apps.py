@@ -261,6 +261,17 @@ class AppMutations:
                 field="subdomain",
             )
 
+        from astrolift_registry.hostname_claims import hostname_label_refusal
+
+        # Across orgs: a shared zone has one namespace of labels (#1930).
+        refusal = (
+            hostname_label_refusal(new_subdomain, organization=app.organization)
+            if app.subdomain != new_subdomain
+            else None
+        )
+        if refusal is not None:
+            return gql_failure(ErrorCode.CONFLICT.value, refusal, field="subdomain")
+
         if app.subdomain != new_subdomain:
             from astrolift_workflows.client import start_workflow
             from astrolift_workflows.inputs import Actor, SyncAppDomainInput

@@ -253,7 +253,7 @@ class TemporalWorkflowsMutation:
                 # supplies; and a gate that names its approvers by address is
                 # decided only by one of them (or the platform operator)
                 # (#1982).
-                refusal = _gate_approver_refusal(info.context.user, resolved)
+                refusal = _gate_approver_refusal(info.context.user, resolved, workflow_id)
                 if refusal is not None:
                     return _failure("payload", refusal)
                 payload = {**payload, "decided_by_user_id": getattr(info.context.user, "pk", None)}
@@ -271,7 +271,7 @@ class TemporalWorkflowsMutation:
 _EXECUTION_SIGNALS = frozenset({"human_gate_decision", "escalation_cleared"})
 
 
-def _gate_approver_refusal(user, execution_id: str) -> str | None:
+def _gate_approver_refusal(user, execution_id: str, workflow_id: str) -> str | None:
     """Why ``user`` may not decide the human gate ``execution_id``, or ``None``.
 
     ``WorkflowStage.approvers`` holds approver references: addresses, or team
@@ -285,7 +285,12 @@ def _gate_approver_refusal(user, execution_id: str) -> str | None:
 
     if is_platform_operator(user):
         return None
-    row = WorkflowStageExecution.objects.select_related("stage").filter(pk=int(execution_id)).first()
+    # tenancy: confined to the signalled run, as in ``_resolve_execution_id``.
+    row = (
+        WorkflowStageExecution.objects.select_related("stage")
+        .filter(workflow_run__workflow_id=workflow_id, pk=int(execution_id))
+        .first()
+    )
     approvers = list(getattr(getattr(row, "stage", None), "approvers", None) or [])
     addresses = {a.strip().casefold() for a in approvers if isinstance(a, str) and "@" in a}
     if not addresses:
