@@ -1121,6 +1121,28 @@ def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
     return dns_label("astrolift", "app-env", app_slug, environment_name)
 
 
+def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: str, d) -> None:
+    """Remove the environment's literal ``[env]`` Secret once it has no
+    literals left (#1923). Nothing references it any more, but it still holds
+    the last plaintext values. Best effort: a failed delete is logged, not
+    fatal, and the next deploy tries again."""
+    delete = getattr(cluster_driver, "delete_manifests", None)
+    if delete is None:
+        return
+    stale = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": _app_env_secret_name(d.registered_app.slug, d.app_environment.name),
+            "namespace": namespace,
+        },
+    }
+    try:
+        delete(cluster_slug, namespace, [stale])
+    except Exception:  # noqa: BLE001 - cleanup must not fail the deploy
+        log.warning("could not delete the stale literal Secret for deployment %s", d.pk, exc_info=True)
+
+
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     from astrolift_lifecycle.models import Deployment
     from astrolift_workflows.activities.direct_apply import DryRunFailed, apply_with_dry_run
@@ -1423,6 +1445,8 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         except FilesystemBindingError as exc:
             raise AppDeployError(str(exc)) from exc
 
+    if not literals:
+        _delete_stale_literal_secret(cluster_driver, ctx.slug, namespace, d)
     if not resources:
         return 0
     result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)

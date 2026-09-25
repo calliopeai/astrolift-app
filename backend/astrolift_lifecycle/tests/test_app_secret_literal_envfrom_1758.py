@@ -1332,3 +1332,27 @@ def test_under_approval_a_scope_check_waits_for_a_scope_change_being_applied(
     assert edited.data.scope == "production"
     assert _live_metadata(app, "K").get(environment_name="").scope == "production"
     assert _materialize(_deployment(app, preview), monkeypatch) == {}
+
+
+def test_removing_the_last_literal_deletes_its_secret(permission_resolver, app, env, monkeypatch):
+    """#1923: with no literals left the old Secret, which still holds the last
+    plaintext values, is deleted rather than left in the namespace."""
+    deployment = _deployment(app, env)
+
+    class _Driver(_FakeClusterDriver):
+        def __init__(self):
+            super().__init__()
+            self.deleted: list[str] = []
+
+        def delete_manifests(self, cluster_slug, namespace, manifests, **_):
+            self.deleted.extend(m["metadata"]["name"] for m in manifests)
+
+    driver = _Driver()
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda d: (driver, SimpleNamespace(slug="test-cluster"), "acme-hello-app"),
+    )
+
+    _update_secrets_sync(deployment.pk)
+
+    assert driver.deleted == [_app_env_secret_name(app.slug, env.name)]
