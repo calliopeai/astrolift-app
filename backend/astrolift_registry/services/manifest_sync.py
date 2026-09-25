@@ -1041,6 +1041,13 @@ def _register_one_agent(
         # when it isn't the root manifest. ``_agent_app_slug`` resolves a
         # collision deterministically.
         app_slug = _agent_app_slug(org, discovered)
+        from astrolift_registry.namespaces import namespace_refusal
+
+        _ns_refusal = namespace_refusal(
+            app_namespace(organization_slug=org.slug, app_slug=app_slug), organization_id=org.pk
+        )
+        if _ns_refusal is not None:
+            raise ValueError(_ns_refusal)
         app = RegisteredApp.objects.create(
             organization=org,
             team=project.team,
@@ -1857,6 +1864,13 @@ def _register_one_app(
     created = app is None
     if app is None:
         app_slug = _app_repo_slug(org, discovered)
+        from astrolift_registry.namespaces import namespace_refusal
+
+        _ns_refusal = namespace_refusal(
+            app_namespace(organization_slug=org.slug, app_slug=app_slug), organization_id=org.pk
+        )
+        if _ns_refusal is not None:
+            raise ValueError(_ns_refusal)
         app = RegisteredApp.objects.create(
             organization=org,
             team=project.team,
