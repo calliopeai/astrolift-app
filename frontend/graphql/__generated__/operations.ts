@@ -5302,11 +5302,11 @@ export type Mutation = {
   createWebhookSubscription: WebhookSecretRevealMutationResult;
   /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
   createWorkflow: CreateWorkflowResult;
-  /** Create a new workflow definition (staff only). */
+  /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
   /** Add a stage to a writable workflow definition. order=null appends after the definition's last stage. */
   createWorkflowStage: CreateWorkflowStageResult;
-  /** Create an inbound webhook trigger for a workflow definition (staff only). */
+  /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
   createWorkflowTrigger: CreateWorkflowTriggerResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;

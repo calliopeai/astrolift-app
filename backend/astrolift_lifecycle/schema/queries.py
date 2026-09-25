@@ -81,7 +81,7 @@ from core.cluster_observability import (
     namespace_for_app,
 )
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
 
@@ -747,9 +747,12 @@ class LifecycleQuery:
     @require_permission(Permission.APP_DELETE)
     def scan_cloud_orphans(self, info: Info) -> CloudOrphanReportType:
         """Read-only orphan-detection scan (#995): platform-owned cloud
-        resources with no live owner row. Install-wide (not tenant-scoped) —
-        an operator capability gated on APP_DELETE. Reaping is a separate,
-        guarded follow-up; this never deletes."""
+        resources with no live owner row. Install-wide (not tenant-scoped):
+        it reads every org's managed clusters and services, so only the
+        platform operator may run it. APP_DELETE alone is not enough, since
+        every org's admins hold it (#1978). Reaping is a separate, guarded
+        follow-up; this never deletes."""
+        check_platform_operator(info.context.request.user, gate=Permission.APP_DELETE)
         from astrolift_operations.services.orphan_reaper import scan_orphans
 
         report = scan_orphans()

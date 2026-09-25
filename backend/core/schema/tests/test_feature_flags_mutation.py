@@ -3,8 +3,8 @@
 Covers the framework the admin "feature flipper" screen
 (/administration/features) wires to:
 
-* platform-admin gating (``admin.elevate``) — a non-admin is denied
-  before any Constance write happens;
+* platform-operator gating (#1978): anyone else is denied before any
+  Constance write happens;
 * the public allow-list is the ONLY settable surface — unknown /
   non-public keys (including build-time feature keys) are rejected;
 * a successful toggle writes the backing Constance value and is
@@ -24,6 +24,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 
@@ -42,8 +43,14 @@ _SERVER_INFO_QUERY = """
 """
 
 
-def _info():
-    return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
+def _info(user=None):
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=None))
+
+
+def _operator():
+    # Setting a flag is the platform operator's alone (#1978): an active
+    # superuser. Unsaved, because the gate reads only the user's flags.
+    return get_user_model()(username="flag-operator", is_superuser=True, is_active=True)
 
 
 def _anonymous_context() -> StrawberryContext:
@@ -89,7 +96,7 @@ def test_set_feature_flag_denied_for_non_admin(permission_resolver, fake_constan
 def test_set_feature_flag_rejects_unknown_key(permission_resolver, fake_constance):
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     result = FeatureFlagMutations().set_feature_flag(
-        _info(), key="totally.bogus", enabled=True
+        _info(_operator()), key="totally.bogus", enabled=True
     )
     assert result.ok is False
     assert result.errors[0].code == "VALIDATION"
@@ -104,7 +111,7 @@ def test_set_feature_flag_rejects_build_time_feature_key(
     LOADING at boot and are read-only — their keys are not in the runtime
     allow-list, so ``setFeatureFlag`` rejects them."""
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
-    result = FeatureFlagMutations().set_feature_flag(_info(), key="agents", enabled=False)
+    result = FeatureFlagMutations().set_feature_flag(_info(_operator()), key="agents", enabled=False)
     assert result.ok is False
     assert result.errors[0].code == "VALIDATION"
     assert vars(fake_constance) == {}
@@ -124,7 +131,7 @@ def test_set_feature_flag_toggles_and_reflects_in_server_info(
 
     # Flip it on.
     result = FeatureFlagMutations().set_feature_flag(
-        _info(), key="admin.cost_enabled", enabled=True
+        _info(_operator()), key="admin.cost_enabled", enabled=True
     )
     assert result.ok, result.errors
     assert result.data.key == "admin.cost_enabled"
@@ -139,7 +146,7 @@ def test_set_feature_flag_toggles_and_reflects_in_server_info(
 
     # Flip back off — handshake follows.
     off = FeatureFlagMutations().set_feature_flag(
-        _info(), key="admin.cost_enabled", enabled=False
+        _info(_operator()), key="admin.cost_enabled", enabled=False
     )
     assert off.ok and off.data.enabled is False
     assert fake_constance.ADMIN_COST_ENABLED is False

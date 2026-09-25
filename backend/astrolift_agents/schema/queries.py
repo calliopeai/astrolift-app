@@ -83,7 +83,7 @@ from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, require_permission, require_platform_operator
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -1437,12 +1437,12 @@ class AgentsQuery:
         # Platform-level routing fabric: DispatcherInstances span tenants
         # (one per cluster/cloud/region), so this resolver intentionally
         # escapes @tenant_scoped — same shape as astrolift_provider_plugins.
-        # Staff/superuser only; the api_key_hash is never surfaced (the
+        # The whole fleet is the platform operator's to see; Django staff is
+        # not the operator (#1978). The api_key_hash is never surfaced (the
         # type omits it). See EXEMPT entry in test_tenancy_guardrail.py.
         user = getattr(getattr(info.context, "request", None), "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             raise GraphQLError("authentication required")
-        if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
-            raise GraphQLError("staff access required")
+        require_platform_operator(user)
         qs = DispatcherInstance.objects.filter(deleted_at__isnull=True).order_by("slug")[:200]
         return [dispatcher_to_type(d) for d in qs]

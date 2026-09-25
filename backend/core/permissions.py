@@ -708,3 +708,26 @@ def require_platform_operator(user) -> None:
     api_token = get_current_api_token()
     if api_token is not None and not has_scope(api_token, SCOPE_ADMIN):
         raise DjangoPermissionDenied("Only the platform operator may do this.")
+
+
+def check_platform_operator(user, *, gate: Permission) -> None:
+    """Refuse anyone but the platform operator at a resolver gate.
+
+    For operations whose reach is the whole install: install-wide settings,
+    fleet-wide sweeps, rows that belong to no organization or to every one.
+    A permission alone cannot gate those. The stock ``org_owner`` and
+    ``org_admin`` roles carry the whole catalogue, ``admin.elevate``
+    included, so every organization's admins hold any permission such a gate
+    could name (#1978).
+
+    Same test as :func:`require_platform_operator`, bearer admin scope
+    included. It raises this module's :class:`PermissionDenied` naming
+    ``gate``, the permission the resolver is declared with, so
+    ``@mutation_audit`` answers PERMISSION_DENIED and records a DENY. Django's
+    exception would surface there as an INTERNAL error.
+    """
+
+    try:
+        require_platform_operator(user)
+    except DjangoPermissionDenied as exc:
+        raise PermissionDenied(gate, None, "only the platform operator may do this") from exc

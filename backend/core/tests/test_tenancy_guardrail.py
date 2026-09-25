@@ -250,15 +250,17 @@ EXEMPT: dict[str, str] = {
         "An orphan has no live owner, so by construction there is no tenant to "
         "scope on — scan_orphans() unions every managed cluster + every live "
         "app across ALL orgs and diffs against dangling cloud resources. Same "
-        "category as the Temporal admin resolvers that span tenants; gated on "
-        "APP_DELETE. Read-only — never deletes."
+        "category as the Temporal admin resolvers that span tenants. Platform "
+        "operator only, on top of APP_DELETE, which every org's admins hold "
+        "(#1978). Read-only — never deletes."
     ),
     "LifecycleMutation.reap_cloud_orphan": (
         "install-wide operator action (#995): the write counterpart to "
         "scan_cloud_orphans. An orphan by construction has NO owning DB row "
         "(that's what makes it an orphan), so there is no tenant to scope "
-        "on — @tenant_scoped would have no org column to filter. Gated on "
-        "CLUSTER_MANAGE + mutation_audit; the reaper itself re-checks "
+        "on — @tenant_scoped would have no org column to filter. Platform "
+        "operator only, on top of CLUSTER_MANAGE, which every org's admins "
+        "hold (#1978), + mutation_audit; the reaper itself re-checks "
         "ownership and refuses anything with a live owner, and deletion "
         "reuses the same idempotent driver deprovision path teardown uses "
         "(#1034) — never a raw cloud API delete."
@@ -267,9 +269,9 @@ EXEMPT: dict[str, str] = {
         "install-wide operator action (#1211, Phase 3): the outbound CI-workflow "
         "resync sweeps EVERY org's managed apps by construction — a fleet-wide "
         "reconcile, so there is no single tenant to scope on (@tenant_scoped "
-        "would have no org column to filter). Gated on ADMIN_ELEVATE — the "
-        "dedicated platform-admin grant, NOT a per-org permission — + "
-        "mutation_audit. Same category as the Temporal admin resolvers and "
+        "would have no org column to filter). Platform operator only, on top "
+        "of ADMIN_ELEVATE, which the stock org owner and admin roles hold "
+        "(#1978), + mutation_audit. Same category as the Temporal admin resolvers and "
         "reap_cloud_orphan. Only pushes the safe drift states; never clobbers "
         "operator hand-edits."
     ),
@@ -324,9 +326,9 @@ EXEMPT: dict[str, str] = {
         "(one per cluster/cloud/region) and are the dispatch router's "
         "targets, not tenant-owned rows — same shape as "
         "astrolift_provider_plugins. tenant_scoped() would filter the "
-        "platform fleet to nothing. Staff/superuser-only: the resolver "
-        "rejects anonymous + non-staff callers inline, and the type "
-        "omits api_key_hash so the scoped key never surfaces."
+        "platform fleet to nothing. Platform operator only: the resolver "
+        "rejects everyone else inline, Django staff included (#1978), and "
+        "the type omits api_key_hash so the scoped key never surfaces."
     ),
 }
 

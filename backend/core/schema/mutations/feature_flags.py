@@ -7,11 +7,12 @@ in ``core/schema/types/server_info.py`` is settable — the same list
 ``astroliftServerInfo.featureFlags`` reflects out — so this can never
 write an arbitrary Constance key.
 
-Gating mirrors the other fleet-wide operator mutations (e.g.
-``resyncAllAstroliftCiWorkflows`` in ``astrolift_scm``): platform-admin
-via ``Permission.ADMIN_ELEVATE`` (granted to no org role; superusers
-bypass in the resolver), NOT ``@tenant_scoped`` — a feature flag is a
-per-install Constance value, not per-org data.
+A flag is a per-install Constance value: flipping it changes the install
+for every tenant, so only the platform operator may set one, as with the
+other fleet-wide operator mutations (e.g. ``resyncAllAstroliftCiWorkflows``
+in ``astrolift_scm``). ``Permission.ADMIN_ELEVATE`` alone is not that gate:
+the stock org owner and admin roles hold it (#1978). Not ``@tenant_scoped``,
+because a flag is not per-org data.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from core.mutations import ErrorCode, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.schema.types.server_info import _PUBLIC_FEATURE_FLAGS, FeatureFlagInfo
 
 # public dotted key -> (constance_key, description). Built once from the
@@ -67,6 +68,7 @@ class FeatureFlagMutations:
     def set_feature_flag(
         self, info: Info, key: str, enabled: bool
     ) -> MutationResultType[FeatureFlagInfo]:
+        check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
         mapping = _PUBLIC_KEY_TO_CONSTANCE.get(key)
         if mapping is None:
             return gql_failure(

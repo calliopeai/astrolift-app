@@ -388,6 +388,10 @@ def test_reap_mutation_allows_operator(app, env, cluster, org, actor, permission
 
     svc = _orphan_service(app, env, cluster)
     permission_resolver.grant(Permission.CLUSTER_MANAGE)
+    # Reaping is the platform operator's alone (#1978); CLUSTER_MANAGE by
+    # itself is held by every org's admins.
+    actor.is_superuser = True
+    actor.save(update_fields=["is_superuser"])
 
     mut = LifecycleMutation()
     _RecordingDriver.calls = []
