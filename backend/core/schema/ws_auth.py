@@ -164,7 +164,7 @@ def _resolve_user_and_tenant_from_bearer(token: str, organization_guid: str = ""
 def _resolve_tenant_for_user(user, session_data: dict) -> Any:
     """Mirror what TenantContextMiddleware does, but synchronously
     in a sync_to_async wrapper so we don't block the loop."""
-    from astrolift_identity.models import Member, Organization
+    from astrolift_identity.models import Organization
     from core.tenancy import TenantContext
 
     if user is None or not getattr(user, "is_authenticated", False):
@@ -173,20 +173,24 @@ def _resolve_tenant_for_user(user, session_data: dict) -> Any:
     # Active org guid pinned on the X-Astrolift-Organization header
     # in HTTP requests; on WS we read it from the session if a
     # client put it there, otherwise fall back to single-membership.
-    active_org_guid = session_data.get("astrolift_active_org") or ""
-    org_id = None
-    if active_org_guid:
-        org_id = Organization.objects.filter(guid=active_org_guid).values_list("pk", flat=True).first()
+    from astrolift_identity.api_tokens import active_member_organizations, session_may_act_in
 
-    if org_id is None:
-        # Single-membership inference.
-        org_id = (
-            Member.objects.filter(user=user, scope_kind="ORG", is_active=True)
-            .order_by("scope_id")
-            .values_list("scope_id", flat=True)
-            .first()
+    active_org_guid = session_data.get("astrolift_active_org") or ""
+    if active_org_guid:
+        # Pinned by the client, so honoured only for an org the user is an
+        # active member of (or the platform operator), as over HTTP (#1925).
+        org_id = Organization.objects.filter(guid=active_org_guid).values_list("pk", flat=True).first()
+        return (
+            TenantContext(organization_id=org_id, actor_user_id=user.pk)
+            if session_may_act_in(user, org_id)
+            else None
         )
 
+    # Membership inference, live memberships only (#1925). The web client
+    # pins its org in a cookie the relay does not read, so a multi-org user
+    # has always landed on their first org here; it is still an org they
+    # belong to, and a task in another of their orgs is refused as before.
+    org_id = active_member_organizations(user.pk).order_by("pk").values_list("pk", flat=True).first()
     if org_id is None:
         return None
     return TenantContext(organization_id=org_id, actor_user_id=user.pk)

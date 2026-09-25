@@ -310,11 +310,11 @@ def with_active_org_member(queryset, *, user: str, organization: str):
     )
 
 
-def is_active_org_member(user_id: int, organization_id: int) -> bool:
-    """Does ``user_id`` belong to ``organization_id``, by the rule
-    :func:`with_active_org_member` applies to credentials? The audit writers
-    use it to decide whether a mutation may be filed under the tenant org
-    (#1955)."""
+def active_member_organizations(user_id: int):
+    """The live organizations ``user_id`` belongs to, by the rule
+    :func:`with_active_org_member` applies to credentials. A browser
+    session may act only in these (#1925), as a bearer token may act only
+    in its own (#1910)."""
     from django.db.models import Exists, OuterRef
 
     from astrolift_identity.models import Member, Organization
@@ -327,11 +327,33 @@ def is_active_org_member(user_id: int, organization_id: int) -> bool:
         is_active=True,
         deleted_at__isnull=True,
     )
-    return (
-        Organization.objects.filter(pk=organization_id, deleted_at__isnull=True)
-        .filter(Exists(membership))
-        .exists()
-    )
+    return Organization.objects.filter(deleted_at__isnull=True).filter(Exists(membership))
+
+
+def session_may_act_in(user, organization_id: int | None) -> bool:
+    """May a session (browser or websocket) user act in ``organization_id``?
+
+    Only in a live org they are an active member of, or anywhere if they
+    are the platform operator (#1925). The selected-org header, the session's
+    saved org and the websocket's pinned org are all caller-chosen, so each
+    is checked here; a user removed by SCIM loses the org immediately rather
+    than when their session expires.
+    """
+    if organization_id is None or user is None or not getattr(user, "is_authenticated", False):
+        return False
+    from core.permissions import is_platform_operator
+
+    if is_platform_operator(user):
+        return True
+    return is_active_org_member(user.pk, organization_id)
+
+
+def is_active_org_member(user_id: int, organization_id: int) -> bool:
+    """Does ``user_id`` belong to ``organization_id``, by the rule
+    :func:`with_active_org_member` applies to credentials? The audit writers
+    use it to decide whether a mutation may be filed under the tenant org
+    (#1955)."""
+    return active_member_organizations(user_id).filter(pk=organization_id).exists()
 
 
 def verify_token(plaintext: str):
