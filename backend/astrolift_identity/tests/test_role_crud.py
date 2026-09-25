@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
-from astrolift_identity.models import Organization, Role
+from astrolift_identity.models import Organization, Role, RoleBinding
 from astrolift_identity.schema.mutations import (
     CreateRoleInput,
     DeleteRoleInput,
@@ -30,6 +30,21 @@ def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
+def _owner_ctx(org):
+    """Act as a user holding every permission: a role can only carry
+    permissions its author holds (#1964)."""
+    user = _info().context.user
+    holder = Role.objects.create(
+        organization=org,
+        slug="holds-all",
+        name="Holds all",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=[p.value for p in Permission],
+    )
+    RoleBinding.objects.create(user=user, role=holder, scope_kind="ORG", scope_id=org.id)
+    return tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id))
+
+
 # ---- create -----------------------------------------------------------
 
 
@@ -37,7 +52,7 @@ def test_create_role_persists(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org):
+    with _owner_ctx(org):
         result = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
@@ -80,7 +95,7 @@ def test_create_role_rejects_duplicate_slug(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org):
+    with _owner_ctx(org):
         a = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
@@ -145,7 +160,7 @@ def test_update_role_swaps_permissions(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org):
+    with _owner_ctx(org):
         c = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
@@ -188,7 +203,7 @@ def test_update_rejects_unknown_permission(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org):
+    with _owner_ctx(org):
         c = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
@@ -211,7 +226,7 @@ def test_update_cross_org_returns_not_found(permission_resolver):
     org_b = Organization.objects.create(name="B", slug="b")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org_a):
+    with _owner_ctx(org_a):
         c = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
@@ -238,7 +253,7 @@ def test_delete_role_soft_deletes(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with _ctx(org):
+    with _owner_ctx(org):
         c = IdentityMutation().create_role(
             _info(),
             input=CreateRoleInput(
