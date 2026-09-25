@@ -546,11 +546,25 @@ def _resolve_quorum_lists(
     app = deployment.registered_app
     deployment_guid = str(deployment.guid)
 
+    eligible_user_ids = _eligible_approver_user_ids(app)
+
+    triggerer_id = deployment.triggered_by_user_id
+    if triggerer_id is not None and not _self_approve_allowed_safe():
+        eligible_user_ids = [uid for uid in eligible_user_ids if uid != triggerer_id]
+    eligible = set(eligible_user_ids)
+
+    # An approve attempt leaves an audit row whether or not it counted, so
+    # only an ALLOW row from an eligible approver lists its actor (#1955).
+    # The org filter keeps out rows filed under another org; the decision
+    # drops refusals raised as PermissionDenied; eligibility drops the rest,
+    # since a refusal returned as an envelope is recorded as ALLOW (#1968).
     approved_events = list(
         AuditEvent.objects.filter(
             action__in=("deployment.approve", "deployment.approve_by_token"),
             target_id=deployment_guid,
             actor_kind="user",
+            organization_id=app.organization_id,
+            decision=AuditEvent.Decision.ALLOW,
         )
         .exclude(actor_id="")
         .order_by("occurred_at")
@@ -562,16 +576,10 @@ def _resolve_quorum_lists(
             uid = int(e.actor_id)
         except (TypeError, ValueError):
             continue
-        if uid in approved_at_by_user:
+        if uid in approved_at_by_user or uid not in eligible:
             continue
         approved_user_ids.append(uid)
         approved_at_by_user[uid] = e.occurred_at
-
-    eligible_user_ids = _eligible_approver_user_ids(app)
-
-    triggerer_id = deployment.triggered_by_user_id
-    if triggerer_id is not None and not _self_approve_allowed_safe():
-        eligible_user_ids = [uid for uid in eligible_user_ids if uid != triggerer_id]
 
     awaiting_user_ids = [uid for uid in eligible_user_ids if uid not in approved_at_by_user]
 

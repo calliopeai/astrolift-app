@@ -36,6 +36,16 @@ class ClusterBootstrapRun(BaseCoreModel):
         on_delete=models.CASCADE,
         related_name="bootstrap_runs",
     )
+    # The org that recorded the run. A shared cluster (organization NULL)
+    # resolves for every org, so the cluster alone does not say whose run
+    # this is (#1955).
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     triggered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
