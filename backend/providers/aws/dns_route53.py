@@ -576,6 +576,7 @@ class Route53Driver(DnsDriver):
         del zone_id
         return "unknown"
 
+    @driver_op(cloud="aws", driver="dns")
     def pin_zone(self, zone: str, zone_id: str) -> None:
         """Bind ``zone`` to the hosted zone the platform created for it (#1931).
 
