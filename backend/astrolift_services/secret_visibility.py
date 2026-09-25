@@ -126,11 +126,43 @@ def redacted_repo_file(info: Any, *, path: str, content: str) -> str:
     grants of :func:`can_reveal_org_secrets`. Manifest-shaped means a
     ``.toml`` path or text that parses as TOML; any other file comes back
     as fetched."""
-    if not content or not _is_manifest_shaped(path, content) or can_reveal_org_secrets(info):
+    if not content or can_reveal_org_secrets(info):
+        return content
+    if _is_secret_file(path):
+        # A dotenv, tfvars, key or credentials file is secret material as a
+        # whole, not a manifest with a few masked values (#1993).
+        return _SECRET_FILE_PLACEHOLDER
+    if not _is_manifest_shaped(path, content):
         return content
     from astrolift_manifest.env_edit import redact_env_values
 
     return redact_env_values(content)
+
+
+_SECRET_FILE_PLACEHOLDER = (
+    "# withheld: this file holds secrets; revealing it needs secret.read and a fresh step-up\n"
+)
+_SECRET_FILE_NAMES = frozenset(
+    {".env", ".envrc", ".npmrc", ".pypirc", ".netrc", ".dockercfg", "credentials", "id_rsa", "id_ed25519"}
+)
+_SECRET_FILE_SUFFIXES = (
+    ".env",
+    ".tfvars",
+    ".tfvars.json",
+    ".pem",
+    ".key",
+    ".p12",
+    ".pfx",
+    ".jks",
+    ".keystore",
+)
+
+
+def _is_secret_file(path: str) -> bool:
+    name = path.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if name in _SECRET_FILE_NAMES or name.startswith((".env.", "secrets.")):
+        return True
+    return name.endswith(_SECRET_FILE_SUFFIXES)
 
 
 def _is_manifest_shaped(path: str, content: str) -> bool:
