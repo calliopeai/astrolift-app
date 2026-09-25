@@ -199,6 +199,11 @@ def test_each_org_sees_only_its_own_mutations_on_a_shared_cluster(
     permission_resolver.grant(Permission.CLUSTER_UPDATE)
     _member(user_a, org_a)
     _member(user_b, org_b)
+    # Registering and changing a shared cluster is the platform operator's
+    # (#1918), so the operator runs it, once in each org's context.
+    for user in (user_a, user_b):
+        user.is_superuser = True
+        user.save(update_fields=["is_superuser"])
     slug = f"shared-{uuid.uuid4().hex[:6]}"
 
     with _ctx(org_a, user_a):
@@ -421,6 +426,9 @@ def test_no_tenant_reads_no_bootstrap_runs(org_b, shared):
 
 
 def test_install_prereqs_hands_the_requesting_org_to_the_workflow(org_b, user_b, shared, monkeypatch):
+    # Installing into a shared cluster is the platform operator's (#1918).
+    user_b.is_superuser = True
+    user_b.save(update_fields=["is_superuser"])
     starts = []
     monkeypatch.setattr(
         "astrolift_clusters.schema.mutations.start_workflow",

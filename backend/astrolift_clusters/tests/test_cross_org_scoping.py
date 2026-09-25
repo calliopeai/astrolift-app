@@ -244,7 +244,8 @@ def test_update_other_org_cluster_is_not_found_and_unchanged(org_a, org_b, permi
     assert theirs.region == "us-east-1"  # mutation must not have landed
 
 
-def test_update_shared_cluster_succeeds(org_a, permission_resolver):
+def test_update_shared_cluster_is_the_operators(org_a, permission_resolver):
+    """A tenant cannot change a shared cluster every org trusts (#1918)."""
     shared = _cluster(None, region="us-east-1")
     permission_resolver.grant(Permission.CLUSTER_UPDATE)
     with _ctx(org_a):
@@ -252,9 +253,10 @@ def test_update_shared_cluster_succeeds(org_a, permission_resolver):
             _info(),
             UpdateTenantClusterInput(id=GUID(str(shared.guid)), region="us-west-2"),
         )
-    assert result.ok is True
+    assert result.ok is False
+    assert result.errors and result.errors[0].code == "PERMISSION_DENIED"
     shared.refresh_from_db()
-    assert shared.region == "us-west-2"
+    assert shared.region == "us-east-1"
 
 
 # ---- destructive: decommissionCluster -----------------------------
@@ -276,7 +278,8 @@ def test_decommission_other_org_cluster_is_not_found_and_unchanged(org_a, org_b,
     assert theirs.lifecycle == TenantCluster.Lifecycle.MANAGED.value
 
 
-def test_decommission_shared_cluster_proceeds(org_a, permission_resolver):
+def test_decommission_shared_cluster_is_the_operators(org_a, permission_resolver):
+    """A tenant cannot tear down a shared cluster (#1918)."""
     shared = _cluster(None, lifecycle=TenantCluster.Lifecycle.MANAGED.value)
     permission_resolver.grant(Permission.CLUSTER_UNREGISTER)
     with _ctx(org_a):
@@ -284,9 +287,10 @@ def test_decommission_shared_cluster_proceeds(org_a, permission_resolver):
             _info(),
             DecommissionClusterInputType(cluster_id=GUID(str(shared.guid)), delete_cloud_infra=False),
         )
-    assert result.ok is True
+    assert result.ok is False
+    assert result.errors and result.errors[0].code == "PERMISSION_DENIED"
     shared.refresh_from_db()
-    assert shared.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value
+    assert shared.lifecycle == TenantCluster.Lifecycle.MANAGED.value
 
 
 # ---- slug-keyed: recordClusterBootstrapRun ------------------------
@@ -337,7 +341,8 @@ def test_soft_delete_other_org_domain_is_not_found_and_unchanged(org_a, org_b, p
     assert theirs.deleted_at is None  # delete must not have landed
 
 
-def test_soft_delete_shared_domain_succeeds(org_a, permission_resolver):
+def test_soft_delete_shared_domain_is_the_operators(org_a, permission_resolver):
+    """A tenant cannot delete a shared zone (#1929)."""
     shared = _domain(None)
     permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
     with _ctx(org_a):
@@ -345,9 +350,10 @@ def test_soft_delete_shared_domain_succeeds(org_a, permission_resolver):
             _info(),
             SoftDeleteManagedDomainInput(id=GUID(str(shared.guid))),
         )
-    assert result.ok is True
+    assert result.ok is False
+    assert result.errors and result.errors[0].code == "PERMISSION_DENIED"
     shared.refresh_from_db()
-    assert shared.deleted_at is not None
+    assert shared.deleted_at is None
 
 
 # ---- non-@tenant_scoped field re-fetch: TenantClusterType.bootstrap_runs
