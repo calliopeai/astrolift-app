@@ -1136,3 +1136,14 @@ def test_availability_catalog_is_executable_and_exposes_token_auth_binding() -> 
     assert entry.status == "ga"
     assert not entry.issue_url
     assert {"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "GCP_MEMORYSTORE_ENDPOINTS"}.issubset(entry.binding_envs)
+
+
+def test_provision_does_not_adopt_another_services_resource(driver) -> None:
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
+    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and "refusing to adopt" in second.message

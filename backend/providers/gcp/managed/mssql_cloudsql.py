@@ -30,6 +30,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "mssql"
@@ -287,7 +288,7 @@ class CloudSQLServerDriver(ManagedServiceDriver):
                     raise CloudSQLServerError(
                         f"Cloud SQL instance {instance_id} exists but its Astrolift master secret is missing",
                     )
-                self._assert_owned(current, cfg)
+                self._assert_owned(current, cfg, spec=spec)
                 recorded_database = str(
                     self._secret_store.get(self._database_secret(instance_id))
                     or self._database_from_instance(current)
@@ -1081,9 +1082,21 @@ class CloudSQLServerDriver(ManagedServiceDriver):
         except CloudSQLServerNotFound:
             return None
 
-    def _assert_owned(self, current: dict[str, Any], cfg: dict[str, Any], *, deleting: bool = False) -> None:
+    def _assert_owned(
+        self,
+        current: dict[str, Any],
+        cfg: dict[str, Any],
+        *,
+        deleting: bool = False,
+        spec: ProvisionSpec | None = None,
+    ) -> None:
         labels = (current.get("settings") or {}).get("userLabels") or {}
         owned = labels.get("astrolift-managed-by") == "platform"
+        # Provision: a platform instance must be this service's, whatever
+        # adopt_existing says; the instance id is tenant-settable (#1961).
+        refusal = label_adoption_refusal(labels, spec, resource="Cloud SQL instance") if spec and owned else None
+        if refusal:
+            raise CloudSQLServerError(refusal)
         if not owned and not cfg.get("adopt_existing"):
             raise CloudSQLServerError("existing Cloud SQL instance is not Astrolift-managed; set adopt_existing=true")
         if deleting and not owned and not cfg.get("delete_adopted"):

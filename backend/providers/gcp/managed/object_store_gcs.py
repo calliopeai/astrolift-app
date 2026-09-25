@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     unsupported_update,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "object_store"
 
@@ -103,10 +104,17 @@ class GCSDriver(ManagedServiceDriver):
                     location=self._config.location,
                 )
             except Exception as exc:
-                if type(exc).__name__ == "Conflict":
-                    pass  # idempotent
-                else:
+                if type(exc).__name__ != "Conflict":
                     raise
+                # Idempotent only for this service's bucket: the labels below
+                # would otherwise take another service's bucket over (#1961).
+                existing = self._client.get_bucket(bucket_name)
+                refusal = label_adoption_refusal(
+                    dict(existing.labels or {}), spec, resource=f"GCS bucket {bucket_name}"
+                )
+                if refusal is not None:
+                    return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
+                bucket = existing
             if self._config.versioning_enabled:
                 bucket.versioning_enabled = True
                 bucket.patch()

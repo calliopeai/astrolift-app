@@ -38,6 +38,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "redis"
@@ -117,6 +118,11 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is not None:
+            refusal = label_adoption_refusal(
+                _get(existing, "labels", None) or {}, spec, resource=f"memorystore {instance_id}"
+            )
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             if (
                 bool(_get(existing, "auth_enabled", False))
                 and self._secret_store.get(
