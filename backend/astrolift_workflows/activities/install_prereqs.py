@@ -881,6 +881,7 @@ def _record_bootstrap_run_sync(
     error_message: str,
     started_at_iso: str,
     ended_at_iso: str,
+    organization_id: int | None = None,
 ) -> None:
     """Persist a ``ClusterBootstrapRun`` row for a UI-triggered install.
 
@@ -888,6 +889,11 @@ def _record_bootstrap_run_sync(
     writes, so the "Last bootstrap" panel populates regardless of how
     the operator initiated the install. Best-effort — callers should
     catch exceptions and not let a write failure mask the real outcome.
+
+    ``organization_id`` is the org that asked for the install (#1955).
+    A workflow started before it was passed sends none; only the owning
+    org can install on an org-owned cluster, so that cluster's org is
+    the right owner, and a shared cluster's legacy run stays unowned.
     """
     from datetime import datetime
 
@@ -903,6 +909,7 @@ def _record_bootstrap_run_sync(
 
     ClusterBootstrapRun.objects.create(
         tenant_cluster=cluster,
+        organization_id=organization_id if organization_id is not None else cluster.organization_id,
         triggered_by=user,
         status=status,
         installed_releases=applied,
@@ -924,6 +931,7 @@ async def record_cluster_bootstrap_run(
     error_message: str,
     started_at_iso: str,
     ended_at_iso: str,
+    organization_id: int | None = None,
 ) -> None:
     """Write a ``ClusterBootstrapRun`` record so the UI 'Last bootstrap'
     panel reflects UI-triggered installs, not just CLI runs."""
@@ -938,6 +946,7 @@ async def record_cluster_bootstrap_run(
         error_message,
         started_at_iso,
         ended_at_iso,
+        organization_id,
     )
     log.info(
         "record_cluster_bootstrap_run cluster_id=%d status=%s applied=%d",

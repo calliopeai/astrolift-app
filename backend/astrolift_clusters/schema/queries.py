@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 import strawberry
 from django.db.models import Q
@@ -125,6 +126,45 @@ def _clusters_qs(*, search: str | None = None):
             )
         )
     return qs
+
+
+# Mutations whose input names the cluster by slug: registration runs before
+# the guid exists, and the CLI reports a bootstrap run by slug.
+_SLUG_ADDRESSED_CLUSTER_OPERATIONS = frozenset(
+    (
+        "cluster.register",
+        "RegisterTenantCluster",
+        "cluster.record_bootstrap_run",
+        "RecordClusterBootstrapRun",
+    ),
+)
+
+
+def _variables_name_cluster(variables, *, guid: uuid.UUID, slug: str | None) -> bool:
+    """Whether some value in ``variables`` is the cluster's guid, or ``slug``.
+
+    Compares whole values, never a substring of the serialised payload
+    (#1955): a short slug such as ``prod`` is part of unrelated values, and
+    a guid inside a longer string is not the id the mutation addressed.
+    The guid is compared as a UUID so a caller's spelling of it (case,
+    hyphens) does not hide the row.
+    """
+    stack = [variables]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            stack.extend(value.values())
+        elif isinstance(value, list):
+            stack.extend(value)
+        elif isinstance(value, str):
+            if slug is not None and value == slug:
+                return True
+            try:
+                if uuid.UUID(value) == guid:
+                    return True
+            except ValueError:
+                continue
+    return False
 
 
 @strawberry.type
@@ -281,17 +321,28 @@ class ClustersQuery:
         """Cluster-scoped slice of the mutation audit log (#68 slice 2).
 
         Filters ``MutationAuditLog`` by cluster-targeted operations
-        whose ``variables`` JSON references this cluster's guid. The
-        resolver surfaces a flat list of "what happened to this
-        cluster, in what order, by whom" — the workhorse for the
-        cluster-detail Status tab's lifecycle timeline card.
+        whose ``variables`` name this cluster. The resolver surfaces a
+        flat list of "what happened to this cluster, in what order, by
+        whom" — the workhorse for the cluster-detail Status tab's
+        lifecycle timeline card.
+
+        Only rows written in the caller's org come back (#1955). A shared
+        cluster resolves for every org, so the cluster lookup alone would
+        hand one org another org's mutations against it: operation,
+        variables, errors and actor.
         """
 
         from core.schema.audit import MutationAuditLog
 
         tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            # Fail closed. With a null org the shared-cluster union below
+            # would match every platform cluster, and the row filter would
+            # match every row written without a tenant.
+            return []
         cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -333,18 +384,20 @@ class ClustersQuery:
                 "ConfigureProviderPlugin",
             ),
         )
-        qs = MutationAuditLog.objects.select_related("user").order_by("-timestamp")
-        cluster_guid = str(cluster.guid)
-        cluster_slug = cluster.slug
+        operation_q = Q(operation__in=operation_names)
+        for prefix in prefixes:
+            operation_q |= Q(operation__startswith=prefix)
+        qs = (
+            MutationAuditLog.objects.filter(operation_q, organization_id=org_id)
+            .select_related("user")
+            .order_by("-timestamp", "-pk")
+        )
+        cluster_guid = uuid.UUID(str(cluster.guid))
+        limit = max(1, min(limit, 200))
         out: list[ClusterLifecycleAuditEntryType] = []
         for log in qs.iterator(chunk_size=200):
-            if not (any(log.operation.startswith(p) for p in prefixes) or log.operation in operation_names):
-                continue
-            # JSON-references via either guid or slug match. Stringify
-            # variables once and substring-match — cheap, no JSON-path
-            # required on the DB side.
-            variables_str = str(log.variables) if log.variables else ""
-            if cluster_guid not in variables_str and cluster_slug not in variables_str:
+            slug = cluster.slug if log.operation in _SLUG_ADDRESSED_CLUSTER_OPERATIONS else None
+            if not _variables_name_cluster(log.variables, guid=cluster_guid, slug=slug):
                 continue
             out.append(
                 ClusterLifecycleAuditEntryType(

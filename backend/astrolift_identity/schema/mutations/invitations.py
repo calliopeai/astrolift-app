@@ -15,6 +15,7 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
+from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import (
     Invitation,
     Member,
@@ -93,6 +94,14 @@ class InvitationMutations:
             )
             if role is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleSlug")
+            # Accepting binds this role at org scope, so inviting with it is
+            # granting it there (#1964).
+            require_grantable(
+                role.permissions,
+                scope_kind="ORG",
+                scope_id=org_id,
+                gate=Permission.ORG_MANAGE_MEMBERS,
+            )
 
         # Reject if there's already an active pending invite for the
         # same email at this scope — re-sending should go through a
@@ -259,6 +268,15 @@ class InvitationMutations:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 f"invitation is {inv.status}; only a pending invitation can be resent",
+            )
+        # A resend issues a live link to the invitation's role on the
+        # resender's say-so, so it is a grant by the resender (#1964).
+        if inv.role_id is not None:
+            require_grantable(
+                inv.role.permissions,
+                scope_kind="ORG",
+                scope_id=org_id,
+                gate=Permission.ORG_MANAGE_MEMBERS,
             )
 
         # Rotate the token (the old link dies) and refresh the window so
