@@ -135,13 +135,37 @@ class SessionMutations:
                     deleted_at__isnull=True,
                 ).exists()
                 if target_in_org and caller_in_org:
+                    from core.permissions import PermissionScope, ScopeKind, is_platform_operator
                     from core.permissions import check_permission as _check
 
                     try:
-                        _check(Permission.ORG_MANAGE_MEMBERS)
+                        # At org scope, not the selected team or project: a
+                        # session reaches the whole install (#1988).
+                        _check(
+                            Permission.ORG_MANAGE_MEMBERS,
+                            scope=PermissionScope(kind=ScopeKind.ORG, id=org_id),
+                        )
                         is_org_admin = True
                     except Exception:  # noqa: BLE001 — gate is best-effort
                         is_org_admin = False
+                    if is_org_admin and not is_platform_operator(viewer):
+                        # A session is the person's, across every org they
+                        # belong to: one org may sign out only someone who is
+                        # its own (not active elsewhere, not a platform
+                        # account) (#1988).
+                        target_user = row.user
+                        active_elsewhere = (
+                            Member.objects.filter(
+                                user_id=row.user_id,
+                                scope_kind=Member.ScopeKind.ORG.value,
+                                is_active=True,
+                                deleted_at__isnull=True,
+                            )
+                            .exclude(scope_id=org_id)
+                            .exists()
+                        )
+                        if active_elsewhere or target_user.is_superuser or target_user.is_staff:
+                            is_org_admin = False
 
         if not (is_owner or is_org_admin):
             return gql_failure(ErrorCode.PERMISSION_DENIED.value, "cannot revoke this session")

@@ -649,3 +649,35 @@ def test_middleware_never_breaks_request_on_internal_error():
     ):
         response = middleware(request)
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("target_kind", ["active_elsewhere", "superuser"])
+def test_an_org_admin_cannot_sign_out_someone_who_is_not_only_theirs_1988(permission_resolver, target_kind):
+    """A session is the person's across every org they belong to (#1988)."""
+    owner = _user()
+    admin = _user()
+    org = Organization.objects.create(name="Y", slug="y-1988")
+    other = Organization.objects.create(name="Z", slug="z-1988")
+    Member.objects.create(user=owner, scope_kind=Member.ScopeKind.ORG.value, scope_id=org.id)
+    Member.objects.create(user=admin, scope_kind=Member.ScopeKind.ORG.value, scope_id=org.id)
+    if target_kind == "active_elsewhere":
+        Member.objects.create(user=owner, scope_kind=Member.ScopeKind.ORG.value, scope_id=other.id)
+    else:
+        owner.is_superuser = True
+        owner.save(update_fields=["is_superuser"])
+
+    target = record_session(_request_with_session(owner))
+    admin_req = _request_with_session(admin)
+    record_session(admin_req)
+
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    with _ctx(org, admin):
+        result = IdentityMutation().revoke_astrolift_session(
+            _info(admin, request=admin_req),
+            input=RevokeAstroliftSessionInput(session_id=str(target.guid)),
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    target.refresh_from_db()
+    assert target.revoked_at is None
