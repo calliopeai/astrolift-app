@@ -242,11 +242,72 @@ async def test_provision_workflow_marks_failed_without_ever_calling_the_driver_w
             )
 
     assert result.ok is False
+    # #1916: the workflow's own result and the row must carry the driver's
+    # actual reason, not Temporal's generic ActivityError envelope.
+    assert "Activity task failed" not in result.message
+    assert "capacity exhausted" in result.message
 
     await sync_to_async(svc.refresh_from_db)()
     assert svc.status == ManagedService.Status.FAILED
     assert svc.status_error != ""
+    assert "Activity task failed" not in svc.status_error
+    assert "capacity exhausted" in svc.status_error
     assert svc.backend_ref == ""
 
     exists = await sync_to_async(ManagedServiceBinding.objects.filter(managed_service=svc).exists)()
     assert exists is False
+
+
+async def test_provision_workflow_redacts_a_credential_in_the_drivers_message(temporal_env):
+    """A driver that echoes a rejected config value back in its refusal
+    message must not leak it onto the row or the workflow result (#1916).
+    The platform's secret-ref convention keeps *known* secret fields as
+    references before a driver ever runs; this is defense in depth for a
+    literal that lands under a key the convention doesn't recognize."""
+    from asgiref.sync import sync_to_async
+
+    class _RefusingDriverWithSecretyMessage:
+        def __init__(self, *, config):
+            pass
+
+        def provision(self, spec):
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message="config rejected: password=hunter2 for host db.internal",
+                errors=["invalid_config"],
+            )
+
+    svc = await sync_to_async(_make_service)()
+
+    with (
+        patch("astrolift_drivers.registry.plugins.get", return_value=_RefusingDriverWithSecretyMessage),
+        patch("core.cluster_observability.managed_config_for", return_value={}),
+    ):
+        async with temporal_worker(
+            temporal_env,
+            workflows=[ProvisionManagedServiceWorkflow],
+            activities=[
+                mark_managed_service_provisioning,
+                provision_managed_service,
+                check_managed_service_ready,
+                finalize_managed_service_provision,
+                mark_managed_service_failed,
+                bounce_workloads_bound_to_managed_service,
+            ],
+        ):
+            result = await temporal_env.client.execute_workflow(
+                ProvisionManagedServiceWorkflow.run,
+                ProvisionManagedServiceInput(managed_service_id=svc.pk, actor=Actor(kind="system")),
+                id=f"ProvisionManagedServiceWorkflow-{svc.guid}-secret",
+                task_queue="astrolift-test",
+            )
+
+    assert result.ok is False
+    assert "hunter2" not in result.message
+    assert "***redacted***" in result.message
+
+    await sync_to_async(svc.refresh_from_db)()
+    assert svc.status == ManagedService.Status.FAILED
+    assert "hunter2" not in svc.status_error
+    assert "***redacted***" in svc.status_error
