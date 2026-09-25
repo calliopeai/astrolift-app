@@ -39,15 +39,15 @@ def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User
     ``core.schema.user`` does not exist; these helpers have raised ImportError
     on every call since the Graphene migration (#1590). Resolution is a plain
     pk lookup because ``UserType`` carries no ``get_queryset`` hook to scope
-    through, so every caller owns its own gate. All five were audited in #1593:
+    through, so every caller owns its own gate. The callers, audited in #1593:
 
     * ``switch_user`` - ``_may_switch_to`` (superuser or shared switch group)
     * ``profile_request_pwd_change`` - platform operator for another user
     * ``profile_request_delete_user`` - platform operator for another user
-    * ``pin_transaction`` - authenticating with another user's PIN is refused
-      (#1864; the Django permission it required never existed)
     * ``sign_request_user`` - refused: sign requests have no permission in
       Astrolift (#1864; the Django one it named never existed).
+
+    ``pin_transaction`` refuses a proxy user before resolving one (#1979).
     """
     # tenancy: User is a core global model with no organization column, so
     # there is no org clause to add here. Authorization lives at each call
@@ -323,12 +323,13 @@ class UserMutations:
         pin: str,
         proxy_user: Optional[strawberry.ID] = None,
     ) -> bool:
-        profile: Profile = info.context.user.profile
-        resolved_proxy_user = None
         if proxy_user:
-            resolved_proxy_user = _get_user_object(info, proxy_user, raise_not_found=True)
-
-        profile.authenticate(pin, resolved_proxy_user, None)
+            # #1979: refused before any lookup or PIN comparison. Refusing
+            # only a correct PIN, as the model does, told a caller in any
+            # org which guess matched another user's PIN.
+            raise PermissionDenied('Authenticating with another user\'s PIN is not permitted.')
+        profile: Profile = info.context.user.profile
+        profile.authenticate(pin, None, None)
         return True
 
     @strawberry.mutation(

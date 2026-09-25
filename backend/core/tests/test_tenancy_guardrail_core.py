@@ -47,7 +47,6 @@ SCOPED_AT_RUNTIME: dict[str, str] = {
     "Query.members_page": "#1235 — shares _members_qs with Query.members",
     "Mutation.organization": "#537 — _require_caller_in_org for edits; creates allowed for any authed user",
     "Mutation.upsert_organization": "#537 — _require_caller_in_org when editing existing org row",
-    "Mutation.organization_member_status": "#537 — _require_caller_in_org against the target org",
 }
 
 
@@ -78,6 +77,10 @@ EXEMPT: dict[str, str] = {
     ),
     "PermissionAnalysisQuery.permission_compare": (
         "#537: superuser-only gate inline; cross-user by construction."
+    ),
+    "Mutation.organization_member_status": (
+        "#1979: platform operator only (require_platform_operator inline); "
+        "the global User.is_active it flips belongs to no one org."
     ),
     # Install handshake is unauthenticated by design (see #479 + the
     # module docstring on AstroliftServerInfoQuery).
