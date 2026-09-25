@@ -56,6 +56,7 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
     tags_for,
@@ -164,6 +165,9 @@ class RDSMySQLDriver(ManagedServiceDriver):
         # Probe for an existing instance first -- provision is idempotent.
         existing = self._describe(instance_id)
         if existing is not None:
+            refusal = adoption_refusal(existing.get("TagList"), spec, resource=f"db instance {instance_id}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=instance_id),

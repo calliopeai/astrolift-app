@@ -51,6 +51,36 @@ def parse_handle(handle: str) -> tuple[str, str]:
     return kind, resource_id
 
 
+def adoption_refusal(existing_tags, spec: ProvisionSpec, *, resource: str) -> str | None:
+    """Why ``provision`` must not adopt an existing resource, or ``None`` (#1961).
+
+    Provision is name-idempotent: a resource that already exists under the
+    computed name is taken as this service's. Names are built from slugs,
+    which can collide across orgs, so adopting on name alone would hand one
+    org another org's database. ``existing_tags`` is the resource's AWS tag
+    list (``[{"Key", "Value"}]``) or dict. It is adopted only when its
+    ``astrolift.io/managed_service_id`` tag is this service's, or, for a
+    resource tagged before that tag existed, when its organization and app
+    tags are this spec's.
+    """
+    if isinstance(existing_tags, dict):
+        tags = {str(k): str(v) for k, v in existing_tags.items()}
+    else:
+        tags = {str(t.get("Key")): str(t.get("Value")) for t in existing_tags or [] if isinstance(t, dict)}
+    owner_id = tags.get("astrolift.io/managed_service_id")
+    if owner_id and spec.managed_service_id:
+        if owner_id == spec.managed_service_id:
+            return None
+        return f"{resource} already exists and belongs to another managed service; refusing to adopt it"
+    if (
+        tags.get("astrolift.io/organization") == spec.organization_slug
+        and tags.get("astrolift.io/app") == spec.app_slug
+        and not (owner_id and spec.managed_service_id and owner_id != spec.managed_service_id)
+    ):
+        return None
+    return f"{resource} already exists and is not tagged as this service's; refusing to adopt it"
+
+
 def tags_for(spec: ProvisionSpec) -> list[dict[str, str]]:
     """Standard AWS tag set the platform applies to every
     managed-service resource. Lets operators filter in the AWS

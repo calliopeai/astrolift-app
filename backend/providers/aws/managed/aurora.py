@@ -42,7 +42,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 _ENGINE_PORT = {"aurora-postgresql": 5432, "aurora-mysql": 3306}
@@ -183,6 +183,9 @@ class AuroraDriver(ManagedServiceDriver):
                 )
             message = f"Aurora cluster {cluster_id} provisioning (password in {secret_arn})"
         else:
+            refusal = adoption_refusal(existing.get("TagList"), spec, resource=f"Aurora cluster {cluster_id}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             message = f"Aurora cluster {cluster_id} already exists"
 
         writer_result = self._ensure_writer(cluster_id, spec)

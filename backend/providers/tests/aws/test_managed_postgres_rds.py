@@ -684,3 +684,36 @@ def test_binding_schema_lists_all_env_vars(
         "DATABASE_URL",
     ):
         assert key in schema.env_vars
+
+
+# ---- adoption ownership (#1961) ------------------------------------
+
+
+def test_provision_refuses_to_adopt_another_orgs_colliding_instance(driver: RDSPostgresDriver) -> None:
+    """org acme app x-api and org acme-x app api compute the same instance id;
+    the second must not adopt the first org's database."""
+    first = driver.provision(_spec(organization_slug="acme", app_slug="x-api"))
+    second = driver.provision(_spec(organization_slug="acme-x", app_slug="api"))
+
+    assert first.ok
+    assert parse_handle(first.handle)[1] == driver._instance_id_for(
+        spec=_spec(organization_slug="acme-x", app_slug="api")
+    )
+    assert second.ok is False
+    assert "refusing to adopt" in second.message
+
+
+def test_provision_refuses_an_instance_tagged_for_another_service(driver: RDSPostgresDriver) -> None:
+    driver.provision(_spec(managed_service_id="svc-1"))
+    other = driver.provision(_spec(managed_service_id="svc-2"))
+    assert other.ok is False
+    assert "another managed service" in other.message
+
+
+def test_provision_still_adopts_its_own_instance(driver: RDSPostgresDriver) -> None:
+    a = driver.provision(_spec(managed_service_id="svc-1"))
+    b = driver.provision(_spec(managed_service_id="svc-1"))
+    legacy = driver.provision(_spec(service_handle_hint="legacy"))
+    legacy_again = driver.provision(_spec(service_handle_hint="legacy"))
+    assert a.ok and b.ok and a.handle == b.handle
+    assert legacy.ok and legacy_again.ok

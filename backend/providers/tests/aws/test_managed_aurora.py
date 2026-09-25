@@ -47,6 +47,7 @@ class FakeRDS:
             "Port": kwargs["Port"],
             "DatabaseName": kwargs["DatabaseName"],
             "MasterUsername": kwargs["MasterUsername"],
+            "TagList": kwargs.get("Tags", []),
             "DeletionProtection": kwargs["DeletionProtection"],
             "ServerlessV2ScalingConfiguration": kwargs.get("ServerlessV2ScalingConfiguration"),
             "DBClusterMembers": [],
