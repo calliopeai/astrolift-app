@@ -593,8 +593,6 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     activity.heartbeat()
 
     def _gather():
-        from astrolift_services.models import AppSecretBundleRef
-
         d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
         app = d.registered_app
         env = d.app_environment
@@ -607,17 +605,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         # synthesized bindings Secret so binding keys can shadow a
         # bundle on intentional collisions (e.g., operator overrides
         # DATABASE_URL).
-        bundle_secret_names = sorted(
-            AppSecretBundleRef.objects.filter(
-                registered_app=app,
-                app_environment=env,
-                deleted_at__isnull=True,
-            ).values_list("secret_bundle__slug", flat=True),
-        )
-        has_bindings, workload_env_from = _binding_secret_refs_for_environment(env)
-        env_from = list(bundle_secret_names)
-        if has_bindings:
-            env_from.append(_bindings_secret_name(app.slug))
+        from core.app_deploy import deployment_env_from
+
+        env_from, workload_env_from = deployment_env_from(app, env)
 
         # Resolve the namespace here, not after the await (#1577).
         # namespace_for_app reads app.organization.slug whenever

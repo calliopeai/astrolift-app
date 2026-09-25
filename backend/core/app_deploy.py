@@ -894,6 +894,38 @@ def _inject_managed_filesystem_bindings(
         raise AppDeployError(str(exc)) from exc
 
 
+def deployment_env_from(app, env) -> tuple[list[str], dict]:
+    """``(envFrom Secret names, per-workload envFrom)`` for ``env``'s deploy.
+
+    The one source for both the applied render and the ``render_manifests``
+    activity, which had drifted apart (#1923). Order matches env_injection's
+    documented precedence (later wins): app literal < bundle < managed
+    service (#1758).
+    """
+    from astrolift_services.models import AppSecretBundleRef
+    from astrolift_services.secret_literals import literal_secrets_for_environment
+    from astrolift_workflows.activities.app_lifecycle import (
+        _app_env_secret_name,
+        _binding_secret_refs_for_environment,
+        _bindings_secret_name,
+    )
+
+    env_from: list[str] = []
+    if literal_secrets_for_environment(app, env):
+        env_from.append(_app_env_secret_name(app.slug, env.name))
+    env_from += sorted(
+        AppSecretBundleRef.objects.filter(
+            registered_app=app,
+            app_environment=env,
+            deleted_at__isnull=True,
+        ).values_list("secret_bundle__slug", flat=True),
+    )
+    has_managed, workload_env_from = _binding_secret_refs_for_environment(env)
+    if has_managed:
+        env_from.append(_bindings_secret_name(app.slug))
+    return env_from, workload_env_from
+
+
 def render_resources_for_deployment(
     deployment: Deployment,
     *,
@@ -937,28 +969,12 @@ def render_resources_for_deployment(
     #
     # Order matches env_injection's documented precedence (later wins):
     # app literal < bundle < managed service (#1758).
-    from astrolift_services.models import AppSecretBundleRef
     from astrolift_services.secret_literals import literal_secrets_for_environment
-    from astrolift_workflows.activities.app_lifecycle import (
-        _app_env_secret_name,
-        _binding_secret_refs_for_environment,
-        _bindings_secret_name,
-    )
+    from astrolift_workflows.activities.app_lifecycle import _bindings_secret_name
 
+    env_from, workload_env_from = deployment_env_from(app, env)
     literals = literal_secrets_for_environment(app, env)
-    env_from: list[str] = []
-    if literals:
-        env_from.append(_app_env_secret_name(app.slug, env.name))
-    env_from += sorted(
-        AppSecretBundleRef.objects.filter(
-            registered_app=app,
-            app_environment=env,
-            deleted_at__isnull=True,
-        ).values_list("secret_bundle__slug", flat=True),
-    )
-    has_managed, workload_env_from = _binding_secret_refs_for_environment(env)
-    if has_managed:
-        env_from.append(_bindings_secret_name(app.slug))
+    has_managed = _bindings_secret_name(app.slug) in env_from
 
     resources = _render(
         manifest,
