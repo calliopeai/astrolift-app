@@ -33,7 +33,7 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "filesystem"
@@ -110,6 +110,10 @@ class FSxDriver(ManagedServiceDriver):
             if file_system_id:
                 file_system = self._await_file_system(file_system_id)
                 self._verify_owned_type(file_system)
+                # Platform-made is not enough: it must be this service's (#1961).
+                refusal = adoption_refusal(file_system.get("Tags") or [], spec, resource="FSx filesystem")
+                if refusal is not None:
+                    raise ManagedServiceError(refusal)
                 self._tag_file_system(file_system, self._tags(spec, token))
                 self._apply_update(file_system, cfg, size=spec.size)
             else:
