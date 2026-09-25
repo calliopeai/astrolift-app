@@ -332,6 +332,53 @@ def _gcp_ref_reason(item: GcpSecretRef, *, owner, store: GcpSecretStore | None) 
     return f"{where} is {_namespace_message(owner)}; in Google Secret Manager its id must start {root!r}"
 
 
+_IAM_ROLE_ARN_RE = re.compile(r"arn:aws[a-z-]*:iam::\d{12}:role(?P<path>/(?:[^/]+/)*)(?P<name>[^/]+)")
+
+
+def config_role_arns(config: Any, path: str = "") -> list[tuple[str, str]]:
+    """``(path, arn)`` for every IAM role ARN in ``config`` a driver hands to
+    AWS or grants ``iam:PassRole`` on: any key ending in ``role_arn`` /
+    ``RoleARN`` / ``RoleArn``, in any spelling (#1960)."""
+    found: list[tuple[str, str]] = []
+    if isinstance(config, dict):
+        for key, value in config.items():
+            here = f"{path}.{key}" if path else str(key)
+            normalized = str(key).replace("_", "").replace("-", "").casefold()
+            if normalized.endswith("rolearn") and isinstance(value, str) and value.strip():
+                found.append((here, value.strip()))
+            else:
+                found.extend(config_role_arns(value, here))
+    elif isinstance(config, list):
+        for index, value in enumerate(config):
+            found.extend(config_role_arns(value, f"{path}[{index}]"))
+    return found
+
+
+def org_role_path(organization) -> str:
+    """The IAM role path a tenant's managed-service roles must sit under."""
+    return f"/astrolift/{organization.guid}/"
+
+
+def _role_arn_reason(arn: str, owner) -> str | None:
+    """Why ``arn`` must not be handed to AWS for a service ``owner`` owns.
+
+    Tenants share the install's AWS account, so a role a config names (a
+    Firehose destination, an EventBridge target, an RDS Proxy IAM role) is
+    passed to AWS with the platform's credentials and granted ``iam:PassRole``
+    on the app's role. It must be a role the operator created for this org,
+    under the org's own IAM path (#1960).
+    """
+    if owner is None or getattr(owner, "organization", None) is None:
+        return "names an IAM role, but the service has no owning org"
+    match = _IAM_ROLE_ARN_RE.fullmatch(arn)
+    expected = org_role_path(owner.organization)
+    if match is None:
+        return f"is not an IAM role ARN; use a role under the path {expected}"
+    if not match.group("path").startswith(expected):
+        return f"is not under this org's IAM role path {expected}"
+    return None
+
+
 def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[str, str, str]]:
     """``(path, ref, reason)`` for each secret reference in ``config`` that
     sits outside the namespace of ``owner`` (the app or project owning the
@@ -342,6 +389,10 @@ def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[st
         reason = _store_ref_reason(ref, owner)
         if reason is not None:
             found.append((path, ref, f"config.{path} {ref!r} {reason}"))
+    for path, arn in config_role_arns(config):
+        reason = _role_arn_reason(arn, owner)
+        if reason is not None:
+            found.append((path, arn, f"config.{path} {arn!r} {reason}"))
     native = gcp_secret_refs(config)
     if native:
         store = gcp_secret_store(cluster)
