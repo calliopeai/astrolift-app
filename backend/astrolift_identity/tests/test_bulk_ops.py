@@ -82,6 +82,7 @@ def test_bulk_revoke_happy_path(permission_resolver):
     role = _org_role("dev-bulk-revoke-happy")
     actor = _user()
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    _holds_everything(actor, org)  # revoking is capped like granting (#1977)
 
     users = [_user() for _ in range(3)]
     bindings = [
@@ -110,6 +111,7 @@ def test_bulk_revoke_partial_failure(permission_resolver):
     role = _org_role("dev-bulk-revoke-partial")
     actor = _user()
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    _holds_everything(actor, org)
 
     user = _user()
     real_binding = RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
@@ -141,6 +143,7 @@ def test_bulk_revoke_dedupes_ids(permission_resolver):
     role = _org_role("dev-bulk-revoke-dedup")
     actor = _user()
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    _holds_everything(actor, org)
 
     user = _user()
     b = RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)

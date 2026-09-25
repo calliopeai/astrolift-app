@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import strawberry
 from django.db.models import Q
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import (
@@ -17,12 +18,13 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
-from astrolift_identity.grants import require_grantable
+from astrolift_identity.grants import REFUSAL, GrantCeiling, grant_ceiling, require_grantable
 from astrolift_identity.models import (
     Member,
     Role,
     RoleBinding,
 )
+from astrolift_identity.permission_resolver import _scope_ancestry
 from astrolift_identity.schema.mutations.helpers import (
     _actor,
     _resolve_scope_pk_in_org,
@@ -46,8 +48,66 @@ from astrolift_identity.scopes import team_scope_by_guid
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
-from core.permissions import Permission, require_permission
-from core.tenancy import get_current_tenant
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    require_permission,
+)
+from core.tenancy import TenantContext, get_current_tenant
+
+LAST_OWNER_REFUSAL = "only the platform operator can remove an organization's last owner"
+
+
+def _removes_last_owner(binding: RoleBinding) -> bool:
+    """Whether revoking ``binding`` leaves its org with no live owner.
+
+    Only the stock ``org_owner`` at org scope counts, since a custom role's
+    slug proves nothing. A binding that is expired or held by a deactivated
+    account is no owner, so revoking one never trips this.
+    """
+
+    role = binding.role
+    if binding.scope_kind != RoleBinding.ScopeKind.ORG or not (role.is_system and role.slug == "org_owner"):
+        return False
+    live = RoleBinding.objects.filter(
+        Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
+        role__is_system=True,
+        role__slug="org_owner",
+        scope_kind=RoleBinding.ScopeKind.ORG,
+        scope_id=binding.scope_id,
+        user__is_active=True,
+    )
+    return set(live.values_list("pk", flat=True)[:2]) == {binding.pk}
+
+
+def _revoke_refusal(
+    binding: RoleBinding, org_id: int, ceilings: dict[tuple[str, int], GrantCeiling]
+) -> str | None:
+    """Why the caller may not revoke ``binding``, or ``None`` (#1977).
+
+    Revoking takes a role's permissions away at the binding's scope, so it
+    is capped like granting them there (#1964). ``ceilings`` memoizes one
+    ceiling per scope across a bulk call.
+    """
+
+    key = (binding.scope_kind, binding.scope_id)
+    if key not in ceilings:
+        tenant = get_current_tenant() or TenantContext()
+        kind, scope_id = key
+        if not _scope_ancestry(tenant, PermissionScope(kind=ScopeKind(kind), id=scope_id)):
+            # The team, project or app was deleted, so the binding grants
+            # nothing until it is restored; the org's own ceiling decides
+            # who may clear it.
+            kind, scope_id = RoleBinding.ScopeKind.ORG, org_id
+        ceilings[key] = grant_ceiling(tenant, scope_kind=kind, scope_id=scope_id)
+    ceiling = ceilings[key]
+    if not ceiling.allows(binding.role.permissions):
+        return REFUSAL
+    if not ceiling.unrestricted and _removes_last_owner(binding):
+        return LAST_OWNER_REFUSAL
+    return None
 
 
 @strawberry.type
@@ -171,9 +231,21 @@ class RoleBindingMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
         # Only bindings on the caller org's own scopes are revocable; a
         # foreign-org binding guid reads as not-found.
-        binding = RoleBinding.objects.filter(guid=str(input.id)).filter(_org_scope_q(org_id)).first()
+        binding = (
+            RoleBinding.objects.select_related("role")
+            .filter(guid=str(input.id))
+            .filter(_org_scope_q(org_id))
+            .first()
+        )
         if binding is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
+        refusal = _revoke_refusal(binding, org_id, {})
+        if refusal is not None:
+            raise PermissionDenied(
+                Permission.ORG_MANAGE_MEMBERS,
+                PermissionScope(kind=ScopeKind(binding.scope_kind), id=binding.scope_id),
+                refusal,
+            )
         binding.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
@@ -246,6 +318,7 @@ class RoleBindingMutations:
         results: list[_BulkOpItemResult] = []
         revoked = 0
         failed = 0
+        ceilings: dict[tuple[str, int], GrantCeiling] = {}
 
         for gid_s in ordered_unique:
             binding = bindings_by_guid.get(gid_s)
@@ -262,6 +335,47 @@ class RoleBindingMutations:
                                 field=None,
                             )
                         ],
+                    )
+                )
+                continue
+
+            # Checked per binding and after the earlier ones in this batch
+            # are revoked, so a batch cannot remove every owner at once.
+            refusal = _revoke_refusal(binding, org_id, ceilings)
+            if refusal is not None:
+                failed += 1
+                results.append(
+                    _BulkOpItemResult(
+                        id=GUID(gid_s),
+                        ok=False,
+                        errors=[
+                            MutationErrorType(
+                                code=ErrorCode.PERMISSION_DENIED.value,
+                                message=refusal,
+                                field=None,
+                            )
+                        ],
+                    )
+                )
+                emit_audit(
+                    AuditEntry(
+                        actor_user_id=actor.pk if actor else None,
+                        organization_id=org_id,
+                        action="role_binding.revoke",
+                        decision="DENY",
+                        target_kind="role_binding",
+                        target_id=str(binding.guid),
+                        duration_ms=0,
+                        permissions=(Permission.ORG_MANAGE_MEMBERS.value,),
+                        error_code=ErrorCode.PERMISSION_DENIED.value,
+                        error_message=refusal,
+                        extra={
+                            "bulk": True,
+                            "user_id": binding.user_id,
+                            "role_id": binding.role_id,
+                            "scope_kind": binding.scope_kind,
+                            "scope_id": binding.scope_id,
+                        },
                     )
                 )
                 continue
