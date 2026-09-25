@@ -33,7 +33,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "event_stream"
@@ -140,7 +140,7 @@ class MSKDriver(ManagedServiceDriver):
         handle = handle_for(kind=KIND, resource_id=arn) if arn else ""
         try:
             cluster = self._await_state(arn, {"ACTIVE"})
-            if not created and not self._is_managed(arn):
+            if not created and not self._is_managed(arn, spec):
                 raise ManagedServiceError(
                     f"MSK cluster {name} already exists outside this resource declaration",
                 )
@@ -741,9 +741,13 @@ class MSKDriver(ManagedServiceDriver):
     def _tag(self, arn: str, spec: ProvisionSpec) -> None:
         self._msk.tag_resource(ResourceArn=arn, Tags=_tag_map(spec))
 
-    def _is_managed(self, arn: str) -> bool:
+    def _is_managed(self, arn: str, spec: ProvisionSpec) -> bool:
+        """Platform-made is not enough: it must be this service's (#1961)."""
         response = self._msk.list_tags_for_resource(ResourceArn=arn)
-        return (response.get("Tags") or {}).get("astrolift.io/managed-by") == "platform"
+        tags = response.get("Tags") or {}
+        return tags.get("astrolift.io/managed-by") == "platform" and (
+            adoption_refusal(tags, spec, resource="MSK cluster") is None
+        )
 
     def _verify_cluster_type(self, cluster: dict[str, Any]) -> None:
         live = str(cluster.get("ClusterType") or "")

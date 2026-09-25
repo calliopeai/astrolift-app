@@ -30,6 +30,12 @@ class FakeElastiCache:
             raise NotFound("ServerlessCacheNotFoundFault")
         return {"ServerlessCaches": [self.caches[name]]}
 
+    def list_tags_for_resource(self, **kwargs):
+        for cache in self.caches.values():
+            if cache["ARN"] == kwargs["ResourceName"]:
+                return {"TagList": cache.get("Tags", [])}
+        return {"TagList": []}
+
     def create_serverless_cache(self, **kwargs):
         self.calls.append(("CreateServerlessCache", kwargs))
         name = kwargs["ServerlessCacheName"]
@@ -276,3 +282,16 @@ def test_current_botocore_accepts_serverless_request_shapes():
     service = Session().get_service_model("elasticache")
     for operation, request in ec.calls:
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+def test_provision_does_not_adopt_another_services_cache():
+    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    import dataclasses
+
+    subject, ec, _ = driver()
+    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+
+    assert first.ok, first.message
+    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert [name for name, _ in ec.calls].count("ModifyServerlessCache") == 0

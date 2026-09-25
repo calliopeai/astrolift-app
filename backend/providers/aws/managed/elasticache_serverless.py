@@ -26,7 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 _ENGINES = {"valkey", "redis", "memcached"}
@@ -94,6 +94,9 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
         handle = handle_for(kind=self.kind, resource_id=name)
         existing = self._describe(name)
         if existing is not None:
+            refusal = adoption_refusal(self._existing_tags(existing), spec, resource=f"serverless cache {name}")
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
             reconciled = self.update(UpdateSpec(handle=handle, size=spec.size, config=cfg))
             return ProvisionResult(
                 reconciled.ok,
@@ -399,6 +402,14 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
             "user_group_id",
             "remove_user_group",
         ]
+
+    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
+        """Tags of a cache found under this service's name; unreadable counts as untagged (#1961)."""
+        try:
+            resp = self._ec.list_tags_for_resource(ResourceName=str(existing.get("ARN", "")))
+            return list(resp.get("TagList") or [])
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe(self, name: str) -> dict[str, Any] | None:
         try:

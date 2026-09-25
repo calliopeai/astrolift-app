@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 _COLLECTION_TYPES = {"SEARCH", "VECTORSEARCH"}
@@ -85,11 +85,17 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
             return ProvisionResult(False, "", error, ["invalid_opensearch_serverless_config"])
         name = self._collection_name(spec)
         handle = handle_for(kind=self.kind, resource_id=name)
+        # Ownership before the policies: they are keyed by collection name, so
+        # reconciling them first would rewrite another service's access (#1961).
+        existing = self._describe(name)
+        if existing is not None:
+            refusal = adoption_refusal(self._existing_tags(existing), spec, resource=f"collection {name}")
+            if refusal is not None:
+                return ProvisionResult(False, "", refusal, [refusal])
         try:
             self._ensure_policies(name, cfg)
         except Exception as exc:
             return ProvisionResult(False, handle, f"reconcile OpenSearch Serverless policies: {exc}", [str(exc)])
-        existing = self._describe(name)
         if existing is not None:
             updated = self.update(UpdateSpec(handle=handle, size=spec.size, config=cfg))
             return ProvisionResult(updated.ok, handle, updated.message, updated.errors)
@@ -340,6 +346,14 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
             "index_permissions",
             "vector_options",
         ]
+
+    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
+        """Tags of a collection found under this service's name; unreadable counts as untagged (#1961)."""
+        try:
+            rows = self._aoss.list_tags_for_resource(resourceArn=str(existing.get("arn", ""))).get("tags") or []
+            return [{"Key": str(t.get("key")), "Value": str(t.get("value"))} for t in rows]
+        except Exception:  # ownership unverifiable, so not adopted
+            return []
 
     def _describe(self, name: str) -> dict[str, Any] | None:
         response = self._aoss.batch_get_collection(names=[name])

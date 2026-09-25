@@ -35,7 +35,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "mq"
@@ -117,7 +117,7 @@ class AmazonMQDriver(ManagedServiceDriver):
         try:
             if broker_id:
                 description = self._await_state(broker_id, {"RUNNING", "REPLICA"})
-                if not self._is_managed(description):
+                if not self._is_managed(description, spec):
                     raise ManagedServiceError(
                         f"Amazon MQ broker {name} already exists outside this resource declaration",
                     )
@@ -761,8 +761,12 @@ class AmazonMQDriver(ManagedServiceDriver):
         if arn:
             self._mq.create_tags(ResourceArn=arn, Tags=tags)
 
-    def _is_managed(self, description: dict[str, Any]) -> bool:
-        return (description.get("Tags") or {}).get("astrolift.io/managed-by") == "platform"
+    def _is_managed(self, description: dict[str, Any], spec: ProvisionSpec) -> bool:
+        """Platform-made is not enough: it must be this service's (#1961)."""
+        tags = description.get("Tags") or {}
+        return tags.get("astrolift.io/managed-by") == "platform" and (
+            adoption_refusal(tags, spec, resource="Amazon MQ broker") is None
+        )
 
     def _verify_engine(self, description: dict[str, Any]) -> None:
         live = str(description.get("EngineType") or "")
