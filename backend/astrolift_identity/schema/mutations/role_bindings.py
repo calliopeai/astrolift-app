@@ -17,6 +17,7 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
+from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import (
     Member,
     Role,
@@ -111,6 +112,15 @@ class RoleBindingMutations:
         scope_id = _resolve_scope_pk_in_org(scope_kind, str(input.scope_guid), org_id)
         if scope_id is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
+
+        # #1964: the gate above says the caller may grant roles, not which
+        # ones. Without this, org.manage_members alone reaches org_owner.
+        require_grantable(
+            role.permissions,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            gate=Permission.ORG_MANAGE_MEMBERS,
+        )
 
         if RoleBinding.objects.filter(
             user=user, role=role, scope_kind=scope_kind, scope_id=scope_id
@@ -348,6 +358,16 @@ class RoleBindingMutations:
                 f"role scope_level {role.scope_level!r} cannot be granted on a team scope",
                 field="roleId",
             )
+
+        # #1964: team.manage_members must not reach roles wider than the
+        # caller's own reach on this team; org_owner is an ORG-level role and
+        # passes the scope_level check above.
+        require_grantable(
+            role.permissions,
+            scope_kind="TEAM",
+            scope_id=team.pk,
+            gate=Permission.TEAM_MANAGE_MEMBERS,
+        )
 
         seen: set[str] = set()
         ordered_unique: list[str] = []

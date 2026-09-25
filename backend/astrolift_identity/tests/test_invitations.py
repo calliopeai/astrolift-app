@@ -64,6 +64,21 @@ def _invite_role():
     )
 
 
+def _owner(org) -> User:
+    """An inviter who holds every permission: a role on an invitation is
+    capped at what the inviter holds (#1964)."""
+    user = _admin_user()
+    role = Role.objects.create(
+        organization=org,
+        slug="holds-all",
+        name="Holds all",
+        scope_level=Role.ScopeLevel.ORG,
+        permissions=[p.value for p in Permission],
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
+    return user
+
+
 # ---- create -----------------------------------------------------------
 
 
@@ -249,9 +264,10 @@ def test_resend_invitation_rejects_accepted(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     role = _invite_role()
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
-    with tenant_context(TenantContext(organization_id=org.id)):
+    owner = _owner(org)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=owner.id)):
         c = IdentityMutation().create_invitation(
-            _info(_admin_user()),
+            _info(owner),
             input=CreateInvitationInput(email="accepted@astrolift.dev", role_slug=role.slug),
         )
     accepting = User.objects.create_user(username="accepted", email="accepted@astrolift.dev")
@@ -324,10 +340,11 @@ def test_accept_invitation_creates_member_and_role_binding(permission_resolver):
     org = Organization.objects.create(name="X", slug="x")
     role = _invite_role()
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    owner = _owner(org)
 
-    with tenant_context(TenantContext(organization_id=org.id)):
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=owner.id)):
         c = IdentityMutation().create_invitation(
-            _info(_admin_user()),
+            _info(owner),
             input=CreateInvitationInput(email="newbie@astrolift.dev", role_slug=role.slug),
         )
     plaintext = c.data.plaintext_token

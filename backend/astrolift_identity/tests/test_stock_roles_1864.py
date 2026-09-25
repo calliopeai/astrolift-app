@@ -512,10 +512,14 @@ def test_0034_reverses_as_a_no_op():
 def test_the_new_stock_roles_refuse_edits_and_clone_into_custom_roles(world, permission_resolver, slug):
     role = _stock_roles()[slug]
     user = User.objects.create(username=f"admin-{slug}-1864", email=f"admin-{slug}-1864@stock.test")
+    # A clone can only carry permissions its author holds (#1964).
+    RoleBinding.objects.create(
+        user=user, role=_stock_roles()["org_owner"], scope_kind="ORG", scope_id=world.org.id
+    )
     info = SimpleNamespace(context=SimpleNamespace(user=user, request=SimpleNamespace(user=user)))
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
 
-    with tenant_context(TenantContext(organization_id=world.org.id)):
+    with tenant_context(TenantContext(organization_id=world.org.id, actor_user_id=user.id)):
         edited = IdentityMutation().update_role(info, input=UpdateRoleInput(id=role.guid, permissions=[]))
         deleted = IdentityMutation().soft_delete_role(info, input=DeleteRoleInput(id=role.guid))
         cloned = IdentityMutation().create_role(
