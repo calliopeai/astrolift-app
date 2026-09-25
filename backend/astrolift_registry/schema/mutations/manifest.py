@@ -43,6 +43,7 @@ def _audit_secret_change(
     managed_service_changes: list[str] | None = None,
     unapproved_keys: list[str] | None = None,
     proposal_ids: list[str] | None = None,
+    action: str = "app.manifest.apply_secret_change",
 ) -> None:
     """Sibling audit entry for a secret change through ``applyStagedManifest``
     (#1759 adversarial review, H1): env keys and managed-service bindings.
@@ -71,7 +72,7 @@ def _audit_secret_change(
             AuditEntry(
                 actor_user_id=tenant.actor_user_id if tenant else None,
                 organization_id=tenant.organization_id if tenant else None,
-                action="app.manifest.apply_secret_change",
+                action=action,
                 decision=decision,
                 target_kind="RegisteredApp",
                 target_id=str(app.guid),
@@ -266,7 +267,8 @@ class ManifestMutations:
         even when the app requires secret approval. The deploy path
         (``astrolift_services.secret_literals``) is what keeps such an
         edit out of workloads until an applied proposal matches it
-        (#1758).
+        (#1758). Without secret approval the staged value is what deploys,
+        so changing one needs a fresh step-up, as setAppSecret does (#1976).
         """
         from astrolift_manifest.env_edit import redact_env_values, resolve_masked_env_values
         from astrolift_manifest.parser import ManifestError, parse_raw
@@ -325,10 +327,38 @@ class ManifestMutations:
             identical = text == (app.manifest_raw or "")
         else:
             identical = (input.raw_manifest or "") == redact_env_values(app.manifest_raw or "")
-        if identical:
-            app.manifest_raw_staged = ""
-        else:
-            app.manifest_raw_staged = text
+        staged = "" if identical else text
+
+        # Without secret approval a deploy takes [env] literals straight from
+        # the staged buffer (secret_literals._deployable_literals), so staging
+        # a changed value changes what the next deploy puts in front of a
+        # workload. That is the change setAppSecret/rotateAppSecret gate on
+        # step-up; so does this (#1976). With approval on, the deploy path
+        # already keeps an unapproved staged value out.
+        if not app.requires_secret_approval:
+            from astrolift_identity.step_up import check_elevation
+            from astrolift_manifest.env_diff import env_changes
+
+            deployable_before = app.manifest_raw_staged or app.manifest_raw or ""
+            deployable_after = staged or app.manifest_raw or ""
+            changed = [
+                change.label for change in env_changes(deployable_before, deployable_after) if change.app_wide
+            ]
+            if changed:
+                deny = check_elevation(
+                    info,
+                    action_label="app.manifest.stage_secret_change",
+                    resolver_name="ManifestMutations.update_manifest",
+                )
+                if deny is not None:
+                    _audit_secret_change(
+                        app, decision="DENY", changed_keys=changed, action="app.manifest.stage_secret_change"
+                    )
+                    return deny
+                _audit_secret_change(
+                    app, decision="ALLOW", changed_keys=changed, action="app.manifest.stage_secret_change"
+                )
+        app.manifest_raw_staged = staged
         app.save(
             update_fields=[
                 "manifest_raw_staged",
