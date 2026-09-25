@@ -2028,3 +2028,58 @@ def test_apply_staged_manifest_refuses_a_service_config_naming_another_apps_secr
     assert not ManagedService.objects.filter(registered_app=app).exists()
     app.refresh_from_db()
     assert app.manifest_raw == _TOML_WITH_CONTAINER
+
+
+# ---- updateManifest step-up for deployable [env] changes (#1976) ------
+
+
+def _stage(org, app, raw, session):
+    with _ctx(org):
+        return RegistryMutation().update_manifest(
+            _info_with_session(session),
+            input=UpdateManifestInput(id=str(app.guid), raw_manifest=raw),
+        )
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_update_manifest_needs_step_up_to_change_a_deployable_env_value(permission_resolver, audit_capture):
+    """Without secret approval the staged [env] is what deploys, so staging a
+    changed value is the change setAppSecret gates on step-up."""
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    result = _stage(org, app, _TOML_WITH_ENV_CHANGED, _FakeSession())
+
+    assert not result.ok
+    assert result.errors[0].code == "STEP_UP_REQUIRED"
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
+    entry = next(e for e in audit_capture if e.action == "app.manifest.stage_secret_change")
+    assert entry.decision == "DENY"
+    assert entry.extra == {"changed_keys": ["FOO"]}
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_update_manifest_stages_an_env_change_once_elevated(permission_resolver):
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    session = _FakeSession()
+    elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)
+
+    result = _stage(org, app, _TOML_WITH_ENV_CHANGED, session)
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged.strip() == _TOML_WITH_ENV_CHANGED.strip()
+
+
+@override_config(REQUIRE_STEP_UP_AUTH=True)
+def test_update_manifest_without_an_env_change_needs_no_step_up(permission_resolver):
+    org, app = _scaffold(manifest_raw=_TOML_WITH_ENV, manifest_hash="abc", source_repo="")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    edited = _TOML_WITH_ENV.replace('name = "web"', 'name = "api"')
+    assert edited != _TOML_WITH_ENV
+
+    result = _stage(org, app, edited, _FakeSession())
+
+    assert result.ok, result.errors
