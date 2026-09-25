@@ -156,6 +156,18 @@ def attributable_organization_id(tenant: TenantContext | None) -> int | None:
 # ---- Decorator -------------------------------------------------------
 
 
+# Error codes that mean the caller was refused, as opposed to an allowed call
+# that failed: audited as DENY so refusals reach the security alert rules.
+_REFUSAL_CODES = frozenset(
+    {
+        "PERMISSION_DENIED",
+        "STEP_UP_REQUIRED",
+        "SECRET_APPROVAL_REQUIRED",
+        "ATTESTATION_REQUIRED",
+    }
+)
+
+
 def mutation_audit(
     *,
     action: str,
@@ -220,12 +232,18 @@ def mutation_audit(
                 error_message = str(exc)
                 result = MutationResult.failure(ErrorCode.INTERNAL, str(exc))
             else:
-                if isinstance(result, MutationResult):
-                    if not result.ok and result.errors:
-                        first = result.errors[0]
-                        error_code = first.code.value
-                        error_message = first.message
-                        decision = "DENY" if first.code is ErrorCode.PERMISSION_DENIED else "ALLOW"
+                # Resolvers return either the ``MutationResult`` dataclass or
+                # (nearly all of them, via ``gql_failure``) the Strawberry
+                # ``MutationResultType``, whose ``code`` is a plain string.
+                # Read both, or every refused mutation is recorded as an ALLOW
+                # with no error code (#1968).
+                errors = getattr(result, "errors", None) or []
+                if getattr(result, "ok", True) is False and errors:
+                    first = errors[0]
+                    code = getattr(first, "code", None)
+                    error_code = getattr(code, "value", code)
+                    error_message = getattr(first, "message", None)
+                    decision = "DENY" if error_code in _REFUSAL_CODES else "ALLOW"
 
             # Resolvers may return either the bare ``MutationResult``
             # dataclass or the Strawberry ``MutationResultType`` —
