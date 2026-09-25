@@ -95,6 +95,7 @@ class FakeFunctions:
 
 RUNTIME_ACCOUNT = "function@project-1.iam.gserviceaccount.com"
 BUILD_ACCOUNT = "builder@project-1.iam.gserviceaccount.com"
+TRIGGER_ACCOUNT = "trigger@project-1.iam.gserviceaccount.com"
 
 
 @pytest.fixture
@@ -104,7 +105,7 @@ def config() -> CloudFunctionsConfig:
         region="us-central1",
         operation_timeout_seconds=1,
         poll_interval_seconds=0,
-        allowed_service_accounts=(RUNTIME_ACCOUNT, BUILD_ACCOUNT),
+        allowed_service_accounts=(RUNTIME_ACCOUNT, BUILD_ACCOUNT, TRIGGER_ACCOUNT),
     )
 
 
@@ -165,7 +166,7 @@ def _full_config() -> dict[str, Any]:
             "event_type": "google.cloud.pubsub.topic.v1.messagePublished",
             "trigger_region": "us-central1",
             "pubsub_topic": "projects/project-1/topics/billing-events",
-            "service_account_email": "trigger@project-1.iam.gserviceaccount.com",
+            "service_account_email": TRIGGER_ACCOUNT,
             "retry_policy": "RETRY_POLICY_RETRY",
             "event_filters": [{"attribute": "type", "value": "invoice", "operator": "match-path-pattern"}],
         },
@@ -558,6 +559,164 @@ def test_update_refuses_an_account_outside_the_allowlist(driver: CloudFunctionsD
     )
     assert not updated.ok and "not allowed by the cluster install policy" in updated.message
     assert not [call for call in client.calls if call[0] == "patch"]
+
+
+VICTIM = "platform-admin@project-1.iam.gserviceaccount.com"
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        # Google's JSON parser takes a field's proto name as well as its JSON
+        # name, so a raw key in either spelling reaches the same field (#1921).
+        pytest.param(
+            {"service_raw_fields": {"service_account_email": VICTIM}},
+            "service_raw_fields must use the API's lowerCamelCase JSON field names, not service_account_email",
+            id="runtime-account-proto-name",
+        ),
+        pytest.param(
+            {"build_raw_fields": {"service_account": f"projects/-/serviceAccounts/{VICTIM}"}},
+            "build_raw_fields must use the API's lowerCamelCase JSON field names, not service_account",
+            id="build-account-proto-name",
+        ),
+        pytest.param(
+            {
+                "service_raw_fields": {
+                    "secret_environment_variables": [
+                        {"key": "T", "secret": "token", "version": "7", "project_id": "other-project"}
+                    ]
+                }
+            },
+            "not secret_environment_variables",
+            id="secret-env-proto-name",
+        ),
+        pytest.param(
+            {"service_raw_fields": {"ServiceAccountEmail": VICTIM}},
+            "service_raw_fields cannot set structured or output fields: ServiceAccountEmail",
+            id="runtime-account-other-case",
+        ),
+        pytest.param(
+            {"raw_fields": {"service_config": {"serviceAccountEmail": VICTIM}}},
+            "raw_fields must use the API's lowerCamelCase JSON field names, not service_config",
+            id="service-config-proto-name",
+        ),
+        pytest.param(
+            {"raw_fields": {"build_config": {"serviceAccount": f"projects/-/serviceAccounts/{VICTIM}"}}},
+            "raw_fields must use the API's lowerCamelCase JSON field names, not build_config",
+            id="build-config-proto-name",
+        ),
+        pytest.param(
+            {"event_trigger": {"event_type": "t", "service_account_email": VICTIM}},
+            f"event_trigger.service_account_email {VICTIM!r} is not allowed",
+            id="trigger-account-not-allowlisted",
+        ),
+        pytest.param(
+            {"event_trigger": {"event_type": "t", "raw_fields": {"service_account_email": VICTIM}}},
+            "event_trigger.raw_fields must use the API's lowerCamelCase JSON field names",
+            id="trigger-account-proto-name",
+        ),
+        # _camelize let the later spelling win, and the project check read
+        # only project_id.
+        pytest.param(
+            {
+                "secret_environment": [
+                    {"key": "T", "secret": "token", "version": "7", "project_id": None, "projectId": "victim"}
+                ]
+            },
+            "secret_environment spells projectId more than one way",
+            id="secret-env-both-spellings",
+        ),
+        pytest.param(
+            {"secret_environment": [{"key": "T", "secret": "token", "version": "7", "projectId": "victim"}]},
+            "secret_environment secrets must be secret ids in the function project project-1",
+            id="secret-env-json-spelling-only",
+        ),
+        pytest.param(
+            {
+                "secret_volumes": [
+                    {
+                        "mount_path": "/etc/s",
+                        "mountPath": "/etc/t",
+                        "secret": "token",
+                        "versions": [{"version": "7", "path": "t"}],
+                    }
+                ]
+            },
+            "secret_volumes spells mountPath more than one way",
+            id="secret-volume-both-spellings",
+        ),
+        pytest.param(
+            {
+                "secret_volumes": [
+                    {
+                        "mount_path": "/etc/s",
+                        "secret": "token",
+                        "projectId": "victim",
+                        "versions": [{"version": "7", "path": "t"}],
+                    }
+                ]
+            },
+            "secret volume secrets must be secret ids in the function project project-1",
+            id="secret-volume-json-spelling-only",
+        ),
+        pytest.param(
+            {"clear_fields": ["service_config"]},
+            "clear_fields must use the API's lowerCamelCase JSON field names, not service_config",
+            id="clear-proto-name",
+        ),
+        pytest.param(
+            {"clear_fields": ["ServiceConfig"]},
+            "clear_fields cannot clear structured or output fields: ServiceConfig",
+            id="clear-other-case",
+        ),
+    ],
+)
+def test_a_second_spelling_cannot_carry_a_field_past_its_check(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+    extra: dict[str, Any],
+    message: str,
+) -> None:
+    result = driver.provision(replace(SPEC, config=_minimal(**extra)))
+    assert not result.ok and message in result.message
+    assert client.calls == []
+
+
+@pytest.mark.parametrize(
+    "raw_fields",
+    [
+        pytest.param({"service_config": {"serviceAccountEmail": VICTIM}}, id="service-config"),
+        pytest.param({"build_config": {"serviceAccount": f"projects/-/serviceAccounts/{VICTIM}"}}, id="build-config"),
+    ],
+)
+def test_update_refuses_a_proto_named_raw_field(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+    raw_fields: dict[str, Any],
+) -> None:
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    updated = driver.update(UpdateSpec(result.handle, config={"raw_fields": raw_fields}))
+    assert not updated.ok and "lowerCamelCase JSON field names" in updated.message
+    assert not [call for call in client.calls if call[0] == "patch"]
+
+
+def test_the_body_refuses_a_field_spelled_twice() -> None:
+    """The backstop under _validate: _camelize no longer lets one spelling
+    silently win."""
+    from gcp.managed.faas_cloud_functions import _camelize
+
+    with pytest.raises(CloudFunctionsError, match="projectId is spelled more than one way"):
+        _camelize([{"secret": "token", "project_id": None, "projectId": "victim"}])
+
+
+def test_a_json_named_raw_field_the_driver_does_not_model_still_passes(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+) -> None:
+    result = driver.provision(replace(SPEC, config=_minimal(service_raw_fields={"futureKnob": 3})))
+    assert result.ok, result.message
+    created = next(call for call in client.calls if call[0] == "create")
+    assert created[2]["serviceConfig"]["futureKnob"] == 3
 
 
 def test_schema_and_snapshot_contract_are_honest(driver: CloudFunctionsDriver) -> None:

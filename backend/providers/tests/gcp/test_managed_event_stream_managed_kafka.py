@@ -723,6 +723,75 @@ def test_status_surfaces_failed_connector(driver: ManagedKafkaDriver, client: Fa
             },
             "protected fields",
         ),
+        # Google's JSON parser takes a field's proto name as well as its JSON
+        # name, so a raw key in either spelling reaches the same field (#1921).
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "raw_fields": {"gcp_config": {"secretPaths": ["projects/victim/secrets/db/versions/1"]}},
+                    },
+                ],
+            },
+            "raw_fields must use the API's lowerCamelCase JSON field names, not gcp_config",
+        ),
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "raw_fields": {"kafka_cluster": "projects/other/locations/x/clusters/y"},
+                    },
+                ],
+            },
+            "raw_fields must use the API's lowerCamelCase JSON field names, not kafka_cluster",
+        ),
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "raw_fields": {"GcpConfig": {"secretPaths": ["projects/victim/secrets/db/versions/1"]}},
+                    },
+                ],
+            },
+            "raw_fields cannot set protected fields: GcpConfig",
+        ),
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "clear_fields": ["gcp_config"],
+                    },
+                ],
+            },
+            "clear_fields must use the API's lowerCamelCase JSON field names, not gcp_config",
+        ),
+        (
+            {
+                "connect_clusters": [
+                    {
+                        "id": "connect",
+                        "network_configs": [{"primary_subnet": "subnet"}],
+                        "connectors": [
+                            {
+                                "id": "sink",
+                                "configs": {"connector.class": "example.Sink"},
+                                "raw_fields": {"task_restart_policy": {}},
+                            },
+                        ],
+                    },
+                ],
+            },
+            "raw_fields must use the API's lowerCamelCase JSON field names, not task_restart_policy",
+        ),
+        ({"raw_fields": {"gcp_config": {"kmsKey": "projects/other/k"}}}, "not gcp_config"),
         ({"delete_topics": ["../other"], "allow_topic_data_delete": True}, "delete_topics"),
         ({"delete_acls": ["../other"], "allow_acl_delete": True}, "delete_acls"),
     ],
