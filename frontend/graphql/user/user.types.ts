@@ -19,6 +19,11 @@ export type ModuleEntitlement = {
   canCreate: boolean;
   canManage: boolean;
   canRun: boolean;
+  // Whether the module is switched on for the active organization (#1859).
+  // Always true for apps/agents/workflows/admin; for the per-org modules
+  // (chat_studio_integration, agent_live_attach) true only when an org
+  // admin turned it on and the install has not forced it off.
+  enabled: boolean;
 };
 
 export type CurrentUser = {

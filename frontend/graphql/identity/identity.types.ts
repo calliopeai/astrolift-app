@@ -26,6 +26,7 @@ import type {
   AstroliftMyProfile as GeneratedMyProfile,
   AstroliftOrganization as GeneratedOrganization,
   AstroliftOrganizationAllowlistedDomain as GeneratedOrganizationAllowlistedDomain,
+  AstroliftOrganizationModule as GeneratedOrganizationModule,
   AstroliftPolicy as GeneratedPolicy,
   AstroliftProject as GeneratedProject,
   AstroliftRevokeAstroliftSessionPayload as GeneratedRevokeAstroliftSessionPayload,
@@ -171,6 +172,8 @@ export type AstroliftSearchableUser = Omit<GeneratedSearchableUser, "matchKind">
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 
 export type AstroliftOrganizationAllowlistedDomain = GeneratedOrganizationAllowlistedDomain;
+
+export type AstroliftOrganizationModule = GeneratedOrganizationModule;
 
 /**
  * Issuance kind of a session row. Mirrors
