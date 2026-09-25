@@ -9,7 +9,10 @@ manifest-stage mutations, the secret-write mutations' echoed staged
 manifest, a secret change proposal's value) must apply the identical
 gate before showing a value, or a caller lacking ``secret.read`` can
 read every staged secret through a field that was never meant to
-disclose them.
+disclose them. Container, job and task ``env`` values are the same kind
+of secret and go through the same gate (#1948): in the manifest text, on
+``AstroliftContainer.env``, in the rendered-manifest previews, and in a
+manifest read straight from the source repo.
 
 :func:`can_reveal_app_secrets` answers that question without a second
 RBAC round-trip when the caller already resolved the app's effective
@@ -46,12 +49,35 @@ def can_reveal_app_secrets(
     query for the whole page; omit it (the default) for a single app
     and this does its own lookup.
     """
+    scope = ("APP", app.pk)
     cache = _query_cache(info)
     if cache is None:
-        return _can_reveal(info, app=app, known_permissions=known_permissions, cache=None)
+        return _can_reveal(info, scope=scope, known_permissions=known_permissions, cache=None)
     return cache(
         f"secret.reveal:app:{app.pk}",
-        lambda: _can_reveal(info, app=app, known_permissions=known_permissions, cache=cache),
+        lambda: _can_reveal(info, scope=scope, known_permissions=known_permissions, cache=cache),
+    )
+
+
+def can_reveal_org_secrets(info: Any) -> bool:
+    """True when ``info``'s caller could call ``revealAppSecret`` on any
+    app in its organization: ``app.read`` and ``secret.read`` bound
+    org-wide, plus the same token ceiling and elevation (#1948).
+
+    For a response with no app to scope the check to, such as a repo
+    file fetched before any app is registered from it."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.organization_id is None:
+        return False
+    scope = ("ORG", tenant.organization_id)
+    cache = _query_cache(info)
+    if cache is None:
+        return _can_reveal(info, scope=scope, known_permissions=None, cache=None)
+    return cache(
+        f"secret.reveal:org:{tenant.organization_id}",
+        lambda: _can_reveal(info, scope=scope, known_permissions=None, cache=cache),
     )
 
 
@@ -62,16 +88,61 @@ def redacted_manifest_text(
     raw_text: str,
     known_permissions: Iterable[str] | None = None,
 ) -> str:
-    """``raw_text`` unchanged when the caller can reveal secrets, ``[env]``-masked otherwise.
+    """``raw_text`` unchanged when the caller can reveal secrets, env-masked otherwise.
 
     The one-line version of the gate every raw-manifest-text response
-    must apply (#1920); see :func:`can_reveal_app_secrets`.
+    must apply (#1920); see :func:`can_reveal_app_secrets`. The mask
+    covers ``[env]`` and every container, job and task ``env`` (#1948).
     """
     if not raw_text or can_reveal_app_secrets(info, app=app, known_permissions=known_permissions):
         return raw_text
     from astrolift_manifest.env_edit import redact_env_values
 
     return redact_env_values(raw_text)
+
+
+def redacted_render_input(info: Any, *, app: Any, manifest: Any) -> Any:
+    """``manifest`` (a ``NormalizedManifest``) unchanged when the caller can
+    reveal secrets, with every container env value masked otherwise (#1948).
+
+    The rendered-manifest previews copy each container's env literals
+    into the pod spec's ``env:`` entries, the values the manifest text
+    masks, so they are rendered from this instead."""
+    if can_reveal_app_secrets(info, app=app):
+        return manifest
+    from astrolift_manifest.env_edit import redact_container_env
+
+    return redact_container_env(manifest)
+
+
+def redacted_repo_file(info: Any, *, path: str, content: str) -> str:
+    """A repo file's ``content``, env-masked when it is manifest-shaped and
+    the caller cannot reveal secrets org-wide (#1948).
+
+    Push to Repo writes the staged manifest, env literals included, into
+    the repo, so its ``astrolift.toml`` carries exactly what the manifest
+    fields mask. The file has no app to scope a check to (the wizard
+    reads it before one exists), so revealing it takes the org-wide
+    grants of :func:`can_reveal_org_secrets`. Manifest-shaped means a
+    ``.toml`` path or text that parses as TOML; any other file comes back
+    as fetched."""
+    if not content or not _is_manifest_shaped(path, content) or can_reveal_org_secrets(info):
+        return content
+    from astrolift_manifest.env_edit import redact_env_values
+
+    return redact_env_values(content)
+
+
+def _is_manifest_shaped(path: str, content: str) -> bool:
+    if path.lower().endswith(".toml"):
+        return True
+    import tomllib
+
+    try:
+        tomllib.loads(content)
+    except tomllib.TOMLDecodeError:
+        return False
+    return True
 
 
 def _query_cache(info: Any) -> Callable[[str, Callable[[], bool]], bool] | None:
@@ -92,7 +163,7 @@ def _query_cache(info: Any) -> Callable[[str, Callable[[], bool]], bool] | None:
 def _can_reveal(
     info: Any,
     *,
-    app: Any,
+    scope: tuple[str, int],
     known_permissions: Iterable[str] | None,
     cache: Callable[[str, Callable[[], bool]], bool] | None,
 ) -> bool:
@@ -105,11 +176,7 @@ def _can_reveal(
         effective = known_permissions
     else:
         tenant = get_current_tenant()
-        effective = (
-            resolve_effective_permissions(tenant, extra_scope=("APP", app.pk))
-            if tenant is not None
-            else set()
-        )
+        effective = resolve_effective_permissions(tenant, extra_scope=scope) if tenant is not None else set()
 
     if Permission.APP_READ.value not in effective or Permission.SECRET_READ.value not in effective:
         return False

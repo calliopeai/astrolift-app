@@ -25,6 +25,7 @@ import { generateFriendlySlug } from "@/lib/friendly-name";
 import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 import { cn } from "@/lib/utils";
 
+import { hasMaskedEnvValues } from "../manifest-submit";
 import type { WizardState } from "../wizard-client";
 
 interface SourceFileResp {
@@ -277,6 +278,12 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           className={cn("font-mono text-xs", isReadOnly && "bg-muted/40 cursor-default")}
           placeholder="Paste an astrolift.toml manifest here."
         />
+        {state.manifestFromRepo && hasMaskedEnvValues(state.manifestRaw) && (
+          <p className="text-muted-foreground text-xs">
+            Env values are masked because your role can&apos;t reveal secrets. Registration reads
+            them from the repo. If you edit the manifest here, replace every masked value first.
+          </p>
+        )}
         {agentConfigDetected && !state.manifestLater && (
           <div className="border-info-border bg-info/10 flex flex-col gap-2 rounded-md border p-3 text-sm">
             <div className="flex items-center gap-2">
