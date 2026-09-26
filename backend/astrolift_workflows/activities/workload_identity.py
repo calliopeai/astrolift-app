@@ -231,6 +231,28 @@ def _ensure_cluster_oidc_issuer(cluster: Any) -> None:
     cluster.save(update_fields=["auth_config"])
 
 
+def _other_identity_namespaces(app: Any, cluster: Any, environment: Any, namespace: str) -> list[str]:
+    """The namespaces, besides ``namespace``, of ``app``'s other live
+    environments on ``cluster`` that consume a managed service, so their
+    rendered ServiceAccount assumes the app's role too (#1922)."""
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
+    from core.app_deploy import namespace_for_environment
+
+    out: set[str] = set()
+    others = (
+        AppEnvironment.objects.filter(registered_app=app, tenant_cluster=cluster)
+        .exclude(pk=environment.pk)
+        .select_related("registered_app__organization")
+        .order_by("pk")
+    )
+    for other in others:
+        other_namespace = namespace_for_environment(other)
+        if other_namespace != namespace and _managed_services_for_environment(other).exists():
+            out.add(other_namespace)
+    return sorted(out)
+
+
 def _ensure_workload_identity_sync(
     registered_app_id: int,
     app_environment_id: int,
@@ -246,7 +268,7 @@ def _ensure_workload_identity_sync(
     from astrolift_workflows.activities.managed_service_lifecycle import (
         _managed_binding_for,
     )
-    from core.app_deploy import namespace_for_app, workload_identity_role_name
+    from core.app_deploy import namespace_for_environment, workload_identity_role_name
 
     app = RegisteredApp.all_objects.select_related("organization").get(
         pk=registered_app_id,
@@ -312,7 +334,7 @@ def _ensure_workload_identity_sync(
 
     identity_driver = _resolve_capability_driver(cluster, "identity")
     role_name = workload_identity_role_name(app)
-    namespace = namespace_for_app(app)
+    namespace = namespace_for_environment(environment)
 
     # Idempotent: create_identity_role returns the existing ARN if present;
     # bind_service_account adds this (namespace, sa) subject to the trust.
@@ -347,6 +369,16 @@ def _ensure_workload_identity_sync(
             role_name,
             refusal,
         )
+    # One role per app, and an environment in a namespace of its own (#1922)
+    # runs its ServiceAccount there. The IRSA driver resets the trust to its
+    # subject-less base on every create and binding adds one subject, so
+    # binding this environment's namespace alone would drop the others' and
+    # their pods would lose the role. Every namespace of the app on this
+    # cluster whose render carries the ServiceAccount is bound, this one
+    # last; with every environment in the app namespace that is the one
+    # call it always was.
+    for other in _other_identity_namespaces(app, cluster, environment, namespace):
+        identity_driver.bind_service_account(cluster.slug, other, role_name, role_name)
     annotation = identity_driver.bind_service_account(
         cluster.slug,
         namespace,

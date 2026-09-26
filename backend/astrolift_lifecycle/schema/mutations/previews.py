@@ -371,7 +371,18 @@ class PreviewMutations:
         org_slug = (
             getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
         ).lower()
-        namespace = _manual_preview_namespace(org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug)
+        from astrolift_registry.namespaces import namespace_for_new_preview
+
+        # The preview's deploys render into this namespace (#1922), so it may
+        # not be one another app or environment already holds (a branch
+        # named ``pr-3`` computes PR #3's name).
+        namespace = namespace_for_new_preview(
+            app,
+            name=environment_name,
+            preferred=_manual_preview_namespace(
+                org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug
+            ),
+        )
         # Hostname follows the platform's preview wildcard convention
         # but keyed on the branch slug (no PR number). The cluster's
         # ingress-target resolution happens at apply time in the
@@ -396,6 +407,7 @@ class PreviewMutations:
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=environment_name,
+                k8s_namespace=namespace,
                 url=f"https://{hostname}",
                 managed_domain=_managed_domain,
                 required_approvals=0,

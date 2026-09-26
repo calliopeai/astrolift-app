@@ -59,6 +59,15 @@ class Command(BaseCommand):
 
             app = env.registered_app
             host = (app.subdomain or app.slug or "").strip()
+            if host and (env.k8s_namespace or "").strip():
+                # An environment in a namespace of its own serves its own
+                # hostname (#1922): a preview the one its row records, which
+                # its URL already names, any other ``<label>-<env>``.
+                from astrolift_lifecycle.models import PreviewEnvironment
+                from core.app_deploy import environment_hostname_label
+
+                is_preview = PreviewEnvironment.all_objects.filter(app_environment=env).exists()
+                host = "" if is_preview else environment_hostname_label(host, env.name)
             new_url = f"https://{host}.{domain.zone}" if host else env.url
             changes: dict = {"managed_domain": domain}
             if new_url != env.url:

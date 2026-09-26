@@ -131,6 +131,46 @@ def namespace_for_app(app: Any) -> str:
     return app_namespace(organization_slug=org_slug, app_slug=str(app.slug))
 
 
+def namespace_for_environment(env: Any) -> str:
+    """The namespace one environment's objects live in (#1922).
+
+    Its own ``AppEnvironment.k8s_namespace`` when it has one (a preview, or
+    an environment that shares a cluster with another environment of the
+    app), else the app namespace. Mirrors
+    ``core.app_deploy.namespace_for_environment``, which the deploy path
+    writes through, so a read looks where the deploy wrote.
+    """
+    recorded = (getattr(env, "k8s_namespace", "") or "").strip()
+    if recorded:
+        return recorded
+    return namespace_for_app(env.registered_app)
+
+
+def namespace_for_app_environment(app: Any, environment_name: str | None) -> str:
+    """The namespace of ``app``'s environment named ``environment_name``, or
+    the app namespace when none is named or no live one has that name.
+
+    For the reads that take an environment by name: the app namespace is
+    where every environment rendered before #1922, and where the primary
+    environment still does.
+    """
+    if environment_name:
+        from astrolift_lifecycle.models import AppEnvironment
+
+        recorded = (
+            AppEnvironment.objects.filter(
+                registered_app=app,
+                name=environment_name,
+                deleted_at__isnull=True,
+            )
+            .values_list("k8s_namespace", flat=True)
+            .first()
+        )
+        if recorded:
+            return str(recorded)
+    return namespace_for_app(app)
+
+
 def _auth_for_cluster(cluster: TenantCluster) -> Any:
     """Build a ``ClusterAuth`` payload from a ``TenantCluster`` row.
 

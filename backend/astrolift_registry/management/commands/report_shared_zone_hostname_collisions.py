@@ -78,6 +78,7 @@ def find_shared_zone_collisions() -> list[dict]:
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
     from astrolift_manifest.types import NormalizedManifest, WorkloadManifest
     from astrolift_registry.models import Workload
+    from core.app_deploy import environment_hostname_inputs
 
     envs = (
         AppEnvironment.objects.filter(
@@ -113,11 +114,14 @@ def find_shared_zone_collisions() -> list[dict]:
 
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(
-                app_slug=app.slug,
-                org_slug=organization.slug,
-                base_zone=env.managed_domain.zone,
-                subdomain_override=label,
+            environment_hostname_inputs(
+                env,
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=organization.slug,
+                    base_zone=env.managed_domain.zone,
+                    subdomain_override=label,
+                ),
             ),
         ):
             by_key[(env.managed_domain_id, wh.hostname)].append(
