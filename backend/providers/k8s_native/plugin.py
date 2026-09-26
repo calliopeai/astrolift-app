@@ -37,6 +37,7 @@ from k8s_native.managed.faas_knative import KnativeServiceDriver
 from k8s_native.managed.filesystem_nfs import NFSDriver
 from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.managed.model_endpoint_kserve import KServeDriver
+from k8s_native.managed.model_endpoint_vllm import VLLMDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
 from k8s_native.managed.mssql_express import DEFAULT_IMAGE as DEFAULT_MSSQL_IMAGE
 from k8s_native.managed.mssql_express import SQLServerExpressDriver
@@ -96,6 +97,7 @@ PLUGIN = ProviderPlugin(
         ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
         ("workflow_engine", "temporal"): TemporalWorkflowEngineDriver,
         ("model_endpoint", "kserve"): KServeDriver,
+        ("model_endpoint", "vllm"): VLLMDriver,
         ("observability", "kube_prometheus_stack"): KubePrometheusStackDriver,
         ("object_store", "s3_compatible_existing"): ExistingS3ObjectStoreDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,

@@ -1305,6 +1305,33 @@ def _k8s_managed_config_for(
             postgres_image=str(pc.get("temporal_postgres_image", DEFAULT_POSTGRES_IMAGE)),
             storage_class=str(pc.get("temporal_storage_class", "")),
         )
+    if pair == ("model_endpoint", "vllm"):
+        from k8s_native.managed.model_endpoint_vllm import VLLMConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by vLLM: {exc}",
+            ) from exc
+        try:
+            from constance import config as constance_config
+
+            frontend_default = str(getattr(constance_config, "VLLM_FRONTEND_DEFAULT", "rust") or "rust")
+        except Exception:  # noqa: BLE001 - constance unavailable (tests, early boot)
+            frontend_default = "rust"
+        return VLLMConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            image=str(pc.get("vllm_image", "")),
+            storage_class=str(pc.get("vllm_storage_class", "")),
+            credential_path_prefix=str(pc.get("vllm_credential_path_prefix", "managed/vllm")),
+            frontend_default=frontend_default,
+            cluster_frontend=str(pc.get("vllm_frontend", "")),
+            model_defaults=dict(pc.get("vllm_model_defaults") or {}),
+        )
     if pair == ("model_endpoint", "kserve"):
         from k8s_native.managed.model_endpoint_kserve import KServeConfig
 

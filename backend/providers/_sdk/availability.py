@@ -2349,6 +2349,20 @@ MATRIX = AvailabilityMatrix(
         ),
         ManagedServiceEntry(
             kind="model_endpoint",
+            variant="vllm",
+            plugin_id="k8s_native",
+            status="preview",
+            description="Self-hosted vLLM OpenAI-compatible server (Rust or Python frontend) on GPU or CPU nodes",
+            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "MODEL_ENDPOINT_URL",
+                "MODEL_API_KEY",
+                "MODEL_DEPLOYMENT_NAME",
+                "MODEL_REGION",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
             variant="kserve",
             plugin_id="k8s_native",
             status="preview",
