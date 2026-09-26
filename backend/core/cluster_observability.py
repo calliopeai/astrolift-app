@@ -1818,6 +1818,9 @@ def _azure_managed_config_for(
             public_network_access_default=str(
                 pc.get("eventgrid_public_network_access_default", "Enabled"),
             ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventgrid_allowed_identity_resource_ids") or []
+            ),
         )
 
     event_hubs_pairs = {
@@ -1840,6 +1843,9 @@ def _azure_managed_config_for(
             default_consumer_group=str(pc.get("eventhubs_default_consumer_group", "astrolift")),
             public_network_access_default=str(
                 pc.get("eventhubs_public_network_access_default", "Enabled"),
+            ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventhubs_allowed_identity_resource_ids") or []
             ),
         )
 
@@ -1904,6 +1910,9 @@ def _azure_managed_config_for(
                 pc.get("eventgrid_namespace_secret_name_prefix", "event-grid-namespace"),
             ),
             default_capacity=int(pc.get("eventgrid_namespace_default_capacity", 1)),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventgrid_namespace_allowed_identity_resource_ids") or []
+            ),
         )
 
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
@@ -2028,6 +2037,9 @@ def _azure_managed_config_for(
             keyvault_url=vault_url,
             secret_name_prefix=str(
                 pc.get("cosmos_api_secret_name_prefix", "astrolift-cosmos-api"),
+            ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("cosmos_api_allowed_identity_resource_ids") or []
             ),
         )
 
@@ -2296,6 +2308,9 @@ def _azure_managed_config_for(
             ),
             keyvault_url=vault_url,
             secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("managed_redis_allowed_identity_resource_ids") or []
+            ),
         )
 
     if pair == ("api_gateway", "api_management") or (kind == "api_gateway" and not variant):

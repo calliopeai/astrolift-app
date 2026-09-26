@@ -208,6 +208,7 @@ def _driver() -> tuple[AzureEventGridDriver, FakeMgmt, FakeLocks]:
             topic_name_prefix="astrolift-eg",
             mgmt_client=mgmt,
             locks_client=locks,
+            allowed_identity_resource_ids=(UAMI_ID,),
         ),
     )
     return driver, mgmt, locks
@@ -320,6 +321,88 @@ def test_all_supported_push_destinations(kind: str, destination: dict[str, Any],
     assert result.ok, result
     parameters = mgmt.topic_event_subscriptions.create_calls[0]["parameters"]
     assert type(parameters.destination).__name__ == model_name
+
+
+FOREIGN_UAMI_ID = (
+    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/rg-other-tenant"
+    "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/their-identity"
+)
+
+
+def _delivering_subscription(identity: str) -> dict[str, Any]:
+    return {
+        "name": "triage",
+        "destination": {"type": "webhook", "endpoint_url": "https://example.com/events"},
+        "delivery_identity": {"type": "UserAssigned", "user_assigned_identity_resource_id": identity},
+        "destination_preauthorized": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        pytest.param({"topic_user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]}, id="topic"),
+        pytest.param(
+            {
+                "topic_user_assigned_identity_resource_ids": [UAMI_ID, FOREIGN_UAMI_ID],
+                "subscriptions": [_delivering_subscription(FOREIGN_UAMI_ID)],
+            },
+            id="delivery",
+        ),
+    ],
+)
+def test_a_topic_cannot_attach_or_deliver_as_an_unlisted_identity(config: dict[str, Any]) -> None:
+    driver, mgmt, _ = _driver()
+
+    result = driver.provision(_spec(**config))
+
+    assert not result.ok
+    assert "eventgrid_allowed_identity_resource_ids" in result.message
+    assert mgmt.topics.create_calls == []
+
+
+def test_the_delivery_identity_is_judged_against_the_policy_not_only_the_topic_list() -> None:
+    driver = AzureEventGridDriver(
+        config=AzureEventGridConfig(
+            subscription_id=SUBSCRIPTION_ID,
+            resource_group=RESOURCE_GROUP,
+            mgmt_client=FakeMgmt(),
+            locks_client=FakeLocks(),
+            allowed_identity_resource_ids=(UAMI_ID,),
+        ),
+    )
+
+    error = driver._validate_identity(
+        {"type": "UserAssigned", "user_assigned_identity_resource_id": FOREIGN_UAMI_ID},
+        {"topic_user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]},
+        preauthorized=True,
+    )
+
+    assert "eventgrid_allowed_identity_resource_ids" in error
+
+
+def test_a_listed_identity_matches_whatever_its_case() -> None:
+    driver, mgmt, _ = _driver()
+
+    recased = UAMI_ID.replace("resourceGroups/rg-platform", "resourcegroups/RG-Platform").replace(
+        "event-grid", "Event-Grid"
+    )
+
+    handle = _provisioned(driver, topic_user_assigned_identity_resource_ids=[recased])
+
+    assert handle.startswith("event_bus/")
+    assert recased in mgmt.topics.create_calls[0]["parameters"].identity.user_assigned_identities
+
+
+def test_update_cannot_attach_an_unlisted_identity() -> None:
+    driver, mgmt, _ = _driver()
+    handle = _provisioned(driver)
+    updates = len(mgmt.topics.update_calls)
+
+    result = driver.update(UpdateSpec(handle, config={"topic_user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]}))
+
+    assert not result.ok and "eventgrid_allowed_identity_resource_ids" in result.message
+    assert len(mgmt.topics.update_calls) == updates
 
 
 def test_filters_retry_dead_letter_attributes_and_identity_are_rendered() -> None:

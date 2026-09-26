@@ -46,6 +46,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "redis"
@@ -162,6 +163,9 @@ class AzureManagedRedisConfig:
     keyvault_url: str = ""
     mgmt_client: Any | None = None
     secret_client: Any | None = None
+    # User-assigned identities a cluster may unwrap its customer-managed key
+    # with. Empty refuses every one (#2087).
+    allowed_identity_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.default_sku not in MANAGED_REDIS_SKUS:
@@ -676,6 +680,12 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
             return "Azure Managed Redis customer_managed_key_url must be an HTTPS Key Vault key URL"
         if identity_id and not identity_id.startswith("/subscriptions/"):
             return "Azure Managed Redis customer_managed_identity_resource_id must be an ARM resource ID"
+        unlisted = unlisted_identity(identity_id, self._config.allowed_identity_resource_ids)
+        if unlisted:
+            return (
+                f"Azure Managed Redis customer_managed_identity_resource_id {unlisted!r} is not allowed by the "
+                "cluster install policy managed_redis_allowed_identity_resource_ids"
+            )
         high_availability = str(cfg.get("high_availability", self._config.high_availability_default))
         if high_availability not in {"Enabled", "Disabled"}:
             return "Azure Managed Redis high_availability must be Enabled or Disabled"

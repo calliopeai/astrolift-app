@@ -312,6 +312,7 @@ def _driver(*, with_secrets: bool = True) -> tuple[AzureEventGridNamespaceDriver
                 mgmt_client=mgmt,
                 locks_client=locks,
                 secret_client=secrets if with_secrets else None,
+                allowed_identity_resource_ids=(UAMI_ID,),
             ),
         ),
         mgmt,
@@ -337,6 +338,53 @@ def _dead_letter() -> dict[str, Any]:
         "identity": _identity(),
         "preauthorized": True,
     }
+
+
+FOREIGN_UAMI_ID = (
+    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/rg-other-tenant"
+    "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/their-identity"
+)
+
+
+def test_a_namespace_cannot_attach_an_unlisted_identity() -> None:
+    driver, mgmt, _, _ = _driver()
+
+    result = driver.provision(_spec(user_assigned_identity_resource_ids=[FOREIGN_UAMI_ID]))
+
+    assert not result.ok
+    assert "eventgrid_namespace_allowed_identity_resource_ids" in result.message
+    assert mgmt.namespaces.create_calls == []
+
+
+def test_a_namespace_cannot_deliver_or_dead_letter_as_an_unlisted_identity() -> None:
+    driver, _, _, _ = _driver()
+    foreign = {"type": "UserAssigned", "user_assigned_identity_resource_id": FOREIGN_UAMI_ID}
+
+    error = driver._validate_identity(
+        foreign,
+        {"user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]},
+        preauthorized=True,
+    )
+
+    assert "eventgrid_namespace_allowed_identity_resource_ids" in error
+
+
+def test_a_namespace_update_cannot_attach_an_unlisted_identity() -> None:
+    driver, mgmt, _, _ = _driver()
+    handle = _provisioned(driver, user_assigned_identity_resource_ids=[UAMI_ID])
+    writes = (len(mgmt.namespaces.create_calls), len(mgmt.namespaces.update_calls))
+
+    result = driver.update(
+        UpdateSpec(
+            handle,
+            config={"user_assigned_identity_resource_ids": [UAMI_ID, FOREIGN_UAMI_ID]},
+            managed_service_id="service-id",
+        ),
+    )
+
+    assert not result.ok
+    assert "eventgrid_namespace_allowed_identity_resource_ids" in result.message
+    assert (len(mgmt.namespaces.create_calls), len(mgmt.namespaces.update_calls)) == writes
 
 
 def test_provisions_standard_namespace_topic_pull_and_push_subscriptions() -> None:
