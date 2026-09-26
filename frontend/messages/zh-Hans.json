@@ -1475,6 +1475,13 @@
         "appWide": "应用全局",
         "votes": "{received}/{required} 个审批",
         "seeAll": "查看全部 {count} 个提案 →"
+      },
+      "pendingApprovalBadge": "won't deploy as shown",
+      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "revertWarning": {
+        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
+        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
+        "seeAll": "+{count} more"
       }
     },
     "security": {

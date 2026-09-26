@@ -1036,6 +1036,7 @@ export type AstroliftAppReprovisionState = {
 
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
+  deploysAsShown: Scalars['Boolean']['output'];
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
