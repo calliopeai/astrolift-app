@@ -103,12 +103,12 @@ def _retained(*, snapshot_id: str, source_handle: str, **owner) -> ManagedServic
     return row
 
 
-def _restoring(*, snapshot_id: str, source_handle: str, **owner) -> ManagedService:
+def _restoring(*, snapshot_id: str, source_handle: str, created_at: str = "", **owner) -> ManagedService:
+    restore = {"snapshot_id": snapshot_id, "source_handle": source_handle}
+    if created_at:
+        restore["created_at"] = created_at
     return ManagedService.objects.create(
-        name="new",
-        config={},
-        lifecycle_policy={"restore": {"snapshot_id": snapshot_id, "source_handle": source_handle}},
-        **owner,
+        name="new", config={}, lifecycle_policy={"restore": restore}, **owner
     )
 
 
@@ -126,7 +126,9 @@ def _spy_driver():
 
         def restore(self, snapshot, target):  # noqa: ANN001 - test stub
             calls.append(snapshot)
-            return SimpleNamespace(ok=True, handle="restored/handle", ready=True, message="restored", errors=[])
+            return SimpleNamespace(
+                ok=True, handle="restored/handle", ready=True, message="restored", errors=[]
+            )
 
     return _SpyDriver, calls
 
@@ -391,3 +393,44 @@ def test_a_project_service_restores_only_its_own_projects_snapshots():
     assert isinstance(refused, ManagedServicePreflightError)
     assert "of this project" in str(refused)
     assert refused_calls == []
+
+
+def test_the_driver_restores_the_recorded_point_in_time():
+    cluster = _cluster("when", "azure")
+    app, env = _app(_tenant("when"), "when", cluster)
+    owner = {"registered_app": app, "app_environment": env, "kind": "postgres", "variant": "azure_pg_flex"}
+    _retained(snapshot_id="when-final", source_handle="postgres/when-db", **owner)
+
+    omitted, _driver_cls, omitted_calls, _preflight = _provision(
+        _restoring(snapshot_id="when-final", source_handle="postgres/when-db", **owner),
+    )
+    ManagedService.objects.filter(registered_app=app, name="new").update(name="restored")
+    repeated, _driver_cls, repeated_calls, _preflight = _provision(
+        _restoring(
+            snapshot_id="when-final",
+            source_handle="postgres/when-db",
+            created_at="2026-09-01T00:00:00Z",
+            **owner,
+        ),
+    )
+
+    assert omitted["ok"] is True and repeated["ok"] is True
+    assert [call.created_at for call in omitted_calls + repeated_calls] == ["2026-09-01T00:00:00Z"] * 2
+
+
+def test_a_point_in_time_other_than_the_recorded_one_is_refused():
+    cluster = _cluster("earlier", "azure")
+    app, env = _app(_tenant("earlier"), "earlier", cluster)
+    owner = {"registered_app": app, "app_environment": env, "kind": "postgres", "variant": "azure_pg_flex"}
+    _retained(snapshot_id="earlier-final", source_handle="postgres/earlier-db", **owner)
+    target = _restoring(
+        snapshot_id="earlier-final",
+        source_handle="postgres/earlier-db",
+        created_at="2026-01-01T00:00:00Z",
+        **owner,
+    )
+
+    outcome, _driver_cls, calls, _preflight = _provision(target)
+
+    assert isinstance(outcome, ManagedServicePreflightError)
+    assert calls == []

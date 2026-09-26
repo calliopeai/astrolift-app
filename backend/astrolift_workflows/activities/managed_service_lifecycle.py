@@ -222,7 +222,7 @@ def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
         )
 
 
-def _assert_restore_source_recorded(svc: Any, restore: dict[str, Any]) -> None:
+def _recorded_restore_source(svc: Any, restore: dict[str, Any]) -> dict[str, str]:
     """Refuse a restore whose source is not a snapshot Astrolift retained for
     this service's own app or project on this cluster (#2087).
 
@@ -241,6 +241,10 @@ def _assert_restore_source_recorded(svc: Any, restore: dict[str, Any]) -> None:
     they were taken in, and the same string on another cluster can name
     another tenant's resource. Every refusal reads the same, so it does not
     tell a caller whether another org holds the snapshot.
+
+    Returns the record, and the driver restores exactly that: its
+    ``created_at`` is the point in time several drivers restore to, so a
+    ``created_at`` typed beside the pair must be the recorded one or absent.
     """
     from astrolift_services.models import ManagedService
     from astrolift_services.secret_ref_config import service_owner
@@ -266,13 +270,23 @@ def _assert_restore_source_recorded(svc: Any, restore: dict[str, Any]) -> None:
         else []
     )
     target = boundary(svc)
-    sources = [boundary(source) for source in recorded]
-    if not sources or any(source != target for source in sources):
+    records = {
+        str((source.lifecycle_policy.get("last_retained_snapshot") or {}).get("created_at") or "")
+        for source in recorded
+    }
+    requested_at = str(restore.get("created_at") or "")
+    if (
+        not recorded
+        or any(boundary(source) != target for source in recorded)
+        or len(records) != 1
+        or requested_at not in ("", *records)
+    ):
         owner = "project" if svc.project_id else "app"
         raise ManagedServicePreflightError(
             f"managed service {svc.name or svc.kind!r}: restore source {snapshot_id!r} is not a "
             f"snapshot Astrolift retained for a {svc.kind} service of this {owner} on this cluster"
         )
+    return {"snapshot_id": snapshot_id, "source_handle": source_handle, "created_at": records.pop()}
 
 
 def _signals_already_gone(*parts: object) -> bool:
@@ -712,9 +726,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
     restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
-    restoring = bool(restore) and not svc.backend_ref
-    if restoring:
-        _assert_restore_source_recorded(svc, restore)
+    source = _recorded_restore_source(svc, restore) if restore and not svc.backend_ref else None
     _run_managed_service_preflight(svc, cluster)
     spec = build_provision_spec(svc, cluster=cluster)
     _assert_email_identity_unclaimed(svc, spec, cluster)
@@ -730,14 +742,14 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
-    if restoring:
+    if source is not None:
         from _sdk.managed_service import SnapshotHandle
 
         result = driver.restore(
             SnapshotHandle(
-                handle=str(restore["source_handle"]),
-                snapshot_id=str(restore["snapshot_id"]),
-                created_at=str(restore.get("created_at", "")),
+                handle=source["source_handle"],
+                snapshot_id=source["snapshot_id"],
+                created_at=source["created_at"],
             ),
             spec,
         )
