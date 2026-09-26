@@ -335,6 +335,8 @@ _PUBLIC_ENVELOPE_KEY_SUFFIXES: tuple[str, ...] = (
     "_DOMAIN",
     "_FROM",
     "_PROVIDER",
+    "_API_STYLE",
+    "_AUTH_MODE",
     "_SSL_MODE",
     "_TLS",
     "_TOPIC",

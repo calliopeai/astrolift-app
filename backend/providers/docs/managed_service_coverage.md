@@ -44,7 +44,7 @@ Opt-in kinds: `api_gateway`, `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `ti
 | `filesystem` | `efs`, `fsx_lustre`, `fsx_openzfs`, `fsx_windows` | `filestore` | `azure_files`, `azure_files_classic` | `nfs_csi`, `rook_cephfs`, `storage_class_pvc` |
 | `graph_db` | `neptune`, `neptune_serverless` | `spanner_graph` | `cosmos_gremlin` | - |
 | `kv_store` | `dynamodb` | `bigtable` | `cosmos`, `cosmos_table` | - |
-| `model_endpoint` | `bedrock` | `vertex_ai` | `azure_openai` | `kserve`, `vllm` |
+| `model_endpoint` | `bedrock` | `vertex_ai` | `azure_foundry`, `azure_openai` | `kserve`, `vllm` |
 | `mq` (opt-in) | `amazon_mq_activemq`, `amazon_mq_rabbitmq` | - | - | - |
 | `mssql` | `rds_sqlserver_express`, `rds_sqlserver_standard`, `rds_sqlserver_web` | `cloudsql_sqlserver` | `azure_sql_database`, `azure_sql_hyperscale`, `azure_sql_serverless` | `sqlserver_express` |
 | `mysql` | `aurora_mysql`, `aurora_mysql_serverless_v2`, `rds_mysql` | `cloudsql` | `azure_mysql_flex` | `operator` |

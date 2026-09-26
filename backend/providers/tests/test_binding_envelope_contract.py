@@ -254,6 +254,7 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
             "FILESYSTEM_USERNAME",
         }
     ),
+    ("azure", "model_endpoint", "azure_foundry"): frozenset({"MODEL_ENDPOINT_MODEL_ID", "MODEL_ENDPOINT_PROVIDER"}),
     ("azure", "model_endpoint", "azure_openai"): frozenset({"MODEL_ENDPOINT_MODEL_ID", "MODEL_ENDPOINT_PROVIDER"}),
     ("azure", "mysql", "azure_mysql_flex"): frozenset(
         {"DATABASE_HOST", "DATABASE_NAME", "DATABASE_PASSWORD", "DATABASE_PORT", "DATABASE_USER"}
@@ -311,7 +312,7 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
 # https://github.com/calliopeai/astrolift-app/issues/1402
 _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
-    ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_API_KEY"}),
     # Only MASTER_SECRET_REF: the Aurora drivers do emit the rest of the
     # postgres envelope, on the ``self._kind == "postgres"`` branch that the
     # extractor now resolves per subclass.
@@ -350,8 +351,6 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
             "GRAPH_DB_URL",
         }
     ),
-    # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
-    ("azure", "model_endpoint", "azure_openai"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
     ("azure", "object_store", "azure_blob"): frozenset(
         {"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}
     ),
@@ -394,7 +393,7 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     ("gcp", "event_stream", "managed_kafka"): frozenset({"EVENT_STREAM_PASSWORD", "EVENT_STREAM_USERNAME"}),
     ("gcp", "graph_db", "spanner_graph"): frozenset({"GRAPH_DB_PORT", "GRAPH_DB_READER_URL"}),
     # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
-    ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_API_KEY"}),
     # KServe serves in-cluster without an API key; vLLM (#2040) requires one.
     ("k8s_native", "model_endpoint", "kserve"): frozenset({"MODEL_API_KEY"}),
     ("gcp", "object_store", "gcs"): frozenset({"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}),

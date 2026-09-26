@@ -395,6 +395,8 @@ class KServeDriver(ManagedServiceDriver):
             "MODEL_ENDPOINT_URL": ValueRef(literal=url),
             "MODEL_DEPLOYMENT_NAME": ValueRef(literal=parsed.name),
             "MODEL_REGION": ValueRef(literal="kubernetes"),
+            "MODEL_API_STYLE": ValueRef(literal="kserve"),
+            "MODEL_AUTH_MODE": ValueRef(literal="none"),
             "KSERVE_INFERENCE_SERVICE": ValueRef(literal=parsed.name),
             "KSERVE_NAMESPACE": ValueRef(literal=parsed.namespace),
         }
@@ -470,6 +472,8 @@ class KServeDriver(ManagedServiceDriver):
             env_vars={
                 "MODEL_ENDPOINT_URL": "Ready KServe REST endpoint",
                 "MODEL_DEPLOYMENT_NAME": "InferenceService name",
+                "MODEL_API_STYLE": "Client protocol: 'kserve' (see MODEL_PROTOCOL_VERSION)",
+                "MODEL_AUTH_MODE": "Credential kind: 'none' (cluster-internal)",
                 "MODEL_REGION": "Always kubernetes",
                 "KSERVE_INFERENCE_SERVICE": "InferenceService name",
                 "KSERVE_NAMESPACE": "InferenceService namespace",
