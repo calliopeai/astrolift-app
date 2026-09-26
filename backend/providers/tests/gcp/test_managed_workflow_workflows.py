@@ -232,21 +232,26 @@ def test_provision_patches_changed_revision_and_runtime_fields(
     assert fake.workflows[_name()]["revisionId"] == "000002-abc"
 
 
-def test_existing_unowned_workflow_requires_explicit_adoption(
+def test_existing_unowned_workflow_is_refused_without_operator_adoption(
     driver: WorkflowsDriver,
     fake: FakeWorkflows,
 ) -> None:
     fake.workflows[_name()] = _owned_workflow(labels={"team": "legacy"})
 
     denied = driver.provision(spec(workflow_id="workflow-one"))
-    adopted = driver.provision(spec(workflow_id="workflow-one", adopt_existing=True))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
 
-    assert not denied.ok and "adopt_existing=true" in denied.message
-    assert adopted.ok
-    assert fake.workflows[_name()]["labels"]["astrolift_io_adopted"] == "true"
+    # The flag is gone entirely, not just ignored: adoption is operator-only
+    # and no tenant config reopens it (#2021).
+    rejected = driver.provision(spec(workflow_id="workflow-one", adopt_existing=True))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert fake.workflows[_name()]["labels"] == {"team": "legacy"}
+    assert not fake.patched
 
 
-def test_existing_managed_workflow_cannot_cross_boundary_without_reassignment(
+def test_existing_managed_workflow_cannot_cross_boundary(
     driver: WorkflowsDriver,
     fake: FakeWorkflows,
 ) -> None:
@@ -255,13 +260,13 @@ def test_existing_managed_workflow_cannot_cross_boundary_without_reassignment(
     fake.workflows[_name()] = workflow
 
     denied = driver.provision(spec(workflow_id="workflow-one"))
-    reassigned = driver.provision(spec(workflow_id="workflow-one", allow_reassignment=True))
-
     assert not denied.ok and "another Astrolift boundary" in denied.message
-    assert reassigned.ok
-    labels = fake.workflows[_name()]["labels"]
-    assert labels["astrolift_io_app"] == "payments"
-    assert labels["astrolift_io_reassigned"] == "true"
+
+    rejected = driver.provision(spec(workflow_id="workflow-one", allow_reassignment=True))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert fake.workflows[_name()]["labels"]["astrolift_io_app"] == "another-app"
+    assert not fake.patched
 
 
 @pytest.mark.parametrize(

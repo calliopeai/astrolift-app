@@ -261,7 +261,98 @@ def test_update_workflow_rejects_foreign_org_binding(
 
 
 # ---------------------------------------------------------------------------
-# runWorkflow — validates bindings, starts the engine, returns a run id (§3)
+# updateWorkflow(definitionSlug): repoint fallback (#1822)
+# ---------------------------------------------------------------------------
+
+
+def test_update_workflow_repoints_to_new_definition(member, org, agent_workload, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    _make_def("cw-repoint-a", organization=org, agent=agent_workload)
+    _make_def("cw-repoint-b", organization=org, agent=agent_workload)
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        created = m.create_workflow(
+            _info(member), name="WF", slug="repoint-wf", definition_slug="cw-repoint-a"
+        )
+        assert created.ok, created.errors
+        res = m.update_workflow(_info(member), slug="repoint-wf", definition_slug="cw-repoint-b")
+    assert res.ok, res.errors
+    assert res.workflow.definition_slug == "cw-repoint-b"
+    wf = Workflow.objects.get(slug="repoint-wf")
+    assert wf.definition.slug == "cw-repoint-b"
+
+
+def test_update_workflow_repoint_refuses_when_bindings_invalid(
+    member, org, agent_workload, permission_resolver
+):
+    """A repoint is refused (not partially applied) when the target
+    definition's stages do not validate against the Workflow's existing
+    bindings: the same guard a versioned importWorkflowManifest(replace:
+    true) relies on (#1822)."""
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    _make_def("cw-repoint-bound", organization=org, agent=agent_workload)
+    _make_def("cw-repoint-unbound", organization=org)  # stage's agent is unset
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        created = m.create_workflow(
+            _info(member), name="WF", slug="repoint-wf-2", definition_slug="cw-repoint-bound"
+        )
+        assert created.ok, created.errors
+        res = m.update_workflow(_info(member), slug="repoint-wf-2", definition_slug="cw-repoint-unbound")
+    assert not res.ok
+    assert any("stage 0" in msg for e in res.errors for msg in e.messages)
+    wf = Workflow.objects.get(slug="repoint-wf-2")
+    assert wf.definition.slug == "cw-repoint-bound"  # never repointed
+
+
+def test_update_workflow_repoint_requires_create_on_target_definition(
+    member, org, agent_workload, permission_resolver
+):
+    """WORKFLOW_UPDATE on the Workflow's own scope is not enough to bind it
+    to a different definition: that also requires the WORKFLOW_CREATE a
+    caller would need to configure a Workflow against that definition in
+    the first place."""
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    _make_def("cw-repoint-c", organization=org, agent=agent_workload)
+    _make_def("cw-repoint-d", organization=org, agent=agent_workload)
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        created = m.create_workflow(
+            _info(member), name="WF", slug="repoint-wf-3", definition_slug="cw-repoint-c"
+        )
+        assert created.ok, created.errors
+
+        # Now withdraw WORKFLOW_CREATE: WORKFLOW_UPDATE alone must not be
+        # enough to point this Workflow at a different definition.
+        permission_resolver.deny(Permission.WORKFLOW_CREATE)
+        from core.permissions import PermissionDenied
+
+        with pytest.raises(PermissionDenied):
+            m.update_workflow(_info(member), slug="repoint-wf-3", definition_slug="cw-repoint-d")
+    wf = Workflow.objects.get(slug="repoint-wf-3")
+    assert wf.definition.slug == "cw-repoint-c"
+
+
+def test_update_workflow_repoint_unknown_definition_slug(member, org, agent_workload, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    _make_def("cw-repoint-e", organization=org, agent=agent_workload)
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        created = m.create_workflow(
+            _info(member), name="WF", slug="repoint-wf-4", definition_slug="cw-repoint-e"
+        )
+        assert created.ok, created.errors
+        res = m.update_workflow(_info(member), slug="repoint-wf-4", definition_slug="does-not-exist")
+    assert not res.ok
+    assert any(e.field == "definition_slug" for e in res.errors)
+
+
+# ---------------------------------------------------------------------------
+# runWorkflow: validates bindings, starts the engine, returns a run id (§3)
 # ---------------------------------------------------------------------------
 
 

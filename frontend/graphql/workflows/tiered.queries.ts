@@ -173,6 +173,21 @@ export const LIST_WORKFLOW_DEFINITION_RUNS = gql`
   }
 `;
 
+export const LIST_PENDING_HUMAN_GATES = gql`
+  query ListPendingHumanGates($orgId: ID, $limit: Int) {
+    pendingHumanGates(orgId: $orgId, limit: $limit) {
+      executionId
+      runGuid
+      workflowId
+      definitionSlug
+      definitionName
+      stageRole
+      stageApprovers
+      startedAt
+    }
+  }
+`;
+
 export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
   query ListWorkflowStageExecutions($workflowId: String!, $runId: String!) {
     workflowStageExecutions(workflowId: $workflowId, runId: $runId) {

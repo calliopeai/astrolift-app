@@ -2685,7 +2685,7 @@ export type AstroliftModuleEntitlement = {
   canManage: Scalars['Boolean']['output'];
   canRun: Scalars['Boolean']['output'];
   canView: Scalars['Boolean']['output'];
-  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
+  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
   enabled: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
 };
@@ -5109,7 +5109,9 @@ export type ImportWorkflowManifestResult = {
   createdSlug?: Maybe<Scalars['String']['output']>;
   errors: Array<ValidationError>;
   manifest?: Maybe<WorkflowManifestPreviewType>;
+  mode?: Maybe<Scalars['String']['output']>;
   ok: Scalars['Boolean']['output'];
+  repointedSlugs: Array<Scalars['String']['output']>;
 };
 
 export type InstallClusterPrereqsInputType = {
@@ -5401,7 +5403,7 @@ export type Mutation = {
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
-  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. */
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
@@ -5561,7 +5563,7 @@ export type Mutation = {
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
-  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration`` or ``agent_live_attach``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
+  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
@@ -5632,7 +5634,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). */
+  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -6344,6 +6346,7 @@ export type MutationImportWorkflowFlowArgs = {
 export type MutationImportWorkflowManifestArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   preview?: Scalars['Boolean']['input'];
+  replace?: Scalars['Boolean']['input'];
   toml: Scalars['String']['input'];
 };
 
@@ -7392,6 +7395,7 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -7589,6 +7593,17 @@ export type OrganizationTypePage = {
 export type PauseAppWebhookDeploysInput = {
   appSlug: Scalars['String']['input'];
   reason: InputMaybe<Scalars['String']['input']>;
+};
+
+export type PendingHumanGate = {
+  definitionName: Scalars['String']['output'];
+  definitionSlug: Scalars['String']['output'];
+  executionId: Scalars['String']['output'];
+  runGuid: Scalars['String']['output'];
+  stageApprovers: Array<Scalars['String']['output']>;
+  stageRole: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  workflowId: Scalars['String']['output'];
 };
 
 export type PermissionComparison = {
@@ -7793,6 +7808,7 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
@@ -8049,6 +8065,8 @@ export type Query = {
   organizations: Array<OrganizationType>;
   /** Cursor-paginated list of the caller's organizations. */
   organizationsPage: OrganizationTypePage;
+  /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
+  pendingHumanGates: Array<PendingHumanGate>;
   /** Compare effective permissions between two users. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission. */
@@ -8176,6 +8194,12 @@ export type QueryAgentTaskArgs = {
 };
 
 
+export type QueryAgentTaskByClientRequestIdArgs = {
+  clientRequestId: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
+};
+
+
 export type QueryAgentTaskEventsArgs = {
   after?: Scalars['Int']['input'];
   limit?: Scalars['Int']['input'];
@@ -8244,6 +8268,7 @@ export type QueryAgentTriggersPageArgs = {
 
 
 export type QueryAgentWorkloadsArgs = {
+  dispatchable?: Scalars['Boolean']['input'];
   orgId: Scalars['ID']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -9363,6 +9388,12 @@ export type QueryOrganizationsPageArgs = {
 };
 
 
+export type QueryPendingHumanGatesArgs = {
+  limit?: Scalars['Int']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
 export type QueryPermissionCompareArgs = {
   userIdA: Scalars['ID']['input'];
   userIdB: Scalars['ID']['input'];
@@ -9844,6 +9875,7 @@ export type RotateZentinelleGatewayCredentialInput = {
 
 export type RunAstroliftAgentInput = {
   agentSlug: Scalars['String']['input'];
+  clientRequestId: InputMaybe<Scalars['String']['input']>;
   environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
   timeoutSeconds: InputMaybe<Scalars['Int']['input']>;
   triggerPayload: InputMaybe<Scalars['JSON']['input']>;

@@ -35,10 +35,11 @@ class OrganizationModuleMutations:
     @strawberry.field(
         description=(
             "Turn a per-organization module on or off for the active organization "
-            "(org admins: ``org.update``). ``key`` is ``chat_studio_integration`` or "
-            "``agent_live_attach``. Turning on a module the install admin has forced "
-            "off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is "
-            "refused with PRECONDITION; turning one off always succeeds."
+            "(org admins: ``org.update``). ``key`` is ``chat_studio_integration``, "
+            "``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module "
+            "the install admin has forced off (``astroliftServerInfo.featureFlags``, "
+            "``modules.*_allowed``) is refused with PRECONDITION; turning one off "
+            "always succeeds."
         )
     )
     @mutation_audit(action="org.module.set", target=_module_target)

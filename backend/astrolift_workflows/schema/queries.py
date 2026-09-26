@@ -26,12 +26,14 @@ from astrolift_workflows.schema.types import (
 )
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
+    PendingHumanGateType,
     WorkflowDefinitionRunType,
     WorkflowDefinitionSummaryType,
     WorkflowRunType,
     definition_run_to_type,
     definition_summary,
     environment_model_map,
+    pending_gate_to_type,
     run_to_type,
     workflow_to_type,
 )
@@ -48,6 +50,7 @@ from workflows.scopes import (
     covered_project_ids,
     definition_scope_by_slug,
     execution_scope_by_id,
+    may_decide_human_gate,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
@@ -694,3 +697,46 @@ class WorkflowsQuery:
             qs = qs.filter(status=status)
         rows = qs.order_by("-started_at", "-guid")[: max(1, min(int(limit), 200))]
         return [definition_run_to_type(run) for run in rows]
+
+    @strawberry.field(
+        description=(
+            "Open human_gate stage executions across the org's runs that the caller may "
+            "decide, newest first (#1820)."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_TRIGGER, any_scope=True)
+    @tenant_scoped()
+    def pending_human_gates(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        limit: int = 50,
+    ) -> list[PendingHumanGateType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from workflows.models import WorkflowStage, WorkflowStageExecution
+
+        runs = visible_runs(
+            WorkflowRun.objects.filter(organization_id=caller), caller, Permission.WORKFLOW_TRIGGER
+        )
+        # A gate naming specific approver addresses the caller isn't one of
+        # is filtered out below, after the DB slice. Declared approvers are
+        # almost always team/role slugs rather than addresses in practice,
+        # and this mirrors the exact check the decide path applies
+        # (``may_decide_human_gate``), so the two never disagree.
+        rows = (
+            WorkflowStageExecution.objects.filter(
+                stage__kind=WorkflowStage.StageKind.HUMAN_GATE,
+                workflow_run_id__in=runs.values("pk"),
+            )
+            .exclude(status__in=WorkflowStageExecution.TERMINAL_STATUSES)
+            .select_related("stage__definition", "workflow_run")
+            .order_by("-started_at", "-pk")[: max(1, min(int(limit), 200))]
+        )
+        user = info.context.user
+        return [
+            pending_gate_to_type(execution)
+            for execution in rows
+            if may_decide_human_gate(user, execution.stage.approvers)
+        ]

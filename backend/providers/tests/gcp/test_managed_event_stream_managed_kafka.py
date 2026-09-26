@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.event_stream_managed_kafka import (
@@ -533,7 +534,7 @@ def test_connector_state_and_restart_controls_are_explicit(
         )
 
 
-def test_schema_registry_collision_requires_adoption_or_reassignment(
+def test_schema_registry_collision_is_refused_without_operator_adoption(
     driver: ManagedKafkaDriver,
     client: FakeManagedKafka,
 ) -> None:
@@ -541,21 +542,68 @@ def test_schema_registry_collision_requires_adoption_or_reassignment(
     registry = f"{parent}/schemaRegistries/events_registry"
     client.resources[registry] = {"name": registry}
     denied = driver.provision(replace(SPEC, config=_full_config()))
-    assert not denied.ok and "not Astrolift-owned" in denied.message
-    adopted_cfg = _full_config()
-    adopted_cfg["schema_registries"][0]["adopt_existing"] = True
-    adopted = driver.provision(replace(SPEC, config=adopted_cfg))
-    assert adopted.ok
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert driver._registry_owner(registry) == ""
+
+    # The flags are gone entirely, on the cluster and on every registry and
+    # Connect declaration: the schema tenant config is validated against
+    # rejects them, and a driver handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    for flag in ("adopt_existing", "reassign_existing"):
+        assert not validator.is_valid({**_full_config(), flag: True})
+        for key in ("schema_registries", "connect_clusters"):
+            nested = _full_config()
+            nested[key][0][flag] = True
+            assert not validator.is_valid(nested)
+    flagged = _full_config()
+    flagged["schema_registries"][0]["adopt_existing"] = True
+    assert not driver.provision(replace(SPEC, config=flagged)).ok
+    assert driver._registry_owner(registry) == ""
+
+
+def test_existing_unowned_cluster_is_refused_without_operator_adoption(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    name = "projects/project-1/locations/us-central1/clusters/shared-events"
+    client.resources[name] = {"name": name, "state": "ACTIVE", "labels": {"owner": "customer"}}
+    denied = driver.provision(replace(SPEC, config=_full_config()))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert client.resources[name]["labels"] == {"owner": "customer"}
+
+
+def test_another_services_cluster_and_registry_are_not_reassigned(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+    cluster = "projects/project-1/locations/us-central1/clusters/shared-events"
+    registry = "projects/project-1/locations/us-central1/schemaRegistries/events_registry"
     assert driver._registry_owner(registry) == "managed-id"
 
     other_spec = replace(SPEC, managed_service_id="other-id")
-    adopted_cfg.pop("connect_clusters")
-    reassignment_denied = driver.provision(replace(other_spec, config=adopted_cfg))
-    assert not reassignment_denied.ok and "another managed service" in reassignment_denied.message
-    adopted_cfg["schema_registries"][0]["reassign_existing"] = True
-    adopted_cfg["reassign_existing"] = True
-    assert driver.provision(replace(other_spec, config=adopted_cfg)).ok
-    assert driver._registry_owner(registry) == "other-id"
+    for reassign in (False, True):
+        cfg = _full_config()
+        if reassign:
+            cfg["reassign_existing"] = True
+            cfg["schema_registries"][0]["reassign_existing"] = True
+        refused = driver.provision(replace(other_spec, config=cfg))
+        assert not refused.ok
+        assert "another managed service" in refused.message
+    assert client.resources[cluster]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+    assert driver._registry_owner(registry) == "managed-id"
+
+    # The registry refuses on its own marker, not only behind the cluster
+    # check: a second cluster naming the same registry is still turned away.
+    other_cluster = {k: v for k, v in _full_config().items() if k != "connect_clusters"}
+    other_cluster["cluster_id"] = "other-events"
+    refused = driver.provision(replace(other_spec, config=other_cluster))
+    assert not refused.ok
+    assert "schema registry events_registry belongs to another managed service" in refused.message
+    assert driver._registry_owner(registry) == "managed-id"
 
 
 def test_destructive_child_operations_require_specific_confirmation(driver: ManagedKafkaDriver) -> None:

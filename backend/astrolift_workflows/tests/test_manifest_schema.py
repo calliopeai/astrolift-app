@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
 from astrolift_workflows.schema.manifest import (
@@ -14,7 +16,7 @@ from astrolift_workflows.schema.manifest import (
 )
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, tenant_context
-from workflows.models import WorkflowDefinition, WorkflowStage
+from workflows.models import Workflow, WorkflowDefinition, WorkflowStage
 
 pytestmark = pytest.mark.django_db
 
@@ -40,6 +42,15 @@ def _info(user=None):
 def _tenant(org_id=1):
     with tenant_context(TenantContext(organization_id=org_id)):
         yield
+
+
+def _user():
+    """A plain authenticated, non-platform-operator caller: needed by the
+    replace tests below, which exercise ``_definition_write_error``'s
+    org-ownership branch rather than its platform-operator bypass. A real
+    persisted User, since ``created_by``/``updated_by`` are FKs to it."""
+    User = get_user_model()
+    return User.objects.create_user(username=f"replace-tester-{uuid.uuid4().hex[:8]}", password="pw")
 
 
 # ---- preview ----------------------------------------------------------------
@@ -221,3 +232,193 @@ def test_import_foreign_org_id_rejected(permission_resolver):
     assert result.ok is False
     assert any("mismatch" in msg for e in result.errors for msg in e.messages)
     assert WorkflowDefinition.objects.count() == before
+
+
+# ---- import replace=true (#1822) --------------------------------------------
+
+GATE_TOML = """\
+[workflow]
+slug = "feature-dev"
+name = "Feature Dev"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve stage one?"
+
+[[stage]]
+kind = "checkpoint"
+"""
+
+GATE_TOML_EDITED = """\
+[workflow]
+slug = "feature-dev"
+name = "Feature Dev v2"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve the updated plan?"
+
+[[stage]]
+kind = "checkpoint"
+"""
+
+ONE_STAGE_TOML = """\
+[workflow]
+slug = "feature-dev"
+name = "Feature Dev"
+pattern = "chained"
+
+[[stage]]
+kind = "agent_dispatch"
+"""
+
+ONE_GATE_TOML = """\
+[workflow]
+slug = "feature-dev"
+name = "Feature Dev"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve?"
+"""
+
+
+def test_replace_creates_when_nothing_to_replace(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        result = m.import_workflow_manifest(_info(_user()), toml=VALID_TOML, preview=False, replace=True)
+    assert result.ok is True
+    assert result.mode == "created"
+    assert result.created_slug == "feature-dev"
+
+
+def test_replace_updates_in_place_when_shape_unchanged(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        first = m.import_workflow_manifest(_info(_user()), toml=GATE_TOML, preview=False)
+        definition = WorkflowDefinition.objects.get(slug=first.created_slug, organization_id=org.pk)
+        stage0_pk = definition.stages.get(order=0).pk
+
+        result = m.import_workflow_manifest(
+            _info(_user()), toml=GATE_TOML_EDITED, preview=False, replace=True
+        )
+
+    assert result.ok is True, result.errors
+    assert result.mode == "updated_in_place"
+    assert result.created_slug == "feature-dev"
+    definition.refresh_from_db()
+    assert definition.name == "Feature Dev v2"
+    assert definition.stages.get(order=0).pk == stage0_pk
+    assert definition.stages.get(order=0).prompt == "Approve the updated plan?"
+
+
+def test_replace_versions_and_repoints_configured_workflow(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        first = m.import_workflow_manifest(_info(_user()), toml=GATE_TOML, preview=False)
+        old = WorkflowDefinition.objects.get(slug=first.created_slug, organization_id=org.pk)
+        old.is_enabled = True
+        old.save(update_fields=["is_enabled", "updated_at", "version"])
+        wf = Workflow.objects.create(
+            organization=org,
+            definition=old,
+            name="Nightly Feature Dev",
+            slug="nightly-feature-dev",
+            stage_bindings={},
+            trigger_kind=Workflow.TriggerKind.SCHEDULE,
+            schedule_cron="0 9 * * *",
+        )
+
+        # Drops to one stage: the shape changes, so this must version.
+        result = m.import_workflow_manifest(_info(_user()), toml=ONE_GATE_TOML, preview=False, replace=True)
+
+    assert result.ok is True, result.errors
+    assert result.mode == "versioned"
+    assert result.created_slug == "feature-dev-1"
+    assert result.repointed_slugs == ["nightly-feature-dev"]
+    wf.refresh_from_db()
+    assert wf.definition.slug == "feature-dev-1"
+    assert wf.schedule_cron == "0 9 * * *"
+    old.refresh_from_db()
+    assert old.stages.filter(deleted_at__isnull=True).count() == 2  # untouched
+
+
+def test_replace_blocked_writes_nothing_and_reports_the_workflow(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        first = m.import_workflow_manifest(_info(_user()), toml=GATE_TOML, preview=False)
+        old = WorkflowDefinition.objects.get(slug=first.created_slug, organization_id=org.pk)
+        Workflow.objects.create(
+            organization=org,
+            definition=old,
+            name="Nightly Feature Dev",
+            slug="nightly-feature-dev",
+            stage_bindings={},
+            trigger_kind=Workflow.TriggerKind.MANUAL,
+        )
+        before = set(WorkflowDefinition.objects.values_list("pk", flat=True))
+
+        # New shape's agent_dispatch stage has no default agent and no
+        # binding covers it.
+        result = m.import_workflow_manifest(_info(_user()), toml=ONE_STAGE_TOML, preview=False, replace=True)
+
+    assert result.ok is False
+    assert result.errors
+    assert any(e.field == "workflow.nightly-feature-dev" for e in result.errors)
+    assert set(WorkflowDefinition.objects.values_list("pk", flat=True)) == before
+
+
+def test_replace_denied_without_update_when_definition_already_exists(permission_resolver):
+    """Only WORKFLOW_CREATE is granted: enough to create fresh, not enough
+    to replace an org's own existing definition (#1822)."""
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        first = m.import_workflow_manifest(_info(_user()), toml=GATE_TOML, preview=False)
+        assert first.ok is True
+        with pytest.raises(PermissionDenied):
+            m.import_workflow_manifest(_info(_user()), toml=GATE_TOML_EDITED, preview=False, replace=True)
+
+
+def test_replace_refuses_source_managed_definition(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    org = _make_org()
+    definition = WorkflowDefinition.objects.create(
+        name="Feature Dev",
+        slug="feature-dev",
+        organization=org,
+        pattern_kind=WorkflowDefinition.PatternKind.CHAINED,
+        model_label="",
+        source_repo="acme/workflows",
+        source_path="feature-dev.toml",
+    )
+    WorkflowStage.objects.create(
+        definition=definition,
+        order=0,
+        kind=WorkflowStage.StageKind.HUMAN_GATE,
+    )
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        result = m.import_workflow_manifest(
+            _info(_user()), toml=GATE_TOML_EDITED, preview=False, replace=True
+        )
+    assert result.ok is False
+    assert any("SOURCE_MANAGED" in msg for e in result.errors for msg in e.messages)
+    definition.refresh_from_db()
+    assert definition.name == "Feature Dev"

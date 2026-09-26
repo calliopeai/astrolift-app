@@ -754,3 +754,88 @@ def test_the_viewer_list_costs_the_same_for_one_row_or_a_full_page(world, tempor
 
     assert listed == MEDOPS_RUNS
     assert full == one
+
+
+# ---------------------------------------------------------------------------
+# pending gates list (#1820)
+# ---------------------------------------------------------------------------
+
+# Every ``_definition_run`` in ``world`` opens with one human_gate execution
+# (see ``_definition``); the two ``_app_run`` rows (wf-deploy-medops,
+# wf-deploy-platform) carry none, so they never surface here regardless of
+# who is asking.
+GATE_DEFINITION_SLUGS = {
+    "wf-intake": "intake-flow",
+    "wf-billing": "billing-flow",
+    "wf-core": "core-flow",
+    "wf-org": "org-flow",
+}
+
+
+@pytest.mark.parametrize(("slug", "kind", "scope", "pick", "own"), SUB_ORG_HOLDERS)
+def test_pending_gates_lists_only_what_the_caller_covers(world, slug, kind, scope, pick, own):
+    holder = _holder(slug, kind, getattr(world, scope).pk, f"gatelist-{slug}")
+    expected = {GATE_DEFINITION_SLUGS[wid] for wid in own if wid in GATE_DEFINITION_SLUGS}
+
+    with _as(world, holder):
+        gates = WorkflowsQuery().pending_human_gates(make_info(holder))
+
+    assert {g.definition_slug for g in gates} == expected
+
+
+def test_pending_gates_never_crosses_into_another_org(world):
+    admin = _holder("org_admin", "ORG", world.org.pk, "gatelist-org-admin")
+
+    with _as(world, admin):
+        gates = WorkflowsQuery().pending_human_gates(make_info(admin))
+
+    slugs = {g.definition_slug for g in gates}
+    assert "beta-flow" not in slugs
+    assert slugs == set(GATE_DEFINITION_SLUGS.values())
+
+
+def test_a_decided_gate_drops_off_the_pending_list(world):
+    admin = _holder("org_admin", "ORG", world.org.pk, "gatelist-decided")
+    execution = world.intake.execution
+    execution.status = WorkflowStageExecution.Status.COMPLETED
+    execution.output = {"human_gate": {"decision": "approved", "decided_by_user_id": None, "note": ""}}
+    execution.save(update_fields=["status", "output"])
+
+    with _as(world, admin):
+        gates = WorkflowsQuery().pending_human_gates(make_info(admin))
+
+    assert "intake-flow" not in {g.definition_slug for g in gates}
+
+
+def test_pending_gates_named_approver_address_is_visible_only_to_them(world):
+    # ``_holder`` stamps ``<name>-wf1965@acme.test`` as the user's email.
+    stage = world.intake.execution.stage
+    stage.approvers = ["gatelist-lead-wf1965@acme.test"]
+    stage.save(update_fields=["approvers"])
+    developer = _holder("team_developer", "TEAM", world.medops.pk, "gatelist-other")
+    lead = _holder("team_developer", "TEAM", world.medops.pk, "gatelist-lead")
+
+    with _as(world, developer):
+        hidden = WorkflowsQuery().pending_human_gates(make_info(developer))
+    with _as(world, lead):
+        visible = WorkflowsQuery().pending_human_gates(make_info(lead))
+
+    assert "intake-flow" not in {g.definition_slug for g in hidden}
+    assert "intake-flow" in {g.definition_slug for g in visible}
+
+
+def test_pending_gates_exposes_what_the_decide_path_and_deep_link_need(world):
+    admin = _holder("org_admin", "ORG", world.org.pk, "gatelist-fields")
+
+    with _as(world, admin):
+        gates = WorkflowsQuery().pending_human_gates(make_info(admin))
+
+    intake = next(g for g in gates if g.definition_slug == "intake-flow")
+    # ``execution_id`` is what ``signalWorkflowInstance``'s payload takes
+    # (the integer pk, not the guid, per #1786); ``workflow_id`` is what its
+    # own ``workflowId`` argument takes; ``run_guid`` is the astrolift
+    # WorkflowRun guid the observe page's ``?run=`` deep link uses (#2068).
+    assert intake.execution_id == str(world.intake.execution.pk)
+    assert intake.workflow_id == "wf-intake"
+    assert intake.run_guid == str(world.intake.run.guid)
+    assert intake.definition_name == "intake-flow"

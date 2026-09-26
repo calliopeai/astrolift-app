@@ -1335,7 +1335,7 @@ MATRIX = AvailabilityMatrix(
             description=(
                 "Google Cloud Workflows definitions, immutable revisions, executions, "
                 "CMEK, service identity, environment, logging, history, IAM bindings, "
-                "rollback, adoption, and protected teardown"
+                "rollback, and protected teardown"
             ),
             binding_envs=(
                 "WORKFLOW_ENGINE_ID",

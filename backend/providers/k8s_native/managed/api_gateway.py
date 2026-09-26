@@ -70,8 +70,6 @@ _CONFIG_FIELDS = {
     "labels",
     "annotations",
     "deletion_protection",
-    "adopt_existing",
-    "expected_existing_uid",
 }
 
 
@@ -119,7 +117,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 namespace=namespace,
                 name=name,
                 managed_service_id=spec.managed_service_id,
-                cfg=cfg,
             )
             manifests = self._manifests(
                 namespace=namespace,
@@ -369,8 +366,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                             "spec": {"type": "object"},
                             "labels": scalar_map,
                             "annotations": scalar_map,
-                            "adopt_existing": {"type": "boolean", "default": False},
-                            "expected_existing_uid": {"type": "string"},
                         },
                     },
                 },
@@ -386,16 +381,12 @@ class GatewayAPIDriver(ManagedServiceDriver):
                             "spec": {"type": "object"},
                             "labels": scalar_map,
                             "annotations": scalar_map,
-                            "adopt_existing": {"type": "boolean", "default": False},
-                            "expected_existing_uid": {"type": "string"},
                         },
                     },
                 },
                 "labels": scalar_map,
                 "annotations": scalar_map,
                 "deletion_protection": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
             },
         }
 
@@ -412,7 +403,7 @@ class GatewayAPIDriver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        return sorted(_CONFIG_FIELDS - {"adopt_existing", "expected_existing_uid"})
+        return sorted(_CONFIG_FIELDS)
 
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         cfg = copy.deepcopy(raw or {})
@@ -448,8 +439,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 "spec",
                 "labels",
                 "annotations",
-                "adopt_existing",
-                "expected_existing_uid",
             }
             if unknown_route:
                 raise ValueError("unsupported route fields: " + ", ".join(sorted(unknown_route)))
@@ -478,8 +467,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 "spec",
                 "labels",
                 "annotations",
-                "adopt_existing",
-                "expected_existing_uid",
             }
             if unknown_resource:
                 raise ValueError("unsupported auxiliary resource fields: " + ", ".join(sorted(unknown_resource)))
@@ -612,7 +599,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 cluster_id,
                 namespace,
                 manifest,
-                route,
                 dns_label(owner[_OWNER_ID]),
             )
             children.append(self._child_ref(manifest))
@@ -638,7 +624,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 cluster_id,
                 namespace,
                 manifest,
-                resource,
                 dns_label(owner[_OWNER_ID]),
             )
             children.append(self._child_ref(manifest))
@@ -715,7 +700,6 @@ class GatewayAPIDriver(ManagedServiceDriver):
         namespace: str,
         name: str,
         managed_service_id: str,
-        cfg: dict[str, Any],
     ) -> None:
         current = self._gateway(cluster_id, namespace, name)
         if current is None:
@@ -728,17 +712,20 @@ class GatewayAPIDriver(ManagedServiceDriver):
             return
         if labels.get(_OWNER) == "astrolift" and owner:
             raise ValueError("Gateway belongs to another Astrolift managed resource")
-        if not cfg.get("adopt_existing") or str(cfg.get("expected_existing_uid") or "") != str(
-            metadata.get("uid") or ""
-        ):
-            raise ValueError("adopting a Gateway requires its exact expected_existing_uid")
+        # An object's uid is a precondition, not an authorization: in an
+        # operator-fixed shared namespace the object may be anyone's. Adoption
+        # of an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
+        raise ValueError(
+            "Gateway already exists and is not owned by this managed service; adoption is a separate, "
+            "operator-authorized operation and cannot be granted by tenant config",
+        )
 
     def _assert_child_adoptable(
         self,
         cluster_id: str,
         namespace: str,
         manifest: dict[str, Any],
-        route: dict[str, Any],
         owner_id: str,
     ) -> None:
         current = self._config.cluster_driver.get_manifest(
@@ -755,12 +742,11 @@ class GatewayAPIDriver(ManagedServiceDriver):
             return
         if labels.get(_OWNER) == "astrolift" and labels.get(_OWNER_ID):
             raise ValueError(f"{manifest['kind']} {manifest['metadata']['name']} belongs to another resource")
-        if not route.get("adopt_existing") or str(route.get("expected_existing_uid") or "") != str(
-            metadata.get("uid") or ""
-        ):
-            raise ValueError(
-                f"adopting {manifest['kind']} {manifest['metadata']['name']} requires its exact expected_existing_uid",
-            )
+        raise ValueError(
+            f"{manifest['kind']} {manifest['metadata']['name']} already exists and is not owned by this "
+            "managed service; adoption is a separate, operator-authorized operation and cannot be granted "
+            "by tenant config",
+        )
 
     def _assert_owned(self, resource: dict[str, Any]) -> str:
         labels = dict((resource.get("metadata", {}) or {}).get("labels", {}) or {})

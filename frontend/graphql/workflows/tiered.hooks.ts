@@ -27,6 +27,7 @@ import {
   LIST_TIERED_WORKFLOW_DEFINITIONS,
   LIST_WORKFLOW_RUNS,
   LIST_WORKFLOW_DEFINITION_RUNS,
+  LIST_PENDING_HUMAN_GATES,
   LIST_WORKFLOW_STAGE_EXECUTIONS,
   LIST_WORKFLOW_STAGES,
   PREVIEW_WORKFLOW_MANIFEST,
@@ -51,6 +52,8 @@ import type {
   TieredWorkflowRunsData,
   WorkflowDefinitionRunsData,
   WorkflowDefinitionRunsVars,
+  PendingHumanGatesData,
+  PendingHumanGatesVars,
   TieredWorkflowsData,
   TieredWorkflowStageExecutionsData,
   TieredWorkflowStagesData,
@@ -245,6 +248,28 @@ export const useWorkflowDefinitionRuns = (params?: {
     startPolling,
     stopPolling,
   };
+};
+
+// Org-wide pending-gates list (#1820): every open human_gate the caller may
+// decide, across every run, the "an owner does not have to open every
+// workflow to find them" view. Same query, same authorization, as the CLI's
+// `astro workflow gates` / `astro workflow gate`.
+export const usePendingHumanGates = (params?: {
+  orgId?: string | null;
+  limit?: number;
+  pollInterval?: number;
+  skip?: boolean;
+}) => {
+  const { data, loading, error, refetch } = useQuery<PendingHumanGatesData, PendingHumanGatesVars>(
+    LIST_PENDING_HUMAN_GATES,
+    {
+      variables: { orgId: params?.orgId ?? null, limit: params?.limit ?? 50 },
+      fetchPolicy: "cache-and-network",
+      pollInterval: params?.pollInterval ?? 0,
+      skip: params?.skip ?? false,
+    }
+  );
+  return { gates: data?.pendingHumanGates ?? [], loading, error, refetch };
 };
 
 // `pollInterval` is passed straight to Apollo, which treats it reactively: a

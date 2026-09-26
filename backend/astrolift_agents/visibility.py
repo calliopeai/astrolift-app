@@ -96,6 +96,19 @@ def agent_workloads(org_id, permission=Permission.AGENT_READ):
     return workload_rows(org_id, permission).filter(kind=Workload.Kind.AGENT)
 
 
+def dispatchable_agent_workloads(org_id):
+    """Agent workloads ``runAstroliftAgent`` would actually accept from the
+    caller (#2071): gated on ``agent.dispatch``, not the coarser
+    ``agent.read`` the plain agent list uses, through the same token
+    team/share ceiling every other org-scoped agent read applies, and
+    narrowed to the Task run family -- ``dispatch_registered_agent``
+    refuses a Service-family agent regardless of RBAC. A caller who can
+    read an agent but not dispatch it, or whose bearer token is scoped to
+    a team that does not hold the dispatch share, sees it absent here even
+    though ``agent_workloads`` still lists it."""
+    return agent_workloads(org_id, Permission.AGENT_DISPATCH).filter(run_family=Workload.RunFamily.TASK)
+
+
 def agent_by_slug(org_id, slug, permission):
     """Resolve one authorized workload; callers still validate its kind."""
     matches = list(

@@ -20,6 +20,7 @@ class OrganizationModule(BaseCoreModel):
     class Key(models.TextChoices):
         CHAT_STUDIO_INTEGRATION = "chat_studio_integration"
         AGENT_LIVE_ATTACH = "agent_live_attach"
+        CHAT_STUDIO_AGENT_RUNS = "chat_studio_agent_runs"
 
     organization = models.ForeignKey(
         "astrolift_identity.Organization",

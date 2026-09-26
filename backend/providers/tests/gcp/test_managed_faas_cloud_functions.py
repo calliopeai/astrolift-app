@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.faas_cloud_functions import (
@@ -252,24 +253,36 @@ def test_binding_exposes_portable_contract_and_scoped_roles(
     assert all(grant.resource == "projects/project-1" for grant in binding.iam_grants)
 
 
-def test_collision_requires_explicit_adoption_and_reassignment(
+def test_collision_is_refused_and_no_config_flag_adopts_or_reassigns(
     driver: CloudFunctionsDriver,
     client: FakeFunctions,
 ) -> None:
     name = "projects/project-1/locations/us-central1/functions/billing-webhook"
     client.resources[name] = {"name": name, "state": "ACTIVE", "labels": {"owner": "customer"}}
     denied = driver.provision(replace(SPEC, config=_full_config()))
-    assert not denied.ok and "adopt_existing" in denied.message
-    adopted_cfg = _full_config()
-    adopted_cfg["adopt_existing"] = True
-    assert driver.provision(replace(SPEC, config=adopted_cfg)).ok
-    assert client.resources[name]["labels"]["astrolift-io-adopted"] == "true"
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
 
+    # The flags are gone entirely: the schema tenant config is validated
+    # against rejects them, and a driver handed one anyway still refuses
+    # (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    for flag in ("adopt_existing", "reassign_existing"):
+        assert not validator.is_valid({**_full_config(), flag: True})
+    still_denied = driver.provision(replace(SPEC, config={**_full_config(), "adopt_existing": True}))
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == {"owner": "customer"}
+
+    del client.resources[name]
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+    owned_labels = dict(client.resources[name]["labels"])
     other = replace(SPEC, managed_service_id="other-id")
-    denied = driver.provision(replace(other, config=adopted_cfg))
-    assert not denied.ok and "another managed service" in denied.message
-    adopted_cfg["reassign_existing"] = True
-    assert driver.provision(replace(other, config=adopted_cfg)).ok
+    for cfg in (_full_config(), {**_full_config(), "reassign_existing": True}):
+        refused = driver.provision(replace(other, config=cfg))
+        assert not refused.ok
+        assert "another managed service" in refused.message
+    assert client.resources[name]["labels"] == owned_labels
 
 
 def test_deprovision_guards_adopted_and_protected_functions(

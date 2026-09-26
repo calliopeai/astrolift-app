@@ -60,6 +60,12 @@ _CONFIG_KEYS = {
     "metric_descriptors",
     "services",
 }
+#: A declaration's ``adopt`` flag used to let tenant config take over an
+#: existing resource under a tenant-chosen id. Rejected rather than ignored.
+_ADOPT_REMOVED = (
+    "adopt is not accepted: adoption of an existing resource is a separate, operator-authorized "
+    "operation and cannot be granted by tenant config"
+)
 
 
 class CloudOperationsError(Exception):
@@ -704,7 +710,6 @@ class CloudOperationsDriver(ManagedServiceDriver):
                         ],
                     },
                 },
-                "adopt": {"type": "boolean", "default": False},
             },
         }
         return {
@@ -731,7 +736,6 @@ class CloudOperationsDriver(ManagedServiceDriver):
                                 "locked": {"type": "boolean"},
                                 "analytics_enabled": {"type": "boolean"},
                                 "body": {"type": "object"},
-                                "adopt": {"type": "boolean", "default": False},
                             },
                         },
                     ],
@@ -1172,11 +1176,15 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 request_params=_request_params(resource, declaration),
             )
             return dict(created)
-        if not _is_owned(existing, bundle_id, resource_id) and not bool(
-            declaration.get("adopt", False),
-        ):
+        if not _is_owned(existing, bundle_id, resource_id):
+            # Declaration ids are tenant-chosen, so a deterministic name can
+            # land on an existing resource somebody else created in the same
+            # project. Adoption of an existing resource is a separate,
+            # operator-authorized operation (#1365) that no tenant config flag
+            # may grant (#2021).
             raise CloudOperationsError(
-                f"refusing to adopt existing {resource.key} {explicit_name!r}; set adopt=true explicitly",
+                f"refusing to adopt existing {resource.key} {explicit_name!r}; adoption is a separate, "
+                "operator-authorized operation and cannot be granted by tenant config",
             )
         if resource is _BUCKET and existing.get("locked"):
             changed = _changed_fields(existing, body)
@@ -1563,7 +1571,6 @@ def _bucket_declaration(
     return {
         "id": str(raw.get("id") or _resource_id(bundle_id, "logs")),
         "body": body,
-        "adopt": bool(raw.get("adopt", False)),
     }
 
 
@@ -1824,6 +1831,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
     if not isinstance(bucket, (bool, Mapping)):
         return "config.log_bucket must be a boolean or object"
     if isinstance(bucket, Mapping):
+        if "adopt" in bucket:
+            return f"config.log_bucket: {_ADOPT_REMOVED}"
         body = bucket.get("body") or {}
         if not isinstance(body, Mapping):
             return "config.log_bucket.body must be an object"
@@ -1852,6 +1861,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                 return f"config.{key}[{index}] must be an object"
             if any(str(field).startswith("_") for field in item):
                 return f"config.{key}[{index}] contains a reserved internal field"
+            if "adopt" in item:
+                return f"config.{key}[{index}]: {_ADOPT_REMOVED}"
             resource_id = str(item.get("id") or "")
             if not _valid_id(resource_id):
                 return f"config.{key}[{index}].id must match ^[a-z][a-z0-9-]{{0,62}}$"
@@ -1966,6 +1977,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                         return f"config.{key}[{index}].service_level_objectives[{child_index}] requires a valid id"
                     if str(child["id"]) in nested_ids:
                         return f"service {resource_id!r} contains duplicate SLO id {child['id']!r}"
+                    if "adopt" in child:
+                        return f"service {resource_id!r} SLO {child['id']!r}: {_ADOPT_REMOVED}"
                     nested_ids.add(str(child["id"]))
                     if not isinstance(child.get("body"), Mapping):
                         return f"service {resource_id!r} SLO {child['id']!r} body must be an object"

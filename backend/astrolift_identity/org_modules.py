@@ -19,12 +19,14 @@ from astrolift_identity.models import OrganizationModule
 
 CHAT_STUDIO_INTEGRATION = str(OrganizationModule.Key.CHAT_STUDIO_INTEGRATION)
 AGENT_LIVE_ATTACH = str(OrganizationModule.Key.AGENT_LIVE_ATTACH)
+CHAT_STUDIO_AGENT_RUNS = str(OrganizationModule.Key.CHAT_STUDIO_AGENT_RUNS)
 
 # Module key -> the Constance switch the install admin turns off to force
 # the module off for every organization.
 INSTALL_SWITCHES: dict[str, str] = {
     CHAT_STUDIO_INTEGRATION: "CHAT_STUDIO_INTEGRATION_ALLOWED",
     AGENT_LIVE_ATTACH: "AGENT_LIVE_ATTACH_ALLOWED",
+    CHAT_STUDIO_AGENT_RUNS: "CHAT_STUDIO_AGENT_RUNS_ALLOWED",
 }
 
 # Why a module is off. Distinct because the fix differs: an org admin can

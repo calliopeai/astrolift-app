@@ -540,7 +540,6 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
                     "default": "Enabled",
                 },
                 "object_lock": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
                 "anonymous_read": {"type": "boolean", "default": False},
                 "quota_size": {
                     "type": "string",
@@ -703,7 +702,12 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
             "name": bucket_name,
             "clusterRef": seaweed_ref,
             "reclaimPolicy": reclaim_policy,
-            "adoptExisting": bucket_config["adopt_existing"],
+            # bucket_name is tenant-settable and the Seaweed cluster is shared,
+            # so an existing bucket of that name may be anyone's; letting the
+            # operator adopt it would bind it to this tenant's S3 identity.
+            # Adoption is operator-only (#1365); no tenant config grants it
+            # (#2021).
+            "adoptExisting": False,
             "owner": names["S3Identity"],
             **self._bucket_spec_fields(bucket_config),
         }
@@ -803,7 +807,6 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
             "prefix",
             "versioning",
             "object_lock",
-            "adopt_existing",
             "anonymous_read",
             "quota_size",
             "quota_enforce",
@@ -856,7 +859,6 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
             "prefix": str(config.get("prefix", "")).strip("/"),
             "versioning": versioning,
             "object_lock": object_lock,
-            "adopt_existing": bool(config.get("adopt_existing", False)),
             "anonymous_read": bool(config.get("anonymous_read", False)),
             "quota_size": quota_size,
             "quota_enforce": bool(config.get("quota_enforce", True)),

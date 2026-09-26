@@ -2,7 +2,7 @@
 
 Currently exposes the CLI / mobile device-flow surface (#475), the SCIM
 2.0 provisioning surface (#78, #91) and the SSO step-up re-auth flow
-(#526). The REST endpoints (``/api/cli/v1/auth/{start,complete,refresh}``
+(#526). The REST endpoints (``/api/cli/v1/auth/{start,complete,refresh,signout}``
 and ``/api/scim/v2/*``) are mounted at the project root by
 ``config.urls``; the in-browser approval page and the SSO step-up
 endpoints live under the auth1-protected ``/app/`` prefix.
@@ -39,6 +39,11 @@ api_urlpatterns = [
         "api/cli/v1/auth/refresh",
         ratelimit(key="ip", rate="60/m", block=True)(device_flow_views.device_flow_refresh),
         name="device-flow-refresh",
+    ),
+    path(
+        "api/cli/v1/auth/signout",
+        ratelimit(key="ip", rate="60/m", block=True)(device_flow_views.device_flow_signout),
+        name="device-flow-signout",
     ),
 ]
 

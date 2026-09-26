@@ -77,8 +77,6 @@ _CONFIG_FIELDS = {
     "labels",
     "annotations",
     "deletion_protection",
-    "adopt_existing",
-    "expected_existing_uid",
 }
 _RESERVED_LABELS = {_OWNER, _OWNER_ID, _VISIBILITY, _KNATIVE_VISIBILITY}
 _RESERVED_ANNOTATIONS = {
@@ -180,7 +178,6 @@ class KServeDriver(ManagedServiceDriver):
                 namespace=namespace,
                 name=name,
                 managed_service_id=spec.managed_service_id,
-                cfg=cfg,
             )
             service_accounts = self._validate_service_accounts(
                 cluster_id=spec.tenant_cluster_id,
@@ -461,8 +458,6 @@ class KServeDriver(ManagedServiceDriver):
                 "labels": scalar_map,
                 "annotations": scalar_map,
                 "deletion_protection": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
             },
         }
 
@@ -485,7 +480,7 @@ class KServeDriver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        return sorted(_CONFIG_FIELDS - {"adopt_existing", "expected_existing_uid"})
+        return sorted(_CONFIG_FIELDS)
 
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         cfg = copy.deepcopy(raw or {})
@@ -508,12 +503,9 @@ class KServeDriver(ManagedServiceDriver):
             "enable_prometheus_scraping",
             "use_local_model_cache",
             "deletion_protection",
-            "adopt_existing",
         ):
             if field in cfg and not isinstance(cfg[field], bool):
                 raise ValueError(f"KServe {field} must be a boolean")
-        if "expected_existing_uid" in cfg and not isinstance(cfg["expected_existing_uid"], str):
-            raise ValueError("KServe expected_existing_uid must be a string")
         inference_spec = cfg.get("inference_spec")
         if not isinstance(inference_spec, dict) or not inference_spec:
             raise ValueError("KServe requires a non-empty inference_spec object")
@@ -943,7 +935,6 @@ class KServeDriver(ManagedServiceDriver):
         namespace: str,
         name: str,
         managed_service_id: str,
-        cfg: dict[str, Any],
     ) -> None:
         current = self._config.cluster_driver.get_manifest(
             cluster_id,
@@ -960,10 +951,14 @@ class KServeDriver(ManagedServiceDriver):
             return
         if labels.get(_OWNER) == "astrolift" and owner:
             raise ValueError("KServe InferenceService belongs to another Astrolift resource")
-        if not cfg.get("adopt_existing") or str(cfg.get("expected_existing_uid") or "") != str(
-            metadata.get("uid") or "",
-        ):
-            raise ValueError("adopting a KServe InferenceService requires its exact expected_existing_uid")
+        # An object's uid is a precondition, not an authorization: in an
+        # operator-fixed shared namespace the object may be anyone's. Adoption
+        # of an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
+        raise ValueError(
+            "KServe InferenceService already exists and is not owned by this managed service; adoption is "
+            "a separate, operator-authorized operation and cannot be granted by tenant config",
+        )
 
     @staticmethod
     def _validate_metadata(labels: Any, annotations: Any) -> None:

@@ -293,7 +293,6 @@ class FilestoreDriver(ManagedServiceDriver):
             else:
                 self._assert_adoptable(
                     current,
-                    cfg,
                     managed_service_id=spec.managed_service_id,
                 )
                 self._assert_immutable_matches(current, cfg)
@@ -309,7 +308,6 @@ class FilestoreDriver(ManagedServiceDriver):
                 current = self._filestore.get_instance(name)
                 self._assert_adoptable(
                     current,
-                    cfg,
                     managed_service_id=spec.managed_service_id,
                 )
                 self._assert_immutable_matches(current, cfg)
@@ -753,8 +751,6 @@ class FilestoreDriver(ManagedServiceDriver):
             "type": "object",
             "properties": {
                 "instance_id": {"type": "string", "minLength": 1, "maxLength": 63},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "location": {"type": "string"},
                 "tier": {"type": "string", "enum": sorted(_TIERS)},
@@ -1049,8 +1045,6 @@ class FilestoreDriver(ManagedServiceDriver):
         desired_labels = dict(labels)
         if claim_labels is not None:
             desired_labels.update(claim_labels)
-            if cfg.get("adopt_existing") and labels.get("astrolift-io-managed-by") != "platform":
-                desired_labels["astrolift-io-adopted"] = "true"
         if "labels" in cfg:
             desired_labels.update(
                 {_label_key(str(key)): _label_value(str(value)) for key, value in cfg["labels"].items()},
@@ -1119,28 +1113,23 @@ class FilestoreDriver(ManagedServiceDriver):
     def _assert_adoptable(
         self,
         current: dict[str, Any],
-        cfg: dict[str, Any],
         *,
         managed_service_id: str,
     ) -> None:
+        # instance_id is tenant-settable, so an existing instance is either
+        # this service's or refused: neither one Astrolift never provisioned
+        # nor another managed service's may be claimed from here. Adoption of
+        # an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
         labels = dict(current.get("labels") or {})
-        if labels.get("astrolift-io-managed-by") == "platform":
-            current_service_id = str(labels.get("astrolift-io-managed-service-id") or "")
-            if (
-                current_service_id
-                and managed_service_id
-                and current_service_id != managed_service_id
-                and not cfg.get("reassign_existing")
-            ):
-                raise FilestoreError(
-                    "Filestore instance belongs to another Astrolift managed service; "
-                    "set reassign_existing=true to transfer ownership",
-                )
-            return
-        if not cfg.get("adopt_existing"):
+        if labels.get("astrolift-io-managed-by") != "platform":
             raise FilestoreError(
-                "existing Filestore instance is not Astrolift-owned; set adopt_existing=true to claim it",
+                "existing Filestore instance is not Astrolift-owned; adoption is a separate, "
+                "operator-authorized operation and cannot be granted by tenant config",
             )
+        current_service_id = str(labels.get("astrolift-io-managed-service-id") or "")
+        if current_service_id and managed_service_id and current_service_id != managed_service_id:
+            raise FilestoreError("Filestore instance belongs to another Astrolift managed service")
 
     def _assert_managed(self, current: dict[str, Any]) -> None:
         labels = dict(current.get("labels") or {})

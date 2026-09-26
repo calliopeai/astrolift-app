@@ -354,7 +354,7 @@ def test_explicit_external_address_is_validated_and_retained(
     assert ("us-central1", "shared-psc-ip") in fake.addresses
 
 
-def test_adoption_is_explicit_marked_and_protected_on_delete(
+def test_unowned_address_and_endpoint_are_refused_without_operator_adoption(
     driver: PrivateServiceConnectDriver,
     fake: FakeCompute,
 ) -> None:
@@ -362,29 +362,52 @@ def test_adoption_is_explicit_marked_and_protected_on_delete(
     assert driver.provision(request).ok
     address = fake.addresses[("us-central1", "payments-psc-ip")]
     endpoint = fake.forwarding[("us-central1", "payments-psc")]
+    owned_address_labels = dict(address["labels"])
     address["labels"] = {"owner": "network"}
     endpoint["labels"] = {"owner": "network"}
+    updates = len(fake.label_updates)
 
     denied = driver.provision(request)
-    adopted_request = service_spec(adopt_existing=True)
-    adopted = driver.provision(adopted_request)
-    assert not denied.ok and "not owned" in denied.message
-    assert adopted.ok
-    assert fake.addresses[("us-central1", "payments-psc-ip")]["labels"]["astrolift-adopted"] == "true"
-    assert fake.forwarding[("us-central1", "payments-psc")]["labels"]["astrolift-adopted"] == "true"
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+
+    # The flag is gone entirely, not just ignored: adoption is operator-only
+    # and no tenant config reopens it (#2021).
+    rejected = driver.provision(service_spec(adopt_existing=True))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+
+    address["labels"] = owned_address_labels
+    endpoint_denied = driver.provision(request)
+    assert not endpoint_denied.ok
+    assert "forwarding rule" in endpoint_denied.message
+    assert "operator-authorized" in endpoint_denied.message
+    assert endpoint["labels"] == {"owner": "network"}
+    assert len(fake.label_updates) == updates
+
+
+def test_resources_adopted_before_2074_stay_protected_on_delete(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    request = service_spec()
+    result = driver.provision(request)
+    assert result.ok
+    fake.addresses[("us-central1", "payments-psc-ip")]["labels"] = ownership("payments-psc", adopted=True)
+    fake.forwarding[("us-central1", "payments-psc")]["labels"] = ownership("payments-psc", adopted=True)
 
     blocked = driver.deprovision(
         DeprovisionSpec(
-            adopted.handle,
-            {**adopted_request.config, "deletion_protection": False},
+            result.handle,
+            {**request.config, "deletion_protection": False},
         ),
     )
     assert not blocked.ok and "delete_adopted_resources" in blocked.message
     accepted = driver.deprovision(
         DeprovisionSpec(
-            adopted.handle,
+            result.handle,
             {
-                **adopted_request.config,
+                **request.config,
                 "deletion_protection": False,
                 "delete_adopted_resources": True,
             },

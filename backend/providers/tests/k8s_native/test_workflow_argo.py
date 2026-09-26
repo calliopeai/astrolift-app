@@ -748,51 +748,46 @@ def test_child_resource_names_are_scoped_to_their_template() -> None:
     }
 
 
-def test_existing_template_requires_exact_uid_adoption() -> None:
+def test_existing_template_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
-    cluster.objects[
-        (
-            f"{API_VERSION}/WorkflowTemplate",
-            "steady-md-triage",
-            "triage-prod-pipeline",
-        )
-    ] = {
+    foreign = {
         "metadata": {
             "uid": "uid-1",
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
+    key = (f"{API_VERSION}/WorkflowTemplate", "steady-md-triage", "triage-prod-pipeline")
+    cluster.objects[key] = foreign
 
     refused = driver.provision(_spec())
-    wrong = driver.provision(
-        _spec(adopt_existing=True, expected_existing_uid="wrong"),
-    )
-    adopted = driver.provision(
-        _spec(adopt_existing=True, expected_existing_uid="uid-1"),
-    )
-
     assert refused.ok is False
-    assert wrong.ok is False
-    assert adopted.ok is True
+    assert "operator-authorized" in refused.message
+
+    # Knowing the uid proved only that the caller could see the object.
+    # Adoption is operator-only (#2021); the flags are rejected, not ignored.
+    flagged = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
+    assert flagged.ok is False
+    assert "unsupported Argo config fields" in flagged.message
+    assert cluster.objects[key] is foreign
+    assert cluster.applied == []
 
 
-def test_existing_child_requires_exact_uid_adoption() -> None:
+def test_existing_child_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
-    cluster.objects[
-        (
-            f"{API_VERSION}/CronWorkflow",
-            "steady-md-triage",
-            "triage-prod-pipeline-hourly",
-        )
-    ] = {
+    foreign = {
         "metadata": {
             "uid": "cron-uid",
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
+    key = (f"{API_VERSION}/CronWorkflow", "steady-md-triage", "triage-prod-pipeline-hourly")
+    cluster.objects[key] = foreign
 
     refused = driver.provision(_spec(cron_workflows=[_cron()]))
-    adopted = driver.provision(
+    assert refused.ok is False
+    assert "operator-authorized" in refused.message
+
+    flagged = driver.provision(
         _spec(
             cron_workflows=[
                 {
@@ -803,9 +798,10 @@ def test_existing_child_requires_exact_uid_adoption() -> None:
             ],
         ),
     )
-
-    assert refused.ok is False
-    assert adopted.ok is True
+    assert flagged.ok is False
+    assert "unsupported CronWorkflow fields" in flagged.message
+    assert cluster.objects[key] is foreign
+    assert cluster.applied == []
 
 
 def test_update_prunes_removed_owned_children() -> None:
