@@ -32,8 +32,8 @@ domain a request names resolves among the org's own rows or shared
 A dev environment also carries a creator and a team (#1919). Create
 resolves the team from an explicit ``team_slug`` or, failing that, the
 caller's own single team, and checks ``app.create`` there. Sync and
-promote check ``app.create`` on that same team — resolved from the row,
-never from the caller's token — and additionally require the caller to
+promote check ``app.create`` on that same team, resolved from the row and
+never from the caller's token, and additionally require the caller to
 be the row's creator or to hold a team-admin-level permission on that
 team, so a co-worker who can create dev environments in a team cannot
 take over another member's running one. A row with no resolvable team
@@ -191,7 +191,7 @@ def _resolve_create_team(request: HttpRequest, org, body):
     An explicit ``team_slug`` always wins, 404ing like every other org-
     scoped lookup here when it doesn't name a live team of this org. Absent
     one, the caller's own ``TEAM``-scope RoleBindings must narrow to exactly
-    one team in this org — an org-wide role (org owner/admin) or two-plus
+    one team in this org. An org-wide role (org owner/admin) or two-plus
     teams cannot guess which team should own the row, so both require an
     explicit slug instead.
     """
@@ -746,7 +746,7 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     # The team (and creator-or-team-admin) check is scoped to the dev
     # environment's own team, never the destination team just resolved
     # above (#1919): otherwise any caller who can create in *some* team
-    # could name it as the destination and promote — and so exfiltrate —
+    # could name it as the destination and promote (and so exfiltrate)
     # a dev environment they neither created nor administer.
     if dev.team_id is not None:
         err = _authorize(token, org, (Permission.APP_CREATE,), team=dev.team)

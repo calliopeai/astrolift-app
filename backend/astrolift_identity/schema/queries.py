@@ -177,7 +177,7 @@ class MeType:
         # or the ORG scope (#1919): a dev environment always resolves to one
         # of those, never a bare project/app grant. chat_studio_integration's
         # ``canCreate`` has to ask that same, narrower question rather than
-        # the flat "anywhere" set ``perms`` holds — otherwise a project- or
+        # the flat "anywhere" set ``perms`` holds; otherwise a project- or
         # app-scoped ``app.create`` holder sees Chat Studio's Ship light up
         # and then gets a 403 on every create.
         create_scopes = granted_scopes(tenant, Permission.APP_CREATE)

@@ -1,7 +1,7 @@
 """A dev environment belongs to its creator and a team (#1919).
 
 Before this, sync and promote checked only that *some* ``app.create``
-holder in the org was asking — the guid is in the preview hostname, so
+holder in the org was asking: the guid is in the preview hostname, so
 any co-worker who could create a dev environment anywhere could take
 over another member's running one. This module pins the fix's actual
 authorization matrix, built on ``ScopeWorld`` so the team-scope shape
@@ -15,7 +15,7 @@ matches every other sub-org permission test in the suite:
 * the same admin-tier grant on a *different* team cannot.
 * an org-scope holder can, same as everywhere else in the RBAC chain.
 * a row with no resolvable team (backfilled null, #1919's own migration)
-  is org-admin-only — not even its own creator passes without one.
+  is org-admin-only; not even its own creator passes without one.
 """
 
 from __future__ import annotations
