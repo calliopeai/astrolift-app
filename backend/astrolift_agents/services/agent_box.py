@@ -250,7 +250,9 @@ def render_agent_box_job(
             },
         },
     }
-    harden_agent_pod(job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)))
+    harden_agent_pod(
+        job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)), spec=spec
+    )
     return job
 
 

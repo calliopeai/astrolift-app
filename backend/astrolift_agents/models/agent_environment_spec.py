@@ -58,6 +58,11 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # with a per-run agent key; no provider key reaches the pod (#1851).
     # Excludes ``managed_model``: the gateway does not proxy Bedrock or Vertex.
     model_gateway = models.BooleanField(default=False)
+    # GPUs for task and box pods (#2039), with the same meaning as a
+    # manifest workload's: whole GPUs, or MIG slices when mig_profile is set.
+    gpu = models.PositiveSmallIntegerField(default=0)
+    gpu_type = models.CharField(max_length=63, blank=True, default="")
+    mig_profile = models.CharField(max_length=32, blank=True, default="")
     # Secret URIs only — values resolved by the dispatcher at launch time.
     # Never store values.  Format:
     #   [{"uri": "arn:aws:secretsmanager:...", "env_var": "GITHUB_TOKEN"}]
