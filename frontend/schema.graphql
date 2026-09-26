@@ -255,6 +255,9 @@ type AstroliftAgentEnvironmentSpec {
   runAsNonRoot: Boolean!
   boxWorkspace: Boolean!
   modelGateway: Boolean!
+  gpu: Int!
+  gpuType: String!
+  migProfile: String!
   secretRefs: JSON!
   envVars: JSON!
   configRepo: String!
@@ -4634,6 +4637,9 @@ input CreateAgentEnvironmentSpecInput {
   runAsNonRoot: Boolean! = false
   boxWorkspace: Boolean! = false
   modelGateway: Boolean! = false
+  gpu: Int! = 0
+  gpuType: String! = ""
+  migProfile: String! = ""
   configRepo: String! = ""
   configBranch: String! = "main"
   configManifestPath: String! = ""
@@ -7017,6 +7023,9 @@ input UpdateAgentEnvironmentSpecInput {
   runAsNonRoot: Boolean = null
   boxWorkspace: Boolean = null
   modelGateway: Boolean = null
+  gpu: Int = null
+  gpuType: String = null
+  migProfile: String = null
   configRepo: String = null
   configBranch: String = null
   configManifestPath: String = null
