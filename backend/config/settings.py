@@ -146,6 +146,7 @@ CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
 CONSTANCE_ADDITIONAL_FIELDS = {
     # uid/gid 0 is root, which runAsNonRoot refuses.
     "posix_id": ["django.forms.IntegerField", {"min_value": 1, "max_value": 2147483647}],
+    "vllm_frontend": ["django.forms.ChoiceField", {"choices": (("rust", "Rust"), ("python", "Python"))}],
 }
 CONSTANCE_DATABASE_CACHE_BACKEND = "default"
 
@@ -490,6 +491,14 @@ CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("
 CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
 
 CONSTANCE_CONFIG = {
+    "VLLM_FRONTEND_DEFAULT": (
+        "rust",
+        "Install-wide vLLM API frontend for self-hosted models (#2040): rust (faster, not yet "
+        "every API) or python. A cluster (provider_config.vllm_frontend), a model default or the "
+        "service itself can override it; a service needing an API the Rust frontend lacks is "
+        "refused on rust, never switched.",
+        "vllm_frontend",
+    ),
     "AGENT_POD_UID": (
         42042,
         "uid non-root agent pods run as. Must be the agent user baked into the agent "
@@ -795,6 +804,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Source repositories": {"fields": ("RESTRICT_SOURCE_REPOS_TO_ORG",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
+    "Model hosting": {"fields": ("VLLM_FRONTEND_DEFAULT",), "collapse": False},
     "Zentinelle": {
         "fields": ("ZENTINELLE_ENABLED", "ZENTINELLE_GATEWAY_ENABLED", "ZENTINELLE_GATEWAY_IMAGE"),
         "collapse": False,

@@ -310,7 +310,8 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
 # relative to the union emitted across that kind.
 # https://github.com/calliopeai/astrolift-app/issues/1402
 _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
-    ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
+    ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
     # Only MASTER_SECRET_REF: the Aurora drivers do emit the rest of the
     # postgres envelope, on the ``self._kind == "postgres"`` branch that the
     # extractor now resolves per subclass.
@@ -349,7 +350,8 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
             "GRAPH_DB_URL",
         }
     ),
-    ("azure", "model_endpoint", "azure_openai"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
+    ("azure", "model_endpoint", "azure_openai"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
     ("azure", "object_store", "azure_blob"): frozenset(
         {"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}
     ),
@@ -391,7 +393,10 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     # driver's binding() readable.
     ("gcp", "event_stream", "managed_kafka"): frozenset({"EVENT_STREAM_PASSWORD", "EVENT_STREAM_USERNAME"}),
     ("gcp", "graph_db", "spanner_graph"): frozenset({"GRAPH_DB_PORT", "GRAPH_DB_READER_URL"}),
-    ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    # IAM-authenticated: no API key to hand the workload (vLLM, #2040, has one).
+    ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_API_KEY", "MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
+    # KServe serves in-cluster without an API key; vLLM (#2040) requires one.
+    ("k8s_native", "model_endpoint", "kserve"): frozenset({"MODEL_API_KEY"}),
     ("gcp", "object_store", "gcs"): frozenset({"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}),
     ("gcp", "queue", "pubsub"): frozenset({"QUEUE_ARN_OR_ID", "QUEUE_NAME", "QUEUE_REGION", "QUEUE_URL"}),
     ("gcp", "vector_index", "vertex_matching_engine"): frozenset(
