@@ -283,6 +283,51 @@ def test_no_agent_test_config_means_no_extra_ingress():
     assert len(policy["spec"]["ingress"]) == 1
 
 
+def test_agent_test_grants_a_namespaced_role_scoped_to_this_services_own_secret():
+    """The Secret-read grant must be a namespaced Role restricted by
+    resourceNames to this one service's Secret -- never a cluster-wide
+    grant (#2064 security review)."""
+    driver, cluster, _ = _driver(agent_test={"namespace": "astrolift-system"})
+    handle = driver.provision(_spec()).handle
+    role = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/Role"))
+    assert role["metadata"]["namespace"] == "acme-chat"
+    assert role["rules"] == [
+        {
+            "apiGroups": [""],
+            "resources": ["secrets"],
+            "resourceNames": ["chat-prod-llm-vllm"],
+            "verbs": ["get"],
+        }
+    ]
+    binding = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/RoleBinding"))
+    assert binding["metadata"]["namespace"] == "acme-chat"
+    assert binding["roleRef"] == {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": role["metadata"]["name"],
+    }
+    assert binding["subjects"] == [
+        {"kind": "ServiceAccount", "name": "astrolift-agent", "namespace": "astrolift-system"}
+    ]
+
+    assert driver.deprovision(DeprovisionSpec(handle)).ok
+    assert f"Role/{role['metadata']['name']}" in cluster.deleted
+    assert f"RoleBinding/{binding['metadata']['name']}" in cluster.deleted
+
+
+def test_agent_test_service_account_is_configurable():
+    driver, cluster, _ = _driver(agent_test={"namespace": "astrolift-system", "service_account": "custom-sa"})
+    driver.provision(_spec())
+    binding = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/RoleBinding"))
+    assert binding["subjects"][0]["name"] == "custom-sa"
+
+
+def test_no_agent_test_config_means_no_role_or_rolebinding():
+    driver, cluster, _ = _driver()
+    driver.provision(_spec())
+    assert not any(kind.endswith("/Role") or kind.endswith("/RoleBinding") for (kind, _, _) in cluster.objects)
+
+
 def test_resolve_agent_test_target_matches_the_driver_naming():
     """Pure derivation the control plane uses for ``testModelEndpoint`` must
     agree byte-for-byte with what ``provision`` actually names -- otherwise

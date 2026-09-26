@@ -21,7 +21,9 @@ A test job rides that existing channel:
 3. The agent runs the bounded chat completion in-cluster -- reading the
    model's API key straight off its Kubernetes Secret, never through the
    control plane -- and POSTs the outcome to the model-test-result view,
-   which calls ``record_result()``.
+   which calls ``record_result()``. The agent derives that view's URL from
+   its own configured heartbeat endpoint, never from the job: nothing here
+   carries a callback URL for the agent to trust.
 
 Cache-backed, not a model: a test prompt and its reply are ephemeral
 diagnostic content an operator typed to check a model is alive, not a
@@ -113,7 +115,6 @@ def enqueue(
     prompt: str,
     model: str,
     base_url: str,
-    result_url: str,
     secret_namespace: str,
     secret_name: str,
     secret_key: str,
@@ -124,6 +125,13 @@ def enqueue(
     Raises :class:`AgentTestConflict` when a job for this cluster is
     already pending or dispatched -- one cluster runs one agent pod, so
     only one chat completion is ever in flight for it at a time.
+
+    No ``result_url`` here on purpose: the agent derives where to report
+    back from its own configured heartbeat endpoint, never from anything
+    this job carries -- a compromised or buggy control plane naming an
+    arbitrary URL here would otherwise be a way to exfiltrate the
+    cluster's agent key (the result POST is Bearer-authenticated with
+    it).
     """
     current_key = _CURRENT_KEY.format(cluster_guid=cluster_guid)
     if cache.get(current_key):
@@ -141,7 +149,6 @@ def enqueue(
         "max_tokens": MAX_TOKENS,
         "model": model,
         "base_url": base_url,
-        "result_url": result_url,
         "secret_namespace": secret_namespace,
         "secret_name": secret_name,
         "secret_key": secret_key,

@@ -35,9 +35,14 @@ Response 200:
         "job_id": "...", "base_url": "http://svc.ns.svc.cluster.local:8000/v1",
         "model": "...", "prompt": "...", "max_tokens": 128,
         "timeout_seconds": 20, "secret_namespace": "...",
-        "secret_name": "...", "secret_key": "api_key",
-        "result_url": "https://.../model-test-result/"
+        "secret_name": "...", "secret_key": "api_key"
     }}
+    Deliberately no result-callback URL here: the agent derives where to
+    report the outcome from its own configured heartbeat endpoint, never
+    from anything this response carries -- a compromised or buggy
+    response naming an arbitrary URL would otherwise be a way to steer
+    the agent's Bearer-authenticated result POST (and so its agent key)
+    anywhere.
 Response 401: missing / invalid agent key, or key not bound to the
     cluster in the URL.
 Response 400: malformed JSON.
@@ -176,7 +181,6 @@ def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
             "secret_namespace": job["secret_namespace"],
             "secret_name": job["secret_name"],
             "secret_key": job["secret_key"],
-            "result_url": job["result_url"],
         }
     return JsonResponse(response)
 

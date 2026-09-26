@@ -293,13 +293,14 @@ def test_deploy_persists_apply_errors(cluster, org, permission_resolver, monkeyp
 # ---- build_agent_manifests: secrets RBAC for the test-prompt relay (#2064) --
 
 
-def test_agent_manifests_grant_get_only_on_secrets(cluster):
-    """The agent needs to fetch one named Secret in-cluster to relay a
-    ``testModelEndpoint`` prompt (#2064), never to enumerate a namespace's
-    secrets -- ``list``/``watch`` must stay off this rule."""
+def test_agent_cluster_role_has_no_cluster_wide_secrets_access(cluster):
+    """The agent's per-model Secret read for the ``testModelEndpoint``
+    relay (#2064) must NOT be a cluster-wide grant -- that would let the
+    agent (and so a compromised control plane naming an arbitrary Secret)
+    read any Secret in any tenant namespace. The narrow grant is a
+    namespaced Role + RoleBinding the vLLM driver renders per service,
+    restricted by ``resourceNames`` to that one Secret -- see
+    ``test_model_endpoint_vllm.py`` in providers."""
     manifests = cluster_management.build_agent_manifests(cluster)
     role = next(m for m in manifests if m["kind"] == "ClusterRole")
-    secrets_rules = [r for r in role["rules"] if r["resources"] == ["secrets"]]
-    assert len(secrets_rules) == 1
-    assert secrets_rules[0]["apiGroups"] == [""]
-    assert secrets_rules[0]["verbs"] == ["get"]
+    assert not any(r["resources"] == ["secrets"] for r in role["rules"])

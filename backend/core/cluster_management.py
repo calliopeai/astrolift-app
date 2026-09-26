@@ -462,18 +462,16 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                     "resources": ["ingresses"],
                     "verbs": ["get", "list"],
                 },
-                # `get`, never `list` or `watch` (#2064): the agent reads a
-                # Secret only when the control plane names it explicitly in a
-                # dispatched test-prompt job, to run one bounded chat
-                # completion against a hosted model and read the model's own
-                # API key -- never the control plane's copy. `get`-only means
-                # the agent cannot enumerate a namespace's Secret names on
-                # its own; it can only fetch a name it was already handed.
-                {
-                    "apiGroups": [""],
-                    "resources": ["secrets"],
-                    "verbs": ["get"],
-                },
+                # Deliberately NO cluster-wide grant on secrets (#2064
+                # security review). The agent's test-prompt relay needs to
+                # read exactly one Secret per hosted model -- that grant is
+                # a namespaced Role + RoleBinding the vLLM driver renders
+                # alongside the service itself, restricted by
+                # `resourceNames` to that one Secret (see
+                # `k8s_native.managed.model_endpoint_vllm._agent_test_rbac`).
+                # A cluster-wide `get` on secrets would have let the agent
+                # (and so a compromised control plane naming an arbitrary
+                # Secret) read any Secret in any tenant namespace.
             ],
         },
         {
