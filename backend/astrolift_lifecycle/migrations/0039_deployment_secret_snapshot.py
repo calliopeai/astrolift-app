@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_lifecycle", "0037_devenvironment_data_file"),
+        ("astrolift_lifecycle", "0038_backfill_devenvironment_team"),
     ]
 
     operations = [
