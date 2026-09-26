@@ -359,17 +359,60 @@ def test_autoscaling_instance_shape(driver: SpannerGraphDriver, client: FakeSpan
     }
 
 
-def test_existing_unowned_instance_requires_adoption(driver: SpannerGraphDriver, client: FakeSpannerClient) -> None:
+def test_existing_unowned_instance_is_refused_without_operator_adoption(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
     created = driver.provision(_spec())
     instance_id, _ = _parse_handle(created.handle)
-    client.instances[f"projects/acme/instances/{instance_id}"]["labels"] = {}
+    name = f"projects/acme/instances/{instance_id}"
+    client.instances[name]["labels"] = {}
     denied = driver.provision(_spec())
-    adopted = driver.provision(_spec(config={"adopt_existing_instance": True}))
-    assert not denied.ok and "adopt_existing_instance" in denied.message
-    assert adopted.ok
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    refused_update = driver.update(UpdateSpec(created.handle, config={}))
+    assert not refused_update.ok
+    assert "operator-authorized" in refused_update.message
+
+    # The flag is gone entirely, not just ignored: adoption is operator-only
+    # and no tenant config reopens it (#2021).
+    rejected = driver.provision(_spec(config={"adopt_existing_instance": True}))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert client.instances[name]["labels"] == {}
 
 
-def test_existing_unmarked_database_requires_explicit_adoption(
+def test_unlabeled_operator_shared_instance_needs_the_operator_marker(client: FakeSpannerClient) -> None:
+    """An operator naming a pre-existing shared instance adopts it by labeling it, not by a switch."""
+    name = "projects/acme/instances/shared-graph"
+    client.instances[name] = {
+        "name": name,
+        "config": "projects/acme/instanceConfigs/regional-us-central1",
+        "edition": "ENTERPRISE",
+        "state": "READY",
+        "labels": {},
+    }
+    driver = SpannerGraphDriver(
+        config=SpannerGraphConfig(
+            project_id="acme",
+            region="us-central1",
+            shared_instance_id="shared-graph",
+            poll_interval_seconds=0,
+        ),
+        client=client,
+        sleep=lambda _: None,
+    )
+
+    denied = driver.provision(_spec())
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert not client.databases
+
+    client.instances[name]["labels"] = {"astrolift-managed-by": "platform"}
+    assert driver.provision(_spec()).ok
+
+
+def test_existing_unmarked_database_is_refused_without_operator_adoption(
     driver: SpannerGraphDriver,
     client: FakeSpannerClient,
 ) -> None:
@@ -378,10 +421,16 @@ def test_existing_unmarked_database_requires_explicit_adoption(
     database_name = f"projects/acme/instances/{instance_id}/databases/{database_id}"
     client.ddl[database_name] = [row for row in client.ddl[database_name] if "AstroliftGraphMetadata" not in row]
     denied = driver.provision(_spec())
-    adopted = driver.provision(_spec(config={"adopt_existing_database": True}))
-    assert not denied.ok and "adopt_existing_database" in denied.message
-    assert adopted.ok
-    assert any("CREATE TABLE AstroliftGraphMetadata" in row for row in client.ddl[database_name])
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    refused_update = driver.update(UpdateSpec(created.handle, config={}))
+    assert not refused_update.ok
+    assert "operator-authorized" in refused_update.message
+
+    rejected = driver.provision(_spec(config={"adopt_existing_database": True}))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert not any("AstroliftGraphMetadata" in row for row in client.ddl[database_name])
 
 
 def test_update_schema_is_replay_safe(driver: SpannerGraphDriver, client: FakeSpannerClient) -> None:

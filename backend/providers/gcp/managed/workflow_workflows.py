@@ -617,8 +617,6 @@ class WorkflowsDriver(ManagedServiceDriver):
                     "default": "invoke",
                 },
                 "deletion_protection": {"type": "boolean", "default": True},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "allow_reassignment": {"type": "boolean", "default": False},
                 "delete_adopted_workflow": {"type": "boolean", "default": False},
                 "allow_cross_project_snapshot": {"type": "boolean", "default": False},
                 "allow_unowned_snapshot": {"type": "boolean", "default": False},
@@ -735,26 +733,24 @@ class WorkflowsDriver(ManagedServiceDriver):
     ) -> dict[str, str]:
         actual = dict(current.get("labels") or {})
         desired = _labels_for(spec, cfg)
+        # workflow_id is tenant-settable, so an existing workflow is either this
+        # boundary's or refused: neither one Astrolift never provisioned nor one
+        # in another org, app, environment or cluster may be claimed from here.
+        # Adoption of an existing resource is a separate, operator-authorized
+        # operation (#1365) that no tenant config flag may grant (#2021).
         if not _owned_by_platform(current):
-            if not cfg.get("adopt_existing"):
-                raise WorkflowsError(
-                    "existing workflow is not Astrolift-managed; set adopt_existing=true",
-                )
-            desired["astrolift_io_adopted"] = "true"
-            return desired
+            raise WorkflowsError(
+                "existing workflow is not Astrolift-managed; adoption is a separate, operator-authorized "
+                "operation and cannot be granted by tenant config",
+            )
         boundary_keys = (
             "astrolift_io_organization",
             "astrolift_io_app",
             "astrolift_io_environment",
             "astrolift_io_cluster",
         )
-        mismatched = [key for key in boundary_keys if actual.get(key) != desired.get(key)]
-        if mismatched and not cfg.get("allow_reassignment"):
-            raise WorkflowsError(
-                "workflow belongs to another Astrolift boundary; set allow_reassignment=true",
-            )
-        if mismatched:
-            desired["astrolift_io_reassigned"] = "true"
+        if any(actual.get(key) != desired.get(key) for key in boundary_keys):
+            raise WorkflowsError("workflow belongs to another Astrolift boundary")
         if actual.get("astrolift_io_adopted") == "true":
             desired["astrolift_io_adopted"] = "true"
         return desired

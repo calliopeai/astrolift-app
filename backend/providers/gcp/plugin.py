@@ -611,7 +611,10 @@ PLUGIN = ProviderPlugin(
             },
             "spanner_shared_instance_id": {
                 "type": "string",
-                "description": "Optional existing or shared Spanner instance for graph databases.",
+                "description": (
+                    "Optional shared Spanner instance for graph databases. An instance Astrolift did not "
+                    "create is used only once it carries the astrolift-managed-by=platform label."
+                ),
             },
             "spanner_instance_config": {
                 "type": "string",
@@ -655,10 +658,6 @@ PLUGIN = ProviderPlugin(
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "default": 2,
-            },
-            "spanner_adopt_existing_instance": {
-                "type": "boolean",
-                "default": False,
             },
             "workflows_name_prefix": {
                 "type": "string",

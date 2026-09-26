@@ -71,7 +71,6 @@ class SpannerGraphConfig:
     api_endpoint: str = _API_ROOT
     operation_timeout_seconds: float = 1800.0
     poll_interval_seconds: float = 2.0
-    adopt_existing_instance: bool = False
 
 
 class SpannerRestClient:
@@ -246,7 +245,6 @@ class SpannerGraphDriver(ManagedServiceDriver):
             self._ensure_database_owned(
                 instance_id,
                 database_id,
-                cfg,
                 allow_mark_unconditionally=created,
             )
             self._reconcile_database(database, cfg)
@@ -273,11 +271,11 @@ class SpannerGraphDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, error, ["invalid_spanner_graph_config"])
         try:
             instance = self._spanner.get_instance(self._instance_name(instance_id))
-            self._assert_owned_instance(instance, cfg)
+            self._assert_owned_instance(instance)
             self._assert_instance_compatible(instance, cfg)
             self._reconcile_instance_capacity(instance, cfg)
             database = self._spanner.get_database(self._database_name(instance_id, database_id))
-            self._ensure_database_owned(instance_id, database_id, cfg)
+            self._ensure_database_owned(instance_id, database_id)
             self._reconcile_database(database, cfg)
             self._apply_schema_updates(instance_id, database_id, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -465,7 +463,6 @@ class SpannerGraphDriver(ManagedServiceDriver):
             self._ensure_database_owned(
                 instance_id,
                 database_id,
-                cfg,
                 allow_mark_unconditionally=True,
             )
             self._reconcile_database(database, cfg)
@@ -498,8 +495,6 @@ class SpannerGraphDriver(ManagedServiceDriver):
                 "restore_kms_key_names": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "ddl_statements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "schema_update_statements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-                "adopt_existing_instance": {"type": "boolean"},
-                "adopt_existing_database": {"type": "boolean"},
                 "delete_adopted_database": {"type": "boolean"},
                 "delete_empty_instance": {"type": "boolean"},
             },
@@ -536,7 +531,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
             )
             self._wait_operation(operation)
             return self._spanner.get_instance(name)
-        self._assert_owned_instance(current, cfg)
+        self._assert_owned_instance(current)
         self._reconcile_instance_capacity(current, cfg)
         return current
 
@@ -633,15 +628,20 @@ class SpannerGraphDriver(ManagedServiceDriver):
         self,
         instance_id: str,
         database_id: str,
-        cfg: dict[str, Any],
         *,
         allow_mark_unconditionally: bool = False,
     ) -> None:
         if self._database_has_ownership_marker(instance_id, database_id):
             return
-        if not allow_mark_unconditionally and not cfg.get("adopt_existing_database"):
+        if not allow_mark_unconditionally:
+            # Only a database this same call created or restored may be
+            # stamped. One that already existed without the marker was not
+            # provisioned by Astrolift; adoption of an existing resource is a
+            # separate, operator-authorized operation (#1365) that no tenant
+            # config flag may grant (#2021).
             raise SpannerGraphError(
-                "existing Spanner database is not Astrolift-managed; set adopt_existing_database=true"
+                "existing Spanner database carries no Astrolift ownership marker; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
             )
         self._apply_ddl(self._database_name(instance_id, database_id), [_OWNERSHIP_DDL])
 
@@ -661,13 +661,17 @@ class SpannerGraphDriver(ManagedServiceDriver):
             if actual and actual != desired:
                 raise SpannerGraphError(f"shared Spanner instance {field} mismatch ({actual!r} != {desired!r})")
 
-    def _assert_owned_instance(self, current: dict[str, Any], cfg: dict[str, Any]) -> None:
-        labels = current.get("labels") or {}
-        owned = labels.get("astrolift-managed-by") == "platform"
-        adopted = bool(cfg.get("adopt_existing_instance", self._config.adopt_existing_instance))
-        if not owned and not adopted:
+    def _assert_owned_instance(self, current: dict[str, Any]) -> None:
+        # An instance with no platform label was never provisioned by
+        # Astrolift. A tenant instance_id outranks spanner_shared_instance_id,
+        # so a per-cluster switch reached any instance a tenant named, not one
+        # the operator chose. Adoption of an existing resource is a separate,
+        # operator-authorized operation (#1365); no config flag may grant it
+        # (#2021).
+        if (current.get("labels") or {}).get("astrolift-managed-by") != "platform":
             raise SpannerGraphError(
-                "existing Spanner instance is not Astrolift-managed; set adopt_existing_instance=true"
+                "existing Spanner instance carries no Astrolift ownership marker; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
             )
 
     def _delete_instance_if_empty(self, instance_id: str) -> None:

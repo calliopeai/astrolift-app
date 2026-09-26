@@ -603,7 +603,6 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("spanner_operation_poll_interval_seconds", 2),
             ),
-            adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
         )
 
     if pair == ("workflow_engine", "workflows") or (kind == "workflow_engine" and not variant):

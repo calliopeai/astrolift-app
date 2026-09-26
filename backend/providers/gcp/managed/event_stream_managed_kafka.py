@@ -358,12 +358,10 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                     cluster = self._kafka.get(name, params={"view": "FULL"})
                 except ManagedKafkaConflict:
                     cluster = self._kafka.get(name, params={"view": "FULL"})
-                    self._assert_adoptable(cluster, cfg, spec.managed_service_id, "cluster")
-                    labels = self._adoption_labels(cluster, labels, cfg)
+                    self._assert_adoptable(cluster, spec.managed_service_id, "cluster")
                     self._patch_cluster(name, cluster, self._cluster_body(cfg, spec.size, labels))
             else:
-                self._assert_adoptable(cluster, cfg, spec.managed_service_id, "cluster")
-                labels = self._adoption_labels(cluster, labels, cfg)
+                self._assert_adoptable(cluster, spec.managed_service_id, "cluster")
                 self._patch_cluster(name, cluster, self._cluster_body(cfg, spec.size, labels))
             self._reconcile_cluster_children(name, cfg)
             self._reconcile_schema_registries(location, cfg, spec.managed_service_id)
@@ -737,8 +735,6 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 "delete_subjects": {"type": "array", "items": {"type": "string", "minLength": 1}},
                 "allow_schema_data_delete": {"type": "boolean", "default": False},
                 "permanent_schema_delete": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
             },
             "additionalProperties": False,
         }
@@ -800,8 +796,6 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 "labels": labels,
                 "raw_fields": raw,
                 "clear_fields": {"type": "array", "items": {"type": "string"}},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
             },
             "additionalProperties": False,
         }
@@ -887,8 +881,6 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 "labels": labels,
                 "raw_fields": raw,
                 "clear_fields": {"type": "array", "items": {"type": "string"}},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "delete_external_dependents": {"type": "boolean", "default": False},
@@ -1224,15 +1216,18 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                     self._kafka.create_schema_registry(parent, registry_id)
                 except ManagedKafkaConflict:
                     current = self._kafka.get(name)
+            # Schema Registry has no labels; the marker subject is the only
+            # ownership proof. A registry with another service's marker, or one
+            # that existed before this call without any, is refused: adoption of
+            # an existing resource is a separate, operator-authorized operation
+            # (#1365) that no tenant config flag may grant (#2021).
             owner = self._registry_owner(name)
-            if owner and owner != service_id and not declaration.get("reassign_existing"):
+            if owner and owner != service_id:
+                raise ManagedKafkaError(f"schema registry {registry_id} belongs to another managed service")
+            if not owner and current is not None:
                 raise ManagedKafkaError(
-                    f"schema registry {registry_id} belongs to another managed service; "
-                    "set reassign_existing=true to transfer ownership",
-                )
-            if not owner and current is not None and not declaration.get("adopt_existing"):
-                raise ManagedKafkaError(
-                    f"schema registry {registry_id} is not Astrolift-owned; set adopt_existing=true",
+                    f"schema registry {registry_id} is not Astrolift-owned; adoption is a separate, "
+                    "operator-authorized operation and cannot be granted by tenant config",
                 )
             if owner != service_id:
                 self._ensure_registry_marker(name, service_id)
@@ -1301,14 +1296,13 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                     current = self._kafka.get(name)
                 except ManagedKafkaConflict:
                     current = self._kafka.get(name)
-                    self._assert_adoptable(current, declaration, service_id, "Connect cluster")
+                    self._assert_adoptable(current, service_id, "Connect cluster")
             else:
-                self._assert_adoptable(current, declaration, service_id, "Connect cluster")
+                self._assert_adoptable(current, service_id, "Connect cluster")
             if str(current.get("kafkaCluster") or "") != kafka_cluster:
                 raise ManagedKafkaError(
                     f"Connect cluster {connect_id} kafka_cluster is immutable; create a replacement",
                 )
-            labels = self._adoption_labels(current, labels, declaration)
             body["labels"] = labels
             self._patch_lro(name, current, body)
             self._reconcile_connectors(name, declaration)
@@ -1565,39 +1559,29 @@ class ManagedKafkaDriver(ManagedServiceDriver):
     def _assert_adoptable(
         self,
         current: dict[str, Any],
-        cfg: dict[str, Any],
         service_id: str,
         resource: str,
     ) -> None:
+        # Cluster and Connect ids are tenant-settable, so an existing resource
+        # is either this service's or refused: neither one Astrolift never
+        # provisioned nor another managed service's may be claimed from here.
+        # Adoption of an existing resource is a separate, operator-authorized
+        # operation (#1365) that no tenant config flag may grant (#2021).
         labels = dict(current.get("labels") or {})
         if labels.get("astrolift-io-managed-by") == "platform":
             current_service = str(labels.get("astrolift-io-managed-service-id") or "")
-            if current_service and service_id and current_service != service_id and not cfg.get("reassign_existing"):
-                raise ManagedKafkaError(
-                    f"Managed Kafka {resource} belongs to another managed service; "
-                    "set reassign_existing=true to transfer ownership",
-                )
+            if current_service and service_id and current_service != service_id:
+                raise ManagedKafkaError(f"Managed Kafka {resource} belongs to another managed service")
             return
-        if not cfg.get("adopt_existing"):
-            raise ManagedKafkaError(
-                f"existing Managed Kafka {resource} is not Astrolift-owned; set adopt_existing=true",
-            )
+        raise ManagedKafkaError(
+            f"existing Managed Kafka {resource} is not Astrolift-owned; adoption is a separate, "
+            "operator-authorized operation and cannot be granted by tenant config",
+        )
 
     @staticmethod
     def _assert_managed(current: dict[str, Any], resource: str) -> None:
         if (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform":
             raise ManagedKafkaError(f"Managed Kafka {resource} is not owned by Astrolift")
-
-    @staticmethod
-    def _adoption_labels(
-        current: dict[str, Any],
-        desired: dict[str, str],
-        cfg: dict[str, Any],
-    ) -> dict[str, str]:
-        labels = dict(desired)
-        if cfg.get("adopt_existing") and (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform":
-            labels["astrolift-io-adopted"] = "true"
-        return labels
 
     def _cluster_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
         if cfg.get("cluster_id"):

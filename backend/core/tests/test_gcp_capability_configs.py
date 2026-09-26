@@ -361,6 +361,9 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
             spanner_api_endpoint="https://spanner.example.test/v1",
             spanner_operation_timeout_seconds=900,
             spanner_operation_poll_interval_seconds=1,
+            # A stale install-level switch from before #2074 must not reach
+            # the driver: it would reopen adoption of any unlabeled instance
+            # a tenant names.
             spanner_adopt_existing_instance=True,
         ),
         kind="graph_db",
@@ -380,7 +383,7 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
     assert config.api_endpoint == "https://spanner.example.test/v1"
     assert config.operation_timeout_seconds == 900
     assert config.poll_interval_seconds == 1
-    assert config.adopt_existing_instance is True
+    assert not hasattr(config, "adopt_existing_instance")
 
 
 def test_workflows_runtime_config_preserves_operator_controls() -> None:

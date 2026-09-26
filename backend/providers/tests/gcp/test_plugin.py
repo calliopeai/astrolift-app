@@ -131,9 +131,9 @@ def test_spanner_graph_operator_controls_are_exposed() -> None:
         "spanner_api_endpoint",
         "spanner_operation_timeout_seconds",
         "spanner_operation_poll_interval_seconds",
-        "spanner_adopt_existing_instance",
     ):
         assert field in properties
+    assert "spanner_adopt_existing_instance" not in properties
 
 
 def test_cloud_cdn_operator_controls_are_exposed() -> None:

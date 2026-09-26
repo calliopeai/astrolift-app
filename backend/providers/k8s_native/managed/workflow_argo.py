@@ -69,16 +69,12 @@ _CONFIG_FIELDS = {
     "labels",
     "annotations",
     "deletion_protection",
-    "adopt_existing",
-    "expected_existing_uid",
 }
 _CHILD_FIELDS = {
     "name",
     "spec",
     "labels",
     "annotations",
-    "adopt_existing",
-    "expected_existing_uid",
 }
 _UNSAFE_BOOLEAN_FIELDS = {
     "hostNetwork",
@@ -164,7 +160,6 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
                 namespace=namespace,
                 name=name,
                 managed_service_id=spec.managed_service_id,
-                cfg=cfg,
             )
             manifests = self._manifests(
                 cluster_id=spec.tenant_cluster_id,
@@ -540,8 +535,6 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
                 },
                 "labels": scalar_map,
                 "annotations": scalar_map,
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
             },
         }
         return {
@@ -558,8 +551,6 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
                 "labels": scalar_map,
                 "annotations": scalar_map,
                 "deletion_protection": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
             },
         }
 
@@ -579,7 +570,7 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        return sorted(_CONFIG_FIELDS - {"adopt_existing", "expected_existing_uid"})
+        return sorted(_CONFIG_FIELDS)
 
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         cfg = copy.deepcopy(raw or {})
@@ -1122,7 +1113,6 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
                     cluster_id,
                     namespace,
                     manifest,
-                    child,
                     dns_label(owner[_OWNER_ID]),
                 )
                 children.append(
@@ -1316,7 +1306,6 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
         namespace: str,
         name: str,
         managed_service_id: str,
-        cfg: dict[str, Any],
     ) -> None:
         current = self._template(ParsedHandle(KIND, cluster_id, namespace, name))
         if current is None:
@@ -1328,17 +1317,20 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
             return
         if labels.get(_OWNER) == "astrolift" and owner:
             raise ValueError("Argo WorkflowTemplate belongs to another Astrolift resource")
-        if not cfg.get("adopt_existing") or str(cfg.get("expected_existing_uid") or "") != str(
-            metadata.get("uid") or "",
-        ):
-            raise ValueError("adopting an Argo WorkflowTemplate requires its exact expected_existing_uid")
+        # An object's uid is a precondition, not an authorization: in an
+        # operator-fixed shared namespace the object may be anyone's. Adoption
+        # of an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
+        raise ValueError(
+            "Argo WorkflowTemplate already exists and is not owned by this managed service; adoption is "
+            "a separate, operator-authorized operation and cannot be granted by tenant config",
+        )
 
     def _assert_child_adoptable(
         self,
         cluster_id: str,
         namespace: str,
         manifest: dict[str, Any],
-        child: dict[str, Any],
         owner_id: str,
     ) -> None:
         current = self._config.cluster_driver.get_manifest(
@@ -1357,12 +1349,11 @@ class ArgoWorkflowsDriver(ManagedServiceDriver):
             raise ValueError(
                 f"{manifest['kind']} {manifest['metadata']['name']} belongs to another resource",
             )
-        if not child.get("adopt_existing") or str(child.get("expected_existing_uid") or "") != str(
-            metadata.get("uid") or "",
-        ):
-            raise ValueError(
-                f"adopting {manifest['kind']} {manifest['metadata']['name']} requires its exact expected_existing_uid",
-            )
+        raise ValueError(
+            f"{manifest['kind']} {manifest['metadata']['name']} already exists and is not owned by this "
+            "managed service; adoption is a separate, operator-authorized operation and cannot be granted "
+            "by tenant config",
+        )
 
     def _assert_owned(self, resource: dict[str, Any], kind: str) -> str:
         labels = dict((resource.get("metadata", {}) or {}).get("labels", {}) or {})

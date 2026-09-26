@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.event_bus_eventarc import (
@@ -371,7 +372,7 @@ def test_clear_fields_explicitly_removes_mutable_provider_values(
     assert bus["displayName"] is None
 
 
-def test_existing_external_bus_requires_explicit_adoption(
+def test_existing_external_bus_is_refused_without_operator_adoption(
     driver: EventarcDriver,
     client: FakeEventarc,
 ) -> None:
@@ -379,30 +380,53 @@ def test_existing_external_bus_requires_explicit_adoption(
     client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
     denied = _provision(driver)
     assert not denied.ok
+    assert "operator-authorized" in denied.message
     assert "one bus per project and region" in denied.message
 
-    adopted = _provision(driver, adopt_existing=True)
-    assert adopted.ok
-    assert client.resources[name]["labels"]["astrolift-io-managed-by"] == "platform"
+    # The flag is gone entirely, on the bus and on every child declaration:
+    # the schema tenant config is validated against rejects it, and a driver
+    # handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    assert not validator.is_valid({**_full_config(), "adopt_existing": True})
+    child = deepcopy(_full_config())
+    child["triggers"][0]["adopt_existing"] = True
+    assert not validator.is_valid(child)
+    still_denied = _provision(driver, adopt_existing=True)
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == {"owner": "customer"}
 
 
-def test_existing_managed_bus_cannot_be_reassigned_silently(
+def test_existing_managed_bus_cannot_be_reassigned_by_config(
     driver: EventarcDriver,
     client: FakeEventarc,
 ) -> None:
     name = "projects/project-1/locations/us-central1/messageBuses/astrolift"
-    client.resources[name] = {
-        "name": name,
-        "labels": {
-            "astrolift-io-managed-by": "platform",
-            "astrolift-io-managed-service-id": "another-service",
-        },
+    labels = {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": "another-service",
     }
+    client.resources[name] = {"name": name, "labels": dict(labels)}
     denied = _provision(driver)
     assert not denied.ok and "another managed service" in denied.message
-    accepted = _provision(driver, reassign_existing=True)
-    assert accepted.ok
-    assert client.resources[name]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+
+    validator = Draft202012Validator(driver.config_schema())
+    assert not validator.is_valid({**_full_config(), "reassign_existing": True})
+    still_denied = _provision(driver, reassign_existing=True)
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == labels
+
+
+def test_existing_external_child_is_refused_without_operator_adoption(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+) -> None:
+    name = "projects/project-1/locations/us-central1/triggers/storage-finalized"
+    client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
+    denied = driver.provision(replace(SPEC, config=_full_config()))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert client.resources[name]["labels"] == {"owner": "customer"}
 
 
 def test_deprovision_requires_protection_override_and_removes_children_first(
@@ -470,9 +494,11 @@ def test_adopted_bus_requires_separate_deletion_consent(
     client: FakeEventarc,
 ) -> None:
     name = "projects/project-1/locations/us-central1/messageBuses/astrolift"
-    client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
-    result = _provision(driver, adopt_existing=True, deletion_protection=False)
+    result = _provision(driver, deletion_protection=False)
     assert result.ok
+    # A bus adopted before #2074 still carries the marker, and teardown still
+    # asks for the second acknowledgement.
+    client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
     denied = driver.deprovision(
         DeprovisionSpec(result.handle, {"deletion_protection": False}),
         force_destroy=True,

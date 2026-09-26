@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.api_gateway import (
@@ -212,6 +213,29 @@ def test_update_creates_revision_and_atomically_retargets_gateway(
     assert "apiConfig" in patch[3]
 
 
+def test_update_cannot_retarget_the_gateway_at_another_services_api(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    """api_id is tenant config; allow_api_retarget must not reach an API this service does not own."""
+    result = driver.provision(replace(SPEC, config=_openapi_config()))
+    _, gateway = _names()
+    active_config = str(client.resources[gateway]["apiConfig"])
+    victim = "projects/project-1/locations/global/apis/victim-api"
+    victim_labels = {"astrolift-io-managed-by": "platform", "astrolift-io-managed-service-id": "victim-service"}
+    client.resources[victim] = {"name": victim, "state": "ACTIVE", "labels": dict(victim_labels)}
+    cfg = {**_openapi_config(), "api_id": "victim-api", "allow_api_retarget": True}
+    cfg.pop("gateway_id")
+
+    refused = driver.update(UpdateSpec(result.handle, config=cfg, managed_service_id="managed-id"))
+
+    assert not refused.ok
+    assert "another managed service" in refused.message
+    assert client.resources[victim]["labels"] == victim_labels
+    assert not [name for name in client.resources if name.startswith(f"{victim}/configs/")]
+    assert client.resources[gateway]["apiConfig"] == active_config
+
+
 def test_explicit_config_id_rejects_changed_immutable_documents(
     driver: APIGatewayDriver,
 ) -> None:
@@ -289,17 +313,43 @@ def test_binding_status_snapshot_and_restore_use_active_revision(
     assert client.resources[restored_name]["apiConfig"] == snapshot.snapshot_id
 
 
-def test_collision_requires_adoption_and_marks_resource(
+def test_collision_is_refused_without_operator_adoption(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    api, gateway = _names()
+    client.resources[api] = {"name": api, "state": "ACTIVE", "labels": {"owner": "customer"}}
+    denied = driver.provision(replace(SPEC, config=_openapi_config()))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+
+    # The flag is gone entirely: the schema tenant config is validated against
+    # rejects it, and a driver handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_openapi_config())
+    assert not validator.is_valid({**_openapi_config(), "adopt_existing": True})
+    still_denied = driver.provision(replace(SPEC, config={**_openapi_config(), "adopt_existing": True}))
+    assert not still_denied.ok
+    assert client.resources[api]["labels"] == {"owner": "customer"}
+    assert gateway not in client.resources
+
+
+def test_another_services_resource_is_refused_and_no_flag_reassigns_it(
     driver: APIGatewayDriver,
     client: FakeGatewayAPI,
 ) -> None:
     api, _ = _names()
-    client.resources[api] = {"name": api, "state": "ACTIVE", "labels": {"owner": "customer"}}
+    labels = {"astrolift-io-managed-by": "platform", "astrolift-io-managed-service-id": "other-service"}
+    client.resources[api] = {"name": api, "state": "ACTIVE", "labels": dict(labels)}
     denied = driver.provision(replace(SPEC, config=_openapi_config()))
-    assert not denied.ok and "adopt_existing" in denied.message
-    cfg = {**_openapi_config(), "adopt_existing": True}
-    assert driver.provision(replace(SPEC, config=cfg)).ok
-    assert client.resources[api]["labels"]["astrolift-io-adopted"] == "true"
+    assert not denied.ok
+    assert "another managed service" in denied.message
+
+    validator = Draft202012Validator(driver.config_schema())
+    assert not validator.is_valid({**_openapi_config(), "reassign_existing": True})
+    still_denied = driver.provision(replace(SPEC, config={**_openapi_config(), "reassign_existing": True}))
+    assert not still_denied.ok
+    assert client.resources[api]["labels"] == labels
 
 
 def test_deprovision_blocks_external_gateway_and_config_before_mutating(

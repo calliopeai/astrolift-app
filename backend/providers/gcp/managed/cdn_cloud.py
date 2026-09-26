@@ -643,7 +643,6 @@ class CloudCdnDriver(ManagedServiceDriver):
                 "forwarding_rule": {"type": "object"},
                 "redirect_http_to_https": {"type": "boolean", "default": True},
                 "allow_insecure_http": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
                 "delete_adopted_resources": {"type": "boolean", "default": False},
                 "allow_external_key_rotation": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
@@ -700,7 +699,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             self._url_map_body(stack_id, cfg, marker=marker, backend_link=backend_link),
             marker=marker,
             allow_create=allow_create,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         address = self._ensure_resource(
             "addresses",
@@ -708,7 +706,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             self._address_body(stack_id, cfg, marker=marker),
             marker=marker,
             allow_create=allow_create,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         address_link = str(
             address.get("selfLink") or _self_link(self._config.project_id, "addresses", str(address["name"])),
@@ -727,7 +724,6 @@ class CloudCdnDriver(ManagedServiceDriver):
                 self._http_proxy_body(stack_id, cfg, marker=marker, url_map=url_map_link),
                 marker=marker,
                 allow_create=allow_create,
-                adopt_existing=bool(cfg.get("adopt_existing")),
             )
             forwarding = self._ensure_resource(
                 "forwardingRules",
@@ -745,7 +741,6 @@ class CloudCdnDriver(ManagedServiceDriver):
                 ),
                 marker=marker,
                 allow_create=allow_create,
-                adopt_existing=bool(cfg.get("adopt_existing")),
             )
         else:
             certificates = [
@@ -792,7 +787,6 @@ class CloudCdnDriver(ManagedServiceDriver):
                 ),
                 marker=marker,
                 allow_create=allow_create,
-                adopt_existing=bool(cfg.get("adopt_existing")),
             )
             forwarding = self._ensure_resource(
                 "forwardingRules",
@@ -810,7 +804,6 @@ class CloudCdnDriver(ManagedServiceDriver):
                 ),
                 marker=marker,
                 allow_create=allow_create,
-                adopt_existing=bool(cfg.get("adopt_existing")),
             )
             if bool(cfg.get("redirect_http_to_https", True)):
                 self._ensure_https_redirect(stack_id, cfg, marker=marker, address=address_link)
@@ -860,7 +853,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             body,
             marker=marker,
             allow_create=allow_create,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         self._reconcile_security_policies(collection, backend_name, cfg)
         return collection, backend
@@ -873,7 +865,6 @@ class CloudCdnDriver(ManagedServiceDriver):
         *,
         marker: str,
         allow_create: bool,
-        adopt_existing: bool = False,
     ) -> dict[str, Any]:
         try:
             current = self._compute.get_resource(collection, name)
@@ -883,18 +874,15 @@ class CloudCdnDriver(ManagedServiceDriver):
             self._wait_operation(self._compute.insert_resource(collection, desired))
             return self._compute.get_resource(collection, name)
         if not _owned(current, marker):
-            if not adopt_existing:
-                raise CloudCdnError(
-                    f"{collection}/{name} exists but is not owned by this Cloud CDN stack",
-                )
-            if collection in {"addresses", "sslCertificates"}:
-                immutable_desired = {key: value for key, value in desired.items() if key != "description"}
-                if not _contains(current, immutable_desired):
-                    raise CloudCdnError(
-                        f"cannot adopt incompatible immutable {collection}/{name}",
-                    )
-                return current
-            desired = {**desired, "description": f"{marker}; adopted=true"}
+            # The marker names this stack, boundary and managed service, so a
+            # mismatch is either a resource Astrolift never made or another
+            # service's. Adoption of an existing resource is a separate,
+            # operator-authorized operation (#1365) that no tenant config flag
+            # may grant (#2021).
+            raise CloudCdnError(
+                f"{collection}/{name} exists but is not owned by this Cloud CDN stack; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
         patch = {
             key: value for key, value in desired.items() if key != "name" and not _contains(current.get(key), value)
         }
@@ -930,7 +918,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             body,
             marker=marker,
             allow_create=allow_create,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         return certificate
 
@@ -956,7 +943,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             },
             marker=marker,
             allow_create=True,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         redirect_map_link = str(
             redirect_map.get("selfLink") or _self_link(self._config.project_id, "urlMaps", str(redirect_map["name"])),
@@ -972,7 +958,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             },
             marker=marker,
             allow_create=True,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
         proxy_link = str(
             proxy.get("selfLink") or _self_link(self._config.project_id, "targetHttpProxies", str(proxy["name"])),
@@ -991,7 +976,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             ),
             marker=marker,
             allow_create=True,
-            adopt_existing=bool(cfg.get("adopt_existing")),
         )
 
     def _backend_bucket_body(
@@ -1505,7 +1489,6 @@ class CloudCdnDriver(ManagedServiceDriver):
             "spa",
             "redirect_http_to_https",
             "allow_insecure_http",
-            "adopt_existing",
             "delete_adopted_resources",
             "allow_external_key_rotation",
             "deletion_protection",

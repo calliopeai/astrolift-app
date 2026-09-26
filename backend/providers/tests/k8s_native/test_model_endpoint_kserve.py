@@ -632,7 +632,7 @@ def test_baseline_service_account_cannot_adopt_foreign_or_ambient_identity() -> 
     assert "ambient workload identity annotation" in ambient.message
 
 
-def test_adoption_requires_exact_uid_and_other_astrolift_owner_is_never_adoptable() -> None:
+def test_existing_service_is_refused_even_with_its_exact_uid_and_other_owner_is_never_adoptable() -> None:
     cluster = _Cluster()
     key = (f"{API_VERSION}/InferenceService", "steady-md-triage", "triage-prod-fraud-model")
     cluster.objects[key] = {
@@ -643,17 +643,24 @@ def test_adoption_requires_exact_uid_and_other_astrolift_owner_is_never_adoptabl
     }
     driver, _ = _driver(cluster)
 
-    assert driver.provision(_spec()).ok is False
-    assert driver.provision(_spec(adopt_existing=True, expected_existing_uid="wrong")).ok is False
-    assert driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1")).ok is True
+    refused = driver.provision(_spec())
+    assert refused.ok is False
+    assert "operator-authorized" in refused.message
+    # Knowing the uid proved only that the caller could see the object.
+    # Adoption is operator-only (#2021); the flags are rejected, not ignored.
+    flagged = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
+    assert flagged.ok is False
+    assert "unsupported KServe config fields" in flagged.message
+    assert "labels" not in cluster.objects[key]["metadata"]
 
     cluster.objects[key]["metadata"]["labels"] = {
         "app.kubernetes.io/managed-by": "astrolift",
         "astrolift.io/managed-service-id": "another-service",
     }
-    result = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
+    result = driver.provision(_spec())
     assert result.ok is False
     assert "another Astrolift resource" in result.message
+    assert cluster.applied == []
 
 
 def test_update_preserves_owner_and_reconciles_native_spec() -> None:
