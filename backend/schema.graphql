@@ -263,6 +263,8 @@ type AstroliftAgentEnvironmentSpec {
   configRepo: String!
   configBranch: String!
   configManifestPath: String!
+  teamId: GUID
+  projectId: GUID
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -4666,6 +4668,8 @@ input CreateAgentEnvironmentSpecInput {
   configManifestPath: String! = ""
   secretRefs: JSON = null
   envVars: JSON = null
+  teamId: GUID = null
+  projectId: GUID = null
 }
 
 input CreateAlertRuleInput {

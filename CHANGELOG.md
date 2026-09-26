@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- Agent surfaces are isolated per team and project, and a guardrail keeps
+  every surface declaring its permission and scope (#1866).
+  `AgentEnvironmentSpec` and `AgentBox` gain nullable `team` and `project`
+  owners; a null spec owner means org-shared, explicitly. Migration 0037
+  gives each spec the project of the one agent that shares its slug, and a
+  spec-only box its spec's owner; a slug two apps' agents share stays
+  org-shared. Spec reads narrow to the org-shared specs and the ones a grant
+  covers (new `teamId`/`projectId` on `AstroliftAgentEnvironmentSpec`), and
+  spec writes check at the owner, org-shared ones at the org
+  (`createAgentEnvironmentSpec` takes an optional `teamId`/`projectId`).
+  Dispatch, `ensureAgentBox` and workflow agent stages run an agent only with
+  a spec its own app may use, so a team can no longer run with another
+  team's secret packet. Boxes are read, destroyed, ensured and attached at
+  their own scope (recorded project or team, else the agent's app, else the
+  org), and a live box is never handed to an ensure from another scope.
+  Skills, tool defs, briefs, org skill repos, secret values, secret bindings
+  and org secret bundles check at the explicit org scope instead of the
+  selected team. The exec relay checks `app.exec_pod` on the app and
+  `agent_box.attach` on the box, under the bearer's scope ceiling; the app
+  log subscriptions check `app.read_logs` on the app. The Dispatch Service
+  log and meter ingest routes, which took any caller's writes into any run,
+  now require the dispatcher key and stay in its org. MCP agent tools
+  declare their scope; `astrolift_sync_agent_repo` and
+  `astrolift_import_agent_spec` check at the named project, and an import
+  no longer moves another project's agent. Manifest sync and agent import
+  stamp a new spec's owner and refuse to rewrite another scope's spec.
+  `core/tests/test_surface_guardrail_1866.py` walks the served GraphQL
+  schemas, the URL conf, the WebSocket routes and the MCP registry, and
+  fails on any route without a declared scope that is not on its allowlist;
+  the remaining gaps outside the agent surfaces are tracked per area there.
+  Still open (#2102): agent secret refs are confined per org only, so a spec
+  writer can bind another team's secret location.
 - Tenant service config can no longer adopt an existing resource on GCP or
   k8s_native (#2074, follow-up to #2021). The tenant-set flag #2021 removed
   from Cloud SQL SQL Server, Valkey and Firestore lived on in sixteen more
