@@ -221,7 +221,9 @@ def _recorded_handle_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
             )
             if other_resolved.driver_cls is not resolved.driver_cls:
                 continue
-            other_cfg = managed_config_for(other_resolved.plugin_slug, cluster, kind=other.kind, variant=variant)
+            other_cfg = managed_config_for(
+                other_resolved.plugin_slug, cluster, kind=other.kind, variant=variant
+            )
         except Exception:  # noqa: BLE001 - a row that cannot be placed may still be the same resource
             return False
         if str(getattr(other_cfg, "project_id", "") or "") == project:

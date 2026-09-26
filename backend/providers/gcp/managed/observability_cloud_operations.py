@@ -1802,12 +1802,13 @@ def _service_bundle_id(value: str, *, prefix: str, managed_service_id: str) -> s
     """The bundle id new bundles take (#2086).
 
     Every ownership marker in a bundle keys on its id, and ``_bundle_id`` built
-    that id from the tenant-set ``name`` alone, so a tenant naming another's
-    bundle reconciled, bound and pruned it. The digest of the managed-service id
-    is always kept, whatever the name, so no ``name`` yields another service's
-    bundle. ``--`` sets it off: ``_resource_id`` collapses a double hyphen, so no
-    bundle named before #2086 has one, and a digest can never be mistaken for
-    the tail of an old name.
+    that id from the service's name alone, which the tenant chooses: two orgs'
+    services with one name shared a bundle, and each reconciled, bound and
+    pruned the other's resources. The digest of the managed-service id is always
+    kept, whatever the name, so no name yields another service's bundle. ``--``
+    sets it off: ``_resource_id`` collapses a double hyphen, so no bundle named
+    before #2086 has one, and a digest can never be mistaken for the tail of an
+    old name.
     """
     digest = _service_digest(managed_service_id)
     return f"{_resource_id(prefix, value)[: 63 - len(digest) - 2].rstrip('-')}--{digest}"

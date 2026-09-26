@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- GCP ownership checks no longer key on a name the tenant chooses (#2086,
+  follow-up to #2074). Spanner Graph proved a database was Astrolift's with
+  a schema marker that named no service, and on a shared instance the
+  derived database id carried no org, so two orgs with the same app,
+  environment and hint shared one database: the second provision
+  reconciled it, applied its own DDL and bound `roles/spanner.databaseUser`
+  on it. Private Service Connect keyed ownership on the tenant-set
+  `endpoint_id`, and Cloud Operations on a bundle id built from the
+  service's name alone, which also let one org's default prune delete
+  another's resources. Spanner databases now carry an
+  `AstroliftGraphOwner_<managed-service id>` table, which tenant DDL may not
+  name; PSC addresses and forwarding rules carry
+  `astrolift_io_managed_service_id`, reserved against tenant labels, with
+  the create-time description (`resource=<managed-service id>`) read back
+  as evidence; Cloud Operations bundle ids end in `--<digest of the
+  managed-service id>`. New Spanner and PSC derived names get the same
+  digest. Existing resources keep their recorded names. One made before this
+  change, and so without the marker, is accepted (and, on provision or
+  update, stamped) only when the platform's record of its handle is
+  exclusive: no other live managed service, on the same driver in the same
+  GCP project, records it. Otherwise it is refused until an operator marks
+  its owner. Eventarc, Managed Kafka and Cloud CDN also stop dropping a
+  pre-#2074 adopted marker on re-provision, which had silently disarmed the
+  `delete_adopted` teardown guard.
 - Tenant service config can no longer adopt an existing resource on GCP or
   k8s_native (#2074, follow-up to #2021). The tenant-set flag #2021 removed
   from Cloud SQL SQL Server, Valkey and Firestore lived on in sixteen more
