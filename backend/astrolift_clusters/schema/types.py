@@ -162,6 +162,14 @@ class ManagedDomainType:
     # remain migration-free while operators can see why activation is gated.
     delegation_check: JSON
     provision_cluster_id: str | None
+    # Proof-of-control challenge (#1931). 'pending' means the zone name
+    # already existed in the provider (or the caller asked to adopt one) and
+    # nothing may write DNS, issue a cert, or stand up an ingress for it
+    # until verifyManagedDomain confirms the TXT record below.
+    verification_state: str
+    challenge_record_name: str
+    challenge_record_value: str
+    verified_at: dt.datetime | None
 
 
 # ---- Certificate picker (#858) ------------------------------------
@@ -334,6 +342,10 @@ def domain_to_type(domain) -> ManagedDomainType:
             if (domain.dns_config or {}).get("provision_cluster_id")
             else None
         ),
+        verification_state=domain.verification_state,
+        challenge_record_name=(f"_astrolift-challenge.{domain.zone}" if domain.verification_token else ""),
+        challenge_record_value=domain.verification_token,
+        verified_at=domain.verified_at,
     )
 
 

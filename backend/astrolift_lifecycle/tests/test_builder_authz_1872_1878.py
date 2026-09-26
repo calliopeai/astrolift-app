@@ -355,6 +355,27 @@ def test_promote_binds_a_managed_domain_of_the_org_or_a_shared_one(world, admin,
     assert env.managed_domain_id == domain.pk
 
 
+def test_promote_refuses_a_pending_managed_domain_as_if_it_did_not_exist(world, admin, workflow_starts):
+    """A row still awaiting its TXT proof-of-control challenge is not
+    registered yet, whether it is the caller's own org or not (#1931)."""
+    domain = ManagedDomain.objects.create(
+        zone="pending.example.test",
+        organization=world.a,
+        dns_driver="route53",
+        verification_state=ManagedDomain.VerificationState.PENDING,
+        verification_token="tok",
+    )
+    dev = _dev_env(world.a, world.cluster_a, admin.user)
+
+    response = _promote(dev, admin.headers, domain=domain.zone)
+
+    assert response.status_code == 404, response.content
+    assert response.json() == {"detail": f"managed domain {domain.zone!r} not found"}
+    assert _untouched(dev)
+    assert not AppEnvironment.objects.exists()
+    assert workflow_starts == []
+
+
 def test_promote_answers_404_for_another_orgs_team(world, admin, workflow_starts):
     """Pinned, not changed: the team was already looked up in the caller's org."""
     dev = _dev_env(world.a, world.cluster_a, admin.user)
