@@ -48,3 +48,7 @@ The cluster's capability probe records GPU nodes, GPU and MIG totals, and whethe
 ### Clusters that create GPU nodes on demand
 
 On GKE Autopilot, or with Karpenter GPU NodePools, a cluster may have no GPU nodes until a pod asks for one. Set `gpu_autoprovision: true` in the cluster's provider config. The deploy check then accepts the request instead of refusing it for zero GPUs.
+
+## GPU quota per organization
+
+An org-scope quota on the `gpu` resource caps the GPUs an organization's workloads hold at once. A deploy is refused when its GPUs plus the org's running deploys and vLLM models would pass the hard limit. Each workload counts at its ceiling: `gpu` times its HPA `hpa_max` (or Knative `max_scale`), else `replicas`. MIG slices count as one each. Redeploying an environment doesn't count what it replaces. With no `gpu` quota there is no limit.

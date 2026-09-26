@@ -26,6 +26,7 @@ class Quota(BaseCoreModel):
         PREVIEW_ENVS = "preview_envs"
         MANAGED_SERVICES = "managed_services"
         CPU = "cpu"
+        GPU = "gpu"
         MEMORY = "memory"
         STORAGE = "storage"
         EGRESS_GB = "egress_gb"

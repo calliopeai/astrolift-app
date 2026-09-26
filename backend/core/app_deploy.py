@@ -946,6 +946,90 @@ def gpu_capacity_refusal(manifest, cluster) -> str | None:
     return None
 
 
+def _max_replicas(w) -> int:
+    """The most replicas ``w`` can run: its HPA or Knative ceiling if it scales."""
+    if getattr(w, "kind", "") == "function":
+        return int(getattr(w, "max_scale", 0) or 0)
+    if getattr(w, "hpa_min", None) is not None and getattr(w, "hpa_max", None) is not None:
+        return max(int(w.hpa_max), int(getattr(w, "replicas", 1) or 0))
+    return int(getattr(w, "replicas", 1) or 0)
+
+
+def _manifest_gpus(manifest) -> int:
+    """GPUs (or MIG slices) ``manifest`` holds at its scaling ceiling."""
+    return sum(int(getattr(w, "gpu", 0) or 0) * _max_replicas(w) for w in getattr(manifest, "workloads", ()))
+
+
+def _org_gpus_in_use(org_id: int, *, excluding_env_id: int) -> int:
+    """GPUs the org's running deploys and vLLM models hold, bar one env.
+
+    A running deploy counts its app's saved manifest; the env being deployed
+    is excluded because this deploy replaces what runs there.
+    """
+    from django.db.models import Q
+
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_manifest.normalize import NormalizationDefaults, normalize
+    from astrolift_manifest.parser import parse_raw
+    from astrolift_services.models import ManagedService
+
+    total = 0
+    running = (
+        Deployment.objects.filter(
+            registered_app__organization_id=org_id,
+            status=Deployment.Status.RUNNING,
+        )
+        .exclude(app_environment_id=excluding_env_id)
+        .select_related("registered_app")
+        .order_by()
+        .distinct("app_environment_id")
+    )
+    for dep in running:
+        raw = (dep.registered_app.manifest_raw or "").strip()
+        if not raw:
+            continue
+        try:
+            total += _manifest_gpus(normalize(parse_raw(raw), defaults=NormalizationDefaults()))
+        except Exception:  # noqa: BLE001 -- a manifest that no longer parses holds nothing new
+            continue
+    models_ = ManagedService.objects.filter(
+        Q(registered_app__organization_id=org_id) | Q(project__organization_id=org_id),
+        kind=ManagedService.Kind.MODEL_ENDPOINT,
+        variant="vllm",
+    ).exclude(status=ManagedService.Status.DEPROVISIONING)
+    for svc in models_:
+        cfg = svc.config or {}
+        total += int(cfg.get("gpu", 1) or 0) * int(cfg.get("replicas", 1) or 0)
+    return total
+
+
+def gpu_quota_refusal(deployment, manifest) -> str | None:
+    """Why this deploy would take the org past its GPU quota, or ``None`` (#2039).
+
+    Reads the org-scope ``Quota`` for ``gpu``; no quota means no limit.
+    """
+    wanted = _manifest_gpus(manifest)
+    if not wanted:
+        return None
+    from astrolift_billing.models import Quota
+
+    org_id = deployment.registered_app.organization_id
+    quota = Quota.objects.filter(
+        organization_id=org_id,
+        scope_kind=Quota.ScopeKind.ORG,
+        resource=Quota.Resource.GPU,
+    ).first()
+    if quota is None:
+        return None
+    in_use = _org_gpus_in_use(org_id, excluding_env_id=deployment.app_environment_id)
+    if in_use + wanted > quota.hard_limit:
+        return (
+            f"this deploy needs {wanted} GPU(s); the organization already runs {in_use} of its "
+            f"{int(quota.hard_limit)}-GPU quota. Stop a GPU workload or request a quota increase"
+        )
+    return None
+
+
 def deployment_env_from(app, env) -> tuple[list[str], dict]:
     """``(envFrom Secret names, per-workload envFrom)`` for ``env``'s deploy.
 
@@ -1050,7 +1134,7 @@ def render_resources_for_deployment(
     # the full resource set regardless of which code path produced it.
     managed_domain = getattr(env, "managed_domain", None)
     cluster = cluster_override or getattr(env, "tenant_cluster", None)
-    refusal = gpu_capacity_refusal(manifest, cluster)
+    refusal = gpu_capacity_refusal(manifest, cluster) or gpu_quota_refusal(deployment, manifest)
     if refusal:
         raise AppDeployError(refusal)
     _ingress_count = 0
