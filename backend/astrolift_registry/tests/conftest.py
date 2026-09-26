@@ -57,3 +57,18 @@ def seed_cluster():
         )
 
     return _seed
+
+
+@pytest.fixture(autouse=True)
+def _no_anonymous_github_reads(monkeypatch):
+    """Registry tests never reach GitHub. With no source connection, a public
+    repo is read anonymously (#2051); here that read fails as if offline, so
+    the no-connection paths behave as they do for a private repo. Tests of the
+    anonymous read patch these themselves."""
+    import requests
+
+    def _offline(**_kwargs):
+        raise requests.ConnectionError("network disabled in tests")
+
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_file", _offline)
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_repo_tree", _offline)
