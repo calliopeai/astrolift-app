@@ -740,10 +740,39 @@ def _probe(factory: Callable, org_id: int) -> str:
     return ""
 
 
+def _gates(resolver: Any, org_id: int) -> tuple[str, str, tuple[str, ...]]:
+    """``(permission, scope, problems)`` for one resolver's gate stack."""
+    tenant_codes, permission_codes = _codes()
+    layers = list(_chain(resolver))
+    gates = [
+        layer.__astrolift_permission_gate__
+        for layer in layers
+        if getattr(layer, "__code__", None) in permission_codes
+    ]
+    problems: list[str] = []
+    if not gates:
+        problems.append("no @require_permission")
+    if not any(getattr(layer, "__code__", None) in tenant_codes for layer in layers):
+        problems.append("no @tenant_scoped")
+    scopes = []
+    for gate in gates:
+        if gate.any_scope:
+            scopes.append("any scope, rows narrowed")
+        elif gate.scope is None:
+            scopes.append("targetless (selected team/project, else org)")
+            problems.append(f"{'+'.join(p.value for p in gate.permissions)} is targetless")
+        else:
+            scopes.append(_factory_name(gate.scope))
+            miss = _probe(gate.scope, org_id)
+            if miss:
+                problems.append(miss)
+    permission = "; ".join("+".join(p.value for p in gate.permissions) for gate in gates)
+    return permission, "; ".join(scopes), tuple(problems)
+
+
 def _graphql(org_id: int) -> Iterator[Surface]:
     from config.schema import schema, schema_auth
 
-    tenant_codes, permission_codes = _codes()
     for prefix, served in (("", schema), ("auth:", schema_auth)):
         for kind in ("Query", "Mutation", "Subscription"):
             root = getattr(served._schema, f"{kind.lower()}_type")
@@ -752,37 +781,14 @@ def _graphql(org_id: int) -> Iterator[Surface]:
             for name in root.fields:
                 field = served.get_field_for_type(field_name=name, type_name=root.name)
                 resolver = field.base_resolver.wrapped_func if field.base_resolver is not None else None
-                layers = list(_chain(resolver))
-                gates = [
-                    layer.__astrolift_permission_gate__
-                    for layer in layers
-                    if getattr(layer, "__code__", None) in permission_codes
-                ]
-                tenant = any(getattr(layer, "__code__", None) in tenant_codes for layer in layers)
-                problems: list[str] = []
-                if not gates:
-                    problems.append("no @require_permission")
-                if not tenant:
-                    problems.append("no @tenant_scoped")
-                scopes = []
-                for gate in gates:
-                    if gate.any_scope:
-                        scopes.append("any scope, rows narrowed")
-                    elif gate.scope is None:
-                        scopes.append("targetless (selected team/project, else org)")
-                        problems.append(f"{'+'.join(p.value for p in gate.permissions)} is targetless")
-                    else:
-                        scopes.append(_factory_name(gate.scope))
-                        miss = _probe(gate.scope, org_id)
-                        if miss:
-                            problems.append(miss)
+                permission, scope, problems = _gates(resolver, org_id)
                 yield Surface(
                     kind="graphql",
                     key=f"{prefix}{kind}.{name}",
                     area=_area(resolver),
-                    permission="; ".join("+".join(p.value for p in gate.permissions) for gate in gates),
-                    scope="; ".join(scopes),
-                    problems=tuple(problems),
+                    permission=permission,
+                    scope=scope,
+                    problems=problems,
                 )
 
 
@@ -960,3 +966,81 @@ def test_gaps_reference_an_issue() -> None:
 def test_the_login_schema_stays_login_only(table) -> None:
     auth = sorted(row.key for row in table if row.key.startswith("auth:"))
     assert auth == ["auth:Mutation.login", "auth:Mutation.logout", "auth:Query.ok"]
+
+
+def _org_scope_factory(_args):
+    from core.permissions import PermissionScope, ScopeKind
+
+    return PermissionScope(kind=ScopeKind.ORG, id=1)
+
+
+def _none_on_a_miss(_args):
+    return None
+
+
+def _look_alike(*permissions, **_kwargs):
+    """Carries the real gate's marker, checks nothing."""
+    import functools
+
+    from core.permissions import PermissionGate
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs)
+
+        wrapper.__astrolift_permission_gate__ = PermissionGate(
+            permissions=permissions, scope=None, any_scope=True
+        )
+        return wrapper
+
+    return decorator
+
+
+def _resolver(*decorators):
+    def resolver(self, info, slug: str = ""):
+        return None
+
+    for decorate in reversed(decorators):
+        resolver = decorate(resolver)
+    return resolver
+
+
+def _stream(*decorators):
+    async def resolver(self, info, slug: str = ""):
+        yield None
+
+    for decorate in reversed(decorators):
+        resolver = decorate(resolver)
+    return resolver
+
+
+def _synthetic():
+    from core.decorators import tenant_scoped
+    from core.permissions import Permission, require_permission
+
+    read = Permission.AGENT_READ
+    return {
+        "scoped": (_resolver(require_permission(read, scope=_org_scope_factory), tenant_scoped()), ()),
+        "collection": (_resolver(require_permission(read, any_scope=True), tenant_scoped()), ()),
+        "subscription": (_stream(require_permission(read, scope=_org_scope_factory), tenant_scoped()), ()),
+        "targetless": (_resolver(require_permission(read), tenant_scoped()), ("agent.read is targetless",)),
+        "none on a miss": (
+            _resolver(require_permission(read, scope=_none_on_a_miss), tenant_scoped()),
+            ("scope factory _none_on_a_miss answers None on a miss",),
+        ),
+        "no tenant": (_resolver(require_permission(read, any_scope=True)), ("no @tenant_scoped",)),
+        "look-alike": (_resolver(_look_alike(read), tenant_scoped()), ("no @require_permission",)),
+    }
+
+
+@pytest.mark.parametrize("case", list(_synthetic()))
+def test_the_walk_reads_the_real_gates(case) -> None:
+    """The guardrail's own red cases: it recognises the real decorators by
+    their code, so a wrapper that forges the gate's marker does not pass,
+    and it catches the targetless check and a factory that misses to None."""
+    from astrolift_identity.models import Organization
+
+    resolver, expected = _synthetic()[case]
+    org = Organization.objects.create(name="Walk", slug=f"walk-{case.replace(' ', '-')}")
+    assert _gates(resolver, org.pk)[2] == expected
