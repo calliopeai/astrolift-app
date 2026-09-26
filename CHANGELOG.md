@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- Tenant service config can no longer adopt an existing resource on GCP or
+  k8s_native (#2074, follow-up to #2021). The tenant-set flag #2021 removed
+  from Cloud SQL SQL Server, Valkey and Firestore lived on in sixteen more
+  drivers, and some went further: `reassign_existing` and
+  `allow_reassignment` took a resource from another managed service or
+  another org's boundary, and Cloud CDN's `adopt_existing` rewrote another
+  stack's ownership marker. Removed, and refused unconditionally:
+  `adopt_existing` and `reassign_existing` on API Gateway, Filestore, Cloud
+  Functions, Eventarc (the bus and every child declaration) and Managed
+  Kafka (cluster, schema registry, Connect); `adopt_existing` on Cloud CDN
+  and Private Service Connect; `adopt_existing` and `allow_reassignment` on
+  Workflows; the per-declaration `adopt` on Cloud Operations;
+  `adopt_existing_instance` and `adopt_existing_database` on Spanner Graph,
+  plus the install-level `spanner_adopt_existing_instance` switch, which any
+  tenant `instance_id` reached because it outranks
+  `spanner_shared_instance_id`; `adopt_existing` and `expected_existing_uid`
+  on the k8s_native Argo Workflows, KServe, Gateway API, Knative Serving and
+  Knative Eventing drivers, where knowing an object's uid proved only that
+  the caller could see it; and SeaweedFS's `adopt_existing`, which asked the
+  operator to bind an existing bucket in the shared cluster to the tenant's
+  S3 identity and is now always rendered `adoptExisting: false`. A config
+  that still sets one of these keys, even to `false`, is rejected rather
+  than ignored. A pre-existing shared Spanner instance takes the
+  `astrolift-managed-by=platform` label instead of the switch. The
+  `delete_adopted*` teardown confirmations stay: a resource adopted before
+  this change keeps its marker and still needs the second acknowledgement to
+  delete.
 - Rendered hostnames, not just app labels, are now unique per managed zone
   (#2012, follow-up to #1930). A multi-workload app's suffixed hostname
   (`<label>-<workload>.<zone>`) can equal another org's plain label of that
