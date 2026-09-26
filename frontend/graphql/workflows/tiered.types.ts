@@ -248,6 +248,30 @@ export type WorkflowDefinitionRunsVars = {
   limit?: number | null;
 };
 
+// One open human_gate stage execution the caller may decide (#1820). Flat
+// and self-contained: enough to deep link into the run's observe page
+// (`?run=` takes runGuid) or drive signalWorkflowInstance directly
+// (workflowId + the executionId payload key), no second lookup.
+export type PendingHumanGate = {
+  executionId: string;
+  runGuid: string;
+  workflowId: string;
+  definitionSlug: string;
+  definitionName: string;
+  stageRole: string;
+  stageApprovers: string[];
+  startedAt: string | null;
+};
+
+export type PendingHumanGatesData = {
+  pendingHumanGates: PendingHumanGate[];
+};
+
+export type PendingHumanGatesVars = {
+  orgId?: string | null;
+  limit?: number | null;
+};
+
 export type TieredWorkflowStageExecutionsData = {
   workflowStageExecutions: WorkflowStageExecution[];
 };

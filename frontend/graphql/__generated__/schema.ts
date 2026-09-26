@@ -7591,6 +7591,17 @@ export type PauseAppWebhookDeploysInput = {
   reason: InputMaybe<Scalars['String']['input']>;
 };
 
+export type PendingHumanGate = {
+  definitionName: Scalars['String']['output'];
+  definitionSlug: Scalars['String']['output'];
+  executionId: Scalars['String']['output'];
+  runGuid: Scalars['String']['output'];
+  stageApprovers: Array<Scalars['String']['output']>;
+  stageRole: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  workflowId: Scalars['String']['output'];
+};
+
 export type PermissionComparison = {
   differences: Array<PermissionDiff>;
   onlyA: Array<Scalars['String']['output']>;
@@ -8049,6 +8060,8 @@ export type Query = {
   organizations: Array<OrganizationType>;
   /** Cursor-paginated list of the caller's organizations. */
   organizationsPage: OrganizationTypePage;
+  /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
+  pendingHumanGates: Array<PendingHumanGate>;
   /** Compare effective permissions between two users. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission. */
@@ -9360,6 +9373,12 @@ export type QueryOrganizationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryPendingHumanGatesArgs = {
+  limit?: Scalars['Int']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 

@@ -5931,6 +5931,17 @@ input PauseAppWebhookDeploysInput {
   reason: String = null
 }
 
+type PendingHumanGate {
+  executionId: String!
+  runGuid: String!
+  workflowId: String!
+  definitionSlug: String!
+  definitionName: String!
+  stageRole: String!
+  stageApprovers: [String!]!
+  startedAt: DateTime
+}
+
 type PermissionComparison {
   userAUsername: String!
   userBUsername: String!
@@ -6431,6 +6442,11 @@ type Query {
   Recent runs of workflow definitions visible in the caller's organization.
   """
   workflowDefinitionRuns(orgId: ID = null, projectId: ID = null, status: String = null, limit: Int! = 50): [WorkflowDefinitionRun!]!
+
+  """
+  Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820).
+  """
+  pendingHumanGates(orgId: ID = null, limit: Int! = 50): [PendingHumanGate!]!
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 

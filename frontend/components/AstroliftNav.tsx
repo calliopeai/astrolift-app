@@ -292,6 +292,7 @@ const modules: ModuleEntry[] = [
     icon: <WorkflowIcon />,
     href: "/workflows",
     items: [
+      { label: "Pending Gates", href: "/gates", icon: <CheckCircle2Icon /> },
       { label: "Jobs", href: "/jobs", icon: <CalendarClockIcon /> },
       { label: "Tasks", href: "/tasks", icon: <ClipboardListIcon /> },
       { label: "Functions", href: "/functions", icon: <BoltIcon /> },
