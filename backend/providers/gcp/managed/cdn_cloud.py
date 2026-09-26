@@ -883,6 +883,11 @@ class CloudCdnDriver(ManagedServiceDriver):
                 f"{collection}/{name} exists but is not owned by this Cloud CDN stack; adoption is a "
                 "separate, operator-authorized operation and cannot be granted by tenant config",
             )
+        if _adopted(current) and desired.get("description") == marker:
+            # The adopted suffix is what ``delete_adopted_resources`` reads, and
+            # nothing writes it any more (#2074): a reconcile must not patch a
+            # resource adopted before then back to the plain marker (#2086).
+            desired = {**desired, "description": f"{marker}; adopted=true"}
         patch = {
             key: value for key, value in desired.items() if key != "name" and not _contains(current.get(key), value)
         }

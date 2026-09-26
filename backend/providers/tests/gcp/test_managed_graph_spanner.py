@@ -455,9 +455,13 @@ def test_existing_unmarked_database_is_refused_without_operator_adoption(
 def test_update_schema_is_replay_safe(driver: SpannerGraphDriver, client: FakeSpannerClient) -> None:
     created = driver.provision(_spec())
     statement = "ALTER TABLE GraphNode ADD COLUMN created_at TIMESTAMP"
-    first = driver.update(UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]}))
+    first = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]})
+    )
     client.schema_operation_already_exists = True
-    second = driver.update(UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]}))
+    second = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]})
+    )
     assert first.ok and second.ok
     assert any(name == "get_operation" for name, _ in client.calls)
 
@@ -492,7 +496,9 @@ def test_update_reconciles_version_retention_with_replay_safe_ddl(
     client: FakeSpannerClient,
 ) -> None:
     created = driver.provision(_spec())
-    updated = driver.update(UpdateSpec(created.handle, managed_service_id=MSID, config={"version_retention_period": "7d"}))
+    updated = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"version_retention_period": "7d"})
+    )
     assert updated.ok
     update = next(
         kwargs
@@ -588,7 +594,9 @@ def test_deprovision_of_adopted_database_requires_separate_delete_consent(
     created = driver.provision(_spec(config={"deletion_protection": False}))
     instance_id, _ = _parse_handle(created.handle)
     client.instances[f"projects/acme/instances/{instance_id}"]["labels"] = {}
-    denied = driver.deprovision(DeprovisionSpec(created.handle, managed_service_id=MSID), delete_data=True, force_destroy=True)
+    denied = driver.deprovision(
+        DeprovisionSpec(created.handle, managed_service_id=MSID), delete_data=True, force_destroy=True
+    )
     allowed = driver.deprovision(
         DeprovisionSpec(created.handle, managed_service_id=MSID, config={"delete_adopted_database": True}),
         delete_data=True,
