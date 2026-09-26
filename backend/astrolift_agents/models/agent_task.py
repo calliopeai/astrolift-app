@@ -126,10 +126,15 @@ class AgentTask(BaseCoreModel):
     # with no such env var.
     dispatch_input = models.JSONField(null=True, blank=True)
     # Idempotency key for ``runAstroliftAgent`` (#2072), mirroring
-    # ``AgentTaskInputMessage.client_request_id``. A retry presenting the
-    # same key for the same organization returns the task already created
-    # for it instead of dispatching a second one; ``agentTaskByClientRequestId``
-    # recovers it without dispatching. Null for the (still supported)
+    # ``AgentTaskInputMessage.client_request_id``. Scoped per requester
+    # (``created_by``), not just per organization: the uniqueness
+    # constraint below is ``(organization, created_by, client_request_id)``,
+    # so a retry presenting the SAME key as the SAME requester returns the
+    # task already created for it, while a different requester presenting
+    # the identical key (collision, not a retry) gets an independent task
+    # rather than someone else's -- ``agentTaskByClientRequestId`` and the
+    # replay check in ``dispatch_registered_agent`` both filter on the
+    # caller's own requester identity. Null for the (still supported)
     # no-key call, and for every other dispatch path.
     client_request_id = models.UUIDField(null=True, blank=True)
     # Lifecycle timestamps.
@@ -225,11 +230,15 @@ class AgentTask(BaseCoreModel):
         # Keep the key reserved after soft deletion so a retry cannot
         # re-dispatch under it -- mirrors ``agentinput_task_request_unique``.
         # Postgres treats every NULL as distinct, so unkeyed dispatches
-        # (the common case) never collide with each other.
+        # (the common case) never collide with each other, and so do two
+        # different requesters (``created_by``) who happen to submit the
+        # same key -- scoping by requester as well as org means a key is
+        # only ever a retry of THAT requester's own prior call, never a
+        # cross-user collision that would hand one caller another's task.
         constraints = [
             models.UniqueConstraint(
-                fields=["organization", "client_request_id"],
-                name="agenttask_org_request_unique",
+                fields=["organization", "created_by", "client_request_id"],
+                name="agenttask_org_requester_request_unique",
             ),
         ]
 

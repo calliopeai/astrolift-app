@@ -689,16 +689,27 @@ class AgentsQuery:
         exists -- retrying the mutation is guarded by the same key
         (``dispatch_registered_agent``'s idempotency check), but a client
         that lost the reply needs a read, not another dispatch attempt.
-        Returns null for a malformed key, a key from another org, or one
-        the caller cannot read -- same shape as ``agentTaskInputMessage``.
+
+        The key is scoped to the requester who minted it (matching
+        ``dispatch_registered_agent``'s ``created_by`` scoping): this
+        resolves only a task ``created_by`` the CALLER's own actor id, never
+        another org member's, even one holding ``agent.read`` -- a
+        clientRequestId is not itself a secret, so a coarse org-wide lookup
+        would let any reader guess-and-check another user's key. Returns
+        null for a malformed key, a key from another org, one the caller
+        cannot read, or one that exists but belongs to a different
+        requester -- same "null, never leak existence" shape as
+        ``agentTaskInputMessage``.
         """
         org_pk = _caller_org_id(info, org_id)
         request_guid = _valid_guid(client_request_id)
         if request_guid is None:
             return None
+        tenant = get_current_tenant()
+        requester_id = tenant.actor_user_id if tenant else None
         task = (
             visible_agent_tasks(org_pk, Permission.AGENT_READ)
-            .filter(organization_id=org_pk, client_request_id=request_guid)
+            .filter(organization_id=org_pk, created_by_id=requester_id, client_request_id=request_guid)
             .first()
         )
         return agent_task_to_type(task) if task is not None else None

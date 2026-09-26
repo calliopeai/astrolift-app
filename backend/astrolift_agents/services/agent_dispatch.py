@@ -60,12 +60,16 @@ def dispatch_registered_agent(
     freezes the same environment spec and immutable Agent Package Brief.
 
     ``client_request_id`` (#2072) is an idempotency key, the dispatch
-    counterpart of ``queue_agent_task_input``'s: presenting the same key
-    again for the same organization with the same agent, environment spec,
-    trigger payload and timeout returns the task already created for it
-    rather than dispatching a second one. The same key with a different
-    payload is refused (``precondition``) instead of silently diverging from
-    what the first call recorded.
+    counterpart of ``queue_agent_task_input``'s: the SAME requester
+    (``actor.user_id``, persisted as the task's ``created_by``) presenting
+    the same key again for the same organization with the same agent,
+    environment spec, trigger payload and timeout gets back the task
+    already created for it rather than a second dispatch. The same key
+    from that requester with a different payload is refused
+    (``precondition``). Scoped per requester, not just per organization: a
+    different requester presenting the identical key is a coincidence, not
+    a retry, so it dispatches its own independent task rather than either
+    conflicting with or returning someone else's.
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
@@ -81,6 +85,12 @@ def dispatch_registered_agent(
     slug = (agent_slug or "").strip()
     if not slug:
         raise AgentDispatchError("validation", "agent slug is required", "agent_slug")
+
+    # The requester a client_request_id is scoped to (#2072). ``actor`` is
+    # already resolved by every caller (the GraphQL mutation via
+    # ``_dispatch_actor``, MCP via its bearer token's owning user), so this
+    # reuses that identity rather than threading a second one through.
+    requester_id = getattr(actor, "user_id", None)
 
     request_id = None
     if client_request_id is not None:
@@ -190,7 +200,7 @@ def dispatch_registered_agent(
 
     if request_id is not None:
         existing = AgentTask.all_objects.filter(
-            organization_id=organization_id, client_request_id=request_id
+            organization_id=organization_id, created_by_id=requester_id, client_request_id=request_id
         ).first()
         if existing is not None:
             return _replay_or_conflict(
@@ -211,6 +221,7 @@ def dispatch_registered_agent(
                 timeout_seconds=effective_timeout,
                 dispatch_input=trigger_payload or None,
                 vnc_enabled=bool(environment_spec and environment_spec.vnc_enabled),
+                created_by_id=requester_id,
                 client_request_id=request_id,
             )
     except IntegrityError:
@@ -219,7 +230,7 @@ def dispatch_registered_agent(
         if request_id is None:
             raise
         existing = AgentTask.all_objects.filter(
-            organization_id=organization_id, client_request_id=request_id
+            organization_id=organization_id, created_by_id=requester_id, client_request_id=request_id
         ).first()
         if existing is None:
             raise

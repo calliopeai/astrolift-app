@@ -28,6 +28,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
 from astrolift_agents.schema.mutations import AgentsMutation, RunAstroliftAgentInput
@@ -68,6 +69,16 @@ def org():
 @pytest.fixture
 def other_org():
     return Organization.objects.create(name="Dispatch Other", slug="dispatch-other")
+
+
+@pytest.fixture
+def user():
+    return get_user_model().objects.create(username="dispatch-user-a", email="dispatch-user-a@astrolift.dev")
+
+
+@pytest.fixture
+def other_user():
+    return get_user_model().objects.create(username="dispatch-user-b", email="dispatch-user-b@astrolift.dev")
 
 
 @pytest.fixture
@@ -448,6 +459,37 @@ def test_client_request_id_with_a_different_payload_is_a_precondition(
     assert len(temporal_recorder) == 1
 
 
+def test_client_request_id_from_a_different_requester_dispatches_an_independent_task(
+    permission_resolver, info, org, user, other_user, with_tenant_org, temporal_recorder
+):
+    """The key is scoped per requester, not just per org: two different
+    users presenting the identical clientRequestId (and identical payload)
+    is a coincidence, not a retry. Each must get its own task; the second
+    caller must never get the first caller's task back, and it must not be
+    refused as a conflict either -- either outcome would tell user B
+    something true about user A's key."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+    key = str(uuid4())
+
+    with with_tenant_org(org, actor_user_id=user.id):
+        first = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+    with with_tenant_org(org, actor_user_id=other_user.id):
+        second = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+
+    assert first.ok is True and second.ok is True
+    assert str(first.data.id) != str(second.data.id)
+    assert AgentTask.objects.count() == 2
+    # Both actually dispatched -- the second was not treated as a replay.
+    assert len(temporal_recorder) == 2
+    assert AgentTask.objects.get(guid=str(first.data.id)).created_by_id == user.id
+    assert AgentTask.objects.get(guid=str(second.data.id)).created_by_id == other_user.id
+
+
 def test_client_request_id_malformed_is_a_validation_error(
     permission_resolver, info, org, with_tenant_org, temporal_recorder
 ):
@@ -488,6 +530,33 @@ def test_agent_task_by_client_request_id_recovers_the_task_without_dispatching(
     # The recovery read did not dispatch anything of its own.
     assert len(temporal_recorder) == 1
     assert AgentTask.objects.count() == 1
+
+
+def test_agent_task_by_client_request_id_returns_null_for_another_users_key(
+    permission_resolver, info, org, user, other_user, with_tenant_org, temporal_recorder
+):
+    """A clientRequestId is not itself a secret; a coarse org-wide lookup
+    would let any agent.read holder guess-and-check another user's key and
+    learn their task exists. The query must resolve only the CALLER's own
+    key -- a real key from a different requester in the same org and the
+    same task-visible scope is still null, not the other user's task."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    permission_resolver.grant(Permission.AGENT_READ)
+    workload = _agent_workload(org)
+    key = str(uuid4())
+
+    with with_tenant_org(org, actor_user_id=user.id):
+        dispatched = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+        assert dispatched.ok is True
+
+    with with_tenant_org(org, actor_user_id=other_user.id):
+        recovered = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(org.guid), client_request_id=key
+        )
+
+    assert recovered is None
 
 
 def test_agent_task_by_client_request_id_unknown_key_is_null(permission_resolver, info, org, with_tenant_org):
@@ -545,19 +614,27 @@ def test_agent_task_by_client_request_id_is_org_scoped(
     assert AgentTask.objects.count() == 2
 
 
-def test_client_request_id_unique_constraint_is_enforced_at_the_db_level(org):
+def test_client_request_id_unique_constraint_is_enforced_at_the_db_level(org, user):
     """The migration's constraint, not just the service's pre-check, is what
     actually stops two concurrent dispatches racing under the same key --
-    ``dispatch_registered_agent`` catches exactly this exception."""
+    ``dispatch_registered_agent`` catches exactly this exception.
+
+    ``created_by`` must be a real, matching value on both rows: Postgres
+    never treats a NULL column as equal to anything, including another
+    NULL, so a composite unique constraint with a null ``created_by``
+    would not catch this duplicate (see ``test_null_client_request_id_never_collides``
+    for that side of the same rule) -- this test has to hold requester
+    identity fixed to actually exercise the constraint.
+    """
     from django.db import IntegrityError, transaction
 
     key = uuid4()
-    AgentTask.objects.create(organization=org, client_request_id=key)
+    AgentTask.objects.create(organization=org, created_by=user, client_request_id=key)
     with pytest.raises(IntegrityError):
         with transaction.atomic():
-            AgentTask.objects.create(organization=org, client_request_id=key)
+            AgentTask.objects.create(organization=org, created_by=user, client_request_id=key)
     # The failed insert's own savepoint rolled back; the first row is intact.
-    assert AgentTask.objects.filter(organization=org, client_request_id=key).count() == 1
+    assert AgentTask.objects.filter(organization=org, created_by=user, client_request_id=key).count() == 1
 
 
 def test_null_client_request_id_never_collides(org):

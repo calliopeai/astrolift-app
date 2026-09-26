@@ -213,13 +213,18 @@ class RunAstroliftAgentInput:
     bounds the run (defaults to the AgentTask model default).
 
     ``client_request_id`` (#2072) is an optional idempotency key, a UUID the
-    caller mints itself: presenting the same key again with the same
-    ``agent_slug``/``environment_spec_id``/``trigger_payload``/
-    ``timeout_seconds`` returns the task already dispatched for it rather
-    than creating a second one, so a client that launched an agent and
-    crashed before recording the reply can retry safely. The same key with a
-    different payload is refused (PRECONDITION). ``agentTaskByClientRequestId``
-    recovers the task for a key without dispatching anything.
+    caller mints itself: the SAME caller presenting the same key again with
+    the same ``agent_slug``/``environment_spec_id``/``trigger_payload``/
+    ``timeout_seconds`` gets back the task already dispatched for it rather
+    than a second one, so a client that launched an agent and crashed
+    before recording the reply can retry safely. That same caller
+    presenting the key again with a different payload is refused
+    (PRECONDITION). The key is scoped to the requester who minted it: a
+    different caller presenting the identical key dispatches its own,
+    independent task rather than either colliding with or recovering the
+    first caller's. ``agentTaskByClientRequestId`` recovers the task for a
+    key without dispatching anything, and likewise resolves only the
+    calling user's own keys.
     """
 
     agent_slug: str
