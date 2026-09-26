@@ -6272,6 +6272,7 @@ type Query {
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
   astroliftProjectResourceClusters(projectId: GUID!): [AstroliftTenantCluster!]!
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
+  astroliftModelEndpoints: [AstroliftManagedService!]!
   astroliftProjectManagedServices(projectId: GUID!): [AstroliftManagedService!]!
   astroliftProjectSecretBundles(projectId: GUID!): [AstroliftSecretBundle!]!
   astroliftAppSecrets(appSlug: String!, environmentName: String = null): [AstroliftAppSecret!]!
