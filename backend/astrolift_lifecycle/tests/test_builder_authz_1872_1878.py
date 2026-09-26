@@ -151,9 +151,12 @@ def _session(user) -> Client:
     return client
 
 
-def _dev_env(org: Organization, cluster: TenantCluster | None, creator) -> DevEnvironment:
+def _dev_env(
+    org: Organization, cluster: TenantCluster | None, creator, *, team: Team | None = None
+) -> DevEnvironment:
     return DevEnvironment.objects.create(
         organization=org,
+        team=team,
         creator=creator,
         tenant_cluster=cluster,
         runtime=DevEnvironment.Runtime.PYTHON,
@@ -171,7 +174,11 @@ def _send(method: str, path: str, payload: dict, headers: dict, client: Client |
 
 
 def _create(headers: dict, client: Client | None = None, **payload):
-    return _send("post", CREATE, {"runtime": "python", **payload}, headers, client)
+    """``team_slug`` defaults to ``world.eng`` (#1919): every fixture user in
+    this module holds a role on that team or an org-wide one that reaches it,
+    so tests that aren't specifically about team resolution don't each have
+    to name it. Pass ``team_slug=...`` (or ``None``) to override."""
+    return _send("post", CREATE, {"runtime": "python", "team_slug": "eng", **payload}, headers, client)
 
 
 def _sync(dev: DevEnvironment, headers: dict):
@@ -257,6 +264,7 @@ def test_the_default_cluster_is_the_orgs_own_before_any_shared_one(workflow_star
         own = _cluster(org, "authz-default-own")
         shared = _cluster(None, "authz-default-shared")
     assert (shared.pk < own.pk) is shared_first
+    Team.objects.create(organization=org, name="Eng", slug="eng")
     user = _member(org, "authz-default-admin", ("org_admin", "ORG", org.id))
 
     response = _create(_bearer(user, org))
@@ -268,6 +276,7 @@ def test_the_default_cluster_is_the_orgs_own_before_any_shared_one(workflow_star
 def test_the_default_cluster_falls_back_to_a_shared_one(workflow_starts):
     org = _org("authz-fallback")
     shared = _cluster(None, "authz-fallback-shared")
+    Team.objects.create(organization=org, name="Eng", slug="eng")
     user = _member(org, "authz-fallback-admin", ("org_admin", "ORG", org.id))
 
     response = _create(_bearer(user, org))
@@ -421,7 +430,7 @@ def test_callers_without_app_create_are_refused_on_every_route(world, workflow_s
         grants = ((role, scope_kind, team.id if team else world.a.id),)
     user = _member(world.a, "authz-denied", *grants)
     headers = _bearer(user, world.a, team=team)
-    dev = _dev_env(world.a, world.cluster_a, user)
+    dev = _dev_env(world.a, world.cluster_a, user, team=world.eng)
 
     create, sync, promote = _create(headers), _sync(dev, headers), _promote(dev, headers)
 
@@ -429,8 +438,7 @@ def test_callers_without_app_create_are_refused_on_every_route(world, workflow_s
         assert response.status_code == 403, response.content
         assert response.json()["reason"] == "missing_permission"
         assert response.json()["permission"] == "app.create"
-    where = "on the api token's team" if team else "in this organization"
-    assert create.json()["detail"] == f"app.create is required {where}"
+    assert create.json()["detail"] == "app.create is required on team 'eng'"
     assert promote.json()["detail"] == "app.create is required on team 'eng'"
     assert DevEnvironment.objects.count() == 1
     assert _untouched(dev)
@@ -488,7 +496,9 @@ def test_a_team_admin_promotes_into_their_team_and_no_other(world, workflow_star
     user = _member(world.a, "authz-team-admin", ("team_admin", "TEAM", world.eng.id))
 
     for headers in (_bearer(user, world.a), _bearer(user, world.a, team=world.eng)):
-        into_ops = _promote(_dev_env(world.a, world.cluster_a, user), headers, team_slug="ops")
+        into_ops = _promote(
+            _dev_env(world.a, world.cluster_a, user, team=world.eng), headers, team_slug="ops"
+        )
         assert into_ops.status_code == 403, into_ops.content
         assert into_ops.json() == {
             "detail": "app.create is required on team 'ops'",
@@ -498,43 +508,50 @@ def test_a_team_admin_promotes_into_their_team_and_no_other(world, workflow_star
     assert not RegisteredApp.objects.exists()
     assert workflow_starts == []
 
-    into_eng = _promote(_dev_env(world.a, world.cluster_a, user), _bearer(user, world.a), team_slug="eng")
+    into_eng = _promote(
+        _dev_env(world.a, world.cluster_a, user, team=world.eng), _bearer(user, world.a), team_slug="eng"
+    )
 
     assert into_eng.status_code == 202, into_eng.content
     assert RegisteredApp.objects.get().team_id == world.eng.pk
 
 
-def test_a_team_role_reaches_create_and_sync_through_a_token_for_its_team(world, workflow_starts):
-    """Create and sync are checked at the org level; the org-wide token of a
-    team admin does not reach them, a token issued for the team does."""
+def test_a_team_roles_own_team_is_what_matters_for_create_sync_and_promote(world, workflow_starts):
+    """Create resolves ``team_slug`` and sync/promote read the row's own
+    team, never the token's (#1919): a team admin of Eng reaches all three
+    whether the token is org-wide or issued for Eng."""
     user = _member(world.a, "authz-team-admin", ("team_admin", "TEAM", world.eng.id))
 
-    org_wide = _create(_bearer(user, world.a))
-    assert org_wide.status_code == 403, org_wide.content
-    assert org_wide.json()["permission"] == "app.create"
-
-    headers = _bearer(user, world.a, team=world.eng)
-    dev = _running(_create(headers))
-    assert _sync(dev, headers).status_code == 200
-    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
-    assert _promote(dev, headers, team_slug="eng").status_code == 202
+    for suffix, headers in enumerate((_bearer(user, world.a), _bearer(user, world.a, team=world.eng))):
+        dev = _running(_create(headers))
+        assert _sync(dev, headers).status_code == 200
+        DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+        promoted = _promote(dev, headers, app_name=f"Shipped {suffix}", team_slug="eng")
+        assert promoted.status_code == 202, promoted.content
 
 
 def test_a_token_for_a_deleted_team_is_refused(world, workflow_starts):
     """``team_admin`` on Eng with a token issued for Eng. Deleting Eng leaves
-    both the binding and the token behind; neither may still create or sync."""
+    the binding, the token and the dev environment's ``team`` FK behind, but
+    a row can no longer be created for, or synced against, a team that's
+    gone: the team-scope RBAC ancestry check denies everyone once the team
+    itself is soft-deleted, the row's own creator included."""
     user = _member(world.a, "authz-deleted-team", ("team_admin", "TEAM", world.eng.id))
     headers = _bearer(user, world.a, team=world.eng)
-    dev = _dev_env(world.a, world.cluster_a, user)
+    dev = _dev_env(world.a, world.cluster_a, user, team=world.eng)
     world.eng.soft_delete()
 
-    for response in (_create(headers), _sync(dev, headers)):
-        assert response.status_code == 403, response.content
-        assert response.json() == {
-            "detail": "app.create is required on the api token's team",
-            "reason": "missing_permission",
-            "permission": "app.create",
-        }
+    create = _create(headers)
+    assert create.status_code == 404, create.content
+    assert create.json() == {"detail": "team 'eng' not found"}
+
+    sync = _sync(dev, headers)
+    assert sync.status_code == 403, sync.content
+    assert sync.json() == {
+        "detail": "app.create is required on team 'eng'",
+        "reason": "missing_permission",
+        "permission": "app.create",
+    }
     assert DevEnvironment.objects.count() == 1
     assert _untouched(dev)
     assert workflow_starts == []
@@ -542,19 +559,18 @@ def test_a_token_for_a_deleted_team_is_refused(world, workflow_starts):
 
 def test_request_headers_do_not_widen_the_check(world, workflow_starts):
     """A team admin of Eng on an org-wide token names Eng in the team header.
-    That lends nothing: create stays org-level and promote into Ops stays on
-    Ops. A header naming another org is refused before the view runs, even
-    for a promote this caller could otherwise make."""
+    That lends nothing: promote into Ops stays on Ops regardless. A header
+    naming another org is refused before the view runs, even for a promote
+    this caller could otherwise make."""
     user = _member(world.a, "authz-header-spoof", ("team_admin", "TEAM", world.eng.id))
     team_header = {**_bearer(user, world.a), "HTTP_X_ASTROLIFT_TEAM": str(world.eng.pk)}
     org_header = {**_bearer(user, world.a), "HTTP_X_ASTROLIFT_ORGANIZATION": str(world.b.guid)}
 
-    created = _create(team_header)
-    into_ops = _promote(_dev_env(world.a, world.cluster_a, user), team_header, team_slug="ops")
-    into_b = _promote(_dev_env(world.a, world.cluster_a, user), org_header, team_slug="eng")
+    into_ops = _promote(
+        _dev_env(world.a, world.cluster_a, user, team=world.eng), team_header, team_slug="ops"
+    )
+    into_b = _promote(_dev_env(world.a, world.cluster_a, user, team=world.eng), org_header, team_slug="eng")
 
-    assert created.status_code == 403, created.content
-    assert created.json()["detail"] == "app.create is required in this organization"
     assert into_ops.status_code == 403, into_ops.content
     assert into_ops.json()["detail"] == "app.create is required on team 'ops'"
     assert into_b.status_code == 403, into_b.content
