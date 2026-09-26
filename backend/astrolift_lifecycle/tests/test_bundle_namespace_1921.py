@@ -24,6 +24,16 @@ from providers._sdk.cluster import ApplyResult
 
 pytestmark = pytest.mark.django_db
 
+
+@pytest.fixture(autouse=True)
+def _skip_the_deploy_dry_run(monkeypatch):
+    """These exercise Secret materialization on apps without a saved
+    manifest; the #1957 pre-write dry-run has its own tests."""
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.app_lifecycle._dry_run_deploy_set", lambda *args, **kwargs: None
+    )
+
+
 # The AWS driver resolves this to astrolift/managed/rds-orders/credentials:
 # another tenant's database credentials.
 _VICTIM = "managed/rds-orders/credentials"
@@ -49,7 +59,9 @@ class _ClusterDriver:
     def __init__(self):
         self.applied: list[dict] = []
 
-    def apply_manifests(self, cluster_slug, namespace, manifests):
+    def apply_manifests(self, cluster_slug, namespace, manifests, dry_run=False):
+        if dry_run:  # the #1957 pre-write gate; only real applies are recorded
+            return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
         self.applied.extend(manifests)
         return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
 

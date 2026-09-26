@@ -337,9 +337,12 @@ class TestBearerScopeCeiling:
         )
 
         assert context._ws_api_token is not None
+        from core.tenancy import tenant_context
+
         guard = set_current_api_token(None)
         try:
-            pin_ws_identity(context)
+            with tenant_context(None):  # pin_ws_identity sets the tenant too; restore it
+                pin_ws_identity(context)
             pinned = get_current_api_token()
             assert pinned is not None and pinned.pk == context._ws_api_token.pk
             assert token_scope_allows_permission(pinned, "app.read")
@@ -354,4 +357,7 @@ class TestBearerScopeCeiling:
         user = _member(org, _user("dana"))
         context = _resolve(cookie=f"sessionid={_session_cookie(user)}")
         assert getattr(context, "_ws_api_token", None) is None
-        pin_ws_identity(context)  # no token to pin; must not raise
+        from core.tenancy import tenant_context
+
+        with tenant_context(None):
+            pin_ws_identity(context)  # no token to pin; must not raise
