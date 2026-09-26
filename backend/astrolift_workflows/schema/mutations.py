@@ -278,25 +278,22 @@ def _gate_approver_refusal(user, execution_id: str, workflow_id: str) -> str | N
     / role slugs the notification service resolves. When the stage names
     addresses, only a caller whose email is one of them may decide; slug
     references are not resolved here (anyone with ``workflow.trigger`` at the
-    run's scope, as before). The platform operator may always decide.
+    run's scope, as before). The platform operator may always decide. The
+    predicate itself is shared with the org-wide pending-gates list
+    (``workflows.scopes.may_decide_human_gate``, #1820) so the two never
+    disagree on who may act.
     """
-    from core.permissions import is_platform_operator
     from workflows.models import WorkflowStageExecution
+    from workflows.scopes import may_decide_human_gate
 
-    if is_platform_operator(user):
-        return None
     # tenancy: confined to the signalled run, as in ``_resolve_execution_id``.
     row = (
         WorkflowStageExecution.objects.select_related("stage")
         .filter(workflow_run__workflow_id=workflow_id, pk=int(execution_id))
         .first()
     )
-    approvers = list(getattr(getattr(row, "stage", None), "approvers", None) or [])
-    addresses = {a.strip().casefold() for a in approvers if isinstance(a, str) and "@" in a}
-    if not addresses:
-        return None
-    email = (getattr(user, "email", "") or "").strip().casefold()
-    if email and email in addresses:
+    approvers = getattr(getattr(row, "stage", None), "approvers", None)
+    if may_decide_human_gate(user, approvers):
         return None
     return "only one of this gate's named approvers may decide it"
 

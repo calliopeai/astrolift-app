@@ -98,6 +98,26 @@ class WorkflowDefinitionRunType:
     ended_at: datetime | None
 
 
+@strawberry.type(name="PendingHumanGate")
+class PendingHumanGateType:
+    """One open ``human_gate`` stage execution the caller may decide (#1820).
+
+    Flat and self-contained on purpose: everything a caller needs to deep
+    link into the run's observe page (``/workflows/<definitionSlug>/observe
+    ?run=<runGuid>``, #2068's ``GateReview``) or drive ``signalWorkflowInstance``
+    directly, without a second lookup.
+    """
+
+    execution_id: str
+    run_guid: str
+    workflow_id: str
+    definition_slug: str
+    definition_name: str
+    stage_role: str
+    stage_approvers: list[str]
+    started_at: datetime | None
+
+
 @strawberry.type(name="ConfiguredWorkflow")
 class ConfiguredWorkflowType:
     """A tier-2 ``Workflow`` — the tenant's named, runnable application of a
@@ -250,6 +270,30 @@ def definition_run_to_type(run) -> WorkflowDefinitionRunType:
         child_run_count=getattr(run, "child_run_count", 0),
         started_at=run.started_at,
         ended_at=run.ended_at,
+    )
+
+
+def pending_gate_to_type(execution) -> PendingHumanGateType:
+    """*execution* is an open ``human_gate`` ``WorkflowStageExecution``.
+
+    The definition comes off the stage, which is always set (a stage always
+    belongs to one definition), not off ``workflow_run.workflow_definition``,
+    whose own denormalized link is not guaranteed for every caller of
+    ``create_stage_execution``.
+    """
+    stage = execution.stage
+    definition = stage.definition
+    run = execution.workflow_run
+    approvers = stage.approvers if isinstance(stage.approvers, list) else []
+    return PendingHumanGateType(
+        execution_id=str(execution.pk),
+        run_guid=str(run.guid),
+        workflow_id=run.workflow_id,
+        definition_slug=definition.slug or "",
+        definition_name=definition.name,
+        stage_role=stage.role or "",
+        stage_approvers=[str(a) for a in approvers if str(a).strip()],
+        started_at=execution.started_at,
     )
 
 
