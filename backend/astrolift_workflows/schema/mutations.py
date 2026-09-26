@@ -39,6 +39,7 @@ from core.permissions import (
 from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
+    definition_scope,
     definition_scope_by_slug,
     definition_scope_by_stage_guid,
     execution_scope_by_id,
@@ -432,7 +433,15 @@ class WorkflowsMutation:
         _sync_schedule(wf)
         return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
 
-    @strawberry.mutation(description="Update a configured Workflow (bindings / inputs / trigger / enabled).")
+    @strawberry.mutation(
+        description=(
+            "Update a configured Workflow (bindings / inputs / trigger / enabled). "
+            "definitionSlug repoints it at another visible definition: the fallback "
+            "for a versioned importWorkflowManifest(replace: true) (#1822), or any "
+            "manual repoint. The existing stage_bindings must still validate against "
+            "the new definition's stages, or the update is refused."
+        )
+    )
     @require_permission(Permission.WORKFLOW_UPDATE, scope=workflow_scope_by_slug("slug"))
     @tenant_scoped()
     def update_workflow(
@@ -446,11 +455,12 @@ class WorkflowsMutation:
         trigger_kind: str | None = None,
         schedule_cron: str | None = None,
         is_enabled: bool | None = None,
+        definition_slug: str | None = None,
         org_id: strawberry.ID | None = None,
     ) -> CreateWorkflowResult:
         from django.core.exceptions import ValidationError as DjangoValidationError
 
-        from workflows.models import Workflow
+        from workflows.models import Workflow, WorkflowDefinition
 
         org, err = _resolve_caller_org(org_id)
         if err is not None:
@@ -465,6 +475,28 @@ class WorkflowsMutation:
             return CreateWorkflowResult(
                 ok=False, errors=[ValidationError(field="slug", messages=[f'Workflow "{slug}" not found'])]
             )
+
+        if definition_slug is not None:
+            # Same visibility rule createWorkflow resolves a definition_slug
+            # with: the org's own wins a slug it shares with a template.
+            visible = WorkflowDefinition.visible_to_org(org.pk).filter(
+                slug=definition_slug, deleted_at__isnull=True
+            )
+            new_definition = visible.filter(organization_id=org.pk).first() or visible.first()
+            if new_definition is None:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="definition_slug",
+                            messages=[f'Workflow definition "{definition_slug}" not visible'],
+                        )
+                    ],
+                )
+            # Same permission createWorkflow requires to bind a Workflow to
+            # this definition in the first place.
+            check_permission(Permission.WORKFLOW_CREATE, scope=definition_scope(new_definition, org.pk))
+            wf.definition = new_definition
 
         if trigger_kind is not None:
             valid_triggers = {c[0] for c in Workflow.TriggerKind.choices}

@@ -5174,6 +5174,8 @@ type ImportWorkflowManifestResult {
   errors: [ValidationError!]!
   createdSlug: String
   manifest: WorkflowManifestPreviewType
+  mode: String
+  repointedSlugs: [String!]!
 }
 
 input InstallClusterPrereqsInputType {
@@ -5778,9 +5780,9 @@ type Mutation {
   importWorkflowFlow(format: String!, payload: JSON!, preview: Boolean! = true): ImportWorkflowFlowResult!
 
   """
-  Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug.
+  Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings.
   """
-  importWorkflowManifest(toml: String!, preview: Boolean! = true, orgId: ID = null): ImportWorkflowManifestResult!
+  importWorkflowManifest(toml: String!, preview: Boolean! = true, replace: Boolean! = false, orgId: ID = null): ImportWorkflowManifestResult!
 
   """Cancel, terminate, or retry cleanup for an exact owned execution."""
   controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!
@@ -5788,8 +5790,10 @@ type Mutation {
   """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
   createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
 
-  """Update a configured Workflow (bindings / inputs / trigger / enabled)."""
-  updateWorkflow(slug: String!, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, orgId: ID = null): CreateWorkflowResult!
+  """
+  Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused.
+  """
+  updateWorkflow(slug: String!, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, definitionSlug: String = null, orgId: ID = null): CreateWorkflowResult!
 
   """Soft-delete a configured Workflow and tear down its schedule."""
   deleteWorkflow(slug: String!, orgId: ID = null): MutationResult!

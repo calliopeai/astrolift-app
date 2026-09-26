@@ -9,11 +9,14 @@ from workflows.manifest import (
     ParsedWorkflowManifest,
     WorkflowDefSpec,
     WorkflowStageSpec,
+    create_definition_from_manifest,
     definition_to_manifest,
     emit_workflow_manifest,
     parse_workflow_manifest,
+    replace_definition_from_manifest,
+    shape_compatible,
 )
-from workflows.models import WorkflowDefinition, WorkflowStage
+from workflows.models import Workflow, WorkflowDefinition, WorkflowStage
 
 # The spec 40 §5.4 reference manifest: a chained workflow with an
 # agent_dispatch stage (role + agent + all three skill-ref forms +
@@ -320,3 +323,331 @@ def test_definition_emit_parse_equivalent():
     s1 = parsed.stages[1]
     assert s1.kind == "human_gate"
     assert s1.timeout == 86400
+
+
+# --------------------------------------------------------------------------- #
+# replace: in place / versioned / blocked (#1822)
+# --------------------------------------------------------------------------- #
+
+
+def _org(slug):
+    from astrolift_identity.models import Organization
+
+    return Organization.objects.create(name=slug, slug=slug)
+
+
+TWO_STAGE_TOML = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout"
+pattern = "chained"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "scout"
+
+[[stage]]
+kind = "human_gate"
+"""
+
+TWO_STAGE_TOML_EDITED = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout v2"
+pattern = "chained"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "scout"
+prompt = "Look for accounts matching the new persona."
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve the leads?"
+"""
+
+ONE_STAGE_TOML = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout"
+pattern = "chained"
+
+[[stage]]
+kind = "agent_dispatch"
+"""
+
+# No agent_dispatch stage in this pair: a configured Workflow needs no
+# binding to save cleanly, so the tests below can isolate replace's own
+# in-place/versioned/blocked behavior from stage_bindings validation.
+TWO_GATE_TOML = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve stage one?"
+
+[[stage]]
+kind = "checkpoint"
+"""
+
+TWO_GATE_TOML_EDITED = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout v2"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve the updated persona targeting?"
+
+[[stage]]
+kind = "checkpoint"
+"""
+
+ONE_GATE_TOML = """\
+[workflow]
+slug = "demand-scout"
+name = "Demand Scout"
+pattern = "chained"
+
+[[stage]]
+kind = "human_gate"
+prompt = "Approve?"
+"""
+
+
+@pytest.mark.django_db
+def test_shape_compatible_true_for_matching_kind_sequence():
+    org = _org("shape-match")
+    definition = create_definition_from_manifest(parse_workflow_manifest(TWO_STAGE_TOML), organization=org)
+    assert shape_compatible(definition, parse_workflow_manifest(TWO_STAGE_TOML_EDITED))
+
+
+@pytest.mark.django_db
+def test_shape_compatible_false_for_stage_count_change():
+    org = _org("shape-count")
+    definition = create_definition_from_manifest(parse_workflow_manifest(TWO_STAGE_TOML), organization=org)
+    assert not shape_compatible(definition, parse_workflow_manifest(ONE_STAGE_TOML))
+
+
+@pytest.mark.django_db
+def test_shape_compatible_false_for_kind_change():
+    org = _org("shape-kind")
+    definition = create_definition_from_manifest(parse_workflow_manifest(TWO_STAGE_TOML), organization=org)
+    swapped = TWO_STAGE_TOML.replace('kind = "human_gate"', 'kind = "checkpoint"')
+    assert not shape_compatible(definition, parse_workflow_manifest(swapped))
+
+
+@pytest.mark.django_db
+def test_shape_compatible_ignores_order_gap_from_soft_deleted_stage():
+    """A soft-deleted middle stage leaves a gap in ``order``: comparison is
+    positional (live-stage index), not the raw ``order`` value (#1822)."""
+    from django.utils import timezone
+
+    org = _org("shape-gap")
+    definition = WorkflowDefinition.objects.create(
+        name="Gapped",
+        slug="gapped",
+        organization=org,
+        pattern_kind=WorkflowDefinition.PatternKind.CHAINED,
+        model_label="",
+    )
+    WorkflowStage.objects.create(definition=definition, order=0, kind=WorkflowStage.StageKind.AGENT_DISPATCH)
+    WorkflowStage.objects.create(
+        definition=definition,
+        order=1,
+        kind=WorkflowStage.StageKind.HUMAN_GATE,
+        deleted_at=timezone.now(),
+    )
+    WorkflowStage.objects.create(definition=definition, order=2, kind=WorkflowStage.StageKind.CHECKPOINT)
+
+    parsed = parse_workflow_manifest(
+        '[workflow]\nslug = "gapped"\nname = "Gapped"\npattern = "chained"\n'
+        '\n[[stage]]\nkind = "agent_dispatch"\n\n[[stage]]\nkind = "checkpoint"\n'
+    )
+    assert shape_compatible(definition, parsed)
+
+
+@pytest.mark.django_db
+def test_replace_creates_when_no_org_owned_definition_exists():
+    org = _org("replace-create")
+    outcome = replace_definition_from_manifest(parse_workflow_manifest(TWO_STAGE_TOML), organization=org)
+    assert outcome.mode == "created"
+    assert outcome.definition.slug == "demand-scout"
+    assert outcome.definition.organization_id == org.pk
+
+
+@pytest.mark.django_db
+def test_replace_leaves_a_global_template_untouched_and_creates_org_copy():
+    """A platform-global (organization=None) sharing the slug is not "the
+    org's own": replace creates an org-scoped copy instead of touching it,
+    identical to a plain import (spec 40 §2.1)."""
+    global_def = create_definition_from_manifest(parse_workflow_manifest(TWO_STAGE_TOML), organization=None)
+    org = _org("replace-global")
+
+    outcome = replace_definition_from_manifest(
+        parse_workflow_manifest(TWO_STAGE_TOML_EDITED), organization=org
+    )
+
+    assert outcome.mode == "created"
+    assert outcome.definition.organization_id == org.pk
+    global_def.refresh_from_db()
+    assert global_def.name == "Demand Scout"  # untouched: still the original
+
+
+@pytest.mark.django_db
+def test_replace_updates_in_place_preserves_stage_identity_and_bindings():
+    """Proves running-instance + binding safety (#1822): matching shape means
+    the same ``WorkflowDefinition``/``WorkflowStage`` rows (same pks) are
+    edited in place, so a configured Workflow's ``stage_bindings`` (keyed by
+    ``order``) and any ``WorkflowStageExecution``/in-flight Temporal run
+    (keyed by stage pk) are unaffected: only content changed."""
+    org = _org("replace-inplace")
+    definition = create_definition_from_manifest(
+        parse_workflow_manifest(TWO_GATE_TOML), organization=org, is_enabled=True
+    )
+    stage0 = definition.stages.get(order=0)
+    stage1 = definition.stages.get(order=1)
+    wf = Workflow.objects.create(
+        organization=org,
+        definition=definition,
+        name="Nightly Scout",
+        slug="nightly-scout",
+        stage_bindings={"1": {"params": {"prompt": "Approve?"}}},
+        trigger_kind=Workflow.TriggerKind.SCHEDULE,
+        schedule_cron="0 9 * * *",
+    )
+
+    outcome = replace_definition_from_manifest(
+        parse_workflow_manifest(TWO_GATE_TOML_EDITED), organization=org
+    )
+
+    assert outcome.mode == "updated_in_place"
+    assert outcome.definition.pk == definition.pk
+
+    definition.refresh_from_db()
+    assert definition.name == "Demand Scout v2"
+
+    stage0.refresh_from_db()
+    stage1.refresh_from_db()
+    assert stage0.prompt == "Approve the updated persona targeting?"
+    # Same rows: the WorkflowStage pks a past WorkflowStageExecution or an
+    # in-flight run's already-fetched stage plan key on did not move.
+    assert {s.pk for s in definition.stages.filter(deleted_at__isnull=True)} == {stage0.pk, stage1.pk}
+
+    wf.refresh_from_db()
+    assert wf.definition_id == definition.pk  # never repointed: same row
+    assert wf.stage_bindings == {"1": {"params": {"prompt": "Approve?"}}}
+    assert wf.schedule_cron == "0 9 * * *"
+
+
+@pytest.mark.django_db
+def test_replace_versions_and_repoints_configured_workflows():
+    org = _org("replace-version")
+    old = create_definition_from_manifest(
+        parse_workflow_manifest(TWO_GATE_TOML), organization=org, is_enabled=True
+    )
+    wf = Workflow.objects.create(
+        organization=org,
+        definition=old,
+        name="Nightly Scout",
+        slug="nightly-scout",
+        stage_bindings={},
+        trigger_kind=Workflow.TriggerKind.SCHEDULE,
+        schedule_cron="0 9 * * *",
+    )
+
+    # Drops to one stage: the shape changed, so this must version rather
+    # than edit `old` in place.
+    outcome = replace_definition_from_manifest(parse_workflow_manifest(ONE_GATE_TOML), organization=org)
+
+    assert outcome.mode == "versioned"
+    assert outcome.definition.pk != old.pk
+    assert outcome.definition.slug == "demand-scout-1"
+    # Inherits the superseded definition's enabled state: a version
+    # replacing an in-use, enabled definition must not land disabled under a
+    # schedule that is about to fire against it.
+    assert outcome.definition.is_enabled is True
+    assert outcome.repointed_slugs == ["nightly-scout"]
+
+    wf.refresh_from_db()
+    assert wf.definition_id == outcome.definition.pk
+    assert wf.schedule_cron == "0 9 * * *"  # the schedule row itself is untouched
+
+    # The old definition and its stages are untouched: any run already
+    # pinned to it (WorkflowRun.workflow_definition_id, frozen at dispatch)
+    # keeps resolving exactly what it started with.
+    old.refresh_from_db()
+    assert old.is_enabled is True
+    assert old.stages.filter(deleted_at__isnull=True).count() == 2
+
+
+@pytest.mark.django_db
+def test_replace_blocks_and_writes_nothing_when_repoint_breaks_bindings():
+    org = _org("replace-blocked")
+    old = create_definition_from_manifest(
+        parse_workflow_manifest(TWO_GATE_TOML), organization=org, is_enabled=True
+    )
+    wf = Workflow.objects.create(
+        organization=org,
+        definition=old,
+        name="Nightly Scout",
+        slug="nightly-scout",
+        stage_bindings={},
+        trigger_kind=Workflow.TriggerKind.MANUAL,
+    )
+    before_definitions = set(WorkflowDefinition.objects.values_list("pk", flat=True))
+
+    # The new shape's agent_dispatch stage has no default agent and no
+    # binding covers it: validate_bindings() must refuse the repoint.
+    outcome = replace_definition_from_manifest(parse_workflow_manifest(ONE_STAGE_TOML), organization=org)
+
+    assert outcome.mode == "blocked"
+    assert outcome.definition is None
+    assert "nightly-scout" in outcome.blocked_errors
+    assert any("stage 0" in msg for msg in outcome.blocked_errors["nightly-scout"])
+
+    # Nothing was written: no orphaned new version, Workflow untouched.
+    assert set(WorkflowDefinition.objects.values_list("pk", flat=True)) == before_definitions
+    wf.refresh_from_db()
+    assert wf.definition_id == old.pk
+
+
+@pytest.mark.django_db
+def test_replace_in_place_rebinds_agent_by_slug():
+    """The manifest's ``agent`` ref is re-resolved on every in-place update,
+    just like a create: a newly-registered agent can pick up an existing
+    stage's slot without a shape change."""
+    org = _org("replace-agent")
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    create_definition_from_manifest(parse_workflow_manifest(ONE_STAGE_TOML), organization=org)
+    team = Team.objects.create(organization=org, name="Eng", slug="replace-agent-eng")
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="replace-agent-demo")
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="App",
+        slug="replace-agent-app",
+        provisioning_status="ready",
+    )
+    workload = Workload.objects.create(
+        registered_app=app,
+        name="Scout",
+        slug="scout-agent",
+        kind=Workload.Kind.AGENT.value,
+        run_family=Workload.RunFamily.TASK.value,
+    )
+
+    toml_with_agent = ONE_STAGE_TOML + 'agent = "scout-agent"\n'
+    outcome = replace_definition_from_manifest(parse_workflow_manifest(toml_with_agent), organization=org)
+
+    assert outcome.mode == "updated_in_place"
+    stage = outcome.definition.stages.get(order=0)
+    assert stage.agent_definition_id == workload.pk
+    assert stage.agent_ref == "scout-agent"

@@ -5109,7 +5109,9 @@ export type ImportWorkflowManifestResult = {
   createdSlug?: Maybe<Scalars['String']['output']>;
   errors: Array<ValidationError>;
   manifest?: Maybe<WorkflowManifestPreviewType>;
+  mode?: Maybe<Scalars['String']['output']>;
   ok: Scalars['Boolean']['output'];
+  repointedSlugs: Array<Scalars['String']['output']>;
 };
 
 export type InstallClusterPrereqsInputType = {
@@ -5401,7 +5403,7 @@ export type Mutation = {
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
-  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. */
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
@@ -5632,7 +5634,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). */
+  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -6344,6 +6346,7 @@ export type MutationImportWorkflowFlowArgs = {
 export type MutationImportWorkflowManifestArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   preview?: Scalars['Boolean']['input'];
+  replace?: Scalars['Boolean']['input'];
   toml: Scalars['String']['input'];
 };
 
@@ -7392,6 +7395,7 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
