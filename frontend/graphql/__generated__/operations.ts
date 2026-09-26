@@ -11781,6 +11781,16 @@ export type ListModelEndpointsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ListModelEndpointsQuery = { astroliftModelEndpoints: Array<{ id: string, name: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string }> };
 
+export type ListModelTargetsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ListModelTargetsQuery = { astroliftEnvironments: Array<{ id: string, name: string, registeredAppSlug: string, clusterId?: string | null, clusterSlug?: string | null }> };
+
+export type ListClusterGpusQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ListClusterGpusQuery = { astroliftClusters: Array<{ id: string, capabilities: Record<string, unknown> }> };
+
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;
 }>;

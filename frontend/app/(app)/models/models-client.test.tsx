@@ -38,7 +38,11 @@ let result: { data?: unknown; loading: boolean; error?: Error } = {
   loading: false,
 };
 
-vi.mock("@apollo/client/react", () => ({ useQuery: () => result }));
+vi.mock("@apollo/client/react", () => ({
+  useQuery: () => result,
+  useMutation: () => [vi.fn(), { loading: false }],
+}));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>

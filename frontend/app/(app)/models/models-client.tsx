@@ -3,12 +3,16 @@
 import { useQuery } from "@apollo/client/react";
 import { BrainCircuitIcon } from "lucide-react";
 import Link from "next/link";
+import * as React from "react";
 
 import { DataTable, type Column, type CursorTableController } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { ListModelEndpointsQuery } from "@/graphql/__generated__/operations";
 import { LIST_MODEL_ENDPOINTS } from "@/graphql/models/models.queries";
+
+import { DeployModelSheet } from "./deploy-model-sheet";
 
 type ModelEndpoint = ListModelEndpointsQuery["astroliftModelEndpoints"][number];
 
@@ -123,6 +127,7 @@ const columns: Column<ModelEndpoint>[] = [
 
 export function ModelsClient() {
   const { data, loading, error, refetch } = useQuery<ListModelEndpointsQuery>(LIST_MODEL_ENDPOINTS);
+  const [deploying, setDeploying] = React.useState(false);
   const table = singlePage(
     data?.astroliftModelEndpoints ?? [],
     loading,
@@ -134,6 +139,7 @@ export function ModelsClient() {
     <PageShell
       title="Models"
       description="Model endpoints across your apps and projects: hosted on your own GPUs with vLLM or KServe, or served by Bedrock, Azure OpenAI, Azure AI Foundry and Vertex. Every one binds through the same MODEL_* variables."
+      actions={<Button onClick={() => setDeploying(true)}>Deploy model</Button>}
     >
       <DataTable
         label="Model endpoints"
@@ -147,6 +153,11 @@ export function ModelsClient() {
             "Add a model_endpoint service to an app or project: vllm to host an open-weight model on your GPUs, or your cloud's managed model service.",
         }}
         emptyFiltered={{ title: "No matching models", description: "No model matches." }}
+      />
+      <DeployModelSheet
+        open={deploying}
+        onOpenChange={setDeploying}
+        onDeployed={() => void refetch()}
       />
     </PageShell>
   );
