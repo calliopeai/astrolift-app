@@ -1040,10 +1040,6 @@ PLUGIN = ProviderPlugin(
                 "exclusiveMinimum": 0,
                 "default": 3,
             },
-            "memorystore_valkey_adopt_existing_instance": {
-                "type": "boolean",
-                "default": False,
-            },
         },
     },
 )

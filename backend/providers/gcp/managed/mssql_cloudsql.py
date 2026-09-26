@@ -288,7 +288,7 @@ class CloudSQLServerDriver(ManagedServiceDriver):
                     raise CloudSQLServerError(
                         f"Cloud SQL instance {instance_id} exists but its Astrolift master secret is missing",
                     )
-                self._assert_owned(current, cfg, spec=spec)
+                self._assert_owned(current, spec=spec)
                 recorded_database = str(
                     self._secret_store.get(self._database_secret(instance_id))
                     or self._database_from_instance(current)
@@ -322,7 +322,7 @@ class CloudSQLServerDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, error, ["invalid_cloudsql_sqlserver_config"])
         try:
             current = self._sql.get_instance(self._config.project_id, instance_id)
-            self._assert_owned(current, cfg)
+            self._assert_owned(current)
             self._reconcile_instance(instance_id, current, cfg, size=spec.size)
             recorded_database = str(
                 self._secret_store.get(self._database_secret(instance_id))
@@ -370,11 +370,16 @@ class CloudSQLServerDriver(ManagedServiceDriver):
             if delete_data:
                 self._delete_connection_secrets(instance_id)
             return DeprovisionResult(True, spec.handle, f"Cloud SQL instance {instance_id} already gone")
-        try:
-            self._assert_owned(current, cfg, deleting=True)
-        except Exception as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), [str(exc)], retryable=False)
         settings = current.get("settings") or {}
+        labels = settings.get("userLabels") or {}
+        if labels.get("astrolift-managed-by") != "platform" and not cfg.get("delete_adopted"):
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                f"Cloud SQL instance {instance_id} is not Astrolift-managed; set delete_adopted=true before deletion",
+                ["adopted_resource_guard"],
+                retryable=False,
+            )
         protected = bool(settings.get("deletionProtectionEnabled"))
         if protected and not force_destroy:
             return DeprovisionResult(
@@ -559,7 +564,6 @@ class CloudSQLServerDriver(ManagedServiceDriver):
             "type": "object",
             "properties": {
                 "instance_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,97}$"},
-                "adopt_existing": {"type": "boolean"},
                 "delete_adopted": {"type": "boolean"},
                 "engine_version": {"type": "string", "enum": list(_ENGINE_VERSIONS)},
                 "cloudsql_edition": {"type": "string", "enum": ["ENTERPRISE", "ENTERPRISE_PLUS"]},
@@ -1082,25 +1086,22 @@ class CloudSQLServerDriver(ManagedServiceDriver):
         except CloudSQLServerNotFound:
             return None
 
-    def _assert_owned(
-        self,
-        current: dict[str, Any],
-        cfg: dict[str, Any],
-        *,
-        deleting: bool = False,
-        spec: ProvisionSpec | None = None,
-    ) -> None:
+    def _assert_owned(self, current: dict[str, Any], *, spec: ProvisionSpec | None = None) -> None:
+        # An instance with no platform label was never provisioned by
+        # Astrolift and cannot be proven to belong to this service. Adoption
+        # of such a resource is a separate, operator-authorized operation
+        # (#1365); no tenant config flag may grant it (#2021). A platform
+        # instance must also be this service's, not another's, whatever the
+        # instance id happens to be -- it is tenant-settable (#1961).
         labels = (current.get("settings") or {}).get("userLabels") or {}
-        owned = labels.get("astrolift-managed-by") == "platform"
-        # Provision: a platform instance must be this service's, whatever
-        # adopt_existing says; the instance id is tenant-settable (#1961).
-        refusal = label_adoption_refusal(labels, spec, resource="Cloud SQL instance") if spec and owned else None
+        if labels.get("astrolift-managed-by") != "platform":
+            raise CloudSQLServerError(
+                "existing Cloud SQL instance carries no Astrolift ownership marker; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
+        refusal = label_adoption_refusal(labels, spec, resource="Cloud SQL instance") if spec else None
         if refusal:
             raise CloudSQLServerError(refusal)
-        if not owned and not cfg.get("adopt_existing"):
-            raise CloudSQLServerError("existing Cloud SQL instance is not Astrolift-managed; set adopt_existing=true")
-        if deleting and not owned and not cfg.get("delete_adopted"):
-            raise CloudSQLServerError("adopted Cloud SQL instances require delete_adopted=true before deletion")
 
     def _instance_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
         explicit = str(cfg.get("instance_id") or "")
