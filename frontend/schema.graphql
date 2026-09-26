@@ -2665,6 +2665,22 @@ type AstroliftMemberPage {
   totalCount: Int
 }
 
+type AstroliftModelEndpointTest {
+  status: String!
+  reply: String!
+  latencyMs: Int
+  promptTokens: Int
+  completionTokens: Int
+  totalTokens: Int
+  error: String!
+}
+
+type AstroliftModelEndpointTestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftModelEndpointTest
+}
+
 type AstroliftModuleEntitlement {
   key: String!
   canView: Boolean!
@@ -5645,6 +5661,7 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   adoptManagedResource(input: AdoptManagedResourceInput!): ManagedresourceadoptionpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
+  testModelEndpoint(input: TestModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!
   removeEmailSuppressionEntry(input: RemoveEmailSuppressionEntryInput!): EmailsuppressionremovepayloadMutationResult!
@@ -6962,6 +6979,11 @@ input TearDownAppInput {
 
 input TearDownPreviewInputGql {
   id: GUID!
+}
+
+input TestModelEndpointInput {
+  managedServiceId: GUID!
+  prompt: String!
 }
 
 input TestNotificationInput {

@@ -28,6 +28,7 @@ import pytest
 from django.test import Client
 from django.utils import timezone
 
+from astrolift_clusters import agent_test_jobs
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_clusters.schema.mutations import (
     ClustersMutation,
@@ -117,6 +118,27 @@ def _hash(raw: str) -> str:
 
 def _heartbeat_url(cluster: TenantCluster) -> str:
     return f"/api/clusters/v1/{cluster.guid}/heartbeat/"
+
+
+def _result_url(cluster: TenantCluster) -> str:
+    return f"/api/clusters/v1/{cluster.guid}/model-test-result/"
+
+
+def _enqueue_job(cluster: TenantCluster, **overrides) -> str:
+    kwargs = {
+        "cluster_guid": str(cluster.guid),
+        "managed_service_guid": str(uuid.uuid4()),
+        "prompt": "hello model",
+        "model": "Qwen/Qwen3-8B",
+        "base_url": "http://svc.ns.svc.cluster.local:8000/v1",
+        "result_url": f"https://cp.example.com{_result_url(cluster)}",
+        "secret_namespace": "ns",
+        "secret_name": "svc-vllm",
+        "secret_key": "api_key",
+        "requested_by_user_id": None,
+    }
+    kwargs.update(overrides)
+    return agent_test_jobs.enqueue(**kwargs)
 
 
 def _bearer(raw_key: str) -> dict:
@@ -535,3 +557,181 @@ def test_live_state_platform_cluster_visible_to_any_org(plugin, permission_resol
         state = ClustersQuery().astrolift_cluster_live_state(_info(), GUID(str(shared.guid)))
     assert state is not None
     assert state.status == "connected"
+
+
+# ---- heartbeat: test-prompt job dispatch (#2064) ----------------------
+
+
+def test_heartbeat_with_no_pending_job_carries_no_test_job_key(cluster):
+    raw = "no-job-key"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    client = Client()
+    resp = client.post(_heartbeat_url(cluster), data="{}", content_type="application/json", **_bearer(raw))
+    assert resp.status_code == 200
+    assert "test_job" not in resp.json()
+
+
+def test_heartbeat_dispatches_a_pending_test_job_exactly_once(cluster):
+    raw = "job-dispatch-key"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    job_id = _enqueue_job(cluster, prompt="say hi")
+    client = Client()
+
+    first = client.post(_heartbeat_url(cluster), data="{}", content_type="application/json", **_bearer(raw))
+    assert first.status_code == 200
+    body = first.json()
+    assert body["test_job"]["job_id"] == job_id
+    assert body["test_job"]["prompt"] == "say hi"
+    assert body["test_job"]["base_url"] == "http://svc.ns.svc.cluster.local:8000/v1"
+    assert body["test_job"]["secret_namespace"] == "ns"
+    assert body["test_job"]["secret_name"] == "svc-vllm"
+    assert body["test_job"]["secret_key"] == "api_key"
+    assert body["test_job"]["result_url"].endswith(_result_url(cluster))
+    assert agent_test_jobs.get_job(job_id)["status"] == agent_test_jobs.DISPATCHED
+
+    # A second pulse must not re-send the same prompt.
+    second = client.post(_heartbeat_url(cluster), data="{}", content_type="application/json", **_bearer(raw))
+    assert "test_job" not in second.json()
+
+
+# ---- model-test-result ingest (#2064) ----------------------------------
+
+
+def test_model_test_result_401_without_bearer(cluster):
+    client = Client()
+    resp = client.post(_result_url(cluster), data="{}", content_type="application/json")
+    assert resp.status_code == 401
+
+
+def test_model_test_result_401_when_key_scoped_to_other_cluster(org, plugin):
+    raw_a = "result-key-a"
+    cluster_a = _make_cluster(org, plugin, agent_key_hash=_hash(raw_a))
+    cluster_b = _make_cluster(org, plugin)
+    job_id = _enqueue_job(cluster_a)
+    client = Client()
+    resp = client.post(
+        _result_url(cluster_b),
+        data=json.dumps({"job_id": job_id, "ok": True}),
+        content_type="application/json",
+        **_bearer(raw_a),
+    )
+    assert resp.status_code == 401
+    assert agent_test_jobs.get_job(job_id)["status"] == agent_test_jobs.PENDING
+
+
+def test_model_test_result_400_on_malformed_json(cluster):
+    raw = "result-bad-json"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    client = Client()
+    resp = client.post(
+        _result_url(cluster), data="{not json", content_type="application/json", **_bearer(raw)
+    )
+    assert resp.status_code == 400
+
+
+def test_model_test_result_400_when_job_id_missing(cluster):
+    raw = "result-no-job-id"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    client = Client()
+    resp = client.post(
+        _result_url(cluster),
+        data=json.dumps({"ok": True}),
+        content_type="application/json",
+        **_bearer(raw),
+    )
+    assert resp.status_code == 400
+
+
+def test_model_test_result_404_for_unknown_job(cluster):
+    raw = "result-unknown-job"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    client = Client()
+    resp = client.post(
+        _result_url(cluster),
+        data=json.dumps({"job_id": "does-not-exist", "ok": True}),
+        content_type="application/json",
+        **_bearer(raw),
+    )
+    assert resp.status_code == 404
+
+
+def test_model_test_result_records_success(cluster):
+    raw = "result-success"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    job_id = _enqueue_job(cluster)
+    client = Client()
+    resp = client.post(
+        _result_url(cluster),
+        data=json.dumps(
+            {
+                "job_id": job_id,
+                "ok": True,
+                "reply": "Hello!",
+                "latency_ms": 512,
+                "prompt_tokens": 3,
+                "completion_tokens": 6,
+                "total_tokens": 9,
+            }
+        ),
+        content_type="application/json",
+        **_bearer(raw),
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    job = agent_test_jobs.get_job(job_id)
+    assert job["status"] == agent_test_jobs.SUCCEEDED
+    assert job["reply"] == "Hello!"
+    assert job["latency_ms"] == 512
+    assert job["total_tokens"] == 9
+
+
+def test_model_test_result_records_failure(cluster):
+    raw = "result-failure"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    job_id = _enqueue_job(cluster)
+    client = Client()
+    resp = client.post(
+        _result_url(cluster),
+        data=json.dumps({"job_id": job_id, "ok": False, "error": "connection refused"}),
+        content_type="application/json",
+        **_bearer(raw),
+    )
+    assert resp.status_code == 200
+    job = agent_test_jobs.get_job(job_id)
+    assert job["status"] == agent_test_jobs.FAILED
+    assert job["error"] == "connection refused"
+
+
+def test_full_dispatch_and_result_round_trip_via_http(cluster):
+    """End-to-end over real HTTP views: enqueue -> heartbeat dispatches it
+    -> the agent's result POST resolves it -- no direct job-store calls
+    once the job exists."""
+    raw = "round-trip-key"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    job_id = _enqueue_job(cluster)
+    client = Client()
+
+    heartbeat = client.post(
+        _heartbeat_url(cluster), data="{}", content_type="application/json", **_bearer(raw)
+    )
+    dispatched = heartbeat.json()["test_job"]
+    assert dispatched["job_id"] == job_id
+
+    result = client.post(
+        _result_url(cluster),
+        data=json.dumps({"job_id": job_id, "ok": True, "reply": "pong"}),
+        content_type="application/json",
+        **_bearer(raw),
+    )
+    assert result.status_code == 200
+    assert agent_test_jobs.get_job(job_id)["status"] == agent_test_jobs.SUCCEEDED
+    # The cluster's slot is free for the next test prompt.
+    assert agent_test_jobs.current_job_id(str(cluster.guid)) is None

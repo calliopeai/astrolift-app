@@ -27,9 +27,23 @@ how rich the snapshot is):
 Response 200:
     {"ok": true, "interval_seconds": 30}
         — the configured cadence so the agent can self-tune.
+    A pending ``testModelEndpoint`` job (#2064) rides along as an
+    optional ``test_job`` key -- the heartbeat is the only channel the
+    control plane has to reach the agent, so a test-prompt job waits
+    for the agent's own next pulse rather than opening a new one:
+    {"ok": true, "interval_seconds": 30, "test_job": {
+        "job_id": "...", "base_url": "http://svc.ns.svc.cluster.local:8000/v1",
+        "model": "...", "prompt": "...", "max_tokens": 128,
+        "timeout_seconds": 20, "secret_namespace": "...",
+        "secret_name": "...", "secret_key": "api_key",
+        "result_url": "https://.../model-test-result/"
+    }}
 Response 401: missing / invalid agent key, or key not bound to the
     cluster in the URL.
 Response 400: malformed JSON.
+
+This module also carries the result callback for that same job
+(``cluster_test_result``), authenticated the same way.
 """
 
 from __future__ import annotations
@@ -43,6 +57,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from astrolift_clusters import agent_test_jobs
 from astrolift_clusters.models import TenantCluster
 
 logger = logging.getLogger(__name__)
@@ -59,6 +74,24 @@ def _bearer_token(request: HttpRequest) -> str | None:
         return None
     token = auth[len("Bearer ") :].strip()
     return token or None
+
+
+def _cluster_for_agent_key(request: HttpRequest, cluster_guid: str) -> TenantCluster | None:
+    """Resolve + authenticate the cluster a Bearer agent key names.
+
+    Shared by the heartbeat and test-result views: both bind the key hash
+    to the ``cluster_guid`` in the URL, the same way, for the same reason
+    (a leaked key for cluster A must never drive a request against
+    cluster B's URL).
+    """
+    raw_key = _bearer_token(request)
+    if raw_key is None:
+        return None
+    return TenantCluster.objects.filter(
+        guid=cluster_guid,
+        agent_key_hash=_hash_key(raw_key),
+        deleted_at__isnull=True,
+    ).first()
 
 
 # Keys the agent may report. The agent version owns the shape; we
@@ -91,26 +124,15 @@ def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
 
     Updates ``last_heartbeat_at`` and ``last_heartbeat_payload`` on the
     cluster the agent key is scoped to. Returns the configured pulse
-    interval so the agent can align its cadence with the control plane.
+    interval so the agent can align its cadence with the control plane,
+    plus (#2064) any test-prompt job waiting to be dispatched.
     """
-    raw_key = _bearer_token(request)
-    if raw_key is None:
-        return JsonResponse({"error": "unauthorized"}, status=401)
-
-    # Bind the key to the cluster named in the URL. Filtering on both the
-    # guid AND the key hash means a leaked key for cluster A cannot be
-    # used to spoof heartbeats for cluster B — the agent must hit its own
-    # cluster's URL with its own key. Empty agent_key_hash rows (no agent
-    # provisioned) never match because the lookup hash is always 64 hex
-    # chars, never empty.
-    cluster = TenantCluster.objects.filter(
-        guid=cluster_guid,
-        agent_key_hash=_hash_key(raw_key),
-        deleted_at__isnull=True,
-    ).first()
+    # Don't distinguish "no such cluster" from "wrong key" — both are 401
+    # so a caller can't probe which cluster guids exist. Empty
+    # agent_key_hash rows (no agent provisioned) never match because the
+    # lookup hash is always 64 hex chars, never empty.
+    cluster = _cluster_for_agent_key(request, cluster_guid)
     if cluster is None:
-        # Don't distinguish "no such cluster" from "wrong key" — both are
-        # 401 so a caller can't probe which cluster guids exist.
         return JsonResponse({"error": "unauthorized"}, status=401)
 
     try:
@@ -138,9 +160,91 @@ def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
         body.get("agent_version"),
     )
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "interval_seconds": cluster.heartbeat_interval_seconds,
+    response = {
+        "ok": True,
+        "interval_seconds": cluster.heartbeat_interval_seconds,
+    }
+    job = agent_test_jobs.dispatch_pending(str(cluster.guid))
+    if job is not None:
+        response["test_job"] = {
+            "job_id": job["job_id"],
+            "base_url": job["base_url"],
+            "model": job["model"],
+            "prompt": job["prompt"],
+            "max_tokens": job["max_tokens"],
+            "timeout_seconds": job["timeout_seconds"],
+            "secret_namespace": job["secret_namespace"],
+            "secret_name": job["secret_name"],
+            "secret_key": job["secret_key"],
+            "result_url": job["result_url"],
         }
+    return JsonResponse(response)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def cluster_test_result(request: HttpRequest, cluster_guid: str) -> JsonResponse:
+    """Ingest the outcome of one dispatched test-prompt job (#2064).
+
+    Called by the keep-alive agent once it finishes the bounded chat
+    completion a heartbeat handed it. Same Bearer-agent-key auth as
+    ``cluster_heartbeat``.
+
+    Request body (JSON):
+        {"job_id": "...", "ok": true, "reply": "...", "latency_ms": 842,
+         "prompt_tokens": 12, "completion_tokens": 34, "total_tokens": 46}
+        or, on failure:
+        {"job_id": "...", "ok": false, "error": "..."}
+
+    Response 200: {"ok": true}
+    Response 401: missing / invalid agent key, or key not bound to the
+        cluster in the URL.
+    Response 400: malformed JSON / missing job_id.
+    Response 404: job unknown, expired, or not owned by this cluster —
+        both read identically so a stolen job id can't be used to probe.
+    """
+    cluster = _cluster_for_agent_key(request, cluster_guid)
+    if cluster is None:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid JSON"}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "body must be a JSON object"}, status=400)
+
+    job_id = body.get("job_id")
+    if not isinstance(job_id, str) or not job_id:
+        return JsonResponse({"error": "job_id is required"}, status=400)
+
+    recorded = agent_test_jobs.record_result(
+        cluster_guid=str(cluster.guid),
+        job_id=job_id,
+        ok=bool(body.get("ok")),
+        reply=str(body.get("reply") or ""),
+        latency_ms=_as_int_or_none(body.get("latency_ms")),
+        prompt_tokens=_as_int_or_none(body.get("prompt_tokens")),
+        completion_tokens=_as_int_or_none(body.get("completion_tokens")),
+        total_tokens=_as_int_or_none(body.get("total_tokens")),
+        error=str(body.get("error") or ""),
     )
+    if not recorded:
+        return JsonResponse({"error": "job not found"}, status=404)
+
+    logger.debug(
+        "cluster.model_test_result: cluster=%s job=%s ok=%s",
+        cluster.slug,
+        job_id,
+        bool(body.get("ok")),
+    )
+    return JsonResponse({"ok": True})
+
+
+def _as_int_or_none(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

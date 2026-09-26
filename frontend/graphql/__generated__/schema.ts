@@ -2659,6 +2659,22 @@ export type AstroliftMemberPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftModelEndpointTest = {
+  completionTokens?: Maybe<Scalars['Int']['output']>;
+  error: Scalars['String']['output'];
+  latencyMs?: Maybe<Scalars['Int']['output']>;
+  promptTokens?: Maybe<Scalars['Int']['output']>;
+  reply: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  totalTokens?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftModelEndpointTestMutationResult = {
+  data?: Maybe<AstroliftModelEndpointTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftModuleEntitlement = {
   canCreate: Scalars['Boolean']['output'];
   canManage: Scalars['Boolean']['output'];
@@ -5571,6 +5587,7 @@ export type Mutation = {
   tearDownApp: SoftdeletepayloadMutationResult;
   tearDownPreview: AstroliftDeploymentMutationResult;
   terminateWorkflowInstance: MutationResult;
+  testModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
@@ -7158,6 +7175,11 @@ export type MutationTearDownPreviewArgs = {
 export type MutationTerminateWorkflowInstanceArgs = {
   reason: Scalars['String']['input'];
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationTestModelEndpointArgs = {
+  input: TestModelEndpointInput;
 };
 
 
@@ -10057,6 +10079,11 @@ export type TearDownAppInput = {
 
 export type TearDownPreviewInputGql = {
   id: Scalars['GUID']['input'];
+};
+
+export type TestModelEndpointInput = {
+  managedServiceId: Scalars['GUID']['input'];
+  prompt: Scalars['String']['input'];
 };
 
 export type TestNotificationInput = {

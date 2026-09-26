@@ -9,6 +9,9 @@ from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_agents.models import AgentEnvironmentSpec
+from astrolift_clusters import agent_test_jobs
+from astrolift_clusters.heartbeat_status import is_live as cluster_agent_is_live
+from astrolift_clusters.heartbeat_status import resolve as resolve_heartbeat_status
 from astrolift_clusters.models import TenantCluster
 from astrolift_drivers.isolation import IsolationError, parse_mode
 from astrolift_graphql import GUID, MutationResultType
@@ -38,6 +41,7 @@ from astrolift_services.schema.mutations.types import (
     ProvisionProjectManagedServiceInput,
     ReprovisionManagedServiceInput,
     RevealManagedServiceConnectionInput,
+    TestModelEndpointInput,
     UpdateManagedServiceInput,
     _ManagedResourceAdoptionPayload,
     _ManagedServiceDeletedPayload,
@@ -47,6 +51,7 @@ from astrolift_services.schema.types import (
     ManagedServiceConnectionKeyType,
     ManagedServiceConnectionType,
     ManagedServiceType,
+    ModelEndpointTestType,
     managed_service_attachment_to_type,
     managed_service_to_type,
 )
@@ -1271,5 +1276,201 @@ class ManagedServiceMutations:
                 connection_secret_ref=ref,
                 keys=keys,
                 revealed_at=now,
+            )
+        )
+
+    # ---- Model endpoint test prompt (#2064) ---------------------------
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.test_prompt",
+        extras=lambda result: (
+            {"status": result.data.status, "latency_ms": result.data.latency_ms}
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @require_permission(
+        Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+    )
+    @tenant_scoped()
+    def test_model_endpoint(
+        self,
+        info: Info,
+        input: TestModelEndpointInput,
+    ) -> MutationResultType[ModelEndpointTestType]:
+        """Run one bounded chat completion against a hosted vLLM model,
+        relayed through the cluster's in-cluster keep-alive agent (#2064).
+
+        The control plane never reaches the model directly: the vLLM
+        Service is ClusterIP-only behind a NetworkPolicy that admits only
+        the owning app's namespace (plus, opt-in, the agent's own
+        namespace/pod -- see ``k8s_native.managed.model_endpoint_vllm``).
+        The agent resolves the model's API key from its own Kubernetes
+        Secret and runs the completion in-cluster; this mutation only
+        ever sees the reply text, latency, and token counts it reports
+        back over the same heartbeat channel it already uses (#808).
+
+        Gated on the same permission as ``updateManagedService``
+        (``app.update``) because a test prompt spends the model's compute
+        exactly like a config change spends its provisioning budget.
+        """
+        prompt = input.prompt.strip()
+        if not prompt:
+            return gql_failure(ErrorCode.VALIDATION.value, "prompt must not be empty", field="prompt")
+        if len(prompt) > agent_test_jobs.MAX_PROMPT_CHARS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"prompt exceeds the {agent_test_jobs.MAX_PROMPT_CHARS}-character limit",
+                field="prompt",
+            )
+
+        # Same org-scoping shape as reveal/update: a managed service has no
+        # direct org column, so the constraint runs through the owning app.
+        svc = (
+            ManagedService.objects.select_related(
+                "app_environment__tenant_cluster",
+                "registered_app__organization",
+            )
+            .filter(
+                guid=str(input.managed_service_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "managed service not found", field="managedServiceId"
+            )
+        if svc.kind != ManagedService.Kind.MODEL_ENDPOINT or svc.variant != "vllm":
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "test prompt is only supported for vllm-hosted models",
+                field="managedServiceId",
+            )
+        if svc.status != ManagedService.Status.ACTIVE:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"managed service is {svc.status}; wait for it to become active",
+                field="managedServiceId",
+            )
+
+        cluster = svc.app_environment.tenant_cluster if svc.app_environment_id else None
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "managed service has no provisioning cluster",
+                field="managedServiceId",
+            )
+
+        heartbeat_status = resolve_heartbeat_status(
+            last_heartbeat_at=cluster.last_heartbeat_at,
+            interval_seconds=cluster.heartbeat_interval_seconds,
+            now=timezone.now(),
+        )
+        if not cluster_agent_is_live(heartbeat_status):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this cluster has no connected agent; deploy the keep-alive agent from the "
+                "cluster's settings and wait for it to report healthy before testing a model",
+                field="managedServiceId",
+            )
+
+        agent_namespace = str(
+            ((cluster.provider_config or {}).get("vllm_agent_test") or {}).get("namespace") or ""
+        )
+        if not agent_namespace:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this cluster has not opted the keep-alive agent into the model's "
+                "NetworkPolicy (set provider_config.vllm_agent_test.namespace on the "
+                "cluster); testing would only time out",
+                field="managedServiceId",
+            )
+
+        model = str((svc.config or {}).get("model") or "")
+        if not model:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "managed service has no model configured",
+                field="managedServiceId",
+            )
+
+        # Lazy: this schema module is imported by the schema-export command,
+        # which runs without the provider plugins installed (see
+        # ``core.cluster_management``'s identical rationale).
+        from k8s_native.managed.model_endpoint_vllm import resolve_agent_test_target
+
+        target = resolve_agent_test_target(
+            organization_slug=svc.registered_app.organization.slug,
+            app_slug=svc.registered_app.slug,
+            environment_name=svc.app_environment.name,
+            service_handle_hint=svc.name or svc.kind,
+            model=model,
+        )
+
+        from django.conf import settings as dj_settings
+
+        base = (getattr(dj_settings, "APP_BASE_URL", "") or "").rstrip("/")
+        result_path = f"/api/clusters/v1/{cluster.guid}/model-test-result/"
+        result_url = f"{base}{result_path}" if base else result_path
+
+        tenant = get_current_tenant()
+        actor_user_id = tenant.actor_user_id if tenant else None
+
+        try:
+            agent_test_jobs.check_rate_limit(actor_user_id or 0)
+        except agent_test_jobs.AgentTestRateLimited as exc:
+            return gql_failure(ErrorCode.RATE_LIMITED.value, str(exc))
+
+        try:
+            job_id = agent_test_jobs.enqueue(
+                cluster_guid=str(cluster.guid),
+                managed_service_guid=str(svc.guid),
+                prompt=prompt,
+                model=target.model,
+                base_url=target.base_url,
+                result_url=result_url,
+                secret_namespace=target.api_key_secret_namespace,
+                secret_name=target.api_key_secret_name,
+                secret_key=target.api_key_secret_key,
+                requested_by_user_id=actor_user_id,
+            )
+        except agent_test_jobs.AgentTestConflict as exc:
+            return gql_failure(ErrorCode.CONFLICT.value, str(exc))
+
+        job = agent_test_jobs.await_result(
+            job_id, heartbeat_interval_seconds=cluster.heartbeat_interval_seconds
+        )
+
+        svc.last_action_at = timezone.now()
+        svc.last_action_kind = "test_prompt"
+        svc.save(update_fields=["last_action_at", "last_action_kind", "updated_at", "version"])
+
+        if job is None:
+            return gql_success(
+                ModelEndpointTestType(
+                    status="timed_out",
+                    reply="",
+                    latency_ms=None,
+                    prompt_tokens=None,
+                    completion_tokens=None,
+                    total_tokens=None,
+                    error=(
+                        "the cluster agent did not respond in time; it may be offline "
+                        "or unable to reach the model"
+                    ),
+                )
+            )
+        return gql_success(
+            ModelEndpointTestType(
+                status="succeeded" if job["status"] == agent_test_jobs.SUCCEEDED else "failed",
+                reply=job["reply"],
+                latency_ms=job["latency_ms"],
+                prompt_tokens=job["prompt_tokens"],
+                completion_tokens=job["completion_tokens"],
+                total_tokens=job["total_tokens"],
+                error=job["error"],
             )
         )
