@@ -572,7 +572,6 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 "labels": {"type": "object", "additionalProperties": {"type": "string"}},
                 "address": {"type": "object"},
                 "forwarding_rule": {"type": "object"},
-                "adopt_existing": {"type": "boolean", "default": False},
                 "delete_adopted_resources": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
             },
@@ -707,11 +706,14 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         if external:
             return current, True
         if not _owned(current, endpoint_id):
-            if not cfg.get("adopt_existing"):
-                raise PrivateServiceConnectError(
-                    f"address {location}/{address_name} exists but is not owned by this endpoint",
-                )
-            labels = {**labels, "astrolift-adopted": "true"}
+            # The astrolift-adopted label this driver used to write on the
+            # tenant's say-so proves nothing about who authorized it. Adoption
+            # of an existing resource is a separate, operator-authorized
+            # operation (#1365) that no tenant config flag may grant (#2021).
+            raise PrivateServiceConnectError(
+                f"address {location}/{address_name} exists but is not owned by this endpoint; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
         current = self._ensure_labels(
             "address",
             location,
@@ -750,11 +752,10 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             )
             return self._compute.get_forwarding_rule(location, endpoint_id)
         if not _owned(current, endpoint_id):
-            if not cfg.get("adopt_existing"):
-                raise PrivateServiceConnectError(
-                    f"forwarding rule {location}/{endpoint_id} exists but is not owned by Astrolift",
-                )
-            labels = {**labels, "astrolift-adopted": "true"}
+            raise PrivateServiceConnectError(
+                f"forwarding rule {location}/{endpoint_id} exists but is not owned by Astrolift; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
         self._assert_forwarding_compatible(current, desired, location)
         current = self._ensure_labels(
             "forwarding",
@@ -1101,7 +1102,6 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         for key in (
             "allow_global_access",
             "no_automate_dns_zone",
-            "adopt_existing",
             "delete_adopted_resources",
             "deletion_protection",
         ):

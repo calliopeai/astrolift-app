@@ -533,8 +533,6 @@ class APIGatewayDriver(ManagedServiceDriver):
                 "prune_config_revisions": {"type": "boolean", "default": False},
                 "retain_config_revisions": {"type": "integer", "minimum": 1, "default": 5},
                 "allow_config_revision_delete": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "delete_external_gateways": {"type": "boolean", "default": False},
@@ -664,8 +662,8 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return self._api.get(name)
             except APIGatewayConflict:
                 current = self._api.get(name)
-        self._assert_adoptable(current, cfg, service_id, "API")
-        desired["labels"] = self._adoption_labels(current, labels, cfg)
+        self._assert_adoptable(current, service_id, "API")
+        desired["labels"] = self._merged_labels(current, labels)
         self._patch(name, current, desired, immutable={"managedService"})
         return self._api.get(name)
 
@@ -694,12 +692,12 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return name
             except APIGatewayConflict:
                 current = self._api.get(name, params={"view": "FULL"})
-        self._assert_adoptable(current, cfg, service_id, "API config")
+        self._assert_adoptable(current, service_id, "API config")
         if _immutable_config(current) != _immutable_config(body):
             raise APIGatewayError(
                 f"API config {config_id} is immutable and differs from the declaration; use a new config_id",
             )
-        desired = {"labels": self._adoption_labels(current, labels, cfg)}
+        desired = {"labels": self._merged_labels(current, labels)}
         if "displayName" in body:
             desired["displayName"] = body["displayName"]
         self._patch(name, current, desired)
@@ -731,8 +729,8 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return self._api.get(name)
             except APIGatewayConflict:
                 current = self._api.get(name)
-        self._assert_adoptable(current, cfg, service_id, "gateway")
-        desired["labels"] = self._adoption_labels(current, labels, cfg)
+        self._assert_adoptable(current, service_id, "gateway")
+        desired["labels"] = self._merged_labels(current, labels)
         self._patch(name, current, desired)
         return self._api.get(name)
 
@@ -891,31 +889,27 @@ class APIGatewayDriver(ManagedServiceDriver):
     def _assert_adoptable(
         self,
         resource: dict[str, Any],
-        cfg: dict[str, Any],
         service_id: str,
         label: str,
     ) -> None:
+        # Neither a resource Astrolift never provisioned nor another managed
+        # service's may be taken over from here. Adoption of an existing
+        # resource is a separate, operator-authorized operation (#1365) that no
+        # tenant config flag may grant (#2021).
         labels = dict(resource.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            if not cfg.get("adopt_existing"):
-                raise APIGatewayError(f"existing {label} is not Astrolift-owned; set adopt_existing=true")
-            return
+            raise APIGatewayError(
+                f"existing {label} is not Astrolift-owned; adoption is a separate, operator-authorized "
+                "operation and cannot be granted by tenant config",
+            )
         owner = str(labels.get("astrolift-io-managed-service-id") or "")
         expected = _label_value(service_id) if service_id else ""
-        if owner and expected and owner != expected and not cfg.get("reassign_existing"):
+        if owner and expected and owner != expected:
             raise APIGatewayError(f"existing {label} belongs to another managed service")
 
-    def _adoption_labels(
-        self,
-        resource: dict[str, Any],
-        desired: dict[str, str],
-        cfg: dict[str, Any],
-    ) -> dict[str, str]:
-        current = dict(resource.get("labels") or {})
-        result = {**current, **desired}
-        if current.get("astrolift-io-managed-by") != "platform" and cfg.get("adopt_existing"):
-            result["astrolift-io-adopted"] = "true"
-        return result
+    @staticmethod
+    def _merged_labels(resource: dict[str, Any], desired: dict[str, str]) -> dict[str, str]:
+        return {**dict(resource.get("labels") or {}), **desired}
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {

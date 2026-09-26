@@ -82,8 +82,6 @@ _DELETE_ORDER = (
 )
 _CONTROL_KEYS = {
     "id",
-    "adopt_existing",
-    "reassign_existing",
     "clear_fields",
     "raw_fields",
 }
@@ -306,28 +304,16 @@ class EventarcDriver(ManagedServiceDriver):
                     current = self._eventarc.get(bus_name)
                     self._assert_adoptable(
                         current,
-                        cfg,
                         managed_service_id=spec.managed_service_id,
                         resource="message bus",
                     )
-                    if (
-                        cfg.get("adopt_existing")
-                        and (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform"
-                    ):
-                        labels["astrolift-io-adopted"] = "true"
                     self._patch_resource(bus_name, current, self._bus_body(cfg, labels))
             else:
                 self._assert_adoptable(
                     current,
-                    cfg,
                     managed_service_id=spec.managed_service_id,
                     resource="message bus",
                 )
-                if (
-                    cfg.get("adopt_existing")
-                    and (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform"
-                ):
-                    labels["astrolift-io-adopted"] = "true"
                 self._patch_resource(bus_name, current, self._bus_body(cfg, labels))
             self._reconcile_children(
                 location=location,
@@ -615,8 +601,6 @@ class EventarcDriver(ManagedServiceDriver):
         declaration_base = {
             "id": {"type": "string", "pattern": _ID_RE.pattern},
             "labels": labels,
-            "adopt_existing": {"type": "boolean", "default": False},
-            "reassign_existing": {"type": "boolean", "default": False},
             "clear_fields": {"type": "array", "items": {"type": "string"}, "uniqueItems": True},
             "raw_fields": raw_fields,
         }
@@ -842,8 +826,6 @@ class EventarcDriver(ManagedServiceDriver):
                     "items": {"type": "string"},
                     "uniqueItems": True,
                 },
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "delete_external_dependents": {"type": "boolean", "default": False},
@@ -1100,29 +1082,17 @@ class EventarcDriver(ManagedServiceDriver):
                         current = self._eventarc.get(name)
                         self._assert_adoptable(
                             current,
-                            declaration,
                             managed_service_id=labels.get("astrolift-io-managed-service-id", ""),
                             resource=collection,
                         )
-                        if (
-                            declaration.get("adopt_existing")
-                            and (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform"
-                        ):
-                            body["labels"]["astrolift-io-adopted"] = "true"
                         self._assert_child_immutable(collection, current, body)
                         self._patch_resource(name, current, body)
                 else:
                     self._assert_adoptable(
                         current,
-                        declaration,
                         managed_service_id=labels.get("astrolift-io-managed-service-id", ""),
                         resource=collection,
                     )
-                    if (
-                        declaration.get("adopt_existing")
-                        and (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform"
-                    ):
-                        body["labels"]["astrolift-io-adopted"] = "true"
                     self._assert_child_immutable(collection, current, body)
                     self._patch_resource(name, current, body)
             prune_key = f"prune_{config_key}"
@@ -1243,33 +1213,27 @@ class EventarcDriver(ManagedServiceDriver):
     def _assert_adoptable(
         self,
         current: dict[str, Any],
-        cfg: dict[str, Any],
         *,
         managed_service_id: str,
         resource: str,
     ) -> None:
+        # The bus id and every child id are tenant-settable, so an existing
+        # resource is either this service's or refused: neither one Astrolift
+        # never provisioned nor another managed service's may be claimed from
+        # here. Adoption of an existing resource is a separate,
+        # operator-authorized operation (#1365) that no tenant config flag may
+        # grant (#2021).
         labels = dict(current.get("labels") or {})
         if labels.get("astrolift-io-managed-by") == "platform":
             current_service_id = str(labels.get("astrolift-io-managed-service-id") or "")
-            if (
-                current_service_id
-                and managed_service_id
-                and current_service_id != managed_service_id
-                and not cfg.get("reassign_existing")
-            ):
-                raise EventarcError(
-                    f"Eventarc {resource} belongs to another managed service; "
-                    "set reassign_existing=true to transfer ownership",
-                )
+            if current_service_id and managed_service_id and current_service_id != managed_service_id:
+                raise EventarcError(f"Eventarc {resource} belongs to another managed service")
             return
-        if not cfg.get("adopt_existing"):
-            quota_hint = (
-                " Eventarc Advanced allows one bus per project and region." if resource == "message bus" else ""
-            )
-            raise EventarcError(
-                f"existing Eventarc {resource} is not Astrolift-owned; "
-                f"set adopt_existing=true to claim it.{quota_hint}",
-            )
+        quota_hint = " Eventarc Advanced allows one bus per project and region." if resource == "message bus" else ""
+        raise EventarcError(
+            f"existing Eventarc {resource} is not Astrolift-owned; adoption is a separate, "
+            f"operator-authorized operation and cannot be granted by tenant config.{quota_hint}",
+        )
 
     @staticmethod
     def _assert_managed(current: dict[str, Any], *, resource: str) -> None:

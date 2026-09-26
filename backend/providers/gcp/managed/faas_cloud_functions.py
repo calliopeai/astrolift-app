@@ -238,13 +238,13 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                     current = self._functions.get(name)
                 except CloudFunctionsConflict:
                     current = self._functions.get(name)
-                    self._assert_adoptable(current, cfg, spec.managed_service_id, "function")
-                    labels = self._adoption_labels(current, labels, cfg)
+                    self._assert_adoptable(current, spec.managed_service_id, "function")
+                    labels = self._merged_labels(current, labels)
                     body = self._body(cfg, labels, partial=False)
                     self._patch(name, current, body)
             else:
-                self._assert_adoptable(current, cfg, spec.managed_service_id, "function")
-                labels = self._adoption_labels(current, labels, cfg)
+                self._assert_adoptable(current, spec.managed_service_id, "function")
+                labels = self._merged_labels(current, labels)
                 body = self._body(cfg, labels, partial=False)
                 self._patch(name, current, body)
         except Exception as exc:
@@ -561,8 +561,6 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                 "build_raw_fields": raw,
                 "service_raw_fields": raw,
                 "clear_fields": {"type": "array", "items": {"type": "string"}},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "access_mode": {"type": "string", "enum": ["none", "invoke", "manage"]},
@@ -590,7 +588,7 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             {
                 *self.config_schema()["properties"],
             }
-            - {"function_id", "region", "adopt_existing", "reassign_existing"},
+            - {"function_id", "region"},
         )
 
     def _validate(self, cfg: dict[str, Any], *, update: bool) -> str:
@@ -929,31 +927,28 @@ class CloudFunctionsDriver(ManagedServiceDriver):
     def _assert_adoptable(
         self,
         resource: dict[str, Any],
-        cfg: dict[str, Any],
         service_id: str,
         label: str,
     ) -> None:
+        # function_id is tenant-settable, so neither a function Astrolift never
+        # provisioned nor another managed service's may be redeployed from
+        # here. Adoption of an existing resource is a separate,
+        # operator-authorized operation (#1365) that no tenant config flag may
+        # grant (#2021).
         labels = dict(resource.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            if not cfg.get("adopt_existing"):
-                raise CloudFunctionsError(f"existing {label} is not Astrolift-owned; set adopt_existing=true")
-            return
+            raise CloudFunctionsError(
+                f"existing {label} is not Astrolift-owned; adoption is a separate, operator-authorized "
+                "operation and cannot be granted by tenant config",
+            )
         owner = str(labels.get("astrolift-io-managed-service-id") or "")
         expected = _label_value(service_id) if service_id else ""
-        if owner and expected and owner != expected and not cfg.get("reassign_existing"):
+        if owner and expected and owner != expected:
             raise CloudFunctionsError(f"existing {label} belongs to another managed service")
 
-    def _adoption_labels(
-        self,
-        resource: dict[str, Any],
-        desired: dict[str, str],
-        cfg: dict[str, Any],
-    ) -> dict[str, str]:
-        current = dict(resource.get("labels") or {})
-        result = {**current, **desired}
-        if current.get("astrolift-io-managed-by") != "platform" and cfg.get("adopt_existing"):
-            result["astrolift-io-adopted"] = "true"
-        return result
+    @staticmethod
+    def _merged_labels(resource: dict[str, Any], desired: dict[str, str]) -> dict[str, str]:
+        return {**dict(resource.get("labels") or {}), **desired}
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {

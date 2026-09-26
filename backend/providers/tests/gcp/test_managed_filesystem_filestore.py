@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import (
     DeprovisionSpec,
@@ -345,7 +346,7 @@ def test_direct_peering_basic_hdd_is_supported(driver: FilestoreDriver) -> None:
     assert result.ok
 
 
-def test_external_collision_requires_explicit_adoption(
+def test_external_collision_is_refused_without_operator_adoption(
     driver: FilestoreDriver,
     client: FakeFilestore,
 ) -> None:
@@ -369,15 +370,20 @@ def test_external_collision_requires_explicit_adoption(
     }
 
     refused = _provision(driver)
-    assert not refused.ok and "adopt_existing=true" in refused.message
-    adopted = _provision(driver, adopt_existing=True)
-    assert adopted.ok
-    assert client.instances[name]["labels"]["astrolift-io-managed-by"] == "platform"
-    assert client.instances[name]["labels"]["astrolift-io-adopted"] == "true"
-    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "service-id"
+    assert not refused.ok
+    assert "operator-authorized" in refused.message
+
+    # The flag is gone entirely: the schema tenant config is validated against
+    # rejects it, and a driver handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid({})
+    assert not validator.is_valid({"adopt_existing": True})
+    still_refused = _provision(driver, adopt_existing=True)
+    assert not still_refused.ok
+    assert client.instances[name]["labels"] == {"owner": "external"}
 
 
-def test_existing_managed_service_cannot_be_silently_reassigned(
+def test_existing_managed_service_cannot_be_reassigned_by_config(
     driver: FilestoreDriver,
     client: FakeFilestore,
 ) -> None:
@@ -386,10 +392,14 @@ def test_existing_managed_service_cannot_be_silently_reassigned(
     name = f"projects/project-1/locations/{location}/instances/{instance_id}"
     client.instances[name]["labels"]["astrolift-io-managed-service-id"] = "other-service"
     refused = _provision(driver)
-    assert not refused.ok and "reassign_existing=true" in refused.message
-    transferred = _provision(driver, reassign_existing=True)
-    assert transferred.ok
-    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "service-id"
+    assert not refused.ok
+    assert "another Astrolift managed service" in refused.message
+
+    validator = Draft202012Validator(driver.config_schema())
+    assert not validator.is_valid({"reassign_existing": True})
+    still_refused = _provision(driver, reassign_existing=True)
+    assert not still_refused.ok
+    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "other-service"
 
 
 def test_update_cannot_use_adopt_flag_to_bypass_ownership(

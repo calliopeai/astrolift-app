@@ -503,7 +503,7 @@ def test_prune_refuses_to_omit_log_data_or_custom_metric_series() -> None:
     assert len(monitoring.resources["metric_descriptors"]) == 1
 
 
-def test_refuses_unowned_deterministic_resource_without_adopt() -> None:
+def test_refuses_unowned_deterministic_resource_without_operator_adoption() -> None:
     driver, logging, _ = _driver()
     name = "projects/acme-prod/locations/global/buckets/application-logs"
     logging.seed(
@@ -517,9 +517,34 @@ def test_refuses_unowned_deterministic_resource_without_adopt() -> None:
 
     assert result.ok is False
     assert "refusing to adopt" in result.message
+    assert "operator-authorized" in result.message
+    assert logging.resources["log_bucket"][name] == {
+        "name": name,
+        "retentionDays": 7,
+        "description": "created elsewhere",
+    }
 
 
-def test_explicit_adoption_stamps_ownership() -> None:
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"log_bucket": {"id": "application-logs", "retention_days": 30, "adopt": True}},
+        {"log_metrics": [{"id": "failures", "body": {"filter": "severity>=ERROR"}, "adopt": True}]},
+        {
+            "services": [
+                {
+                    "id": "checkout-api",
+                    "body": {"displayName": "Checkout API", "custom": {}},
+                    "service_level_objectives": [
+                        {"id": "availability", "body": {"goal": 0.999}, "adopt": True},
+                    ],
+                },
+            ],
+        },
+    ],
+)
+def test_adopt_flag_is_rejected_not_ignored(config: dict[str, Any]) -> None:
+    """Adoption is operator-only (#2021): the old per-declaration ``adopt`` is refused outright."""
     driver, logging, _ = _driver()
     name = "projects/acme-prod/locations/global/buckets/application-logs"
     logging.seed(
@@ -527,20 +552,12 @@ def test_explicit_adoption_stamps_ownership() -> None:
         {"name": name, "retentionDays": 7, "description": "created elsewhere"},
     )
 
-    result = driver.provision(
-        _spec(
-            {
-                "log_bucket": {
-                    "id": "application-logs",
-                    "retention_days": 30,
-                    "adopt": True,
-                },
-            },
-        ),
-    )
+    result = driver.provision(_spec(config))
 
-    assert result.ok
-    assert "astrolift-observability" in logging.resources["log_bucket"][name]["description"]
+    assert result.ok is False
+    assert result.errors == ["invalid_cloud_operations_config"]
+    assert "adopt is not accepted" in result.message
+    assert "astrolift-observability" not in logging.resources["log_bucket"][name]["description"]
 
 
 def test_locked_bucket_refuses_mutation_and_data_delete_even_with_force() -> None:
