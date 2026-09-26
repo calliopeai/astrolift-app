@@ -617,20 +617,99 @@ def test_promote_with_explicit_slug_and_environment(org, cluster, user, team, au
     assert env.name == "staging"
 
 
-def test_promote_already_promoted_returns_409(org, cluster, user, team, auth_headers, workflow_starts):
+def test_promote_same_slug_again_updates_the_app_in_place(
+    org, cluster, user, team, auth_headers, workflow_starts
+):
+    """Chat Studio's re-ship: promote the same dev env into the app it
+    already promoted to, matched by slug, updates it instead of 409ing (#1875)."""
     dev = _running_dev_env(org, cluster, user)
-    dev.status = DevEnvironment.Status.PROMOTING
-    dev.save(update_fields=["status", "updated_at", "version"])
-
     client = Client()
-    r = _post_json(
+    first = _post_json(
         client,
         f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
-        {"app_name": "Whatever"},
+        {"app_name": "Chat Studio App"},
         auth_headers,
     )
-    assert r.status_code == 409
-    assert workflow_starts == []
+    assert first.status_code == 202, first.content
+    app_guid = first.json()["app_guid"]
+
+    # The deploy that would flip this back to RUNNING never actually runs
+    # in this test (Temporal is patched out) -- simulate it having
+    # finished, which is the steady state a real re-ship lands in.
+    dev.refresh_from_db()
+    dev.status = DevEnvironment.Status.RUNNING
+    dev.save(update_fields=["status", "updated_at", "version"])
+    workflow_starts.clear()
+
+    second = _post_json(
+        client,
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Chat Studio App"},
+        auth_headers,
+    )
+
+    assert second.status_code == 202, second.content
+    assert second.json()["app_guid"] == app_guid
+    assert RegisteredApp.objects.filter(organization=org, slug="chat-studio-app").count() == 1
+    assert AppEnvironment.objects.filter(registered_app__guid=app_guid).count() == 1
+    dev.refresh_from_db()
+    assert dev.status == DevEnvironment.Status.PROMOTING
+    # Onboarding is a one-time bootstrap; a re-promote only re-deploys.
+    assert [s["name"] for s in workflow_starts] == ["DeployPromotedAppWorkflow"]
+
+
+def test_promote_again_while_still_promoting_is_allowed_as_an_update(
+    org, cluster, user, team, auth_headers, workflow_starts
+):
+    """The dev env's own status can still read PROMOTING (a row from before
+    the #1875 fix, or a re-promote landing mid-flight) -- that must not
+    permanently lock it out of ever being re-promoted."""
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+    first = _post_json(
+        client,
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Still Promoting"},
+        auth_headers,
+    )
+    assert first.status_code == 202, first.content
+    dev.refresh_from_db()
+    assert dev.status == DevEnvironment.Status.PROMOTING
+
+    second = _post_json(
+        client,
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Still Promoting"},
+        auth_headers,
+    )
+    assert second.status_code == 202, second.content
+
+
+def test_promote_update_refuses_to_move_the_app_to_a_different_team(
+    org, cluster, user, team, auth_headers, workflow_starts
+):
+    other_team = Team.objects.create(organization=org, name="Other", slug="other-team")
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+    first = _post_json(
+        client,
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Team Locked", "team_slug": team.slug},
+        auth_headers,
+    )
+    assert first.status_code == 202, first.content
+    dev.refresh_from_db()
+    dev.status = DevEnvironment.Status.RUNNING
+    dev.save(update_fields=["status", "updated_at", "version"])
+
+    second = _post_json(
+        client,
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Team Locked", "team_slug": other_team.slug},
+        auth_headers,
+    )
+    assert second.status_code == 409
+    assert "different team" in second.json()["detail"]
 
 
 def test_promote_torn_down_returns_409(org, cluster, user, team, auth_headers, workflow_starts):
