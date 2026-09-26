@@ -274,9 +274,12 @@ export type AstroliftAgentEnvironmentSpec = {
   configRepo: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   envVars: Scalars['JSON']['output'];
+  gpu: Scalars['Int']['output'];
+  gpuType: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   imageTag: Scalars['String']['output'];
   managedModel: Scalars['Boolean']['output'];
+  migProfile: Scalars['String']['output'];
   modelGateway: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   runAsNonRoot: Scalars['Boolean']['output'];
@@ -4577,8 +4580,11 @@ export type CreateAgentEnvironmentSpecInput = {
   configManifestPath: Scalars['String']['input'];
   configRepo: Scalars['String']['input'];
   envVars: InputMaybe<Scalars['JSON']['input']>;
+  gpu: Scalars['Int']['input'];
+  gpuType: Scalars['String']['input'];
   imageTag: Scalars['String']['input'];
   managedModel: Scalars['Boolean']['input'];
+  migProfile: Scalars['String']['input'];
   modelGateway: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   runAsNonRoot: Scalars['Boolean']['input'];
@@ -10106,8 +10112,11 @@ export type UpdateAgentEnvironmentSpecInput = {
   configManifestPath: InputMaybe<Scalars['String']['input']>;
   configRepo: InputMaybe<Scalars['String']['input']>;
   envVars: InputMaybe<Scalars['JSON']['input']>;
+  gpu: InputMaybe<Scalars['Int']['input']>;
+  gpuType: InputMaybe<Scalars['String']['input']>;
   imageTag: InputMaybe<Scalars['String']['input']>;
   managedModel: InputMaybe<Scalars['Boolean']['input']>;
+  migProfile: InputMaybe<Scalars['String']['input']>;
   modelGateway: InputMaybe<Scalars['Boolean']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   runAsNonRoot: InputMaybe<Scalars['Boolean']['input']>;
