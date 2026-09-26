@@ -476,6 +476,22 @@ def test_a_tenant_bucket_name_cannot_take_another_services_bucket() -> None:
     assert len(cluster.applied) == applied
 
 
+def test_adopt_existing_is_rejected_and_the_operator_is_never_asked_to_adopt() -> None:
+    """A tenant-named bucket in the shared Seaweed cluster may be anyone's (#2021)."""
+    driver, cluster, backend = _driver()
+
+    flagged = driver.provision(_spec(config={"bucket_name": "platform-backups", "adopt_existing": True}))
+    assert not flagged.ok
+    assert flagged.errors == ["invalid_object_store_config"]
+    assert "adopt_existing" in flagged.message
+    assert cluster.applied == []
+    assert backend.upserts == []
+
+    assert driver.provision(_spec(config={"bucket_name": "platform-backups"})).ok
+    bucket_key = ("seaweed.seaweedfs.com/v1/Bucket", "storage", "platform-backups")
+    assert cluster.objects[bucket_key]["spec"]["adoptExisting"] is False
+
+
 def test_reprovisioning_this_services_bucket_still_reconciles() -> None:
     driver, _, _ = _driver()
     assert driver.provision(_spec()).ok

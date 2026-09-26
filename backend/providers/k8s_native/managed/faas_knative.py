@@ -123,7 +123,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
                 namespace=namespace,
                 name=name,
                 managed_service_id=spec.managed_service_id,
-                cfg=cfg,
             )
             manifest = self._manifest(
                 namespace=namespace,
@@ -365,8 +364,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 8080},
                 "public": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
                 "command": {"type": "array", "items": {"type": "string"}},
                 "args": {"type": "array", "items": {"type": "string"}},
                 "working_dir": {"type": "string"},
@@ -439,9 +436,7 @@ class KnativeServiceDriver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        return sorted(
-            set(self.config_schema()["properties"]) - {"adopt_existing", "expected_existing_uid"},
-        )
+        return sorted(self.config_schema()["properties"])
 
     def _require_driver(self) -> None:
         if self._config.cluster_driver is None:
@@ -596,7 +591,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
         namespace: str,
         name: str,
         managed_service_id: str,
-        cfg: dict[str, Any],
     ) -> None:
         current = self._config.cluster_driver.get_manifest(
             cluster_id,
@@ -613,11 +607,14 @@ class KnativeServiceDriver(ManagedServiceDriver):
             return
         if labels.get("app.kubernetes.io/managed-by") == "astrolift" and owner:
             raise ValueError("Knative Service belongs to another Astrolift managed resource")
-        if not bool(cfg.get("adopt_existing", False)):
-            raise ValueError("Knative Service already exists and is not owned by this managed resource")
-        expected_uid = str(cfg.get("expected_existing_uid") or "")
-        if not expected_uid or expected_uid != str(metadata.get("uid") or ""):
-            raise ValueError("adopting a Knative Service requires its exact expected_existing_uid")
+        # An object's uid is a precondition, not an authorization: in an
+        # operator-fixed shared namespace the object may be anyone's. Adoption
+        # of an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
+        raise ValueError(
+            "Knative Service already exists and is not owned by this managed resource; adoption is a "
+            "separate, operator-authorized operation and cannot be granted by tenant config",
+        )
 
     def _manifest(
         self,

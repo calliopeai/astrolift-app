@@ -363,58 +363,52 @@ def test_trigger_resource_names_are_scoped_to_their_broker() -> None:
     }
 
 
-def test_existing_broker_requires_exact_uid_adoption() -> None:
+def test_existing_broker_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
     key = (f"{API_VERSION}/Broker", "steady-md-triage", "triage-prod-events")
-    cluster.objects[key] = {
+    foreign = {
         "metadata": {
             "uid": "uid-1",
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
+    cluster.objects[key] = foreign
 
     refused = driver.provision(_spec())
-    wrong = driver.provision(
-        _spec(adopt_existing=True, expected_existing_uid="wrong"),
-    )
-    adopted = driver.provision(
-        _spec(adopt_existing=True, expected_existing_uid="uid-1"),
-    )
-
     assert refused.ok is False
-    assert wrong.ok is False
-    assert adopted.ok is True
+    assert "operator-authorized" in refused.message
+
+    # Knowing the uid proved only that the caller could see the object.
+    # Adoption is operator-only (#2021); the flags are rejected, not ignored.
+    flagged = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
+    assert flagged.ok is False
+    assert "unsupported Knative Eventing config fields" in flagged.message
+    assert cluster.objects[key] is foreign
+    assert cluster.applied == []
 
 
-def test_existing_trigger_requires_exact_uid_adoption() -> None:
+def test_existing_trigger_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
-    cluster.objects[
-        (
-            f"{API_VERSION}/Trigger",
-            "steady-md-triage",
-            "triage-prod-events-triage",
-        )
-    ] = {
+    key = (f"{API_VERSION}/Trigger", "steady-md-triage", "triage-prod-events-triage")
+    foreign = {
         "metadata": {
             "uid": "trigger-uid",
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
+    cluster.objects[key] = foreign
 
     refused = driver.provision(_spec())
-    adopted = driver.provision(
-        _spec(
-            triggers=[
-                _trigger(
-                    adopt_existing=True,
-                    expected_existing_uid="trigger-uid",
-                ),
-            ],
-        ),
-    )
-
     assert refused.ok is False
-    assert adopted.ok is True
+    assert "operator-authorized" in refused.message
+
+    flagged = driver.provision(
+        _spec(triggers=[_trigger(adopt_existing=True, expected_existing_uid="trigger-uid")]),
+    )
+    assert flagged.ok is False
+    assert "unsupported Trigger fields" in flagged.message
+    assert cluster.objects[key] is foreign
+    assert cluster.applied == []
 
 
 def test_update_prunes_removed_owned_trigger_and_reconciles_remaining_set() -> None:
