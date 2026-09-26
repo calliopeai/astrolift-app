@@ -131,7 +131,6 @@ def _enqueue_job(cluster: TenantCluster, **overrides) -> str:
         "prompt": "hello model",
         "model": "Qwen/Qwen3-8B",
         "base_url": "http://svc.ns.svc.cluster.local:8000/v1",
-        "result_url": f"https://cp.example.com{_result_url(cluster)}",
         "secret_namespace": "ns",
         "secret_name": "svc-vllm",
         "secret_key": "api_key",
@@ -588,7 +587,9 @@ def test_heartbeat_dispatches_a_pending_test_job_exactly_once(cluster):
     assert body["test_job"]["secret_namespace"] == "ns"
     assert body["test_job"]["secret_name"] == "svc-vllm"
     assert body["test_job"]["secret_key"] == "api_key"
-    assert body["test_job"]["result_url"].endswith(_result_url(cluster))
+    # No callback URL rides the response -- the agent derives it from its
+    # own configured HEARTBEAT_URL (#2064 security review).
+    assert "result_url" not in body["test_job"]
     assert agent_test_jobs.get_job(job_id)["status"] == agent_test_jobs.DISPATCHED
 
     # A second pulse must not re-send the same prompt.

@@ -119,13 +119,16 @@ class VLLMConfig:
     NetworkPolicy admits that namespace on the metrics port. Empty: no scrape."""
     agent_test: dict[str, Any] = field(default_factory=dict)
     """``provider_config.vllm_agent_test`` (#2064): ``{"namespace": "astrolift-system",
-    "pod_labels": {"app": "astrolift-agent"}}``. When ``namespace`` is set the
-    NetworkPolicy admits that namespace + podSelector on the API port, so the cluster's
-    in-cluster keep-alive agent can relay ``testModelEndpoint`` prompts. ``pod_labels``
-    defaults to the keep-alive Deployment's own labels (``core.cluster_management.
-    build_agent_manifests``). Empty: no allowance -- the control plane's test mutation
-    still dispatches through the agent, but the chat-completion call itself fails
-    closed with a connection error rather than opening the policy implicitly."""
+    "pod_labels": {"app": "astrolift-agent"}, "service_account": "astrolift-agent"}``.
+    When ``namespace`` is set: the NetworkPolicy admits that namespace + podSelector on
+    the API port, AND a namespaced Role + RoleBinding (in the *service's own* namespace,
+    never cluster-wide) let ``service_account`` (in ``namespace``) ``get`` exactly this
+    service's own API key Secret by name. ``pod_labels``/``service_account`` default to
+    the keep-alive Deployment's own labels and ServiceAccount name (``core.
+    cluster_management.build_agent_manifests``). Empty: no allowance -- the control
+    plane's test mutation still dispatches through the agent, but the chat-completion
+    call itself fails closed (no network path, no RBAC to read the Secret) rather than
+    opening either implicitly."""
 
 
 @dataclass(frozen=True)
@@ -256,6 +259,10 @@ class VLLMDriver(ManagedServiceDriver):
         ]
         if self._metrics_namespace():
             doomed.append(self._stub("monitoring.coreos.com/v1", "ServiceMonitor", parsed.namespace, parsed.name))
+        if self._agent_test_namespace():
+            role_name = self._agent_test_role_name(parsed.name)
+            doomed.append(self._stub("rbac.authorization.k8s.io/v1", "Role", parsed.namespace, role_name))
+            doomed.append(self._stub("rbac.authorization.k8s.io/v1", "RoleBinding", parsed.namespace, role_name))
         if delete_data:
             doomed.append(self._stub("v1", "PersistentVolumeClaim", parsed.namespace, self._cache_name(parsed.name)))
         result = self._config.cluster_driver.delete_manifests(parsed.cluster_id, parsed.namespace, doomed)
@@ -517,6 +524,7 @@ class VLLMDriver(ManagedServiceDriver):
                     ],
                 },
             },
+            *self._agent_test_rbac(namespace=namespace, name=name),
         ]
         if self._metrics_namespace():
             manifests.append(self._service_monitor(namespace, name, labels))
@@ -561,6 +569,56 @@ class VLLMDriver(ManagedServiceDriver):
                 ],
                 "ports": [{"port": PORT, "protocol": "TCP"}],
             }
+        ]
+
+    def _agent_test_service_account(self) -> str:
+        return str((self._config.agent_test or {}).get("service_account") or "astrolift-agent")
+
+    def _agent_test_role_name(self, name: str) -> str:
+        return dns_label(name, "agent-test", max_length=63)
+
+    def _agent_test_rbac(self, *, namespace: str, name: str) -> list[dict[str, Any]]:
+        """Namespaced Role + RoleBinding letting the keep-alive agent's own
+        ServiceAccount read exactly this service's API key Secret (#2064
+        security review) -- never a cluster-wide grant. Rendered in the
+        service's own namespace (never the agent's), alongside the
+        NetworkPolicy allowance, only when ``vllm_agent_test.namespace`` is
+        set; torn down with the service (see ``deprovision``)."""
+        agent_namespace = self._agent_test_namespace()
+        if not agent_namespace:
+            return []
+        role_name = self._agent_test_role_name(name)
+        return [
+            {
+                "apiVersion": "rbac.authorization.k8s.io/v1",
+                "kind": "Role",
+                "metadata": {"name": role_name, "namespace": namespace},
+                "rules": [
+                    {
+                        "apiGroups": [""],
+                        "resources": ["secrets"],
+                        "resourceNames": [self._secret_name(name)],
+                        "verbs": ["get"],
+                    }
+                ],
+            },
+            {
+                "apiVersion": "rbac.authorization.k8s.io/v1",
+                "kind": "RoleBinding",
+                "metadata": {"name": role_name, "namespace": namespace},
+                "roleRef": {
+                    "apiGroup": "rbac.authorization.k8s.io",
+                    "kind": "Role",
+                    "name": role_name,
+                },
+                "subjects": [
+                    {
+                        "kind": "ServiceAccount",
+                        "name": self._agent_test_service_account(),
+                        "namespace": agent_namespace,
+                    }
+                ],
+            },
         ]
 
     def _service_monitor(self, namespace: str, name: str, labels: dict[str, str]) -> dict[str, Any]:

@@ -1410,12 +1410,6 @@ class ManagedServiceMutations:
             model=model,
         )
 
-        from django.conf import settings as dj_settings
-
-        base = (getattr(dj_settings, "APP_BASE_URL", "") or "").rstrip("/")
-        result_path = f"/api/clusters/v1/{cluster.guid}/model-test-result/"
-        result_url = f"{base}{result_path}" if base else result_path
-
         tenant = get_current_tenant()
         actor_user_id = tenant.actor_user_id if tenant else None
 
@@ -1425,13 +1419,15 @@ class ManagedServiceMutations:
             return gql_failure(ErrorCode.RATE_LIMITED.value, str(exc))
 
         try:
+            # No result_url passed: the agent derives its own callback
+            # endpoint from its configured heartbeat URL, never from
+            # anything the control plane sends it (#2064 security review).
             job_id = agent_test_jobs.enqueue(
                 cluster_guid=str(cluster.guid),
                 managed_service_guid=str(svc.guid),
                 prompt=prompt,
                 model=target.model,
                 base_url=target.base_url,
-                result_url=result_url,
                 secret_namespace=target.api_key_secret_namespace,
                 secret_name=target.api_key_secret_name,
                 secret_key=target.api_key_secret_key,
