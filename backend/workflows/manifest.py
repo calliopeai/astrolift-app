@@ -416,7 +416,9 @@ def _unique_definition_slug(base_slug: str, organization) -> str:
     return candidate
 
 
-def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organization, created_by=None):
+def create_definition_from_manifest(
+    parsed: ParsedWorkflowManifest, *, organization, created_by=None, is_enabled: bool = False
+):
     """Persist a structured manifest as an org-scoped ``WorkflowDefinition`` +
     its ordered stages. The single create path shared by the visual-flow
     importers (#984) and any future native-TOML create surface — it consumes
@@ -424,11 +426,17 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
     persistence rules (org scope, fan-out tri-state → two columns, role-only
     globals) live in exactly one place.
 
-    Imported definitions land disabled for operator review. Local ``agent``
-    slugs are retained in ``agent_ref`` and eagerly bound when the matching
-    org workload already exists; otherwise they remain late-bound and can
-    resolve after that agent is registered. The slug is made unique within
-    the org on collision.
+    Imported definitions land disabled for operator review by default. Local
+    ``agent`` slugs are retained in ``agent_ref`` and eagerly bound when the
+    matching org workload already exists; otherwise they remain late-bound
+    and can resolve after that agent is registered. The slug is made unique
+    within the org on collision.
+
+    ``is_enabled`` defaults to ``False`` for a brand-new import; the
+    ``replace``-versioning path (#1822) passes the superseded definition's
+    own ``is_enabled`` so a version created to replace an already-enabled,
+    in-use definition does not land disabled under configured Workflows that
+    keep firing on a schedule.
     """
     slug = _unique_definition_slug(parsed.definition.slug, organization)
     definition = WorkflowDefinition.objects.create(
@@ -438,7 +446,7 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
         description=parsed.definition.description or "",
         pattern_kind=parsed.definition.pattern,
         model_label="",
-        is_enabled=False,
+        is_enabled=is_enabled,
         created_by=created_by,
         updated_by=created_by,
     )
@@ -476,3 +484,203 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
             updated_by=created_by,
         )
     return definition
+
+
+# --------------------------------------------------------------------------- #
+# Replace: re-import onto an existing org-owned definition (#1822)
+# --------------------------------------------------------------------------- #
+
+
+def shape_compatible(definition: WorkflowDefinition, parsed: ParsedWorkflowManifest) -> bool:
+    """True when ``parsed`` can overwrite ``definition``'s stage *content* in
+    place: the same number of live stages, in the same ``kind`` sequence.
+
+    Positional, not ``order``-value, comparison: a stage soft-deleted by
+    ``deleteWorkflowStage`` can leave gaps in ``order``, while a manifest's
+    stage order is always the contiguous ``0..N-1`` array index. Content
+    fields (prompt, bindings, timeouts, ...) are free to differ; only the
+    sequence of kinds has to match, because that sequence is what a
+    configured ``Workflow.stage_bindings`` (keyed by order) and any in-flight
+    Temporal run (which reads the stage plan once, at start) depend on.
+    """
+    live = list(definition.stages.filter(deleted_at__isnull=True).order_by("order"))
+    if len(live) != len(parsed.stages):
+        return False
+    manifest_stages = sorted(parsed.stages, key=lambda s: s.order)
+    return all(existing.kind == spec.kind for existing, spec in zip(live, manifest_stages, strict=True))
+
+
+def replace_definition_content(
+    definition: WorkflowDefinition,
+    parsed: ParsedWorkflowManifest,
+    *,
+    organization,
+    updated_by=None,
+) -> None:
+    """Overwrite ``definition``'s own fields and its existing stages' content
+    from ``parsed`` in place. Caller must already know :func:`shape_compatible`
+    is true.
+
+    Every stage is matched to the manifest positionally and edited on its
+    existing row: never deleted and recreated. That preserves three things
+    a stage's pk is load-bearing for: a configured ``Workflow.stage_bindings``
+    dict keyed by ``order`` (unchanged, since ``order`` is never touched
+    here), a ``WorkflowStageExecution.stage`` FK (``on_delete=PROTECT``) from
+    any past run, and the stage plan an in-flight Temporal run already
+    fetched once at start (``get_workflow_stages``: see
+    ``astrolift_workflows.activities.workflow_stage_activities``) and will
+    keep replaying from its own history regardless of what this writes.
+    """
+    definition.name = parsed.definition.name
+    definition.description = parsed.definition.description or ""
+    definition.pattern_kind = parsed.definition.pattern
+    definition.updated_by = updated_by
+    definition.save(
+        update_fields=["name", "description", "pattern_kind", "updated_by", "updated_at", "version"]
+    )
+
+    live = list(definition.stages.filter(deleted_at__isnull=True).order_by("order"))
+    manifest_stages = sorted(parsed.stages, key=lambda s: s.order)
+    for stage_row, stage_spec in zip(live, manifest_stages, strict=True):
+        agent_definition = None
+        if stage_spec.agent:
+            from astrolift_registry.models import Workload
+
+            agent_definition = Workload.objects.filter(
+                registered_app__organization=organization,
+                slug=stage_spec.agent,
+                kind=Workload.Kind.AGENT,
+                deleted_at__isnull=True,
+            ).first()
+        fan_out_count, fan_out_dynamic = _fan_out_columns(stage_spec.fan_out)
+        stage_row.role = stage_spec.role or ""
+        stage_row.agent_definition = agent_definition
+        stage_row.agent_ref = stage_spec.agent or ""
+        stage_row.workflow_ref = stage_spec.workflow or ""
+        stage_row.environment_spec_slug = stage_spec.environment_spec_slug or ""
+        stage_row.skill_refs = list(stage_spec.skills)
+        stage_row.on_failure = stage_spec.on_failure
+        stage_row.timeout_seconds = stage_spec.timeout
+        stage_row.fan_out_count = fan_out_count
+        stage_row.fan_out_dynamic = fan_out_dynamic
+        stage_row.prompt = stage_spec.prompt or ""
+        stage_row.output_key = stage_spec.output_key or ""
+        stage_row.approvers = list(stage_spec.approvers)
+        stage_row.updated_by = updated_by
+        stage_row.save(
+            update_fields=[
+                "role",
+                "agent_definition",
+                "agent_ref",
+                "workflow_ref",
+                "environment_spec_slug",
+                "skill_refs",
+                "on_failure",
+                "timeout_seconds",
+                "fan_out_count",
+                "fan_out_dynamic",
+                "prompt",
+                "output_key",
+                "approvers",
+                "updated_by",
+                "updated_at",
+                "version",
+            ]
+        )
+
+
+@dataclasses.dataclass
+class ReplaceOutcome:
+    """How :func:`replace_definition_from_manifest` applied the manifest.
+
+    ``mode``:
+
+    * ``"created"``: no live org-owned definition shared this slug; same as
+      a plain import (a platform-global template sharing the slug, if any,
+      is left untouched: globals are read-only to tenants).
+    * ``"updated_in_place"``: stage kinds matched positionally, so the
+      existing definition and its ``WorkflowStage`` rows were edited in
+      place (same pks, same ``order``): configured Workflows, their
+      bindings, their Temporal schedules and any in-flight run are all
+      unaffected, because nothing about identity moved.
+    * ``"versioned"``: the shape changed, so a new ``WorkflowDefinition``
+      was created (``definition``) and every configured Workflow that
+      pointed at the old one was repointed to it (``repointed_slugs``),
+      because every one of them validated clean against the new shape.
+    * ``"blocked"``: the shape changed and repointing would break at least
+      one configured Workflow's ``stage_bindings`` (``blocked_errors``,
+      keyed by Workflow slug). Nothing was written: the attempted new
+      version is rolled back, not left as an orphan.
+    """
+
+    definition: WorkflowDefinition | None
+    mode: str
+    repointed_slugs: list[str] = dataclasses.field(default_factory=list)
+    blocked_errors: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+
+
+def replace_definition_from_manifest(
+    parsed: ParsedWorkflowManifest, *, organization, created_by=None
+) -> ReplaceOutcome:
+    """Idempotent upsert of ``parsed`` onto the org's own definition sharing
+    its slug (#1822): see :class:`ReplaceOutcome` for the four outcomes.
+
+    Never targets a platform-global template (``organization`` is null): the
+    lookup is org-owned only, exactly like :func:`create_definition_from_manifest`,
+    so a shared slug with a global is simply not "the org's own" and a fresh
+    org-scoped definition is created instead, same as a plain import.
+
+    Self-contained transaction: a ``"blocked"`` outcome leaves the database
+    exactly as it was, even though reaching that verdict requires creating
+    the candidate new version first (to validate every configured Workflow's
+    bindings against its actual stages). Safe to nest inside a caller's own
+    ``transaction.atomic()``: ``set_rollback`` only unwinds to this
+    function's savepoint.
+    """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.db import transaction
+
+    from workflows.models import Workflow
+
+    existing = WorkflowDefinition.objects.filter(
+        organization=organization, slug=parsed.definition.slug, deleted_at__isnull=True
+    ).first()
+
+    with transaction.atomic():
+        if existing is None:
+            definition = create_definition_from_manifest(
+                parsed, organization=organization, created_by=created_by
+            )
+            return ReplaceOutcome(definition=definition, mode="created")
+
+        if shape_compatible(existing, parsed):
+            replace_definition_content(existing, parsed, organization=organization, updated_by=created_by)
+            return ReplaceOutcome(definition=existing, mode="updated_in_place")
+
+        new_definition = create_definition_from_manifest(
+            parsed, organization=organization, created_by=created_by, is_enabled=existing.is_enabled
+        )
+
+        configured = list(
+            Workflow.objects.filter(organization=organization, definition=existing, deleted_at__isnull=True)
+        )
+        blocked: dict[str, list[str]] = {}
+        for wf in configured:
+            wf.definition = new_definition
+            try:
+                wf.validate_bindings()
+            except DjangoValidationError as exc:
+                blocked[wf.slug or str(wf.guid)] = list(exc.messages)
+        if blocked:
+            transaction.set_rollback(True)
+            return ReplaceOutcome(definition=None, mode="blocked", blocked_errors=blocked)
+
+        for wf in configured:
+            wf.updated_by = created_by
+            wf.save(update_fields=["definition", "updated_by", "updated_at", "version"])
+
+        return ReplaceOutcome(
+            definition=new_definition,
+            mode="versioned",
+            repointed_slugs=[wf.slug or str(wf.guid) for wf in configured],
+        )
