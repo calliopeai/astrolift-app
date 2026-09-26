@@ -1539,6 +1539,14 @@ MATRIX = AvailabilityMatrix(
             description="Azure OpenAI model deployment",
         ),
         ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="azure_foundry",
+            plugin_id="azure",
+            status="preview",
+            description="Azure AI Foundry model deployment (Meta, Mistral, DeepSeek, ...) on the model inference API",
+            issue_url=_AZURE_CERTIFICATION_ISSUE,
+        ),
+        ManagedServiceEntry(
             kind="mssql",
             variant="azure_sql_serverless",
             plugin_id="azure",
@@ -2359,6 +2367,8 @@ MATRIX = AvailabilityMatrix(
                 "MODEL_API_KEY",
                 "MODEL_DEPLOYMENT_NAME",
                 "MODEL_REGION",
+                "MODEL_API_STYLE",
+                "MODEL_AUTH_MODE",
             ),
         ),
         ManagedServiceEntry(
@@ -2372,6 +2382,8 @@ MATRIX = AvailabilityMatrix(
                 "MODEL_ENDPOINT_URL",
                 "MODEL_DEPLOYMENT_NAME",
                 "MODEL_REGION",
+                "MODEL_API_STYLE",
+                "MODEL_AUTH_MODE",
                 "KSERVE_INFERENCE_SERVICE",
                 "KSERVE_NAMESPACE",
                 "MODEL_ENDPOINT_GRPC_URL",

@@ -262,6 +262,8 @@ KINDS = KindCatalog(
                 "MODEL_API_KEY",
                 "MODEL_DEPLOYMENT_NAME",
                 "MODEL_REGION",
+                "MODEL_API_STYLE",
+                "MODEL_AUTH_MODE",
             ),
             snapshot_supported=False,
         ),

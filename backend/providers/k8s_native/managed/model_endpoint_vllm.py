@@ -248,6 +248,8 @@ class VLLMDriver(ManagedServiceDriver):
                 "MODEL_API_KEY": ValueRef(secret_ref=f"{path}#api_key"),
                 "MODEL_DEPLOYMENT_NAME": ValueRef(literal=model),
                 "MODEL_REGION": ValueRef(literal="kubernetes"),
+                "MODEL_API_STYLE": ValueRef(literal="openai"),
+                "MODEL_AUTH_MODE": ValueRef(literal="api_key"),
             },
             notes="OpenAI-compatible vLLM endpoint; reachable only from the owning app's namespace.",
         )
@@ -300,6 +302,8 @@ class VLLMDriver(ManagedServiceDriver):
                 "MODEL_ENDPOINT_URL": "OpenAI-compatible base URL (in-cluster)",
                 "MODEL_API_KEY": "API key the server requires (secret)",
                 "MODEL_DEPLOYMENT_NAME": "Served model id",
+                "MODEL_API_STYLE": "Client protocol: 'openai'",
+                "MODEL_AUTH_MODE": "Credential kind: 'api_key'",
                 "MODEL_REGION": "Always kubernetes",
             },
         )

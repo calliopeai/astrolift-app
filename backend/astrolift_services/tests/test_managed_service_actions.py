@@ -266,6 +266,8 @@ def test_reveal_model_endpoint_returns_portable_envelope(permission_resolver):
     assert result.data is not None
     assert {item.key for item in result.data.keys} == {
         "MODEL_API_KEY",
+        "MODEL_API_STYLE",
+        "MODEL_AUTH_MODE",
         "MODEL_DEPLOYMENT_NAME",
         "MODEL_ENDPOINT_URL",
         "MODEL_REGION",

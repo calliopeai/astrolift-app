@@ -21,6 +21,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
             "virtualNetworks/platform/subnets/aks"
         ],
         "azure_openai_account_name": "platform-prod-ai",
+        "azure_foundry_account_name": "platform-prod-foundry",
         "mssql_managed_instance_subnet_id": (
             "/subscriptions/00000000-1111-2222-3333-444444444444/"
             "resourceGroups/rg-platform-prod/providers/Microsoft.Network/"
@@ -93,6 +94,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("time_series", "azure_monitor_prometheus", "AzureMonitorPrometheusConfig"),
         ("email", "azure_acs", "AzureCommunicationEmailConfig"),
         ("model_endpoint", "azure_openai", "AzureOpenAIConfig"),
+        ("model_endpoint", "azure_foundry", "AzureFoundryConfig"),
         ("mssql", "azure_sql_database", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_serverless", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
@@ -567,6 +569,7 @@ def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
         ("servicebus_namespace", "queue", "azure_servicebus"),
         ("servicebus_namespace", "topic", "service_bus_topic"),
         ("azure_openai_account_name", "model_endpoint", "azure_openai"),
+        ("azure_foundry_account_name", "model_endpoint", "azure_foundry"),
         ("acs_communication_resource_id", "email", "azure_acs"),
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
         ("mssql_virtual_network_subnet_id", "mssql", "azure_sql_database"),

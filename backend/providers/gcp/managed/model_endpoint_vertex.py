@@ -466,6 +466,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                 "MODEL_ENDPOINT_URL": ValueRef(
                     literal=(f"https://{self._config.region}-aiplatform.googleapis.com"),
                 ),
+                "MODEL_DEPLOYMENT_NAME": ValueRef(literal=endpoint_id),
+                "MODEL_REGION": ValueRef(literal=self._config.region),
+                "MODEL_API_STYLE": ValueRef(literal="vertex_ai"),
+                "MODEL_AUTH_MODE": ValueRef(literal="cloud_identity"),
                 "MODEL_ENDPOINT_MODEL_ID": ValueRef(literal=deployed_id),
                 "MODEL_ENDPOINT_PROVIDER": ValueRef(literal="vertex_ai"),
                 # Vertex-flavoured aliases
@@ -556,6 +560,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "MODEL_ENDPOINT_URL": ("Vertex AI Platform HTTPS endpoint base URL"),
+                "MODEL_DEPLOYMENT_NAME": "Vertex endpoint id the client predicts against",
+                "MODEL_REGION": "GCP region of the endpoint",
+                "MODEL_API_STYLE": "Client protocol: 'vertex_ai'",
+                "MODEL_AUTH_MODE": "Credential kind: 'cloud_identity' (Workload Identity)",
                 "MODEL_ENDPOINT_MODEL_ID": ("Deployed-model id within the endpoint"),
                 "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'vertex_ai'"),
                 "VERTEX_PROJECT_ID": "GCP project hosting the endpoint",

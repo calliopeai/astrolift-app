@@ -695,6 +695,8 @@ def test_status_and_binding_report_runtime_protocol_and_endpoints() -> None:
         "MODEL_ENDPOINT_URL": "http://triage-prod-fraud-model.steady-md-triage.svc",
         "MODEL_DEPLOYMENT_NAME": "triage-prod-fraud-model",
         "MODEL_REGION": "kubernetes",
+        "MODEL_API_STYLE": "kserve",
+        "MODEL_AUTH_MODE": "none",
         "KSERVE_INFERENCE_SERVICE": "triage-prod-fraud-model",
         "KSERVE_NAMESPACE": "steady-md-triage",
         "MODEL_ENDPOINT_GRPC_URL": "grpc://triage-prod-fraud-model.steady-md-triage.svc:8081",

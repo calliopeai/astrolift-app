@@ -2068,6 +2068,25 @@ def _azure_managed_config_for(
             secret_name_prefix=str(pc.get("azure_openai_secret_name_prefix", "astrolift-aoai")),
         )
 
+    if pair == ("model_endpoint", "azure_foundry"):
+        from azure.managed.model_endpoint_foundry import AzureFoundryConfig
+
+        account_name = str(pc.get("azure_foundry_account_name") or "")
+        if not account_name:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure model_endpoint/azure_foundry requires "
+                "provider_config.azure_foundry_account_name",
+            )
+        return AzureFoundryConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            account_name=account_name,
+            location=location,
+            deployment_name_prefix=str(pc.get("azure_openai_deployment_name_prefix", "astrolift")),
+            api_version=str(pc.get("azure_foundry_api_version", "2024-05-01-preview")),
+            keyvault_url=vault_url,
+        )
+
     if pair == ("faas", "azure_functions") or (kind == "faas" and not variant):
         from azure.managed.faas_functions import AzureFunctionsConfig
 

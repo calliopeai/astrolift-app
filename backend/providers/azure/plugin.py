@@ -33,6 +33,7 @@ Managed services:
 - AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
 - AzureCommunicationEmailDriver — email/azure_acs
 - AzureOpenAIDriver — model_endpoint/azure_openai
+- AzureFoundryDriver — model_endpoint/azure_foundry
 - AzureSQLDatabaseDriver — mssql/azure_sql_database,
   mssql/azure_sql_serverless, mssql/azure_sql_hyperscale
 - AzureSQLManagedInstanceDriver — mssql/azure_sql_managed_instance
@@ -60,6 +61,7 @@ from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
+from azure.managed.model_endpoint_foundry import AzureFoundryDriver
 from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -459,6 +461,8 @@ _MANAGED_CONFIG_PROPERTIES = {
     "azure_openai_deployment_name_prefix": {"type": "string", "default": "astrolift"},
     "azure_openai_api_version": {"type": "string", "default": "2024-02-15-preview"},
     "azure_openai_secret_name_prefix": {"type": "string", "default": "astrolift-aoai"},
+    "azure_foundry_account_name": {"type": "string"},
+    "azure_foundry_api_version": {"type": "string", "default": "2024-05-01-preview"},
     "mssql_server_name_prefix": {"type": "string", "default": "astrolift-sql"},
     "mssql_database_name_prefix": {"type": "string", "default": "astrolift"},
     "mssql_administrator_login": {"type": "string", "default": "astrolift"},
@@ -578,6 +582,7 @@ PLUGIN = ProviderPlugin(
         ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,
         ("email", "azure_acs"): AzureCommunicationEmailDriver,
         ("model_endpoint", "azure_openai"): AzureOpenAIDriver,
+        ("model_endpoint", "azure_foundry"): AzureFoundryDriver,
         ("mssql", "azure_sql_database"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_serverless"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_hyperscale"): AzureSQLDatabaseDriver,

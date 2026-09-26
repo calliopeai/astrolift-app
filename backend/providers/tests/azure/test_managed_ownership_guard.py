@@ -92,7 +92,8 @@ def test_every_lifecycle_driver_is_accounted_for() -> None:
     """
 
     ungated = {path.stem for path in DRIVERS if "verify_azure_ownership" not in path.read_text()}
-    assert ungated == {"email_obs"}
+    # model_endpoint_foundry subclasses the aoai driver and inherits its gate.
+    assert ungated == {"email_obs", "model_endpoint_foundry"}
 
 
 def test_the_classic_share_metadata_write_path_uses_the_keys_the_gate_reads() -> None:

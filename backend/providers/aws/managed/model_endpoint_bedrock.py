@@ -402,6 +402,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             env_vars={
                 # Canonical contract envs
                 "MODEL_ENDPOINT_URL": ValueRef(literal=invoke_endpoint),
+                "MODEL_DEPLOYMENT_NAME": ValueRef(literal=model_id),
+                "MODEL_REGION": ValueRef(literal=self._config.region),
+                "MODEL_API_STYLE": ValueRef(literal="bedrock"),
+                "MODEL_AUTH_MODE": ValueRef(literal="cloud_identity"),
                 "MODEL_ENDPOINT_MODEL_ID": ValueRef(literal=model_id),
                 "MODEL_ENDPOINT_PROVIDER": ValueRef(literal="bedrock"),
                 # AWS-flavoured aliases
@@ -487,6 +491,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "MODEL_ENDPOINT_URL": ("Bedrock runtime HTTPS endpoint"),
+                "MODEL_DEPLOYMENT_NAME": "Foundation model id, sent as the request's modelId",
+                "MODEL_REGION": "AWS region of the Bedrock runtime",
+                "MODEL_API_STYLE": "Client protocol: 'bedrock'",
+                "MODEL_AUTH_MODE": "Credential kind: 'cloud_identity' (IRSA)",
                 "MODEL_ENDPOINT_MODEL_ID": ("Foundation model id (e.g. anthropic.claude-3-...)"),
                 "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'bedrock'"),
                 "BEDROCK_REGION": "AWS region hosting the endpoint",

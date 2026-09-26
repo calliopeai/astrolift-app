@@ -149,6 +149,9 @@ class AzureOpenAIConfig:
 
 
 class AzureOpenAIDriver(ManagedServiceDriver):
+    PROVIDER = "azure_openai"
+    API_STYLE = "azure_openai"
+
     def __init__(self, *, config: AzureOpenAIConfig) -> None:
         self._config = config
         if config.mgmt_client is not None:
@@ -207,19 +210,21 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                 message=(f"aoai deployment {deployment_name} already exists (state={_state_of(existing)})"),
             )
 
-        sku_name = cfg.get("sku") or _SIZE_TO_SKU.get(spec.size, "Standard")
+        sku_name = cfg.get("sku") or self._default_sku(spec.size)
         capacity = int(
             cfg.get("capacity") or _SIZE_TO_CAPACITY.get(spec.size, 10),
         )
-        model_name = cfg.get("model_name") or _SIZE_TO_MODEL_NAME.get(spec.size, "gpt-35-turbo")
-        model_version = cfg.get("model_version") or _DEFAULT_MODEL_VERSION.get(model_name, "")
+        try:
+            model_format, model_name, model_version = self._model_of(cfg, spec.size)
+        except AzureOpenAIError as exc:
+            return ProvisionResult(ok=False, handle="", message=str(exc), errors=["invalid_config"])
         rai_policy = cfg.get("rai_policy_name") or "Microsoft.Default"
 
         parameters: dict[str, Any] = {
             "sku": {"name": sku_name, "capacity": capacity},
             "properties": {
                 "model": {
-                    "format": "OpenAI",
+                    "format": model_format,
                     "name": model_name,
                     "version": model_version,
                 },
@@ -327,7 +332,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                 _model_field_of(existing, "name") if existing is not None else cfg.get("model_name", "gpt-35-turbo")
             )
             properties["model"] = {
-                "format": "OpenAI",
+                "format": _model_field_of(existing, "format") or "OpenAI",
                 "name": cfg.get("model_name") or current_model_name,
                 "version": cfg["model_version"],
             }
@@ -486,30 +491,23 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             raise AzureOpenAIError(
                 f"binding requested for missing deployment {deployment_name}",
             )
-        endpoint_url = f"https://{self._config.account_name}.openai.azure.com"
+        endpoint_url = self._endpoint_url()
         api_key_secret = self._api_key_secret_for(
             deployment_name=deployment_name,
         )
+        api_key = ValueRef(secret_ref=key_vault_secret_ref(self._config.keyvault_url, api_key_secret))
         model_name = _model_field_of(existing, "name") or "unknown"
         env_vars: dict[str, ValueRef] = {
             # Canonical contract envs
             "MODEL_ENDPOINT_URL": ValueRef(literal=endpoint_url),
+            "MODEL_API_KEY": api_key,
+            "MODEL_DEPLOYMENT_NAME": ValueRef(literal=deployment_name),
+            "MODEL_REGION": ValueRef(literal=self._config.location),
+            "MODEL_API_STYLE": ValueRef(literal=self.API_STYLE),
+            "MODEL_AUTH_MODE": ValueRef(literal="api_key"),
             "MODEL_ENDPOINT_MODEL_ID": ValueRef(literal=deployment_name),
-            "MODEL_ENDPOINT_PROVIDER": ValueRef(
-                literal="azure_openai",
-            ),
-            # AOAI-flavoured aliases
-            "AZURE_OPENAI_ENDPOINT": ValueRef(literal=endpoint_url),
-            "AZURE_OPENAI_DEPLOYMENT_NAME": ValueRef(
-                literal=deployment_name,
-            ),
-            "AZURE_OPENAI_API_VERSION": ValueRef(
-                literal=self._config.api_version,
-            ),
-            "AZURE_OPENAI_API_KEY": ValueRef(
-                secret_ref=key_vault_secret_ref(self._config.keyvault_url, api_key_secret),
-            ),
-            "AZURE_OPENAI_MODEL_NAME": ValueRef(literal=model_name),
+            "MODEL_ENDPOINT_PROVIDER": ValueRef(literal=self.PROVIDER),
+            **self._alias_envs(endpoint_url, deployment_name, model_name, api_key),
         }
         account_resource_id = (
             f"/subscriptions/{self._config.subscription_id}"
@@ -534,13 +532,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                     ],
                 ),
             ],
-            notes=(
-                "AZURE_OPENAI_API_KEY is a Key Vault ref to the "
-                "shared account key; the deployment selector is "
-                "AZURE_OPENAI_DEPLOYMENT_NAME. Use the official "
-                "openai SDK's ``AzureOpenAI`` client with these "
-                "envs."
-            ),
+            notes=self._binding_notes(),
         )
 
     @driver_op(cloud="azure", driver="model_endpoint_aoai")
@@ -593,6 +585,11 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "MODEL_ENDPOINT_URL": ("Azure OpenAI account HTTPS endpoint"),
+                "MODEL_API_KEY": "Key Vault ref to the shared account API key",
+                "MODEL_DEPLOYMENT_NAME": "Deployment name within the account",
+                "MODEL_REGION": "Azure location of the account",
+                "MODEL_API_STYLE": "Client protocol: 'azure_openai'",
+                "MODEL_AUTH_MODE": "Credential kind: 'api_key'",
                 "MODEL_ENDPOINT_MODEL_ID": ("Deployment name within the account"),
                 "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'azure_openai'"),
                 "AZURE_OPENAI_ENDPOINT": "Alias for MODEL_ENDPOINT_URL",
@@ -603,6 +600,38 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                     "Underlying model name (e.g. gpt-4) -- informational; routing is by deployment_name"
                 ),
             },
+        )
+
+    # ---- provider hooks (overridden by the Foundry driver) --------------
+
+    def _default_sku(self, size: str) -> str:
+        return _SIZE_TO_SKU.get(size, "Standard")
+
+    def _model_of(self, cfg: dict[str, Any], size: str) -> tuple[str, str, str]:
+        name = cfg.get("model_name") or _SIZE_TO_MODEL_NAME.get(size, "gpt-35-turbo")
+        return "OpenAI", name, cfg.get("model_version") or _DEFAULT_MODEL_VERSION.get(name, "")
+
+    def _endpoint_url(self) -> str:
+        return f"https://{self._config.account_name}.openai.azure.com"
+
+    def _alias_envs(
+        self, endpoint_url: str, deployment_name: str, model_name: str, api_key: ValueRef
+    ) -> dict[str, ValueRef]:
+        return {
+            "AZURE_OPENAI_ENDPOINT": ValueRef(literal=endpoint_url),
+            "AZURE_OPENAI_DEPLOYMENT_NAME": ValueRef(literal=deployment_name),
+            "AZURE_OPENAI_API_VERSION": ValueRef(literal=self._config.api_version),
+            "AZURE_OPENAI_API_KEY": api_key,
+            "AZURE_OPENAI_MODEL_NAME": ValueRef(literal=model_name),
+        }
+
+    def _binding_notes(self) -> str:
+        return (
+            "AZURE_OPENAI_API_KEY is a Key Vault ref to the "
+            "shared account key; the deployment selector is "
+            "AZURE_OPENAI_DEPLOYMENT_NAME. Use the official "
+            "openai SDK's ``AzureOpenAI`` client with these "
+            "envs."
         )
 
     # ---- internals ----------------------------------------------------
