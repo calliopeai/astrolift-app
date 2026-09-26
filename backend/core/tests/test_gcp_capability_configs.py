@@ -478,7 +478,6 @@ def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None
             memorystore_valkey_api_endpoint="https://memorystore.example.test/v1beta",
             memorystore_valkey_operation_timeout_seconds=900,
             memorystore_valkey_poll_interval_seconds=1,
-            memorystore_valkey_adopt_existing_instance=True,
         ),
         kind="redis",
         variant="memorystore_valkey",
@@ -509,4 +508,3 @@ def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None
     assert config.api_endpoint.endswith("/v1beta")
     assert config.operation_timeout_seconds == 900
     assert config.poll_interval_seconds == 1
-    assert config.adopt_existing_instance is True

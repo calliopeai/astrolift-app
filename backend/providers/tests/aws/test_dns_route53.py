@@ -347,3 +347,14 @@ def test_only_a_zone_provision_zone_created_verifies_as_platform_made(route53_cl
     assert driver.zone_created_by_platform("corp.example", foreign_id) is False
     assert driver.zone_created_by_platform("other.example", ours) is False  # name must match
     assert driver.zone_created_by_platform("shop.example", "ZNOSUCHZONE") is False
+
+
+def test_zone_exists_reports_a_name_already_in_the_account(driver_with_zone) -> None:
+    driver, _ = driver_with_zone
+    assert driver.zone_exists("acme.platform.example") is True
+    assert driver.zone_exists("nobody-has-this.example") is False
+
+
+def test_zone_exists_is_insensitive_to_a_trailing_dot(driver_with_zone) -> None:
+    driver, _ = driver_with_zone
+    assert driver.zone_exists("acme.platform.example.") is True

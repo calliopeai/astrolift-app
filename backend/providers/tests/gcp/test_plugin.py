@@ -307,8 +307,8 @@ def test_memorystore_valkey_operator_controls_are_exposed() -> None:
         "memorystore_valkey_api_endpoint",
         "memorystore_valkey_operation_timeout_seconds",
         "memorystore_valkey_poll_interval_seconds",
-        "memorystore_valkey_adopt_existing_instance",
     ):
         assert field in properties
+    assert "memorystore_valkey_adopt_existing_instance" not in properties
     assert properties["memorystore_valkey_token_auth_user"]["default"] == "default"
     assert properties["managed_cert_name_prefix"]["default"] == "astrolift"

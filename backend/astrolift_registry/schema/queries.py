@@ -468,6 +468,10 @@ def _annotate_managed_domain(qs):
     onto each row. Neither adds a query — the cost stays O(1) regardless
     of row count. ``_managed_hostnames_for_apps`` then reads both off the
     materialised rows with no further DB hits.
+
+    Excludes a row still awaiting its TXT proof-of-control challenge
+    (#1931), the same as ``resolve_managed_domain`` -- a hostname must not
+    render for a zone nothing has proven the platform may use.
     """
     from astrolift_clusters.models import ManagedDomain
 
@@ -477,6 +481,7 @@ def _annotate_managed_domain(qs):
             default_for__in=[ManagedDomain.DefaultFor.TENANT_APPS, ManagedDomain.DefaultFor.BOTH],
             deleted_at__isnull=True,
         )
+        .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
         .order_by("pk")
         .values("zone")[:1]
     )
@@ -492,10 +497,13 @@ def _managed_hostnames_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, str]
     pre-loaded onto the rows — the ``organization.default_managed_domain``
     FK (select_related cache) and the ``_platform_zone`` annotation —
     so it issues no queries of its own. Resolution mirrors
-    ``resolve_managed_domain``: a non-deleted org-default wins, else the
-    platform-level zone. ``app_to_type`` reads this map via the
-    ``managed_hostname=`` kwarg.
+    ``resolve_managed_domain``: a non-deleted, non-pending org-default wins
+    (#1931 -- a row still awaiting its TXT challenge is not proven, so it
+    does not render a hostname), else the platform-level zone.
+    ``app_to_type`` reads this map via the ``managed_hostname=`` kwarg.
     """
+    from astrolift_clusters.models import ManagedDomain
+
     app_list = list(apps)
     if not app_list:
         return {}
@@ -505,6 +513,8 @@ def _managed_hostnames_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, str]
         org = app.organization if app.organization_id else None
         domain = getattr(org, "default_managed_domain", None) if org is not None else None
         if domain is not None and getattr(domain, "deleted_at", None) is not None:
+            domain = None
+        if domain is not None and domain.verification_state == ManagedDomain.VerificationState.PENDING:
             domain = None
         zone = domain.zone if domain is not None else getattr(app, "_platform_zone", None)
         if not zone:

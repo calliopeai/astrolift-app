@@ -20,6 +20,12 @@ from aws.managed._base import ManagedServiceError
 from aws.managed.email_ses import AmazonSESDriver, SESEmailConfig
 
 
+class _NotFoundException(Exception):
+    def __init__(self) -> None:
+        super().__init__("NotFoundException")
+        self.response = {"Error": {"Code": "NotFoundException"}}
+
+
 class _RecordingSES:
     """Minimal SES stand-in covering only the calls ``binding`` makes."""
 
@@ -38,10 +44,23 @@ class _RecordingSES:
         }
 
 
+class _RecordingSESv2:
+    """Minimal SESv2 stand-in covering only the calls ``binding`` makes."""
+
+    def __init__(self, *, verified: dict[str, str] | None = None) -> None:
+        self._verified = verified or {}
+
+    def get_email_identity(self, *, EmailIdentity: str) -> dict[str, Any]:  # noqa: N803
+        if EmailIdentity not in self._verified:
+            raise _NotFoundException()
+        return {"VerifiedForSendingStatus": self._verified[EmailIdentity] == "Success"}
+
+
 def _driver(*, base_domain: str = "", verified: dict[str, str] | None = None) -> AmazonSESDriver:
     return AmazonSESDriver(
         config=SESEmailConfig(region="us-east-1", base_domain=base_domain),
         ses_client=_RecordingSES(verified=verified),
+        sesv2_client=_RecordingSESv2(verified=verified),
         secrets_client=object(),
     )
 

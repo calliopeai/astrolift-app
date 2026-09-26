@@ -259,6 +259,9 @@ class FirestoreNativeDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, adopt_restored: bool = False) -> ProvisionResult:
         cfg = dict(spec.config or {})
         error = self._validate_config(cfg)
         if error:
@@ -266,15 +269,25 @@ class FirestoreNativeDriver(ManagedServiceDriver):
         database_id = self._database_id(spec)
         name = self._database_name(database_id)
         try:
-            if self._requires_adoption(database_id, cfg) and not cfg.get("adopt_existing"):
-                raise FirestoreError(
-                    f"database id {database_id!r} is outside the Astrolift namespace; set adopt_existing=true",
-                )
             current = self._get_database(name)
             if current is None:
+                # Nothing to adopt: a tenant-chosen database_id is free to
+                # name a database that does not exist yet.
                 operation = self._create_or_clone(database_id, cfg)
                 self._wait_operation(operation)
                 current = self._firestore.get_database(name)
+            elif not adopt_restored and self._requires_adoption(database_id, cfg):
+                # It already existed before this call and Firestore databases
+                # carry no label an ownership check could read, so there is no
+                # way to tell "we created this on an earlier call" from "a
+                # tenant pointed database_id at something else's database".
+                # Adoption of an existing resource is a separate,
+                # operator-authorized operation (#1365); no tenant config flag
+                # may grant it (#2021).
+                raise FirestoreError(
+                    f"database id {database_id!r} already exists and is outside the Astrolift namespace; "
+                    "adoption is a separate, operator-authorized operation and cannot be granted by tenant config",
+                )
             self._reconcile_database(name, current, cfg)
             self._reconcile_backup_schedules(name, cfg)
             self._reconcile_indexes(name, cfg)
@@ -502,10 +515,6 @@ class FirestoreNativeDriver(ManagedServiceDriver):
         database_id = self._database_id(target)
         database_name = self._database_name(database_id)
         try:
-            if self._requires_adoption(database_id, cfg) and not cfg.get("adopt_existing"):
-                raise FirestoreError(
-                    f"restore target {database_id!r} is outside the Astrolift namespace; set adopt_existing=true",
-                )
             if self._get_database(database_name) is not None:
                 raise FirestoreError(f"restore target database {database_id} already exists")
             if snapshot.snapshot_id.startswith("projects/") and "/backups/" in snapshot.snapshot_id:
@@ -536,13 +545,11 @@ class FirestoreNativeDriver(ManagedServiceDriver):
                 )
             else:
                 raise FirestoreError("Firestore snapshot must be a backup resource name or gs:// export URI")
-            # The restore call created the target inside this operation.  An
-            # explicit database id still needs the normal adoption guard for
-            # user-created databases, so opt into adoption only for this
-            # internal post-restore reconciliation.
-            reconciled = self.provision(
-                replace(target, config={**cfg, "adopt_existing": True}),
-            )
+            # The restoreDatabase call above already created the target
+            # inside this operation, so the namespace guard -- which exists
+            # to keep a tenant pointing database_id at a database it did not
+            # create -- does not apply to the one this restore just made.
+            reconciled = self._provision(target, adopt_restored=True)
             if not reconciled.ok:
                 return reconciled
             return replace(
@@ -693,8 +700,16 @@ class FirestoreNativeDriver(ManagedServiceDriver):
         return {
             "type": "object",
             "properties": {
-                "database_id": {"type": "string", "minLength": 4, "maxLength": 63},
-                "adopt_existing": {"type": "boolean", "default": False},
+                "database_id": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 63,
+                    "description": (
+                        "Custom database id. Only usable to create a new database: an id that "
+                        "already exists and is outside the Astrolift namespace is refused, since "
+                        "Firestore databases carry no label an ownership check could verify."
+                    ),
+                },
                 "delete_adopted": {"type": "boolean", "default": False},
                 "access_mode": {"type": "string", "enum": ["read", "write", "admin"], "default": "write"},
                 "client_api": {"type": "string", "enum": ["firestore", "mongodb"], "default": "firestore"},
@@ -1004,6 +1019,15 @@ class FirestoreNativeDriver(ManagedServiceDriver):
         return f"projects/{self._config.project_id}/databases/{database_id}"
 
     def _requires_adoption(self, database_id: str, cfg: dict[str, Any]) -> bool:
+        """Whether ``database_id``, if it already exists, would need an operator adoption to use.
+
+        Only ever consulted when a database was already there before this
+        call (see ``_provision``); a name that is about to be created fresh
+        has nothing to adopt. A tenant-supplied ``database_id`` and the
+        well-known ``(default)`` database are always outside the namespace,
+        because Firestore databases carry no label a later call could read
+        back to prove "we created this one already".
+        """
         if cfg.get("database_id"):
             return True
         namespace = _database_id_prefix(self._config.database_name_prefix)

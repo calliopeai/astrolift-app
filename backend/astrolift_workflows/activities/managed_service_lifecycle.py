@@ -173,6 +173,55 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
     )
 
 
+def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
+    """Refuse provisioning an SES identity a different live ManagedService
+    already holds (#2029).
+
+    The driver's own ownership-tag check (#1961's ``adoption_refusal``)
+    only sees AWS's state, so it can refuse to *adopt* a foreign identity
+    once ``create_email_identity``/``get_email_identity`` runs -- but
+    nothing stops the platform from dispatching two different
+    ``ManagedService`` rows at the very same derived (or operator-typed)
+    identity in the first place. Checking the platform's own row set
+    first means a same-account collision never reaches AWS at all, and
+    it runs ahead of driver resolution so it is the only place that can
+    refuse *before* the first create -- the driver can only refuse an
+    adopt of something that already exists.
+
+    Reads ``identity_prefix`` / ``base_domain`` straight off the
+    cluster's ``provider_config`` -- the same two keys
+    ``core.cluster_observability``'s ``kind == "email"`` branch reads --
+    rather than the driver's built ``SESEmailConfig``, so this can run
+    before driver resolution instead of duplicating it.
+    """
+    if (str(svc.kind), str(getattr(svc, "variant", "") or "")) != ("email", "ses"):
+        return
+
+    from aws.managed._base import ManagedServiceError, handle_for
+    from aws.managed.email_ses import KIND, identity_for
+
+    from astrolift_services.models import ManagedService
+
+    pc = cluster.provider_config or {}
+    try:
+        identity = identity_for(
+            spec,
+            identity_prefix=str(pc.get("ses_identity_prefix", "astrolift")),
+            base_domain=str(pc.get("base_domain", "")),
+        )
+    except ManagedServiceError:
+        # provision() raises this same "needs an identity or base_domain"
+        # error itself; there's nothing to check ownership of yet.
+        return
+
+    handle = handle_for(kind=KIND, resource_id=identity)
+    if ManagedService.objects.filter(kind=svc.kind, backend_ref=handle).exclude(pk=svc.pk).exists():
+        raise ManagedServicePreflightError(
+            f"managed service {svc.name or svc.kind!r}: identity {identity!r} is already "
+            f"provisioned by another managed service"
+        )
+
+
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
@@ -610,6 +659,8 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
     _run_managed_service_preflight(svc, cluster)
+    spec = build_provision_spec(svc, cluster=cluster)
+    _assert_email_identity_unclaimed(svc, spec, cluster)
     try:
         resolved = resolve_managed_driver(
             cluster_plugin_slug=plugin_slug,
@@ -622,7 +673,6 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
-    spec = build_provision_spec(svc, cluster=cluster)
     restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
     if restore and not svc.backend_ref:
         from _sdk.managed_service import SnapshotHandle
