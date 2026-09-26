@@ -22,13 +22,16 @@
   Knative Eventing drivers, where knowing an object's uid proved only that
   the caller could see it; and SeaweedFS's `adopt_existing`, which asked the
   operator to bind an existing bucket in the shared cluster to the tenant's
-  S3 identity and is now always rendered `adoptExisting: false`. A config
-  that still sets one of these keys, even to `false`, is rejected rather
-  than ignored. A pre-existing shared Spanner instance takes the
-  `astrolift-managed-by=platform` label instead of the switch. The
-  `delete_adopted*` teardown confirmations stay: a resource adopted before
-  this change keeps its marker and still needs the second acknowledgement to
-  delete.
+  S3 identity and is now always rendered `adoptExisting: false`. API
+  Gateway's `update` also stops trusting a platform label alone for the
+  tenant-named `api_id`: with `allow_api_retarget` it could point the
+  gateway at, patch and prune another managed service's API, and now the
+  API must be this service's. A config that still sets one of the removed
+  keys, even to `false`, is rejected rather than ignored. A pre-existing
+  shared Spanner instance takes the `astrolift-managed-by=platform` label
+  instead of the switch. The `delete_adopted*` teardown confirmations stay:
+  a resource adopted before this change keeps its marker and still needs the
+  second acknowledgement to delete.
 - Rendered hostnames, not just app labels, are now unique per managed zone
   (#2012, follow-up to #1930). A multi-workload app's suffixed hostname
   (`<label>-<workload>.<zone>`) can equal another org's plain label of that

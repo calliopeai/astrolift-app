@@ -213,6 +213,29 @@ def test_update_creates_revision_and_atomically_retargets_gateway(
     assert "apiConfig" in patch[3]
 
 
+def test_update_cannot_retarget_the_gateway_at_another_services_api(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    """api_id is tenant config; allow_api_retarget must not reach an API this service does not own."""
+    result = driver.provision(replace(SPEC, config=_openapi_config()))
+    _, gateway = _names()
+    active_config = str(client.resources[gateway]["apiConfig"])
+    victim = "projects/project-1/locations/global/apis/victim-api"
+    victim_labels = {"astrolift-io-managed-by": "platform", "astrolift-io-managed-service-id": "victim-service"}
+    client.resources[victim] = {"name": victim, "state": "ACTIVE", "labels": dict(victim_labels)}
+    cfg = {**_openapi_config(), "api_id": "victim-api", "allow_api_retarget": True}
+    cfg.pop("gateway_id")
+
+    refused = driver.update(UpdateSpec(result.handle, config=cfg, managed_service_id="managed-id"))
+
+    assert not refused.ok
+    assert "another managed service" in refused.message
+    assert client.resources[victim]["labels"] == victim_labels
+    assert not [name for name in client.resources if name.startswith(f"{victim}/configs/")]
+    assert client.resources[gateway]["apiConfig"] == active_config
+
+
 def test_explicit_config_id_rejects_changed_immutable_documents(
     driver: APIGatewayDriver,
 ) -> None:

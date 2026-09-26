@@ -265,7 +265,10 @@ class APIGatewayDriver(ManagedServiceDriver):
                     ["api_retarget_guard"],
                 )
             api_resource = self._api.get(api_name)
-            self._assert_managed(api_resource, "API")
+            # api_id comes from tenant config, so with allow_api_retarget a
+            # platform-label check alone let an update point this gateway at,
+            # patch and prune another managed service's API (#2074).
+            self._assert_adoptable(api_resource, spec.managed_service_id, "API")
             api_labels = dict(api_resource.get("labels") or {})
             self._patch(api_name, api_resource, self._api_body(cfg, api_labels), immutable={"managedService"})
             service_id = str(api_labels.get("astrolift-io-managed-service-id") or "")
