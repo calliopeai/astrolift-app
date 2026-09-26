@@ -1166,7 +1166,11 @@ def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: s
     """Remove the environment's literal ``[env]`` Secret once it has no
     literals left (#1923). Nothing references it any more, but it still holds
     the last plaintext values. Best effort: a failed delete is logged, not
-    fatal, and the next deploy tries again."""
+    fatal, and the next deploy tries again.
+
+    ``d`` only needs ``registered_app`` and ``app_environment`` -- a
+    ``Deployment`` (the normal deploy path) or a ``PreviewEnvironment``
+    (preview teardown, #1923) both qualify."""
     delete = getattr(cluster_driver, "delete_manifests", None)
     if delete is None:
         return
@@ -1181,7 +1185,12 @@ def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: s
     try:
         delete(cluster_slug, namespace, [stale])
     except Exception:  # noqa: BLE001 - cleanup must not fail the deploy
-        log.warning("could not delete the stale literal Secret for deployment %s", d.pk, exc_info=True)
+        log.warning(
+            "could not delete the stale literal Secret for app %s env %s",
+            d.registered_app.slug,
+            d.app_environment.name,
+            exc_info=True,
+        )
 
 
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
@@ -2151,10 +2160,11 @@ async def mark_preview_torn_down(preview_environment_id: int) -> None:
 
 def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
     from astrolift_lifecycle.models import PreviewEnvironment
-    from core.app_deploy import AppDeployError
+    from core.app_deploy import AppDeployError, namespace_for_app
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     p = PreviewEnvironment.all_objects.select_related(
+        "registered_app",
         "app_environment__tenant_cluster__provider_plugin",
     ).get(pk=preview_environment_id)
     cluster = p.app_environment.tenant_cluster
@@ -2164,6 +2174,14 @@ def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
         )
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
+    # The preview's literal `[env]` Secret does not live in p.namespace --
+    # every environment of an app (prod, staging, every preview) shares one
+    # namespace per cluster (see _app_env_secret_name), and that Secret is
+    # materialized there by update_secrets, not here. delete_namespace
+    # below only cascades p.namespace, so without this the preview's
+    # literal Secret -- still holding its last plaintext values -- outlived
+    # the preview indefinitely (#1923).
+    _delete_stale_literal_secret(driver, ctx.slug, namespace_for_app(p.registered_app), p)
     # delete_namespace cascades all the namespaced resources k8s knows
     # about (Deployments, Services, ConfigMaps, Secrets, PVCs, Ingresses).
     # Pass wait=True so we don't return until the namespace is actually

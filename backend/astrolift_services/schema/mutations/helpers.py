@@ -223,12 +223,24 @@ def _secret_write_payload(input) -> dict:
 
 
 def _validate_scope(scope: str | None) -> str | None:
-    """None keeps the stored scope; an explicit blank is refused. Stored
-    as-is, "" matches no environment, so the key would silently stop
-    deploying anywhere."""
-    if scope is not None and not scope.strip():
+    """None keeps the stored scope; anything else must be one of the
+    values ``allowed_scopes_for_env`` actually resolves against (#1923).
+
+    An explicit blank is refused: stored as-is, "" matches no environment,
+    so the key would silently stop deploying anywhere. A value outside the
+    recognised set -- a typo, or an actual environment name typed into the
+    scope field (this isn't the field for that; scope is an audience
+    class, not an environment name) -- is refused the same way: stored
+    as-is, it never matches any environment's allowed-scope set either, so
+    the key would silently stop deploying everywhere, with nothing to say
+    why."""
+    if scope is None:
+        return None
+    if not scope.strip():
         return "scope must not be empty; omit it to keep the current scope"
-    return None
+    from astrolift_services.secret_literals import valid_scope_literal_error
+
+    return valid_scope_literal_error(scope)
 
 
 def _resolve_email_service(managed_service_id):

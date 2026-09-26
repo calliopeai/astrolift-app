@@ -1036,6 +1036,7 @@ export type AstroliftAppReprovisionState = {
 
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
+  deploysAsShown: Scalars['Boolean']['output'];
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
@@ -12243,7 +12244,7 @@ export type ListAppSecretsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
+export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, deploysAsShown: boolean, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
 
 export type PreviewManagedServiceCostQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];

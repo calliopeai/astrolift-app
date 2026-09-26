@@ -264,10 +264,18 @@ def _drain_source_cluster_sync(
     other apps may share the namespace (if the cluster runs multiple
     orgs/apps in the same ns, which is possible when ``k8s_namespace``
     is operator-pinned).
+
+    Also deletes the environment's literal ``[env]`` Secret (#1923):
+    ``render_resources_for_deployment`` renders only the workloads
+    (Deployments, Services, Ingress, ...) -- the literal Secret is
+    synthesized separately by ``update_secrets`` and was never part of
+    this delete set, so it stayed behind on the source cluster holding
+    the last plaintext values indefinitely.
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment, Deployment
     from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.activities.app_lifecycle import _app_env_secret_name
     from core.app_deploy import (
         AppDeployError,
         namespace_for_app,
@@ -315,8 +323,17 @@ def _drain_source_cluster_sync(
         )
     except AppDeployError as exc:
         return [str(exc)]
-    if not resources:
-        return []
+    resources = [
+        *resources,
+        {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": _app_env_secret_name(app.slug, env.name),
+                "namespace": namespace,
+            },
+        },
+    ]
     result = driver.delete_manifests(ctx.slug, namespace, resources)
     return list(result.errors)
 

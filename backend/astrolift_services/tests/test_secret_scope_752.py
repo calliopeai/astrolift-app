@@ -443,6 +443,74 @@ def test_set_metadata_refuses_an_empty_scope(permission_resolver):
     assert _scope_of(app, "EMPTY_K") == "production"
 
 
+# A value outside {all, production, preview, preview:<branch>} never matches
+# either branch of allowed_scopes_for_env, so it silently hides the key from
+# every environment forever -- the same failure mode as an empty string,
+# just without the obvious "" to catch on read. This is most likely to
+# happen when an operator types an actual environment name (this app might
+# genuinely have one named "staging") into the scope field, mistaking it
+# for an environment selector rather than an audience class (#1923).
+
+
+def _refused_as_unrecognised_scope(result) -> bool:
+    return result.ok is False and result.errors[0].code == "VALIDATION" and result.errors[0].field == "scope"
+
+
+def test_set_refuses_an_environment_name_as_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope="staging"),
+        )
+    assert _refused_as_unrecognised_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_rotate_refuses_a_typo_d_scope(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(app_slug=app.slug, key="EMPTY_K", value="v2", scope="produciton"),
+        )
+    assert _refused_as_unrecognised_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_set_metadata_refuses_a_bare_preview_colon(permission_resolver):
+    """'preview:' with no branch is refused -- distinct from the empty-string
+    case, but the same failure mode: it never matches any environment."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _restrict_to_production(org, app, "EMPTY_K")
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret_metadata(
+            _info(),
+            input=SetAppSecretMetadataInput(app_slug=app.slug, key="EMPTY_K", scope="preview:"),
+        )
+    assert _refused_as_unrecognised_scope(result)
+    assert _scope_of(app, "EMPTY_K") == "production"
+
+
+def test_set_still_accepts_a_preview_branch_scope(permission_resolver):
+    """The one non-literal, still-valid shape: 'preview:<branch>' must keep
+    working -- only unrecognised values are refused."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with _ctx(org):
+        result = ServicesMutation().set_app_secret(
+            _info(),
+            input=SetAppSecretInput(app_slug=app.slug, key="BRANCH_K", value="v", scope="preview:feat-x"),
+        )
+    assert result.ok, result.errors
+    assert _scope_of(app, "BRANCH_K") == "preview:feat-x"
+
+
 # Scope decides which environments receive a value, so changing it is a
 # secret write: it needs the same fresh elevation as set/rotate (#1946).
 

@@ -12,7 +12,6 @@ from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_identity.models import Project
 from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_manifest.env_injection import envelope_keys_for
 from astrolift_registry.models import RegisteredApp
@@ -60,7 +59,11 @@ from astrolift_services.schema.types import (
     workload_identity_grant_to_type,
 )
 from astrolift_services.scopes import managed_service_scope_by_guid, secret_change_proposal_app_scope
-from astrolift_services.secret_literals import allowed_scopes_for_env
+from astrolift_services.secret_literals import (
+    allowed_scopes_for_env,
+    literal_keys_pending_deploy,
+    preview_branches_for_app,
+)
 from astrolift_services.secret_metadata_ops import scope_in_force
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -357,6 +360,11 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     out (#752).  Preview envs accept ``all``, ``preview``, and
     ``preview:<branch>``; all other envs accept ``all`` and
     ``production``.
+
+    A literal row also carries ``deploys_as_shown`` (#1923): false when the
+    app requires secret approval and this key's staged value has no
+    matching applied proposal, so the value shown here is not what the
+    next deploy actually puts in front of a workload.
     """
     out: list[AppSecretType] = []
 
@@ -366,6 +374,7 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     raw_text = app.manifest_raw_staged or app.manifest_raw or ""
     literals = read_app_env(raw_text)
     literal_editor = secret_editor_from_user(app.updated_by)
+    pending_deploy_keys = literal_keys_pending_deploy(app)
 
     # Pre-fetch metadata for this app's literal keys so the resolver
     # is one round-trip rather than N.  The lookup table maps
@@ -380,18 +389,12 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     for m in meta_qs:
         meta_index[(m.environment_name, m.key)] = m
 
-    # Build preview-env → branch mapping for scope filtering (#752).
-    # One extra query per _list_app_secrets call; avoids N+1 over envs.
-    preview_env_branches: dict[str, str] = dict(
-        PreviewEnvironment.objects.filter(
-            registered_app=app,
-            deleted_at__isnull=True,
-            status__in=(
-                PreviewEnvironment.Status.BUILDING,
-                PreviewEnvironment.Status.RUNNING,
-            ),
-        ).values_list("app_environment__name", "branch")
-    )
+    # Build preview-env → branch mapping for scope filtering (#752), by
+    # identity rather than current build status -- a FAILED or torn-down
+    # preview is still a preview, and used to fall through to the
+    # production branch here and show production-scoped keys the deploy
+    # path already withheld (#1758 review H2; #1923 review-fix pass).
+    preview_env_branches = preview_branches_for_app(app, env_names)
 
     for env_name in env_names:
         allowed = allowed_scopes_for_env(env_name, preview_env_branches)
@@ -416,6 +419,7 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
                     expires_at=meta.expires_at if meta else None,
                     set_via=(meta.source if meta else "web"),
                     scope=secret_scope,
+                    deploys_as_shown=key not in pending_deploy_keys,
                 )
             )
 

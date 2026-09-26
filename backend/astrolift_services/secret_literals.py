@@ -25,7 +25,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from django.conf import settings
 from django.utils.crypto import constant_time_compare, salted_hmac
@@ -36,6 +36,31 @@ from astrolift_services.models import AppSecretMetadata, SecretChangeProposal
 from astrolift_services.secret_metadata_ops import scope_in_force
 
 log = logging.getLogger(__name__)
+
+
+_SCOPE_LITERALS = frozenset({"all", "production", "preview"})
+_SCOPE_PREVIEW_BRANCH_PREFIX = "preview:"
+
+
+def valid_scope_literal_error(scope: str) -> str | None:
+    """Why ``scope`` isn't a value ``allowed_scopes_for_env`` can ever match,
+    or ``None`` (#1923).
+
+    The recognised set is exactly ``all``, ``production``, ``preview``, and
+    ``preview:<branch>``. Anything else -- a typo, or an actual environment
+    name (an app can perfectly well name an environment "production" or
+    "staging"; scope is not that) -- silently hides the key from every
+    environment: it doesn't match either branch of ``allowed_scopes_for_env``,
+    ever, for any env."""
+    if scope in _SCOPE_LITERALS:
+        return None
+    if scope.startswith(_SCOPE_PREVIEW_BRANCH_PREFIX) and scope[len(_SCOPE_PREVIEW_BRANCH_PREFIX) :]:
+        return None
+    return (
+        f"scope {scope!r} is not a recognised value; use 'all', 'production', 'preview', "
+        "'preview:<branch>', or omit it to keep the current scope -- this is not an "
+        "environment name"
+    )
 
 
 def allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) -> frozenset[str]:
@@ -279,3 +304,70 @@ def snapshot_literal_secrets(deployment) -> dict[str, str]:
     deployment.secret_snapshot = snapshot
     deployment.save(update_fields=["secret_snapshot", "updated_at", "version"])
     return literals
+
+
+def preview_branches_for_app(app, env_names: Iterable[str]) -> dict[str, str]:
+    """Which of ``env_names`` are previews, by identity rather than current
+    build status, and their branch -- batched across every name in one call
+    (#1923).
+
+    Mirrors the per-environment lookup ``literal_secrets_for_environment``
+    uses (a FAILED or torn-down preview, or one known only by its
+    ``previewed_environment`` lineage, still counts) so the UI's secret
+    list and the deploy path never disagree about which environments are
+    previews. The list used to run its own query filtered to
+    BUILDING/RUNNING PreviewEnvironment rows, so a FAILED or torn-down
+    preview fell through to the production branch and showed
+    production-scoped keys the deploy already withheld (#1758 review, H2;
+    #1923 review-fix pass).
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+
+    names = list(env_names)
+    if not names:
+        return {}
+    envs = list(
+        AppEnvironment.all_objects.filter(registered_app=app, name__in=names).only(
+            "id", "name", "previewed_environment_id"
+        )
+    )
+    env_ids = [e.pk for e in envs]
+    branch_by_env_id: dict[int, str] = {}
+    for env_id, branch in (
+        PreviewEnvironment.all_objects.filter(app_environment_id__in=env_ids)
+        .order_by("-created_at", "-pk")
+        .values_list("app_environment_id", "branch")
+    ):
+        branch_by_env_id.setdefault(env_id, branch or "")
+    out: dict[str, str] = {}
+    for e in envs:
+        if e.pk in branch_by_env_id:
+            out[e.name] = branch_by_env_id[e.pk]
+        elif e.previewed_environment_id is not None:
+            out[e.name] = ""
+    return out
+
+
+def literal_keys_pending_deploy(app) -> frozenset[str]:
+    """Staged literal keys whose value differs from what would actually
+    deploy right now (#1923).
+
+    Empty when the app doesn't require secret approval -- every staged
+    change is deployable there, so nothing is "pending". Otherwise this is
+    ``_deployable_literals``'s own ``unapproved`` computation, surfaced
+    instead of only logged: a key lands here when its staged value has no
+    matching applied proposal, whether because it is mid-review under an
+    always-on approval policy, or because it was staged while approval was
+    briefly off and nothing ever proposed it -- either way the next deploy
+    reverts it to ``manifest_raw``, which for an already-live key can be an
+    outage-causing surprise, not just a missing feature (#1923: "surface it
+    in the UI (list the keys that will revert) before deploy").
+    """
+    if not app.requires_secret_approval:
+        return frozenset()
+    staged_text = app.manifest_raw_staged or app.manifest_raw or ""
+    staged = read_app_env(staged_text)
+    if not staged:
+        return frozenset()
+    deployable = _deployable_literals(app)
+    return frozenset(key for key, value in staged.items() if deployable.get(key) != value)

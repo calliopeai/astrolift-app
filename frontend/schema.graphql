@@ -1037,6 +1037,7 @@ type AstroliftAppSecret {
   expiresAt: DateTime
   setVia: String!
   scope: String!
+  deploysAsShown: Boolean!
 }
 
 type AstroliftAppSecretBundleAttachment {
