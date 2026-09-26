@@ -13,6 +13,7 @@ import type { ListModelEndpointsQuery } from "@/graphql/__generated__/operations
 import { LIST_MODEL_ENDPOINTS } from "@/graphql/models/models.queries";
 
 import { DeployModelSheet } from "./deploy-model-sheet";
+import { ModelReplicas } from "./model-replicas";
 
 type ModelEndpoint = ListModelEndpointsQuery["astroliftModelEndpoints"][number];
 
@@ -82,48 +83,65 @@ function singlePage<T>(
   };
 }
 
-const columns: Column<ModelEndpoint>[] = [
-  { id: "name", header: "Name", cell: (m) => <span className="font-medium">{m.name}</span> },
-  {
-    id: "model",
-    header: "Model",
-    cellClassName: "font-mono text-xs",
-    cell: (m) => modelId((m.config ?? {}) as Record<string, unknown>) || "—",
-  },
-  {
-    id: "serving",
-    header: "Serving",
-    cell: (m) => (
-      <Badge variant={HOSTED.has(m.variant) ? "default" : "secondary"}>{m.variant}</Badge>
-    ),
-  },
-  {
-    id: "hardware",
-    header: "Hardware",
-    cellClassName: "text-muted-foreground text-sm",
-    cell: gpuLabel,
-  },
-  {
-    id: "owner",
-    header: "Owner",
-    cell: (m) => (
-      <Link className="hover:underline" href={ownerHref(m)}>
-        {m.ownerScope === "project"
-          ? m.projectSlug
-          : `${m.registeredAppSlug} · ${m.environmentName}`}
-      </Link>
-    ),
-  },
-  {
-    id: "status",
-    header: "Status",
-    cell: (m) => (
-      <Badge variant="outline" title={m.statusError || undefined}>
-        {m.status}
-      </Badge>
-    ),
-  },
-];
+function columnsFor(refetch: () => void): Column<ModelEndpoint>[] {
+  return [
+    { id: "name", header: "Name", cell: (m) => <span className="font-medium">{m.name}</span> },
+    {
+      id: "model",
+      header: "Model",
+      cellClassName: "font-mono text-xs",
+      cell: (m) => modelId((m.config ?? {}) as Record<string, unknown>) || "—",
+    },
+    {
+      id: "serving",
+      header: "Serving",
+      cell: (m) => (
+        <Badge variant={HOSTED.has(m.variant) ? "default" : "secondary"}>{m.variant}</Badge>
+      ),
+    },
+    {
+      id: "hardware",
+      header: "Hardware",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: gpuLabel,
+    },
+    {
+      id: "owner",
+      header: "Owner",
+      cell: (m) => (
+        <Link className="hover:underline" href={ownerHref(m)}>
+          {m.ownerScope === "project"
+            ? m.projectSlug
+            : `${m.registeredAppSlug} · ${m.environmentName}`}
+        </Link>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (m) => (
+        <Badge variant="outline" title={m.statusError || undefined}>
+          {m.status}
+        </Badge>
+      ),
+    },
+    {
+      id: "replicas",
+      header: "Replicas",
+      cell: (m) =>
+        m.variant === "vllm" ? (
+          <ModelReplicas
+            id={m.id}
+            name={m.name}
+            config={(m.config ?? {}) as Record<string, unknown>}
+            onChanged={refetch}
+          />
+        ) : (
+          <span className="text-muted-foreground text-sm">—</span>
+        ),
+    },
+  ];
+}
 
 export function ModelsClient() {
   const { data, loading, error, refetch } = useQuery<ListModelEndpointsQuery>(LIST_MODEL_ENDPOINTS);
@@ -144,7 +162,7 @@ export function ModelsClient() {
       <DataTable
         label="Model endpoints"
         controller={table}
-        columns={columns}
+        columns={columnsFor(() => void refetch())}
         getRowId={(m) => m.id}
         empty={{
           icon: <BrainCircuitIcon className="size-5" />,
