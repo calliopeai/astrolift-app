@@ -274,7 +274,7 @@ class AppMutations:
 
         # The label check above can't see a multi-workload app's suffixed
         # hostname (``<subdomain>-<workload>``) colliding with another app's
-        # plain claim of that name (#2012) — this app's live workload set is
+        # plain claim of that name (#2012); this app's live workload set is
         # already known here, so render every hostname the rename would
         # produce and refuse if the ledger says another app holds one.
         claim_refusal = (

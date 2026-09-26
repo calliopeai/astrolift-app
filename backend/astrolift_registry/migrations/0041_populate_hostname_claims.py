@@ -12,8 +12,8 @@ Pre-existing collisions are the entire reason this table needs a data
 migration rather than starting empty: two orgs may already render the same
 hostname in a shared zone (#1930's own bug report), and this pass must not
 fail the deploy over that. The first claimant wins, chosen deterministically
-by app creation order (oldest app first) — an arbitrary but stable and
-auditable rule — and every hostname it would have collided with is logged,
+by app creation order (oldest app first), an arbitrary but stable and
+auditable rule, and every hostname it would have collided with is logged,
 not written. ``report_shared_zone_hostname_collisions`` is the durable,
 re-runnable way to find what this migration left out; this migration only
 runs once.

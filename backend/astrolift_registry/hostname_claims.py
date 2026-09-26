@@ -10,7 +10,7 @@ a shared zone this org would use. Existing apps keep what they have.
 
 ``hostname_label_refusal`` compares *labels* (an app's slug/subdomain), so it
 cannot see a multi-workload app's suffixed hostname (``<label>-<workload>``)
-colliding with another org's plain label of that name — the renderer never
+colliding with another org's plain label of that name; the renderer never
 runs before the label check, because at register/rename time the workload
 set that will eventually exist isn't known yet. The rest of this module is
 the ledger that closes that gap: ``astrolift_registry.models.HostnameClaim``
@@ -18,12 +18,12 @@ holds one row per (zone, hostname) a live app/workload/environment actually
 renders, with a database-level unique constraint on the rendered string, and
 these functions keep it in sync at every point #1930 already checks plus
 ``setAppSubdomain``'s full rename (which now also gates on the ledger,
-because by rename time the app's live workload set — and so its true
-rendered hostnames — is fully known).
+because by rename time the app's live workload set (and so its true
+rendered hostnames) is fully known).
 
 Two write modes:
 
-* ``sync_workload_hostname_claims`` — best-effort. Called from
+* ``sync_workload_hostname_claims``: best-effort. Called from
   ``persist_manifest`` (every manifest apply: register, resync, agent
   repo scans) and from environment creation (bootstrap, the builder path),
   none of which may fail the caller's operation over a hostname (manifest
@@ -32,7 +32,7 @@ Two write modes:
   is left unclaimed and logged rather than stolen; the report command
   (``report_shared_zone_hostname_collisions``) is the place to go looking
   for what that leaves outstanding.
-* ``hostname_claim_refusal`` — hard gate. Called from ``setAppSubdomain``,
+* ``hostname_claim_refusal``: hard gate. Called from ``setAppSubdomain``,
   which can refuse cleanly because nothing is written until it passes.
 """
 
@@ -98,7 +98,7 @@ def _public_workload_manifest(app):
     """Adapter: ``app``'s live Workload rows, shaped as a ``NormalizedManifest``.
 
     For call sites with no manifest object in hand (``setAppSubdomain``,
-    environment creation) — only ``name`` / ``kind`` / ``is_public`` feed
+    environment creation); only ``name`` / ``kind`` / ``is_public`` feed
     ``compute_hostnames``, so a minimal per-workload stand-in is enough.
     ``name`` is set from ``Workload.slug``, not ``Workload.name``: manifest
     workloads are keyed by name (``persist_manifest`` writes that same value
@@ -124,7 +124,7 @@ def _public_workload_manifest(app):
 def _desired_claims(app, manifest, *, subdomain: str | None = None):
     """Yield ``(environment, workload_slug, hostname)`` for every live
     *non-preview* environment of ``app`` that has a managed zone, rendering
-    ``manifest`` with ``subdomain`` (or the app's own) as the label —
+    ``manifest`` with ``subdomain`` (or the app's own) as the label,
     exactly what ``compute_hostnames`` would put on the wire.
 
     Excludes preview environments (``previewed_environment`` set): a preview
@@ -165,7 +165,7 @@ def hostname_claim_refusal(app, *, subdomain: str, manifest=None) -> str | None:
     ``hostname_label_refusal`` this sees the multi-workload suffixed form,
     because the app's full workload set is already known here.
 
-    Read-only — callers that pass still call
+    Read-only; callers that pass still call
     ``sync_workload_hostname_claims`` to commit the ledger.
     """
     from astrolift_registry.models import HostnameClaim
@@ -195,15 +195,15 @@ def sync_workload_hostname_claims(app, manifest=None) -> list[str]:
 
     Best-effort and never raises: a hostname another app already holds is
     left with its existing owner (never stolen) and reported back as a
-    conflict message for the caller to log, not enforced here — the
+    conflict message for the caller to log, not enforced here; the
     callers that reach this (``persist_manifest``, environment bootstrap,
     the builder path, imported agents) are all "must survive" paths
     elsewhere in this codebase, so a hostname collision degrades a claim,
     it does not fail a registration or a resync.
 
     Releases (soft-deletes) any of ``app``'s own claims that are no longer
-    desired — a removed or renamed workload, a narrowed subdomain, a
-    workload flipped private — so the ledger only ever describes live
+    desired (a removed or renamed workload, a narrowed subdomain, a
+    workload flipped private), so the ledger only ever describes live
     hostnames. Pass ``manifest`` when the caller already has a freshly
     parsed one (``persist_manifest``); other callers fall back to the
     app's current live ``Workload`` rows.
@@ -228,7 +228,7 @@ def sync_workload_hostname_claims(app, manifest=None) -> list[str]:
             workload = app.workloads.filter(slug=workload_slug, deleted_at__isnull=True).only("pk").first()
             if workload is None:
                 # Between the manifest snapshot and this call the workload
-                # vanished (soft-deleted concurrently) — nothing to attach
+                # vanished (soft-deleted concurrently); nothing to attach
                 # the claim to; skip rather than claim a hostname no live
                 # workload answers on.
                 continue
@@ -277,7 +277,7 @@ def sync_workload_hostname_claims(app, manifest=None) -> list[str]:
                     )
             except IntegrityError:
                 # Lost a race to another transaction between the read above
-                # and this insert — the database constraint is the real
+                # and this insert; the database constraint is the real
                 # backstop the ledger exists for. Leave it with the winner.
                 conflicts.append(f"{hostname!r} was just claimed by another app")
                 log.warning("hostname claim race for %r in zone %s", hostname, env.managed_domain.zone)
@@ -296,7 +296,7 @@ def release_app_hostname_claims(app) -> int:
     """Soft-delete every live ledger claim for ``app``. Returns the count.
 
     Called at app teardown/deregister and at the immediate ``softDeleteApp``
-    path — both are "the app is gone" moments, so every claim releases
+    path; both are "the app is gone" moments, so every claim releases
     together rather than being reconciled workload-by-workload.
     """
     from django.utils import timezone

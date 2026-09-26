@@ -1,5 +1,5 @@
 """
-HostnameClaim — the ledger of rendered hostnames (#2012).
+HostnameClaim: the ledger of rendered hostnames (#2012).
 
 ``astrolift_registry.hostname_claims.hostname_label_refusal`` (#1930) refuses
 a new app label that collides with another org's app *label* in a shared
@@ -16,7 +16,7 @@ Deliberately a new table rather than reusing ``astrolift_lifecycle.IngressRule``
 (see ``astrolift_registry.hostname_claims`` module docstring for the reasoning):
 IngressRule has no ``environment`` column, is exposed over GraphQL, and is read
 by the cluster-decommission DNS sweep on the assumption that every row is a
-real, rendered ingress rule — bending it into a claim ledger would either
+real, rendered ingress rule; bending it into a claim ledger would either
 starve that sweep of its historical (already-dormant) input shape or start
 deleting DNS records nobody asked this change to touch.
 """

@@ -10,7 +10,7 @@
   app/workload/environment renders, with a database-level unique constraint
   on the rendered string, kept in sync at register, `setAppSubdomain`,
   every manifest apply (register, resync, agent repo scans), imported
-  agents and the builder path — the same places #1930 already checks.
+  agents and the builder path, the same places #1930 already checks.
   `setAppSubdomain` refuses a rename that would produce a colliding
   suffixed hostname, since the app's full workload set is already known
   there; the manifest-apply paths are best-effort (a hostname another app
@@ -23,7 +23,7 @@
   report_shared_zone_hostname_collisions` is a new read-only command that
   renders every live app's public hostnames in shared zones independently
   of the ledger and lists every hostname two or more organizations render
-  — the way to find what the migration left unclaimed, and to audit the
+  : the way to find what the migration left unclaimed, and to audit the
   ledger against the live renderer going forward.
 - AWS SES: a tenant could adopt another org's or the platform's own sending
   identity by deriving, or typing, the same name (#2029). The driver now

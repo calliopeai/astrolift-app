@@ -3,9 +3,9 @@
 collisions in shared managed zones (#2012).
 
 Read-only. Renders every live app's public hostnames in every shared
-(``organization`` NULL) managed zone its live environments actually use —
+(``organization`` NULL) managed zone its live environments actually use:
 single-workload apps as ``<label>.<zone>``, multi-workload apps as
-``<label>-<workload>.<zone>`` per workload — reusing the platform's own
+``<label>-<workload>.<zone>`` per workload, reusing the platform's own
 renderer (``astrolift_manifest.hostname.compute_hostnames``) so the report
 can never drift from what a deploy would actually produce. Lists every
 hostname two or more organizations both render.
@@ -13,12 +13,12 @@ hostname two or more organizations both render.
     manage.py report_shared_zone_hostname_collisions
     manage.py report_shared_zone_hostname_collisions --format json
 
-#1930 refuses a *new* label collision going forward, comparing labels only —
+#1930 refuses a *new* label collision going forward, comparing labels only;
 it cannot see a multi-workload app's suffixed hostname colliding with
 another org's plain label, and it does nothing for a collision that
 predates the fix. This command is the read side for both: run it before
 adopting the hostname ledger (#2012) to see what already collides, and
-re-run it any time as an independent check — it recomputes from live app
+re-run it any time as an independent check: it recomputes from live app
 state rather than reading the ``HostnameClaim`` ledger, so it also catches
 a ledger that has drifted from what would actually be rendered.
 
@@ -28,7 +28,7 @@ never ``compute_hostnames``, so this command would otherwise report
 fictitious collisions.
 
 Never point this at a production database from an untrusted or unreviewed
-change — it is read-only, but it does run the full app catalogue through the
+change. It is read-only, but it does run the full app catalogue through the
 renderer, which is as expensive as a fleet-wide dry-run deploy.
 """
 
