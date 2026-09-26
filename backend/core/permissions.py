@@ -615,6 +615,21 @@ def check_permission_any_scope(permission: Permission) -> None:
 # ---- Decorator -------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class PermissionGate:
+    """What one ``@require_permission`` layer checks, kept on its wrapper.
+
+    ``scope`` is the factory that names the target, ``any_scope`` the
+    collection form. Neither means the targetless check, where the
+    selected team or project stands in for the target (#1743). The
+    surface guardrail (#1866) reads this off every resolver.
+    """
+
+    permissions: tuple[Permission, ...]
+    scope: Callable[[dict[str, Any]], PermissionScope | None] | None
+    any_scope: bool
+
+
 def require_permission(
     *permissions: Permission,
     scope: Callable[[dict[str, Any]], PermissionScope | None] | None = None,
@@ -645,6 +660,11 @@ def require_permission(
     The check raises :class:`PermissionDenied`; mutation wrappers
     (``@mutation_audit``) translate that into the ``MutationResult``
     envelope so resolvers never need to catch it directly.
+
+    An async-generator resolver (a subscription) is checked when it is
+    first iterated, after the WebSocket identity is pinned, and a refusal
+    ends the stream without an event: a subscription has no envelope to
+    carry the error, and its contract is to complete silently.
     """
 
     if not permissions:
@@ -657,16 +677,11 @@ def require_permission(
 
         signature = inspect.signature(fn)
 
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
+        def check(args, kwargs) -> None:
             if any_scope:
-                token = _scopes_memo.set({})
-                try:
-                    for perm in permissions:
-                        check_permission_any_scope(perm)
-                    return fn(*args, **kwargs)
-                finally:
-                    _scopes_memo.reset(token)
+                for perm in permissions:
+                    check_permission_any_scope(perm)
+                return
             target_scope = None
             if scope is not None:
                 bound = signature.bind(*args, **kwargs)
@@ -674,14 +689,92 @@ def require_permission(
                 target_scope = scope(bound.arguments)
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
-            return fn(*args, **kwargs)
+
+        if inspect.isasyncgenfunction(fn):
+
+            def admitted(args, kwargs) -> bool:
+                try:
+                    check(args, kwargs)
+                except PermissionDenied:
+                    return False
+                return True
+
+            @functools.wraps(fn)
+            async def wrapper(*args, **kwargs):
+                from asgiref.sync import sync_to_async
+
+                if not await sync_to_async(admitted)(args, kwargs):
+                    return
+                # ``async for`` alone never closes the inner generator when the
+                # subscriber goes away; close it so its own teardown runs now.
+                inner = fn(*args, **kwargs)
+                try:
+                    async for item in inner:
+                        yield item
+                finally:
+                    await inner.aclose()
+
+        else:
+
+            @functools.wraps(fn)
+            def wrapper(*args, **kwargs):
+                if any_scope:
+                    token = _scopes_memo.set({})
+                    try:
+                        check(args, kwargs)
+                        return fn(*args, **kwargs)
+                    finally:
+                        _scopes_memo.reset(token)
+                check(args, kwargs)
+                return fn(*args, **kwargs)
 
         # Strawberry resolver introspection follows __wrapped__ but
         # also reads __signature__ when present; set both so the
         # wrapper looks identical to the wrapped resolver.
         wrapper.__signature__ = signature  # type: ignore[attr-defined]
         wrapper.__astrolift_permissions__ = tuple(permissions)
+        wrapper.__astrolift_permission_gate__ = PermissionGate(  # type: ignore[attr-defined]
+            permissions=tuple(permissions), scope=scope, any_scope=any_scope
+        )
         return wrapper
+
+    return decorator
+
+
+@dataclass(frozen=True, slots=True)
+class RouteAuth:
+    """How a route outside GraphQL authorizes, declared on its view (#1866).
+
+    A REST view or WebSocket relay has no resolver decorator to read, so it
+    states its contract here: ``credential`` is what authenticates the
+    caller, ``permissions`` what is then checked (empty when the credential
+    alone is the grant, as for a machine key bound to one object), and
+    ``scope`` the target the check runs against. The surface guardrail
+    requires one on every route that is not on its allowlist. It records
+    the contract and enforces nothing: the view's own checks, and the tests
+    that pin them, are what hold it to what it says.
+    """
+
+    credential: str
+    scope: str
+    permissions: tuple[Permission, ...] = ()
+
+
+def route_auth(
+    *, credential: str, scope: str, permissions: Iterable[Permission] = ()
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Declare a route's :class:`RouteAuth` on its view.
+
+    Apply it innermost, directly on the view function: Django's view
+    decorators copy the function's attributes onto their wrappers, so the
+    declaration stays readable from the callback the URL resolver holds.
+    """
+
+    declared = RouteAuth(credential=credential, scope=scope, permissions=tuple(permissions))
+
+    def decorator(view: Callable[..., Any]) -> Callable[..., Any]:
+        view.__astrolift_route_auth__ = declared  # type: ignore[attr-defined]
+        return view
 
     return decorator
 
