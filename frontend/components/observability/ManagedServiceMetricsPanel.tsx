@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from "@apollo/client/react";
-import { ChartSplineIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
+import { BrainCircuitIcon, ChartSplineIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
 import * as React from "react";
 import {
   CartesianGrid,
@@ -49,7 +49,7 @@ interface MetricsResp {
  *  only for the ones we can actually query. Mirrors the
  *  ``_POSTGRES_METRICS`` / ``_OBJECT_STORE_METRICS`` lists on the
  *  resolver. */
-export const SUPPORTED_KINDS = new Set(["postgres", "object_store"]);
+export const SUPPORTED_KINDS = new Set(["postgres", "object_store", "model_endpoint"]);
 
 /** Per-metric display copy. Title + description are operator-facing;
  *  the metric ``name`` field on the wire matches a key here. */
@@ -96,6 +96,42 @@ const METRIC_COPY: Record<string, { title: string; description: string }> = {
     title: "Egress",
     description: "Bytes downloaded per second from this bucket.",
   },
+  // Hosted model (vLLM, #2064)
+  tokens_per_second: {
+    title: "Tokens/sec",
+    description: "Generated tokens per second across replicas.",
+  },
+  requests_running: {
+    title: "Running",
+    description: "Requests being decoded right now.",
+  },
+  requests_waiting: {
+    title: "Waiting",
+    description: "Requests queued for a slot.",
+  },
+  ttft_p95: {
+    title: "Time to first token",
+    description: "95th percentile time to the first generated token.",
+  },
+  kv_cache_usage: {
+    title: "KV cache",
+    description: "Share of the GPU KV cache in use.",
+  },
+};
+
+const KIND_HEADER: Record<string, { label: string; description: string }> = {
+  postgres: {
+    label: "Database",
+    description: "Connections, IO, slow-query rate, and replica lag for this database.",
+  },
+  object_store: {
+    label: "Storage",
+    description: "Bucket size, request rate, error breakdown, and egress for this bucket.",
+  },
+  model_endpoint: {
+    label: "Model",
+    description: "Throughput, queue, time to first token and KV cache for this hosted model.",
+  },
 };
 
 interface PanelProps {
@@ -109,13 +145,9 @@ interface PanelProps {
  * service) so the caller doesn't need to know which kinds we support
  * at the GraphQL layer.
  */
-export function ManagedServiceMetricsPanel({
-  managedServiceId,
-  rangeSeconds,
-}: PanelProps) {
+export function ManagedServiceMetricsPanel({ managedServiceId, rangeSeconds }: PanelProps) {
   const [range, setRange] = React.useState<TimeRangeKey>("1h");
-  const rangeS =
-    rangeSeconds ?? TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ?? 3600;
+  const rangeS = rangeSeconds ?? TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ?? 3600;
 
   const q = useQuery<MetricsResp>(GET_MANAGED_SERVICE_METRICS, {
     variables: { managedServiceId, rangeSeconds: rangeS },
@@ -133,8 +165,14 @@ export function ManagedServiceMetricsPanel({
     return null;
   }
 
-  const KindIcon = data?.kind === "postgres" ? DatabaseIcon : HardDriveIcon;
-  const kindLabel = data?.kind === "postgres" ? "Database" : "Storage";
+  const KindIcon =
+    data?.kind === "postgres"
+      ? DatabaseIcon
+      : data?.kind === "model_endpoint"
+        ? BrainCircuitIcon
+        : HardDriveIcon;
+  const header = KIND_HEADER[data?.kind ?? ""] ?? KIND_HEADER.object_store;
+  const kindLabel = header.label;
 
   return (
     <Card>
@@ -144,15 +182,9 @@ export function ManagedServiceMetricsPanel({
             <CardTitle className="flex items-center gap-2 text-base">
               <KindIcon className="size-4" />
               {kindLabel}
-              <span className="text-muted-foreground font-mono text-xs">
-                {data?.name ?? "—"}
-              </span>
+              <span className="text-muted-foreground font-mono text-xs">{data?.name ?? "—"}</span>
             </CardTitle>
-            <CardDescription>
-              {data?.kind === "postgres"
-                ? "Connections, IO, slow-query rate, and replica lag for this database."
-                : "Bucket size, request rate, error breakdown, and egress for this bucket."}
-            </CardDescription>
+            <CardDescription>{header.description}</CardDescription>
           </div>
           <RangePicker value={range} onChange={setRange} />
         </div>
@@ -260,7 +292,7 @@ function MetricSeriesCard({ series }: { series: AstroliftManagedServiceMetricSer
           </p>
         )}
       </div>
-      <p className="text-muted-foreground mt-2 text-2xs">source: {series.source}</p>
+      <p className="text-muted-foreground text-2xs mt-2">source: {series.source}</p>
     </div>
   );
 }
@@ -293,6 +325,8 @@ function pickFormatter(unit: string): (v: number) => string {
       return (v: number) => v.toFixed(0);
     case "rps":
       return (v: number) => `${v.toFixed(2)}/s`;
+    case "ratio":
+      return (v: number) => `${(v * 100).toFixed(0)}%`;
     case "seconds":
       return (v: number) => (v < 1 ? `${(v * 1000).toFixed(0)} ms` : `${v.toFixed(2)} s`);
     default:
@@ -344,8 +378,8 @@ function RangePicker({
 function NoMetricsCallout() {
   return (
     <p className="text-muted-foreground py-8 text-center text-xs">
-      Metrics not yet flowing — either the cluster&apos;s Prometheus endpoint isn&apos;t
-      configured, or the exporter sidecar hasn&apos;t emitted samples for this service yet.
+      Metrics not yet flowing — either the cluster&apos;s Prometheus endpoint isn&apos;t configured,
+      or the exporter sidecar hasn&apos;t emitted samples for this service yet.
     </p>
   );
 }

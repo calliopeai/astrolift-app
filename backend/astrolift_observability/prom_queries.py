@@ -708,6 +708,46 @@ def build_managed_service_postgres_query(
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
 
+def build_managed_service_model_endpoint_query(
+    *,
+    service_guid: str,
+    metric: str,
+    range_seconds: int,
+) -> QueryPlan:
+    """One vLLM server metric scoped to one managed-service guid (#2064).
+
+    The vLLM driver's ServiceMonitor labels every series ``managed_service``:
+
+    * tokens_per_second → ``sum(rate(vllm:generation_tokens_total{...}[<w>]))``
+    * requests_running  → ``sum(vllm:num_requests_running{...})``
+    * requests_waiting  → ``sum(vllm:num_requests_waiting{...})``
+    * ttft_p95          → p95 of ``vllm:time_to_first_token_seconds``
+    * kv_cache_usage    → ``max(vllm:kv_cache_usage_perc{...})``, or the pre-V1
+      ``vllm:gpu_cache_usage_perc``
+    """
+    labels = {"managed_service": sanitize_label_value(service_guid)}
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+
+    if metric == "tokens_per_second":
+        expr = f"sum(rate(vllm:generation_tokens_total{match}[{rate_window}]))"
+    elif metric == "requests_running":
+        expr = f"sum(vllm:num_requests_running{match})"
+    elif metric == "requests_waiting":
+        expr = f"sum(vllm:num_requests_waiting{match})"
+    elif metric == "ttft_p95":
+        expr = (
+            "histogram_quantile(0.95, sum by (le) "
+            f"(rate(vllm:time_to_first_token_seconds_bucket{match}[{rate_window}])))"
+        )
+    elif metric == "kv_cache_usage":
+        expr = f"max(vllm:kv_cache_usage_perc{match} or vllm:gpu_cache_usage_perc{match})"
+    else:
+        raise ValueError(f"unknown model_endpoint metric: {metric!r}")
+
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
 def build_managed_service_object_store_query(
     *,
     service_guid: str,

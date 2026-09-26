@@ -112,6 +112,11 @@ class VLLMConfig:
     """This cluster's choice (``provider_config.vllm_frontend``); empty to inherit."""
     model_defaults: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Per-model defaults keyed by model id or glob, e.g. ``{"Qwen/*": {"frontend": "rust"}}``."""
+    metrics: dict[str, Any] = field(default_factory=dict)
+    """``provider_config.vllm_metrics`` (#2064): ``{"namespace": "monitoring", "labels":
+    {"release": "kube-prometheus-stack"}}``. When ``namespace`` is set the server gets a
+    ServiceMonitor carrying ``labels`` (what the cluster's Prometheus selects on), and its
+    NetworkPolicy admits that namespace on the metrics port. Empty: no scrape."""
 
 
 class VLLMDriver(ManagedServiceDriver):
@@ -193,6 +198,8 @@ class VLLMDriver(ManagedServiceDriver):
             self._stub("networking.k8s.io/v1", "NetworkPolicy", parsed.namespace, parsed.name),
             self._stub("v1", "Secret", parsed.namespace, self._secret_name(parsed.name)),
         ]
+        if self._metrics_namespace():
+            doomed.append(self._stub("monitoring.coreos.com/v1", "ServiceMonitor", parsed.namespace, parsed.name))
         if delete_data:
             doomed.append(self._stub("v1", "PersistentVolumeClaim", parsed.namespace, self._cache_name(parsed.name)))
         result = self._config.cluster_driver.delete_manifests(parsed.cluster_id, parsed.namespace, doomed)
@@ -445,12 +452,60 @@ class VLLMDriver(ManagedServiceDriver):
                 "spec": {
                     "podSelector": {"matchLabels": {"app.kubernetes.io/instance": name}},
                     "policyTypes": ["Ingress"],
-                    # Only pods in this (the owning app's) namespace reach the server.
-                    "ingress": [{"from": [{"podSelector": {}}], "ports": [{"port": PORT, "protocol": "TCP"}]}],
+                    # Only pods in this (the owning app's) namespace reach the server,
+                    # plus the cluster's Prometheus when metrics are on (#2064).
+                    "ingress": [
+                        {"from": [{"podSelector": {}}], "ports": [{"port": PORT, "protocol": "TCP"}]},
+                        *self._metrics_ingress(),
+                    ],
                 },
             },
         ]
+        if self._metrics_namespace():
+            manifests.append(self._service_monitor(namespace, name, labels))
         return manifests
+
+    def _metrics_namespace(self) -> str:
+        return str((self._config.metrics or {}).get("namespace") or "")
+
+    def _metrics_ingress(self) -> list[dict[str, Any]]:
+        metrics_namespace = self._metrics_namespace()
+        if not metrics_namespace:
+            return []
+        return [
+            {
+                "from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": metrics_namespace}}}],
+                "ports": [{"port": PORT, "protocol": "TCP"}],
+            }
+        ]
+
+    def _service_monitor(self, namespace: str, name: str, labels: dict[str, str]) -> dict[str, Any]:
+        """Scrape vLLM's ``/metrics`` (open; the API key guards ``/v1`` only), with every
+        series labelled ``managed_service`` = the row's guid, the label the managed-service
+        metrics panel scopes on."""
+        extra = {str(k): str(v) for k, v in dict((self._config.metrics or {}).get("labels") or {}).items()}
+        return {
+            "apiVersion": "monitoring.coreos.com/v1",
+            "kind": "ServiceMonitor",
+            "metadata": {"name": name, "namespace": namespace, "labels": {**extra, **labels}},
+            "spec": {
+                "selector": {"matchLabels": {"app.kubernetes.io/instance": name}},
+                "namespaceSelector": {"matchNames": [namespace]},
+                "endpoints": [
+                    {
+                        "port": "http",
+                        "path": "/metrics",
+                        "interval": "30s",
+                        "relabelings": [
+                            {
+                                "sourceLabels": ["__meta_kubernetes_service_label_astrolift_io_managed_service_id"],
+                                "targetLabel": "managed_service",
+                            }
+                        ],
+                    }
+                ],
+            },
+        }
 
     def _deployment_manifest(
         self,
