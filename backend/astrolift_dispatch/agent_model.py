@@ -132,7 +132,11 @@ def resolve_managed_model_wiring(*, cluster, namespace: str) -> ManagedModelWiri
     except ClusterManagementError as exc:
         raise ManagedModelError(f"managed model: {exc}") from exc
 
+    from core.app_deploy import permissions_boundary_arn
+
     provider_config: dict[str, Any] = dict(getattr(cluster, "provider_config", None) or {})
+    if boundary := permissions_boundary_arn(provider_config):
+        provider_config["iam_permissions_boundary_arn"] = boundary
     region = str(getattr(cluster, "region", "") or provider_config.get("region", "") or "")
 
     try:
