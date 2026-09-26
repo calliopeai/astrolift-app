@@ -965,3 +965,43 @@ def test_operation_error_is_not_reported_as_success(
     }
     with pytest.raises(ManagedKafkaError, match="quota exhausted"):
         driver._wait_operation({"name": "operations/wait", "done": False})
+
+
+def test_a_cluster_adopted_before_2074_keeps_its_marker_through_reprovision(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    """#2086: provision built the label map from the spec alone, so the next
+    one dropped the marker, and with it the ``delete_adopted`` guard."""
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    parent = "projects/project-1/locations/us-central1"
+    cluster = f"{parent}/clusters/shared-events"
+    connect = f"{parent}/connectClusters/events-connect"
+    for name in (cluster, connect):
+        client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+
+    assert client.resources[cluster]["labels"]["astrolift-io-adopted"] == "true"
+    assert client.resources[connect]["labels"]["astrolift-io-adopted"] == "true"
+    denied = driver.deprovision(
+        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        delete_data=True,
+        force_destroy=True,
+    )
+    assert not denied.ok and denied.errors == ["adopted_resource_guard"]
+
+
+def test_connect_clusters_do_not_inherit_an_adopted_clusters_marker(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    config = {key: value for key, value in _full_config().items() if key != "connect_clusters"}
+    result = driver.provision(replace(SPEC, config=config))
+    parent = "projects/project-1/locations/us-central1"
+    client.resources[f"{parent}/clusters/shared-events"]["labels"]["astrolift-io-adopted"] = "true"
+
+    updated = driver.update(UpdateSpec(result.handle, config={"connect_clusters": _full_config()["connect_clusters"]}))
+
+    assert updated.ok
+    assert "astrolift-io-adopted" not in client.resources[f"{parent}/connectClusters/events-connect"]["labels"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +12,7 @@ from gcp.managed.graph_spanner import (
     SpannerGraphAlreadyExists,
     SpannerGraphConfig,
     SpannerGraphDriver,
+    SpannerGraphError,
     SpannerGraphNotFound,
     SpannerRestClient,
     _dynamic_graph_ddl,
@@ -139,7 +141,14 @@ class FakeSpannerClient:
         if self.schema_operation_already_exists:
             self.operations[operation_name] = {"name": operation_name, "done": True}
             raise SpannerGraphAlreadyExists(operation_name)
-        self.ddl.setdefault(database_name, []).extend(statements)
+        schema = self.ddl.setdefault(database_name, [])
+        for statement in statements:
+            # get_ddl returns the live schema, not a log: a DROP removes the table.
+            dropped = re.fullmatch(r"DROP TABLE (\w+)", statement)
+            if dropped:
+                schema[:] = [row for row in schema if not row.startswith(f"CREATE TABLE {dropped.group(1)} ")]
+            else:
+                schema.append(statement)
         operation = {"name": operation_name, "done": True}
         self.operations[operation_name] = operation
         return operation
@@ -188,6 +197,10 @@ def driver(client: FakeSpannerClient) -> SpannerGraphDriver:
     )
 
 
+MSID = "01996b1a-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
+OTHER_MSID = "01996b1a-ffff-7e8f-9a0b-aaaaaaaaaaaa"
+
+
 def _spec(**overrides: Any) -> ProvisionSpec:
     values: dict[str, Any] = {
         "organization_id": "1",
@@ -200,9 +213,14 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "knowledge",
         "size": "small",
         "binding_id": "binding-1",
+        "managed_service_id": MSID,
     }
     values.update(overrides)
     return ProvisionSpec(**values)
+
+
+def _owner_table(managed_service_id: str) -> str:
+    return "AstroliftGraphOwner_" + managed_service_id.replace("-", "")
 
 
 def test_rest_client_uses_admin_v1_paths_and_errors() -> None:
@@ -297,7 +315,8 @@ def test_custom_graph_ddl_and_cmek_are_atomic(driver: SpannerGraphDriver, client
     assert result.ok
     create = next(kwargs for name, kwargs in client.calls if name == "create_database")
     assert "CREATE TABLE AstroliftGraphMetadata" in create["body"]["extraStatements"][0]
-    assert create["body"]["extraStatements"][1:] == ddl
+    assert f"CREATE TABLE {_owner_table(MSID)} " in create["body"]["extraStatements"][1]
+    assert create["body"]["extraStatements"][2:] == ddl
     assert create["body"]["encryptionConfig"]["kmsKeyNames"][0].endswith("/k")
 
 
@@ -370,7 +389,7 @@ def test_existing_unowned_instance_is_refused_without_operator_adoption(
     denied = driver.provision(_spec())
     assert not denied.ok
     assert "operator-authorized" in denied.message
-    refused_update = driver.update(UpdateSpec(created.handle, config={}))
+    refused_update = driver.update(UpdateSpec(created.handle, managed_service_id=MSID, config={}))
     assert not refused_update.ok
     assert "operator-authorized" in refused_update.message
 
@@ -419,11 +438,11 @@ def test_existing_unmarked_database_is_refused_without_operator_adoption(
     created = driver.provision(_spec())
     instance_id, database_id = _parse_handle(created.handle)
     database_name = f"projects/acme/instances/{instance_id}/databases/{database_id}"
-    client.ddl[database_name] = [row for row in client.ddl[database_name] if "AstroliftGraphMetadata" not in row]
+    client.ddl[database_name] = [row for row in client.ddl[database_name] if "AstroliftGraph" not in row]
     denied = driver.provision(_spec())
     assert not denied.ok
     assert "operator-authorized" in denied.message
-    refused_update = driver.update(UpdateSpec(created.handle, config={}))
+    refused_update = driver.update(UpdateSpec(created.handle, managed_service_id=MSID, config={}))
     assert not refused_update.ok
     assert "operator-authorized" in refused_update.message
 
@@ -436,9 +455,13 @@ def test_existing_unmarked_database_is_refused_without_operator_adoption(
 def test_update_schema_is_replay_safe(driver: SpannerGraphDriver, client: FakeSpannerClient) -> None:
     created = driver.provision(_spec())
     statement = "ALTER TABLE GraphNode ADD COLUMN created_at TIMESTAMP"
-    first = driver.update(UpdateSpec(created.handle, config={"schema_update_statements": [statement]}))
+    first = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]})
+    )
     client.schema_operation_already_exists = True
-    second = driver.update(UpdateSpec(created.handle, config={"schema_update_statements": [statement]}))
+    second = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"schema_update_statements": [statement]})
+    )
     assert first.ok and second.ok
     assert any(name == "get_operation" for name, _ in client.calls)
 
@@ -451,6 +474,7 @@ def test_update_reconciles_capacity_and_drop_protection(
     changed = driver.update(
         UpdateSpec(
             created.handle,
+            managed_service_id=MSID,
             config={
                 "processing_units": 500,
                 "manage_instance_capacity": True,
@@ -472,7 +496,9 @@ def test_update_reconciles_version_retention_with_replay_safe_ddl(
     client: FakeSpannerClient,
 ) -> None:
     created = driver.provision(_spec())
-    updated = driver.update(UpdateSpec(created.handle, config={"version_retention_period": "7d"}))
+    updated = driver.update(
+        UpdateSpec(created.handle, managed_service_id=MSID, config={"version_retention_period": "7d"})
+    )
     assert updated.ok
     update = next(
         kwargs
@@ -485,7 +511,7 @@ def test_update_reconciles_version_retention_with_replay_safe_ddl(
 
 def test_binding_emits_portable_graph_contract(driver: SpannerGraphDriver) -> None:
     created = driver.provision(_spec(config={"graph_name": "Knowledge"}))
-    binding = driver.binding(ServiceHandle(created.handle), {"graph_name": "Knowledge"})
+    binding = driver.binding(ServiceHandle(created.handle, managed_service_id=MSID), {"graph_name": "Knowledge"})
     assert binding.env_vars["GRAPH_DB_URL"].literal.endswith("/graphs/Knowledge")
     assert binding.env_vars["GRAPH_DB_PROTOCOL"].literal == "gql"
     assert binding.env_vars["GRAPH_DB_AUTH_MODE"].literal == "gcp_iam"
@@ -513,7 +539,7 @@ def test_status_maps_instance_and_database_states(
     instance_id, database_id = _parse_handle(created.handle)
     client.instances[f"projects/acme/instances/{instance_id}"]["state"] = instance_state
     client.databases[f"projects/acme/instances/{instance_id}/databases/{database_id}"]["state"] = database_state
-    assert driver.status(ServiceHandle(created.handle)).state == expected
+    assert driver.status(ServiceHandle(created.handle, managed_service_id=MSID)).state == expected
 
 
 def test_snapshot_and_restore_use_exact_backup_resource(
@@ -521,7 +547,7 @@ def test_snapshot_and_restore_use_exact_backup_resource(
     client: FakeSpannerClient,
 ) -> None:
     source = driver.provision(_spec(config={"graph_name": "Knowledge"}))
-    snapshot = driver.snapshot(ServiceHandle(source.handle))
+    snapshot = driver.snapshot(ServiceHandle(source.handle, managed_service_id=MSID))
     assert snapshot.snapshot_id in client.backups
     restored = driver.restore(
         snapshot,
@@ -537,8 +563,8 @@ def test_deprovision_requires_force_for_protection_and_retains_backup(
     client: FakeSpannerClient,
 ) -> None:
     created = driver.provision(_spec())
-    denied = driver.deprovision(DeprovisionSpec(created.handle))
-    allowed = driver.deprovision(DeprovisionSpec(created.handle), force_destroy=True)
+    denied = driver.deprovision(DeprovisionSpec(created.handle, managed_service_id=MSID))
+    allowed = driver.deprovision(DeprovisionSpec(created.handle, managed_service_id=MSID), force_destroy=True)
     assert not denied.ok and denied.errors == ["deletion_protection_enabled"]
     assert allowed.ok and "retained backup" in allowed.message
     assert client.backups
@@ -551,7 +577,7 @@ def test_destructive_delete_can_remove_empty_owned_instance(
 ) -> None:
     created = driver.provision(_spec(config={"deletion_protection": False}))
     result = driver.deprovision(
-        DeprovisionSpec(created.handle, config={"delete_empty_instance": True}),
+        DeprovisionSpec(created.handle, managed_service_id=MSID, config={"delete_empty_instance": True}),
         delete_data=True,
         force_destroy=True,
     )
@@ -568,9 +594,11 @@ def test_deprovision_of_adopted_database_requires_separate_delete_consent(
     created = driver.provision(_spec(config={"deletion_protection": False}))
     instance_id, _ = _parse_handle(created.handle)
     client.instances[f"projects/acme/instances/{instance_id}"]["labels"] = {}
-    denied = driver.deprovision(DeprovisionSpec(created.handle), delete_data=True, force_destroy=True)
+    denied = driver.deprovision(
+        DeprovisionSpec(created.handle, managed_service_id=MSID), delete_data=True, force_destroy=True
+    )
     allowed = driver.deprovision(
-        DeprovisionSpec(created.handle, config={"delete_adopted_database": True}),
+        DeprovisionSpec(created.handle, managed_service_id=MSID, config={"delete_adopted_database": True}),
         delete_data=True,
         force_destroy=True,
     )
@@ -590,3 +618,254 @@ def test_handle_validation_is_kind_specific() -> None:
     for invalid in ("graph_db/instance", "postgres/instance/database", "graph_db//database"):
         with pytest.raises(ValueError):
             _parse_handle(invalid)
+
+
+# ---- #2086: ownership is the managed-service id, not a tenant-settable name ----
+
+_MUTATIONS = {"patch_database", "patch_instance", "update_ddl", "drop_database", "create_backup"}
+
+
+def _shared_driver(client: FakeSpannerClient) -> SpannerGraphDriver:
+    return SpannerGraphDriver(
+        config=SpannerGraphConfig(
+            project_id="acme",
+            region="us-central1",
+            shared_instance_id="shared-graph",
+            poll_interval_seconds=0,
+        ),
+        client=client,
+        sleep=lambda _: None,
+    )
+
+
+def _other_org(**overrides: Any) -> ProvisionSpec:
+    """A second org whose app slug, environment and hint all match the first's."""
+    return _spec(organization_id="9", organization_slug="globex", managed_service_id=OTHER_MSID, **overrides)
+
+
+def _database_name(handle: str) -> str:
+    instance_id, database_id = _parse_handle(handle)
+    return f"projects/acme/instances/{instance_id}/databases/{database_id}"
+
+
+def _owner_rows(client: FakeSpannerClient, name: str) -> list[str]:
+    return [row for row in client.ddl[name] if "AstroliftGraphOwner_" in row]
+
+
+def _legacy_database(client: FakeSpannerClient, driver: SpannerGraphDriver, spec: ProvisionSpec) -> tuple[str, str]:
+    """A database provisioned before #2086: the Metadata marker and no owner table."""
+    created = driver.provision(spec)
+    assert created.ok
+    name = _database_name(created.handle)
+    client.ddl[name] = [row for row in client.ddl[name] if "AstroliftGraphOwner_" not in row]
+    return created.handle, name
+
+
+def test_two_orgs_with_the_same_app_env_and_hint_get_separate_databases_on_a_shared_instance(
+    client: FakeSpannerClient,
+) -> None:
+    driver = _shared_driver(client)
+    first = driver.provision(_spec())
+    second = driver.provision(_other_org())
+
+    assert first.ok and second.ok
+    assert first.handle != second.handle
+    assert _owner_rows(client, _database_name(first.handle)) == [
+        f"CREATE TABLE {_owner_table(MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+    ]
+    assert _owner_rows(client, _database_name(second.handle)) == [
+        f"CREATE TABLE {_owner_table(OTHER_MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+    ]
+
+
+def test_a_tenant_naming_another_orgs_database_is_refused_and_it_is_left_untouched(
+    client: FakeSpannerClient,
+) -> None:
+    driver = _shared_driver(client)
+    victim = driver.provision(_spec())
+    name = _database_name(victim.handle)
+    ddl_before = list(client.ddl[name])
+    client.calls.clear()
+
+    denied = driver.provision(
+        _other_org(
+            config={
+                "database_id": _parse_handle(victim.handle)[1],
+                "deletion_protection": False,
+                "version_retention_period": "7d",
+                "schema_update_statements": ["ALTER TABLE GraphNode ADD COLUMN taken STRING(MAX)"],
+                "manage_instance_capacity": True,
+                "processing_units": 500,
+            },
+        ),
+    )
+
+    assert not denied.ok
+    assert "another managed service" in denied.message
+    assert client.ddl[name] == ddl_before
+    assert client.databases[name]["enableDropProtection"] is True
+    assert client.instances["projects/acme/instances/shared-graph"]["processingUnits"] == 100
+    assert not [call for call, _ in client.calls if call in _MUTATIONS]
+
+
+def test_another_services_handle_is_refused_by_update_binding_snapshot_and_deprovision(
+    client: FakeSpannerClient,
+) -> None:
+    driver = _shared_driver(client)
+    victim = driver.provision(_spec(config={"deletion_protection": False}))
+    name = _database_name(victim.handle)
+    client.calls.clear()
+    # Even a record claiming exclusivity loses to the marker once there is one.
+    stranger: dict[str, Any] = {"managed_service_id": OTHER_MSID, "recorded_handle_exclusive": True}
+
+    updated = driver.update(UpdateSpec(victim.handle, config={"deletion_protection": True}, **stranger))
+    assert not updated.ok and "another managed service" in updated.message
+    with pytest.raises(SpannerGraphError, match="another managed service"):
+        driver.binding(ServiceHandle(victim.handle, **stranger))
+    with pytest.raises(SpannerGraphError, match="another managed service"):
+        driver.snapshot(ServiceHandle(victim.handle, **stranger))
+    deleted = driver.deprovision(DeprovisionSpec(victim.handle, **stranger), delete_data=True, force_destroy=True)
+    assert not deleted.ok
+    assert deleted.errors == ["resource_not_owned"]
+    assert deleted.retryable is False
+
+    assert name in client.databases
+    assert client.databases[name]["enableDropProtection"] is False
+    assert not [call for call, _ in client.calls if call in _MUTATIONS]
+
+
+def test_a_database_from_before_2086_is_refused_without_an_exclusive_record(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
+    handle, name = _legacy_database(client, driver, _spec())
+
+    refused = [
+        driver.provision(_spec()),
+        driver.provision(_spec(recorded_handle=handle)),
+        driver.update(UpdateSpec(handle, managed_service_id=MSID, config={})),
+    ]
+    for result in refused:
+        assert not result.ok
+        assert "exclusive platform record" in result.message
+        assert _owner_table(MSID) in result.message
+    with pytest.raises(SpannerGraphError, match="exclusive platform record"):
+        driver.binding(ServiceHandle(handle, managed_service_id=MSID))
+    deleted = driver.deprovision(DeprovisionSpec(handle, managed_service_id=MSID), delete_data=True, force_destroy=True)
+    assert not deleted.ok and deleted.errors == ["resource_not_owned"]
+
+    assert _owner_rows(client, name) == []
+    assert name in client.databases
+
+
+def test_a_database_from_before_2086_is_backfilled_once_on_an_exclusive_record(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
+    handle, name = _legacy_database(client, driver, _spec())
+
+    assert driver.update(UpdateSpec(handle, managed_service_id=MSID, recorded_handle_exclusive=True, config={})).ok
+    assert _owner_rows(client, name) == [
+        f"CREATE TABLE {_owner_table(MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+    ]
+
+    # From here the marker decides: this service needs no record, another is refused with one.
+    assert driver.update(UpdateSpec(handle, managed_service_id=MSID, config={})).ok
+    taken = driver.update(
+        UpdateSpec(handle, managed_service_id=OTHER_MSID, recorded_handle_exclusive=True, config={}),
+    )
+    assert not taken.ok and "another managed service" in taken.message
+    assert len(_owner_rows(client, name)) == 1
+
+
+def test_a_reprovision_backfills_a_database_its_exclusive_record_names(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
+    handle, name = _legacy_database(client, driver, _spec())
+
+    result = driver.provision(_spec(recorded_handle=handle, recorded_handle_exclusive=True))
+
+    assert result.ok and result.handle == handle
+    assert _owner_rows(client, name) == [
+        f"CREATE TABLE {_owner_table(MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+    ]
+
+
+def test_a_service_named_before_2086_keeps_its_recorded_database(client: FakeSpannerClient) -> None:
+    driver = _shared_driver(client)
+    legacy_handle = "graph_db/shared-graph/triage-prod-knowledge"
+    seeded, name = _legacy_database(client, driver, _spec(config={"database_id": "triage-prod-knowledge"}))
+    assert seeded == legacy_handle
+    databases_before = set(client.databases)
+
+    kept = driver.provision(_spec(recorded_handle=legacy_handle, recorded_handle_exclusive=True))
+    assert kept.ok and kept.handle == legacy_handle
+    assert set(client.databases) == databases_before
+    assert _owner_rows(client, name)
+
+    # Another org with the same app, environment and hint now derives its own
+    # database, and naming the old one outright is refused.
+    other = driver.provision(_other_org())
+    assert other.ok and other.handle != legacy_handle
+    named = driver.provision(_other_org(config={"database_id": "triage-prod-knowledge"}))
+    assert not named.ok and "another managed service" in named.message
+
+
+@pytest.mark.parametrize("key", ["ddl_statements", "schema_update_statements"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        f"CREATE TABLE {_owner_table(OTHER_MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+        "CREATE TABLE astroliftgraphowner_01 (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+        "ALTER TABLE AstroliftGraphMetadata ADD COLUMN owner STRING(36)",
+        "RENAME TABLE GraphNode TO AstroliftGraphOwner_x",
+    ],
+)
+def test_tenant_ddl_cannot_name_the_ownership_tables(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+    key: str,
+    statement: str,
+) -> None:
+    statements = [statement]
+    if key == "ddl_statements":
+        statements.append("CREATE PROPERTY GRAPH Graph NODE TABLES (GraphNode)")
+
+    result = driver.provision(_spec(config={key: statements}))
+
+    assert not result.ok
+    assert "ownership tables" in result.message
+    assert not client.databases
+
+
+def test_restore_marks_the_restored_database_for_the_target_service(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
+    source = driver.provision(_spec(config={"graph_name": "Knowledge"}))
+    snapshot = driver.snapshot(ServiceHandle(source.handle, managed_service_id=MSID))
+
+    restored = driver.restore(
+        snapshot,
+        _spec(service_handle_hint="restored", managed_service_id=OTHER_MSID, config={"graph_name": "Knowledge"}),
+    )
+
+    assert restored.ok
+    assert _owner_rows(client, _database_name(restored.handle)) == [
+        f"CREATE TABLE {_owner_table(OTHER_MSID)} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)",
+    ]
+    config = {"graph_name": "Knowledge"}
+    assert driver.update(UpdateSpec(restored.handle, managed_service_id=OTHER_MSID, config=config)).ok
+    assert not driver.update(UpdateSpec(restored.handle, managed_service_id=MSID, config=config)).ok
+
+
+def test_provision_without_a_managed_service_id_fails_closed(
+    driver: SpannerGraphDriver,
+    client: FakeSpannerClient,
+) -> None:
+    result = driver.provision(_spec(managed_service_id=""))
+
+    assert not result.ok
+    assert "managed-service id" in result.message
+    assert not client.instances and not client.databases
