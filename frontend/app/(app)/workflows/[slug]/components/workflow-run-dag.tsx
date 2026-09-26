@@ -7,6 +7,8 @@ import { PipelineDag, type PipelineDagStage } from "@/components/viz";
 import { useWorkflowStageExecutions, useWorkflowStages } from "@/graphql/workflows/tiered.hooks";
 import type { WorkflowStage, WorkflowStageExecution } from "@/graphql/workflows/tiered.types";
 
+import { GateReview } from "./gate-review";
+
 // 4s sits inside the ticket's 3–5s live window (#1090). The poll is gated on
 // run terminality by the caller (pollInterval 0 once the run settles).
 const POLL_MS = 4000;
@@ -130,7 +132,11 @@ export function WorkflowRunDag({
   isTerminal: boolean;
 }) {
   const { stages, loading: stagesLoading } = useWorkflowStages(definitionSlug);
-  const { executions, loading: execLoading } = useWorkflowStageExecutions({
+  const {
+    executions,
+    loading: execLoading,
+    refetch,
+  } = useWorkflowStageExecutions({
     workflowId,
     runId,
     pollInterval: isTerminal ? 0 : POLL_MS,
@@ -168,12 +174,19 @@ export function WorkflowRunDag({
   }
 
   return (
-    <PipelineDag
-      key={signature}
-      stages={dagStages}
-      height={280}
-      variant="telemetry"
-      animateActiveEdges
-    />
+    <div className="grid gap-4">
+      <PipelineDag
+        key={signature}
+        stages={dagStages}
+        height={280}
+        variant="telemetry"
+        animateActiveEdges
+      />
+      <GateReview
+        workflowId={workflowId}
+        executions={executions}
+        onDecided={() => void refetch()}
+      />
+    </div>
   );
 }

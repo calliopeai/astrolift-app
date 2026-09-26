@@ -64,7 +64,7 @@ export function WorkflowTabs({ workflowSlug }: WorkflowTabsProps) {
     <div className="-mx-6">
       <nav
         aria-label="Workflow pillars"
-        className="border-border flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+        className="border-border scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
       >
         {PILLARS.map((pillar) => {
           const active = pillar.key === activePillar;

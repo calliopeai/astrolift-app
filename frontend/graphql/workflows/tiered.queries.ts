@@ -193,6 +193,9 @@ export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
       childWorkflowRunGuid
       childWorkflowDefinitionSlug
       childWorkflowStatus
+      stageRole
+      stageApprovers
+      humanGateState
     }
   }
 `;

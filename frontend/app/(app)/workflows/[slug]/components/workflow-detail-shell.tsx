@@ -61,7 +61,9 @@ export function WorkflowDetailShell({ workflowSlug, children }: WorkflowDetailSh
     return (
       <PageShell title="Workflow not found">
         <EmptyState
-          icon={error ? <AlertTriangleIcon className="size-5" /> : <WorkflowIcon className="size-5" />}
+          icon={
+            error ? <AlertTriangleIcon className="size-5" /> : <WorkflowIcon className="size-5" />
+          }
           title={error ? "Couldn't load this workflow" : `No workflow with slug ${workflowSlug}`}
           description={
             error

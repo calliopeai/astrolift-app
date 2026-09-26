@@ -159,6 +159,10 @@ export type WorkflowStageExecution = {
   childWorkflowRunGuid: string | null;
   childWorkflowDefinitionSlug: string | null;
   childWorkflowStatus: string | null;
+  stageRole?: string;
+  stageApprovers?: string[];
+  /** "pending" while a human_gate waits on a decision; "" for other kinds. */
+  humanGateState?: string;
 };
 
 // ─── Manifest (TOML code view) ───────────────────────────────────────────
