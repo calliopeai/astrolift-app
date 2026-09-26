@@ -1331,6 +1331,7 @@ def _k8s_managed_config_for(
             frontend_default=frontend_default,
             cluster_frontend=str(pc.get("vllm_frontend", "")),
             model_defaults=dict(pc.get("vllm_model_defaults") or {}),
+            metrics=dict(pc.get("vllm_metrics") or {}),
         )
     if pair == ("model_endpoint", "kserve"):
         from k8s_native.managed.model_endpoint_kserve import KServeConfig

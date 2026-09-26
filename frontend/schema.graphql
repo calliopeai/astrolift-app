@@ -6295,6 +6295,7 @@ type Query {
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   PostgresMetrics: [[String!]!]!
   ObjectStoreMetrics: [[String!]!]!
+  ModelEndpointMetrics: [[String!]!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage

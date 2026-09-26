@@ -984,6 +984,14 @@ class GoldenSignalsQuery:
         ("egress_bytes", "rps"),
     )
 
+    _MODEL_ENDPOINT_METRICS: tuple[tuple[str, str], ...] = (
+        ("tokens_per_second", "rps"),
+        ("requests_running", "count"),
+        ("requests_waiting", "count"),
+        ("ttft_p95", "seconds"),
+        ("kv_cache_usage", "ratio"),
+    )
+
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
     @tenant_scoped()
@@ -1025,6 +1033,9 @@ class GoldenSignalsQuery:
         elif kind == ManagedService.Kind.OBJECT_STORE:
             metric_set = self._OBJECT_STORE_METRICS
             builder = prom_queries.build_managed_service_object_store_query
+        elif kind == ManagedService.Kind.MODEL_ENDPOINT and svc.variant == "vllm":
+            metric_set = self._MODEL_ENDPOINT_METRICS
+            builder = prom_queries.build_managed_service_model_endpoint_query
         else:
             return None
 

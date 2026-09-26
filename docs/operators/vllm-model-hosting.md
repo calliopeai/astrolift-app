@@ -44,3 +44,4 @@ Fix it by setting `frontend = "python"` on that service, or by changing the leve
 - **`vllm_image` (required):** a pinned image, such as `vllm/vllm-openai@sha256:…`, or the AWS Deep Learning Container image on EKS. There is no default, because a floating tag changes the server under running models.
 - **`vllm_storage_class` (optional):** the StorageClass for the weight cache. Empty means the cluster default.
 - **GPU nodes:** see [GPU workloads](gpu-workloads.md) for taints, the GPU operator and MIG.
+- **`vllm_metrics` (optional):** `{"namespace": "monitoring", "labels": {"release": "kube-prometheus-stack"}}`. With a namespace set, each model gets a ServiceMonitor carrying `labels` (whatever your Prometheus selects on), and its NetworkPolicy admits that namespace on port 8000. The model's metrics panel then shows tokens/sec, running and waiting requests, p95 time to first token and KV cache use. `/metrics` is open; the API key only guards `/v1`.

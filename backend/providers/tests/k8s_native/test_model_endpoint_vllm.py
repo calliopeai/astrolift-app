@@ -225,3 +225,30 @@ def test_no_image_is_refused():
     cluster, secrets = _Cluster(), _Secrets()
     driver = VLLMDriver(config=VLLMConfig(cluster_driver=cluster, secrets_backend=secrets))
     assert "vllm_image" in driver.provision(_spec()).message
+
+
+def test_metrics_add_a_service_monitor_and_admit_only_the_prometheus_namespace():
+    driver, cluster, _ = _driver(
+        metrics={"namespace": "monitoring", "labels": {"release": "kps", "app.kubernetes.io/managed-by": "x"}}
+    )
+    handle = driver.provision(_spec()).handle
+    monitor = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/ServiceMonitor"))
+    assert monitor["metadata"]["labels"]["release"] == "kps"
+    # The platform's own labels win over configured ones.
+    assert monitor["metadata"]["labels"]["app.kubernetes.io/managed-by"] == "astrolift"
+    relabel = monitor["spec"]["endpoints"][0]["relabelings"][0]
+    assert relabel["targetLabel"] == "managed_service"
+    policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
+    assert policy["spec"]["ingress"][1]["from"] == [
+        {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "monitoring"}}}
+    ]
+    assert driver.deprovision(DeprovisionSpec(handle)).ok
+    assert "ServiceMonitor/chat-prod-llm" in cluster.deleted
+
+
+def test_no_metrics_config_means_no_service_monitor_and_no_extra_ingress():
+    driver, cluster, _ = _driver()
+    driver.provision(_spec())
+    assert not any(kind.endswith("/ServiceMonitor") for (kind, _, _) in cluster.objects)
+    policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
+    assert len(policy["spec"]["ingress"]) == 1

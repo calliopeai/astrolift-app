@@ -346,3 +346,30 @@ def test_workload_request_query_rejects_bad_resource() -> None:
             workload_slug="api",
             resource="disk",
         )
+
+
+@pytest.mark.parametrize(
+    ("metric", "fragment"),
+    [
+        ("tokens_per_second", "rate(vllm:generation_tokens_total{"),
+        ("requests_running", "sum(vllm:num_requests_running{"),
+        ("requests_waiting", "sum(vllm:num_requests_waiting{"),
+        ("ttft_p95", "histogram_quantile(0.95"),
+        ("kv_cache_usage", "vllm:kv_cache_usage_perc{"),
+    ],
+)
+def test_model_endpoint_metrics_are_scoped_to_the_service(metric, fragment):
+    from astrolift_observability.prom_queries import build_managed_service_model_endpoint_query
+
+    plan = build_managed_service_model_endpoint_query(
+        service_guid="abc-123", metric=metric, range_seconds=3600
+    )
+    assert fragment in plan.promql
+    assert 'managed_service="abc-123"' in plan.promql
+
+
+def test_unknown_model_endpoint_metric_is_refused():
+    from astrolift_observability.prom_queries import build_managed_service_model_endpoint_query
+
+    with pytest.raises(ValueError):
+        build_managed_service_model_endpoint_query(service_guid="g", metric="nope", range_seconds=60)
