@@ -123,7 +123,6 @@ class MemorystoreValkeyConfig:
     api_endpoint: str = _API_ROOT
     operation_timeout_seconds: float = 1800.0
     poll_interval_seconds: float = 3.0
-    adopt_existing_instance: bool = False
 
 
 class MemorystoreValkeyRestClient:
@@ -336,7 +335,7 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
                 self._reconcile(current, cfg)
                 current = self._valkey.get_instance(self._instance_name(instance_id))
             else:
-                self._assert_owned(current, cfg, spec=spec)
+                self._assert_owned(current, spec=spec)
                 if restore_hash and (current.get("labels") or {}).get("astrolift-restore-source") != restore_hash:
                     raise MemorystoreValkeyError("restore target exists but was created from a different source")
                 self._assert_immutable_compatible(current, cfg)
@@ -367,7 +366,7 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
             error = self._validate_config(cfg, current=current)
             if error:
                 return UpdateResult(False, spec.handle, error, ["invalid_memorystore_valkey_config"])
-            self._assert_owned(current, cfg)
+            self._assert_owned(current)
             self._assert_immutable_compatible(current, cfg, include_defaults=False)
             self._reconcile(current, cfg)
             current = self._valkey.get_instance(self._instance_name(instance_id))
@@ -727,7 +726,6 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
                 "cross_instance_role": {"type": "string", "enum": ["NONE", "PRIMARY", "SECONDARY"]},
                 "primary_instance": {"type": "string"},
                 "secondary_instances": {"type": "array", "uniqueItems": True, "items": {"type": "string"}},
-                "adopt_existing_instance": {"type": "boolean"},
                 "delete_adopted_instance": {"type": "boolean"},
             },
             "additionalProperties": False,
@@ -1216,22 +1214,22 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
             if actual is not None and not _contains_desired(actual, value):
                 raise MemorystoreValkeyError(f"immutable {field} mismatch ({actual!r} != {value!r})")
 
-    def _assert_owned(self, current: dict[str, Any], cfg: dict[str, Any], *, spec: ProvisionSpec | None = None) -> None:
-        owned = (current.get("labels") or {}).get("astrolift-managed-by") == "platform"
-        # Provision: a platform instance must be this service's, whatever
-        # adopt_existing_instance says; the instance id is tenant-settable (#1961).
-        refusal = (
-            label_adoption_refusal(current.get("labels") or {}, spec, resource="Valkey instance")
-            if spec and owned
-            else None
-        )
+    def _assert_owned(self, current: dict[str, Any], *, spec: ProvisionSpec | None = None) -> None:
+        # An instance with no platform label was never provisioned by
+        # Astrolift and cannot be proven to belong to this service. Adoption
+        # of such a resource is a separate, operator-authorized operation
+        # (#1365); no tenant config flag may grant it (#2021). A platform
+        # instance must also be this service's, not another's, whatever the
+        # instance id happens to be -- it is tenant-settable (#1961).
+        labels = current.get("labels") or {}
+        if labels.get("astrolift-managed-by") != "platform":
+            raise MemorystoreValkeyError(
+                "existing Valkey instance carries no Astrolift ownership marker; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config"
+            )
+        refusal = label_adoption_refusal(labels, spec, resource="Valkey instance") if spec else None
         if refusal:
             raise MemorystoreValkeyError(refusal)
-        adopted = bool(cfg.get("adopt_existing_instance", self._config.adopt_existing_instance))
-        if not owned and not adopted:
-            raise MemorystoreValkeyError(
-                "existing Valkey instance is not Astrolift-managed; set adopt_existing_instance=true"
-            )
 
     def _assert_secondary_create_compatible(
         self,
@@ -1489,7 +1487,6 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
             "allow_fewer_zones_deployment",
             "deletion_protection",
             "async_endpoint_deletion",
-            "adopt_existing_instance",
             "delete_adopted_instance",
             "clear_acl_policy",
         ):

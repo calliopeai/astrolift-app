@@ -415,7 +415,7 @@ def test_output_only_psc_and_maintenance_fields_do_not_create_perpetual_drift(
     assert not any(action == "patch_instance" for action, _ in client.calls)
 
 
-def test_existing_unowned_instance_requires_explicit_adoption(
+def test_existing_unowned_instance_is_refused_without_operator_adoption(
     driver: MemorystoreValkeyDriver,
     client: FakeValkeyClient,
 ) -> None:
@@ -423,9 +423,16 @@ def test_existing_unowned_instance_requires_explicit_adoption(
     name = next(iter(client.instances))
     client.instances[name]["labels"] = {}
     refused = driver.provision(_spec())
-    adopted = driver.provision(_spec(config={"adopt_existing_instance": True}))
-    assert first.ok and not refused.ok and "adopt_existing_instance" in refused.message
-    assert adopted.ok
+    assert first.ok
+    assert not refused.ok
+    assert "operator-authorized" in refused.message
+
+    # The flag is gone entirely, not just ignored -- adoption is
+    # operator-only and no tenant config reopens it (#2021).
+    rejected = driver.provision(_spec(config={"adopt_existing_instance": True}))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert client.instances[name]["labels"] == {}
 
 
 def test_immutable_drift_fails_closed(driver: MemorystoreValkeyDriver) -> None:
