@@ -29,6 +29,7 @@ with workflow.unsafe.imports_passed_through():
         pre_flight,
         provision_namespace,
         render_manifests,
+        restore_previous_secrets,
         resync_manifest_for_deploy,
         update_secrets,
         wait_dns,
@@ -340,6 +341,27 @@ class DeployAppWorkflow:
             # aborted_reason persistence has something to show — str(exc)
             # is the generic "Activity task failed" envelope.
             reason = _failure_reason(exc)
+            # #1957: update_secrets already wrote this deploy's new literal
+            # Secret by the time a later step (apply, rollout, health) can
+            # fail here — put the previous release's values back so a pod
+            # that restarts on the old workload spec later doesn't pick up
+            # this failed attempt's values. Best-effort and its own
+            # try/except: a restore failure must not mask the real failure
+            # reason above it, or skip mark_failed. Patched for replay —
+            # an in-flight deploy that already failed before this shipped
+            # must not suddenly schedule a new activity on replay.
+            if workflow.patched("restore-secrets-on-deploy-failure"):
+                try:
+                    await workflow.execute_activity(
+                        restore_previous_secrets,
+                        deployment_id,
+                        start_to_close_timeout=_MARK_TIMEOUT,
+                        retry_policy=_STANDARD_RETRY,
+                    )
+                except Exception:  # noqa: BLE001 — best-effort, see above
+                    workflow.logger.exception(
+                        "restore_previous_secrets failed for deployment %s", deployment_id
+                    )
             await workflow.execute_activity(
                 mark_failed,
                 args=[deployment_id, reason],

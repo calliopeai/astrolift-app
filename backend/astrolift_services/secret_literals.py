@@ -244,3 +244,38 @@ def literal_secrets_for_environment(app, environment) -> dict[str, str]:
         if scope_in_force(scopes.get((environment.name, key)), scopes.get(("", key))) in allowed:
             out[key] = value
     return out
+
+
+def snapshot_literal_secrets(deployment) -> dict[str, str]:
+    """This deployment's literal `[env]` secrets, computed once and
+    persisted on ``Deployment.secret_snapshot`` (#1957, #1923).
+
+    ``render_resources_for_deployment`` and ``_update_secrets_sync`` used to
+    each call ``literal_secrets_for_environment`` independently, so they
+    could disagree if the staged buffer moved between the two calls within
+    one deploy (one deciding the workload's envFrom references the literal
+    Secret, the other deciding whether to write or delete it). The first
+    caller for a given deployment row computes it live and stores the
+    result; every later caller for the *same* row reads the stored value
+    back instead of recomputing, so the whole deploy pipeline -- render,
+    apply, update_secrets -- agrees on one answer for that row.
+
+    This is also how a rollback restores what its target deployment ran
+    with: ``create_rollback_deployment`` copies the target's
+    ``secret_snapshot`` onto the new row before this ever runs for it, so
+    the first (and only) call here finds it already populated and returns
+    the target's values rather than live-recomputing against whatever is
+    staged now.
+
+    Presence of the ``"literals"`` key is what marks a row as already
+    computed -- a legitimately empty dict (no literals visible to this
+    environment) is a valid, final answer, not "not yet computed".
+    """
+    snapshot = deployment.secret_snapshot or {}
+    if "literals" in snapshot:
+        return dict(snapshot["literals"])
+    literals = literal_secrets_for_environment(deployment.registered_app, deployment.app_environment)
+    snapshot = {**snapshot, "literals": literals}
+    deployment.secret_snapshot = snapshot
+    deployment.save(update_fields=["secret_snapshot", "updated_at", "version"])
+    return literals

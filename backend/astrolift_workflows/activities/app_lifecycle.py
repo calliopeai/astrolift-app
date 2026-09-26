@@ -607,7 +607,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         # DATABASE_URL).
         from core.app_deploy import deployment_env_from
 
-        env_from, workload_env_from = deployment_env_from(app, env)
+        env_from, workload_env_from = deployment_env_from(d)
 
         # Resolve the namespace here, not after the await (#1577).
         # namespace_for_app reads app.organization.slug whenever
@@ -1111,6 +1111,34 @@ def _app_env_secret_name(app_slug: str, environment_name: str) -> str:
     return dns_label("astrolift", "app-env", app_slug, environment_name)
 
 
+def _render_literal_secret_resource(
+    *, app_slug: str, environment_name: str, namespace: str, literals: dict[str, str]
+) -> dict[str, Any]:
+    """The k8s Secret manifest for one environment's literal ``[env]``
+    values (#1758). Shared by the normal materialize path and the
+    failed-deploy restore path (#1957) so the two can never drift apart
+    on the Secret's shape."""
+    import base64
+
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": _app_env_secret_name(app_slug, environment_name),
+            "namespace": namespace,
+            "labels": {
+                "astrolift.io/managed-by": "astrolift",
+                "astrolift.io/app-env-secrets": app_slug,
+            },
+        },
+        "type": "Opaque",
+        "data": {
+            key: base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+            for key, value in literals.items()
+        },
+    }
+
+
 def _dry_run_deploy_set(
     cluster_driver, cluster_slug: str, namespace: str, d, secrets: list[dict[str, Any]]
 ) -> None:
@@ -1235,7 +1263,7 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         ManagedServiceBinding,
         ManagedServiceVolumeBinding,
     )
-    from astrolift_services.secret_literals import literal_secrets_for_environment
+    from astrolift_services.secret_literals import snapshot_literal_secrets
     from core.app_deploy import (
         AppDeployError,
         driver_for_capability,
@@ -1270,27 +1298,21 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
     # Lowest precedence source per env_injection's documented merge order
     # (app literal < bundle < managed service), so a colliding bundle or
     # binding key still wins -- render_resources_for_deployment lists this
-    # secret first in env_from to match.
-    literals = literal_secrets_for_environment(d.registered_app, d.app_environment)
+    # secret first in env_from to match. snapshot_literal_secrets (#1957,
+    # #1923) computes this once per deployment row and persists it, so a
+    # concurrent secret edit landing mid-deploy can't make this disagree
+    # with what render_resources_for_deployment already decided for the
+    # same row -- and a rollback's copied-forward snapshot is what makes
+    # it restore the target deployment's values instead of live state.
+    literals = snapshot_literal_secrets(d)
     if literals:
         resources.append(
-            {
-                "apiVersion": "v1",
-                "kind": "Secret",
-                "metadata": {
-                    "name": _app_env_secret_name(d.registered_app.slug, d.app_environment.name),
-                    "namespace": namespace,
-                    "labels": {
-                        "astrolift.io/managed-by": "astrolift",
-                        "astrolift.io/app-env-secrets": d.registered_app.slug,
-                    },
-                },
-                "type": "Opaque",
-                "data": {
-                    key: base64.b64encode(str(value).encode("utf-8")).decode("ascii")
-                    for key, value in literals.items()
-                },
-            },
+            _render_literal_secret_resource(
+                app_slug=d.registered_app.slug,
+                environment_name=d.app_environment.name,
+                namespace=namespace,
+                literals=literals,
+            ),
         )
 
     # ---- operator-authored secret bundles --------------------------
@@ -1492,6 +1514,93 @@ async def update_secrets(deployment_id: int) -> int:
     n = await sync_to_async(_update_secrets_sync)(deployment_id)
     log.info("update_secrets materialized %d bundle(s)", n, extra={"deployment_id": deployment_id})
     return n
+
+
+def _restore_previous_secrets_sync(deployment_id: int) -> bool:
+    """Put back the previous release's literal Secret after ``deployment_id``
+    fails, so a pod that restarts later on the old workload spec doesn't
+    pick up this failed attempt's values (#1957).
+
+    update_secrets now runs before apply_manifests (#1758), so a deploy
+    that writes its new literal Secret and then fails on a later step --
+    the workload apply itself, rollout, health check -- leaves the still-
+    running previous release's pods a Secret update away from the new
+    values under their own old spec. The dry-run in update_secrets
+    (#2048) only stops a write the apiserver would reject; it does
+    nothing once the write already succeeded and a later step fails on
+    its own.
+
+    Finds the most recent prior running/superseded deployment for the
+    same (app, env) and, if it carries a literal snapshot, re-applies
+    exactly that -- not a live recompute, which could reflect an edit
+    made after that release went out. Literal-only: bundle and binding
+    values live in an external secrets backend and were never snapshotted
+    (see ``Deployment.secret_snapshot``), so there is nothing recorded to
+    restore for them.
+
+    Returns whether a prior snapshot was found and restored. False (no
+    prior deployment, or the prior deployment predates this feature and
+    carries no snapshot) is a normal, silent no-op -- not every deploy has
+    something to restore to.
+    """
+    from astrolift_lifecycle.models import Deployment
+    from core.app_deploy import AppDeployError, driver_for_deployment
+
+    d = Deployment.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster__provider_plugin",
+    ).get(pk=deployment_id)
+    prior = (
+        Deployment.objects.filter(
+            registered_app=d.registered_app,
+            app_environment=d.app_environment,
+            deleted_at__isnull=True,
+            created_at__lt=d.created_at,
+            status__in=[Deployment.Status.RUNNING.value, Deployment.Status.SUPERSEDED.value],
+        )
+        .exclude(pk=d.pk)
+        .order_by("-created_at")
+        .first()
+    )
+    if prior is None:
+        return False
+    snapshot = prior.secret_snapshot or {}
+    if "literals" not in snapshot:
+        return False
+
+    cluster_driver, ctx, namespace = driver_for_deployment(d)
+    literals = snapshot["literals"]
+    if not literals:
+        _delete_stale_literal_secret(cluster_driver, ctx.slug, namespace, d)
+        return True
+    resource = _render_literal_secret_resource(
+        app_slug=d.registered_app.slug,
+        environment_name=d.app_environment.name,
+        namespace=namespace,
+        literals=literals,
+    )
+    result = cluster_driver.apply_manifests(ctx.slug, namespace, [resource])
+    if not result.ok:
+        raise AppDeployError(
+            f"restore_previous_secrets failed for deployment {deployment_id}: " + "; ".join(result.summary()),
+        )
+    return True
+
+
+@activity.defn(name="astrolift.deploy.restore_previous_secrets")
+async def restore_previous_secrets(deployment_id: int) -> bool:
+    """Re-materialize the previous release's literal Secret after a
+    deploy fails (#1957). See ``_restore_previous_secrets_sync``."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    restored = await sync_to_async(_restore_previous_secrets_sync)(deployment_id)
+    log.info(
+        "restore_previous_secrets restored=%s",
+        restored,
+        extra={"deployment_id": deployment_id},
+    )
+    return restored
 
 
 def _wait_dns_sync(deployment_id: int, timeout_seconds: int) -> int:
@@ -2189,6 +2298,11 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
         image_tag=prior.image_tag,
         image_digest=prior.image_digest,
         config_snapshot=prior.config_snapshot,
+        # Copied forward so update_secrets restores exactly what `prior`
+        # ran with instead of live-recomputing (#1957): snapshot_literal_secrets
+        # finds this already populated and returns it as-is. Bundle/binding
+        # secrets aren't part of this snapshot and re-materialize normally.
+        secret_snapshot=prior.secret_snapshot,
         approvals_required=0,
         approvals_received=0,
         ci_actor_kind="rollback",
