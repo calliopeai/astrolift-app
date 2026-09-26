@@ -59,6 +59,39 @@ class ManagedDomain(BaseCoreModel):
             "(tenant-editable): DNS writes pin to it, and teardown deletes only it (#1931)."
         ),
     )
+
+    class VerificationState(models.TextChoices):
+        NOT_REQUIRED = "not_required"
+        PENDING = "pending"
+        VERIFIED = "verified"
+
+    verification_state = models.CharField(
+        max_length=32,
+        choices=VerificationState.choices,
+        default=VerificationState.NOT_REQUIRED,
+        help_text=(
+            "Proof-of-control state for this row's zone name (#1931). Set to 'pending' at "
+            "registration when the zone name already exists in the DNS provider or the caller "
+            "supplied config for an existing zone, instead of one the platform is about to create. "
+            "A 'pending' row is treated as unregistered by resolve_managed_domain / "
+            "managed_domain_for_zone: no DNS write, cert issuance or ingress may use its zone until "
+            "the caller publishes the TXT challenge and verifyManagedDomain flips this to 'verified'."
+        ),
+    )
+    verification_token = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "Random value the caller publishes as `_astrolift-challenge.<zone>` TXT to prove control "
+            "of the zone (#1931). Blank when verification_state is 'not_required'."
+        ),
+    )
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When verification_state last flipped to 'verified' (#1931).",
+    )
     provision_validation_records = models.JSONField(
         default=list,
         blank=True,
@@ -109,6 +142,10 @@ def resolve_managed_domain(
 
     ``for_preview=True`` matches ``preview_envs`` and ``both``;
     ``for_preview=False`` (default) matches ``tenant_apps`` and ``both``.
+
+    A row awaiting its TXT proof-of-control challenge (#1931) never comes
+    back here: it is not yet proven to belong to anyone, so it resolves
+    the same as a zone nobody registered.
     """
     target_values = (
         [ManagedDomain.DefaultFor.PREVIEW_ENVS, ManagedDomain.DefaultFor.BOTH]
@@ -117,7 +154,12 @@ def resolve_managed_domain(
     )
     if organization is not None:
         org_default = getattr(organization, "default_managed_domain", None)
-        if org_default is not None and getattr(org_default, "deleted_at", None) is None:
+        if (
+            org_default is not None
+            and getattr(org_default, "deleted_at", None) is None
+            and getattr(org_default, "verification_state", ManagedDomain.VerificationState.NOT_REQUIRED)
+            != ManagedDomain.VerificationState.PENDING
+        ):
             return org_default  # type: ignore[return-value]
         org_pk = getattr(organization, "pk", None)
         if org_pk is not None:
@@ -127,6 +169,7 @@ def resolve_managed_domain(
                     default_for__in=target_values,
                     deleted_at__isnull=True,
                 )
+                .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
                 .order_by("pk")
                 .first()
             )
@@ -139,6 +182,7 @@ def resolve_managed_domain(
             default_for__in=target_values,
             deleted_at__isnull=True,
         )
+        .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
         .order_by("pk")
         .first()
     )
@@ -151,11 +195,19 @@ def managed_domain_for_zone(zone: str, organization_id: int | None) -> ManagedDo
     are guessable and unique across the install, so another org's zone
     answers ``None``, exactly like a zone nobody registered (#1909). With no
     org the shared branch alone would match, so that answers ``None`` too.
+
+    A row still awaiting its TXT proof-of-control challenge (#1931) also
+    answers ``None`` -- it is not yet proven, so nothing may write DNS,
+    issue a cert, or stand up an ingress against its zone.
     """
     if organization_id is None:
         return None
-    return ManagedDomain.objects.filter(
-        Q(organization_id=organization_id) | Q(organization__isnull=True),
-        zone=zone,
-        deleted_at__isnull=True,
-    ).first()
+    return (
+        ManagedDomain.objects.filter(
+            Q(organization_id=organization_id) | Q(organization__isnull=True),
+            zone=zone,
+            deleted_at__isnull=True,
+        )
+        .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
+        .first()
+    )

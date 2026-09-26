@@ -2419,6 +2419,10 @@ type AstroliftManagedDomain {
   provisionValidationRecords: JSON!
   delegationCheck: JSON!
   provisionClusterId: String
+  verificationState: String!
+  challengeRecordName: String!
+  challengeRecordValue: String!
+  verifiedAt: DateTime
 }
 
 type AstroliftManagedDomainMutationResult {
@@ -5546,6 +5550,7 @@ type Mutation {
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   softDeleteManagedDomain(input: SoftDeleteManagedDomainInput!): SoftdeletepayloadMutationResult!
+  verifyManagedDomain(input: VerifyManagedDomainInput!): VerifyManagedDomainPayloadMutationResult!
   provisionManagedDomain(clusterId: GUID!, zone: String!, isPlatformManagedZone: Boolean! = false): ProvisionManagedDomainPayloadMutationResult!
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
   reissueManagedDomainCert(clusterId: GUID!, zone: String!): ReissueManagedDomainCertPayloadMutationResult!
@@ -7284,6 +7289,22 @@ input ValidateAstroliftCiSecretsInput {
 type ValidationError {
   field: String!
   messages: [String!]!
+}
+
+input VerifyManagedDomainInput {
+  zone: String!
+}
+
+type VerifyManagedDomainPayload {
+  zone: String!
+  verified: Boolean!
+  message: String!
+}
+
+type VerifyManagedDomainPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: VerifyManagedDomainPayload
 }
 
 """Represents NULL values"""

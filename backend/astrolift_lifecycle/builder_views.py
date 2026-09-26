@@ -702,19 +702,16 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     # ``domain``, look it up by zone and bind it to the env; otherwise
     # leave ``managed_domain=NULL`` and let the org's default kick in.
     # Zone names are guessable, so only the org's own zones and shared
-    # (org NULL) ones bind; another org's answers 404 (#1872).
-    from django.db.models import Q
-
-    from astrolift_clusters.models import ManagedDomain
+    # (org NULL) ones bind; another org's answers 404 (#1872). Reuses
+    # ``managed_domain_for_zone`` rather than querying directly so a row
+    # still awaiting its TXT proof-of-control challenge answers 404 too,
+    # the same as an unregistered zone (#1931).
+    from astrolift_clusters.models import managed_domain_for_zone
 
     domain_zone = body.get("domain")
     managed_domain = None
     if domain_zone:
-        managed_domain = ManagedDomain.objects.filter(
-            Q(organization=org) | Q(organization__isnull=True),
-            zone=domain_zone,
-            deleted_at__isnull=True,
-        ).first()
+        managed_domain = managed_domain_for_zone(domain_zone, org.pk)
         if managed_domain is None:
             return JsonResponse(
                 {"detail": f"managed domain {domain_zone!r} not found"},

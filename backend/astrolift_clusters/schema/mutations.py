@@ -153,6 +153,34 @@ def _first_dns_cluster():
     )
 
 
+def _zone_exists_in_provider(cluster, zone: str) -> bool:
+    """Whether ``cluster``'s DNS driver already has a hosted zone named ``zone`` (#1931).
+
+    Best-effort: no cluster, a driver that doesn't opt into the optional
+    ``zone_exists`` hook, or a lookup that errors, all answer ``False`` here.
+    That does not open a hole -- ``provision_zone`` still refuses a real
+    duplicate name when the (unchallenged) provisioning workflow reaches it
+    (#2025). This check only decides whether the caller is asked to prove
+    control up front instead of hitting that failure after the fact.
+    """
+    if cluster is None:
+        return False
+    try:
+        from core.app_deploy import driver_for_capability
+
+        dns_driver = driver_for_capability(cluster, "dns")
+    except Exception:  # noqa: BLE001 - unresolvable driver just skips the check
+        return False
+    check = getattr(dns_driver, "zone_exists", None)
+    if check is None:
+        return False
+    try:
+        return bool(check(zone))
+    except Exception as exc:  # noqa: BLE001 - a flaky provider call must not block registration
+        logger.warning("zone_exists check failed for zone=%s: %s", zone, exc)
+        return False
+
+
 def _require_operator_for_shared(info: Info, row, gate: Permission) -> None:
     """Writes to a shared (org-NULL) cluster or managed zone are the platform
     operator's (#1918, #1929).
@@ -348,6 +376,16 @@ class SoftDeleteManagedDomainInput:
 
 
 @strawberry.input
+class VerifyManagedDomainInput:
+    """``verifyManagedDomain`` mutation input (#1931).
+
+    ``zone`` names the pending row -- the caller's own or a shared one,
+    same scoping as the other zone-keyed mutations."""
+
+    zone: str
+
+
+@strawberry.input
 class ConfigureProviderPluginInput:
     plugin_slug: str
     config: JSON
@@ -506,6 +544,20 @@ class ProvisionManagedDomainPayload:
     zone: str
     workflow_id: str
     nameservers: list[str]
+    message: str
+
+
+@strawberry.type
+class VerifyManagedDomainPayload:
+    """Outcome of ``verifyManagedDomain`` (#1931).
+
+    ``verified`` reflects the domain-level finding, not whether the call
+    executed -- a TXT record that hasn't propagated yet is a normal
+    ``ok=True, verified=False`` result the caller retries after fixing DNS,
+    same shape as ``RevalidateManagedDomainPayload``."""
+
+    zone: str
+    verified: bool
     message: str
 
 
@@ -1291,14 +1343,37 @@ class ClustersMutation:
             # A row with no org is shared: every org trusts it (#1918).
             check_platform_operator(_caller(info), gate=Permission.PROVIDER_PLUGIN_CONFIGURE)
 
+        dns_config = input.dns_config or {}
+        cluster = _first_dns_cluster()
+        # Proof of control (#1931): a zone name the platform is not about to
+        # create for the caller -- either they handed us config for a hosted
+        # zone that already exists (``zone_id``), or the name already exists
+        # in the provider account under a zone we never created -- is not
+        # registered on the caller's say-so alone. The row is stored pending;
+        # no provisioning workflow starts (no DNS write, cert or ingress can
+        # use the zone -- see resolve_managed_domain / managed_domain_for_zone)
+        # until verifyManagedDomain confirms the caller published the TXT
+        # challenge this returns.
+        requires_verification = bool(dns_config.get("zone_id")) or _zone_exists_in_provider(cluster, zone)
+        verification_token = secrets.token_hex(16) if requires_verification else ""
+
         domain = ManagedDomain.objects.create(
             organization=org,
             zone=input.zone,
             dns_driver=input.dns_driver,
             default_for=input.default_for,
             is_wildcard_managed=input.is_wildcard_managed,
-            dns_config=input.dns_config or {},
+            dns_config=dns_config,
+            verification_state=(
+                ManagedDomain.VerificationState.PENDING
+                if requires_verification
+                else ManagedDomain.VerificationState.NOT_REQUIRED
+            ),
+            verification_token=verification_token,
         )
+
+        if requires_verification:
+            return gql_success(domain_to_type(domain))
 
         # Registering a zone without provisioning it is a dead end the
         # operator cannot see (#1673): the row exists but no hosted zone,
@@ -1306,7 +1381,6 @@ class ClustersMutation:
         # workflow against the first cluster whose driver can host the
         # zone; the row's provision_state / provision_nameservers fill in
         # as it runs and the UI surfaces them.
-        cluster = _first_dns_cluster()
         if cluster is not None:
             start_workflow(
                 "ProvisionManagedDomainWorkflow",
@@ -1385,6 +1459,104 @@ class ClustersMutation:
                 ),
             )
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="domain.verify")
+    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @tenant_scoped()
+    def verify_managed_domain(
+        self, info: Info, input: VerifyManagedDomainInput
+    ) -> MutationResultType[VerifyManagedDomainPayload]:
+        """Resolve the TXT proof-of-control challenge ``createManagedDomain``
+        issued for a zone name that already existed in the provider, or that
+        the caller asked to adopt via ``dns_config`` (#1931).
+
+        Looks up ``_astrolift-challenge.<zone>`` over public DNS and compares
+        it against the token stored on the row. A match flips
+        ``verification_state`` to ``verified`` and starts the provisioning
+        workflow with ``is_platform_managed_zone=False``: the platform did
+        not create this zone, so it only requests the wildcard cert and
+        writes the DNS-01 validation CNAMEs into it, the same as the
+        existing manual provisioning path for an operator-owned zone.
+
+        Looked up directly (not via ``managed_domain_for_zone``, which treats
+        a pending row as unregistered) but with the same org-or-shared
+        scoping every other zone mutation uses.
+        """
+        zone = canonical_zone(input.zone)
+        if not zone:
+            return gql_failure(ErrorCode.VALIDATION.value, "zone is required", field="zone")
+
+        tenant = get_current_tenant()
+        domain = ManagedDomain.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            zone=zone,
+            deleted_at__isnull=True,
+        ).first()
+        _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
+        if domain is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found", field="zone")
+
+        if domain.verification_state != ManagedDomain.VerificationState.PENDING:
+            return gql_success(
+                VerifyManagedDomainPayload(
+                    zone=zone,
+                    verified=True,
+                    message="no verification required for this domain",
+                )
+            )
+
+        challenge_name = f"_astrolift-challenge.{zone}"
+        from _sdk._dns_probe import DnsResolveError, lookup_txt
+
+        try:
+            values = lookup_txt(challenge_name)
+        except DnsResolveError as exc:
+            return gql_success(
+                VerifyManagedDomainPayload(
+                    zone=zone,
+                    verified=False,
+                    message=f"TXT lookup for {challenge_name} failed: {exc}",
+                )
+            )
+
+        # Substring match (not exact): some zone editors wrap or concatenate
+        # TXT values, the same tolerance the custom-domain probe uses.
+        if not any(domain.verification_token in value for value in values):
+            return gql_success(
+                VerifyManagedDomainPayload(
+                    zone=zone,
+                    verified=False,
+                    message=(
+                        f"TXT record {challenge_name} does not yet carry the expected token; "
+                        "publish it and try again"
+                    ),
+                )
+            )
+
+        from django.utils import timezone
+
+        domain.verification_state = ManagedDomain.VerificationState.VERIFIED
+        domain.verified_at = timezone.now()
+        domain.save(update_fields=["verification_state", "verified_at", "updated_at", "version"])
+
+        message = "verified"
+        cluster = _first_dns_cluster()
+        if cluster is not None:
+            start_workflow(
+                "ProvisionManagedDomainWorkflow",
+                args=[
+                    ProvisionManagedDomainInput(
+                        cluster_id=cluster.pk,
+                        zone=zone,
+                        is_platform_managed_zone=False,
+                        actor=_actor_from_request(info),
+                    ),
+                ],
+                workflow_id=f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}",
+            )
+            message = "verified; certificate provisioning started"
+        return gql_success(VerifyManagedDomainPayload(zone=zone, verified=True, message=message))
 
     @strawberry.mutation
     @mutation_audit(action="cluster.managed_domain.provision")
