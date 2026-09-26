@@ -3,12 +3,13 @@
 REST (not GraphQL) — the CLI ships a Go HTTP client and the wire
 contract is documented in ``astrolift-cli/internal/auth/auth.go``.
 
-Three public endpoints (no auth required to *call*; auth is
+Four public endpoints (no auth required to *call*; auth is
 established by the flow itself):
 
 * ``POST /api/cli/v1/auth/start`` — mint a device-flow session
 * ``POST /api/cli/v1/auth/complete`` — poll for an issued token pair
 * ``POST /api/cli/v1/auth/refresh`` — rotate the refresh token
+* ``POST /api/cli/v1/auth/signout`` (#2070): end the caller's own session
 
 And one auth1-protected browser surface:
 
@@ -310,6 +311,34 @@ def device_flow_refresh(request: HttpRequest) -> JsonResponse:
     if result.status == "expired":
         return _error("refresh chain expired", status=410, code="expired_token")
     return _error("invalid refresh token", status=401, code="invalid_grant")
+
+
+# ---- POST /api/cli/v1/auth/signout -----------------------------------
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def device_flow_signout(request: HttpRequest) -> JsonResponse:
+    """End the caller's own device-flow session (#2070).
+
+    Body ``{"refresh_token": "alft_rt_..."}``, proof of possession is
+    the refresh secret itself, exactly like ``/refresh``. Revokes the
+    session's access token and kills its refresh chain the same way
+    an expired chain already dies in ``refresh_credentials``.
+
+    Always 200 on a well-formed request. Whether the token resolved
+    to a live session or not never shows up in the response: a
+    prober holding a stale or guessed token can't tell "revoked" from
+    "never existed" apart, and a second call with the same token is
+    the same harmless 200 rather than an error.
+    """
+    body = _json_body(request)
+    refresh_token = body.get("refresh_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        return _error("refresh_token is required", status=400, code="invalid_request")
+
+    device_flow.sign_out(refresh_token)
+    return JsonResponse({"status": "signed_out"}, status=200)
 
 
 # ---- GET / POST /app/cli/auth/device/<id>/ ---------------------------

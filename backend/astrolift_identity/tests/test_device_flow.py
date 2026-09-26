@@ -190,9 +190,9 @@ def test_poll_complete_expires_pending_lazily():
 # ---- refresh + replay detection --------------------------------------
 
 
-def _approve_and_issue(now=None):
+def _approve_and_issue(now=None, org_slug="x"):
     user = _make_user()
-    org = Organization.objects.create(name="X", slug="x")
+    org = Organization.objects.create(name=org_slug.upper(), slug=org_slug)
     # The approval page offers only orgs the user is an active member
     # of, and the issued credentials stop working without one (#1910).
     _make_member(user, org)
@@ -259,6 +259,77 @@ def test_refresh_expired_chain_is_rejected_and_invalidates():
     assert row.refresh_token_hash == ""
     # api_token revoked
     assert ApiToken.objects.get(pk=row.api_token_id).is_revoked is True
+
+
+# ---- sign_out: self-service revoke (#2070) ----------------------------
+
+
+def test_sign_out_ends_a_live_session():
+    _, _, row, creds, _ = _approve_and_issue()
+    assert device_flow.sign_out(creds.refresh_token) == "ended"
+
+    row.refresh_from_db()
+    assert row.refresh_token_hash == ""
+    assert row.refresh_token_last_4 == ""
+    assert ApiToken.objects.get(pk=row.api_token_id).is_revoked is True
+    # The row itself survives for audit history; only the credentials die.
+    assert row.state == DeviceFlowSession.STATE_CONSUMED
+
+
+def test_sign_out_revoked_access_token_stops_authenticating_immediately():
+    _, _, _, creds, _ = _approve_and_issue()
+    device_flow.sign_out(creds.refresh_token)
+
+    captured: dict = {}
+
+    def _view(request):
+        captured["request"] = request
+        return HttpResponse(b"ok", status=200)
+
+    mw = ApiTokenAuthMiddleware(_view)
+    request = RequestFactory().get("/", HTTP_AUTHORIZATION=f"Bearer {creds.access_token}")
+    request.user = AnonymousUser()
+    response = mw(request)
+    # A revoked token fails verification, so the middleware returns
+    # 401 directly rather than ever reaching the wrapped view.
+    assert response.status_code == 401
+    assert "request" not in captured
+
+
+def test_sign_out_is_idempotent():
+    _, _, row, creds, _ = _approve_and_issue()
+    assert device_flow.sign_out(creds.refresh_token) == "ended"
+    # Second call with the same plaintext: the hash is already gone,
+    # so this is a harmless no-op, not an error.
+    assert device_flow.sign_out(creds.refresh_token) == "not_found"
+    row.refresh_from_db()
+    assert row.refresh_token_hash == ""
+    assert ApiToken.objects.get(pk=row.api_token_id).is_revoked is True
+
+
+def test_sign_out_unknown_or_malformed_token_returns_not_found():
+    assert device_flow.sign_out("") == "not_found"
+    assert device_flow.sign_out("not_a_refresh_token") == "not_found"
+    assert device_flow.sign_out("alft_at_lookalike") == "not_found"
+    assert device_flow.sign_out("alft_rt_neverissued") == "not_found"
+
+
+def test_sign_out_never_touches_a_different_session():
+    # Two independent CLI sessions. Signing out one must not so much
+    # as glance at the other: proven by the second's credentials
+    # still working end to end afterward.
+    _, _, row_a, creds_a, after = _approve_and_issue()
+    _, _, row_b, creds_b, _ = _approve_and_issue(now=after, org_slug="y")
+
+    assert device_flow.sign_out(creds_a.refresh_token) == "ended"
+
+    row_b.refresh_from_db()
+    assert row_b.refresh_token_hash != ""
+    assert ApiToken.objects.get(pk=row_b.api_token_id).is_revoked is False
+
+    later = after + device_flow.MIN_POLL_INTERVAL + dt.timedelta(seconds=5)
+    r = device_flow.refresh_credentials(creds_b.refresh_token, now=later)
+    assert r.status == "issued"
 
 
 # ---- issued access token authenticates middleware ---------------------
@@ -382,6 +453,72 @@ def test_view_complete_returns_200_after_approval():
     assert body["refresh_token"].startswith("alft_rt_")
     assert body["token_type"] == "Bearer"
     assert "expires_at" in body
+
+
+# ---- signout REST view (#2070) ----------------------------------------
+
+
+def test_view_signout_requires_token():
+    client = Client()
+    r = _post_json(client, "/api/cli/v1/auth/signout", {})
+    assert r.status_code == 400
+
+
+def test_view_signout_unknown_token_returns_200_no_leak():
+    client = Client()
+    r = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": "alft_rt_doesnotexist"})
+    assert r.status_code == 200
+    assert r.json() == {"status": "signed_out"}
+
+
+def test_view_signout_revokes_a_live_session_and_response_matches_unknown():
+    _, _, row, creds, _ = _approve_and_issue()
+    client = Client()
+
+    r_known = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": creds.refresh_token})
+    assert r_known.status_code == 200
+    r_unknown = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": "alft_rt_doesnotexist"})
+    assert r_unknown.status_code == 200
+    # Same status, same body either way: no signal a prober can use
+    # to learn whether a given refresh token was ever live.
+    assert r_known.json() == r_unknown.json()
+
+    row.refresh_from_db()
+    assert row.refresh_token_hash == ""
+    # The access token this session minted is revoked (proven against
+    # the middleware directly in test_sign_out_revoked_access_token_
+    # stops_authenticating_immediately).
+    assert ApiToken.objects.get(pk=row.api_token_id).is_revoked is True
+
+    # And the refresh chain is dead too: a subsequent /refresh call
+    # with the signed-out token behaves exactly like any other
+    # unknown refresh token.
+    r_refresh = _post_json(client, "/api/cli/v1/auth/refresh", {"refresh_token": creds.refresh_token})
+    assert r_refresh.status_code == 401
+
+
+def test_view_signout_is_idempotent_over_the_wire():
+    _, _, _, creds, _ = _approve_and_issue()
+    client = Client()
+    first = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": creds.refresh_token})
+    second = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": creds.refresh_token})
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json()
+
+
+def test_view_signout_never_touches_another_sessions_token():
+    _, _, row_a, creds_a, after = _approve_and_issue()
+    _, _, row_b, creds_b, _ = _approve_and_issue(now=after, org_slug="y")
+    client = Client()
+
+    r = _post_json(client, "/api/cli/v1/auth/signout", {"refresh_token": creds_a.refresh_token})
+    assert r.status_code == 200
+
+    row_b.refresh_from_db()
+    assert row_b.refresh_token_hash != ""
+    assert ApiToken.objects.get(pk=row_b.api_token_id).is_revoked is False
+    # b's own credentials are untouched by a's sign-out.
+    assert creds_b.refresh_token != creds_a.refresh_token
 
 
 # ---- Browser approval surface ----------------------------------------
