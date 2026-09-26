@@ -27,8 +27,13 @@ NON_ROOT_INSTALL_CONFLICT = (
 )
 
 
-def harden_agent_pod(pod_spec: dict, *, non_root: bool = False) -> dict:
-    """Apply the agent sandbox baseline to a pod spec in place."""
+def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> dict:
+    """Apply the agent sandbox baseline to a pod spec in place.
+
+    ``spec`` (an AgentEnvironmentSpec) that asks for GPUs gets them on the
+    first container, the agent, plus the GPU-pool tolerations and type
+    affinity a manifest workload gets (#2039).
+    """
     pod_spec["automountServiceAccountToken"] = False
     pod_security = pod_spec.setdefault("securityContext", {})
     pod_security["seccompProfile"] = {"type": "RuntimeDefault"}
@@ -59,4 +64,12 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False) -> dict:
                 "memory": settings.AGENT_POD_MEMORY_LIMIT,
             },
         }
+    if getattr(spec, "gpu", 0) and pod_spec.get("containers"):
+        from astrolift_manifest.render import gpu_resource_name, gpu_scheduling
+
+        pod_spec["containers"][0]["resources"]["limits"][gpu_resource_name(spec)] = str(spec.gpu)
+        scheduling = gpu_scheduling(spec)
+        pod_spec.setdefault("tolerations", []).extend(scheduling["tolerations"])
+        if "affinity" in scheduling:
+            pod_spec["affinity"] = scheduling["affinity"]
     return pod_spec

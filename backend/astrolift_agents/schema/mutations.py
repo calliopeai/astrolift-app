@@ -147,6 +147,10 @@ class CreateAgentEnvironmentSpecInput:
     # Model traffic goes through the Zentinelle gateway with a per-run key and
     # no provider key in the pod (#1851); excludes managed_model.
     model_gateway: bool = False
+    # GPUs for task and box pods (#2039); mig_profile makes gpu count slices.
+    gpu: int = 0
+    gpu_type: str = ""
+    mig_profile: str = ""
     config_repo: str = ""
     config_branch: str = "main"
     config_manifest_path: str = ""
@@ -155,6 +159,18 @@ class CreateAgentEnvironmentSpecInput:
     # collection literal); the resolver coerces None → []/{}.
     secret_refs: JSON | None = None
     env_vars: JSON | None = None
+
+
+def _agent_gpu_error(gpu: int, gpu_type: str, mig_profile: str) -> str:
+    """Why an environment spec's GPU fields are invalid, or "" (#2039); the
+    manifest's rules, so an agent pod asks for GPUs the way a workload does."""
+    from astrolift_manifest.parser import ManifestError, _parse_gpu
+
+    try:
+        _parse_gpu({"gpu": gpu, "gpu_type": gpu_type or None, "mig_profile": mig_profile or None}, "spec")
+    except ManifestError as exc:
+        return str(exc)
+    return ""
 
 
 @strawberry.input
@@ -173,6 +189,9 @@ class UpdateAgentEnvironmentSpecInput:
     run_as_non_root: bool | None = None
     box_workspace: bool | None = None
     model_gateway: bool | None = None
+    gpu: int | None = None
+    gpu_type: str | None = None
+    mig_profile: str | None = None
     config_repo: str | None = None
     config_branch: str | None = None
     config_manifest_path: str | None = None
@@ -918,6 +937,9 @@ class AgentsMutation:
 
         if input.run_as_non_root and input.allow_install:
             return gql_failure(ErrorCode.VALIDATION.value, NON_ROOT_INSTALL_CONFLICT, field="runAsNonRoot")
+        gpu_error = _agent_gpu_error(input.gpu, input.gpu_type, input.mig_profile)
+        if gpu_error:
+            return gql_failure(ErrorCode.VALIDATION.value, gpu_error, field="gpu")
         if input.model_gateway and input.managed_model:
             return gql_failure(
                 ErrorCode.VALIDATION.value, MODEL_GATEWAY_MANAGED_CONFLICT, field="modelGateway"
@@ -946,6 +968,9 @@ class AgentsMutation:
                 run_as_non_root=bool(input.run_as_non_root),
                 box_workspace=bool(input.box_workspace),
                 model_gateway=bool(input.model_gateway),
+                gpu=input.gpu,
+                gpu_type=input.gpu_type.strip(),
+                mig_profile=input.mig_profile.strip(),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
@@ -1021,6 +1046,15 @@ class AgentsMutation:
             spec.box_workspace = bool(input.box_workspace)
         if input.model_gateway is not None:
             spec.model_gateway = bool(input.model_gateway)
+        if input.gpu is not None:
+            spec.gpu = input.gpu
+        if input.gpu_type is not None:
+            spec.gpu_type = input.gpu_type.strip()
+        if input.mig_profile is not None:
+            spec.mig_profile = input.mig_profile.strip()
+        gpu_error = _agent_gpu_error(spec.gpu, spec.gpu_type, spec.mig_profile)
+        if gpu_error:
+            return gql_failure(ErrorCode.VALIDATION.value, gpu_error, field="gpu")
         if spec.model_gateway and spec.managed_model:
             return gql_failure(
                 ErrorCode.VALIDATION.value, MODEL_GATEWAY_MANAGED_CONFLICT, field="modelGateway"
