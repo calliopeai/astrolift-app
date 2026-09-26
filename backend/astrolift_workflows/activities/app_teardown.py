@@ -533,6 +533,13 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
         app_slug=app.slug,
     )
 
+    # Hostname ledger (#2012). The app's environments and workloads were
+    # just soft-deleted above, so every claim they held is now stale;
+    # release them all in one pass rather than reconciling per-environment.
+    from astrolift_registry.hostname_claims import release_app_hostname_claims
+
+    summary["hostname_claims"] = release_app_hostname_claims(app)
+
     # Finally the app row itself.
     if app.deleted_at is None:
         app.deleted_at = now

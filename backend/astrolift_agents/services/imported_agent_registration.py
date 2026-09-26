@@ -203,6 +203,14 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     workload.brief = brief
     workload.save()
 
+    # Hostname ledger (#2012) -- same call site the #1930 label check
+    # covers. An agent workload is never public (dispatched, not served),
+    # so this claims nothing today; wired in for whenever that changes and
+    # for parity with every other place a workload is persisted.
+    from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+
+    sync_workload_hostname_claims(app)
+
     container = workload.containers.filter(is_primary=True, deleted_at__isnull=True).first()
     if container is None:
         container = Container(workload=workload, name=effective_slug, is_primary=True)
