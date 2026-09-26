@@ -91,6 +91,11 @@ def _device_flow_bearer(org: Organization) -> str:
         permissions=["app.create", "app.deploy"],
     )
     RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
+    # Also on the org's one team (#1919): create resolves ``team_slug``
+    # from the caller's own single team when the request doesn't name one,
+    # which every create call in this module relies on.
+    team = Team.objects.get(organization=org)
+    RoleBinding.objects.create(user=user, role=role, scope_kind="TEAM", scope_id=team.id)
     row, session_id = device_flow.create_session(client_label="chat-studio")
     assert device_flow.approve_session(row, user=user, organization=org) is None
     later = timezone.now() + device_flow.MIN_POLL_INTERVAL + dt.timedelta(seconds=1)

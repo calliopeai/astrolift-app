@@ -829,9 +829,6 @@ def _gcp_managed_config_for(
                 pc.get("memorystore_valkey_operation_timeout_seconds", 1800),
             ),
             poll_interval_seconds=float(pc.get("memorystore_valkey_poll_interval_seconds", 3)),
-            adopt_existing_instance=bool(
-                pc.get("memorystore_valkey_adopt_existing_instance", False),
-            ),
         )
 
     if pair == ("kv_store", "bigtable") or (kind == "kv_store" and not variant):

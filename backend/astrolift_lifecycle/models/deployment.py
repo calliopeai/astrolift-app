@@ -106,6 +106,17 @@ class Deployment(BaseCoreModel):
     image_tag = models.CharField(max_length=128, blank=True, default="")
     image_digest = models.CharField(max_length=256, blank=True, default="")
     config_snapshot = models.JSONField(default=dict, blank=True)
+    # What this deployment materialized into its environment's literal
+    # `[env]` Secret (#1957, #1923). Written once, the first time it's
+    # computed for this row (see secret_literals.snapshot_literal_secrets),
+    # so the render and the Secret write agree even if the staged buffer
+    # moves mid-deploy. A rollback copies the target deployment's snapshot
+    # onto the new row at creation so it restores exactly what that
+    # deployment ran with, rather than whatever is staged live. Bundle and
+    # binding secrets are deliberately not snapshotted here -- their values
+    # live in an external secrets backend, and duplicating them in plaintext
+    # onto this row would put secret material outside that store.
+    secret_snapshot = models.JSONField(default=dict, blank=True)
     cluster_revision = models.CharField(max_length=128, blank=True, default="")
     # Rollout strategy captured at deploy-creation time (#736).  The
     # workflow's rollout-policy decision writes this once; never

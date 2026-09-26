@@ -109,6 +109,12 @@ interface AppSecret {
   // LIST_APP_SECRETS query selection set may not include scope on
   // older builds; treat missing/empty as "all".
   scope?: string | null;
+  // #1923 — false for a literal row whose staged value has no matching
+  // applied secret-change proposal under an app that requires approval:
+  // shown here, but not what the next deploy actually puts in front of a
+  // workload (it reverts to the last-approved value instead). Optional /
+  // defaults true so older builds that predate this field render as before.
+  deploysAsShown?: boolean | null;
 }
 
 interface AppSecretBundleAttachment {
@@ -194,8 +200,8 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
       variant="outline"
       className={
         isProd
-          ? "ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
-          : "ml-2 border-info-border bg-info/10 text-2xs text-info-fg"
+          ? "border-warning-border bg-warning/10 text-2xs text-warning-fg ml-2"
+          : "border-info-border bg-info/10 text-2xs text-info-fg ml-2"
       }
     >
       {scopeBadgeLabel(scope)}
@@ -212,14 +218,14 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
-      <Badge variant="destructive" className="ml-2 text-2xs">
+      <Badge variant="destructive" className="text-2xs ml-2">
         Expired {Math.abs(days)}d ago
       </Badge>
     );
   }
   if (days <= 7) {
     return (
-      <Badge variant="destructive" className="ml-2 text-2xs">
+      <Badge variant="destructive" className="text-2xs ml-2">
         Rotate — expires in {days}d
       </Badge>
     );
@@ -228,16 +234,74 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
     return (
       <Badge
         variant="outline"
-        className="ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
+        className="border-warning-border bg-warning/10 text-2xs text-warning-fg ml-2"
       >
         Expires in {days}d
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-muted-foreground ml-2 text-2xs">
+    <Badge variant="outline" className="text-muted-foreground text-2xs ml-2">
       Expires in {days}d
     </Badge>
+  );
+}
+
+/** #1923 — flags a literal row whose staged value has no matching applied
+ *  proposal: what shows here is not what the next deploy actually ships.
+ *  Covers both a normal pending review and a value staged while approval
+ *  was briefly off, since either way the next deploy reverts it. */
+function SecretPendingApprovalBadge({
+  source,
+  deploysAsShown,
+}: {
+  source: string;
+  deploysAsShown?: boolean | null;
+}) {
+  const t = useTranslations("apps.secrets");
+  if (source !== "literal" || deploysAsShown !== false) return null;
+  return (
+    <Badge
+      variant="outline"
+      className="border-warning-border bg-warning/10 text-2xs text-warning-fg ml-2"
+      title={t("pendingApprovalTooltip")}
+    >
+      {t("pendingApprovalBadge")}
+    </Badge>
+  );
+}
+
+/** #1923 — surfaces literal keys that will revert to their last-approved
+ *  value on the next deploy, ahead of time: staged with no matching
+ *  applied proposal, whether mid-review under an always-on approval
+ *  policy or staged during a window when approval was briefly off.
+ *  Deduplicated by key -- deploysAsShown is an app-wide answer, so the
+ *  same key repeats across every environment row it appears in. */
+function RevertWarningBanner({ secrets }: { secrets: AppSecret[] }) {
+  const t = useTranslations("apps.secrets");
+  const keys = Array.from(
+    new Set(
+      secrets.filter((s) => s.source === "literal" && s.deploysAsShown === false).map((s) => s.key)
+    )
+  ).sort();
+  if (keys.length === 0) return null;
+  return (
+    <div className="bg-card border-warning-border rounded-md border p-3 text-sm">
+      <p className="font-medium">{t("revertWarning.title", { count: keys.length })}</p>
+      <p className="text-muted-foreground mt-1 text-xs">{t("revertWarning.description")}</p>
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+        {keys.slice(0, 8).map((key) => (
+          <li key={key} className="font-mono text-xs">
+            {key}
+          </li>
+        ))}
+        {keys.length > 8 && (
+          <li className="text-muted-foreground text-xs">
+            {t("revertWarning.seeAll", { count: keys.length - 8 })}
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -281,7 +345,7 @@ export function SecretsClient({ slug }: { slug: string }) {
   // for this app slug.
   const appVersion = useQuery<{ astroliftApp: { id: string; version: number } | null }>(
     GET_APP_VERSION,
-    { variables: { slug }, fetchPolicy: "cache-and-network" },
+    { variables: { slug }, fetchPolicy: "cache-and-network" }
   );
   const secrets = useQuery<SecretsResp>(LIST_APP_SECRETS, {
     variables,
@@ -451,7 +515,12 @@ export function SecretsClient({ slug }: { slug: string }) {
         setRotatingId(null);
         return true;
       }
-      if (handleVersionMismatch(data?.rotateAppSecret, { label: "app", onRefresh: () => appVersion.refetch() })) {
+      if (
+        handleVersionMismatch(data?.rotateAppSecret, {
+          label: "app",
+          onRefresh: () => appVersion.refetch(),
+        })
+      ) {
         return false;
       }
       toast.error(data?.rotateAppSecret.errors?.[0]?.message ?? "Rotate failed");
@@ -464,7 +533,12 @@ export function SecretsClient({ slug }: { slug: string }) {
       setEditingId(null);
       return true;
     }
-    if (handleVersionMismatch(data?.setAppSecret, { label: "app", onRefresh: () => appVersion.refetch() })) {
+    if (
+      handleVersionMismatch(data?.setAppSecret, {
+        label: "app",
+        onRefresh: () => appVersion.refetch(),
+      })
+    ) {
       return false;
     }
     toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
@@ -522,6 +596,7 @@ export function SecretsClient({ slug }: { slug: string }) {
       <PendingProposalsBanner
         proposals={pendingProposals.data?.astroliftSecretChangeProposals ?? []}
       />
+      <RevertWarningBanner secrets={list} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Label className="text-muted-foreground text-xs tracking-wide uppercase">
@@ -608,7 +683,7 @@ export function SecretsClient({ slug }: { slug: string }) {
                       historyOpen={historyTarget?.secretId === s.id}
                       onToggleHistory={() =>
                         setHistoryTarget((prev) =>
-                          prev?.secretId === s.id ? null : { secretId: s.id, key: s.key },
+                          prev?.secretId === s.id ? null : { secretId: s.id, key: s.key }
                         )
                       }
                       busy={busy || rotateState.loading}
@@ -773,6 +848,7 @@ function SecretRow({
         {s.key}
         <SecretScopeBadge scope={s.scope} />
         <SecretExpiryBadge expiresAt={s.expiresAt} />
+        <SecretPendingApprovalBadge source={s.source} deploysAsShown={s.deploysAsShown} />
       </TableCell>
       <TableCell className="font-mono text-xs">
         {editing && canEdit ? (
@@ -797,16 +873,16 @@ function SecretRow({
           {SOURCE_LABEL[s.source] ?? s.source}
         </Badge>
         {s.bundleSlug && (
-          <span className="text-muted-foreground ml-2 font-mono text-2xs">{s.bundleSlug}</span>
+          <span className="text-muted-foreground text-2xs ml-2 font-mono">{s.bundleSlug}</span>
         )}
         {s.managedServiceKind && (
-          <span className="text-muted-foreground ml-2 font-mono text-2xs">
+          <span className="text-muted-foreground text-2xs ml-2 font-mono">
             {s.managedServiceKind}
           </span>
         )}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className="font-mono text-2xs">
+        <Badge variant="outline" className="text-2xs font-mono">
           {s.environmentName || "—"}
         </Badge>
       </TableCell>
@@ -898,9 +974,7 @@ function SecretRow({
                   <TooltipContent>Audit history for this key</TooltipContent>
                 </Tooltip>
                 <PopoverContent align="end" className="w-96 p-0">
-                  {historyOpen && (
-                    <SecretHistoryPanel appSlug={appSlug} secretKey={s.key} />
-                  )}
+                  {historyOpen && <SecretHistoryPanel appSlug={appSlug} secretKey={s.key} />}
                 </PopoverContent>
               </Popover>
             </Can>
@@ -953,7 +1027,7 @@ function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey
     <div className="flex flex-col">
       <div className="border-b px-3 py-2">
         <p className="text-xs font-medium">Audit history</p>
-        <p className="text-muted-foreground font-mono text-2xs">{secretKey}</p>
+        <p className="text-muted-foreground text-2xs font-mono">{secretKey}</p>
       </div>
       <div className="max-h-80 overflow-y-auto">
         {loading && entries.length === 0 ? (
@@ -972,7 +1046,7 @@ function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey
               <li key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
                 <Badge
                   variant={e.success ? "secondary" : "destructive"}
-                  className="mt-0.5 text-2xs"
+                  className="text-2xs mt-0.5"
                 >
                   {e.action}
                 </Badge>
@@ -1108,7 +1182,7 @@ function InlineValueEditor({
       >
         <XIcon className="size-4" />
       </Button>
-      <span className="text-muted-foreground hidden text-2xs sm:inline">{t("edit.hint")}</span>
+      <span className="text-muted-foreground text-2xs hidden sm:inline">{t("edit.hint")}</span>
     </form>
   );
 }
@@ -1165,11 +1239,11 @@ function AttachedBundlesSection({
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-xs">
                     {a.bundleName}
-                    <span className="text-muted-foreground ml-2 text-2xs">{a.bundleSlug}</span>
+                    <span className="text-muted-foreground text-2xs ml-2">{a.bundleSlug}</span>
                   </TableCell>
                   <TableCell>
                     {a.teamSlug ? (
-                      <Badge variant="outline" className="font-mono text-2xs">
+                      <Badge variant="outline" className="text-2xs font-mono">
                         {a.teamSlug}
                       </Badge>
                     ) : (
@@ -1177,7 +1251,7 @@ function AttachedBundlesSection({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="font-mono text-2xs">
+                    <Badge variant="outline" className="text-2xs font-mono">
                       {t("perEnvBadge", { env: a.environmentName })}
                     </Badge>
                   </TableCell>
@@ -1255,9 +1329,7 @@ function SetSecretSheet({
   }, [open]);
 
   const needsBranchInput = scope === SCOPE_PREVIEW_BRANCH;
-  const effectiveScope = needsBranchInput
-    ? `preview:${previewBranch.trim()}`
-    : scope;
+  const effectiveScope = needsBranchInput ? `preview:${previewBranch.trim()}` : scope;
   const scopeReady = !needsBranchInput || previewBranch.trim().length > 0;
 
   return (
@@ -1314,9 +1386,7 @@ function SetSecretSheet({
                 <SelectItem value="all">All environments (default)</SelectItem>
                 <SelectItem value="production">Production only</SelectItem>
                 <SelectItem value="preview">All previews</SelectItem>
-                <SelectItem value={SCOPE_PREVIEW_BRANCH}>
-                  Specific preview branch…
-                </SelectItem>
+                <SelectItem value={SCOPE_PREVIEW_BRANCH}>Specific preview branch…</SelectItem>
               </SelectContent>
             </Select>
             {needsBranchInput && (
@@ -1412,12 +1482,12 @@ function BulkImportSheet({
               </p>
               <div className="flex flex-wrap gap-1">
                 {previewKeys.slice(0, 20).map((k) => (
-                  <Badge key={k} variant="outline" className="font-mono text-2xs">
+                  <Badge key={k} variant="outline" className="text-2xs font-mono">
                     {k}
                   </Badge>
                 ))}
                 {previewKeys.length > 20 && (
-                  <Badge variant="outline" className="font-mono text-2xs">
+                  <Badge variant="outline" className="text-2xs font-mono">
                     +{previewKeys.length - 20}
                   </Badge>
                 )}

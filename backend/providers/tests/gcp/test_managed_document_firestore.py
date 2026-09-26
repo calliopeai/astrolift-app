@@ -265,7 +265,6 @@ def _spec(config: dict[str, Any] | None = None, *, hint: str = "documents") -> P
 def _full_config() -> dict[str, Any]:
     return {
         "database_id": "astrolift-records",
-        "adopt_existing": True,
         "delete_adopted": True,
         "location": "nam5",
         "database_edition": "ENTERPRISE",
@@ -334,7 +333,7 @@ def test_full_native_lifecycle_reconcile_is_idempotent(harness: Harness) -> None
     assert len(harness.state.fields) == 1
 
     mutation_count = len(harness.client.calls)
-    second = harness.driver.provision(_spec(_full_config()))
+    second = harness.driver.update(UpdateSpec(result.handle, config=_full_config()))
     assert second.ok, second
     assert len(harness.client.calls) == mutation_count
 
@@ -349,7 +348,7 @@ def test_generated_database_id_is_owned_and_retry_safe_without_adoption_flag(har
     assert len([call for call in harness.client.calls if call[0] == "create_database"]) == 1
 
 
-def test_adoption_and_immutable_guards_are_fail_closed(harness: Harness) -> None:
+def test_preexisting_default_database_is_refused_without_operator_adoption(harness: Harness) -> None:
     name = "projects/acme-prod/databases/(default)"
     harness.state.databases[name] = {
         "name": name,
@@ -363,43 +362,62 @@ def test_adoption_and_immutable_guards_are_fail_closed(harness: Harness) -> None
 
     refused = harness.driver.provision(_spec({"database_id": "(default)"}))
     assert not refused.ok
-    assert "adopt_existing" in refused.message
+    assert "operator-authorized" in refused.message
 
-    adopted = harness.driver.provision(
-        _spec({"database_id": "(default)", "adopt_existing": True, "delete_protection": False}),
+    # No config knob reopens it -- adoption of an existing, unlabelable
+    # database is operator-only, never a tenant config flag (#2021).
+    still_refused = harness.driver.provision(
+        _spec({"database_id": "(default)", "delete_protection": False}),
     )
-    assert adopted.ok, adopted
+    assert not still_refused.ok
+    assert "operator-authorized" in still_refused.message
+    assert harness.state.databases[name]["databaseEdition"] == "STANDARD"
+
+
+def test_immutable_field_mismatch_fails_closed_on_reconcile(harness: Harness) -> None:
+    config = {
+        "location": "nam5",
+        "kms_key_name": "projects/p/locations/l/keyRings/r/cryptoKeys/existing",
+        "delete_protection": False,
+    }
+    assert harness.driver.provision(_spec(config)).ok
 
     mismatch = harness.driver.provision(
-        _spec(
-            {
-                "database_id": "(default)",
-                "adopt_existing": True,
-                "kms_key_name": "projects/p/locations/l/keyRings/r/cryptoKeys/different",
-            },
-        ),
+        _spec({**config, "kms_key_name": "projects/p/locations/l/keyRings/r/cryptoKeys/different"}),
     )
     assert not mismatch.ok
     assert "immutable" in mismatch.message
 
 
-def test_explicit_database_outside_namespace_requires_stable_adoption_opt_in(harness: Harness) -> None:
+def test_explicit_database_id_creates_fresh_and_reconciles_through_update(harness: Harness) -> None:
+    """A custom database_id names a database that does not exist yet, so there is nothing to adopt."""
+    config = {"database_id": "customer-records", "location": "nam5", "delete_protection": False}
+
+    created = harness.driver.provision(_spec(config))
+    assert created.ok, created
+    assert "projects/acme-prod/databases/customer-records" in harness.state.databases
+
+    reconciled = harness.driver.update(UpdateSpec(created.handle, config=config))
+    assert reconciled.ok, reconciled
+
+
+def test_preexisting_custom_named_database_is_refused_without_operator_adoption(harness: Harness) -> None:
+    name = "projects/acme-prod/databases/customer-records"
+    harness.state.databases[name] = {
+        "name": name,
+        "type": "FIRESTORE_NATIVE",
+        "locationId": "nam5",
+        "databaseEdition": "STANDARD",
+        "deleteProtectionState": "DELETE_PROTECTION_DISABLED",
+        "realtimeUpdatesMode": "REALTIME_UPDATES_MODE_ENABLED",
+    }
+
     refused = harness.driver.provision(
         _spec({"database_id": "customer-records", "location": "nam5"}),
     )
     assert not refused.ok
-    assert "adopt_existing" in refused.message
-    assert harness.state.databases == {}
-
-    config = {
-        "database_id": "customer-records",
-        "adopt_existing": True,
-        "location": "nam5",
-        "delete_protection": False,
-    }
-    first = harness.driver.provision(_spec(config))
-    second = harness.driver.provision(_spec(config))
-    assert first.ok and second.ok
+    assert "operator-authorized" in refused.message
+    assert harness.state.databases[name]["deleteProtectionState"] == "DELETE_PROTECTION_DISABLED"
 
 
 def test_update_reconciles_mutable_database_schedule_and_ttl(harness: Harness) -> None:
@@ -485,7 +503,6 @@ def test_snapshot_and_export_restore_round_trip(harness: Harness) -> None:
         _spec(
             {
                 "database_id": "astrolift-restored",
-                "adopt_existing": True,
                 "location": "nam5",
             },
         ),
@@ -506,7 +523,6 @@ def test_scheduled_backup_restore_reconciles_explicit_target(harness: Harness) -
         _spec(
             {
                 "database_id": "customer-restored",
-                "adopt_existing": True,
                 "location": "nam5",
                 "database_edition": "STANDARD",
                 "delete_protection": False,
@@ -611,7 +627,6 @@ def test_clone_uses_pitr_source_and_reconciles_target(harness: Harness) -> None:
 
     clone_config = {
         "database_id": "astrolift-clone",
-        "adopt_existing": True,
         "location": "nam5",
         "database_edition": "ENTERPRISE",
         "kms_key_name": source_config["kms_key_name"],
@@ -661,7 +676,7 @@ def test_adopted_database_cannot_be_deleted_without_second_acknowledgement(harne
     }
     spec = DeprovisionSpec(
         "document_db/customer-records",
-        config={"database_id": "customer-records", "adopt_existing": True},
+        config={"database_id": "customer-records"},
     )
 
     result = harness.driver.deprovision(spec, delete_data=True)

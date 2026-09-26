@@ -2,11 +2,14 @@
 
 Implements ``ManagedServiceDriver`` for AWS's transactional email
 path. SES is the canonical AWS managed-email surface and pre-dates
-the newer ``Pinpoint Email`` rebrand -- we target the classic SES
-v1 control-plane (``boto3.client('ses')``) because moto's coverage
-is broader there and the v1 + v2 split doesn't affect the
-identity-verification + configuration-set primitives this driver
-needs.
+the newer ``Pinpoint Email`` rebrand. Identity lifecycle (create,
+read, tag) goes through ``boto3.client('sesv2')``: v1 identities
+carry no tags, so a re-entrant provision had no way to tell its own
+identity apart from another org's -- or the platform's own sending
+domain -- registered under a colliding derived name (#2029).
+Configuration sets, DKIM/DNS token fetch, and delete stay on v1;
+both API versions read and write the same underlying identity
+store, so mixing the two is safe.
 
 The driver provisions a *verified sending identity* (domain or
 single email address). Identity verification is the SES contract
@@ -72,8 +75,10 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import (
     ManagedServiceError,
+    adoption_refusal,
     handle_for,
     parse_handle,
+    tags_for,
 )
 from aws.session import aws_client
 
@@ -146,6 +151,7 @@ class AmazonSESDriver(ManagedServiceDriver):
         *,
         config: SESEmailConfig,
         ses_client: Any | None = None,
+        sesv2_client: Any | None = None,
         secrets_client: Any | None = None,
         route53: Any | None = None,
     ) -> None:
@@ -154,6 +160,10 @@ class AmazonSESDriver(ManagedServiceDriver):
             self._ses = ses_client
         else:
             self._ses = aws_client("ses", region=config.region, credential=config.credential)
+        if sesv2_client is not None:
+            self._sesv2 = sesv2_client
+        else:
+            self._sesv2 = aws_client("sesv2", region=config.region, credential=config.credential)
         if secrets_client is not None:
             self._sm = secrets_client
         else:
@@ -192,8 +202,19 @@ class AmazonSESDriver(ManagedServiceDriver):
         cfg = spec.config or {}
         is_domain = "@" not in identity
 
-        existing_state = self._identity_verified_state(identity)
-        if existing_state is not None:
+        existing = self._get_identity(identity)
+        if existing is not None:
+            # The identity is already registered -- either a re-entrant call
+            # over this service's own identity, or a name this spec's slugs
+            # happen to collide with (another org's identity, or the
+            # platform's own sending domain). v1 identities never carried
+            # tags; SESv2 does, so refuse the adopt unless the existing
+            # identity's ownership tags are this managed service's (#1961
+            # pattern, closing #2029).
+            refusal = adoption_refusal(existing.get("Tags"), spec, resource=f"ses identity {identity}")
+            if refusal is not None:
+                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
+            existing_state = _verification_state(existing)
             # Re-entrant provision: the identity is already registered.
             # Re-run the best-effort ancillary steps (idempotent) so a
             # previously-stuck partial provision can self-heal -- including
@@ -216,15 +237,15 @@ class AmazonSESDriver(ManagedServiceDriver):
             )
 
         try:
-            if is_domain:
-                self._ses.verify_domain_identity(Domain=identity)
-            else:
-                self._ses.verify_email_identity(EmailAddress=identity)
+            self._sesv2.create_email_identity(
+                EmailIdentity=identity,
+                Tags=tags_for(spec),
+            )
         except Exception as exc:
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=f"verify_identity: {exc}",
+                message=f"create_email_identity: {exc}",
                 errors=[str(exc)],
             )
 
@@ -653,49 +674,35 @@ class AmazonSESDriver(ManagedServiceDriver):
 
     # ---- internals ----------------------------------------------------
 
+    def _get_identity(self, identity: str) -> dict[str, Any] | None:
+        """Fetch the SESv2 identity, or ``None`` if it doesn't exist.
+
+        Single read shared by the verification-state check and the
+        ownership-tag check (#2029) so ``provision`` doesn't pay for two
+        ``get_email_identity`` round trips on the re-entrant path.
+        """
+        try:
+            return dict(self._sesv2.get_email_identity(EmailIdentity=identity))
+        except Exception as exc:
+            if _not_found(exc):
+                return None
+            raise
+
     def _identity_verified_state(
         self,
         identity: str,
     ) -> str | None:
-        try:
-            resp = self._ses.get_identity_verification_attributes(
-                Identities=[identity],
-            )
-        except Exception as exc:
-            if "NotFound" in str(exc) or "ResourceNotFound" in str(exc):
-                return None
-            raise
-        attrs = resp.get("VerificationAttributes") or {}
-        if identity not in attrs:
+        existing = self._get_identity(identity)
+        if existing is None:
             return None
-        return str(attrs[identity].get("VerificationStatus") or "Pending")
+        return _verification_state(existing)
 
     def _identity_for(self, *, spec: ProvisionSpec) -> str:
-        cfg = spec.config or {}
-        explicit = cfg.get("identity")
-        if explicit:
-            return str(explicit)
-        # Per-service ``config={base_domain: ...}`` overrides the install-
-        # level base_domain (#1038): a tenant provisioning email with its
-        # own sending domain passes it through the mutation config, which
-        # is threaded into ``spec.config``. Without this the driver only
-        # read the install bundle's base_domain and raised even when the
-        # caller supplied one.
-        base_domain = str(cfg.get("base_domain") or "").strip() or self._config.base_domain
-        if not base_domain:
-            raise ManagedServiceError(
-                "ses driver requires either spec.config.identity or a "
-                "configured base_domain so it can derive a sending "
-                "domain",
-            )
-        parts = [
-            self._config.identity_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        sub = "-".join(_safe(p) for p in parts if p)
-        return f"{sub}.{base_domain}".lower()
+        return identity_for(
+            spec,
+            identity_prefix=self._config.identity_prefix,
+            base_domain=self._config.base_domain,
+        )
 
     def _configuration_set_name_for(self, identity: str) -> str:
         return (f"{self._config.configuration_set_name_prefix}-{_safe(identity)}")[:64]
@@ -988,6 +995,56 @@ class AmazonSESDriver(ManagedServiceDriver):
 
 
 # ----- module-level helpers --------------------------------------------
+
+
+def identity_for(spec: ProvisionSpec, *, identity_prefix: str, base_domain: str) -> str:
+    """The sending identity ``spec`` provisions, derived the same way
+    regardless of caller.
+
+    Pulled out of the driver instance method so the backend's own
+    provisioning preflight (#2029) can compute the identity a
+    ``ManagedService`` row would claim -- and check it against the rest
+    of the platform's rows -- without duplicating the derivation, which
+    would drift the two checks apart from each other."""
+    cfg = spec.config or {}
+    explicit = cfg.get("identity")
+    if explicit:
+        return str(explicit)
+    # Per-service ``config={base_domain: ...}`` overrides the install-
+    # level base_domain (#1038): a tenant provisioning email with its
+    # own sending domain passes it through the mutation config, which
+    # is threaded into ``spec.config``. Without this the driver only
+    # read the install bundle's base_domain and raised even when the
+    # caller supplied one.
+    domain = str(cfg.get("base_domain") or "").strip() or base_domain
+    if not domain:
+        raise ManagedServiceError(
+            "ses driver requires either spec.config.identity or a "
+            "configured base_domain so it can derive a sending "
+            "domain",
+        )
+    parts = [identity_prefix, spec.organization_slug, spec.app_slug, spec.environment_name]
+    sub = "-".join(_safe(p) for p in parts if p)
+    return f"{sub}.{domain}".lower()
+
+
+def _verification_state(identity_response: dict[str, Any]) -> str:
+    """Collapse SESv2's ``GetEmailIdentity`` shape to the v1 tri-state
+    vocabulary (``Success`` / ``Pending`` / ``Failed``) the rest of the
+    driver already speaks. SESv2 has no single verification-state string:
+    ``VerifiedForSendingStatus`` is the real send-eligibility signal, and
+    ``DkimAttributes.Status`` is the only place a hard failure shows up
+    before that flips true."""
+    if identity_response.get("VerifiedForSendingStatus"):
+        return "Success"
+    dkim_status = str((identity_response.get("DkimAttributes") or {}).get("Status") or "")
+    return "Failed" if dkim_status == "FAILED" else "Pending"
+
+
+def _not_found(exc: Exception) -> bool:
+    response = getattr(exc, "response", {}) or {}
+    code = str((response.get("Error") or {}).get("Code") or "")
+    return code in {"NotFound", "NotFoundException"} or "not found" in str(exc).lower()
 
 
 def _safe(value: str) -> str:

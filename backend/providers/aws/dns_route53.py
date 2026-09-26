@@ -598,6 +598,21 @@ class Route53Driver(DnsDriver):
         )
 
     @driver_op(cloud="aws", driver="dns")
+    def zone_exists(self, zone: str) -> bool:
+        """Whether a hosted zone named ``zone`` already exists in this account (#1931).
+
+        Checked at managed-domain registration, before the platform decides
+        whether it is about to create a fresh zone or the caller is naming
+        one that is already there. A name that already exists is not
+        created for the caller: ``createManagedDomain`` asks for a TXT
+        proof-of-control challenge instead of calling ``provision_zone``
+        (which would refuse the duplicate anyway, just later and with a
+        failed workflow instead of a clear next step).
+        """
+        canonical = zone.rstrip(".") + "."
+        return bool(self._zone_ids_named(canonical))
+
+    @driver_op(cloud="aws", driver="dns")
     def pin_zone(self, zone: str, zone_id: str) -> None:
         """Bind ``zone`` to the hosted zone the platform created for it (#1931).
 

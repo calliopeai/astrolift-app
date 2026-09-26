@@ -475,16 +475,22 @@ def test_existing_instance_without_secret_is_not_claimed_healthy(
     assert retry.handle == created.handle
 
 
-def test_unowned_existing_instance_requires_explicit_adoption(
+def test_unowned_existing_instance_is_refused_without_operator_adoption(
     driver: CloudSQLServerDriver,
     sql: FakeSqlClient,
 ) -> None:
     created = driver.provision(_spec())
     sql.instances[_instance_id(created)]["settings"]["userLabels"] = {}
     denied = driver.provision(_spec())
-    assert not denied.ok and "adopt_existing" in denied.message
-    adopted = driver.provision(_spec(config={"adopt_existing": True}))
-    assert adopted.ok
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+
+    # The flag is gone entirely, not just ignored -- adoption is
+    # operator-only and no tenant config reopens it (#2021).
+    rejected = driver.provision(_spec(config={"adopt_existing": True}))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert sql.instances[_instance_id(created)]["settings"]["userLabels"] == {}
 
 
 def test_operation_polling_and_operation_failure_are_real_contracts(
@@ -746,15 +752,9 @@ def test_adopted_deletion_requires_separate_delete_ack(
 ) -> None:
     created = driver.provision(_spec(config={"deletion_protection": False}))
     sql.instances[_instance_id(created)]["settings"]["userLabels"] = {}
-    denied = driver.deprovision(
-        DeprovisionSpec(created.handle, config={"adopt_existing": True}),
-        delete_data=True,
-    )
+    denied = driver.deprovision(DeprovisionSpec(created.handle), delete_data=True)
     allowed = driver.deprovision(
-        DeprovisionSpec(
-            created.handle,
-            config={"adopt_existing": True, "delete_adopted": True},
-        ),
+        DeprovisionSpec(created.handle, config={"delete_adopted": True}),
         delete_data=True,
     )
     assert not denied.ok and "delete_adopted" in denied.message

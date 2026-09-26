@@ -1036,6 +1036,7 @@ export type AstroliftAppReprovisionState = {
 
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
+  deploysAsShown: Scalars['Boolean']['output'];
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
@@ -2405,6 +2406,8 @@ export type AstroliftLogoutAllSessionsPayloadMutationResult = {
 };
 
 export type AstroliftManagedDomain = {
+  challengeRecordName: Scalars['String']['output'];
+  challengeRecordValue: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
   delegationCheck: Scalars['JSON']['output'];
@@ -2416,6 +2419,8 @@ export type AstroliftManagedDomain = {
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];
+  verificationState: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
   zone: Scalars['String']['output'];
 };
 
@@ -5641,6 +5646,7 @@ export type Mutation = {
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
+  verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
@@ -7458,6 +7464,11 @@ export type MutationUpsertUserArgs = {
 
 export type MutationValidateAstroliftCiSecretsArgs = {
   input: ValidateAstroliftCiSecretsInput;
+};
+
+
+export type MutationVerifyManagedDomainArgs = {
+  input: VerifyManagedDomainInput;
 };
 
 
@@ -10405,6 +10416,22 @@ export type ValidateAstroliftCiSecretsInput = {
 export type ValidationError = {
   field: Scalars['String']['output'];
   messages: Array<Scalars['String']['output']>;
+};
+
+export type VerifyManagedDomainInput = {
+  zone: Scalars['String']['input'];
+};
+
+export type VerifyManagedDomainPayload = {
+  message: Scalars['String']['output'];
+  verified: Scalars['Boolean']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type VerifyManagedDomainPayloadMutationResult = {
+  data?: Maybe<VerifyManagedDomainPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type WebhookSecretReveal = {

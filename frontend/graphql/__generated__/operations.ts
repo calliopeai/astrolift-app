@@ -1036,6 +1036,7 @@ export type AstroliftAppReprovisionState = {
 
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
+  deploysAsShown: Scalars['Boolean']['output'];
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
@@ -2405,6 +2406,8 @@ export type AstroliftLogoutAllSessionsPayloadMutationResult = {
 };
 
 export type AstroliftManagedDomain = {
+  challengeRecordName: Scalars['String']['output'];
+  challengeRecordValue: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
   delegationCheck: Scalars['JSON']['output'];
@@ -2416,6 +2419,8 @@ export type AstroliftManagedDomain = {
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];
+  verificationState: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
   zone: Scalars['String']['output'];
 };
 
@@ -5641,6 +5646,7 @@ export type Mutation = {
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
+  verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
@@ -7458,6 +7464,11 @@ export type MutationUpsertUserArgs = {
 
 export type MutationValidateAstroliftCiSecretsArgs = {
   input: ValidateAstroliftCiSecretsInput;
+};
+
+
+export type MutationVerifyManagedDomainArgs = {
+  input: VerifyManagedDomainInput;
 };
 
 
@@ -10407,6 +10418,22 @@ export type ValidationError = {
   messages: Array<Scalars['String']['output']>;
 };
 
+export type VerifyManagedDomainInput = {
+  zone: Scalars['String']['input'];
+};
+
+export type VerifyManagedDomainPayload = {
+  message: Scalars['String']['output'];
+  verified: Scalars['Boolean']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type VerifyManagedDomainPayloadMutationResult = {
+  data?: Maybe<VerifyManagedDomainPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type WebhookSecretReveal = {
   plaintextSecret: Scalars['String']['output'];
   subscription: AstroliftWebhookSubscription;
@@ -12270,7 +12297,7 @@ export type ListAppSecretsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
+export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, deploysAsShown: boolean, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
 
 export type PreviewManagedServiceCostQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];

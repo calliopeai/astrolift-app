@@ -85,6 +85,15 @@ class AppSecretType:
     ``production`` / ``preview`` / ``preview:<branch>``.  Resolution-time
     filtering drops rows whose scope doesn't match the queried env."""
 
+    deploys_as_shown: bool = True
+    """False for a literal row whose staged value has no matching applied
+    secret-change proposal, under an app that requires secret approval
+    (#1923). Such a value is what the operator sees here, but not what the
+    next deploy actually puts in front of a workload -- it reverts to the
+    last-approved (``manifest_raw``) value instead. Always true for
+    bundle / managed_service rows: secret approval only gates literal
+    ``[env]`` writes."""
+
 
 @strawberry.type(name="AstroliftSecretBundleConsumer")
 class SecretBundleConsumerType:

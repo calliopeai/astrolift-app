@@ -1475,6 +1475,13 @@
         "appWide": "toda la app",
         "votes": "{received}/{required} aprobaciones",
         "seeAll": "Ver todas las {count} propuestas →"
+      },
+      "pendingApprovalBadge": "won't deploy as shown",
+      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "revertWarning": {
+        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
+        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
+        "seeAll": "+{count} more"
       }
     },
     "security": {
