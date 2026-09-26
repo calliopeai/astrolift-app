@@ -38,9 +38,12 @@ from astrolift_identity.models import (
     RoleBinding,
     Team,
 )
-from astrolift_lifecycle.models import AppEnvironment, DevEnvironment
-from astrolift_registry.models import RegisteredApp
-from astrolift_workflows.activities.dev_environment import _deploy_promoted_app_sync
+from astrolift_lifecycle.models import AppEnvironment, Deployment, DevEnvironment
+from astrolift_registry.models import RegisteredApp, Workload
+from astrolift_workflows.activities.dev_environment import (
+    _deploy_promoted_app_sync,
+    _record_promoted_app_deployment_sync,
+)
 from astrolift_workflows.tests.test_builder_runtime_1858 import (
     _by_kind,
     _RecordingDriver,
@@ -1201,3 +1204,114 @@ def test_uploaded_sqlite_reaches_the_promoted_app_intact(
         160 * 64 * 1024,
     )
     conn.close()
+
+
+# ---- update path (#1875): re-promote the same dev env into the same app --
+
+
+def test_reshipping_an_edit_updates_the_app_in_place_and_keeps_the_data_volume(
+    org, cluster, user, team, auth_headers, workflow_starts, monkeypatch, tmp_path
+):
+    """The full loop #1875 exists for: edit in Chat Studio, sync the dev env,
+    re-promote. Proves all three pieces together on one app across two
+    ship cycles: the update path (no duplicate app/environment, the same
+    Workload updates in place, the prior Deployment is superseded) and the
+    data volume claim identity (same PVC name + storage class both times --
+    a real cluster's server-side apply would update it, never recreate it,
+    which is what "the data volume survives across updates" actually rests
+    on) -- while the edited content really does reach the second deploy.
+    """
+    driver = _RecordingDriver(
+        storage_classes=[StorageClassInfo(name="gp3", is_default=True, provisioner="ebs.csi.aws.com")],
+        csi_drivers=["ebs.csi.aws.com"],
+    )
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: driver)
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+
+    data_v1 = b"v1-" + b"x" * 4096
+    synced = _sync(
+        client,
+        dev,
+        {
+            "files": {"server.py": "print('v1')"},
+            "data_file": {"path": "data.sqlite", "content": _b64(data_v1), "encoding": "base64"},
+        },
+        auth_headers,
+    )
+    assert synced.status_code == 200, synced.content
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+
+    promoted = _post_json(
+        client, f"/api/builder/v1/dev-environments/{dev.guid}/promote/", {"app_name": "Reship"}, auth_headers
+    )
+    assert promoted.status_code == 202, promoted.content
+    app_guid = promoted.json()["app_guid"]
+    [deploy] = [s for s in workflow_starts if s["name"] == "DeployPromotedAppWorkflow"]
+    dev_id, storage_class = deploy["args"][0].dev_environment_id, deploy["args"][0].storage_class
+
+    _deploy_promoted_app_sync(dev_id, storage_class)
+    _record_promoted_app_deployment_sync(dev_id, storage_class)
+
+    app = RegisteredApp.objects.get(guid=app_guid)
+    first_pvc = _by_kind(driver.applied[-1][1], "PersistentVolumeClaim")[0]
+    first_workload = Workload.objects.get(registered_app=app)
+    first_deployment = Deployment.objects.get(registered_app=app)
+    assert first_deployment.status == Deployment.Status.RUNNING
+
+    # The dev env's own status is RUNNING again (the actual #1875 fix for
+    # the stuck-PROMOTING bug) -- so the "edit, then sync" half of the loop
+    # works again too, on the very same dev env that was just promoted.
+    dev.refresh_from_db()
+    assert dev.status == DevEnvironment.Status.RUNNING
+
+    data_v2 = b"v2-" + b"y" * 8192
+    resynced = _sync(
+        client,
+        dev,
+        {
+            "files": {"server.py": "print('v2')"},
+            "data_file": {"path": "data.sqlite", "content": _b64(data_v2), "encoding": "base64"},
+        },
+        auth_headers,
+    )
+    assert resynced.status_code == 200, resynced.content
+    DevEnvironment.objects.filter(pk=dev.pk).update(status=DevEnvironment.Status.RUNNING)
+    workflow_starts.clear()
+
+    reshipped = _post_json(
+        client, f"/api/builder/v1/dev-environments/{dev.guid}/promote/", {"app_name": "Reship"}, auth_headers
+    )
+    assert reshipped.status_code == 202, reshipped.content
+    assert reshipped.json()["app_guid"] == app_guid
+    assert [s["name"] for s in workflow_starts] == ["DeployPromotedAppWorkflow"]
+    [redeploy] = workflow_starts
+    dev_id2, storage_class2 = redeploy["args"][0].dev_environment_id, redeploy["args"][0].storage_class
+
+    _deploy_promoted_app_sync(dev_id2, storage_class2)
+    _record_promoted_app_deployment_sync(dev_id2, storage_class2)
+
+    # No duplicate app/environment; the same Workload row updated in place.
+    assert RegisteredApp.objects.filter(organization=org, slug="reship").count() == 1
+    assert AppEnvironment.objects.filter(registered_app=app).count() == 1
+    assert Workload.objects.filter(registered_app=app).count() == 1
+
+    # The prior Deployment is superseded, exactly as a normal redeploy does.
+    deployments = list(Deployment.objects.filter(registered_app=app).order_by("pk"))
+    assert len(deployments) == 2
+    first_deployment.refresh_from_db()
+    assert first_deployment.status == Deployment.Status.SUPERSEDED
+    assert deployments[1].status == Deployment.Status.RUNNING
+    assert deployments[1].workload_id == first_workload.id
+
+    # The data volume claim is the same one both times -- an update reuses
+    # it, it never recreates it, which is what keeps the data on it.
+    second_pvc = _by_kind(driver.applied[-1][1], "PersistentVolumeClaim")[0]
+    assert second_pvc["metadata"]["name"] == first_pvc["metadata"]["name"]
+    assert second_pvc["spec"]["storageClassName"] == first_pvc["spec"]["storageClassName"]
+
+    # And the edit really did ship: the second deploy's rendered Secrets
+    # reassemble the NEW content, not the first deploy's.
+    target = tmp_path / "data" / "data.sqlite"
+    _seed(driver.applied[-1][1], str(target), tmp_path)
+    assert target.read_bytes() == data_v2
