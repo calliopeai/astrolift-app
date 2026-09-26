@@ -323,6 +323,15 @@ def module_entitlements(
     first four (install-wide) and, for the two per-org modules, whether
     the key is in ``org_modules_enabled``.
 
+    One deliberate exception to "the mapping table is fixed": the
+    ``AstroliftMe.modules`` resolver recomputes ``chat_studio_integration``'s
+    ``can_create`` from :func:`granted_scopes` instead of taking the row
+    returned here (#1919). The Builder API's create only ever checks
+    ``app.create`` at a TEAM or the ORG scope, so the flat "held anywhere"
+    ``perms`` set this function reads -- which also lights up for a bare
+    project- or app-scoped grant -- cannot answer whether create will
+    actually succeed.
+
     ``dashboard`` is always visible and is **not** returned here.
 
     Superuser short-circuits every ``can_*`` to ``true`` on every module,
