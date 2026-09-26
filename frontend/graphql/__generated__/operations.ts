@@ -2685,7 +2685,7 @@ export type AstroliftModuleEntitlement = {
   canManage: Scalars['Boolean']['output'];
   canRun: Scalars['Boolean']['output'];
   canView: Scalars['Boolean']['output'];
-  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
+  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
   enabled: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
 };
@@ -5561,7 +5561,7 @@ export type Mutation = {
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
-  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration`` or ``agent_live_attach``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
+  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
@@ -7793,6 +7793,7 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
@@ -8176,6 +8177,12 @@ export type QueryAgentTaskArgs = {
 };
 
 
+export type QueryAgentTaskByClientRequestIdArgs = {
+  clientRequestId: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
+};
+
+
 export type QueryAgentTaskEventsArgs = {
   after?: Scalars['Int']['input'];
   limit?: Scalars['Int']['input'];
@@ -8244,6 +8251,7 @@ export type QueryAgentTriggersPageArgs = {
 
 
 export type QueryAgentWorkloadsArgs = {
+  dispatchable?: Scalars['Boolean']['input'];
   orgId: Scalars['ID']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -9844,6 +9852,7 @@ export type RotateZentinelleGatewayCredentialInput = {
 
 export type RunAstroliftAgentInput = {
   agentSlug: Scalars['String']['input'];
+  clientRequestId: InputMaybe<Scalars['String']['input']>;
   environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
   timeoutSeconds: InputMaybe<Scalars['Int']['input']>;
   triggerPayload: InputMaybe<Scalars['JSON']['input']>;

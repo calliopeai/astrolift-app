@@ -125,6 +125,13 @@ class AgentTask(BaseCoreModel):
     # manual/cron/loop dispatch, which carry no ad-hoc input — those launch
     # with no such env var.
     dispatch_input = models.JSONField(null=True, blank=True)
+    # Idempotency key for ``runAstroliftAgent`` (#2072), mirroring
+    # ``AgentTaskInputMessage.client_request_id``. A retry presenting the
+    # same key for the same organization returns the task already created
+    # for it instead of dispatching a second one; ``agentTaskByClientRequestId``
+    # recovers it without dispatching. Null for the (still supported)
+    # no-key call, and for every other dispatch path.
+    client_request_id = models.UUIDField(null=True, blank=True)
     # Lifecycle timestamps.
     queued_at = models.DateTimeField(null=True, blank=True)
     provisioning_at = models.DateTimeField(null=True, blank=True)
@@ -213,6 +220,16 @@ class AgentTask(BaseCoreModel):
             models.Index(
                 fields=["agent_definition", "status"],
                 name="agent_task_agentdef_status_idx",
+            ),
+        ]
+        # Keep the key reserved after soft deletion so a retry cannot
+        # re-dispatch under it -- mirrors ``agentinput_task_request_unique``.
+        # Postgres treats every NULL as distinct, so unkeyed dispatches
+        # (the common case) never collide with each other.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "client_request_id"],
+                name="agenttask_org_request_unique",
             ),
         ]
 

@@ -211,6 +211,15 @@ class RunAstroliftAgentInput:
     context (e.g. an inline prompt or input map) folded into the task's
     brief context; ``None`` is the no-payload manual case. ``timeout_seconds``
     bounds the run (defaults to the AgentTask model default).
+
+    ``client_request_id`` (#2072) is an optional idempotency key, a UUID the
+    caller mints itself: presenting the same key again with the same
+    ``agent_slug``/``environment_spec_id``/``trigger_payload``/
+    ``timeout_seconds`` returns the task already dispatched for it rather
+    than creating a second one, so a client that launched an agent and
+    crashed before recording the reply can retry safely. The same key with a
+    different payload is refused (PRECONDITION). ``agentTaskByClientRequestId``
+    recovers the task for a key without dispatching anything.
     """
 
     agent_slug: str
@@ -220,6 +229,7 @@ class RunAstroliftAgentInput:
     # coerces None -> {}.
     trigger_payload: JSON | None = None
     timeout_seconds: int | None = None
+    client_request_id: str | None = None
 
 
 @strawberry.input
@@ -2126,6 +2136,7 @@ class AgentsMutation:
                 trigger_payload=input.trigger_payload or None,
                 timeout_seconds=input.timeout_seconds,
                 trigger="manual",
+                client_request_id=input.client_request_id,
             )
         except AgentDispatchError as exc:
             code = {
@@ -2140,6 +2151,7 @@ class AgentsMutation:
                     "agent_slug": "agentSlug",
                     "environment_spec_id": "environmentSpecId",
                     "timeout_seconds": "timeoutSeconds",
+                    "client_request_id": "clientRequestId",
                 }.get(exc.field),
             )
 

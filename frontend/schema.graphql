@@ -2694,7 +2694,7 @@ type AstroliftModuleEntitlement {
   canRun: Boolean!
 
   """
-  Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields.
+  Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields.
   """
   enabled: Boolean!
 }
@@ -5474,7 +5474,7 @@ type Mutation {
   removeOrganizationAllowlistDomain(input: RemoveOrganizationAllowlistDomainInput!): SoftdeletepayloadMutationResult!
 
   """
-  Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration`` or ``agent_live_attach``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds.
+  Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds.
   """
   setOrganizationModule(input: SetOrganizationModuleInput!): AstroliftOrganizationModuleMutationResult!
   createApiToken(input: CreateApiTokenInput!): AstroliftApiTokenPlaintextMutationResult!
@@ -6356,6 +6356,7 @@ type Query {
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage
+  agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
@@ -6366,7 +6367,7 @@ type Query {
   agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
   agentSecretBundles(envSpecSlug: String!): [AstroliftAgentSecretBundle!]!
   agentEnvironmentSpecSecretBundleAttachments(slug: String!): [AstroliftAgentSecretBundleAttachment!]!
-  agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
+  agentWorkloads(orgId: ID!, projectSlug: String = null, dispatchable: Boolean! = false): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agentFleetPage(orgId: ID!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentListItemPage!
   agentTasksPage(orgId: ID!, status: String = null, workloadId: ID = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTaskPage!
@@ -6772,6 +6773,7 @@ input RunAstroliftAgentInput {
   environmentSpecId: GUID = null
   triggerPayload: JSON = null
   timeoutSeconds: Int = null
+  clientRequestId: String = null
 }
 
 input RunJobOnceInput {

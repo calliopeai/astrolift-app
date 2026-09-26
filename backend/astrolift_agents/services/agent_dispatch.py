@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 
 
@@ -19,6 +20,27 @@ class AgentDispatchError(RuntimeError):
         return self.message
 
 
+def _replay_or_conflict(existing, *, workload, environment_spec, trigger_payload, effective_timeout: int):
+    """``existing`` if it is the same request the caller is retrying under a
+    ``client_request_id``, else raise ``precondition`` (#2072).
+
+    A soft-deleted match also conflicts: the key stays spent rather than
+    letting a retry dispatch a fresh task under a key that already named a
+    (since-deleted) one, mirroring ``AgentTaskInputMessage``'s "reserve after
+    soft deletion" rule.
+    """
+    same = (
+        existing.deleted_at is None
+        and existing.agent_definition_id == workload.pk
+        and existing.environment_spec_id == (environment_spec.pk if environment_spec else None)
+        and existing.dispatch_input == (trigger_payload or None)
+        and existing.timeout_seconds == effective_timeout
+    )
+    if not same:
+        raise AgentDispatchError("precondition", "clientRequestId has already been used", "client_request_id")
+    return existing
+
+
 def dispatch_registered_agent(
     *,
     organization_id: int,
@@ -30,11 +52,20 @@ def dispatch_registered_agent(
     trigger_payload: dict[str, Any] | None = None,
     timeout_seconds: int | None = None,
     trigger: str = "manual",
+    client_request_id: str | None = None,
 ):
     """Create, prepare, queue, and durably dispatch one registered agent.
 
     This is deliberately below GraphQL/MCP so every authenticated entry point
     freezes the same environment spec and immutable Agent Package Brief.
+
+    ``client_request_id`` (#2072) is an idempotency key, the dispatch
+    counterpart of ``queue_agent_task_input``'s: presenting the same key
+    again for the same organization with the same agent, environment spec,
+    trigger payload and timeout returns the task already created for it
+    rather than dispatching a second one. The same key with a different
+    payload is refused (``precondition``) instead of silently diverging from
+    what the first call recorded.
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
@@ -50,6 +81,15 @@ def dispatch_registered_agent(
     slug = (agent_slug or "").strip()
     if not slug:
         raise AgentDispatchError("validation", "agent slug is required", "agent_slug")
+
+    request_id = None
+    if client_request_id is not None:
+        try:
+            request_id = UUID(str(client_request_id))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise AgentDispatchError(
+                "validation", "clientRequestId must be a UUID", "client_request_id"
+            ) from exc
 
     workloads = (
         Workload.objects.filter(
@@ -148,15 +188,47 @@ def dispatch_registered_agent(
             "timeout_seconds",
         )
 
-    with transaction.atomic():
-        task = AgentTask.objects.create(
-            organization=organization,
-            agent_definition=workload,
+    if request_id is not None:
+        existing = AgentTask.all_objects.filter(
+            organization_id=organization_id, client_request_id=request_id
+        ).first()
+        if existing is not None:
+            return _replay_or_conflict(
+                existing,
+                workload=workload,
+                environment_spec=environment_spec,
+                trigger_payload=trigger_payload,
+                effective_timeout=effective_timeout,
+            )
+
+    try:
+        with transaction.atomic():
+            task = AgentTask.objects.create(
+                organization=organization,
+                agent_definition=workload,
+                environment_spec=environment_spec,
+                status=AgentTask.Status.DRAFT,
+                timeout_seconds=effective_timeout,
+                dispatch_input=trigger_payload or None,
+                vnc_enabled=bool(environment_spec and environment_spec.vnc_enabled),
+                client_request_id=request_id,
+            )
+    except IntegrityError:
+        # A concurrent caller won the race for this exact key -- the
+        # unique constraint, not this check, is the actual guard.
+        if request_id is None:
+            raise
+        existing = AgentTask.all_objects.filter(
+            organization_id=organization_id, client_request_id=request_id
+        ).first()
+        if existing is None:
+            raise
+        return _replay_or_conflict(
+            existing,
+            workload=workload,
             environment_spec=environment_spec,
-            status=AgentTask.Status.DRAFT,
-            timeout_seconds=effective_timeout,
-            dispatch_input=trigger_payload or None,
-            vnc_enabled=bool(environment_spec and environment_spec.vnc_enabled),
+            trigger_payload=trigger_payload,
+            effective_timeout=effective_timeout,
         )
 
     try:

@@ -25,11 +25,13 @@ lifecycle ``temporal_recorder`` pattern).
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
 from astrolift_agents.schema.mutations import AgentsMutation, RunAstroliftAgentInput
+from astrolift_agents.schema.queries import AgentsQuery
 from astrolift_agents.schema.types import AgentTaskType
 from astrolift_dispatch.spawners import registry as spawner_registry
 from astrolift_dispatch.spawners.base import SpawnResult, TaskStatus
@@ -391,3 +393,176 @@ def test_dispatch_unknown_environment_spec_not_found(
     assert result.errors[0].code == ErrorCode.NOT_FOUND.value
     assert AgentTask.objects.count() == 0
     assert temporal_recorder == []
+
+
+# ---------------------------------------------------------------------------
+# clientRequestId idempotency (#2072)
+# ---------------------------------------------------------------------------
+
+
+def test_client_request_id_replay_returns_the_same_task_without_a_second_dispatch(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+    key = str(uuid4())
+
+    with with_tenant_org(org):
+        first = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+        second = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+
+    assert first.ok is True and second.ok is True
+    assert str(first.data.id) == str(second.data.id)
+    assert AgentTask.objects.count() == 1
+    # The replay did not dispatch a second workflow.
+    assert len(temporal_recorder) == 1
+
+
+def test_client_request_id_with_a_different_payload_is_a_precondition(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+    key = str(uuid4())
+
+    with with_tenant_org(org):
+        first = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+        assert first.ok is True
+        second = AgentsMutation().run_astrolift_agent(
+            info,
+            input=RunAstroliftAgentInput(
+                agent_slug=workload.slug, trigger_payload={"prompt": "different"}, client_request_id=key
+            ),
+        )
+
+    assert second.ok is False
+    assert second.errors[0].code == ErrorCode.PRECONDITION.value
+    assert second.errors[0].field == "clientRequestId"
+    assert AgentTask.objects.count() == 1
+    assert len(temporal_recorder) == 1
+
+
+def test_client_request_id_malformed_is_a_validation_error(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id="not-a-uuid")
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.VALIDATION.value
+    assert result.errors[0].field == "clientRequestId"
+    assert AgentTask.objects.count() == 0
+    assert temporal_recorder == []
+
+
+def test_agent_task_by_client_request_id_recovers_the_task_without_dispatching(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    permission_resolver.grant(Permission.AGENT_READ)
+    workload = _agent_workload(org)
+    key = str(uuid4())
+
+    with with_tenant_org(org):
+        dispatched = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+        assert dispatched.ok is True
+        recovered = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(org.guid), client_request_id=key
+        )
+
+    assert recovered is not None
+    assert str(recovered.id) == str(dispatched.data.id)
+    # The recovery read did not dispatch anything of its own.
+    assert len(temporal_recorder) == 1
+    assert AgentTask.objects.count() == 1
+
+
+def test_agent_task_by_client_request_id_unknown_key_is_null(permission_resolver, info, org, with_tenant_org):
+    permission_resolver.grant(Permission.AGENT_READ)
+    with with_tenant_org(org):
+        result = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(org.guid), client_request_id=str(uuid4())
+        )
+    assert result is None
+
+
+def test_agent_task_by_client_request_id_malformed_key_is_null_not_an_error(
+    permission_resolver, info, org, with_tenant_org
+):
+    permission_resolver.grant(Permission.AGENT_READ)
+    with with_tenant_org(org):
+        result = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(org.guid), client_request_id="overview"
+        )
+    assert result is None
+
+
+def test_agent_task_by_client_request_id_is_org_scoped(
+    permission_resolver, info, org, other_org, with_tenant_org, temporal_recorder
+):
+    """Two different orgs may independently reuse the identical key; each
+    org's lookup recovers only its own row (#2072's tenancy requirement)."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    permission_resolver.grant(Permission.AGENT_READ)
+    workload = _agent_workload(org)
+    foreign = _agent_workload(other_org, app_slug="foreign-app", workload_slug="foreign-agent")
+    key = str(uuid4())
+
+    with with_tenant_org(org):
+        mine = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug, client_request_id=key)
+        )
+        assert mine.ok is True
+        recovered = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(org.guid), client_request_id=key
+        )
+        assert recovered is not None and str(recovered.id) == str(mine.data.id)
+
+    with with_tenant_org(other_org):
+        theirs = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=foreign.slug, client_request_id=key)
+        )
+        assert theirs.ok is True
+        assert str(theirs.data.id) != str(mine.data.id)
+        recovered_theirs = AgentsQuery().agent_task_by_client_request_id(
+            info, org_id=str(other_org.guid), client_request_id=key
+        )
+        assert recovered_theirs is not None and str(recovered_theirs.id) == str(theirs.data.id)
+
+    assert AgentTask.objects.count() == 2
+
+
+def test_client_request_id_unique_constraint_is_enforced_at_the_db_level(org):
+    """The migration's constraint, not just the service's pre-check, is what
+    actually stops two concurrent dispatches racing under the same key --
+    ``dispatch_registered_agent`` catches exactly this exception."""
+    from django.db import IntegrityError, transaction
+
+    key = uuid4()
+    AgentTask.objects.create(organization=org, client_request_id=key)
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            AgentTask.objects.create(organization=org, client_request_id=key)
+    # The failed insert's own savepoint rolled back; the first row is intact.
+    assert AgentTask.objects.filter(organization=org, client_request_id=key).count() == 1
+
+
+def test_null_client_request_id_never_collides(org):
+    """Every unkeyed dispatch (the common case) carries a null key; Postgres
+    treats every NULL as distinct, so they never collide with each other."""
+    AgentTask.objects.create(organization=org)
+    AgentTask.objects.create(organization=org)
+    assert AgentTask.objects.filter(organization=org, client_request_id__isnull=True).count() == 2

@@ -32,6 +32,7 @@ pytestmark = pytest.mark.django_db
 
 CHAT = org_modules.CHAT_STUDIO_INTEGRATION
 ATTACH = org_modules.AGENT_LIVE_ATTACH
+RUNS = org_modules.CHAT_STUDIO_AGENT_RUNS
 
 
 @pytest.fixture
@@ -145,7 +146,7 @@ def test_me_modules_org_a_enabled_org_b_not(org_a, org_b, user):
 def test_me_modules_keeps_the_entity_modules_enabled(org_b, user):
     _bind(user, org_b, [Permission.APP_READ.value])
     mods = _modules(user, org_b)
-    assert list(mods) == ["apps", "agents", "workflows", "admin", CHAT, ATTACH]
+    assert list(mods) == ["apps", "agents", "workflows", "admin", CHAT, ATTACH, RUNS]
     for key in ("apps", "agents", "workflows", "admin"):
         assert mods[key].enabled is True, key
 
@@ -159,6 +160,46 @@ def test_me_modules_capabilities_follow_permissions(org_a, user):
     assert (attach.can_create, attach.can_manage) == (False, False)
     # agent.read alone does not grant attach.
     assert mods[CHAT].can_view is False
+
+
+def test_me_modules_chat_studio_agent_runs_capabilities_mirror_agent_live_attach(org_a, user):
+    """chat_studio_agent_runs (#2069) is view+run only, off ``agent.read`` /
+    ``agent.dispatch`` -- the same shape as agent_live_attach, never
+    can_create/can_manage, so calliope-chat-studio#694's
+    ``astrolift_capability(owner, "chat_studio_agent_runs", can="run")``
+    reads exactly ``agent.dispatch``."""
+    _enable(org_a, RUNS)
+    _bind(user, org_a, [Permission.AGENT_READ.value, Permission.AGENT_DISPATCH.value])
+    mods = _modules(user, org_a)
+    runs = mods[RUNS]
+    assert (runs.enabled, runs.can_view, runs.can_run) == (True, True, True)
+    assert (runs.can_create, runs.can_manage) == (False, False)
+
+
+def test_me_modules_chat_studio_agent_runs_off_for_dispatch_without_enable(org_a, user):
+    """``agent.dispatch`` alone does not light the row up: the org switch
+    (#1859) still gates ``enabled``, independent of the can_* fields."""
+    _bind(user, org_a, [Permission.AGENT_READ.value, Permission.AGENT_DISPATCH.value])
+    mods = _modules(user, org_a)
+    assert mods[RUNS].enabled is False
+    assert mods[RUNS].can_run is True
+
+
+def test_install_force_off_beats_the_org_switch_for_agent_runs(org_a):
+    _enable(org_a, RUNS)
+    with override_config(CHAT_STUDIO_AGENT_RUNS_ALLOWED=False):
+        assert org_modules.module_state(org_a.id, RUNS) == (False, org_modules.REASON_DISABLED_BY_INSTALL)
+    assert org_modules.module_state(org_a.id, RUNS) == (True, None)
+
+
+def test_org_admin_turns_agent_runs_on_and_off(org_a, permission_resolver):
+    permission_resolver.grant(Permission.ORG_UPDATE)
+    on = _set(org_a, RUNS, True)
+    assert on.ok is True, on.errors
+    assert (on.data.key, on.data.enabled) == (RUNS, True)
+    off = _set(org_a, RUNS, False)
+    assert off.ok is True, off.errors
+    assert org_modules.module_state(org_a.id, RUNS)[0] is False
 
 
 def test_me_modules_reflects_an_install_force_off(org_a, user):

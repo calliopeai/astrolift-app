@@ -81,6 +81,7 @@ from astrolift_agents.schema.types import (
 from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
+from astrolift_agents.visibility import dispatchable_agent_workloads
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission, require_platform_operator
@@ -276,13 +277,19 @@ def _agent_run_rollup(workload_pks: list[int]) -> dict[int, dict]:
     return rollup
 
 
-def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
+def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None, dispatchable: bool = False):
     """Base queryset of the caller-org's ``kind: agent`` workloads.
 
     Permission and token/share filters precede the optional project
     filter, ordering and result cap. Deleted workloads/apps are excluded.
+
+    ``dispatchable=True`` (#2071) swaps the ``agent.read`` visibility set for
+    :func:`~astrolift_agents.visibility.dispatchable_agent_workloads` --
+    ``agent.dispatch``-gated, token-ceilinged, Task-family only -- so the
+    list matches exactly what ``runAstroliftAgent`` would accept.
     """
-    qs = visible_agent_workloads(org_pk).select_related("registered_app", "registered_app__project")
+    qs = dispatchable_agent_workloads(org_pk) if dispatchable else visible_agent_workloads(org_pk)
+    qs = qs.select_related("registered_app", "registered_app__project")
     if project_slug:
         qs = qs.filter(registered_app__project__slug=project_slug)
     return qs.order_by("-created_at")
@@ -318,7 +325,9 @@ def _agent_triggers_qs(org_pk: int, *, agent_slug: str, search: str | None = Non
     return qs
 
 
-def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None) -> list[AgentListItemType]:
+def _agent_list_rows(
+    info: Info, org_id: strawberry.ID, project_slug: str | None, *, dispatchable: bool = False
+) -> list[AgentListItemType]:
     """Build the agent list rows for an org (+ optional project filter).
 
     Module-level so both ``agent_workloads`` and ``agent_fleet`` can call it.
@@ -327,7 +336,9 @@ def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None
     resolver, so that raised ``'NoneType' has no attribute 'agent_workloads'``.
     """
     org_pk = _caller_org_id(info, org_id)
-    workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
+    workloads = list(
+        _agent_workload_qs(org_pk, project_slug=project_slug, dispatchable=dispatchable)[:_AGENT_LIST_CAP]
+    )
     return _agent_list_rows_for_workloads(workloads)
 
 
@@ -663,6 +674,34 @@ class AgentsQuery:
             organization_id=org_pk, agent_task=task, client_request_id=request_guid
         ).first()
         return agent_task_input_message_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_task_by_client_request_id(
+        self, info: Info, org_id: strawberry.ID, client_request_id: str
+    ) -> AgentTaskType | None:
+        """Recover the task ``runAstroliftAgent`` created for a
+        ``clientRequestId``, without dispatching anything (#2072).
+
+        A caller that launched an agent and crashed before it recorded
+        ``runAstroliftAgent``'s reply cannot otherwise tell whether the task
+        exists -- retrying the mutation is guarded by the same key
+        (``dispatch_registered_agent``'s idempotency check), but a client
+        that lost the reply needs a read, not another dispatch attempt.
+        Returns null for a malformed key, a key from another org, or one
+        the caller cannot read -- same shape as ``agentTaskInputMessage``.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        request_guid = _valid_guid(client_request_id)
+        if request_guid is None:
+            return None
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(organization_id=org_pk, client_request_id=request_guid)
+            .first()
+        )
+        return agent_task_to_type(task) if task is not None else None
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
@@ -1088,7 +1127,11 @@ class AgentsQuery:
     @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_workloads(
-        self, info: Info, org_id: strawberry.ID, project_slug: str | None = None
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        project_slug: str | None = None,
+        dispatchable: bool = False,
     ) -> list[AgentListItemType]:
         """The org's ``kind: agent`` workloads as list rows, newest first.
 
@@ -1099,11 +1142,23 @@ class AgentsQuery:
         running count rolled up in bulk so the list stays a single
         round-trip with no per-agent query.
 
+        ``dispatchable=True`` (#2071) narrows the list to exactly the
+        agents ``runAstroliftAgent`` would accept from this caller:
+        ``agent.dispatch`` rather than ``agent.read``, the same bearer
+        token team/share ceiling every org-scoped agent read applies, and
+        Task run family only (nothing ever dispatches a Service agent). An
+        agent the caller may read but not dispatch -- or may dispatch only
+        because of an ``app.read``-shaped grant that does not extend to
+        ``agent.dispatch`` -- is absent from this narrowed list even
+        though the default (unfiltered) list still shows it, so a client
+        rendering "agents you may launch" never has to learn the gap from
+        a refused ``runAstroliftAgent`` call.
+
         Org-scoped: ``org_id`` must match the caller's active tenant
         (superusers excepted, via ``_caller_org_id``); the workload
         queryset is filtered to that org through the app's organization.
         """
-        return _agent_list_rows(info, org_id, project_slug)
+        return _agent_list_rows(info, org_id, project_slug, dispatchable=dispatchable)
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, any_scope=True)
