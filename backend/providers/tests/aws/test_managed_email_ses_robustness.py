@@ -28,6 +28,12 @@ class _AlreadyExistsException(Exception):
     pass
 
 
+class _NotFoundException(Exception):
+    def __init__(self, code: str = "NotFoundException") -> None:
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}}
+
+
 class FakeSes:
     """Stateful recording fake for the SES v1 control plane surface the
     driver touches. PascalCase kwargs match the real boto3 client so the
@@ -38,19 +44,6 @@ class FakeSes:
         self._identities: dict[str, dict[str, Any]] = {}
         self._csets: set[str] = set()
         self._dkim: dict[str, list[str]] = {}
-
-    def verify_domain_identity(self, *, Domain: str, **_: Any) -> dict:  # noqa: N803
-        self.calls.append(("verify_domain_identity", Domain))
-        self._identities[Domain] = {
-            "VerificationStatus": "Pending",
-            "VerificationToken": f"verifytoken-{Domain}",
-        }
-        return {"VerificationToken": f"verifytoken-{Domain}"}
-
-    def verify_email_identity(self, *, EmailAddress: str, **_: Any) -> dict:  # noqa: N803
-        self.calls.append(("verify_email_identity", EmailAddress))
-        self._identities[EmailAddress] = {"VerificationStatus": "Pending"}
-        return {}
 
     def verify_domain_dkim(self, *, Domain: str, **_: Any) -> dict:  # noqa: N803
         self.calls.append(("verify_domain_dkim", Domain))
@@ -73,6 +66,44 @@ class FakeSes:
             raise _AlreadyExistsException("ConfigurationSetAlreadyExists")
         self._csets.add(name)
         return {}
+
+
+class FakeSesV2:
+    """Stateful recording fake for the SES v2 identity + tagging surface
+    (#2029). Shares ``ses``'s ``_identities`` store rather than keeping
+    its own -- v1 and v2 read and write the same underlying identity on
+    real AWS (and on moto), and ``_publish_verification_dns`` still reads
+    the v1 verification-token surface for an identity this fake creates
+    through v2."""
+
+    def __init__(self, ses: FakeSes) -> None:
+        self.calls: list[tuple] = []
+        self._ses = ses
+
+    def create_email_identity(
+        self,
+        *,
+        EmailIdentity: str,  # noqa: N803
+        Tags: list[dict[str, str]] | None = None,  # noqa: N803
+        **_: Any,
+    ) -> dict:
+        self.calls.append(("create_email_identity", EmailIdentity))
+        self._ses._identities[EmailIdentity] = {
+            "VerificationStatus": "Pending",
+            "VerificationToken": f"verifytoken-{EmailIdentity}",
+            "Tags": list(Tags or []),
+        }
+        return {}
+
+    def get_email_identity(self, *, EmailIdentity: str, **_: Any) -> dict:  # noqa: N803
+        record = self._ses._identities.get(EmailIdentity)
+        if record is None:
+            raise _NotFoundException("NotFoundException")
+        return {
+            "VerifiedForSendingStatus": record.get("VerificationStatus") == "Success",
+            "DkimAttributes": {"Status": "NOT_STARTED"},
+            "Tags": record.get("Tags", []),
+        }
 
 
 class FakeSecretsManager:
@@ -145,13 +176,16 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 def _driver(
     *,
     ses: FakeSes | None = None,
+    sesv2: FakeSesV2 | None = None,
     sm: FakeSecretsManager | None = None,
     route53: FakeRoute53Driver | None = None,
     base_domain: str = "astrolift.test",
 ) -> AmazonSESDriver:
+    ses = ses or FakeSes()
     return AmazonSESDriver(
         config=SESEmailConfig(region="us-east-1", base_domain=base_domain),
-        ses_client=ses or FakeSes(),
+        ses_client=ses,
+        sesv2_client=sesv2 or FakeSesV2(ses),
         secrets_client=sm or FakeSecretsManager(),
         route53=route53 or FakeRoute53Driver(),
     )
@@ -272,15 +306,16 @@ def test_reentrant_provision_republishes_dns_for_pending_identity() -> None:
 
 
 def test_verify_failure_still_reported_as_not_ok() -> None:
-    """The load-bearing verify step failing is still a real failure --
+    """The load-bearing create step failing is still a real failure --
     robustness only applies to the ancillary best-effort steps."""
     ses = FakeSes()
+    sesv2 = FakeSesV2(ses)
 
     def boom(**_kwargs):
         raise RuntimeError("simulated SES outage")
 
-    ses.verify_domain_identity = boom  # type: ignore[assignment]
-    d = _driver(ses=ses)
+    sesv2.create_email_identity = boom  # type: ignore[assignment]
+    d = _driver(ses=ses, sesv2=sesv2)
     result = d.provision(_spec())
     assert result.ok is False
-    assert "verify_identity" in result.message
+    assert "create_email_identity" in result.message
