@@ -58,6 +58,27 @@ class AgentBox(NamedBaseCoreModel):
         related_name="agent_boxes",
         on_delete=models.CASCADE,
     )
+    # The scope a box runs in (#1866), taken from what launched it, as an
+    # agent task's is: a recorded project, else a recorded team, else the
+    # agent's app through ``agent_definition``, else the org. A box ensured
+    # from an agent records nothing here and belongs to the agent's app; one
+    # ensured from a spec alone records the spec's owner. An org-level box is
+    # reached by org-level grants only, so losing an owner narrows access
+    # rather than widening it.
+    team = models.ForeignKey(
+        "astrolift_identity.Team",
+        related_name="agent_boxes",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    project = models.ForeignKey(
+        "astrolift_identity.Project",
+        related_name="agent_boxes",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     # Nullable so a box outlives the user record it was ensured for; a
     # box with no owner is still an org resource and still reapable.
     owner = models.ForeignKey(

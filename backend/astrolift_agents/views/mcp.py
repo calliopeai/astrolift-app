@@ -32,7 +32,7 @@ from astrolift_agents.mcp_contract import (
     SERVER_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
 )
-from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
+from astrolift_agents.scopes import agent_project_scope, agent_task_scope, agent_workload_app_scope
 from astrolift_identity.api_tokens import (
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_READ,
@@ -45,6 +45,7 @@ from core.permissions import (
     PermissionScope,
     check_permission,
     check_permission_any_scope,
+    route_auth,
 )
 from core.tenancy import get_current_tenant
 
@@ -67,14 +68,27 @@ def _reject_nonfinite_json(value: str):
 
 
 _TOOL_META = MCP_TOOL_META
-_FLEET_COLLECTIONS = {"astrolift_list_agents", "astrolift_list_tasks", "astrolift_list_runtimes"}
-_FLEET_OBJECT_SCOPES = {
+
+#: The collection form of a tool's permission scope: held anywhere in the
+#: org, with the handler narrowing its rows to the grant.
+ANY_SCOPE = "any_scope"
+
+#: Where each tool's permissions are checked (#1866): ``ANY_SCOPE`` for a
+#: collection, else a factory over the tool's arguments naming its target.
+#: A tool missing here runs the targetless check, where the token's team
+#: stands in for the target; the surface guardrail allows that only for the
+#: tools on its allowlist.
+TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_list_agents": ANY_SCOPE,
+    "astrolift_list_tasks": ANY_SCOPE,
+    "astrolift_list_runtimes": ANY_SCOPE,
     "astrolift_get_agent": agent_workload_app_scope("agent_slug"),
     "astrolift_get_task": agent_task_scope("task_id"),
     "astrolift_run_agent": agent_workload_app_scope("agent_slug", Permission.AGENT_DISPATCH),
     "astrolift_cancel_task": agent_task_scope("task_id", Permission.AGENT_DISPATCH),
+    "astrolift_sync_agent_repo": agent_project_scope("project_id"),
+    "astrolift_import_agent_spec": agent_project_scope("project_id"),
 }
-_FLEET_TOOLS = _FLEET_COLLECTIONS | _FLEET_OBJECT_SCOPES.keys()
 
 
 def _token(request: HttpRequest):
@@ -920,7 +934,9 @@ def _audit(request: HttpRequest, name: str, *, decision: str, duration_ms: int, 
 def _tool_list(request: HttpRequest) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name, meta in _TOOL_META.items():
-        if not _may(request, meta, any_scope=name in _FLEET_TOOLS):
+        # Listing has no target: a scoped tool is offered where its grant is
+        # held anywhere; the call itself checks the target.
+        if not _may(request, meta, any_scope=name in TOOL_SCOPES):
             continue
         out.append(
             {
@@ -992,13 +1008,13 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
         _validate_tool_arguments(meta, args)
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
         scopes = (meta["scope"], *meta.get("additional_scopes", ()))
-        scope_factory = _FLEET_OBJECT_SCOPES.get(name)
+        declared = TOOL_SCOPES.get(name)
         _authorize(
             request,
             scopes,
             *(p for p in permissions if p is not None),
-            permission_scope=scope_factory(args) if scope_factory is not None else None,
-            any_scope=name in _FLEET_COLLECTIONS,
+            permission_scope=declared(args) if callable(declared) else None,
+            any_scope=declared == ANY_SCOPE,
         )
         payload = handler(request, args)
     except Exception as exc:
@@ -1118,6 +1134,10 @@ def _rpc_error(
 @csrf_exempt
 @ratelimit(key="user_or_ip", rate="240/m", block=True)
 @require_http_methods(["POST", "DELETE"])
+@route_auth(
+    credential="alft_at_ API token with an MCP scope; sessions are refused",
+    scope="per tool: its token scope, permission and TOOL_SCOPES entry; resources at the agent's app",
+)
 def mcp_gateway(request: HttpRequest) -> HttpResponse:
     """Authenticated MCP Streamable HTTP endpoint (JSON response mode)."""
     if not _origin_allowed(request):

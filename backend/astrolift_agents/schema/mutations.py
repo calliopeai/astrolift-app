@@ -10,6 +10,11 @@ Skills/Briefs/ToolDefs reuse the app-tier grants because they are
 agent-workload building blocks. Environment-spec CRUD and user-facing agent
 dispatch use their dedicated grants so API-token scopes can authorize those
 CLI operations without granting broad app mutation authority.
+
+Scopes (#1866): the org catalog (skills, tool defs, briefs, org skill repos)
+and every secret value, binding and org bundle check at the explicit org
+scope; environment specs at their owner; boxes and tasks at the scope of
+what launched them.
 """
 
 from __future__ import annotations
@@ -62,6 +67,10 @@ from astrolift_agents.schema.types import (
     tool_def_to_type,
 )
 from astrolift_agents.scopes import (
+    agent_box_ensure_scope,
+    agent_box_scope,
+    agent_env_spec_owner_scope,
+    agent_env_spec_scope,
     agent_org_scope,
     agent_task_scope,
     agent_trigger_scope,
@@ -72,9 +81,11 @@ from astrolift_agents.services.agent_package import (
     normalize_environment_values,
     normalize_secret_references,
 )
+from astrolift_agents.visibility import agent_boxes as visible_agent_boxes
 from astrolift_agents.visibility import agent_by_slug
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
+from astrolift_agents.visibility import environment_specs as visible_environment_specs
 from astrolift_dispatch.model_gateway import MODEL_GATEWAY_MANAGED_CONFLICT
 from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
 from astrolift_graphql import GUID, MutationResultType
@@ -159,6 +170,10 @@ class CreateAgentEnvironmentSpecInput:
     # collection literal); the resolver coerces None → []/{}.
     secret_refs: JSON | None = None
     env_vars: JSON | None = None
+    # The owner (#1866): a project, or a team with no project. Neither makes
+    # the spec org-shared, which only an org-level grant may create.
+    team_id: GUID | None = None
+    project_id: GUID | None = None
 
 
 def _agent_gpu_error(gpu: int, gpu_type: str, mig_profile: str) -> str:
@@ -430,6 +445,45 @@ def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | N
     return org, None
 
 
+def _resolve_spec_owner(org, team_id, project_id):
+    """Resolve a new spec's owner (#1866) to ``(team, project, None)``, or
+    ``(None, None, failure)``.
+
+    A project brings its own team, and a team named beside it must be that
+    team. Owners resolve among the org's live rows only, the same rows the
+    gate's scope factory resolved, so a foreign or deleted owner is
+    NOT_FOUND. Neither leaves the spec org-shared.
+    """
+    from astrolift_identity.models import Project, Team
+
+    team = project = None
+    if project_id is not None:
+        guid = read_guid({"project_id": project_id}, "project_id")
+        project = (
+            Project.objects.filter(guid=guid, organization=org).select_related("team").first()
+            if guid
+            else None
+        )
+        if project is None:
+            return None, None, gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+        team = project.team
+    if team_id is not None:
+        guid = read_guid({"team_id": team_id}, "team_id")
+        named = Team.objects.filter(guid=guid, organization=org).first() if guid else None
+        if named is None:
+            return None, None, gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
+        if project is not None and project.team_id != named.pk:
+            return (
+                None,
+                None,
+                gql_failure(
+                    ErrorCode.VALIDATION.value, "the project belongs to another team", field="teamId"
+                ),
+            )
+        team = named
+    return team, project, None
+
+
 # Valid OrgSkillRepo source hosts — the host-prefix half of every
 # ``SourceConnection.Kind`` ("github_pat" → "github", etc.). Derived so the
 # set stays in lockstep with the connection kinds the platform supports.
@@ -567,20 +621,21 @@ def _agent_secret_target(*args, **kwargs):
     return "AgentSecret", f"{env_spec_slug}:{env_var}"
 
 
-def _load_spec_and_ref(env_spec_slug: str, env_var: str):
-    """Resolve ``(spec, ref, None)`` for a tenant-scoped spec + the
-    ``secret_refs`` entry bound to ``env_var``, or ``(None, None, failure)``.
+def _load_spec_and_ref(env_spec_slug: str, env_var: str, permission: Permission):
+    """Resolve ``(spec, ref, None)`` for a spec the caller reaches at
+    ``permission`` + the ``secret_refs`` entry bound to ``env_var``, or
+    ``(None, None, failure)``.
 
-    Org-scoped to the caller's active tenant (a spec in another org is
-    NOT_FOUND, no leak). ``ref`` is the normalized ``{"uri", "env_var"}``.
+    A spec in another org, or behind the caller's token ceiling, is
+    NOT_FOUND, no leak. ``ref`` is the normalized ``{"uri", "env_var"}``.
     """
     from astrolift_dispatch.agent_secrets import effective_secret_refs
 
     tenant = get_current_tenant()
     org_pk = tenant.organization_id if tenant else None
     spec = (
-        AgentEnvironmentSpec.objects.select_related("organization")
-        .filter(slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True)
+        visible_environment_specs(org_pk, permission)
+        .filter(slug=env_spec_slug, organization_id=org_pk)
         .first()
     )
     if spec is None:
@@ -628,12 +683,12 @@ def _refuse_ref_value_access(spec, env_var: str):
     return gql_failure(ErrorCode.PRECONDITION.value, reason, field="envVar")
 
 
-def _load_agent_spec(env_spec_slug: str):
+def _load_agent_spec(env_spec_slug: str, permission: Permission):
     tenant = get_current_tenant()
     org_pk = tenant.organization_id if tenant else None
     spec = (
-        AgentEnvironmentSpec.objects.select_related("organization")
-        .filter(slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True)
+        visible_environment_specs(org_pk, permission)
+        .filter(slug=env_spec_slug, organization_id=org_pk)
         .first()
     )
     if spec is None:
@@ -758,7 +813,7 @@ def _agent_secrets_backend(spec):
 class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.skill.create")
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.APP_CREATE, scope=agent_org_scope)
     @tenant_scoped()
     def create_skill(
         self, info: Info, input: SkillInput, org_id: strawberry.ID
@@ -786,7 +841,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.skill.update")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_org_scope)
     @tenant_scoped()
     def update_skill(self, info: Info, id: strawberry.ID, input: SkillInput) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
@@ -811,7 +866,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.skill.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=agent_org_scope)
     @tenant_scoped()
     def delete_skill(self, info: Info, id: strawberry.ID) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
@@ -824,7 +879,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.tool_def.create")
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.APP_CREATE, scope=agent_org_scope)
     @tenant_scoped()
     def create_tool_def(
         self, info: Info, skill_id: strawberry.ID, input: ToolDefInput
@@ -863,7 +918,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.tool_def.update")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=agent_org_scope)
     @tenant_scoped()
     def update_tool_def(
         self, info: Info, id: strawberry.ID, input: ToolDefInput
@@ -901,7 +956,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.tool_def.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=agent_org_scope)
     @tenant_scoped()
     def delete_tool_def(self, info: Info, id: strawberry.ID) -> MutationResultType[ToolDefType]:
         tenant = get_current_tenant()
@@ -920,7 +975,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.create")
-    @require_permission(Permission.AGENT_ENV_SPEC_CREATE)
+    @require_permission(Permission.AGENT_ENV_SPEC_CREATE, scope=agent_env_spec_owner_scope("input"))
     @tenant_scoped()
     def create_agent_environment_spec(
         self, info: Info, input: CreateAgentEnvironmentSpecInput, org_id: strawberry.ID
@@ -928,6 +983,9 @@ class AgentsMutation:
         org, err = _resolve_org(org_id)
         if err is not None:
             return err
+        team, project, owner_err = _resolve_spec_owner(org, input.team_id, input.project_id)
+        if owner_err is not None:
+            return owner_err
         if not input.name.strip():
             return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
         if not input.slug.strip():
@@ -971,6 +1029,8 @@ class AgentsMutation:
         with transaction.atomic():
             spec = AgentEnvironmentSpec.objects.create(
                 organization=org,
+                team=team,
+                project=project,
                 name=input.name.strip()[:255],
                 slug=slug,
                 agent_type=input.agent_type,
@@ -996,16 +1056,20 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.update")
-    @require_permission(Permission.AGENT_ENV_SPEC_UPDATE)
+    @require_permission(
+        Permission.AGENT_ENV_SPEC_UPDATE, scope=agent_env_spec_scope("slug", Permission.AGENT_ENV_SPEC_UPDATE)
+    )
     @tenant_scoped()
     def update_agent_environment_spec(
         self, info: Info, slug: str, input: UpdateAgentEnvironmentSpecInput
     ) -> MutationResultType[AgentEnvironmentSpecType]:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug, organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        spec = (
+            visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_UPDATE)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
+        )
         if spec is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
 
@@ -1089,16 +1153,20 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.delete")
-    @require_permission(Permission.AGENT_ENV_SPEC_DELETE)
+    @require_permission(
+        Permission.AGENT_ENV_SPEC_DELETE, scope=agent_env_spec_scope("slug", Permission.AGENT_ENV_SPEC_DELETE)
+    )
     @tenant_scoped()
     def delete_agent_environment_spec(
         self, info: Info, slug: str
     ) -> MutationResultType[AgentEnvironmentSpecType]:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug, organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        spec = (
+            visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_DELETE)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
+        )
         if spec is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
         spec.soft_delete()
@@ -1115,7 +1183,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.set", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.set")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def set_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str, value: str
@@ -1129,7 +1197,7 @@ class AgentsMutation:
         """
         from astrolift_dispatch.agent_secrets import write_secret_value
 
-        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var, Permission.SECRET_WRITE)
         if err is not None:
             return err
         refused = _refuse_ref_value_access(spec, env_var)
@@ -1156,7 +1224,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.delete", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.delete")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def delete_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str
@@ -1169,7 +1237,7 @@ class AgentsMutation:
         """
         from astrolift_dispatch.agent_secrets import delete_secret_value, normalize_secret_uri
 
-        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var, Permission.SECRET_WRITE)
         if err is not None:
             return err
         refused = _refuse_ref_value_access(spec, env_var)
@@ -1197,7 +1265,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.binding.upsert", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.binding.upsert")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def upsert_agent_secret_ref(
         self, info: Info, env_spec_slug: str, env_var: str, uri: str
@@ -1210,7 +1278,7 @@ class AgentsMutation:
             valid_agent_env_var,
         )
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         env_var = (env_var or "").strip()
@@ -1272,13 +1340,13 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.binding.remove", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.binding.remove")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def remove_agent_secret_ref(
         self, info: Info, env_spec_slug: str, env_var: str
     ) -> MutationResultType[AgentSecretStatusType]:
         """Remove a binding without deleting its provider-side value."""
-        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var, Permission.SECRET_WRITE)
         if err is not None:
             return err
         with transaction.atomic():
@@ -1297,7 +1365,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.reveal", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.reveal")
-    @require_permission(Permission.SECRET_READ)
+    @require_permission(Permission.SECRET_READ, scope=agent_org_scope)
     @tenant_scoped()
     def reveal_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str
@@ -1308,7 +1376,7 @@ class AgentsMutation:
             secret_backend_capabilities,
         )
 
-        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var, Permission.SECRET_READ)
         if err is not None:
             return err
         refused = _refuse_ref_value_access(spec, env_var)
@@ -1345,7 +1413,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.create")
     @requires_elevation(action_label="agents.secret.bundle.create")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def create_agent_secret_bundle(
         self,
@@ -1362,7 +1430,7 @@ class AgentsMutation:
         )
         from astrolift_services.models import SecretBundle
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         name = (name or "").strip()
@@ -1406,7 +1474,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.update")
     @requires_elevation(action_label="agents.secret.bundle.update")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def update_agent_secret_bundle(
         self,
@@ -1423,7 +1491,7 @@ class AgentsMutation:
             unscoped_bundle_reason,
         )
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id)
@@ -1495,14 +1563,14 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.delete")
     @requires_elevation(action_label="agents.secret.bundle.delete")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def delete_agent_secret_bundle(
         self, info: Info, env_spec_slug: str, bundle_id: strawberry.ID
     ) -> MutationResultType[AgentSecretBundleType]:
         from astrolift_dispatch.agent_secrets import secret_backend_capabilities, unscoped_bundle_reason
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id)
@@ -1545,7 +1613,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.attach")
     @requires_elevation(action_label="agents.secret.bundle.attach")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def attach_agent_secret_bundle(
         self,
@@ -1558,7 +1626,7 @@ class AgentsMutation:
     ) -> MutationResultType[AgentSecretBundleAttachmentType]:
         from astrolift_dispatch.agent_secrets import valid_env_var
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id, allow_project=True)
@@ -1600,12 +1668,12 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.detach")
     @requires_elevation(action_label="agents.secret.bundle.detach")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def detach_agent_secret_bundle(
         self, info: Info, env_spec_slug: str, attachment_id: strawberry.ID
     ) -> MutationResultType[AgentSecretBundleAttachmentType]:
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         ref = (
@@ -1627,7 +1695,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.set")
     @requires_elevation(action_label="agents.secret.bundle.key.set")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def set_agent_bundle_secret_value(
         self,
@@ -1640,7 +1708,7 @@ class AgentsMutation:
         from astrolift_dispatch.agent_secrets import secret_backend_capabilities, valid_agent_env_var
         from astrolift_services.models import SecretBundle
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id)
@@ -1691,7 +1759,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.delete")
     @requires_elevation(action_label="agents.secret.bundle.key.delete")
-    @require_permission(Permission.SECRET_WRITE)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
     @tenant_scoped()
     def delete_agent_bundle_secret_value(
         self,
@@ -1703,7 +1771,7 @@ class AgentsMutation:
         from astrolift_dispatch.agent_secrets import secret_backend_capabilities
         from astrolift_services.models import SecretBundle
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_WRITE)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id)
@@ -1735,7 +1803,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.reveal")
     @requires_elevation(action_label="agents.secret.bundle.key.reveal")
-    @require_permission(Permission.SECRET_READ)
+    @require_permission(Permission.SECRET_READ, scope=agent_org_scope)
     @tenant_scoped()
     def reveal_agent_bundle_secret_value(
         self,
@@ -1746,7 +1814,7 @@ class AgentsMutation:
     ) -> MutationResultType[AgentSecretRevealType]:
         from astrolift_dispatch.agent_secrets import secret_backend_capabilities
 
-        spec, err = _load_agent_spec(env_spec_slug)
+        spec, err = _load_agent_spec(env_spec_slug, Permission.SECRET_READ)
         if err is not None:
             return err
         bundle, berr = _load_agent_bundle(spec, bundle_id)
@@ -1785,7 +1853,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.brief.assemble")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope)
     @tenant_scoped()
     def assemble_brief(
         self,
@@ -2170,7 +2238,7 @@ class AgentsMutation:
             input.agent_slug or input.environment_spec_slug or input.image,
         ),
     )
-    @require_permission(Permission.AGENT_DISPATCH)
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_box_ensure_scope("input"))
     @tenant_scoped()
     def ensure_agent_box(
         self, info: Info, input: EnsureAgentBoxInput, org_id: strawberry.ID
@@ -2189,7 +2257,9 @@ class AgentsMutation:
         A settled box (idle-reaped, stopped, failed) is restarted under its
         existing slug, so the address a client stored keeps working across a
         reaping. Behind ``agent.dispatch``, the same grant that authorizes
-        running an agent — a box is a running agent that happens to wait.
+        running an agent — a box is a running agent that happens to wait —
+        checked where the box will run: the agent's app, else the spec's
+        owner, else the org (#1866).
         """
         org, err = _resolve_org(org_id)
         if err is not None:
@@ -2201,12 +2271,32 @@ class AgentsMutation:
             ensure_agent_box,
         )
 
+        # The rows the gate's scope factory resolved, through what the
+        # caller may dispatch; the service acts on exactly these (#1866).
+        spec = agent = None
+        spec_slug = (input.environment_spec_slug or "").strip()
+        if spec_slug:
+            spec = (
+                visible_environment_specs(org.pk, Permission.AGENT_DISPATCH)
+                .filter(slug=spec_slug, organization_id=org.pk)
+                .first()
+            )
+            if spec is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value, "environment spec not found", field="environmentSpecSlug"
+                )
+        agent_slug = (input.agent_slug or "").strip()
+        if agent_slug:
+            agent = agent_by_slug(org.pk, agent_slug, Permission.AGENT_DISPATCH)
+            if agent is None or agent.kind != Workload.Kind.AGENT:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
+
         try:
             box = ensure_agent_box(
                 organization=org,
-                environment_spec_slug=input.environment_spec_slug,
+                environment_spec=spec,
                 image=input.image,
-                agent_slug=input.agent_slug,
+                agent=agent,
                 name=input.name,
                 idle_timeout_seconds=input.idle_timeout_seconds,
                 owner=_box_owner(info),
@@ -2216,6 +2306,7 @@ class AgentsMutation:
                 "validation": ErrorCode.VALIDATION.value,
                 "not_found": ErrorCode.NOT_FOUND.value,
                 "precondition": ErrorCode.PRECONDITION.value,
+                "conflict": ErrorCode.CONFLICT.value,
             }.get(exc.code, ErrorCode.INTERNAL.value)
             return gql_failure(code, exc.message, field=exc.field or None)
         except AgentBoxError as exc:
@@ -2230,15 +2321,16 @@ class AgentsMutation:
         action="agents.box.destroy",
         target=lambda self, info, slug: ("AgentBox", slug),
     )
-    @require_permission(Permission.AGENT_DISPATCH)
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_box_scope("slug", Permission.AGENT_DISPATCH))
     @tenant_scoped()
     def destroy_agent_box(self, info: Info, slug: str) -> MutationResultType[AgentBoxType]:
         """Tear a box down now rather than waiting for it to go idle.
 
         The cluster objects go first and the row is soft-deleted after, so a
         retired box can never leave a pod running that nothing is watching.
-        Org-filtered explicitly — ``@tenant_scoped`` asserts a tenant exists,
-        it does not filter — so another org's slug reads as NOT_FOUND,
+        Checked at the box's own scope and resolved through the boxes
+        ``agent.dispatch`` reaches (#1866), so another org's slug, or a box
+        of a scope the caller does not cover, reads as NOT_FOUND,
         indistinguishable from a slug that was never used.
         """
         tenant = get_current_tenant()
@@ -2246,11 +2338,12 @@ class AgentsMutation:
         if org_pk is None:
             return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
 
-        from astrolift_agents.models import AgentBox
         from astrolift_agents.services.agent_box import AgentBoxError, destroy_agent_box
 
         box = (
-            AgentBox.objects.filter(slug=slug, organization_id=org_pk).select_related("organization").first()
+            visible_agent_boxes(org_pk, Permission.AGENT_DISPATCH)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
         )
         if box is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "agent box not found", field="slug")
@@ -2655,7 +2748,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.skill.import_from_repo")
-    @require_permission(Permission.SKILL_IMPORT)
+    @require_permission(Permission.SKILL_IMPORT, scope=agent_org_scope)
     @tenant_scoped()
     def import_skills_from_repo(
         self,
@@ -2722,7 +2815,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.org_skill_repo.register")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=agent_org_scope)
     @tenant_scoped()
     def register_org_skill_repo(
         self, info: Info, input: RegisterOrgSkillRepoInput, org_id: strawberry.ID
@@ -2781,7 +2874,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.org_skill_repo.update")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=agent_org_scope)
     @tenant_scoped()
     def update_org_skill_repo(
         self, info: Info, input: UpdateOrgSkillRepoInput
@@ -2837,7 +2930,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.org_skill_repo.remove")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=agent_org_scope)
     @tenant_scoped()
     def remove_org_skill_repo(
         self, info: Info, input: RemoveOrgSkillRepoInput

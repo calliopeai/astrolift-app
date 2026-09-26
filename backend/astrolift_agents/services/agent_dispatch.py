@@ -73,10 +73,12 @@ def dispatch_registered_agent(
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
+        default_environment_spec,
         prepare_agent_task,
         settle_dispatch_start_failure,
         settle_preparation_failure,
     )
+    from astrolift_agents.visibility import spec_usable_by_app
     from astrolift_identity.models import Organization
     from astrolift_registry.models import AppTeamAccess, Workload
     from astrolift_workflows.client import start_workflow
@@ -162,13 +164,11 @@ def dispatch_registered_agent(
             guid=environment_spec_guid,
             organization_id=organization_id,
             deleted_at__isnull=True,
-        )
+        ).select_related("team", "project")
         if team_id is not None:
-            # Environment specs currently have organization ownership but no
-            # team FK. A team-scoped API token may therefore use only the
-            # agent's canonical spec (same slug) or a source-bound spec for
-            # this exact repo slice; arbitrary org-level reusable specs remain
-            # available to session/org-scoped callers.
+            # A team-scoped API token may use only the agent's canonical
+            # spec (same slug) or a source-bound spec for this exact repo
+            # slice, on top of the ownership rule below that binds everyone.
             allowed_spec = Q(slug=slug)
             if workload.registered_app.source_repo:
                 allowed_spec |= Q(
@@ -177,18 +177,18 @@ def dispatch_registered_agent(
                 )
             environment_specs = environment_specs.filter(allowed_spec)
         environment_spec = environment_specs.first()
-        if environment_spec is None:
+        # An env spec's secrets are usable only by agents in scopes that may
+        # read it (#1866): org-shared, or owned by this agent's project or
+        # team. Another team's spec reads as absent, so its existence does
+        # not leak either.
+        if environment_spec is None or not spec_usable_by_app(environment_spec, workload.registered_app):
             raise AgentDispatchError(
                 "not_found",
                 "environment spec not found",
                 "environment_spec_id",
             )
     else:
-        environment_spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug,
-            organization_id=organization_id,
-            deleted_at__isnull=True,
-        ).first()
+        environment_spec = default_environment_spec(workload)
 
     effective_timeout = int(timeout_seconds or workload.tool_timeout_seconds or 300)
     if effective_timeout < 1 or effective_timeout > 604800:

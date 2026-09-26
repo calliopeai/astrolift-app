@@ -131,6 +131,28 @@ def agent_tasks(org_id, permission):
     qs = AgentTask.objects.filter(
         organization_id=org_id, organization__deleted_at__isnull=True
     ).select_related("project", "team", "agent_definition__registered_app")
+    return _owned_rows(qs, org_id, permission)
+
+
+def agent_boxes(org_id, permission):
+    """Live boxes the caller reaches at ``permission`` (#1866).
+
+    A box is owned like a task: a recorded project, else a recorded team,
+    else its agent's app, else the org alone, behind the same bearer-token
+    ceiling. ``agent_box_scope`` applies the same priority to object gates.
+    """
+    from astrolift_agents.models import AgentBox
+
+    qs = AgentBox.objects.filter(
+        organization_id=org_id, organization__deleted_at__isnull=True
+    ).select_related(
+        "organization", "project", "team", "agent_definition__registered_app", "environment_spec"
+    )
+    return _owned_rows(qs, org_id, permission)
+
+
+def _owned_rows(qs, org_id, permission):
+    """Narrow task or box rows to the ones ``permission`` reaches."""
     if not _token_allows_org(org_id, permission):
         return qs.none()
 
@@ -157,6 +179,85 @@ def agent_tasks(org_id, permission):
         | Q(project_id__isnull=True, team_id__in=teams.values("pk"))
         | Q(project_id__isnull=True, team_id__isnull=True, agent_definition_id__in=definitions.values("pk"))
     )
+
+
+def environment_specs(org_id, permission):
+    """Live environment specs the caller reaches at ``permission`` (#1866).
+
+    An org-shared spec (no team, no project) reaches every holder of
+    ``permission`` in the org: it is the org's to share. An owned spec
+    reaches holders covering its project, else its team; an owner that is
+    deleted or in another org leaves the spec to org-level grants, never to
+    whichever team is selected. A team-scoped bearer token sees the
+    org-shared specs and its own team's.
+    """
+    from astrolift_agents.models import AgentEnvironmentSpec
+
+    qs = AgentEnvironmentSpec.objects.filter(
+        organization_id=org_id,
+        organization__deleted_at__isnull=True,
+        deleted_at__isnull=True,
+    ).select_related("organization", "team", "project")
+    if not _token_allows_org(org_id, permission):
+        return qs.none()
+    scopes = granted_scopes(get_current_tenant(), permission)
+    if not scopes:
+        return qs.none()
+    token = get_current_api_token()
+    token_team_id = token.team_id if token is not None else None
+    if scopes.org and token_team_id is None:
+        return qs
+    projects = Project.objects.filter(organization_id=org_id)
+    teams = Team.objects.filter(organization_id=org_id)
+    if not scopes.org:
+        projects = visible_projects(projects, permission)
+        teams = visible_teams(teams, permission)
+    if token_team_id is not None:
+        projects = projects.filter(team_id=token_team_id)
+        teams = teams.filter(pk=token_team_id)
+    return qs.filter(
+        Q(team__isnull=True, project__isnull=True)
+        | Q(project_id__in=projects.values("pk"))
+        | Q(project__isnull=True, team_id__in=teams.values("pk"))
+    )
+
+
+def spec_owner_scope(spec) -> PermissionScope:
+    """The scope a spec's writes are checked at (#1866).
+
+    Its live project, else its live team. An org-shared spec, or one whose
+    owner is deleted or foreign, takes an explicit org scope: a factory
+    miss must not inherit the selected team or project (#1745).
+    """
+    org_id = spec.organization_id
+    if spec.project_id is not None:
+        project = spec.project
+        if project.organization_id == org_id and project.deleted_at is None:
+            return PermissionScope(kind=ScopeKind.PROJECT, id=project.pk)
+    elif spec.team_id is not None:
+        team = spec.team
+        if team.organization_id == org_id and team.deleted_at is None:
+            return PermissionScope(kind=ScopeKind.TEAM, id=team.pk)
+    return PermissionScope(kind=ScopeKind.ORG, id=org_id)
+
+
+def spec_usable_by_app(spec, app) -> bool:
+    """Whether ``app``'s agents may run with ``spec`` (#1866).
+
+    An env spec's secrets are usable only by agents in scopes that may read
+    it: an org-shared spec serves every app in its org, a project's spec
+    that project's apps, and a team's spec (with no project) that team's
+    apps. A spec whose owner is gone serves nobody.
+    """
+    if spec is None or app is None or spec.organization_id != app.organization_id:
+        return False
+    if spec.project_id is None and spec.team_id is None:
+        return True
+    if spec_owner_scope(spec).kind == ScopeKind.ORG:
+        return False
+    if spec.project_id is not None:
+        return spec.project_id == app.project_id
+    return spec.team_id == app.team_id
 
 
 def watchable_task_ids(tasks):

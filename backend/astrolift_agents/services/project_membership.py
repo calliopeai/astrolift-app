@@ -22,3 +22,35 @@ def agent_spec_belongs_to_project(spec, project) -> bool:
         environment_spec_slug=spec.slug,
         deleted_at__isnull=True,
     ).exists()
+
+
+class SpecOwnedElsewhere(ValueError):
+    """An agent registration named another project's or team's spec."""
+
+
+def spec_for_registration(*, organization, slug: str, app):
+    """The environment spec an agent registration writes under ``slug`` (#1866).
+
+    The live spec with that slug when ``app``'s agents may run with it (it is
+    org-shared, or owned by the app's project or team); otherwise a new,
+    unsaved spec owned by the app's project and team. A slug naming another
+    scope's spec raises :class:`SpecOwnedElsewhere`, so registering an agent
+    can never rewrite another team's image and secret bindings.
+    """
+    from astrolift_agents.models import AgentEnvironmentSpec
+    from astrolift_agents.visibility import spec_usable_by_app
+
+    spec = (
+        AgentEnvironmentSpec.objects.filter(organization=organization, slug=slug, deleted_at__isnull=True)
+        .select_related("team", "project")
+        .first()
+    )
+    if spec is None:
+        return AgentEnvironmentSpec(
+            organization=organization, slug=slug, team_id=app.team_id, project_id=app.project_id
+        )
+    if not spec_usable_by_app(spec, app):
+        raise SpecOwnedElsewhere(
+            f"environment spec {slug!r} belongs to another project or team; give this agent another slug"
+        )
+    return spec

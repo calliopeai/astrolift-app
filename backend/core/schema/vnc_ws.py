@@ -45,6 +45,8 @@ import logging
 
 from asgiref.sync import sync_to_async
 
+from core.permissions import Permission, route_auth
+
 logger = logging.getLogger(__name__)
 
 # Container port the agent's raw RFB server (x11vnc) listens on (see the
@@ -237,6 +239,11 @@ def _parse_task_guid(path: str) -> str | None:
 # ---- ASGI app --------------------------------------------------------
 
 
+@route_auth(
+    credential="session cookie",
+    permissions=(Permission.AGENT_TASK_WATCH,),
+    scope="the task's recorded project, else team, else agent app, else org (agent_task_scope)",
+)
 async def vnc_ws_application(scope: dict, receive, send) -> None:
     """ASGI WebSocket handler for /app/vnc/<task-guid>."""
     if scope["type"] != "websocket":

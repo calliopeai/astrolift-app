@@ -1215,18 +1215,11 @@ def _upsert_agent_environment_spec(
     for ref in secret_refs:
         assert_org_scoped_secret_ref(ref["uri"], organization=app.organization)
 
-    spec = AgentEnvironmentSpec.objects.filter(
-        organization=app.organization,
-        slug=workload_slug,
-        deleted_at__isnull=True,
-    ).first()
-    if spec is None:
-        spec = AgentEnvironmentSpec(
-            organization=app.organization,
-            slug=workload_slug,
-            name=f"{workload.name} runtime",
-            agent_type=agent_type,
-        )
+    from astrolift_agents.services.project_membership import spec_for_registration
+
+    # A new spec belongs to the agent's project; an existing one is written
+    # only when this agent may run with it (#1866).
+    spec = spec_for_registration(organization=app.organization, slug=workload_slug, app=app)
     spec.name = spec.name or f"{workload.name} runtime"
     spec.agent_type = agent_type
     spec.image_tag = image

@@ -515,14 +515,23 @@ def _dispatch_agent_for_stage_sync(
 
     environment_spec = None
     if environment_spec_slug:
-        environment_spec = AgentEnvironmentSpec.objects.filter(
-            organization_id=organization_id,
-            slug=environment_spec_slug,
-            deleted_at__isnull=True,
-        ).first()
-        if environment_spec is None:
+        from astrolift_agents.visibility import spec_usable_by_app
+
+        environment_spec = (
+            AgentEnvironmentSpec.objects.filter(
+                organization_id=organization_id,
+                slug=environment_spec_slug,
+                deleted_at__isnull=True,
+            )
+            .select_related("team", "project")
+            .first()
+        )
+        # The stage's agent may run only with a spec its own app may use
+        # (#1866): org-shared, or owned by the agent's project or team.
+        if environment_spec is None or not spec_usable_by_app(environment_spec, workload.registered_app):
             raise RuntimeError(
-                f"environment spec {environment_spec_slug!r} not found for stage {stage.order} organization"
+                f"environment spec {environment_spec_slug!r} not found for stage {stage.order} organization, "
+                f"or not usable by agent {workload.slug!r}"
             )
 
     # Temporal may retry an activity after the DB commit or even after the
