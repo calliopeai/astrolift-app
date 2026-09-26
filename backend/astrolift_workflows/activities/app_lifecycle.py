@@ -140,15 +140,49 @@ async def mark_app_ready(registered_app_id: int) -> None:
     await sync_to_async(_mark_app_ready_sync)(registered_app_id)
 
 
+def _environment_namespace_labels(app, env) -> tuple[dict[str, str], dict[str, str]]:
+    """Labels and annotations for the namespace ``env`` of ``app`` renders into.
+
+    ``ensure_namespace`` is a server-side apply under one field manager, so
+    whichever call ran last drops any label the other set. A preview's own
+    namespace is ensured by both the preview build and every deploy (#1922),
+    so both take this one set: the app namespace labels, plus the preview's
+    for a preview. The app namespace gets exactly what it always had.
+    """
+    labels = {
+        "astrolift.io/managed-by": "astrolift",
+        "astrolift.io/organization": app.organization.slug,
+        "astrolift.io/app": app.slug,
+    }
+    annotations = {
+        "astrolift.io/registered-app-id": str(app.pk),
+    }
+    if env is not None and (getattr(env, "k8s_namespace", "") or "").strip():
+        from astrolift_lifecycle.models import PreviewEnvironment
+
+        preview = PreviewEnvironment.all_objects.filter(app_environment=env).order_by("-pk").first()
+        if preview is not None:
+            labels.update(
+                {
+                    "astrolift-managed": "true",
+                    "app-slug": app.slug,
+                    "preview-pr": str(preview.pr_number),
+                }
+            )
+    return labels, annotations
+
+
 def _provision_namespace_sync(registered_app_id: int, app_environment_id: int | None) -> str:
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.models import RegisteredApp
-    from core.app_deploy import AppDeployError, namespace_for_app
+    from astrolift_registry.namespaces import adopt_preview_namespace
+    from core.app_deploy import AppDeployError, namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
     cluster: TenantCluster | None = None
+    env = None
     # Treat falsy ids (0, None) as "no explicit env" so the workflow can
     # pass a placeholder (0) without triggering a DoesNotExist lookup.
     if app_environment_id:
@@ -167,20 +201,18 @@ def _provision_namespace_sync(registered_app_id: int, app_environment_id: int | 
             raise AppDeployError(
                 f"app {app.slug!r} has {len(envs)} environments; pass app_environment_id explicitly",
             )
-        cluster = envs[0].tenant_cluster
+        env = envs[0]
+        cluster = env.tenant_cluster
     if cluster is None:
         raise AppDeployError(f"app {app.slug!r} env has no tenant_cluster bound")
-    namespace = namespace_for_app(app)
+    # A preview created during the upgrade by a server on the previous
+    # release has no namespace recorded yet; this runs before anything is
+    # rendered for it, so it is where that gets fixed (#1922).
+    adopt_preview_namespace(env)
+    namespace = namespace_for_environment(env)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
-    labels = {
-        "astrolift.io/managed-by": "astrolift",
-        "astrolift.io/organization": app.organization.slug,
-        "astrolift.io/app": app.slug,
-    }
-    annotations = {
-        "astrolift.io/registered-app-id": str(app.pk),
-    }
+    labels, annotations = _environment_namespace_labels(app, env)
     driver.ensure_namespace(ctx.slug, namespace, labels, annotations)
     return namespace
 
@@ -617,9 +649,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         # it inside _gather keeps the ORM access in the sync context
         # and, unlike widening select_related, cannot be undone by a
         # later edit to the query above.
-        from core.app_deploy import namespace_for_app
+        from core.app_deploy import namespace_for_environment
 
-        return manifest, app, env, d, env_from, workload_env_from, namespace_for_app(app)
+        return manifest, app, env, d, env_from, workload_env_from, namespace_for_environment(env)
 
     manifest, app, env, d, env_from, workload_env_from, namespace = await sync_to_async(_gather)()
 
@@ -787,6 +819,11 @@ def _render_app_ingresses_and_tls(
         is_active=True,
         validation_status=CustomDomain.ValidationStatus.VALIDATED,
     )
+    if (getattr(d.app_environment, "k8s_namespace", "") or "").strip():
+        # A custom domain is the app's, served from the app namespace. An
+        # environment in a namespace of its own (a preview, #1922) emitting
+        # it too would be a second Ingress for the same host on the cluster.
+        domains = domains.none()
     for cd in domains:
         state = cd.certificate_state
         if state not in (
@@ -935,15 +972,19 @@ def _render_app_ingresses_and_tls(
     cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
     if managed_domain is not None and cluster is not None:
         from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+        from core.app_deploy import environment_hostname_inputs
 
         org_slug = d.registered_app.organization.slug if d.registered_app.organization_id else ""
         if org_slug:
             computed = compute_hostnames(
                 manifest,
-                HostnameInputs(
-                    app_slug=d.registered_app.slug,
-                    org_slug=org_slug,
-                    base_zone=managed_domain.zone,
+                environment_hostname_inputs(
+                    env,
+                    HostnameInputs(
+                        app_slug=d.registered_app.slug,
+                        org_slug=org_slug,
+                        base_zone=managed_domain.zone,
+                    ),
                 ),
             )
             cert_arn: str | None = (
@@ -1984,13 +2025,15 @@ async def mark_preview_failed(preview_environment_id: int, reason: str = "") -> 
 def _provision_preview_namespace_sync(preview_environment_id: int) -> str:
     """Ensure the preview env's dedicated namespace exists on its cluster.
 
-    The namespace name is stored in ``PreviewEnvironment.namespace`` at
-    row-creation time.  Using the stored name (rather than re-computing it
-    here) keeps the workflow idempotent across retries even if the naming
-    convention changes in flight.
+    The namespace name is stored at row-creation time, on
+    ``PreviewEnvironment.namespace`` and on the preview's ``AppEnvironment``,
+    whose deploys render into it (#1922). Using the stored name (rather than
+    re-computing it here) keeps the workflow idempotent across retries even
+    if the naming convention changes in flight.
     """
     from astrolift_lifecycle.models import PreviewEnvironment
-    from core.app_deploy import AppDeployError
+    from astrolift_registry.namespaces import adopt_preview_namespace
+    from core.app_deploy import AppDeployError, namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     p = PreviewEnvironment.objects.select_related(
@@ -2002,15 +2045,13 @@ def _provision_preview_namespace_sync(preview_environment_id: int) -> str:
         raise AppDeployError(
             f"preview {p.pk} env has no tenant_cluster bound — cannot provision namespace",
         )
+    adopt_preview_namespace(p.app_environment)
+    namespace = namespace_for_environment(p.app_environment)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
-    labels = {
-        "astrolift-managed": "true",
-        "app-slug": p.registered_app.slug,
-        "preview-pr": str(p.pr_number),
-    }
-    driver.ensure_namespace(ctx.slug, p.namespace, labels, {})
-    return p.namespace
+    labels, annotations = _environment_namespace_labels(p.registered_app, p.app_environment)
+    driver.ensure_namespace(ctx.slug, namespace, labels, annotations)
+    return namespace
 
 
 @activity.defn(name="astrolift.preview.provision_managed_services")
@@ -2160,7 +2201,7 @@ async def mark_preview_torn_down(preview_environment_id: int) -> None:
 
 def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
     from astrolift_lifecycle.models import PreviewEnvironment
-    from core.app_deploy import AppDeployError, namespace_for_app
+    from core.app_deploy import AppDeployError, namespace_for_app, namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     p = PreviewEnvironment.all_objects.select_related(
@@ -2174,20 +2215,24 @@ def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
         )
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
-    # The preview's literal `[env]` Secret does not live in p.namespace --
-    # every environment of an app (prod, staging, every preview) shares one
-    # namespace per cluster (see _app_env_secret_name), and that Secret is
-    # materialized there by update_secrets, not here. delete_namespace
-    # below only cascades p.namespace, so without this the preview's
-    # literal Secret -- still holding its last plaintext values -- outlived
-    # the preview indefinitely (#1923).
-    _delete_stale_literal_secret(driver, ctx.slug, namespace_for_app(p.registered_app), p)
+    app_namespace = namespace_for_app(p.registered_app)
+    # A preview deployed before #1922 rendered into the app namespace, so
+    # its literal `[env]` Secret -- still holding its last plaintext values
+    # -- may sit there rather than in the preview's own namespace, and
+    # delete_namespace below never reaches it (#1923). Its workloads there
+    # carried the other environments' names, so they are those
+    # environments' objects now and are left alone.
+    _delete_stale_literal_secret(driver, ctx.slug, app_namespace, p)
     # delete_namespace cascades all the namespaced resources k8s knows
     # about (Deployments, Services, ConfigMaps, Secrets, PVCs, Ingresses).
     # Pass wait=True so we don't return until the namespace is actually
     # gone — operators see a clean teardown rather than a "torn-down"
-    # marker that lingers as a Terminating namespace.
-    driver.delete_namespace(ctx.slug, p.namespace, wait=True)
+    # marker that lingers as a Terminating namespace. The preview's own
+    # namespace holds its workloads since #1922; never the app namespace,
+    # which the app's other environments render into.
+    for namespace in dict.fromkeys([p.namespace, namespace_for_environment(p.app_environment)]):
+        if namespace and namespace != app_namespace:
+            driver.delete_namespace(ctx.slug, namespace, wait=True)
     return p.namespace
 
 

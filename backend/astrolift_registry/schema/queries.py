@@ -631,7 +631,7 @@ def _read_live_replicas(*, workload, environment_name: str | None) -> tuple[int,
     swallows so an unreachable cluster degrades to the manifest-side
     replica count, not a 500.
     """
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     env = _scaling_environment_for_workload(workload, environment_name)
@@ -640,7 +640,7 @@ def _read_live_replicas(*, workload, environment_name: str | None) -> tuple[int,
     cluster = env.tenant_cluster
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
-    namespace = namespace_for_app(workload.registered_app)
+    namespace = namespace_for_environment(env)
     get_status = getattr(driver, "get_workload_status", None)
     if not callable(get_status):
         raise RuntimeError("driver lacks get_workload_status")
@@ -1567,9 +1567,9 @@ class RegistryQuery:
             .first()
         )
         env_name = env.name if env else (environment_name or "preview")
-        from core.app_deploy import namespace_for_app
+        from core.app_deploy import namespace_for_app, namespace_for_environment
 
-        namespace = namespace_for_app(app)
+        namespace = namespace_for_environment(env) if env else namespace_for_app(app)
         image = image_tag or "preview"
 
         # Apps registered before the wizard's manifest step shipped, or
@@ -1721,9 +1721,9 @@ class RegistryQuery:
             .first()
         )
         env_name = env.name if env else (environment_name or "preview")
-        from core.app_deploy import namespace_for_app
+        from core.app_deploy import namespace_for_app, namespace_for_environment
 
-        namespace = namespace_for_app(app)
+        namespace = namespace_for_environment(env) if env else namespace_for_app(app)
         image = image_tag or "preview"
 
         prior = _previous_deployment_for(app=app, environment=env, current_image_tag=image)

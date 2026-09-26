@@ -36,7 +36,7 @@ from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
     from astrolift_clusters.models import TenantCluster
-    from astrolift_lifecycle.models import Deployment
+    from astrolift_lifecycle.models import AppEnvironment, Deployment
     from astrolift_registry.models import RegisteredApp
 
 log = logging.getLogger(__name__)
@@ -84,6 +84,69 @@ def namespace_for_app(app: RegisteredApp) -> str:
         organization_slug=str(app.organization.slug),
         app_slug=str(app.slug),
     )
+
+
+def namespace_for_environment(env: AppEnvironment) -> str:
+    """The namespace one environment renders into (#1922).
+
+    ``AppEnvironment.k8s_namespace`` when the environment has one of its
+    own: a preview, or one created on a cluster where another environment
+    of the app already rendered into the app namespace. Blank on every
+    environment that predates it, which keeps rendering into
+    ``namespace_for_app`` exactly as before. Every reader and writer of an
+    environment's objects resolves through here, so no path reads the app
+    namespace for an environment whose objects live in its own.
+    """
+    recorded = str(getattr(env, "k8s_namespace", "") or "").strip()
+    if recorded:
+        return recorded
+    return namespace_for_app(env.registered_app)
+
+
+def environment_hostname_inputs(env: AppEnvironment, inputs: Any) -> Any:
+    """``inputs`` (a ``HostnameInputs``) as ``env`` renders them (#1922).
+
+    Unchanged for an environment in the app namespace. The managed-subdomain
+    hostname carries no environment, so an environment with a namespace of
+    its own serving it too would put a second Ingress for the same host on
+    the same cluster, next to the one the app namespace already serves:
+    ingress-nginx's admission webhook rejects a host and path another Ingress
+    already defines, and an ALB splits the host between two load balancers
+    that external-dns then fights over. So a preview serves the hostname its
+    ``PreviewEnvironment`` row records (and the environment's URL names), and
+    any other environment in a namespace of its own serves
+    ``<label>-<environment>`` in its zone.
+    """
+    import dataclasses
+
+    if not str(getattr(env, "k8s_namespace", "") or "").strip():
+        return inputs
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    preview_host = (
+        PreviewEnvironment.all_objects.filter(app_environment=env)
+        .exclude(hostname="")
+        .order_by("-pk")
+        .values_list("hostname", flat=True)
+        .first()
+    )
+    if preview_host:
+        label, _, zone = preview_host.strip().lower().partition(".")
+        if label and zone:
+            return dataclasses.replace(inputs, base_zone=zone, subdomain_override=label)
+    return dataclasses.replace(
+        inputs,
+        subdomain_override=environment_hostname_label(inputs.subdomain_override or inputs.app_slug, env.name),
+    )
+
+
+def environment_hostname_label(label: str, environment_name: str) -> str:
+    """The managed-subdomain label of a non-preview environment that renders
+    into a namespace of its own (#1922): ``<label>-<environment>``, one DNS
+    label, so the zone's wildcard certificate still covers it."""
+    from _sdk.k8s_naming import dns_label
+
+    return dns_label(label, environment_name)
 
 
 def workload_identity_role_name(app: RegisteredApp) -> str:
@@ -358,7 +421,7 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     except ClusterManagementError as exc:
         raise AppDeployError(str(exc)) from exc
     ctx = _context_for_cluster(cluster)
-    namespace = namespace_for_app(deployment.registered_app)
+    namespace = namespace_for_environment(deployment.app_environment)
     return driver, ctx, namespace
 
 
@@ -778,8 +841,8 @@ def driver_for_target_cluster(
     bound source cluster.
 
     Reads the target ``TenantCluster`` row by id and builds the driver
-    + context against it. Namespace is still derived from the app — the
-    namespace name is cluster-agnostic.
+    + context against it. The namespace is the environment's, which is
+    cluster-agnostic, so the target gets the same one the source has.
     """
     from astrolift_clusters.models import TenantCluster
 
@@ -798,7 +861,7 @@ def driver_for_target_cluster(
     except ClusterManagementError as exc:
         raise AppDeployError(str(exc)) from exc
     ctx = _context_for_cluster(cluster)
-    namespace = namespace_for_app(deployment.registered_app)
+    namespace = namespace_for_environment(deployment.app_environment)
     return driver, ctx, namespace
 
 
@@ -1099,7 +1162,7 @@ def render_resources_for_deployment(
             f"app {app.slug!r} has no saved manifest — open the Manifest tab and paste astrolift.toml first",
         )
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
-    namespace = namespace_for_app(app)
+    namespace = namespace_for_environment(env)
 
     # envFrom: the app's literal [env] secrets + operator secret bundles +
     # the platform-synthesized managed-service bindings Secret
@@ -1429,15 +1492,18 @@ def _render_managed_subdomain_ingress(
 
     computed = compute_hostnames(
         manifest,
-        HostnameInputs(
-            app_slug=app.slug,
-            org_slug=org_slug,
-            base_zone=managed_domain.zone,
-            # ``setAppSubdomain`` writes this field and SyncAppDomainWorkflow
-            # re-applies from here (#143). Without the override the rendered
-            # host stayed ``<slug>.<zone>`` forever, so a rename only ever
-            # changed the URL the API reported -- never the live Ingress.
-            subdomain_override=app.subdomain or "",
+        environment_hostname_inputs(
+            deployment.app_environment,
+            HostnameInputs(
+                app_slug=app.slug,
+                org_slug=org_slug,
+                base_zone=managed_domain.zone,
+                # ``setAppSubdomain`` writes this field and SyncAppDomainWorkflow
+                # re-applies from here (#143). Without the override the rendered
+                # host stayed ``<slug>.<zone>`` forever, so a rename only ever
+                # changed the URL the API reported -- never the live Ingress.
+                subdomain_override=app.subdomain or "",
+            ),
         ),
     )
     log.info("render_managed_subdomain_ingress: computed hostnames=%s", [h.hostname for h in computed])
@@ -1626,7 +1692,10 @@ __all__ = [
     "driver_for_capability",
     "driver_for_deployment",
     "driver_for_target_cluster",
+    "environment_hostname_inputs",
+    "environment_hostname_label",
     "namespace_for_app",
+    "namespace_for_environment",
     "workload_identity_role_name",
     "render_resources_for_deployment",
     "shared_ingress_annotations",

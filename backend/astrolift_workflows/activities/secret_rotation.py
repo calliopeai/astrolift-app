@@ -84,6 +84,19 @@ def _list_targets_sync(secret_bundle_id: int) -> list[dict[str, Any]]:
     return out
 
 
+def _target_namespace(target: dict[str, Any], app) -> str:
+    """The namespace the target environment's bundle Secret lives in: its
+    own when it has one (#1922), else the app namespace. Targets listed
+    before #1922 carry the same ``app_environment_id``."""
+    from astrolift_lifecycle.models import AppEnvironment
+    from core.app_deploy import namespace_for_app, namespace_for_environment
+
+    env = AppEnvironment.all_objects.filter(pk=target.get("app_environment_id")).first()
+    if env is None:
+        return namespace_for_app(app)
+    return namespace_for_environment(env)
+
+
 @activity.defn(name="astrolift.secret_rotation.list_targets")
 async def list_active_secret_bundle_targets(
     secret_bundle_id: int,
@@ -177,7 +190,6 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     from core.app_deploy import (
         AppDeployError,
         driver_for_capability,
-        namespace_for_app,
     )
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
@@ -187,7 +199,7 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     app = RegisteredApp.all_objects.select_related("organization").get(
         pk=target["registered_app_id"],
     )
-    namespace = namespace_for_app(app)
+    namespace = _target_namespace(target, app)
     cluster_driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
     secrets_backend = driver_for_capability(cluster, "secrets")
@@ -262,14 +274,13 @@ def _bounce_workloads_sync(target: dict[str, Any]) -> int:
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_registry.models import RegisteredApp
-    from core.app_deploy import namespace_for_app
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     cluster = TenantCluster.all_objects.get(pk=target["tenant_cluster_id"])
     app = RegisteredApp.all_objects.select_related("organization").get(
         pk=target["registered_app_id"],
     )
-    namespace = namespace_for_app(app)
+    namespace = _target_namespace(target, app)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
 
@@ -367,14 +378,13 @@ def _delete_from_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_registry.models import RegisteredApp
-    from core.app_deploy import namespace_for_app
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     cluster = TenantCluster.all_objects.get(pk=target["tenant_cluster_id"])
     app = RegisteredApp.all_objects.select_related("organization").get(
         pk=target["registered_app_id"],
     )
-    namespace = namespace_for_app(app)
+    namespace = _target_namespace(target, app)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
     stub = {

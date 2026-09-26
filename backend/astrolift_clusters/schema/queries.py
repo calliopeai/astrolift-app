@@ -90,9 +90,10 @@ def _tenant_view_of_shared(info: Info, cluster) -> bool:
 
 
 def _org_app_namespaces(cluster, organization_id) -> list[str]:
-    """Namespaces of ``organization_id``'s apps bound to ``cluster``."""
+    """Namespaces of ``organization_id``'s app environments bound to
+    ``cluster``: the app namespace, or an environment's own (#1922)."""
     from astrolift_lifecycle.models.app_environment import AppEnvironment
-    from core.cluster_observability import namespace_for_app
+    from core.cluster_observability import namespace_for_environment
 
     envs = (
         AppEnvironment.objects.filter(
@@ -101,9 +102,14 @@ def _org_app_namespaces(cluster, organization_id) -> list[str]:
             registered_app__organization_id=organization_id,
         )
         .select_related("registered_app__organization")
-        .only("registered_app__slug", "registered_app__k8s_namespace", "registered_app__organization__slug")
+        .only(
+            "k8s_namespace",
+            "registered_app__slug",
+            "registered_app__k8s_namespace",
+            "registered_app__organization__slug",
+        )
     )
-    return sorted({namespace_for_app(env.registered_app) for env in envs})
+    return sorted({namespace_for_environment(env) for env in envs})
 
 
 def _primary_app_namespace(cluster) -> str:
@@ -116,7 +122,7 @@ def _primary_app_namespace(cluster) -> str:
     namespace. Mirrors the namespace collection
     ``astroliftClusterWorkloadHealth`` already does."""
     from astrolift_lifecycle.models.app_environment import AppEnvironment
-    from core.cluster_observability import namespace_for_app
+    from core.cluster_observability import namespace_for_environment
 
     envs = (
         AppEnvironment.objects.filter(
@@ -125,12 +131,13 @@ def _primary_app_namespace(cluster) -> str:
         )
         .select_related("registered_app__organization")
         .only(
+            "k8s_namespace",
             "registered_app__slug",
             "registered_app__k8s_namespace",
             "registered_app__organization__slug",
         )
     )
-    namespaces = sorted({namespace_for_app(ae.registered_app) for ae in envs})
+    namespaces = sorted({namespace_for_environment(ae) for ae in envs})
     return namespaces[0] if namespaces else "astrolift-system"
 
 
@@ -1334,7 +1341,7 @@ class ClustersQuery:
         # this cluster so the workload-health table includes app workloads, not
         # just the astrolift-system namespace.
         from astrolift_lifecycle.models.app_environment import AppEnvironment
-        from core.cluster_observability import namespace_for_app
+        from core.cluster_observability import namespace_for_environment
 
         app_envs = (
             AppEnvironment.objects.filter(
@@ -1343,12 +1350,13 @@ class ClustersQuery:
             )
             .select_related("registered_app__organization")
             .only(
+                "k8s_namespace",
                 "registered_app__slug",
                 "registered_app__k8s_namespace",
                 "registered_app__organization__slug",
             )
         )
-        app_namespaces = list({namespace_for_app(ae.registered_app) for ae in app_envs})
+        app_namespaces = list({namespace_for_environment(ae) for ae in app_envs})
         if _tenant_view_of_shared(info, cluster):
             # Only this org's own namespaces on a shared cluster, never the
             # platform's or another org's; and never "all namespaces" (the

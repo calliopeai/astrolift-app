@@ -194,6 +194,7 @@ class ExportMutations:
         from core.cluster_observability import (
             ClusterObservabilityError,
             namespace_for_app,
+            namespace_for_environment,
         )
 
         fmt = (input.format or "").strip().lower()
@@ -258,6 +259,7 @@ class ExportMutations:
         # contract). An unknown env name fails loudly so a typo
         # doesn't silently land logs from the wrong cluster.
         cluster = None
+        namespace = namespace_for_app(app)
         if input.environment_name:
             env = (
                 AppEnvironment.objects.select_related("tenant_cluster")
@@ -275,6 +277,8 @@ class ExportMutations:
                     field="environmentName",
                 )
             cluster = env.tenant_cluster
+            # The pinned environment's own namespace when it has one (#1922).
+            namespace = namespace_for_environment(env)
         if cluster is None:
             cluster = app.default_tenant_cluster
         if cluster is None or not getattr(cluster, "is_active", True):
@@ -282,8 +286,6 @@ class ExportMutations:
                 ErrorCode.PRECONDITION.value,
                 f"app {app.slug!r} has no active cluster wired",
             )
-
-        namespace = namespace_for_app(app)
 
         max_lines = max(
             1,

@@ -204,7 +204,9 @@ def placed(org, app, env, cluster, settings, monkeypatch):
         return identity if capability == "identity" else _SecretsBackend()
 
     monkeypatch.setattr("core.app_deploy.driver_for_capability", _capability)
-    return SimpleNamespace(app=app, env=env, deployment=deployment, source=source, driver=driver, identity=identity)
+    return SimpleNamespace(
+        app=app, env=env, deployment=deployment, source=source, driver=driver, identity=identity
+    )
 
 
 def _capture(placed) -> dict:
@@ -259,7 +261,9 @@ def test_an_existing_environment_renders_byte_for_byte_as_before(placed):
 
     # Structural half, so a digest failure says what moved.
     namespaces = {
-        r["metadata"]["namespace"] for r in [*doc["render"], *doc["render_manifests"]] if "namespace" in r["metadata"]
+        r["metadata"]["namespace"]
+        for r in [*doc["render"], *doc["render_manifests"]]
+        if "namespace" in r["metadata"]
     }
     assert namespaces == {"acme-test-hello-app"}
     assert sorted((r["kind"], r["metadata"]["name"]) for r in doc["render"]) == [

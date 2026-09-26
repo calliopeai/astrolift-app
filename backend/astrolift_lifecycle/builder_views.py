@@ -864,12 +864,17 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     )
 
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.namespaces import namespace_for_new_environment
 
     AppEnvironment.objects.create(
         registered_app=app,
         name=environment_name,
         tenant_cluster=cluster,
         managed_domain=managed_domain,
+        # A brand-new app's only environment, so the app namespace; asked
+        # anyway so every creation path places its environment the same way
+        # (#1922).
+        k8s_namespace=namespace_for_new_environment(app, name=environment_name, cluster=cluster),
     )
 
     # Hostname ledger (#2012) -- same call site the #1930 label check

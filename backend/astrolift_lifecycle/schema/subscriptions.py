@@ -201,6 +201,7 @@ class LifecycleSubscription:
         from astrolift_registry.models import RegisteredApp
         from core.cluster_observability import (
             namespace_for_app,
+            namespace_for_environment,
             stream_app_logs_multi,
         )
         from core.permissions import (
@@ -244,6 +245,7 @@ class LifecycleSubscription:
             if app is None:
                 return None
             cluster = None
+            namespace = namespace_for_app(app)
             if environment_name:
                 env = (
                     AppEnvironment.objects.select_related("tenant_cluster")
@@ -256,11 +258,13 @@ class LifecycleSubscription:
                 )
                 if env and env.tenant_cluster_id:
                     cluster = env.tenant_cluster
+                    # The named environment's own namespace when it has
+                    # one (#1922).
+                    namespace = namespace_for_environment(env)
             if cluster is None:
                 cluster = app.default_tenant_cluster
             if cluster is None or not getattr(cluster, "is_active", True):
                 return None
-            namespace = namespace_for_app(app)
             return app, cluster, namespace
 
         resolved = await sync_to_async(_resolve)()

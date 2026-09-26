@@ -286,7 +286,7 @@ def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> 
         storage_consumer_key,
     )
     from astrolift_services.models import ManagedServiceAttachment, ManagedServiceVolumeBinding
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     bindings = list(
@@ -315,13 +315,13 @@ def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> 
     namespaces: set[str] = set()
     for attachment in attachments:
         if attachment.app_environment_id:
-            namespaces.add(namespace_for_app(attachment.app_environment.registered_app))
+            namespaces.add(namespace_for_environment(attachment.app_environment))
         elif attachment.agent_environment_spec_id:
             from astrolift_workflows.activities.agent_stage import _agent_namespace
 
             namespaces.add(_agent_namespace(attachment.agent_environment_spec.organization.slug))
     if not svc.project_id and svc.app_environment_id:
-        namespaces.add(namespace_for_app(svc.registered_app))
+        namespaces.add(namespace_for_environment(svc.app_environment))
     if not namespaces:
         return True, "no materialized dynamic claims found"
 
@@ -1213,7 +1213,7 @@ def _bounce_dependent_workloads_sync(
 
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_services.models import ManagedService
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     if not rebound_binding_ids:
@@ -1245,7 +1245,7 @@ def _bounce_dependent_workloads_sync(
         .order_by("pk")
     )
     for env in environments:
-        namespace = namespace_for_app(env.registered_app)
+        namespace = namespace_for_environment(env)
         driver = _driver_for_cluster(env.tenant_cluster)
         cluster_slug = _context_for_cluster(env.tenant_cluster).slug
         patch_workload = getattr(driver, "patch_workload", None)

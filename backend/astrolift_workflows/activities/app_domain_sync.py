@@ -35,19 +35,25 @@ _HANDSHAKE_TIMEOUT_SECONDS = 5.0
 _VERIFY_POLL_SECONDS = 5.0
 
 
-def _hostnames_for(app: Any, manifest: Any, *, zone: str, subdomain: str) -> list[str]:
+def _hostnames_for(app: Any, manifest: Any, *, zone: str, subdomain: str, env: Any) -> list[str]:
+    """The hostnames ``env`` serves under ``subdomain``, the way the
+    renderer computes them for that environment (#1922)."""
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+    from core.app_deploy import environment_hostname_inputs
 
     org_slug = app.organization.slug if app.organization_id else "none"
     return [
         wh.hostname
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(
-                app_slug=app.slug,
-                org_slug=org_slug,
-                base_zone=zone,
-                subdomain_override=subdomain,
+            environment_hostname_inputs(
+                env,
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=org_slug,
+                    base_zone=zone,
+                    subdomain_override=subdomain,
+                ),
             ),
         )
     ]
@@ -114,10 +120,10 @@ def _plan_app_domain_sync_sync(
                 "zone": managed_domain.zone,
                 "zone_id": str(dns_config.get("zone_id", "")),
                 "old_hostnames": _hostnames_for(
-                    app, manifest, zone=managed_domain.zone, subdomain=old_subdomain
+                    app, manifest, zone=managed_domain.zone, subdomain=old_subdomain, env=env
                 ),
                 "new_hostnames": _hostnames_for(
-                    app, manifest, zone=managed_domain.zone, subdomain=new_subdomain
+                    app, manifest, zone=managed_domain.zone, subdomain=new_subdomain, env=env
                 ),
                 "wildcard_sans": [f"*.{managed_domain.zone}"] if has_wildcard else [],
             }

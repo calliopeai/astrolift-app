@@ -79,6 +79,7 @@ from core.cluster_observability import (
     ClusterObservabilityError,
     list_app_pods,
     namespace_for_app,
+    namespace_for_environment,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, check_platform_operator, require_permission
@@ -152,7 +153,8 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
 
     Extracted from ``astrolift_app_pods`` (#429) so the workload-
     detail breakdown resolver shares the exact same resolution rules
-    (env-named cluster preferred → default cluster, ``namespace_for_app``).
+    (env-named cluster and namespace preferred → default cluster and
+    ``namespace_for_app``).
     Returns an empty list on any kind of cluster-side failure so the
     UI stays renderable.
 
@@ -170,6 +172,7 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
         return []
 
     cluster = None
+    namespace = namespace_for_app(app)
     if environment_name:
         env = (
             AppEnvironment.objects.select_related("tenant_cluster")
@@ -181,12 +184,14 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
             .first()
         )
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+        if cluster is not None:
+            # The environment's own namespace when it has one (#1922).
+            namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
     if cluster is None or not getattr(cluster, "is_active", True):
         return []
 
-    namespace = namespace_for_app(app)
     try:
         return list(
             list_app_pods(
@@ -276,6 +281,7 @@ def _recent_pod_warnings_for_app(
         return {}
 
     cluster = None
+    namespace = namespace_for_app(app)
     if environment_name:
         env = (
             AppEnvironment.objects.select_related("tenant_cluster")
@@ -287,12 +293,13 @@ def _recent_pod_warnings_for_app(
             .first()
         )
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+        if cluster is not None:
+            namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
     if cluster is None or not getattr(cluster, "is_active", True):
         return {}
 
-    namespace = namespace_for_app(app)
     from core.cluster_observability import (
         ClusterObservabilityError,
         list_app_pod_warning_events,
@@ -1922,7 +1929,6 @@ class LifecycleQuery:
         )
         from astrolift_registry.models import Workload
         from astrolift_services.models import AppSecretBundleRef, ManagedService
-        from core.app_deploy import namespace_for_app
 
         # Org-scope the lookup to the caller's tenant — slugs are unique only
         # within an org, so an unscoped fetch would leak a sibling org's
@@ -1965,7 +1971,6 @@ class LifecycleQuery:
             names.append(app.slug)
             seen.add(app.slug)
 
-        namespace = namespace_for_app(app)
         # apiVersion / kind pairs the renderer emits for a typical app.
         # Same list the force-redeploy delete path targets so the preview
         # honestly reflects what gets deleted; the namespace cascade
@@ -1983,6 +1988,9 @@ class LifecycleQuery:
             cluster = env.tenant_cluster
             if cluster is None:
                 continue
+            # Each environment's own namespace when it has one (#1922),
+            # which is what teardown deletes.
+            namespace = namespace_for_environment(env)
             for api_version, kind in _RENDER_KINDS:
                 if kind == "Namespace":
                     k8s_objects.append(

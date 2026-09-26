@@ -387,14 +387,18 @@ def _ensure_static_site_services_sync(deployment_id: int) -> dict[str, Any]:
     aliases_by_workload: dict[str, list[str]] = {}
     if managed_domain is not None:
         from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+        from core.app_deploy import environment_hostname_inputs
 
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(
-                app_slug=app.slug,
-                org_slug=org_slug,
-                base_zone=managed_domain.zone,
-                subdomain_override=app.subdomain or "",
+            environment_hostname_inputs(
+                env,
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=org_slug,
+                    base_zone=managed_domain.zone,
+                    subdomain_override=app.subdomain or "",
+                ),
             ),
         ):
             aliases_by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
@@ -735,21 +739,25 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
 
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
     from astrolift_services.models import ManagedService
-    from core.app_deploy import driver_for_capability
+    from core.app_deploy import driver_for_capability, environment_hostname_inputs
 
     org_slug = app.organization.slug if app.organization_id else "none"
     host_by_workload: dict[str, str] = {
         wh.workload_slug: wh.hostname
         for wh in compute_hostnames(
             manifest,
-            # Same override the Ingress render uses (#143). A cdn-backed
-            # workload has no Ingress, so this CNAME is the only thing that
-            # can follow an operator's ``setAppSubdomain``.
-            HostnameInputs(
-                app_slug=app.slug,
-                org_slug=org_slug,
-                base_zone=managed_domain.zone,
-                subdomain_override=app.subdomain or "",
+            # Same override the Ingress render uses (#143), and the same
+            # per-environment hostname (#1922). A cdn-backed workload has no
+            # Ingress, so this CNAME is the only thing that can follow an
+            # operator's ``setAppSubdomain``.
+            environment_hostname_inputs(
+                env,
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=org_slug,
+                    base_zone=managed_domain.zone,
+                    subdomain_override=app.subdomain or "",
+                ),
             ),
         )
     }
@@ -808,7 +816,7 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
 
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
-    from core.app_deploy import AppDeployError, driver_for_capability
+    from core.app_deploy import AppDeployError, driver_for_capability, environment_hostname_inputs
 
     org_slug = app.organization.slug if app.organization_id else "none"
     deleted: list[str] = []
@@ -828,11 +836,14 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
             wh.workload_slug: wh.hostname
             for wh in compute_hostnames(
                 manifest,
-                HostnameInputs(
-                    app_slug=app.slug,
-                    org_slug=org_slug,
-                    base_zone=managed_domain.zone,
-                    subdomain_override=app.subdomain or "",
+                environment_hostname_inputs(
+                    env,
+                    HostnameInputs(
+                        app_slug=app.slug,
+                        org_slug=org_slug,
+                        base_zone=managed_domain.zone,
+                        subdomain_override=app.subdomain or "",
+                    ),
                 ),
             )
         }
