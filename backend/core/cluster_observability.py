@@ -455,6 +455,9 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("api_gateway_operation_poll_interval_seconds", 5),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("api_gateway_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("event_stream", "managed_kafka") or (kind == "event_stream" and not variant):
@@ -503,6 +506,9 @@ def _gcp_managed_config_for(
             ),
             poll_interval_seconds=float(
                 pc.get("eventarc_operation_poll_interval_seconds", 5),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("eventarc_allowed_service_accounts") or []
             ),
         )
 
@@ -571,6 +577,9 @@ def _gcp_managed_config_for(
         return PubSubTopicConfig(
             project_id=project_id,
             topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("pubsub_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("warehouse", "bigquery") or (kind == "warehouse" and not variant):
@@ -592,6 +601,7 @@ def _gcp_managed_config_for(
                     "https://bigqueryreservation.googleapis.com/v1",
                 ),
             ),
+            allowed_connections=tuple(str(value) for value in pc.get("bigquery_allowed_connections") or []),
         )
 
     if pair == ("document_db", "firestore_native") or (kind == "document_db" and not variant):
@@ -679,6 +689,9 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("workflows_operation_poll_interval_seconds", 2),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("workflows_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("observability", "cloud_operations") or (kind == "observability" and not variant):
@@ -717,6 +730,9 @@ def _gcp_managed_config_for(
             ),
             operation_poll_interval_seconds=float(
                 pc.get("cloud_operations_operation_poll_interval_seconds", 2),
+            ),
+            allowed_writer_identities=tuple(
+                str(value) for value in pc.get("cloud_operations_allowed_writer_identities") or []
             ),
         )
 

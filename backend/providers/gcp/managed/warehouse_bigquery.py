@@ -119,6 +119,11 @@ class BigQueryWarehouseConfig:
     deletion_protection_default: bool = True
     dataset_api_endpoint: str = _BQ_API_ROOT
     reservation_api_endpoint: str = _RESERVATION_API_ROOT
+    # Connections an external dataset may federate through. A connection holds
+    # the credentials or service identity that reads the external source, so a
+    # dataset over another tenant's connection reads what that tenant can.
+    # Empty refuses every one (#2087).
+    allowed_connections: tuple[str, ...] = ()
 
 
 class BigQueryRestClient:
@@ -949,6 +954,14 @@ class BigQueryWarehouseDriver(ManagedServiceDriver):
             delete(name)
 
     def _validate_config(self, cfg: dict[str, Any]) -> str | None:
+        external = cfg.get("external_dataset_reference")
+        if external is not None:
+            connection = str(external.get("connection") or "").strip() if isinstance(external, dict) else ""
+            if connection not in {str(item).strip() for item in self._config.allowed_connections}:
+                return (
+                    f"external_dataset_reference.connection {connection!r} is not allowed by the cluster "
+                    "install policy bigquery_allowed_connections"
+                )
         access_mode = str(cfg.get("access_mode") or "write")
         if access_mode not in {"read", "write", "admin"}:
             return f"access_mode {access_mode!r} is invalid"

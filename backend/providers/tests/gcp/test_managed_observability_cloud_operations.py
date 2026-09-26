@@ -106,11 +106,15 @@ class FakeCloudOperationsClient:
         self.resources.setdefault(key, {})[str(item["name"])] = dict(item)
 
 
+_LISTED_WRITER = "logging@example.iam.gserviceaccount.com"
+
+
 def _driver(
     *,
     logging: FakeCloudOperationsClient | None = None,
     monitoring: FakeCloudOperationsClient | None = None,
     secret_reader: Any | None = None,
+    allowed_writer_identities: tuple[str, ...] = (_LISTED_WRITER,),
 ) -> tuple[CloudOperationsDriver, FakeCloudOperationsClient, FakeCloudOperationsClient]:
     logging = logging or FakeCloudOperationsClient()
     monitoring = monitoring or FakeCloudOperationsClient()
@@ -120,6 +124,7 @@ def _driver(
                 project_id="acme-prod",
                 location="global",
                 request_timeout_seconds=1,
+                allowed_writer_identities=allowed_writer_identities,
             ),
             logging_client=logging,
             monitoring_client=monitoring,
@@ -388,6 +393,62 @@ def test_log_sink_writer_identity_options_reconcile_through_api_query_params() -
     }
     sink = next(iter(logging.resources["log_sinks"].values()))
     assert sink["writerIdentity"] == "serviceAccount:logging@example.iam.gserviceaccount.com"
+
+
+@pytest.mark.parametrize(
+    ("writer", "allowed"),
+    [
+        ("serviceAccount:platform-admin@example.iam.gserviceaccount.com", (_LISTED_WRITER,)),
+        ("platform-admin@example.iam.gserviceaccount.com", (_LISTED_WRITER,)),
+        (f"serviceAccount:{_LISTED_WRITER}", ()),
+    ],
+)
+def test_a_sink_cannot_write_as_an_unlisted_identity(writer: str, allowed: tuple[str, ...]) -> None:
+    driver, logging, _ = _driver(allowed_writer_identities=allowed)
+    config = {
+        "log_sinks": [
+            {
+                "id": "audit",
+                "body": {"destination": "storage.googleapis.com/audit-logs"},
+                "unique_writer_identity": False,
+                "custom_writer_identity": writer,
+            },
+        ],
+    }
+
+    result = driver.provision(_spec(config))
+
+    assert result.ok is False
+    assert "cloud_operations_allowed_writer_identities" in result.message
+    assert not [call for call in logging.calls if call[0] in {"create", "update"}]
+
+
+def test_update_cannot_move_a_sink_to_an_unlisted_writer() -> None:
+    driver, logging, _ = _driver()
+    sink = {
+        "id": "audit",
+        "body": {"destination": "storage.googleapis.com/audit-logs"},
+        "unique_writer_identity": False,
+        "custom_writer_identity": f"serviceAccount:{_LISTED_WRITER}",
+    }
+    created = driver.provision(_spec({"log_sinks": [sink]}))
+    assert created.ok, created.message
+    writes = [call for call in logging.calls if call[0] in {"create", "update"}]
+
+    denied = driver.update(
+        UpdateSpec(
+            created.handle,
+            config={
+                "log_sinks": [
+                    {**sink, "custom_writer_identity": "serviceAccount:platform-admin@example.iam.gserviceaccount.com"},
+                ],
+            },
+        ),
+    )
+
+    assert denied.ok is False
+    assert "cloud_operations_allowed_writer_identities" in denied.message
+    assert [call for call in logging.calls if call[0] in {"create", "update"}] == writes
 
 
 def test_nested_monitoring_groups_bind_uptime_checks_by_bundle_id() -> None:
@@ -1139,6 +1200,7 @@ def test_runtime_config_reads_operator_controls() -> None:
             "cloud_operations_request_timeout_seconds": 12,
             "cloud_operations_operation_timeout_seconds": 600,
             "cloud_operations_operation_poll_interval_seconds": 0.25,
+            "cloud_operations_allowed_writer_identities": [_LISTED_WRITER],
             "secret_id_prefix": "platform",
         },
         auth_config={},
@@ -1163,6 +1225,7 @@ def test_runtime_config_reads_operator_controls() -> None:
         request_timeout_seconds=12,
         operation_timeout_seconds=600,
         operation_poll_interval_seconds=0.25,
+        allowed_writer_identities=(_LISTED_WRITER,),
     )
 
 

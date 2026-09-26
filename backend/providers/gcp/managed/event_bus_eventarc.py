@@ -33,6 +33,7 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp._service_accounts import unlisted_service_account
 
 KIND = "event_bus"
 _API_ROOT = "https://eventarc.googleapis.com/v1"
@@ -99,6 +100,10 @@ _OUTPUT_ONLY_FIELDS = {
     "updateTime",
 }
 _PROTECTED_PROVIDER_FIELDS = _OUTPUT_ONLY_FIELDS | {"labels"}
+# Fields that carry the service account Eventarc acts as. Only typed config
+# may set them, where the account is checked against the install policy; a
+# raw or cleared field would replace the checked value (#2087).
+_IDENTITY_FIELDS = {"pipelines": {"destinations"}, "triggers": {"serviceAccount"}}
 
 
 class EventarcError(RuntimeError):
@@ -123,6 +128,9 @@ class EventarcConfig:
     deletion_protection_default: bool = True
     operation_timeout_seconds: float = 900
     poll_interval_seconds: float = 5
+    # Service accounts a pipeline may mint destination tokens for, or a trigger
+    # may invoke its destination as. Empty refuses every one (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class EventarcRestClient:
@@ -934,6 +942,17 @@ class EventarcDriver(ManagedServiceDriver):
                     )
                 if forbidden_clear:
                     return f"Eventarc clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
+                identity_fields = _IDENTITY_FIELDS.get(collection, set())
+                _, raw_identity = raw_field_conflicts(declaration.get("raw_fields") or {}, identity_fields)
+                _, cleared_identity = raw_field_conflicts(declaration.get("clear_fields") or [], identity_fields)
+                if raw_identity or cleared_identity:
+                    return (
+                        f"Eventarc {collection} raw_fields and clear_fields cannot set "
+                        f"{', '.join(raw_identity or cleared_identity)}; declare it in typed config"
+                    )
+        identity_error = self._identity_error(cfg)
+        if identity_error:
+            return identity_error
         for pipeline in cfg.get("pipelines") or []:
             destinations = list(pipeline.get("destinations") or [])
             if len(destinations) != 1:
@@ -1043,6 +1062,32 @@ class EventarcDriver(ManagedServiceDriver):
             )
         if forbidden_clear:
             return f"Eventarc clear_fields cannot clear protected fields: {', '.join(forbidden_clear)}"
+        return ""
+
+    def _identity_error(self, cfg: dict[str, Any]) -> str:
+        """Refuse a service account the install policy does not list.
+
+        Judged in the spelling Google receives: a declaration is camelized the
+        way ``_child_body`` sends it, so a field spelled in proto or JSON form,
+        or both, is read as the value that reaches the API.
+        """
+        accounts: list[tuple[str, Any]] = []
+        for pipeline in cfg.get("pipelines") or []:
+            for destination in _camelize(list(pipeline.get("destinations") or [])):
+                authentication = destination.get("authenticationConfig") if isinstance(destination, dict) else None
+                for kind in ("googleOidc", "oauthToken"):
+                    token = authentication.get(kind) if isinstance(authentication, dict) else None
+                    if isinstance(token, dict):
+                        accounts.append((f"pipeline {pipeline.get('id')} {kind}", token.get("serviceAccount")))
+        for trigger in cfg.get("triggers") or []:
+            accounts.append((f"trigger {trigger.get('id')}", _camelize(dict(trigger)).get("serviceAccount")))
+        for where, value in accounts:
+            account = unlisted_service_account(value, self._config.allowed_service_accounts)
+            if account:
+                return (
+                    f"Eventarc {where} service account {account!r} is not allowed by the cluster install "
+                    "policy eventarc_allowed_service_accounts"
+                )
         return ""
 
     def _reconcile_children(

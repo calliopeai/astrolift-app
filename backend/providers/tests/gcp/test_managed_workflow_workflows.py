@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.workflow_workflows import (
@@ -109,6 +110,12 @@ def fake() -> FakeWorkflows:
     return FakeWorkflows()
 
 
+_ALLOWED_ACCOUNTS = (
+    "workflow@acme-prod.iam.gserviceaccount.com",
+    "target@acme-prod.iam.gserviceaccount.com",
+)
+
+
 @pytest.fixture
 def driver(fake: FakeWorkflows) -> WorkflowsDriver:
     return WorkflowsDriver(
@@ -116,6 +123,7 @@ def driver(fake: FakeWorkflows) -> WorkflowsDriver:
             project_id="acme-prod",
             region="us-central1",
             poll_interval_seconds=0,
+            allowed_service_accounts=_ALLOWED_ACCOUNTS,
         ),
         client=fake,
     )
@@ -535,7 +543,19 @@ def test_restore_reads_exact_revision_and_allows_target_security_overrides(
     assert body["userEnvVars"] == {"SOURCE": "true"}
 
 
-def test_restore_requires_opt_in_for_cross_project_revision(
+def _snapshot(snapshot_id: str) -> Any:
+    return type(
+        "Snapshot",
+        (),
+        {
+            "snapshot_id": snapshot_id,
+            "handle": f"workflow_engine/{snapshot_id.rpartition('@')[0]}",
+            "created_at": "2026-08-14T12:00:00Z",
+        },
+    )()
+
+
+def test_restore_refuses_a_revision_in_another_project(
     driver: WorkflowsDriver,
     fake: FakeWorkflows,
 ) -> None:
@@ -548,27 +568,21 @@ def test_restore_requires_opt_in_for_cross_project_revision(
             "labels": {"astrolift_io_managed_by": "platform"},
         },
     ]
-    snapshot = type(
-        "Snapshot",
-        (),
-        {
-            "snapshot_id": f"{source_name}@000007-abc",
-            "handle": f"workflow_engine/{source_name}",
-            "created_at": "2026-08-14T12:00:00Z",
-        },
-    )()
 
-    denied = driver.restore(snapshot, spec(workflow_id="restored"))
-    accepted = driver.restore(
-        snapshot,
+    denied = driver.restore(_snapshot(f"{source_name}@000007-abc"), spec(workflow_id="restored"))
+
+    assert not denied.ok and denied.errors == ["cross_project_snapshot_refused"]
+    assert fake.created == []
+    # The tenant opt-in is gone, not just ignored (#2087).
+    widened = driver.restore(
+        _snapshot(f"{source_name}@000007-abc"),
         spec(workflow_id="restored", allow_cross_project_snapshot=True),
     )
+    assert not widened.ok
+    assert fake.created == []
 
-    assert not denied.ok and denied.errors == ["cross_project_snapshot_requires_opt_in"]
-    assert accepted.ok
 
-
-def test_restore_requires_opt_in_for_unowned_revision(
+def test_restore_refuses_a_revision_astrolift_did_not_create(
     driver: WorkflowsDriver,
     fake: FakeWorkflows,
 ) -> None:
@@ -580,24 +594,133 @@ def test_restore_requires_opt_in_for_unowned_revision(
             "labels": {"team": "legacy"},
         },
     ]
-    snapshot = type(
-        "Snapshot",
-        (),
-        {
-            "snapshot_id": f"{_name()}@000008-def",
-            "handle": f"workflow_engine/{_name()}",
-            "created_at": "2026-08-14T12:00:00Z",
-        },
-    )()
 
-    denied = driver.restore(snapshot, spec(workflow_id="imported"))
-    accepted = driver.restore(
-        snapshot,
+    denied = driver.restore(_snapshot(f"{_name()}@000008-def"), spec(workflow_id="imported"))
+
+    assert not denied.ok and denied.errors == ["unowned_snapshot_refused"]
+    assert fake.created == []
+    widened = driver.restore(
+        _snapshot(f"{_name()}@000008-def"),
         spec(workflow_id="imported", allow_unowned_snapshot=True),
     )
+    assert not widened.ok and widened.errors == ["unowned_snapshot_refused"]
+    assert fake.created == []
 
-    assert not denied.ok and denied.errors == ["unowned_snapshot_requires_opt_in"]
-    assert accepted.ok
+
+@pytest.mark.parametrize("flag", ["allow_cross_project_snapshot", "allow_unowned_snapshot"])
+def test_removed_restore_opt_ins_fail_the_config_schema(driver: WorkflowsDriver, flag: str) -> None:
+    validator = Draft202012Validator(driver.config_schema())
+    base = {"definition": {"main": {"return": "ok"}}}
+
+    assert validator.is_valid(base)
+    assert not validator.is_valid({**base, flag: True})
+
+
+def test_restore_runs_as_the_targets_account_not_the_revisions(
+    driver: WorkflowsDriver,
+    fake: FakeWorkflows,
+) -> None:
+    fake.revisions[_name()] = [
+        _owned_workflow(
+            serviceAccount="projects/acme-prod/serviceAccounts/source-only@acme-prod.iam.gserviceaccount.com",
+            revisionId="000007-abc",
+        ),
+    ]
+
+    result = driver.restore(_snapshot(f"{_name()}@000007-abc"), spec(workflow_id="workflow-restored"))
+
+    assert result.ok
+    assert fake.created[-1][2]["serviceAccount"] == ""
+
+
+@pytest.mark.parametrize(
+    "account",
+    [
+        "workflow@acme-prod.iam.gserviceaccount.com",
+        "Workflow@ACME-prod.iam.gserviceaccount.com",
+        "projects/-/serviceAccounts/workflow@acme-prod.iam.gserviceaccount.com",
+        "projects/acme-prod/serviceAccounts/target@acme-prod.iam.gserviceaccount.com",
+    ],
+)
+def test_a_listed_service_account_is_accepted(driver: WorkflowsDriver, fake: FakeWorkflows, account: str) -> None:
+    result = driver.provision(spec(workflow_id="workflow-one", service_account=account))
+
+    assert result.ok
+    assert fake.created[-1][2]["serviceAccount"] == account
+
+
+@pytest.mark.parametrize(
+    "account",
+    [
+        "platform-admin@acme-prod.iam.gserviceaccount.com",
+        "projects/-/serviceAccounts/other-tenant@acme-prod.iam.gserviceaccount.com",
+        "109876543210987654321",
+    ],
+)
+def test_a_service_account_the_operator_did_not_list_is_refused(
+    driver: WorkflowsDriver,
+    fake: FakeWorkflows,
+    account: str,
+) -> None:
+    denied = driver.provision(spec(workflow_id="workflow-one", service_account=account))
+
+    assert not denied.ok
+    assert "workflows_allowed_service_accounts" in denied.message
+    assert fake.created == []
+
+
+def test_update_cannot_move_a_workflow_to_an_unlisted_account(driver: WorkflowsDriver, fake: FakeWorkflows) -> None:
+    fake.workflows[_name()] = _owned_workflow()
+
+    denied = driver.update(
+        UpdateSpec(
+            handle=f"workflow_engine/{_name()}",
+            config={
+                "definition": {"main": {"return": "ok"}},
+                "service_account": "platform-admin@acme-prod.iam.gserviceaccount.com",
+            },
+        ),
+    )
+
+    assert not denied.ok and "workflows_allowed_service_accounts" in denied.message
+    assert fake.patched == []
+    assert fake.workflows[_name()]["serviceAccount"] == ""
+
+
+def test_no_allowlist_refuses_every_config_supplied_account(fake: FakeWorkflows) -> None:
+    driver = WorkflowsDriver(
+        config=WorkflowsConfig(project_id="acme-prod", region="us-central1", poll_interval_seconds=0),
+        client=fake,
+    )
+
+    denied = driver.provision(
+        spec(workflow_id="workflow-one", service_account="workflow@acme-prod.iam.gserviceaccount.com"),
+    )
+    default_identity = driver.provision(spec(workflow_id="workflow-two"))
+
+    assert not denied.ok and "workflows_allowed_service_accounts" in denied.message
+    assert default_identity.ok
+    assert [created[1] for created in fake.created] == ["workflow-two"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        ({"service_account": "platform-admin@acme-prod.iam.gserviceaccount.com"}, "lowerCamelCase"),
+        ({"ServiceAccount": "platform-admin@acme-prod.iam.gserviceaccount.com"}, "cannot override"),
+        ({"crypto_key_name": "projects/other/locations/global/keyRings/r/cryptoKeys/k"}, "lowerCamelCase"),
+    ],
+)
+def test_raw_workflow_fields_cannot_carry_an_identity_in_another_spelling(
+    driver: WorkflowsDriver,
+    fake: FakeWorkflows,
+    raw: dict[str, Any],
+    message: str,
+) -> None:
+    denied = driver.provision(spec(workflow_id="workflow-one", workflow=raw))
+
+    assert not denied.ok and message in denied.message
+    assert fake.created == []
 
 
 def test_start_execution_serializes_arguments_and_runtime_options(
