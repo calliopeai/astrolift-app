@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from astrolift_clusters.views_heartbeat import cluster_heartbeat
+from astrolift_clusters.views_heartbeat import cluster_heartbeat, cluster_test_result
 
 app_name = "astrolift_clusters"
 
@@ -20,5 +20,10 @@ urlpatterns = [
         "api/clusters/v1/<str:cluster_guid>/heartbeat/",
         cluster_heartbeat,
         name="cluster-heartbeat",
+    ),
+    path(
+        "api/clusters/v1/<str:cluster_guid>/model-test-result/",
+        cluster_test_result,
+        name="cluster-model-test-result",
     ),
 ]

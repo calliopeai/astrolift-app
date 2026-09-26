@@ -14,6 +14,7 @@ import { LIST_MODEL_ENDPOINTS } from "@/graphql/models/models.queries";
 
 import { DeployModelSheet } from "./deploy-model-sheet";
 import { ModelReplicas } from "./model-replicas";
+import { ModelTestDialog } from "./model-test-dialog";
 
 type ModelEndpoint = ListModelEndpointsQuery["astroliftModelEndpoints"][number];
 
@@ -136,6 +137,16 @@ function columnsFor(refetch: () => void): Column<ModelEndpoint>[] {
             config={(m.config ?? {}) as Record<string, unknown>}
             onChanged={refetch}
           />
+        ) : (
+          <span className="text-muted-foreground text-sm">—</span>
+        ),
+    },
+    {
+      id: "test",
+      header: "Test",
+      cell: (m) =>
+        m.variant === "vllm" ? (
+          <ModelTestDialog id={m.id} name={m.name} />
         ) : (
           <span className="text-muted-foreground text-sm">—</span>
         ),

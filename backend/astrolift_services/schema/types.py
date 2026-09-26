@@ -350,6 +350,27 @@ class ManagedServiceConnectionType:
     revealed_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftModelEndpointTest")
+class ModelEndpointTestType:
+    """Outcome of one bounded ``testModelEndpoint`` chat completion (#2064).
+
+    ``status`` is one of ``succeeded`` / ``failed`` / ``timed_out``.
+    ``failed`` and ``timed_out`` both carry an ``error`` and leave the
+    reply/latency/token fields at their zero values -- the mutation
+    always returns ``ok: true`` at the envelope level once the agent's
+    round trip is accounted for; a chat-completion failure is data, not
+    a mutation error.
+    """
+
+    status: str
+    reply: str
+    latency_ms: int | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    total_tokens: int | None
+    error: str
+
+
 @strawberry.type(name="AstroliftManagedServiceObject")
 class ManagedServiceObjectType:
     """A single entry in the recent-objects listing for an

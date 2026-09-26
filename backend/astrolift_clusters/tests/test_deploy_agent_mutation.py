@@ -288,3 +288,18 @@ def test_deploy_persists_apply_errors(cluster, org, permission_resolver, monkeyp
     assert result.errors and result.errors[0].code == "INTERNAL"
     cluster.refresh_from_db()
     assert "namespace is terminating" in cluster.last_management_error
+
+
+# ---- build_agent_manifests: secrets RBAC for the test-prompt relay (#2064) --
+
+
+def test_agent_manifests_grant_get_only_on_secrets(cluster):
+    """The agent needs to fetch one named Secret in-cluster to relay a
+    ``testModelEndpoint`` prompt (#2064), never to enumerate a namespace's
+    secrets -- ``list``/``watch`` must stay off this rule."""
+    manifests = cluster_management.build_agent_manifests(cluster)
+    role = next(m for m in manifests if m["kind"] == "ClusterRole")
+    secrets_rules = [r for r in role["rules"] if r["resources"] == ["secrets"]]
+    assert len(secrets_rules) == 1
+    assert secrets_rules[0]["apiGroups"] == [""]
+    assert secrets_rules[0]["verbs"] == ["get"]

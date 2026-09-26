@@ -252,3 +252,57 @@ def test_no_metrics_config_means_no_service_monitor_and_no_extra_ingress():
     assert not any(kind.endswith("/ServiceMonitor") for (kind, _, _) in cluster.objects)
     policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
     assert len(policy["spec"]["ingress"]) == 1
+
+
+# ---- keep-alive agent test-prompt relay (#2064) --------------------------
+
+
+def test_agent_test_admits_only_the_configured_namespace_and_pod():
+    driver, cluster, _ = _driver(agent_test={"namespace": "astrolift-system"})
+    driver.provision(_spec())
+    policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
+    assert policy["spec"]["ingress"][1]["from"] == [
+        {
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "astrolift-system"}},
+            "podSelector": {"matchLabels": {"app": "astrolift-agent"}},
+        }
+    ]
+
+
+def test_agent_test_pod_labels_are_configurable():
+    driver, cluster, _ = _driver(agent_test={"namespace": "astrolift-system", "pod_labels": {"app": "custom-agent"}})
+    driver.provision(_spec())
+    policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
+    assert policy["spec"]["ingress"][1]["from"][0]["podSelector"] == {"matchLabels": {"app": "custom-agent"}}
+
+
+def test_no_agent_test_config_means_no_extra_ingress():
+    driver, cluster, _ = _driver()
+    driver.provision(_spec())
+    policy = next(v for (kind, _, _), v in cluster.objects.items() if kind.endswith("/NetworkPolicy"))
+    assert len(policy["spec"]["ingress"]) == 1
+
+
+def test_resolve_agent_test_target_matches_the_driver_naming():
+    """Pure derivation the control plane uses for ``testModelEndpoint`` must
+    agree byte-for-byte with what ``provision`` actually names -- otherwise
+    the agent gets pointed at a Service/Secret that doesn't exist."""
+    from k8s_native.managed.model_endpoint_vllm import resolve_agent_test_target
+
+    driver, cluster, _ = _driver()
+    driver.provision(_spec())
+    deployment_name = next(name for (kind, _ns, name) in cluster.objects if kind == "apps/v1/Deployment")
+    secret_name = next(name for (kind, _ns, name) in cluster.objects if kind == "v1/Secret")
+
+    target = resolve_agent_test_target(
+        organization_slug="acme",
+        app_slug="chat",
+        environment_name="prod",
+        service_handle_hint="llm",
+        model="Qwen/Qwen3-8B",
+    )
+    assert target.base_url == f"http://{deployment_name}.acme-chat.svc.cluster.local:8000/v1"
+    assert target.model == "Qwen/Qwen3-8B"
+    assert target.api_key_secret_namespace == "acme-chat"
+    assert target.api_key_secret_name == secret_name
+    assert target.api_key_secret_key == "api_key"

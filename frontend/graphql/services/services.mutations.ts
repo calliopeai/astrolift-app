@@ -412,6 +412,34 @@ export const UPDATE_MANAGED_SERVICE = gql`
 `;
 
 /**
+ * One bounded chat completion against a hosted vLLM model (#2064), relayed
+ * through the cluster's in-cluster keep-alive agent -- the control plane
+ * never reaches the model directly. Blocks until the agent's reply lands or
+ * the bounded wait gives up (``status: "timed_out"``); there is no polling
+ * on the client side.
+ */
+export const TEST_MODEL_ENDPOINT = gql`
+  mutation TestModelEndpoint($input: TestModelEndpointInput!) {
+    testModelEndpoint(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        status
+        reply
+        latencyMs
+        promptTokens
+        completionTokens
+        totalTokens
+        error
+      }
+    }
+  }
+`;
+
+/**
  * Trigger a full reprovision cycle for a managed service (#745).
  *
  * Use when a config change requires tearing down the backing cloud

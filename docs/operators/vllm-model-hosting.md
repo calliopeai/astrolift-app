@@ -45,3 +45,15 @@ Fix it by setting `frontend = "python"` on that service, or by changing the leve
 - **`vllm_storage_class` (optional):** the StorageClass for the weight cache. Empty means the cluster default.
 - **GPU nodes:** see [GPU workloads](gpu-workloads.md) for taints, the GPU operator and MIG.
 - **`vllm_metrics` (optional):** `{"namespace": "monitoring", "labels": {"release": "kube-prometheus-stack"}}`. With a namespace set, each model gets a ServiceMonitor carrying `labels` (whatever your Prometheus selects on), and its NetworkPolicy admits that namespace on port 8000. The model's metrics panel then shows tokens/sec, running and waiting requests, p95 time to first token and KV cache use. `/metrics` is open; the API key only guards `/v1`.
+- **`vllm_agent_test` (optional):** `{"namespace": "astrolift-system", "pod_labels": {"app": "astrolift-agent"}}`. With a namespace set, each model's NetworkPolicy additionally admits that namespace + pod selector on port 8000, so the cluster's keep-alive agent can reach it. Required for the Models page's **Test** action (below); `pod_labels` defaults to the keep-alive Deployment's own labels, so most clusters only need to set `namespace`.
+
+## Testing a model from the Models page
+
+The **Test** button on a `vllm` row (Models page) sends one bounded prompt through the cluster's keep-alive agent -- the control plane never calls the model itself. The agent resolves the model's API key from its own Kubernetes Secret and runs a single chat completion, then reports the reply, latency and token counts back over the same heartbeat channel it already uses.
+
+This needs two things on the cluster, both fail closed with a specific message rather than a bare timeout when missing:
+
+1. A connected agent (`astro operator cluster deploy-agent`; the cluster settings page shows its live status).
+2. `vllm_agent_test` set (above), so the agent's NetworkPolicy allowance actually reaches the model.
+
+The prompt and reply never touch Postgres -- they live only in the cache for the duration of the request, capped in size, and the reply is capped to a short response (128 tokens).

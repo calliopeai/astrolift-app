@@ -356,6 +356,23 @@ class RevealManagedServiceConnectionInput:
 
 
 @strawberry.input
+class TestModelEndpointInput:
+    """One bounded test prompt against a hosted (vLLM) model (#2064).
+
+    The control plane never reaches the model itself -- the request is
+    relayed through the cluster's in-cluster keep-alive agent, which runs
+    a single chat completion with the model's API key resolved in-cluster
+    and reports back the reply, latency, and token counts. ``prompt`` and
+    ``maxTokens`` are both capped server-side; there is no streaming and
+    no conversation history -- this is a liveness/smoke check, not a chat
+    surface.
+    """
+
+    managed_service_id: GUID
+    prompt: str
+
+
+@strawberry.input
 class AddEmailSuppressionEntryInput:
     """Manually add an address to the email backend's account-level
     suppression list (#631).
