@@ -114,7 +114,11 @@ class _FakeClusterDriver:
     def ensure_namespace(self, cluster_slug, namespace, labels, annotations):
         self.calls.append(("ensure_namespace", namespace))
 
-    def apply_manifests(self, cluster_slug, namespace, manifests):
+    def apply_manifests(self, cluster_slug, namespace, manifests, dry_run=False):
+        if dry_run:  # the #1957 pre-write gate; only real applies are recorded
+            from providers._sdk.cluster import ApplyResult
+
+            return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
         from providers._sdk.cluster import ApplyResult
 
         self.calls.append(("apply_manifests", namespace, [m["metadata"]["name"] for m in manifests]))
@@ -204,7 +208,11 @@ def test_update_secrets_sync_materializes_the_literal_value(permission_resolver,
         def __init__(self):
             self.applied: list[dict] = []
 
-        def apply_manifests(self, cluster_slug, namespace, manifests):
+        def apply_manifests(self, cluster_slug, namespace, manifests, dry_run=False):
+            if dry_run:  # the #1957 pre-write gate; only real applies are recorded
+                from providers._sdk.cluster import ApplyResult
+
+                return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
             from providers._sdk.cluster import ApplyResult
 
             self.applied = manifests
@@ -1381,3 +1389,55 @@ def test_render_manifests_activity_lists_the_same_env_from_as_the_applied_render
 
     assert _app_env_secret_name(app.slug, env.name) in activity["env_from_secret_refs"]
     assert activity["env_from_secret_refs"] == applied
+
+
+def test_a_rejected_dry_run_writes_no_secret(permission_resolver, app, env, monkeypatch):
+    """#1957: the apiserver's verdict on the whole set (Secrets and workloads)
+    comes before the first Secret write, so a rejected deploy leaves the
+    running release's Secrets as they were."""
+    from core.app_deploy import AppDeployError
+    from providers._sdk.cluster import ApplyError, ApplyResult
+
+    permission_resolver.grant(Permission.APP_UPDATE)
+    _seed_manifest(app)
+    assert _set_app_secret(app, key="API_KEY", value="new-value").ok
+    app.refresh_from_db()
+    deployment = _deployment(app, env)
+
+    class _Rejecting(_FakeClusterDriver):
+        def __init__(self):
+            super().__init__()
+            self.dry_runs: list[list[str]] = []
+
+        def apply_manifests(self, cluster_slug, namespace, manifests, dry_run=False):
+            if dry_run:
+                self.dry_runs.append([m["kind"] for m in manifests])
+                return ApplyResult(
+                    created=[],
+                    updated=[],
+                    unchanged=[],
+                    errors=[
+                        ApplyError(
+                            kind="Deployment",
+                            name="web",
+                            namespace=namespace,
+                            exception_type="ApiException",
+                            exception_message="invalid",
+                            is_retryable=False,
+                        )
+                    ],
+                )
+            return super().apply_manifests(cluster_slug, namespace, manifests)
+
+    driver = _Rejecting()
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda d: (driver, SimpleNamespace(slug="test-cluster"), "acme-hello-app"),
+    )
+
+    with pytest.raises(AppDeployError, match="before any Secret was written"):
+        _update_secrets_sync(deployment.pk)
+
+    assert driver.applied == []  # nothing written
+    [kinds] = driver.dry_runs
+    assert "Secret" in kinds and "Deployment" in kinds  # the whole set was checked
