@@ -483,3 +483,26 @@ def test_the_hostname_ledger_claims_what_each_environment_serves(app, env, stagi
         "hello-app.apps.example.net",
         "hello-app-staging.apps.example.net",
     }
+
+
+def test_the_managed_domain_backfill_advertises_what_each_environment_serves(org, app, env, staging):
+    """Binding a zone later recomputes each row's URL from the host it will
+    render, so an environment in its own namespace does not advertise the
+    primary environment's address."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    zone = ManagedDomain.objects.create(
+        organization=org,
+        zone="apps.example.net",
+        dns_driver="route53",
+        default_for=ManagedDomain.DefaultFor.TENANT_APPS,
+    )
+
+    call_command("backfill_managed_domain", stdout=StringIO())
+
+    env.refresh_from_db()
+    staging.refresh_from_db()
+    assert (env.managed_domain, env.url) == (zone, "https://hello-app.apps.example.net")
+    assert (staging.managed_domain, staging.url) == (zone, "https://hello-app-staging.apps.example.net")
