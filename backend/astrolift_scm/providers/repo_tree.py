@@ -181,6 +181,28 @@ def fetch_public_repo_tree(*, repo_full_name: str, ref: str) -> dict[str, str]:
     return repo_tree_from_zipball_bytes(read_requests_response(resp, limit=_MAX_ARCHIVE_BYTES))
 
 
+def fetch_public_file(*, repo_full_name: str, path: str, ref: str) -> str | None:
+    """One file of a PUBLIC GitHub repo, read with NO authentication (#2051).
+
+    ``None`` when GitHub answers 404: the file is absent, or the repo is
+    private, which an anonymous read cannot tell apart. Raises
+    ``requests.HTTPError`` / ``requests.RequestException`` otherwise, so the
+    caller reports it as a fetch failure.
+    """
+    from urllib.parse import quote
+
+    url = "https://raw.githubusercontent.com/{}/{}/{}".format(
+        quote(repo_full_name.strip("/"), safe="/"),
+        quote(ref, safe="/"),
+        quote(path.lstrip("/"), safe="/"),
+    )
+    resp = requests.get(url, timeout=_GITHUB_ARCHIVE_TIMEOUT_SECONDS, allow_redirects=False, stream=True)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return read_requests_response(resp, limit=_MAX_ARCHIVE_BYTES).decode("utf-8")
+
+
 def fetch_repo_tree_with_pat(*, repo_full_name: str, ref: str) -> dict[str, str] | None:
     """Fetch a PRIVATE GitHub repo's file tree map using ``settings.GITHUB_PAT``.
 

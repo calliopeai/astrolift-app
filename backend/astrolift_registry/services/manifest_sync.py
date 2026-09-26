@@ -456,6 +456,12 @@ def _clear_stale_bootstrap_failure(app: RegisteredApp) -> list[str]:
     return ["manifest_bootstrap_status", "manifest_bootstrap_error"]
 
 
+_NO_CONNECTION_PUBLIC_READ = (
+    "no active source connection found for this organization, and {repo!r} could not be read "
+    "anonymously ({reason}); a private repo needs a connection under Settings -> Source connections"
+)
+
+
 def _resync_app_manifest_from_repo(
     app: RegisteredApp,
     *,
@@ -481,7 +487,10 @@ def _resync_app_manifest_from_repo(
         )
 
     connection = _pick_source_connection(app)
-    if connection is None:
+    # No connection: a public GitHub repo is still readable anonymously, the
+    # same way the build clones it (#2051). A test-injected ``fetch`` opts out.
+    anonymous = connection is None and fetch is None and app.source_kind == RegisteredApp.SourceKind.GITHUB
+    if connection is None and not anonymous:
         return ResyncResult(
             status="fetch_failed",
             changes=ResyncChanges(),
@@ -495,7 +504,14 @@ def _resync_app_manifest_from_repo(
     manifest_path = app.manifest_path or "astrolift.toml"
 
     try:
-        repo_text = fetch_fn(connection, app.source_repo, manifest_path, deploy_branch)
+        if anonymous:
+            from astrolift_scm.providers.repo_tree import fetch_public_file
+
+            repo_text = fetch_public_file(
+                repo_full_name=app.source_repo, path=manifest_path, ref=deploy_branch
+            )
+        else:
+            repo_text = fetch_fn(connection, app.source_repo, manifest_path, deploy_branch)
     except ProviderError as exc:
         return ResyncResult(
             status="fetch_failed",
@@ -503,6 +519,12 @@ def _resync_app_manifest_from_repo(
             error=f"{exc.code}: {exc.message}",
         )
     except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
+        if anonymous:
+            return ResyncResult(
+                status="fetch_failed",
+                changes=ResyncChanges(),
+                error=_NO_CONNECTION_PUBLIC_READ.format(repo=app.source_repo, reason=exc),
+            )
         log.exception(
             "resync fetch crashed for app %s (repo=%s)",
             app.pk,
@@ -518,7 +540,13 @@ def _resync_app_manifest_from_repo(
         return ResyncResult(
             status="fetch_failed",
             changes=ResyncChanges(),
-            error=(f"{manifest_path!r} not found on {deploy_branch!r} of {app.source_repo!r}"),
+            error=(
+                _NO_CONNECTION_PUBLIC_READ.format(
+                    repo=app.source_repo, reason=f"{manifest_path!r} not found on {deploy_branch!r}"
+                )
+                if anonymous
+                else f"{manifest_path!r} not found on {deploy_branch!r} of {app.source_repo!r}"
+            ),
         )
 
     # Parse the repo content first. A repo with broken TOML is a
@@ -879,7 +907,7 @@ def _scan_repo_for_agents(
     # opts out) and only for GitHub, so registration and dispatch read the
     # repo through the same working credential.
     if not discovered and tree is None and source_kind == "github":
-        pat_files, pat_error = _pat_fallback_tree(source_repo, ref)
+        pat_files, pat_error = _pat_fallback_tree(source_repo, ref, report_anonymous=connection is None)
         if pat_files:
             try:
                 pat_discovered, pat_skips = scan_agent_manifests_with_skips(pat_files)
@@ -914,21 +942,35 @@ def _scan_repo_for_agents(
     return discovered, files, None, skipped
 
 
-def _pat_fallback_tree(source_repo: str, ref: str) -> tuple[dict[str, str], str | None]:
-    """Best-effort ``settings.GITHUB_PAT`` repo-tree fetch for the register
-    scan fallback. Returns ``(files, error)``: ``files`` is the
-    ``{path: contents}`` tree (``{}`` when no PAT is configured or the fetch
-    failed), ``error`` a message on failure (``None`` otherwise). Never
+def _pat_fallback_tree(
+    source_repo: str, ref: str, *, report_anonymous: bool = True
+) -> tuple[dict[str, str], str | None]:
+    """Best-effort repo-tree fetch for the register scan fallback: the
+    install-wide ``settings.GITHUB_PAT`` first, then an anonymous read of a
+    public repo (#2051), the way the build clones it. Returns ``(files,
+    error)``: ``files`` is the ``{path: contents}`` tree (``{}`` when neither
+    read worked), ``error`` a message on failure (``None`` otherwise). The
+    anonymous miss is only reported with ``report_anonymous`` (no connection):
+    a connection that found no agents must still mean "no agents". Never
     raises — a fallback miss must not mask the primary connection outcome.
     """
-    from astrolift_scm.providers.repo_tree import fetch_repo_tree_with_pat
+    from astrolift_scm.providers.repo_tree import fetch_public_repo_tree, fetch_repo_tree_with_pat
 
+    error: str | None = None
     try:
         files = fetch_repo_tree_with_pat(repo_full_name=source_repo, ref=ref)
+        if files:
+            return files, None
     except Exception as exc:  # noqa: BLE001 — fallback miss, not fatal
         log.warning("agent-repo PAT fallback fetch failed (repo=%s): %s", source_repo, exc)
-        return {}, str(exc) or exc.__class__.__name__
-    return (files or {}), None
+        error = str(exc) or exc.__class__.__name__
+    try:
+        return (fetch_public_repo_tree(repo_full_name=source_repo, ref=ref) or {}), None
+    except Exception as exc:  # noqa: BLE001 — fallback miss, not fatal
+        log.warning("agent-repo anonymous fetch failed (repo=%s): %s", source_repo, exc)
+        if error is None and report_anonymous:
+            error = f"no source connection, and {source_repo!r} is not publicly readable ({exc})"
+        return {}, error
 
 
 def discover_agent_manifests(
