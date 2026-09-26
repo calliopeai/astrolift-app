@@ -1037,6 +1037,7 @@ type AstroliftAppSecret {
   expiresAt: DateTime
   setVia: String!
   scope: String!
+  deploysAsShown: Boolean!
 }
 
 type AstroliftAppSecretBundleAttachment {
@@ -2419,6 +2420,10 @@ type AstroliftManagedDomain {
   provisionValidationRecords: JSON!
   delegationCheck: JSON!
   provisionClusterId: String
+  verificationState: String!
+  challengeRecordName: String!
+  challengeRecordValue: String!
+  verifiedAt: DateTime
 }
 
 type AstroliftManagedDomainMutationResult {
@@ -2663,6 +2668,22 @@ type AstroliftMemberPage {
 
   """Total rows matching the filters, across all pages."""
   totalCount: Int
+}
+
+type AstroliftModelEndpointTest {
+  status: String!
+  reply: String!
+  latencyMs: Int
+  promptTokens: Int
+  completionTokens: Int
+  totalTokens: Int
+  error: String!
+}
+
+type AstroliftModelEndpointTestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftModelEndpointTest
 }
 
 type AstroliftModuleEntitlement {
@@ -5546,6 +5567,7 @@ type Mutation {
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   softDeleteManagedDomain(input: SoftDeleteManagedDomainInput!): SoftdeletepayloadMutationResult!
+  verifyManagedDomain(input: VerifyManagedDomainInput!): VerifyManagedDomainPayloadMutationResult!
   provisionManagedDomain(clusterId: GUID!, zone: String!, isPlatformManagedZone: Boolean! = false): ProvisionManagedDomainPayloadMutationResult!
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
   reissueManagedDomainCert(clusterId: GUID!, zone: String!): ReissueManagedDomainCertPayloadMutationResult!
@@ -5645,6 +5667,7 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   adoptManagedResource(input: AdoptManagedResourceInput!): ManagedresourceadoptionpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
+  testModelEndpoint(input: TestModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!
   removeEmailSuppressionEntry(input: RemoveEmailSuppressionEntryInput!): EmailsuppressionremovepayloadMutationResult!
@@ -6964,6 +6987,11 @@ input TearDownPreviewInputGql {
   id: GUID!
 }
 
+input TestModelEndpointInput {
+  managedServiceId: GUID!
+  prompt: String!
+}
+
 input TestNotificationInput {
   id: GUID!
   message: String = null
@@ -7284,6 +7312,22 @@ input ValidateAstroliftCiSecretsInput {
 type ValidationError {
   field: String!
   messages: [String!]!
+}
+
+input VerifyManagedDomainInput {
+  zone: String!
+}
+
+type VerifyManagedDomainPayload {
+  zone: String!
+  verified: Boolean!
+  message: String!
+}
+
+type VerifyManagedDomainPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: VerifyManagedDomainPayload
 }
 
 """Represents NULL values"""

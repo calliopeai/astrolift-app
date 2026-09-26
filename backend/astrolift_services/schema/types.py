@@ -85,6 +85,15 @@ class AppSecretType:
     ``production`` / ``preview`` / ``preview:<branch>``.  Resolution-time
     filtering drops rows whose scope doesn't match the queried env."""
 
+    deploys_as_shown: bool = True
+    """False for a literal row whose staged value has no matching applied
+    secret-change proposal, under an app that requires secret approval
+    (#1923). Such a value is what the operator sees here, but not what the
+    next deploy actually puts in front of a workload -- it reverts to the
+    last-approved (``manifest_raw``) value instead. Always true for
+    bundle / managed_service rows: secret approval only gates literal
+    ``[env]`` writes."""
+
 
 @strawberry.type(name="AstroliftSecretBundleConsumer")
 class SecretBundleConsumerType:
@@ -348,6 +357,27 @@ class ManagedServiceConnectionType:
 
     keys: list[ManagedServiceConnectionKeyType]
     revealed_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftModelEndpointTest")
+class ModelEndpointTestType:
+    """Outcome of one bounded ``testModelEndpoint`` chat completion (#2064).
+
+    ``status`` is one of ``succeeded`` / ``failed`` / ``timed_out``.
+    ``failed`` and ``timed_out`` both carry an ``error`` and leave the
+    reply/latency/token fields at their zero values -- the mutation
+    always returns ``ok: true`` at the envelope level once the agent's
+    round trip is accounted for; a chat-completion failure is data, not
+    a mutation error.
+    """
+
+    status: str
+    reply: str
+    latency_ms: int | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    total_tokens: int | None
+    error: str
 
 
 @strawberry.type(name="AstroliftManagedServiceObject")

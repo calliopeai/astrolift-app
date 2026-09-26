@@ -12,9 +12,12 @@ policy module. This workflow binds each of its steps to an activity:
                                             workloads; no-op for the
                                             ingress-backed case, where DNS
                                             follows the Ingress
-  PATCH_INGRESS     apply_manifests         re-render + server-side apply;
-                                            the Ingress keeps its name, so
-                                            the host rule is replaced
+  PATCH_INGRESS     update_secrets,         re-render + server-side apply;
+                    apply_manifests         the Ingress keeps its name, so
+                                            the host rule is replaced.
+                                            update_secrets goes first (#1952),
+                                            same order and reason as the
+                                            deploy path (#1758)
   REQUEST_CERT      request_wildcard_cert_   skipped when the zone's wildcard
                     for_zone                already covers the new hostname,
                                             which is the common case
@@ -59,6 +62,7 @@ with workflow.unsafe.imports_passed_through():
         plan_app_domain_sync,
         request_wildcard_cert_for_zone,
         revert_app_subdomain,
+        update_secrets,
         verify_app_hostnames,
         wait_dns,
     )
@@ -192,6 +196,21 @@ class SyncAppDomainWorkflow:
             )
             return
         if step == SyncStep.PATCH_INGRESS:
+            # Secrets before the workloads that read them (#1952), same
+            # order and reason as the deploy path (#1758): apply_manifests
+            # re-renders every workload, pod-template digest included, so
+            # running it first can roll pods onto the new digest before
+            # update_secrets has written the Secret it names -- the pods
+            # then never roll again, because the digest already matches.
+            # Patched so a sync in flight when this ships replays in its
+            # original order.
+            if workflow.patched("sync-domain-secrets-before-apply"):
+                await workflow.execute_activity(
+                    update_secrets,
+                    deployment_id,
+                    start_to_close_timeout=deadline,
+                    retry_policy=_RETRY,
+                )
             await workflow.execute_activity(
                 apply_manifests,
                 deployment_id,

@@ -39,18 +39,24 @@ from aws.managed.email_ses import (
 
 @pytest.fixture
 def aws_mock() -> Generator:
-    """Single moto context covering SES + Secrets Manager."""
+    """Single moto context covering SES + SESv2 + Secrets Manager."""
     from moto import mock_aws
 
     with mock_aws():
         ses = boto3.client("ses", region_name="us-east-1")
+        sesv2 = boto3.client("sesv2", region_name="us-east-1")
         sm = boto3.client("secretsmanager", region_name="us-east-1")
-        yield {"ses": ses, "sm": sm}
+        yield {"ses": ses, "sesv2": sesv2, "sm": sm}
 
 
 @pytest.fixture
 def ses_client(aws_mock) -> Any:
     return aws_mock["ses"]
+
+
+@pytest.fixture
+def sesv2_client(aws_mock) -> Any:
+    return aws_mock["sesv2"]
 
 
 @pytest.fixture
@@ -66,6 +72,7 @@ def driver(aws_mock) -> AmazonSESDriver:
             base_domain="astrolift.test",
         ),
         ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
         secrets_client=aws_mock["sm"],
     )
 
@@ -203,6 +210,7 @@ def test_provision_wires_sns_event_destination_when_arn_configured(
             sns_event_destination_arn=arn,
         ),
         ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
         secrets_client=aws_mock["sm"],
     )
     result = d.provision(_spec())
@@ -233,6 +241,7 @@ def test_provision_is_idempotent_for_sns_event_destination(aws_mock) -> None:
             sns_event_destination_arn=arn,
         ),
         ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
         secrets_client=aws_mock["sm"],
     )
     first = d.provision(_spec())
@@ -251,6 +260,7 @@ def test_provision_skips_sns_destination_when_arn_blank(aws_mock) -> None:
             sns_event_destination_arn="",
         ),
         ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
         secrets_client=aws_mock["sm"],
     )
     result = d.provision(_spec())
@@ -292,6 +302,7 @@ def test_provision_marker_off_when_disabled(
 def test_provision_surfaces_verify_failure(
     sm_client,
     ses_client,
+    sesv2_client,
 ) -> None:
     d = AmazonSESDriver(
         config=SESEmailConfig(
@@ -299,16 +310,117 @@ def test_provision_surfaces_verify_failure(
             base_domain="astrolift.test",
         ),
         ses_client=ses_client,
+        sesv2_client=sesv2_client,
         secrets_client=sm_client,
     )
 
     def boom(**_kwargs):
         raise RuntimeError("simulated AWS failure")
 
-    ses_client.verify_domain_identity = boom  # type: ignore[assignment]
+    sesv2_client.create_email_identity = boom  # type: ignore[assignment]
     result = d.provision(_spec(service_handle_hint="boomer"))
     assert not result.ok
-    assert "verify_identity" in result.message
+    assert "create_email_identity" in result.message
+
+
+# ---- ownership (#2029) -------------------------------------------
+
+
+def test_provision_tags_a_new_identity_with_the_ownership_envelope(
+    driver: AmazonSESDriver,
+    sesv2_client,
+) -> None:
+    result = driver.provision(_spec(organization_slug="acme", app_slug="api"))
+    assert result.ok
+    _, identity = parse_handle(result.handle)
+    tags = {t["Key"]: t["Value"] for t in sesv2_client.get_email_identity(EmailIdentity=identity)["Tags"]}
+    assert tags["astrolift.io/organization"] == "acme"
+    assert tags["astrolift.io/app"] == "api"
+
+
+def test_provision_refuses_another_orgs_identity(aws_mock) -> None:
+    """Org B naming org A's verified identity (explicitly, or by a
+    collision in the derived name) must be refused, not adopted (#2029)."""
+    shared_identity = {"identity": "shared.example.com"}
+    victim = AmazonSESDriver(
+        config=SESEmailConfig(region="us-east-1"),
+        ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
+        secrets_client=aws_mock["sm"],
+    )
+    victim.provision(_spec(organization_slug="acme", config=dict(shared_identity)))
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("mutating call must not run once adoption is refused")
+
+    attacker_ses = aws_mock["ses"]
+    attacker_sesv2 = aws_mock["sesv2"]
+    attacker_sm = aws_mock["sm"]
+    attacker_ses.create_configuration_set = boom  # type: ignore[assignment]
+    attacker_ses.verify_domain_dkim = boom  # type: ignore[assignment]
+    attacker_sesv2.create_email_identity = boom  # type: ignore[assignment]
+    attacker_sesv2.tag_resource = boom  # type: ignore[assignment]
+    attacker_sm.create_secret = boom  # type: ignore[assignment]
+    attacker_sm.put_secret_value = boom  # type: ignore[assignment]
+    attacker = AmazonSESDriver(
+        config=SESEmailConfig(region="us-east-1"),
+        ses_client=attacker_ses,
+        sesv2_client=attacker_sesv2,
+        secrets_client=attacker_sm,
+    )
+
+    result = attacker.provision(
+        _spec(organization_slug="villain", app_slug="evil-app", config=dict(shared_identity)),
+    )
+
+    assert result.ok is False
+    assert result.handle == ""
+    assert "refusing to adopt" in result.message
+
+
+def test_provision_refuses_an_untagged_preexisting_identity(
+    driver: AmazonSESDriver,
+    sesv2_client,
+) -> None:
+    """An identity that predates ownership tagging -- or the platform's
+    own base sending domain -- carries no astrolift.io tags at all;
+    provision must not silently treat it as this service's own (#2029)."""
+    sesv2_client.create_email_identity(EmailIdentity="legacy.astrolift.test")
+
+    result = driver.provision(_spec(config={"identity": "legacy.astrolift.test"}))
+
+    assert result.ok is False
+    assert "refusing to adopt" in result.message
+
+
+def test_provision_reentrant_by_managed_service_id_despite_app_slug_drift(
+    driver: AmazonSESDriver,
+) -> None:
+    """The managed_service_id tag is authoritative (#1961 pattern): a
+    reprovision with the same managed_service_id succeeds even though the
+    app slug resolved differently in between (e.g. the app was renamed)."""
+    shared_identity = {"identity": "shared.example.com"}
+    first = driver.provision(_spec(managed_service_id="svc-123", config=dict(shared_identity)))
+    second = driver.provision(
+        _spec(managed_service_id="svc-123", app_slug="renamed-app", config=dict(shared_identity)),
+    )
+    assert first.ok and second.ok
+    assert first.handle == second.handle == "email/shared.example.com"
+
+
+def test_provision_refuses_when_managed_service_id_tag_mismatches(
+    driver: AmazonSESDriver,
+) -> None:
+    """A managed_service_id tag mismatch refuses even under the same org
+    + app: a deleted-and-recreated row must not silently inherit the old
+    row's identity."""
+    shared_identity = {"identity": "shared.example.com"}
+    driver.provision(_spec(managed_service_id="svc-a", config=dict(shared_identity)))
+
+    result = driver.provision(_spec(managed_service_id="svc-b", config=dict(shared_identity)))
+
+    assert result.ok is False
+    assert "refusing to adopt" in result.message
 
 
 # ---- update -----------------------------------------------------
@@ -473,7 +585,7 @@ def test_status_maps_pending_to_provisioning(
     driver: AmazonSESDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    # moto returns Pending after verify_domain_identity
+    # moto returns Pending after create_email_identity
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state in ("provisioning", "available")
 
@@ -770,6 +882,7 @@ def test_default_client_construction_path() -> None:
             ),
         )
         assert d._ses is not None  # type: ignore[attr-defined]
+        assert d._sesv2 is not None  # type: ignore[attr-defined]
         assert d._sm is not None  # type: ignore[attr-defined]
 
 

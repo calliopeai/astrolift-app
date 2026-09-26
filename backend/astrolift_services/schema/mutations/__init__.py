@@ -58,6 +58,7 @@ from astrolift_services.schema.mutations.types import (  # noqa: F401
     SendManagedServiceTestEmailInput,
     SetAppSecretInput,
     SetAppSecretMetadataInput,
+    TestModelEndpointInput,
     UpdateEmailTemplateInput,
     UpdateManagedServiceInput,
     UpdateProjectSecretBundleInput,

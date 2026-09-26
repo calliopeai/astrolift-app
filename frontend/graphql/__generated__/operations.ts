@@ -1036,6 +1036,7 @@ export type AstroliftAppReprovisionState = {
 
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
+  deploysAsShown: Scalars['Boolean']['output'];
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
@@ -2405,6 +2406,8 @@ export type AstroliftLogoutAllSessionsPayloadMutationResult = {
 };
 
 export type AstroliftManagedDomain = {
+  challengeRecordName: Scalars['String']['output'];
+  challengeRecordValue: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
   delegationCheck: Scalars['JSON']['output'];
@@ -2416,6 +2419,8 @@ export type AstroliftManagedDomain = {
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];
+  verificationState: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
   zone: Scalars['String']['output'];
 };
 
@@ -2657,6 +2662,22 @@ export type AstroliftMemberPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftModelEndpointTest = {
+  completionTokens?: Maybe<Scalars['Int']['output']>;
+  error: Scalars['String']['output'];
+  latencyMs?: Maybe<Scalars['Int']['output']>;
+  promptTokens?: Maybe<Scalars['Int']['output']>;
+  reply: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  totalTokens?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftModelEndpointTestMutationResult = {
+  data?: Maybe<AstroliftModelEndpointTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftModuleEntitlement = {
@@ -5571,6 +5592,7 @@ export type Mutation = {
   tearDownApp: SoftdeletepayloadMutationResult;
   tearDownPreview: AstroliftDeploymentMutationResult;
   terminateWorkflowInstance: MutationResult;
+  testModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
@@ -5624,6 +5646,7 @@ export type Mutation = {
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
+  verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
@@ -7161,6 +7184,11 @@ export type MutationTerminateWorkflowInstanceArgs = {
 };
 
 
+export type MutationTestModelEndpointArgs = {
+  input: TestModelEndpointInput;
+};
+
+
 export type MutationTestNotificationChannelArgs = {
   input: TestNotificationInput;
 };
@@ -7436,6 +7464,11 @@ export type MutationUpsertUserArgs = {
 
 export type MutationValidateAstroliftCiSecretsArgs = {
   input: ValidateAstroliftCiSecretsInput;
+};
+
+
+export type MutationVerifyManagedDomainArgs = {
+  input: VerifyManagedDomainInput;
 };
 
 
@@ -10059,6 +10092,11 @@ export type TearDownPreviewInputGql = {
   id: Scalars['GUID']['input'];
 };
 
+export type TestModelEndpointInput = {
+  managedServiceId: Scalars['GUID']['input'];
+  prompt: Scalars['String']['input'];
+};
+
 export type TestNotificationInput = {
   id: Scalars['GUID']['input'];
   message: InputMaybe<Scalars['String']['input']>;
@@ -10378,6 +10416,22 @@ export type ValidateAstroliftCiSecretsInput = {
 export type ValidationError = {
   field: Scalars['String']['output'];
   messages: Array<Scalars['String']['output']>;
+};
+
+export type VerifyManagedDomainInput = {
+  zone: Scalars['String']['input'];
+};
+
+export type VerifyManagedDomainPayload = {
+  message: Scalars['String']['output'];
+  verified: Scalars['Boolean']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type VerifyManagedDomainPayloadMutationResult = {
+  data?: Maybe<VerifyManagedDomainPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type WebhookSecretReveal = {
@@ -12243,7 +12297,7 @@ export type ListAppSecretsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
+export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, deploysAsShown: boolean, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
 
 export type PreviewManagedServiceCostQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];

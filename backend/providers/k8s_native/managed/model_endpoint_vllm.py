@@ -117,6 +117,62 @@ class VLLMConfig:
     {"release": "kube-prometheus-stack"}}``. When ``namespace`` is set the server gets a
     ServiceMonitor carrying ``labels`` (what the cluster's Prometheus selects on), and its
     NetworkPolicy admits that namespace on the metrics port. Empty: no scrape."""
+    agent_test: dict[str, Any] = field(default_factory=dict)
+    """``provider_config.vllm_agent_test`` (#2064): ``{"namespace": "astrolift-system",
+    "pod_labels": {"app": "astrolift-agent"}}``. When ``namespace`` is set the
+    NetworkPolicy admits that namespace + podSelector on the API port, so the cluster's
+    in-cluster keep-alive agent can relay ``testModelEndpoint`` prompts. ``pod_labels``
+    defaults to the keep-alive Deployment's own labels (``core.cluster_management.
+    build_agent_manifests``). Empty: no allowance -- the control plane's test mutation
+    still dispatches through the agent, but the chat-completion call itself fails
+    closed with a connection error rather than opening the policy implicitly."""
+
+
+@dataclass(frozen=True)
+class ModelTestTarget:
+    """Where and how the keep-alive agent runs one bounded chat completion
+    against an existing vLLM service (#2064)."""
+
+    base_url: str
+    """OpenAI-compatible base URL, in-cluster only (``.svc.cluster.local``)."""
+    model: str
+    """Served model id, straight off the managed service's own config --
+    never a live cluster read."""
+    api_key_secret_namespace: str
+    api_key_secret_name: str
+    api_key_secret_key: str = "api_key"
+
+
+def resolve_agent_test_target(
+    *,
+    organization_slug: str,
+    app_slug: str,
+    environment_name: str,
+    service_handle_hint: str,
+    model: str,
+) -> ModelTestTarget:
+    """Pure (no cluster I/O, no driver instance): derive the in-cluster
+    Service URL and the Secret holding the API key for an *existing* vLLM
+    service, from the same identity a provision call used to name it
+    (``organization_slug``/``app_slug`` -> namespace via ``app_namespace``;
+    ``app_slug``/``environment_name``/``service_handle_hint`` -> name via
+    ``dns_label``, matching ``ProvisionSpec.service_handle_hint`` -- see
+    ``astrolift_workflows.activities.managed_service_lifecycle.
+    build_provision_spec``, which sets it to ``svc.name or svc.kind``).
+
+    Exists so ``testModelEndpoint`` (control plane) never needs to unpack a
+    driver handle, resolve a live ``ClusterDriver``, or reach the cluster
+    itself just to learn where to point the agent -- the naming scheme is
+    deterministic and this is its one other reader.
+    """
+    namespace = app_namespace(organization_slug=organization_slug, app_slug=app_slug)
+    name = dns_label(app_slug, environment_name, service_handle_hint or "model")
+    return ModelTestTarget(
+        base_url=f"http://{name}.{namespace}.svc.cluster.local:{PORT}/v1",
+        model=model,
+        api_key_secret_namespace=namespace,
+        api_key_secret_name=VLLMDriver._secret_name(name),
+    )
 
 
 class VLLMDriver(ManagedServiceDriver):
@@ -457,6 +513,7 @@ class VLLMDriver(ManagedServiceDriver):
                     "ingress": [
                         {"from": [{"podSelector": {}}], "ports": [{"port": PORT, "protocol": "TCP"}]},
                         *self._metrics_ingress(),
+                        *self._agent_test_ingress(),
                     ],
                 },
             },
@@ -475,6 +532,33 @@ class VLLMDriver(ManagedServiceDriver):
         return [
             {
                 "from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": metrics_namespace}}}],
+                "ports": [{"port": PORT, "protocol": "TCP"}],
+            }
+        ]
+
+    def _agent_test_namespace(self) -> str:
+        return str((self._config.agent_test or {}).get("namespace") or "")
+
+    def _agent_test_pod_labels(self) -> dict[str, str]:
+        labels = (self._config.agent_test or {}).get("pod_labels") or {"app": "astrolift-agent"}
+        return {str(k): str(v) for k, v in dict(labels).items()}
+
+    def _agent_test_ingress(self) -> list[dict[str, Any]]:
+        """Narrow, opt-in ingress for the keep-alive agent's test-prompt relay
+        (#2064): namespace AND pod selector together, never a bare namespace
+        allowance -- the whole point is admitting one known pod, not every
+        workload the operator happens to run in ``astrolift-system``."""
+        agent_namespace = self._agent_test_namespace()
+        if not agent_namespace:
+            return []
+        return [
+            {
+                "from": [
+                    {
+                        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": agent_namespace}},
+                        "podSelector": {"matchLabels": self._agent_test_pod_labels()},
+                    }
+                ],
                 "ports": [{"port": PORT, "protocol": "TCP"}],
             }
         ]

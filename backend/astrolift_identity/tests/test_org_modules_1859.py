@@ -185,6 +185,55 @@ def test_module_entitlements_is_pure_about_enabled():
     assert rows[ATTACH].enabled is False
 
 
+def test_me_modules_chat_studio_can_create_needs_team_or_org_not_project(org_a, user):
+    """The Builder API's create only ever checks ``app.create`` at a TEAM or
+    the ORG scope (#1919) -- a dev environment has no project -- so
+    ``chat_studio_integration.can_create`` must ask that question, not mirror
+    ``apps.can_create``'s flat "anywhere" one. A project-scoped holder can
+    still create ordinary apps in their project; they just can't Ship."""
+    from astrolift_identity.models import Project, Team
+
+    _enable(org_a, CHAT)
+    team = Team.objects.create(organization=org_a, name="Eng", slug="eng-1919-project")
+    project = Project.objects.create(organization=org_a, team=team, name="Core", slug="core-1919")
+    role = Role.objects.create(
+        name="project-creator-1919",
+        slug="project-creator-1919",
+        scope_level=Role.ScopeLevel.PROJECT,
+        permissions=[Permission.APP_CREATE.value],
+        is_system=False,
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="PROJECT", scope_id=project.id)
+
+    mods = _modules(user, org_a)
+
+    assert mods["apps"].can_create is True
+    assert mods[CHAT].can_create is False
+
+
+def test_me_modules_chat_studio_can_create_true_for_a_team_scope_holder(org_a, user):
+    """The mirror the row above says chat_studio diverges from: a TEAM-scope
+    ``app.create`` holder is exactly who the Builder API's create allows, so
+    both modules agree it's true."""
+    from astrolift_identity.models import Team
+
+    _enable(org_a, CHAT)
+    team = Team.objects.create(organization=org_a, name="Eng", slug="eng-1919-team")
+    role = Role.objects.create(
+        name="team-creator-1919",
+        slug="team-creator-1919",
+        scope_level=Role.ScopeLevel.TEAM,
+        permissions=[Permission.APP_CREATE.value],
+        is_system=False,
+    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="TEAM", scope_id=team.id)
+
+    mods = _modules(user, org_a)
+
+    assert mods["apps"].can_create is True
+    assert mods[CHAT].can_create is True
+
+
 # ---- setOrganizationModule ---------------------------------------------
 
 

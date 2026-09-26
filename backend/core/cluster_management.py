@@ -462,6 +462,18 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                     "resources": ["ingresses"],
                     "verbs": ["get", "list"],
                 },
+                # `get`, never `list` or `watch` (#2064): the agent reads a
+                # Secret only when the control plane names it explicitly in a
+                # dispatched test-prompt job, to run one bounded chat
+                # completion against a hosted model and read the model's own
+                # API key -- never the control plane's copy. `get`-only means
+                # the agent cannot enumerate a namespace's Secret names on
+                # its own; it can only fetch a name it was already handed.
+                {
+                    "apiGroups": [""],
+                    "resources": ["secrets"],
+                    "verbs": ["get"],
+                },
             ],
         },
         {

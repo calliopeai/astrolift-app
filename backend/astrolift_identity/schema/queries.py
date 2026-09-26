@@ -75,7 +75,13 @@ from astrolift_identity.scope_visibility import visible_projects, visible_teams
 from astrolift_identity.scopes import team_scope_by_guid
 from core.decorators import tenant_scoped
 from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
-from core.permissions import Permission, is_platform_operator, module_entitlements, require_permission
+from core.permissions import (
+    Permission,
+    granted_scopes,
+    is_platform_operator,
+    module_entitlements,
+    require_permission,
+)
 
 
 @strawberry.type(name="AstroliftUserProfile")
@@ -138,6 +144,14 @@ class MeType:
         ``enabled`` on the per-org modules comes from
         :func:`astrolift_identity.org_modules.enabled_modules`, the same
         source the builder API gate reads (#1859).
+
+        ``chat_studio_integration.canCreate`` is the one exception to the
+        "single mapping" rule above (#1919): it does not mirror
+        ``apps.canCreate`` like the rest of the module, because the Builder
+        API's create only ever checks ``app.create`` at a TEAM or the ORG
+        scope, never a bare project/app grant, and is recomputed from
+        :func:`core.permissions.granted_scopes` accordingly so it matches
+        what create will actually allow.
         """
         from astrolift_identity.org_modules import enabled_modules
         from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
@@ -159,11 +173,20 @@ class MeType:
             is_staff=is_staff,
             org_modules_enabled=enabled_modules(tenant.organization_id),
         )
+        # The Builder API's create only ever checks ``app.create`` at a TEAM
+        # or the ORG scope (#1919): a dev environment always resolves to one
+        # of those, never a bare project/app grant. chat_studio_integration's
+        # ``canCreate`` has to ask that same, narrower question rather than
+        # the flat "anywhere" set ``perms`` holds; otherwise a project- or
+        # app-scoped ``app.create`` holder sees Chat Studio's Ship light up
+        # and then gets a 403 on every create.
+        create_scopes = granted_scopes(tenant, Permission.APP_CREATE)
+        chat_studio_can_create = create_scopes.org or bool(create_scopes.team_ids)
         return [
             ModuleEntitlementType(
                 key=r.key,
                 can_view=r.can_view,
-                can_create=r.can_create,
+                can_create=(chat_studio_can_create if r.key == "chat_studio_integration" else r.can_create),
                 can_manage=r.can_manage,
                 can_run=r.can_run,
                 enabled=r.enabled,

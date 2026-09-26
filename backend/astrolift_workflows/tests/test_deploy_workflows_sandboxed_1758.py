@@ -171,6 +171,11 @@ def fake_activities(calls: list[str]) -> list:
         calls.append("create_rollback_deployment")
         return 31
 
+    @activity.defn(name="astrolift.deploy.restore_previous_secrets")
+    async def restore_previous_secrets(deployment_id: int) -> bool:
+        calls.append("restore_previous_secrets")
+        return True
+
     return [
         resync_manifest_for_deploy,
         pre_flight,
@@ -194,6 +199,7 @@ def fake_activities(calls: list[str]) -> list:
         create_promotion_deployment,
         evaluate_supply_chain_gate,
         create_rollback_deployment,
+        restore_previous_secrets,
     ]
 
 
@@ -283,3 +289,72 @@ async def test_a_run_started_before_the_reorder_still_replays(case):
     assert scheduled.index("apply_manifests") < scheduled.index("update_secrets")
 
     await _replay(workflow_cls, history)
+
+
+# #1957: a deploy failure after update_secrets already wrote the new literal
+# Secret must restore the previous release's values before marking the
+# deployment failed, so a pod that restarts later on the old workload spec
+# doesn't pick up this attempt's values.
+
+
+def _fake_activities_with_failing_apply(calls: list[str]) -> list:
+    """``fake_activities`` with ``apply_manifests`` replaced by a version
+    that always raises, so DeployAppWorkflow's except-handler runs."""
+
+    @activity.defn(name="astrolift.deploy.apply_manifests")
+    async def apply_manifests_fails(deployment_id: int) -> dict:
+        calls.append("apply_manifests")
+        raise RuntimeError("apply rejected after secrets were already written")
+
+    activities = [a for a in fake_activities(calls) if getattr(a, "__name__", "") != "apply_manifests"]
+    activities.append(apply_manifests_fails)
+    return activities
+
+
+async def test_a_failed_deploy_restores_the_previous_secrets_before_marking_failed(temporal_env):
+    calls: list[str] = []
+    worker = Worker(
+        temporal_env.client,
+        task_queue=TASK_QUEUE,
+        workflows=[DeployAppWorkflow],
+        activities=_fake_activities_with_failing_apply(calls),
+        workflow_runner=SandboxedWorkflowRunner(),
+        workflow_failure_exception_types=[NondeterminismError],
+    )
+    async with worker:
+        handle = await temporal_env.client.start_workflow(
+            DeployAppWorkflow.run,
+            DeployAppInput(
+                registered_app_id=1,
+                app_environment_id=2,
+                deployment_id=3,
+                image_tags={},
+                trigger_kind="manual",
+                actor=_ACTOR,
+            ),
+            id="deploy-restores-secrets-on-failure",
+            task_queue=TASK_QUEUE,
+        )
+        result = await asyncio.wait_for(handle.result(), timeout=180)
+
+    assert result.ok is False
+    assert calls.count("restore_previous_secrets") == 1
+    assert calls.count("mark_failed") == 1
+    assert calls.index("restore_previous_secrets") < calls.index("mark_failed")
+    await _replay(DeployAppWorkflow, await handle.fetch_history())
+
+
+async def test_a_failed_deploy_from_before_the_restore_still_replays():
+    """Captured before #1957 shipped: apply_manifests fails, the workflow
+    schedules only mark_failed. A worker on this code must replay that run
+    without suddenly expecting restore_previous_secrets to have been
+    scheduled too."""
+    history = WorkflowHistory.from_json(
+        "legacy-deploy-app-failed-restore-capture",
+        (FIXTURES / "legacy-deploy-app-failed-no-secret-restore.json").read_text(),
+    )
+    scheduled = _scheduled(history)
+    assert "restore_previous_secrets" not in scheduled
+    assert scheduled.count("mark_failed") == 1
+
+    await _replay(DeployAppWorkflow, history)

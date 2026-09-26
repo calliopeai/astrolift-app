@@ -1030,24 +1030,31 @@ def gpu_quota_refusal(deployment, manifest) -> str | None:
     return None
 
 
-def deployment_env_from(app, env) -> tuple[list[str], dict]:
-    """``(envFrom Secret names, per-workload envFrom)`` for ``env``'s deploy.
+def deployment_env_from(deployment: Deployment) -> tuple[list[str], dict]:
+    """``(envFrom Secret names, per-workload envFrom)`` for this deployment.
 
     The one source for both the applied render and the ``render_manifests``
     activity, which had drifted apart (#1923). Order matches env_injection's
     documented precedence (later wins): app literal < bundle < managed
     service (#1758).
+
+    Takes the deployment (not bare ``app``/``env``) so the literal-secret
+    half reads ``snapshot_literal_secrets`` -- this deployment's own
+    persisted answer -- rather than recomputing live and risking another
+    disagreement with whatever ``_update_secrets_sync`` decided (#1957).
     """
     from astrolift_services.models import AppSecretBundleRef
-    from astrolift_services.secret_literals import literal_secrets_for_environment
+    from astrolift_services.secret_literals import snapshot_literal_secrets
     from astrolift_workflows.activities.app_lifecycle import (
         _app_env_secret_name,
         _binding_secret_refs_for_environment,
         _bindings_secret_name,
     )
 
+    app = deployment.registered_app
+    env = deployment.app_environment
     env_from: list[str] = []
-    if literal_secrets_for_environment(app, env):
+    if snapshot_literal_secrets(deployment):
         env_from.append(_app_env_secret_name(app.slug, env.name))
     env_from += sorted(
         AppSecretBundleRef.objects.filter(
@@ -1105,11 +1112,11 @@ def render_resources_for_deployment(
     #
     # Order matches env_injection's documented precedence (later wins):
     # app literal < bundle < managed service (#1758).
-    from astrolift_services.secret_literals import literal_secrets_for_environment
+    from astrolift_services.secret_literals import snapshot_literal_secrets
     from astrolift_workflows.activities.app_lifecycle import _bindings_secret_name
 
-    env_from, workload_env_from = deployment_env_from(app, env)
-    literals = literal_secrets_for_environment(app, env)
+    env_from, workload_env_from = deployment_env_from(deployment)
+    literals = snapshot_literal_secrets(deployment)
     has_managed = _bindings_secret_name(app.slug) in env_from
 
     resources = _render(

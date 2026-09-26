@@ -77,7 +77,7 @@ def team(org):
 
 
 @pytest.fixture
-def user(org):
+def user(org, team):
     u = User.objects.create_user(username="builder-user", email="builder@astrolift.dev", password="pw")
     Member.objects.create(
         user=u,
@@ -97,6 +97,11 @@ def user(org):
         permissions=[Permission.APP_CREATE.value, Permission.APP_DEPLOY.value],
     )
     RoleBinding.objects.create(user=u, role=role, scope_kind=RoleBinding.ScopeKind.ORG, scope_id=org.id)
+    # Also a TEAM-scope binding on ``team`` (#1919): create now resolves
+    # ``team_slug`` from the caller's own single team when none is passed,
+    # and every create call in this module relies on that fallback rather
+    # than naming ``team_slug`` itself.
+    RoleBinding.objects.create(user=u, role=role, scope_kind=RoleBinding.ScopeKind.TEAM, scope_id=team.id)
     return u
 
 
