@@ -7885,6 +7885,7 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage. */
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -11774,6 +11775,11 @@ export type OnAppLogsSubscriptionVariables = Exact<{
 
 
 export type OnAppLogsSubscription = { astroliftOnAppLogs: { podName: string, container: string, timestamp: string, message: string, stream: string } };
+
+export type ListModelEndpointsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ListModelEndpointsQuery = { astroliftModelEndpoints: Array<{ id: string, name: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string }> };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

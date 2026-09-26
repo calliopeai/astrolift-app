@@ -5,6 +5,7 @@ import {
   BellIcon,
   BoltIcon,
   BotIcon,
+  BrainCircuitIcon,
   Building2Icon,
   ClipboardListIcon,
   LayoutDashboardIcon,
@@ -193,6 +194,7 @@ const runExtrasSection: { label: string; items: NavItem[] } = {
     { label: "Jobs", href: "/jobs", icon: <CalendarClockIcon />, permission: "app.read_logs" },
     { label: "Tasks", href: "/tasks", icon: <ClipboardListIcon />, permission: "app.read" },
     { label: "Functions", href: "/functions", icon: <BoltIcon />, permission: "app.read" },
+    { label: "Models", href: "/models", icon: <BrainCircuitIcon />, permission: "app.read" },
   ],
 };
 
@@ -293,6 +295,7 @@ const modules: ModuleEntry[] = [
       { label: "Jobs", href: "/jobs", icon: <CalendarClockIcon /> },
       { label: "Tasks", href: "/tasks", icon: <ClipboardListIcon /> },
       { label: "Functions", href: "/functions", icon: <BoltIcon /> },
+      { label: "Models", href: "/models", icon: <BrainCircuitIcon /> },
     ],
   },
   {

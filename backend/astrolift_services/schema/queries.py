@@ -613,6 +613,33 @@ class ServicesQuery:
         ]
 
     @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_model_endpoints(self, info: Info) -> list[ManagedServiceType]:
+        """Every model endpoint the caller can read, app- or project-owned (#2040).
+
+        Hosted (vLLM, KServe) and cloud (Bedrock, Azure OpenAI, Foundry,
+        Vertex) alike, for the Models page. Narrowed to the caller's org and
+        then to the apps and projects its bindings cover.
+        """
+        from astrolift_identity.scope_visibility import visible_apps, visible_projects
+
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), Permission.APP_READ)
+        projects = visible_projects(Project.objects.filter(organization_id=org_id), Permission.PROJECT_READ)
+        rows = (
+            ManagedService.objects.select_related(
+                "registered_app", "project", "tenant_cluster__provider_plugin"
+            )
+            .filter(kind=ManagedService.Kind.MODEL_ENDPOINT, deleted_at__isnull=True)
+            .filter(Q(registered_app__in=apps) | Q(project__in=projects))
+            .order_by("name", "guid")
+        )
+        return [managed_service_to_type(row) for row in rows]
+
+    @strawberry.field
     @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
     @tenant_scoped()
     def astrolift_project_managed_services(
