@@ -19,6 +19,7 @@ re-use the helper rather than duplicate plugin-registry lookup logic.
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from core.cluster_credentials import (
@@ -46,6 +47,25 @@ class AppDeployError(Exception):
     driver, or apply the rendered manifests. Workflow activities catch
     this and surface it through mark_error so the deployment status row
     carries the operator-facing message."""
+
+
+def permissions_boundary_arn(pc: dict[str, Any]) -> str:
+    """The IAM boundary every role minted on this cluster must carry.
+
+    ``provider_config["iam_permissions_boundary_arn"]`` first. A cluster
+    registered before #1681 recorded that key never has it, while the
+    install's task still carries the boundary in its env; fall back to that
+    env only for a cluster in the install's own account, since another
+    account can't attach this account's policy.
+    """
+    recorded = str(pc.get("iam_permissions_boundary_arn") or "").strip()
+    if recorded:
+        return recorded
+    env = os.environ.get("ASTROLIFT_CLUSTER_IAM_PERMISSIONS_BOUNDARY_ARN", "").strip()
+    account = str(pc.get("account_id") or "").strip()
+    if env and account and env.split(":")[4:5] == [account]:
+        return env
+    return ""
 
 
 def namespace_for_app(app: RegisteredApp) -> str:
@@ -475,7 +495,7 @@ def _config_for_capability_uncredentialed(
                 # Set on an agent-installed (pull mode) cluster, whose agent
                 # boundary denies creating a role that does not carry it;
                 # empty on an admin-provisioned one, which has no boundary.
-                permissions_boundary_arn=str(pc.get("iam_permissions_boundary_arn", "")),
+                permissions_boundary_arn=permissions_boundary_arn(pc),
             )
         if capability == "identity":
             from aws.identity_irsa import IRSAConfig
@@ -488,7 +508,7 @@ def _config_for_capability_uncredentialed(
                 # Set on an agent-installed (pull mode) cluster, whose agent
                 # boundary denies creating a role that does not carry it;
                 # empty on an admin-provisioned one, which has no boundary.
-                permissions_boundary_arn=str(pc.get("iam_permissions_boundary_arn", "")),
+                permissions_boundary_arn=permissions_boundary_arn(pc),
             )
         if capability == "secrets":
             from aws.secrets import SecretsConfig
