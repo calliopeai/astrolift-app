@@ -7,10 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { useWorkflowRuns } from "@/graphql/workflows/tiered.hooks";
-import type {
-  ConfiguredWorkflowWithRuns,
-  TieredWorkflowRun,
-} from "@/graphql/workflows/tiered.types";
+import type { ConfiguredWorkflowWithRuns, TieredWorkflowRun } from "@/graphql/workflows/tiered.types";
 import { useWorkflowInstanceDetail } from "@/graphql/workflows/workflows.hooks";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -103,9 +100,7 @@ export function ObserveContent({ workflow }: { workflow: ConfiguredWorkflowWithR
                     </div>
                     <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <span>Started {fmt.formatDateTime(run.startedAt)}</span>
-                      {run.completedAt && (
-                        <span>Completed {fmt.formatDateTime(run.completedAt)}</span>
-                      )}
+                      {run.completedAt && <span>Completed {fmt.formatDateTime(run.completedAt)}</span>}
                     </div>
                   </div>
                   <ChevronRightIcon className="text-muted-foreground size-4 shrink-0" />
@@ -156,7 +151,9 @@ function RunTimelinePanel({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <RunStateBadge state={run.currentState} />
-            <span className="truncate font-mono text-xs">{run.temporalWorkflowId ?? run.guid}</span>
+            <span className="truncate font-mono text-xs">
+              {run.temporalWorkflowId ?? run.guid}
+            </span>
           </div>
           <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 text-xs">
             <span>Started {fmt.formatDateTime(run.startedAt)}</span>

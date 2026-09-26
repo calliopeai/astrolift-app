@@ -1,6 +1,9 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 
-import { GET_WORKFLOW_INSTANCE_DETAIL, GET_WORKFLOW_INSTANCES } from "./workflows.queries";
+import {
+  GET_WORKFLOW_INSTANCE_DETAIL,
+  GET_WORKFLOW_INSTANCES,
+} from "./workflows.queries";
 import {
   CANCEL_WORKFLOW_INSTANCE,
   SIGNAL_WORKFLOW_INSTANCE,
