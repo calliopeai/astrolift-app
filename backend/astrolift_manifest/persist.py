@@ -114,6 +114,13 @@ class PersistResult:
     # back because the caller may not make them (#1966).
     project_changes_withheld: list[str] = dataclasses.field(default_factory=list)
     hash_changed: bool = False
+    # Rendered hostnames another app already holds in the ledger, so this
+    # reconcile left them unclaimed (#2012). Never fails the persist:
+    # every caller here is a "must survive" manifest-apply path. But a
+    # caller that surfaces operator-facing detail can report these instead
+    # of a bare log line. Empty when every desired hostname claimed cleanly
+    # (including the common case of no public workloads at all).
+    hostname_conflicts: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def changed(self) -> bool:
@@ -240,6 +247,14 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
     result.managed_service_attachments_removed += managed.managed_service_attachments_removed
     result.managed_service_changes += managed.managed_service_changes
     result.managed_services_deferred = managed.managed_services_deferred
+
+    # Hostname ledger (#2012). Best-effort: every caller of persist_manifest
+    # (registration, resync, agent repo scans, staged apply) must survive a
+    # bad or colliding manifest, so a claim already held by another app is
+    # left with its existing owner and reported here rather than raised.
+    from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+
+    result.hostname_conflicts = sync_workload_hostname_claims(app, manifest)
 
     return result
 

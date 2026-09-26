@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Rendered hostnames, not just app labels, are now unique per managed zone
+  (#2012, follow-up to #1930). A multi-workload app's suffixed hostname
+  (`<label>-<workload>.<zone>`) can equal another org's plain label of that
+  name, which the #1930 label-only check could not see. A new
+  `HostnameClaim` ledger records one row per (zone, hostname) a live
+  app/workload/environment renders, with a database-level unique constraint
+  on the rendered string, kept in sync at register, `setAppSubdomain`,
+  every manifest apply (register, resync, agent repo scans), imported
+  agents and the builder path, the same places #1930 already checks.
+  `setAppSubdomain` refuses a rename that would produce a colliding
+  suffixed hostname, since the app's full workload set is already known
+  there; the manifest-apply paths are best-effort (a hostname another app
+  already holds is left with its existing owner and logged, never stolen,
+  since those paths must survive a bad or colliding manifest elsewhere in
+  this codebase). Claims release on app teardown/deregister and on
+  `softDeleteApp`. A data migration backfills the ledger from every
+  existing app, keeping the first claimant (oldest app) on any
+  pre-existing collision and logging the rest. `manage.py
+  report_shared_zone_hostname_collisions` is a new read-only command that
+  renders every live app's public hostnames in shared zones independently
+  of the ledger and lists every hostname two or more organizations render
+  : the way to find what the migration left unclaimed, and to audit the
+  ledger against the live renderer going forward.
 - AWS SES: a tenant could adopt another org's or the platform's own sending
   identity by deriving, or typing, the same name (#2029). The driver now
   provisions through SESv2 -- `create_email_identity` with ownership tags,

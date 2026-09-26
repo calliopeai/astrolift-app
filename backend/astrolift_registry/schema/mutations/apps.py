@@ -261,7 +261,7 @@ class AppMutations:
                 field="subdomain",
             )
 
-        from astrolift_registry.hostname_claims import hostname_label_refusal
+        from astrolift_registry.hostname_claims import hostname_claim_refusal, hostname_label_refusal
 
         # Across orgs: a shared zone has one namespace of labels (#1930).
         refusal = (
@@ -272,13 +272,26 @@ class AppMutations:
         if refusal is not None:
             return gql_failure(ErrorCode.CONFLICT.value, refusal, field="subdomain")
 
+        # The label check above can't see a multi-workload app's suffixed
+        # hostname (``<subdomain>-<workload>``) colliding with another app's
+        # plain claim of that name (#2012); this app's live workload set is
+        # already known here, so render every hostname the rename would
+        # produce and refuse if the ledger says another app holds one.
+        claim_refusal = (
+            hostname_claim_refusal(app, subdomain=new_subdomain) if app.subdomain != new_subdomain else None
+        )
+        if claim_refusal is not None:
+            return gql_failure(ErrorCode.CONFLICT.value, claim_refusal, field="subdomain")
+
         if app.subdomain != new_subdomain:
+            from astrolift_registry.hostname_claims import sync_workload_hostname_claims
             from astrolift_workflows.client import start_workflow
             from astrolift_workflows.inputs import Actor, SyncAppDomainInput
 
             previous_subdomain = app.subdomain
             app.subdomain = new_subdomain
             app.save(update_fields=["subdomain", "updated_at", "version"])
+            sync_workload_hostname_claims(app)
             # Deterministic id: re-firing for the same app supersedes the
             # in-flight sync rather than racing a second one onto the same
             # Ingress. The workflow needs the pre-write value to diff the
@@ -311,6 +324,9 @@ class AppMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         app.soft_delete(by=_actor())
+        from astrolift_registry.hostname_claims import release_app_hostname_claims
+
+        release_app_hostname_claims(app)
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
     @strawberry.field

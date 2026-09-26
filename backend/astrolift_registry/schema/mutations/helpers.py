@@ -566,6 +566,15 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     if manifest_services:
         reconcile_managed_services(app, manifest_services)
 
+    # Hostname ledger (#2012). ``persist_manifest`` also syncs claims, but it
+    # runs before this bootstrap during initial registration -- at that point
+    # the app had no environment yet, so nothing could be claimed. Now that
+    # every environment this call created is bound to a zone, sync once more
+    # so the app's existing public workloads actually get their claim.
+    from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+
+    sync_workload_hostname_claims(app)
+
     # Trigger OnboardAppWorkflow when the app is still pending (never
     # provisioned).
     #

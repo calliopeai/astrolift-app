@@ -872,6 +872,15 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         managed_domain=managed_domain,
     )
 
+    # Hostname ledger (#2012) -- same call site the #1930 label check
+    # covers. A promoted app has no Workload rows yet (its "web" service is
+    # rendered by DeployPromotedAppWorkflow, not persist_manifest), so this
+    # is a no-op today; wiring it in now means it starts claiming the day
+    # that changes, with no call site to remember to add.
+    from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+
+    sync_workload_hostname_claims(app)
+
     dev.status = DevEnvironment.Status.PROMOTING
     dev.promoted_app = app
     dev.save(update_fields=["status", "promoted_app", "updated_at", "version"])
