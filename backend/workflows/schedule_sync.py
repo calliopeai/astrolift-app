@@ -2,15 +2,17 @@
 
 When a configured ``Workflow`` is saved with ``trigger_kind=schedule`` and a
 ``schedule_cron``, exactly one Temporal Schedule is created/updated for it
-(id ``workflow-<guid>``) that starts ``WorkflowDefinitionRunWorkflow`` on the
-cron. The schedule is paused/deleted when the Workflow is disabled or deleted.
+(id ``workflow-<guid>``). The schedule is paused/deleted when the Workflow is
+disabled or deleted.
 
 Mirrors ``astrolift_pipelines/schedule_sync.py`` (the per-trigger pattern) —
-NOT ``schedule_boot`` (the platform-sweep allowlist registrar). The schedule
-action carries a real ``WorkflowDefinitionRunInput`` (built the same way the
-inline run path builds it via ``build_workflow_definition_run_input``) so each
-fire deserializes correctly, the same fix the agent-workflow scheduled path
-landed (#1036).
+NOT ``schedule_boot`` (the platform-sweep allowlist registrar). The action
+starts ``ConfiguredWorkflowScheduleWorkflow`` with the Workflow's guid and
+organization only, and that wrapper builds a fresh run per fire (#2053). What
+stood here built the ``WorkflowDefinitionRunInput`` once, at save time, and
+baked it into the action: it named one ``WorkflowRun``, every fire reused it,
+and once the first fire closed it every later fire failed at its first stage
+with "Cannot open a stage on a closed workflow".
 
 All Temporal calls are best-effort: a sync failure is logged and swallowed so
 it never blocks the Workflow save or delete (the row is the source of truth;
@@ -29,6 +31,22 @@ def schedule_id_for(workflow) -> str:
     return f"workflow-{workflow.guid}"
 
 
+def schedule_inactive_reason(workflow) -> str | None:
+    """Why ``workflow`` should have no schedule, or None when it should.
+
+    The save-time sync and the fire (``create_scheduled_workflow_run``) both
+    ask this, so a fire never runs a Workflow its own save would have
+    unscheduled.
+    """
+    if workflow.deleted_at is not None:
+        return "workflow was deleted"
+    if not workflow.is_enabled:
+        return "workflow is disabled"
+    if workflow.trigger_kind != "schedule" or not workflow.schedule_cron:
+        return "workflow is no longer schedule-triggered"
+    return None
+
+
 def sync_workflow_schedule(workflow) -> None:
     """Create or update the Temporal Schedule for a scheduled ``Workflow``.
 
@@ -38,13 +56,7 @@ def sync_workflow_schedule(workflow) -> None:
     """
     schedule_id = schedule_id_for(workflow)
 
-    active = (
-        workflow.deleted_at is None
-        and workflow.is_enabled
-        and workflow.trigger_kind == "schedule"
-        and bool(workflow.schedule_cron)
-    )
-    if not active:
+    if schedule_inactive_reason(workflow) is not None:
         delete_workflow_schedule(workflow)
         return
 
@@ -58,7 +70,7 @@ def sync_workflow_schedule(workflow) -> None:
         return
 
     try:
-        _create_or_update(workflow, schedule_id)
+        write_workflow_schedule(workflow)
     except Exception:  # noqa: BLE001 — never block the save
         logger.exception("workflows.schedule_sync: failed to sync schedule %s", schedule_id)
 
@@ -91,22 +103,22 @@ def delete_workflow_schedule(workflow) -> None:
         )
 
 
-def _create_or_update(workflow, schedule_id: str) -> None:
-    """Build the run input + (re)create the Temporal Schedule (sync wrapper)."""
+def write_workflow_schedule(workflow) -> None:
+    """(Re)create the Workflow's schedule. Raises when Temporal refuses.
+
+    ``sync_workflow_schedule`` swallows that so a save never blocks;
+    ``manage.py resync_workflow_schedules`` reports it.
+    """
     from asgiref.sync import async_to_sync
     from django.conf import settings
 
     from astrolift_workflows.client import _get_client_async
-    from astrolift_workflows.inputs import Actor
-    from workflows.run_service import build_workflow_definition_run_input
 
-    _run, run_input, run_workflow_id = build_workflow_definition_run_input(
-        workflow.definition,
-        trigger_payload=dict(workflow.inputs or {}),
-        organization_id=workflow.organization_id,
-        actor=Actor(kind="system", user_id=None, display="scheduled"),
-        stage_bindings=workflow.stage_bindings,
-    )
+    schedule_id = schedule_id_for(workflow)
+    action_input = {
+        "workflow_guid": str(workflow.guid),
+        "organization_id": workflow.organization_id,
+    }
     task_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")
     cron = workflow.schedule_cron
 
@@ -121,14 +133,16 @@ def _create_or_update(workflow, schedule_id: str) -> None:
 
         client = await _get_client_async()
         action = ScheduleActionStartWorkflow(
-            "WorkflowDefinitionRunWorkflow",
-            run_input,
-            id=run_workflow_id,
+            "ConfiguredWorkflowScheduleWorkflow",
+            action_input,
+            # Temporal appends each fire's nominal time to this id.
+            id=f"{schedule_id}-run",
             task_queue=task_queue,
         )
         spec = ScheduleSpec(cron_expressions=[cron])
         schedule = Schedule(action=action, spec=spec, state=ScheduleState(paused=False))
-        # Update via delete+recreate so a changed cron / bindings take effect.
+        # Update via delete+recreate so a changed cron takes effect, and so a
+        # schedule written before #2053 loses its baked action.
         try:
             await client.get_schedule_handle(schedule_id).delete()
         except Exception:  # noqa: BLE001 — first sync: no schedule yet
