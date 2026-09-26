@@ -33,6 +33,12 @@ const MODULE_CONFIG = [
     description: "Lets members attach live to a running agent session.",
     installFlagKey: "modules.agent_live_attach_allowed",
   },
+  {
+    key: "chat_studio_agent_runs",
+    label: "Chat Studio agent runs",
+    description: "Lets Chat Studio launch this organization's registered agents.",
+    installFlagKey: "modules.chat_studio_agent_runs_allowed",
+  },
 ] as const;
 
 /**

@@ -211,6 +211,20 @@ class RunAstroliftAgentInput:
     context (e.g. an inline prompt or input map) folded into the task's
     brief context; ``None`` is the no-payload manual case. ``timeout_seconds``
     bounds the run (defaults to the AgentTask model default).
+
+    ``client_request_id`` (#2072) is an optional idempotency key, a UUID the
+    caller mints itself: the SAME caller presenting the same key again with
+    the same ``agent_slug``/``environment_spec_id``/``trigger_payload``/
+    ``timeout_seconds`` gets back the task already dispatched for it rather
+    than a second one, so a client that launched an agent and crashed
+    before recording the reply can retry safely. That same caller
+    presenting the key again with a different payload is refused
+    (PRECONDITION). The key is scoped to the requester who minted it: a
+    different caller presenting the identical key dispatches its own,
+    independent task rather than either colliding with or recovering the
+    first caller's. ``agentTaskByClientRequestId`` recovers the task for a
+    key without dispatching anything, and likewise resolves only the
+    calling user's own keys.
     """
 
     agent_slug: str
@@ -220,6 +234,7 @@ class RunAstroliftAgentInput:
     # coerces None -> {}.
     trigger_payload: JSON | None = None
     timeout_seconds: int | None = None
+    client_request_id: str | None = None
 
 
 @strawberry.input
@@ -2126,6 +2141,7 @@ class AgentsMutation:
                 trigger_payload=input.trigger_payload or None,
                 timeout_seconds=input.timeout_seconds,
                 trigger="manual",
+                client_request_id=input.client_request_id,
             )
         except AgentDispatchError as exc:
             code = {
@@ -2140,6 +2156,7 @@ class AgentsMutation:
                     "agent_slug": "agentSlug",
                     "environment_spec_id": "environmentSpecId",
                     "timeout_seconds": "timeoutSeconds",
+                    "client_request_id": "clientRequestId",
                 }.get(exc.field),
             )
 

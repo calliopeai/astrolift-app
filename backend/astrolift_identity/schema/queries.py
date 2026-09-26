@@ -107,9 +107,10 @@ class ModuleEntitlementType:
         description=(
             "Whether the module is switched on for the active organization. "
             "Always true for apps, agents, workflows and admin. For the per-org "
-            "modules (chat_studio_integration, agent_live_attach) it is true only "
-            "when an org admin turned the module on and the install has not "
-            "forced it off. Independent of the can* fields."
+            "modules (chat_studio_integration, agent_live_attach, "
+            "chat_studio_agent_runs) it is true only when an org admin turned "
+            "the module on and the install has not forced it off. Independent "
+            "of the can* fields."
         )
     )
 

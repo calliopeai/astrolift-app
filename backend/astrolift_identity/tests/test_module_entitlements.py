@@ -296,7 +296,7 @@ class TestModulesPerRole:
         with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
             mods = _modules(MeType(id=str(user.pk), profile=None), info)
         assert "dashboard" not in mods
-        # The two per-org modules (#1859) ride along as rows of their own.
+        # The three per-org modules (#1859, #2069) ride along as rows of their own.
         assert set(mods) == {
             "apps",
             "agents",
@@ -304,6 +304,7 @@ class TestModulesPerRole:
             "admin",
             "chat_studio_integration",
             "agent_live_attach",
+            "chat_studio_agent_runs",
         }
 
 
