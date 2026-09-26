@@ -68,7 +68,8 @@ def test_binding_is_the_shared_model_envelope(driver) -> None:
 
 def test_update_keeps_the_publisher_format(driver, mgmt) -> None:
     handle = driver.provision(_foundry_spec()).handle
-    assert driver.update(UpdateSpec(handle, config={"model_version": "5"}, managed_service_id=_spec().managed_service_id)).ok
+    owner = _spec().managed_service_id
+    assert driver.update(UpdateSpec(handle, config={"model_version": "5"}, managed_service_id=owner)).ok
     assert mgmt.deployments_obj.update_calls[0]["parameters"]["properties"]["model"]["format"] == "Meta"
 
 
