@@ -94,6 +94,8 @@ _WORKLOAD_KEYS = frozenset(
         "faas_runtime",
         "faas_timeout_seconds",
         "fs_group",
+        "gpu",
+        "gpu_type",
         "hpa_max",
         "hpa_min",
         "hpa_target_cpu_pct",
@@ -106,6 +108,7 @@ _WORKLOAD_KEYS = frozenset(
         "memory_limit",
         "memory_request",
         "metrics",
+        "mig_profile",
         "min_scale",
         "name",
         "replicas",
@@ -751,9 +754,13 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
 
     volumes = _parse_volumes(d.get("volumes", []), path)
     fs_group = _parse_fs_group(d, path)
+    gpu, gpu_type, mig_profile = _parse_gpu(d, path)
 
     return WorkloadManifest(
         name=name,
+        gpu=gpu,
+        gpu_type=gpu_type,
+        mig_profile=mig_profile,
         kind=kind,
         is_public=bool(d.get("is_public", False)),
         schedule=schedule,
@@ -1019,6 +1026,31 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_size=None,
         containers=(container,),
     )
+
+
+_GPU_TYPE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,62}")
+_MIG_PROFILE_RE = re.compile(r"[1-7]g\.[0-9]+gb")
+_MAX_GPUS = 16
+
+
+def _parse_gpu(d: dict, path: str) -> tuple[int, str | None, str | None]:
+    """``gpu`` / ``gpu_type`` / ``mig_profile`` (#2038). ``gpu`` counts whole
+    GPUs, or MIG slices when ``mig_profile`` is set; the type and profile
+    need a count."""
+    raw = d.get("gpu", 0)
+    if isinstance(raw, bool) or not isinstance(raw, int) or not 0 <= raw <= _MAX_GPUS:
+        raise ManifestError(f"gpu must be an int from 0 to {_MAX_GPUS}, got {raw!r}", path=f"{path}.gpu")
+    gpu_type = d.get("gpu_type")
+    if gpu_type is not None and (not isinstance(gpu_type, str) or not _GPU_TYPE_RE.fullmatch(gpu_type)):
+        raise ManifestError(
+            f"gpu_type must be a label value such as 'nvidia-l4', got {gpu_type!r}", path=f"{path}.gpu_type"
+        )
+    mig = d.get("mig_profile")
+    if mig is not None and (not isinstance(mig, str) or not _MIG_PROFILE_RE.fullmatch(mig)):
+        raise ManifestError(f"mig_profile must look like '3g.47gb', got {mig!r}", path=f"{path}.mig_profile")
+    if (gpu_type or mig) and not raw:
+        raise ManifestError("gpu_type and mig_profile need gpu >= 1", path=f"{path}.gpu")
+    return raw, gpu_type, mig
 
 
 def _parse_fs_group(d: dict, path: str) -> int | None:

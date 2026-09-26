@@ -672,6 +672,28 @@ def _render_hpa(
 # ---------------------------------------------------------------------------
 
 
+def gpu_resource_name(w: WorkloadManifest) -> str:
+    """The extended resource a GPU workload requests (#2038)."""
+    return f"nvidia.com/mig-{w.mig_profile}" if w.mig_profile else "nvidia.com/gpu"
+
+
+def gpu_scheduling(w: WorkloadManifest) -> dict[str, Any]:
+    """Pod-spec scheduling fields for a GPU workload (#2038): node affinity on
+    the GPU type when one is pinned. #2039 adds the GPU-pool toleration here.
+    Empty for a workload without GPUs."""
+    if not w.gpu or not w.gpu_type:
+        return {}
+    terms = [
+        {"matchExpressions": [{"key": key, "operator": "In", "values": [w.gpu_type]}]}
+        for key in ("nvidia.com/gpu.product", "cloud.google.com/gke-accelerator")
+    ]
+    return {
+        "affinity": {
+            "nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": terms}}
+        }
+    }
+
+
 def _pod_spec(
     w: WorkloadManifest,
     *,
@@ -681,6 +703,7 @@ def _pod_spec(
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
+        **gpu_scheduling(w),
         "containers": [
             _render_container(
                 c,
@@ -763,6 +786,10 @@ def _render_container(
         spec["livenessProbe"] = probe
         spec["readinessProbe"] = probe
     resources = _render_resources(workload)
+    if workload.gpu and c is _primary_container(workload):
+        # GPUs go on the primary container only; a sidecar asking for one
+        # would hold a device it never uses (#2038).
+        resources.setdefault("limits", {})[gpu_resource_name(workload)] = str(workload.gpu)
     if resources:
         spec["resources"] = resources
     return spec

@@ -894,6 +894,38 @@ def _inject_managed_filesystem_bindings(
         raise AppDeployError(str(exc)) from exc
 
 
+def gpu_capacity_refusal(manifest, cluster) -> str | None:
+    """Why ``manifest``'s GPU workloads cannot schedule on ``cluster``, or
+    ``None`` (#2038): refused up front rather than left Pending.
+
+    Only a probed cluster is judged (``capabilities["gpu"]`` empty means the
+    nodes could not be listed), and one that provisions GPU nodes on demand
+    (``provider_config.gpu_autoprovision``, e.g. GKE Autopilot or Karpenter)
+    is never refused for having none yet.
+    """
+    wanted = [w for w in getattr(manifest, "workloads", ()) if getattr(w, "gpu", 0)]
+    if not wanted or cluster is None:
+        return None
+    gpu = (getattr(cluster, "capabilities", None) or {}).get("gpu") or {}
+    if not gpu or (getattr(cluster, "provider_config", None) or {}).get("gpu_autoprovision"):
+        return None
+    for w in wanted:
+        # A pod's GPUs all come from one node, so the largest node counts.
+        nodes = gpu.get("nodes") or []
+        if w.mig_profile:
+            have = max((int((n.get("mig") or {}).get(w.mig_profile, 0)) for n in nodes), default=0)
+            what = f"{w.gpu} MIG slice(s) of {w.mig_profile}"
+        else:
+            have = max((sum(int(v) for v in (n.get("gpus") or {}).values()) for n in nodes), default=0)
+            what = f"{w.gpu} GPU(s)"
+        if have < w.gpu:
+            return (
+                f"workload {w.name!r} requests {what} but no node of cluster {cluster.slug!r} has more than {have} "
+                "(from its last capability probe); add GPU nodes or set gpu_autoprovision on the cluster"
+            )
+    return None
+
+
 def deployment_env_from(app, env) -> tuple[list[str], dict]:
     """``(envFrom Secret names, per-workload envFrom)`` for ``env``'s deploy.
 
@@ -998,6 +1030,9 @@ def render_resources_for_deployment(
     # the full resource set regardless of which code path produced it.
     managed_domain = getattr(env, "managed_domain", None)
     cluster = cluster_override or getattr(env, "tenant_cluster", None)
+    refusal = gpu_capacity_refusal(manifest, cluster)
+    if refusal:
+        raise AppDeployError(refusal)
     _ingress_count = 0
     if managed_domain is not None and cluster is not None:
         ingress_resources = (

@@ -108,6 +108,9 @@ _DEFAULT_CAPABILITIES: dict[str, Any] = {
     # TenantCluster.node_archs from this and must not clear a known value
     # because one probe failed.
     "node_architectures": [],
+    # GPU nodes, totals and GPU stack presence (#2038). Empty means "not
+    # probed" (nodes could not be listed), like node_architectures.
+    "gpu": {},
 }
 
 
@@ -157,6 +160,9 @@ class ManagementBackend(Protocol):
 
     def list_storage_classes(self, *, auth: ClusterAuth) -> list[str]:
         """Return storage class names. Empty list when none defined."""
+
+    def list_nodes(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        """Return node objects as dicts (``metadata``, ``spec``, ``status``)."""
 
     def list_node_architectures(self, *, auth: ClusterAuth) -> list[str]:
         """Return the distinct CPU architectures across the cluster's nodes.
@@ -655,6 +661,16 @@ def probe_cluster_capabilities(
         except Exception as exc:
             log.debug("probe: node architecture discovery unavailable: %s", exc)
 
+    gpu: dict[str, Any] = {}
+    node_lister = getattr(backend, "list_nodes", None)
+    if callable(node_lister):
+        try:
+            from k8s_native.gpu import summarize as summarize_gpus
+
+            gpu = summarize_gpus(list(node_lister(auth=auth)), pods_by_namespace.get("*") or [])
+        except Exception as exc:
+            log.debug("probe: GPU discovery unavailable: %s", exc)
+
     # When operators use the UI bootstrap recipe, all components land in
     # astrolift-system via Flux HelmRelease. Merge those pods into each
     # classifier's candidate list so detection works regardless of whether
@@ -755,6 +771,7 @@ def probe_cluster_capabilities(
         "ingress": ingress,
         "storage_classes": list(storage_classes),
         "node_architectures": node_architectures,
+        "gpu": gpu,
         "external_dns": external_dns,
         "service_mesh": service_mesh,
         "metrics_server": metrics_server,
@@ -1104,6 +1121,18 @@ class LiveManagementBackend:
             for item in (resp.items or [])
         }
         return sorted(a.strip().lower() for a in archs if a and a.strip())
+
+    def list_nodes(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        """Node objects as plain dicts, for GPU discovery (#2038)."""
+        try:
+            from kubernetes import client as k8s_client
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("kubernetes python client is not installed") from exc
+        from k8s_native.observability import build_api_client
+
+        api_client = build_api_client(auth)
+        resp = k8s_client.CoreV1Api(api_client).list_node(timeout_seconds=10)
+        return [api_client.sanitize_for_serialization(item) for item in (resp.items or [])]
 
     def run_preflight_job(
         self,
