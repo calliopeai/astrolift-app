@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- AWS SES: a tenant could adopt another org's or the platform's own sending
+  identity by deriving, or typing, the same name (#2029). The driver now
+  provisions through SESv2 -- `create_email_identity` with ownership tags,
+  `get_email_identity` for both state and tag reads -- and refuses to reuse
+  an existing identity whose tags don't match this managed service, the
+  same `adoption_refusal` pattern #1961 established for the other AWS
+  drivers. Provisioning also now refuses up front, before resolving a
+  driver at all, when a different and still-live `ManagedService` row
+  already holds the identity a spec would derive or was given explicitly,
+  so a same-account collision never reaches SES.
 - One organization can no longer act on a person's account past its own
   reach (#1979, #1977). Anonymizing someone else now needs them to be a
   member of the active organization, not the platform operator, not an
