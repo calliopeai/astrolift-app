@@ -13,6 +13,7 @@ from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
     ServiceHandle,
+    SnapshotHandle,
     UpdateSpec,
 )
 from aws.managed._base import ManagedServiceError
@@ -786,3 +787,33 @@ def test_a_platform_filesystem_of_another_org_is_not_adopted():
 
     assert not result.ok and "refusing to adopt" in result.message
     client.tag_resource.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("fragment", "repository"),
+    [
+        ("file_system", {"LustreConfiguration": {"ImportPath": "s3://other-tenant-data/export"}}),
+        ("file_system", {"LustreConfiguration": {"ExportPath": "s3://other-tenant-data/inbox"}}),
+        ("file_system", {"LustreConfiguration": {"AutoImportPolicy": "NEW_CHANGED_DELETED"}}),
+        ("restore_file_system", {"LustreConfiguration": {"ImportPath": "s3://other-tenant-data/export"}}),
+    ],
+)
+def test_a_lustre_file_system_names_no_s3_data_repository(fragment, repository):
+    # An import path reads any S3 path FSx can reach into the new file system,
+    # a restore the platform never checked; an export path writes into a bucket
+    # this app does not own (#2087).
+    client = _client("LUSTRE")
+    driver = FSxLustreDriver(config=_config(), client=client)
+
+    if fragment == "file_system":
+        result = driver.provision(_spec(config={fragment: repository}))
+    else:
+        result = driver.restore(
+            SnapshotHandle(f"filesystem/{FS_ID}", BACKUP_ID, "2026-08-14T00:00:00Z"),
+            _spec(config={fragment: repository}),
+        )
+
+    assert not result.ok
+    assert "S3 data repository fields" in result.message
+    client.create_file_system.assert_not_called()
+    client.create_file_system_from_backup.assert_not_called()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -84,10 +84,24 @@ class DocumentDBDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, snapshot_identifier: str = "") -> ProvisionResult:
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_documentdb_config"])
+        # restore() takes only the snapshot the platform retained for this
+        # service's own app; a config that names one itself skipped that check
+        # (#2087).
+        if "snapshot_identifier" in cfg:
+            return ProvisionResult(
+                False,
+                "",
+                "DocumentDB config cannot name a snapshot to copy data from (snapshot_identifier); "
+                "restore from a snapshot Astrolift retained for this app instead",
+                ["invalid_documentdb_config"],
+            )
         cluster_id = self._cluster_id(spec)
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
@@ -99,8 +113,8 @@ class DocumentDBDriver(ManagedServiceDriver):
                 return ProvisionResult(False, "", refusal, [refusal])
         try:
             if cluster is None:
-                if cfg.get("snapshot_identifier"):
-                    self._restore_cluster(cluster_id, spec, cfg)
+                if snapshot_identifier:
+                    self._restore_cluster(cluster_id, spec, cfg, snapshot_identifier)
                 else:
                     self._create_cluster(cluster_id, spec, cfg)
             self._ensure_instances(cluster_id, spec, cfg)
@@ -398,9 +412,7 @@ class DocumentDBDriver(ManagedServiceDriver):
                 f"copy DocumentDB snapshot credentials: {exc}",
                 [str(exc)],
             )
-        cfg = dict(target.config or {})
-        cfg["snapshot_identifier"] = snapshot.snapshot_id
-        return self.provision(replace(target, config=cfg))
+        return self._provision(target, snapshot_identifier=snapshot.snapshot_id)
 
     @driver_op(cloud="aws", driver="documentdb", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
@@ -504,11 +516,17 @@ class DocumentDBDriver(ManagedServiceDriver):
             kwargs["ServerlessV2ScalingConfiguration"] = self._scaling(cfg)
         self._docdb.create_db_cluster(**kwargs)
 
-    def _restore_cluster(self, cluster_id: str, spec: ProvisionSpec, cfg: dict[str, Any]) -> None:
+    def _restore_cluster(
+        self,
+        cluster_id: str,
+        spec: ProvisionSpec,
+        cfg: dict[str, Any],
+        snapshot_identifier: str,
+    ) -> None:
         self._password_value(cluster_id)
         kwargs: dict[str, Any] = {
             "DBClusterIdentifier": cluster_id,
-            "SnapshotIdentifier": str(cfg["snapshot_identifier"]),
+            "SnapshotIdentifier": snapshot_identifier,
             "Engine": "docdb",
             "DBSubnetGroupName": self._config.db_subnet_group,
             "VpcSecurityGroupIds": list(self._config.security_group_ids),

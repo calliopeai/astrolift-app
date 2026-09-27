@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,6 +30,10 @@ from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for,
 from aws.session import aws_client
 
 KIND = "redis"
+# Config keys that would seed this cluster from another snapshot. A restore
+# takes only the snapshot the platform retained for this service's own app
+# (#2087).
+_SOURCE_KEYS = frozenset({"snapshot_arns_to_restore", "snapshot_name_to_restore"})
 _ENGINES = {"valkey", "redis"}
 _SIZE_TO_NODE_TYPE = {
     "small": "db.t4g.small",
@@ -85,10 +89,22 @@ class MemoryDBDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, snapshot_id: str = "") -> ProvisionResult:
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_memorydb_config"])
+        named = sorted(_SOURCE_KEYS.intersection(cfg))
+        if named:
+            return ProvisionResult(
+                False,
+                "",
+                f"MemoryDB config cannot name a snapshot to copy data from ({', '.join(named)}); "
+                "restore from a snapshot Astrolift retained for this app instead",
+                ["invalid_memorydb_config"],
+            )
         name = self._cluster_name(spec)
         handle = handle_for(kind=KIND, resource_id=name)
         # Ownership before the access resources, which are keyed by name (#1961).
@@ -148,10 +164,10 @@ class MemoryDBDriver(ManagedServiceDriver):
         ):
             if key in cfg:
                 kwargs[aws_key] = bool(cfg[key])
-        if cfg.get("snapshot_arns_to_restore"):
-            kwargs["SnapshotArns"] = list(cfg["snapshot_arns_to_restore"])
-        if cfg.get("snapshot_name_to_restore"):
-            kwargs["SnapshotName"] = str(cfg["snapshot_name_to_restore"])
+        if snapshot_id.startswith("arn:"):
+            kwargs["SnapshotArns"] = [snapshot_id]
+        elif snapshot_id:
+            kwargs["SnapshotName"] = snapshot_id
         try:
             self._memorydb.create_cluster(**kwargs)
         except Exception as exc:
@@ -344,12 +360,7 @@ class MemoryDBDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="memorydb")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
-        cfg = dict(target.config or {})
-        if snapshot.snapshot_id.startswith("arn:"):
-            cfg["snapshot_arns_to_restore"] = [snapshot.snapshot_id]
-        else:
-            cfg["snapshot_name_to_restore"] = snapshot.snapshot_id
-        return self.provision(replace(target, config=cfg))
+        return self._provision(target, snapshot_id=snapshot.snapshot_id)
 
     @driver_op(cloud="aws", driver="memorydb", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
