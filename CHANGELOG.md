@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- A managed service restores only from a snapshot Astrolift retained for its
+  own app, and no longer runs as an identity its config chose (#2087).
+  `restore.snapshot_id` and `restore.source_handle` came from the manifest
+  and every driver's `restore` read what they named with the platform's
+  credentials: another org's backup, revision or export on a shared cluster.
+  The platform now refuses, before any driver runs, a pair that does not
+  match a `last_retained_snapshot` a data-preserving teardown recorded on a
+  service of the same organization, app (or project), kind and cluster, and
+  restores that record's own point in time. Config that copied data around
+  restore is refused: Firestore `clone_source_database`, the Neptune,
+  DocumentDB, Redshift, MemoryDB and ElastiCache Serverless snapshot keys,
+  Neptune replication and global-cluster joins, FSx Lustre import and export
+  paths, Amazon MQ replica brokers, REST API `cloneFrom`, and Redshift
+  `owner_account`. Workflows' `allow_cross_project_snapshot` and
+  `allow_unowned_snapshot` are gone. Service accounts, user-assigned
+  identities and roles a config names must be listed by the operator in the
+  cluster's `provider_config`, and an empty list refuses every one:
+  `workflows_`, `eventarc_`, `pubsub_` and `api_gateway_allowed_service_accounts`,
+  `cloud_operations_allowed_writer_identities`, `bigquery_allowed_connections`,
+  `eventgrid_`, `eventgrid_namespace_`, `eventhubs_`, `cosmos_api_` and
+  `managed_redis_allowed_identity_resource_ids`, `mssql_allowed_option_groups`
+  and, in a shared `knative_namespace`, `knative_allowed_service_accounts`.
+  Lambda `grants` and VPC endpoint `iam_grants`, which wrote config-chosen IAM
+  statements onto the role tenant code runs as, are refused, and a Lambda
+  update resets its execution role to basic execution. Redshift `iam_roles`,
+  API Gateway integration and authorizer credentials and Firehose processor
+  roles must sit under the org's IAM role path like other roles. Upgrading:
+  a restore from a snapshot taken outside Astrolift, or from another app or
+  cluster, stops working, and configs that name one of these identities fail
+  their next provision or update until an operator lists it.
+
 - GCP ownership checks no longer key on a name the tenant chooses (#2086,
   follow-up to #2074). Spanner Graph proved a database was Astrolift's with
   a schema marker that named no service, and on a shared instance the

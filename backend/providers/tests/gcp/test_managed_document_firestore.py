@@ -640,13 +640,22 @@ def test_clone_from_a_named_database_is_refused(harness: Harness, clone: dict[st
     assert "projects/acme-prod/databases/astrolift-clone" not in harness.state.databases
 
 
-@pytest.mark.parametrize("key", ["clone_source_database", "clone_snapshot_time", "clone_encryption_config"])
-def test_removed_clone_keys_fail_the_config_schema(harness: Harness, key: str) -> None:
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        # Each value is one the schema accepted while the key existed, so the
+        # refusal is the key's removal, not a malformed value.
+        ("clone_source_database", "projects/other-tenant/databases/records"),
+        ("clone_snapshot_time", "2026-08-14T12:00:00Z"),
+        ("clone_encryption_config", {"use_source_encryption": {}}),
+    ],
+)
+def test_removed_clone_keys_fail_the_config_schema(harness: Harness, key: str, value: Any) -> None:
     validator = Draft202012Validator(harness.driver.config_schema())
     base = {"location": "nam5"}
 
     assert validator.is_valid(base)
-    assert not validator.is_valid({**base, key: "x"})
+    assert not validator.is_valid({**base, key: value})
 
 
 def test_weekly_backup_day_change_requires_explicit_replacement(harness: Harness) -> None:
