@@ -264,7 +264,7 @@ _OIDC_PUBLIC_KEYS = (
     "upstream_connector",
     "auth_proxy_host",
     "logout_url",
-    "acme_email",
+    "jwks_uri",
 )
 
 

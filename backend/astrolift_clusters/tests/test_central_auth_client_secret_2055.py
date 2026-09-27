@@ -111,30 +111,6 @@ def test_a_config_without_a_client_secret_reports_it_unset():
     assert view["client_secret_set"] is False
 
 
-def test_the_acme_contact_reads_back():
-    """Not a credential; the operator checks what the issuer will use."""
-    view = redact_oidc_auth_config({**OIDC, "acme_email": "ops@example.net"})
-    assert view["acme_email"] == "ops@example.net"
-
-
-def test_a_malformed_acme_contact_is_refused_and_not_saved(cluster, permission_resolver):
-    """A contact Let's Encrypt rejects fails the account, and every
-    certificate on the edge with it."""
-    permission_resolver.grant(Permission.CLUSTER_UPDATE)
-
-    result = _update(cluster, oidc_auth_config={**OIDC, "acme_email": "ops at example"})
-
-    assert result.ok is False
-    assert result.errors[0].code == "VALIDATION"
-    assert result.errors[0].field == "oidcAuthConfig"
-    assert "ops at example" not in result.errors[0].message
-    cluster.refresh_from_db()
-    assert cluster.oidc_auth_config is None
-
-
-# ---- the bootstrap plan ---------------------------------------------
-
-
 def test_the_bootstrap_plan_never_serves_the_secrets(cluster):
     """The plan is what an operator reads before installing. The EKS recipe
     for a configured cluster, converted exactly as the query converts it."""
@@ -161,7 +137,7 @@ def test_the_bootstrap_plan_never_serves_the_secrets(cluster):
             slug=cluster.slug, auth_method="exec_plugin", oidc_auth_config=cluster.oidc_auth_config
         )
     )
-    assert {"ingress-nginx", "oauth2-proxy"} <= {c.key for c in components}
+    assert {"envoy-gateway", "oauth2-proxy"} <= {c.key for c in components}
 
     plan = bootstrap_plan_to_type(cluster, components)
     rendered = repr(plan) + json.dumps([c.helm_values for c in plan.components], default=str)
@@ -263,7 +239,7 @@ def _register(slug, monkeypatch, **extra) -> str:
     return out.getvalue()
 
 
-def test_a_restart_keeps_the_client_secret_and_the_acme_contact(aws_plugin, monkeypatch):
+def test_a_restart_keeps_the_client_secret(aws_plugin, monkeypatch):
     """The command runs on every container start and rebuilds the config
     from the environment. Losing the client secret there leaves the next
     install unable to write the auth host's Secret."""
@@ -273,7 +249,6 @@ def test_a_restart_keeps_the_client_secret_and_the_acme_contact(aws_plugin, monk
     row.oidc_auth_config = {
         **row.oidc_auth_config,
         "client_secret": CLIENT_SECRET,
-        "acme_email": "ops@example.net",
     }
     row.save(update_fields=["oidc_auth_config"])
 
@@ -281,7 +256,6 @@ def test_a_restart_keeps_the_client_secret_and_the_acme_contact(aws_plugin, monk
 
     row.refresh_from_db()
     assert row.oidc_auth_config["client_secret"] == CLIENT_SECRET
-    assert row.oidc_auth_config["acme_email"] == "ops@example.net"
     assert CLIENT_SECRET not in output
     assert COOKIE_SECRET not in output
 

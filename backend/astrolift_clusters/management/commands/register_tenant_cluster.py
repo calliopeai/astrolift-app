@@ -520,15 +520,12 @@ class Command(BaseCommand):
 
             # ``client_secret`` (#2055) -- the install writes the auth host's
             # credentials Secret from it, so losing it on a restart leaves the
-            # next install unable to. ``acme_email`` is the operator's contact
-            # for the edge's certificates.
+            # next install unable to.
             _oidc_client_secret = _env("ASTROLIFT_CLUSTER_OIDC_CLIENT_SECRET") or _existing_oidc.get(
                 "client_secret", ""
             )
             if _oidc_client_secret:
                 oidc_auth_config["client_secret"] = _oidc_client_secret
-            if _existing_oidc.get("acme_email"):
-                oidc_auth_config["acme_email"] = _existing_oidc["acme_email"]
 
             _proxy_args = _json_env("ASTROLIFT_CLUSTER_OIDC_PROXY_EXTRA_ARGS") or _existing_oidc.get(
                 "proxy_extra_args"
