@@ -10,6 +10,7 @@ from k8s_native.managed._secret_refs import secret_names_in
 from k8s_native.managed.faas_knative import KnativeServiceConfig, KnativeServiceDriver
 from k8s_native.managed.model_endpoint_kserve import KServeConfig, KServeDriver
 from k8s_native.managed.mssql_express import SQLServerExpressConfig, SQLServerExpressDriver
+from k8s_native.managed.opensearch_operator import OpenSearchOperatorConfig, OpenSearchSearchDriver
 from k8s_native.managed.workflow_argo import ArgoWorkflowsConfig, ArgoWorkflowsDriver
 
 from .test_faas_knative import IMAGE as KNATIVE_IMAGE
@@ -66,8 +67,23 @@ def _argo_cfg():
         lambda ns: SQLServerExpressDriver(config=SQLServerExpressConfig(namespace=ns))._service_config(
             "small", {"tls_secret_name": "other"}
         ),
+        # A pull secret is a registry credential too; these two drivers left it out (#2087).
+        lambda ns: SQLServerExpressDriver(config=SQLServerExpressConfig(namespace=ns))._service_config(
+            "small", {"image_pull_secrets": ["other"]}
+        ),
+        lambda ns: OpenSearchSearchDriver(config=OpenSearchOperatorConfig(namespace=ns))._service_config(
+            "small", {"image_pull_secrets": ["other"], "index_prefix": "app-"}, spec=None
+        ),
     ],
-    ids=["knative-secret-env", "knative-pull-secret", "kserve", "argo", "mssql-tls"],
+    ids=[
+        "knative-secret-env",
+        "knative-pull-secret",
+        "kserve",
+        "argo",
+        "mssql-tls",
+        "mssql-pull-secret",
+        "opensearch-pull-secret",
+    ],
 )
 def test_secret_refs_are_refused_only_in_a_shared_namespace(validate):
     validate(None)  # the default per-app namespace holds only this tenant's Secrets

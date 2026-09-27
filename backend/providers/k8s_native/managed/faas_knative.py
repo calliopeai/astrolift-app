@@ -98,6 +98,10 @@ class KnativeServiceConfig:
     default_port: int = 8080
     default_timeout_seconds: int = 300
     default_container_concurrency: int = 0
+    # ServiceAccounts a Service may run as when ``namespace`` is shared between
+    # tenants, where a name can resolve to another tenant's account and the
+    # cloud identity annotated on it. Empty refuses every one there (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class KnativeServiceDriver(ManagedServiceDriver):
@@ -490,6 +494,13 @@ class KnativeServiceDriver(ManagedServiceDriver):
             {"image_pull_secrets": cfg.get("image_pull_secrets") or [], "volumes": cfg.get("volumes") or []},
             extra=[str(value.get("secret_name")) for value in secret_env.values()],
         )
+        account = str(cfg.get("service_account_name") or "")
+        if account and self._config.namespace and account not in self._config.allowed_service_accounts:
+            raise ValueError(
+                f"service_account_name {account!r} is not allowed: this driver runs in the namespace "
+                f"{self._config.namespace!r}, shared between tenants, where the name can resolve to another "
+                "tenant's ServiceAccount; the cluster's knative_allowed_service_accounts does not list it"
+            )
         labels = cfg.get("labels") or {}
         if not isinstance(labels, dict):
             raise ValueError("labels must be an object")

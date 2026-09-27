@@ -1193,6 +1193,9 @@ def _k8s_managed_config_for(
             default_container_concurrency=int(
                 pc.get("knative_default_container_concurrency", 0),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("knative_allowed_service_accounts") or []
+            ),
         )
     if pair == ("api_gateway", "gateway_api"):
         from k8s_native.managed.api_gateway import GatewayAPIConfig
