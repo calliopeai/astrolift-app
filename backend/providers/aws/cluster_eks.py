@@ -93,7 +93,12 @@ from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
 from aws.session import aws_client
-from k8s_native.central_auth import central_auth_component
+from k8s_native.central_auth import (
+    NGINX_FAMILY_INGRESS_CLASSES,
+    central_auth_component,
+    central_auth_configured,
+    edge_cluster_issuer,
+)
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -1132,6 +1137,10 @@ class EKSClusterDriver(ClusterDriver):
             a platform-minted IRSA role (#1024) — self-sufficient, NOT an
             EKS managed addon and not provisioned out-of-band in Terraform.
           - Ingress: aws-load-balancer-controller renders Ingress as ALB.
+          - Central auth edge (#2055): ingress-nginx behind one NLB with TLS
+            passed through, plus a Let's Encrypt HTTP-01 ClusterIssuer on
+            cert-manager, only on a cluster with a complete oidc_auth_config
+            or an nginx-family ingress class.
 
         IRSA wiring:
           Controllers that call AWS APIs (LB controller, external-dns)
@@ -1282,6 +1291,78 @@ class EKSClusterDriver(ClusterDriver):
                 },
             },
         }
+
+        # The nginx edge (#2055): the controller the central auth host gates
+        # through, and the ClusterIssuer its certificates come from. Offered
+        # only to a cluster that asked for it, with a complete auth config or
+        # an nginx-family ingress class, so an ALB-only cluster's recipe is
+        # unchanged.
+        oidc_auth_config = getattr(cluster, "oidc_auth_config", None) or {}
+        nginx_edge = central_auth_configured(oidc_auth_config) or (
+            getattr(cluster, "ingress_class", "") in NGINX_FAMILY_INGRESS_CLASSES
+        )
+        edge_components = (
+            [
+                BootstrapComponent(
+                    key="ingress-nginx",
+                    title="Ingress controller (nginx behind one NLB)",
+                    default_enabled=True,
+                    rationale=(
+                        "The edge the central auth host gates through: one "
+                        "internet-facing NLB for every app on the cluster, with TLS "
+                        "passed through to nginx so each host serves its own "
+                        "cert-manager certificate. An NLB that terminates TLS hands "
+                        "nginx plain HTTP with no X-Forwarded-Proto, and nginx "
+                        "redirects every request to HTTPS forever. Offered because "
+                        "this cluster has a central auth config or an nginx-family "
+                        "ingress class. ALB Ingresses keep working beside it until "
+                        "each app is redeployed on the nginx class."
+                    ),
+                    helm_values={
+                        "controller": {
+                            "replicaCount": 2,
+                            # No ssl-cert / ssl-ports: 443 stays TCP to the https
+                            # target port, so TLS terminates at nginx.
+                            "service": {
+                                "annotations": {
+                                    "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                                    "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                                    "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+                                },
+                            },
+                            # The platform renders configuration-snippet (gateway
+                            # secret, logout, edge identity headers) and
+                            # server-snippet (paused apps) annotations. The chart
+                            # refuses both by default, and controllers from 1.12
+                            # also need the Critical risk level to accept them.
+                            "allowSnippetAnnotations": True,
+                            "config": {
+                                # oauth2-proxy splits its session across cookies
+                                # scoped to the parent zone, and nginx copies the
+                                # whole Cookie header into the auth subrequest
+                                # (#1725). "8 64k" is what the first install needed.
+                                "large-client-header-buffers": "8 64k",
+                                "proxy-buffer-size": "16k",
+                                "annotations-risk-level": "Critical",
+                            },
+                            "metrics": {"enabled": True, "serviceMonitor": {"enabled": True}},
+                        },
+                    },
+                    requires=["aws-load-balancer-controller (provisions the NLB)"],
+                    options=[],
+                    chart_name="ingress-nginx",
+                    chart_repo_url="https://kubernetes.github.io/ingress-nginx",
+                    chart_repo_type="default",
+                    chart_version="4.13.9",
+                    # The NLB comes from the load balancer controller, whose
+                    # Service webhook must be up first; the ServiceMonitor needs
+                    # the monitoring.coreos.com CRDs.
+                    depends_on=["aws-load-balancer-controller", "kube-prometheus-stack"],
+                ),
+            ]
+            if nginx_edge
+            else []
+        )
 
         return [
             BootstrapComponent(
@@ -1601,29 +1682,48 @@ class EKSClusterDriver(ClusterDriver):
             BootstrapComponent(
                 key="cert-manager",
                 title="cert-manager (in-cluster TLS, internal mTLS)",
-                default_enabled=False,
+                default_enabled=nginx_edge,
                 rationale=(
-                    "EKS operators typically use ACM via ALB annotations for "
-                    "public TLS — no in-cluster cert controller needed. Enable "
-                    "cert-manager only when you need internal mTLS, webhook "
-                    "certificates, or non-ALB cert flows."
+                    (
+                        "This cluster serves apps through the nginx edge, where the "
+                        "NLB passes TLS through and ACM cannot serve it. cert-manager "
+                        "issues each host's certificate from the letsencrypt-prod "
+                        "ClusterIssuer (HTTP-01 through nginx, no Route53 access), "
+                        "which the install applies once the chart's CRDs are "
+                        "registered. The ACME contact is oidc_auth_config.acme_email "
+                        "when set."
+                    )
+                    if nginx_edge
+                    else (
+                        "EKS operators typically use ACM via ALB annotations for "
+                        "public TLS — no in-cluster cert controller needed. Enable "
+                        "cert-manager only when you need internal mTLS, webhook "
+                        "certificates, or non-ALB cert flows."
+                    )
                 ),
                 helm_values={
                     "installCRDs": True,
                 },
                 requires=[],
-                options=[
-                    BootstrapOption(
-                        key="mode",
-                        label="Issuer",
-                        choices=[
-                            ("self_signed", "Self-signed (internal / mTLS)"),
-                            ("acme_letsencrypt_prod", "Let's Encrypt prod (Route53 DNS-01)"),
-                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
-                        ],
-                        default="self_signed",
-                    ),
-                ],
+                # The issuer select changes nothing (the edge issuer is always
+                # Let's Encrypt), and a picked value reaches the chart's values,
+                # whose schema refuses unknown keys. Not offered on the edge.
+                options=(
+                    []
+                    if nginx_edge
+                    else [
+                        BootstrapOption(
+                            key="mode",
+                            label="Issuer",
+                            choices=[
+                                ("self_signed", "Self-signed (internal / mTLS)"),
+                                ("acme_letsencrypt_prod", "Let's Encrypt prod (Route53 DNS-01)"),
+                                ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ],
+                            default="self_signed",
+                        ),
+                    ]
+                ),
                 chart_name="cert-manager",
                 chart_repo_url="https://charts.jetstack.io",
                 chart_repo_type="default",
@@ -1633,6 +1733,9 @@ class EKSClusterDriver(ClusterDriver):
                 # Wait until the ALB controller is ready to avoid "no endpoints"
                 # failures on the webhook call.
                 depends_on=["aws-load-balancer-controller"],
+                post_install_manifests=(
+                    [edge_cluster_issuer(str(oidc_auth_config.get("acme_email") or ""))] if nginx_edge else []
+                ),
             ),
             BootstrapComponent(
                 key="knative-serving",
@@ -1683,6 +1786,7 @@ class EKSClusterDriver(ClusterDriver):
                     knative_serving_cr,
                 ],
             ),
+            *edge_components,
             # The central auth host (#1539). Astrolift's tenant runtime
             # is EKS, so the cluster that actually serves tenant apps is
             # the one that most needs it -- offering it only in the

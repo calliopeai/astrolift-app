@@ -19,6 +19,8 @@ across the cloud drivers the same way.
 
 from __future__ import annotations
 
+import base64
+import re
 from typing import Any
 
 from _sdk.cluster import BootstrapComponent
@@ -34,6 +36,27 @@ from .logout import central_logout_snippet
 CENTRAL_AUTH_SECRET_NAME = "astrolift-central-auth"
 
 CENTRAL_AUTH_TLS_SECRET_NAME = "astrolift-central-auth-tls"
+
+# Secret key -> ``oidc_auth_config`` field. With ``existingSecret`` set the
+# chart reads all three from the Secret (``proxyVarsAsSecrets`` defaults
+# on), ``client-id`` included, whatever ``config.clientID`` says.
+_SECRET_KEYS = (
+    ("client-id", "client_id"),
+    ("client-secret", "client_secret"),
+    ("cookie-secret", "cookie_secret"),
+)
+
+# Ingress classes served by the nginx-family render path. Same set
+# ``core.app_deploy.oidc_auth_for_cluster`` treats as nginx.
+NGINX_FAMILY_INGRESS_CLASSES = frozenset({"nginx", "ingress-nginx"})
+
+# The ClusterIssuer every nginx-family Ingress the platform renders names,
+# the auth host's included.
+EDGE_CLUSTER_ISSUER = "letsencrypt-prod"
+
+LETSENCRYPT_PROD_SERVER = "https://acme-v02.api.letsencrypt.org/directory"
+
+_ACME_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
 def cookie_scope_for(auth_proxy_host: str) -> str:
@@ -66,6 +89,29 @@ def issuer_from_discovery_url(discovery_url: str) -> str:
     if url.endswith(suffix):
         url = url[: -len(suffix)]
     return url
+
+
+def central_auth_configured(oidc_auth_config: dict[str, Any] | None) -> bool:
+    """Whether the config names a complete auth host: host, client, issuer.
+
+    The recipe's one completeness test, so the auth host and the nginx edge
+    it gates through are offered on the same clusters.
+    """
+    config = oidc_auth_config or {}
+    return bool(
+        str(config.get("auth_proxy_host") or "")
+        and str(config.get("client_id") or "")
+        and issuer_from_discovery_url(str(config.get("discovery_url") or ""))
+    )
+
+
+def _issuer_is_in_cluster_dex(config: dict[str, Any]) -> bool:
+    """``kind: "dex"`` marks the recipe's own Dex as the issuer.
+
+    Nothing else can say so: a discovery URL does not tell an in-cluster
+    Dex from an external provider.
+    """
+    return str(config.get("kind") or "").strip().lower() == "dex"
 
 
 # Flags the platform computes from the cluster's own configuration.
@@ -120,7 +166,7 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
     client_id = str(config.get("client_id") or "")
     issuer_url = issuer_from_discovery_url(str(config.get("discovery_url") or ""))
     cookie_scope = cookie_scope_for(auth_proxy_host)
-    configured = bool(auth_proxy_host and client_id and issuer_url)
+    configured = central_auth_configured(config)
 
     extra_args: dict[str, str] = {
         "provider": "oidc",
@@ -151,7 +197,7 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
 
     extra_args.update(proxy_extra_args(config))
 
-    annotations = {"cert-manager.io/cluster-issuer": "letsencrypt-prod"}
+    annotations = {"cert-manager.io/cluster-issuer": EDGE_CLUSTER_ISSUER}
     logout_snippet = central_logout_snippet(config)
     if logout_snippet:
         annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = logout_snippet
@@ -167,7 +213,9 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
             "auth_request sub-request and a new public app needs no callback "
             "registration of its own. Rendered from the cluster's "
             "oidc_auth_config; enabled once that config is complete. Works "
-            "against Dex in-cluster or any external OIDC provider."
+            "against Dex in-cluster or any external OIDC provider. The "
+            "install writes the proxy's credentials Secret from the same "
+            "config's client_secret and cookie_secret."
         ),
         helm_values={
             "config": {
@@ -200,21 +248,108 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
         requires=[
             "dex or external OIDC provider",
             "oidc_auth_config set on cluster (discovery_url, client_id, auth_proxy_host)",
-            f"Secret {CENTRAL_AUTH_SECRET_NAME} (client-secret, cookie-secret) in the release namespace",
+            f"Secret {CENTRAL_AUTH_SECRET_NAME} (client-id, client-secret, cookie-secret) in the release "
+            "namespace, written from oidc_auth_config when it carries client_secret and cookie_secret",
         ],
         options=[],
         chart_name="oauth2-proxy",
         chart_repo_url="https://oauth2-proxy.github.io/manifests",
         chart_repo_type="default",
         chart_version="7.7.14",
-        depends_on=["dex"],
+        # The proxy's Ingress names the nginx class, and on EKS the load
+        # balancer controller's admission webhook rejects an Ingress whose
+        # class does not exist yet, so the auth host waits for the
+        # controller that creates it. Dex only when it is the issuer: an
+        # external provider has no release to wait on, and a dependsOn
+        # naming a release that is never installed holds this one forever.
+        depends_on=["ingress-nginx", "dex"] if _issuer_is_in_cluster_dex(config) else ["ingress-nginx"],
     )
+
+
+def central_auth_secret_manifest(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> dict[str, Any] | None:
+    """The Secret the auth host reads its credentials from, or ``None``.
+
+    Built by the install activity from the cluster row, never by the
+    recipe: a ``BootstrapComponent`` is served to operators over GraphQL,
+    and these values let a reader finish the OIDC flow as the platform
+    (``client_secret``) or mint a session outright (``cookie_secret``).
+
+    ``None`` unless client_id, client_secret and cookie_secret are all set.
+    The chart reads every one of them, so a Secret short of one leaves the
+    proxy unable to start, and writing part of the set would replace
+    working values in a Secret someone created by hand.
+    """
+    config = oidc_auth_config or {}
+    values = {key: str(config.get(field) or "") for key, field in _SECRET_KEYS}
+    if not all(values.values()):
+        return None
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": CENTRAL_AUTH_SECRET_NAME,
+            "namespace": namespace,
+            "labels": {
+                "astrolift.io/managed-by": "platform",
+                "astrolift.io/bootstrap-component": "oauth2-proxy",
+            },
+        },
+        "type": "Opaque",
+        "data": {key: base64.b64encode(value.encode("utf-8")).decode("ascii") for key, value in values.items()},
+    }
+
+
+def edge_cluster_issuer(acme_email: str = "") -> dict[str, Any]:
+    """The ``letsencrypt-prod`` ClusterIssuer, solving HTTP-01 through nginx.
+
+    HTTP-01 through the nginx class needs no DNS credentials: the
+    challenge is answered by the controller that serves the host. The
+    email is the ACME account contact. Let's Encrypt accepts an account
+    without one, so an unset email is left out rather than defaulted to
+    anyone.
+    """
+    acme: dict[str, Any] = {
+        "server": LETSENCRYPT_PROD_SERVER,
+        "privateKeySecretRef": {"name": f"{EDGE_CLUSTER_ISSUER}-account-key"},
+        "solvers": [{"http01": {"ingress": {"ingressClassName": "nginx"}}}],
+    }
+    if acme_email:
+        acme["email"] = acme_email
+    return {
+        "apiVersion": "cert-manager.io/v1",
+        "kind": "ClusterIssuer",
+        "metadata": {
+            "name": EDGE_CLUSTER_ISSUER,
+            "labels": {"astrolift.io/managed-by": "platform"},
+        },
+        "spec": {"acme": acme},
+    }
+
+
+def validate_acme_email(oidc_auth_config: dict[str, Any] | None) -> None:
+    """Refuse an ``acme_email`` Let's Encrypt would reject.
+
+    A rejected contact fails the ACME account registration, and with it
+    the certificate of every host on the edge. Checked where the config is
+    written, so a typo fails the save rather than every TLS handshake.
+    """
+    value = (oidc_auth_config or {}).get("acme_email")
+    if value is None or value == "":
+        return
+    if not isinstance(value, str) or len(value) > 254 or not _ACME_EMAIL.fullmatch(value):
+        raise ValueError("acme_email must be a single email address")
 
 
 __all__ = [
     "CENTRAL_AUTH_SECRET_NAME",
     "CENTRAL_AUTH_TLS_SECRET_NAME",
+    "EDGE_CLUSTER_ISSUER",
+    "NGINX_FAMILY_INGRESS_CLASSES",
     "central_auth_component",
+    "central_auth_configured",
+    "central_auth_secret_manifest",
     "cookie_scope_for",
+    "edge_cluster_issuer",
     "issuer_from_discovery_url",
+    "validate_acme_email",
 ]
