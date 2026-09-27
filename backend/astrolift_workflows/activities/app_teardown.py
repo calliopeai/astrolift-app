@@ -166,6 +166,14 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
                 ).order_by("name"),
             )
             driver.delete_namespace(ctx.slug, namespace, wait=True)
+            if getattr(cluster, "ingress_class", None) == "envoy":
+                # The environment's routes live on the shared edge, not in its
+                # namespace, so the delete above does not reach them. An empty
+                # rendered set prunes every route labelled with this namespace,
+                # which frees its hostnames for the next claim (#2055).
+                from core.app_deploy import prune_edge_leftovers
+
+                prune_edge_leftovers(driver, ctx.slug, app_slug=app.slug, namespace=namespace, rendered=[])
             pv_refs = [
                 ref
                 for ref in cleanup_binding_resources(

@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
+from _sdk._kube_health import PLATFORM_NAMESPACE
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.cluster import (
@@ -94,6 +95,7 @@ from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
 from aws.session import aws_client
 from k8s_native.central_auth import central_auth_component
+from k8s_native.edge_gateway import alb_front, edge_component
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -1692,6 +1694,15 @@ class EKSClusterDriver(ClusterDriver):
             # controller to gate against, so it is inert on an ALB-only
             # cluster rather than harmful.
             central_auth_component(getattr(cluster, "oidc_auth_config", None)),
+            # The Envoy Gateway edge (#2055): central auth with no nginx. The
+            # ALB in front keeps TLS on the zone's ACM certificate and hands
+            # plain HTTP to Envoy, which the release installs into this same
+            # platform namespace, so the Ingress can name its Service.
+            edge_component(
+                getattr(cluster, "oidc_auth_config", None),
+                ingress_class=getattr(cluster, "ingress_class", "") or "",
+                front=alb_front(getattr(cluster, "oidc_auth_config", None), namespace=PLATFORM_NAMESPACE),
+            ),
         ]
 
     # ---- exec_plugin token materialization (#309) -----------------

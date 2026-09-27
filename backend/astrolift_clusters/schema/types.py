@@ -254,10 +254,18 @@ class ProviderPluginType:
 
 # Keys of oidc_auth_config that are safe to read back. cookie_secret is not
 # one of them: it is the signing key for the oauth2-proxy session cookie, so
-# anyone who can read it can mint a session. alb_auth_config needs no
-# equivalent -- its keys (user_pool_arn, user_pool_client_id,
-# user_pool_domain) are identifiers, not credentials.
-_OIDC_PUBLIC_KEYS = ("discovery_url", "client_id", "upstream_connector", "auth_proxy_host", "logout_url")
+# anyone who can read it can mint a session. Nor is client_secret, which
+# lets its holder complete the OIDC flow as the auth host (#2055).
+# alb_auth_config needs no equivalent -- its keys (user_pool_arn,
+# user_pool_client_id, user_pool_domain) are identifiers, not credentials.
+_OIDC_PUBLIC_KEYS = (
+    "discovery_url",
+    "client_id",
+    "upstream_connector",
+    "auth_proxy_host",
+    "logout_url",
+    "jwks_uri",
+)
 
 
 def redact_oidc_auth_config(config: dict | None) -> dict | None:
@@ -265,13 +273,14 @@ def redact_oidc_auth_config(config: dict | None) -> dict | None:
 
     An operator needs to know whether the gate is configured and where it
     points, which is what makes a class flip safe to attempt (#1616). They
-    do not need the cookie secret, so it is reported as set or unset rather
-    than returned.
+    do not need the cookie or client secret, so each is reported as set or
+    unset rather than returned.
     """
     if not config:
         return None
     view = {k: config[k] for k in _OIDC_PUBLIC_KEYS if k in config}
     view["cookie_secret_set"] = bool(config.get("cookie_secret"))
+    view["client_secret_set"] = bool(config.get("client_secret"))
     return view
 
 
