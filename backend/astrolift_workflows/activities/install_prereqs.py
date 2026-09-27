@@ -216,6 +216,19 @@ def _flux_crd_missing(errors: list) -> bool:
     return False
 
 
+def _operator_not_serving(errors: list) -> bool:
+    """A post-install object failed because its operator is not up yet.
+
+    Either its CRD is not registered, or the operator's admission webhook
+    has no ready endpoint. The chart that brings both was applied moments
+    ago, so a ClusterIssuer sent while cert-manager's webhook is still
+    starting is refused the same way a CR sent before its CRD is. Kept
+    apart from ``_flux_crd_missing``, which decides whether to bootstrap
+    Flux and must not fire on a webhook error.
+    """
+    return _flux_crd_missing(errors) or any("failed calling webhook" in str(err).lower() for err in errors)
+
+
 def _ensure_flux_installed(driver, ctx_slug: str) -> None:
     """Fetch the pinned Flux install manifest and apply it to the cluster.
 
@@ -351,8 +364,9 @@ def _apply_post_install_manifests(
     HelmRelease. Returns ``(crd_not_ready, errors)``:
 
       - ``crd_not_ready`` is True when a manifest failed only because its
-        CRD isn't registered yet (the component's operator chart was just
-        applied and Flux hasn't finished installing it). The caller raises a
+        operator isn't serving yet: its CRD isn't registered, or its
+        admission webhook has no endpoint (the component's operator chart was
+        just applied and Flux hasn't finished installing it). The caller raises a
         retriable error so Temporal re-runs; by then the operator is up and
         the idempotent re-apply lands the CR. This mirrors the Flux-own-CRD
         convergence path (``_ensure_flux_installed`` + the retriable raise in
@@ -388,16 +402,16 @@ def _apply_post_install_manifests(
             )
             continue
 
-        if _flux_crd_missing(result.errors):
+        if _operator_not_serving(result.errors):
             crd_not_ready = True
             log.info(
-                "install_cluster_prereqs: post-install %s deferred — its "
-                "operator CRD isn't registered yet; Temporal will retry",
+                "install_cluster_prereqs: post-install %s deferred; its "
+                "operator isn't serving yet (CRD or webhook); Temporal will retry",
                 component.key,
             )
         for err in result.errors:
             errors.append(str(err))
-            if not _flux_crd_missing([err]):
+            if not _operator_not_serving([err]):
                 log.warning(
                     "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
                     component.key,
@@ -538,6 +552,113 @@ def _provision_aws_controller_irsa_role(
     return role_arn
 
 
+# The central auth host's component key (``k8s_native.central_auth``), and
+# the pod annotation that rolls its pods when the Secret they read changes.
+_CENTRAL_AUTH_COMPONENT_KEY = "oauth2-proxy"
+_CENTRAL_AUTH_DIGEST_ANNOTATION = "astrolift.io/central-auth-secret-digest"
+_CENTRAL_AUTH_SECRET_FIELDS = ("client_secret", "cookie_secret")
+
+
+def _central_auth_secret_digest(data: dict[str, str]) -> str:
+    """Digest of the Secret's data, keyed with the platform's SECRET_KEY.
+
+    Keyed for the reason ``core.app_deploy._literal_secrets_digest`` is:
+    the annotation is readable by anyone who can read the pod spec.
+    """
+    import json
+
+    from django.utils.crypto import salted_hmac
+
+    canonical = json.dumps(sorted(data.items()), separators=(",", ":"))
+    return salted_hmac("astrolift.central-auth-secret", canonical, algorithm="sha256").hexdigest()
+
+
+def _without_secrets(text: str, secrets: list[str]) -> str:
+    """``text`` with each secret masked, raw and base64-encoded.
+
+    Apply errors carry the apiserver's reply verbatim, and they end up in
+    the run's error message, which operators read.
+    """
+    import base64
+
+    for secret in secrets:
+        if not secret:
+            continue
+        for form in (secret, base64.b64encode(secret.encode("utf-8")).decode("ascii")):
+            text = text.replace(form, "***REDACTED***")
+    return text
+
+
+def _apply_central_auth_secret(
+    driver: Any,
+    ctx_slug: str,
+    cluster: Any,
+    rendered_release_keys: set[str],
+    namespace: str,
+) -> str:
+    """Write the auth host's credentials Secret from the cluster row (#2055).
+
+    The oauth2-proxy release reads ``client-id``, ``client-secret`` and
+    ``cookie-secret`` from a Secret it never creates. Built here, at apply
+    time, rather than in the recipe, which operators read over GraphQL; and
+    written before the HelmRelease, so the proxy's pods never start
+    without it.
+
+    Returns a keyed digest of what was written, for the release's pod
+    annotations, or ``""`` when nothing was: this run renders no oauth2-proxy
+    release, or the row does not carry both secrets and a Secret already
+    exists (made by hand before the platform wrote one, which keeps
+    working). Refuses when neither the row nor the cluster can supply it.
+    No return value, log line or error carries a secret.
+    """
+    if _CENTRAL_AUTH_COMPONENT_KEY not in rendered_release_keys:
+        return ""
+
+    from core.app_deploy import AppDeployError
+    from providers.k8s_native.central_auth import (
+        CENTRAL_AUTH_SECRET_NAME,
+        central_auth_secret_manifest,
+    )
+
+    config = getattr(cluster, "oidc_auth_config", None) or {}
+    manifest = central_auth_secret_manifest(config, namespace=namespace)
+    if manifest is None:
+        if driver.get_manifest(ctx_slug, namespace, "Secret", CENTRAL_AUTH_SECRET_NAME) is None:
+            missing = [
+                field for field in ("client_id", *_CENTRAL_AUTH_SECRET_FIELDS) if not config.get(field)
+            ]
+            raise AppDeployError(
+                f"oauth2-proxy reads Secret {CENTRAL_AUTH_SECRET_NAME} in {namespace}, which does not "
+                f"exist, and the cluster's oidcAuthConfig has no {', '.join(missing)} to write it "
+                "from. Set them with updateTenantCluster, then run the install again.",
+            )
+        log.warning(
+            "install_cluster_prereqs: cluster %s oidc_auth_config lacks client_secret or cookie_secret; "
+            "keeping the existing Secret %s/%s, which the platform does not manage",
+            ctx_slug,
+            namespace,
+            CENTRAL_AUTH_SECRET_NAME,
+        )
+        return ""
+
+    result = driver.apply_manifests(ctx_slug, namespace, [manifest])
+    if not result.ok:
+        secrets = [str(config.get(field) or "") for field in _CENTRAL_AUTH_SECRET_FIELDS]
+        raise AppDeployError(
+            f"could not write Secret {CENTRAL_AUTH_SECRET_NAME} in {namespace}: "
+            + _without_secrets("; ".join(str(e) for e in result.errors), secrets),
+        )
+    log.info(
+        "install_cluster_prereqs: central auth Secret %s/%s created=%d updated=%d unchanged=%d",
+        namespace,
+        CENTRAL_AUTH_SECRET_NAME,
+        len(result.created),
+        len(result.updated),
+        len(result.unchanged),
+    )
+    return _central_auth_secret_digest(manifest["data"])
+
+
 _LEGACY_HELM_RELEASE_NAMES: frozenset[str] = frozenset(
     [
         # tls_issuer was renamed to cert-manager across all cloud drivers.
@@ -611,6 +732,16 @@ def _install_cluster_prereqs_sync(
         mint_method="provision_s3_csi_role",
     )
 
+    # The releases this run renders. The stale cleanup below deletes every
+    # other recipe release, so a dependsOn naming one can never be met and
+    # Flux holds the dependent forever: the Dex a Cognito-backed auth host
+    # never uses, or a controller the cluster runs outside Flux.
+    rendered_release_keys = {c.key for c in components if c.key in selected_set and c.chart_repo_url}
+
+    central_auth_digest = _apply_central_auth_secret(
+        driver, ctx.slug, cluster, rendered_release_keys, target_namespace
+    )
+
     resources: list[dict[str, Any]] = []
     applied: list[dict[str, str]] = []
     skipped: list[str] = []
@@ -665,6 +796,17 @@ def _install_cluster_prereqs_sync(
         merged_values = _merge_helm_values(component.helm_values, component_options)
         merged_values = _apply_semantic_options(component.key, merged_values, component_options)
         _assert_storage_class_preflight(driver, ctx.slug, component.key, component_options)
+        if component.key == _CENTRAL_AUTH_COMPONENT_KEY and central_auth_digest:
+            # The proxy reads its Secret once, at start. A changed digest
+            # changes the pod template, so rewritten credentials roll it.
+            merged_values = {
+                **merged_values,
+                "podAnnotations": {
+                    **(merged_values.get("podAnnotations") or {}),
+                    _CENTRAL_AUTH_DIGEST_ANNOTATION: central_auth_digest,
+                },
+            }
+        depends_on = [dep for dep in component.depends_on if dep in rendered_release_keys]
 
         # Slug the repo URL into a valid K8s resource name:
         # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars
@@ -730,10 +872,10 @@ def _install_cluster_prereqs_sync(
                                 "name": f"astrolift-{dep.replace('_', '-')}",
                                 "namespace": target_namespace,
                             }
-                            for dep in component.depends_on
+                            for dep in depends_on
                         ]
                     }
-                    if component.depends_on
+                    if depends_on
                     else {}
                 ),
             },
@@ -852,12 +994,14 @@ def _install_cluster_prereqs_sync(
 
         log.info(
             "install_cluster_prereqs: post-install CRs on cluster %s are waiting "
-            "for their operator's CRDs to register — Temporal will retry",
+            "for their operator (CRDs or admission webhook); Temporal will retry",
             ctx.slug,
         )
         raise ApplicationError(
             f"post-install custom resources on cluster {ctx.slug!r} are waiting "
-            "for their operator's CRDs to register — Temporal will retry",
+            "for their operator (CRDs or admission webhook) to come up. Temporal "
+            "retries; if the run still fails, run the install again once the "
+            "component is Ready.",
             non_retryable=False,
         )
 
