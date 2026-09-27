@@ -802,7 +802,7 @@ function RowActions({
       <ConfirmDialogWithReason
         open={confirmTrash}
         onOpenChange={setConfirmTrash}
-        title={`Discard failed deploy ${d.imageTag || d.id.slice(0, 8)}?`}
+        title={`Discard failed deploy ${(d.imageTag || d.id).slice(0, 8)}?`}
         description="The row stays in history but the rollout is marked aborted. Tell the team what changed."
         reasonLabel="Reason for discard"
         reasonPlaceholder="Why are you discarding this deploy?"
