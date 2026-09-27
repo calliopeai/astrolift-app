@@ -163,7 +163,14 @@ def test_the_controller_accepts_the_platforms_snippet_annotations():
 def test_the_edge_waits_for_the_load_balancer_controller():
     """The NLB comes from the AWS Load Balancer Controller, whose Service
     webhook has to be serving first."""
-    assert "aws-load-balancer-controller" in _by_key(_recipe(oidc=COGNITO))["ingress-nginx"].depends_on
+    assert _by_key(_recipe(oidc=COGNITO))["ingress-nginx"].depends_on == ["aws-load-balancer-controller"]
+
+
+def test_the_edge_does_not_need_the_prometheus_operator():
+    """A ServiceMonitor is a kind only kube-prometheus-stack registers. On a
+    cluster whose monitoring runs elsewhere it fails the whole release."""
+    metrics = _by_key(_recipe(oidc=COGNITO))["ingress-nginx"].helm_values["controller"]["metrics"]
+    assert metrics == {"enabled": True}
 
 
 # ---- the issuer the Ingresses name -----------------------------------

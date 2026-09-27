@@ -1345,7 +1345,11 @@ class EKSClusterDriver(ClusterDriver):
                                 "proxy-buffer-size": "16k",
                                 "annotations-risk-level": "Critical",
                             },
-                            "metrics": {"enabled": True, "serviceMonitor": {"enabled": True}},
+                            # No ServiceMonitor: its CRD comes with
+                            # kube-prometheus-stack, and an EKS cluster whose
+                            # monitoring runs elsewhere would fail the release
+                            # on a kind it does not have.
+                            "metrics": {"enabled": True},
                         },
                     },
                     requires=["aws-load-balancer-controller (provisions the NLB)"],
@@ -1355,9 +1359,8 @@ class EKSClusterDriver(ClusterDriver):
                     chart_repo_type="default",
                     chart_version="4.13.9",
                     # The NLB comes from the load balancer controller, whose
-                    # Service webhook must be up first; the ServiceMonitor needs
-                    # the monitoring.coreos.com CRDs.
-                    depends_on=["aws-load-balancer-controller", "kube-prometheus-stack"],
+                    # Service webhook must be up first.
+                    depends_on=["aws-load-balancer-controller"],
                 ),
             ]
             if nginx_edge
