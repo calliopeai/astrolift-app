@@ -2765,6 +2765,9 @@ def _managed_config_uncredentialed(
                 secrets_manager_prefix=str(
                     pc.get("managed_service_secrets_prefix", "astrolift/managed"),
                 ),
+                allowed_option_groups=tuple(
+                    str(value) for value in pc.get("mssql_allowed_option_groups") or []
+                ),
             )
         if kind == "mysql":
             from aws.managed.mysql_rds import RDSMySQLConfig
