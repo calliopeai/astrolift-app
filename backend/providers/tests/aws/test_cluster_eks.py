@@ -776,14 +776,15 @@ def test_bootstrap_knative_cr_pre_enables_request_logging(fake_k8s_client) -> No
 
 def test_bootstrap_existing_components_have_no_post_install(fake_k8s_client) -> None:
     """No regression: the pre-existing components install via their
-    HelmRelease alone (empty post_install_manifests). Only knative-serving
-    opts into the new post-install path."""
+    HelmRelease alone (empty post_install_manifests). knative-serving and the
+    Envoy edge (#2055), whose Gateway and policies are objects rather than
+    chart values, opt into the post-install path."""
     driver = _mock_bootstrap_driver(fake_k8s_client)
     ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
 
     for component in driver.bootstrap_components(ctx):
-        if component.key == "knative-serving":
-            assert component.post_install_manifests  # the one opt-in
+        if component.key in ("knative-serving", "envoy-gateway"):
+            assert component.post_install_manifests  # the opt-ins
         else:
             assert component.post_install_manifests == []
 
