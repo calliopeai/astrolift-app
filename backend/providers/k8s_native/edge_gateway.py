@@ -64,6 +64,9 @@ EDGE_OIDC_SECRET_NAME = "astrolift-edge-oidc"
 GATE_LABEL = "astrolift.dev/edge-auth"
 GATE_LABEL_GATED = "gated"
 ROUTE_NAMESPACE_LABEL = "astrolift.dev/namespace"
+# Marks an environment's own ALB rule onto the edge (#2124), so nothing that
+# sweeps an app's legacy managed-subdomain Ingresses can mistake it for one.
+EDGE_FRONT_LABEL = "astrolift.dev/edge-front"
 
 # Carries the verified ID token from the OAuth2 filter to the JWT filter.
 # Stripped at the listener before any filter (so a client cannot supply
@@ -521,14 +524,74 @@ def render_app_routes(
     return out
 
 
+def alb_host_ingress(
+    *,
+    app_slug: str,
+    namespace: str,
+    hostnames: list[str],
+    platform_namespace: str,
+    group_annotations: dict[str, str],
+) -> dict[str, Any]:
+    """An environment's own ALB rule for its hosts, forwarding to the edge (#2124).
+
+    Rendered in the platform namespace, where the edge's Service lives, and
+    joined to the ALB group the app's old Ingress used. While an app moves,
+    its host then has two rules on the same load balancer: the old one goes
+    and this one keeps answering, so the host's DNS record never changes
+    target and there is no window where the old ALB answers 404 for it.
+
+    Carries no authenticate-cognito annotation: the gate is Envoy's.
+    """
+    ingress = _manifest(
+        "networking.k8s.io/v1",
+        "Ingress",
+        route_name(namespace, "alb"),
+        platform_namespace,
+        spec={
+            "ingressClassName": "alb",
+            "tls": [{"hosts": list(hostnames)}],
+            "rules": [
+                {
+                    "host": host,
+                    "http": {
+                        "paths": [
+                            {
+                                "path": "/",
+                                "pathType": "Prefix",
+                                "backend": {"service": {"name": EDGE_SERVICE_NAME, "port": {"number": EDGE_HTTP_PORT}}},
+                            }
+                        ]
+                    },
+                }
+                for host in hostnames
+            ],
+        },
+    )
+    ingress["metadata"]["labels"].update(
+        {"astrolift.dev/app": app_slug, ROUTE_NAMESPACE_LABEL: namespace, EDGE_FRONT_LABEL: "true"}
+    )
+    ingress["metadata"]["annotations"] = {
+        "alb.ingress.kubernetes.io/scheme": "internet-facing",
+        "alb.ingress.kubernetes.io/target-type": "ip",
+        "alb.ingress.kubernetes.io/listen-ports": '[{"HTTP": 80}, {"HTTPS": 443}]',
+        "alb.ingress.kubernetes.io/ssl-redirect": "443",
+        "alb.ingress.kubernetes.io/healthcheck-path": "/",
+        "alb.ingress.kubernetes.io/success-codes": "200-499",
+        **group_annotations,
+    }
+    return ingress
+
+
 __all__ = [
     "EDGE_COMPONENT_KEY",
+    "EDGE_FRONT_LABEL",
     "EDGE_NAMESPACE",
     "EDGE_OIDC_SECRET_NAME",
     "EDGE_SERVICE_NAME",
     "GATE_LABEL",
     "ROUTE_NAMESPACE_LABEL",
     "alb_front",
+    "alb_host_ingress",
     "edge_component",
     "edge_configured",
     "edge_oidc_secret_manifest",
