@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Any
 
 from core.cluster_credentials import (
@@ -1339,6 +1340,23 @@ def cognito_auth_for_cluster(cluster: Any) -> Any | None:
     )
 
 
+_ACM_CERTIFICATE_ARN = re.compile(r"arn:aws[a-z-]*:acm:")
+
+
+def nginx_serves_domain_cert(cert_arn: str | None) -> bool:
+    """Whether an nginx-family Ingress can use the managed domain's cert.
+
+    An ACM certificate lives in AWS and only an AWS load balancer can
+    present it. The nginx edge takes TLS passed through its NLB (#2055),
+    so an Ingress rendered as "provided" for an ACM ARN names a TLS Secret
+    nothing creates, and nginx answers with its fake default certificate.
+    Every AWS-provisioned managed domain records its wildcard ACM ARN, so
+    that is every app on a cluster moved off ALB. cert-manager issues
+    instead. Shared by both managed-subdomain renderers.
+    """
+    return bool(cert_arn) and not _ACM_CERTIFICATE_ARN.match(str(cert_arn))
+
+
 def oidc_auth_for_cluster(cluster: Any) -> Any | None:
     """Build the nginx renderer's ``OIDCAuthConfig`` from a cluster row,
     or ``None`` when the cluster has no central auth host configured.
@@ -1630,7 +1648,7 @@ def _render_managed_subdomain_ingress(
                 oidc_auth=oidc_auth,
             )
         )
-        tls_strategy = "letsencrypt" if not cert_arn else "provided"
+        tls_strategy = "provided" if nginx_serves_domain_cert(cert_arn) else "letsencrypt"
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
             if wh.workload_slug in serviceless_workloads:

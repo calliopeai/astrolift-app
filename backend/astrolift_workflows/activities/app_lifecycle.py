@@ -1047,7 +1047,7 @@ def _render_app_ingresses_and_tls(
                     # Generic Ingress for nginx, traefik, etc. All
                     # managed hostnames share one Ingress + one cert
                     # Secret (wildcard covers them all).
-                    from core.app_deploy import oidc_auth_for_cluster
+                    from core.app_deploy import nginx_serves_domain_cert, oidc_auth_for_cluster
                     from providers.k8s_native.ingress import nginx_auth_annotations
 
                     all_hostnames = [wh.hostname for wh in computed]
@@ -1072,9 +1072,10 @@ def _render_app_ingresses_and_tls(
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'
                         )
-                    if not cert_arn:
-                        # No pre-provisioned cert — let cert-manager
-                        # issue via the cluster's ACME issuer.
+                    if not nginx_serves_domain_cert(cert_arn):
+                        # No pre-provisioned cert nginx can present (an ACM
+                        # ARN is not one), so cert-manager issues via the
+                        # cluster's ACME issuer.
                         managed_annotations["cert-manager.io/cluster-issuer"] = "letsencrypt-prod"
                     out.append(
                         {
