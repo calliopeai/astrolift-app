@@ -8,6 +8,8 @@ without any platform context.
 
 from __future__ import annotations
 
+import pytest
+
 # ---- _merge_helm_values --------------------------------------------------
 
 
@@ -1009,3 +1011,76 @@ def test_an_additive_run_applies_its_selection_and_deletes_nothing(monkeypatch):
     assert result["deleted"] == []
     assert ("HelmRelease", "astrolift-edge") in driver.applied_refs
     assert ("HelmRelease", "astrolift-other") not in driver.applied_refs
+
+
+def _probe_reports(monkeypatch, capabilities):  # noqa: ANN001
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", lambda cluster: capabilities)  # noqa: ARG005
+
+
+def _edge_recipe():
+    return [
+        _chart_component("envoy-gateway"),
+        _chart_component("aws-load-balancer-controller"),
+        _chart_component("external-dns"),
+        _chart_component("cert-manager"),
+    ]
+
+
+def test_an_additive_edge_run_brings_the_controllers_a_fresh_cluster_lacks(monkeypatch):
+    """A cluster straight from the installer runs no ALB controller and no
+    external-dns, and the edge's Gateway would sit behind no load balancer."""
+    _probe_reports(monkeypatch, {"installed_crds": [], "external_dns": {"installed": False}})
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+
+    assert {a["name"] for a in result["applied"]} == {
+        "envoy-gateway",
+        "aws-load-balancer-controller",
+        "external-dns",
+    }
+    assert driver.deletes == []
+
+
+def test_an_additive_edge_run_never_duplicates_a_controller_already_running(monkeypatch):
+    """CONFLICT's shape: both controllers hand-installed into kube-system."""
+    _probe_reports(
+        monkeypatch,
+        {
+            "installed_crds": ["targetgroupbindings.elbv2.k8s.aws"],
+            "external_dns": {"installed": True, "provider": None},
+        },
+    )
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+
+
+def test_a_failed_probe_stops_the_additive_edge_run(monkeypatch):
+    """Guessing "absent" would install a second controller over a hand-installed one."""
+    import core.cluster_management as cm
+
+    def _boom(cluster):  # noqa: ANN001, ARG001
+        raise ConnectionError("apiserver unreachable")
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", _boom)
+    driver = _FakeDriver()
+
+    with pytest.raises(ConnectionError):
+        _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+    assert driver.calls == []
+
+
+def test_an_operator_run_never_probes_or_adds_controllers(monkeypatch):
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", lambda cluster: pytest.fail("probed"))  # noqa: ARG005
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"})
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]

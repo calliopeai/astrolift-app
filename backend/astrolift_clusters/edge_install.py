@@ -23,6 +23,42 @@ logger = logging.getLogger(__name__)
 EDGE_INGRESS_CLASS = "envoy"
 
 
+# What the edge needs beside itself on a cluster whose recipe offers it, and
+# how each shows up whoever installed it: the ALB controller by its CRD, and
+# external-dns through the capability probe's own classifier.
+_LBC_KEY = "aws-load-balancer-controller"
+_EXTERNAL_DNS_KEY = "external-dns"
+_LBC_CRD = "targetgroupbindings.elbv2.k8s.aws"
+
+
+def controllers_present(capabilities: dict[str, Any] | None) -> set[str]:
+    """The edge's controllers a capability probe found running, by recipe key.
+
+    Found means running at all, in any namespace, by any installer. A cluster
+    with a hand-installed controller must not get a second one from the
+    recipe, because two ALB controllers or two external-dns fight over the
+    same load balancers and records.
+    """
+    caps = capabilities or {}
+    present: set[str] = set()
+    if _LBC_CRD in set(caps.get("installed_crds") or ()):
+        present.add(_LBC_KEY)
+    if (caps.get("external_dns") or {}).get("installed"):
+        present.add(_EXTERNAL_DNS_KEY)
+    return present
+
+
+def edge_controllers_to_add(recipe_keys: set[str], capabilities: dict[str, Any] | None) -> set[str]:
+    """The controllers an additive edge install brings along.
+
+    Only the ones this cluster's recipe offers (the EKS recipe does; the
+    vanilla one has no ALB) and the probe did not find. Without them a fresh
+    cluster gets a Gateway and no load balancer or record in front of it.
+    """
+    wanted = {_LBC_KEY, _EXTERNAL_DNS_KEY} & recipe_keys
+    return wanted - controllers_present(capabilities)
+
+
 def edge_install_wanted(cluster: Any) -> bool:
     """The cluster is on the Envoy edge and still has no install of it."""
     from astrolift_clusters.models import ClusterBootstrapRun

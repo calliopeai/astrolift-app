@@ -8,7 +8,14 @@
   config gets `envoy-gateway` installed on start, or when an update moves it
   there. That install is additive: it deletes no other release, and it never
   runs for a cluster on any other class, so existing nginx and ALB installs
-  are unchanged.
+  are unchanged. On a cluster whose recipe offers them it also brings the
+  AWS Load Balancer Controller and external-dns, but only when a live probe
+  finds neither running, so a hand-installed controller never gets a twin.
+  The probe now sees an external-dns in `kube-system`.
+- A fresh install gets its apps zone from the installer
+  (`bootstrap_managed_domain`, from `ASTROLIFT_MANAGED_DOMAIN_ZONE`,
+  `_ZONE_ID` and `_CERTIFICATE_ARN`). It registers the zone once as the
+  platform default for tenant apps and never touches an existing row.
 - A cluster's class flip no longer redeploys every app (#2122). The flip
   used to commit the new gate to every bound app's `astrolift.toml`, and
   each commit started that app's deploy. The deploy path renders from the

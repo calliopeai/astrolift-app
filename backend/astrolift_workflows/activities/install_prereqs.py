@@ -646,6 +646,33 @@ def _apply_edge_oidc_secret(driver: Any, ctx_slug: str, cluster: Any, selected_s
     )
 
 
+def _edge_controllers_for_additive_run(
+    cluster: Any, components: list[Any], selected_set: set[str]
+) -> set[str]:
+    """The controllers the control plane's own edge install brings along (#2130).
+
+    Probed live, not read from the stored capabilities: on a fresh cluster the
+    probe may never have run, and guessing "absent" there would install a
+    second copy of a controller someone put in by hand. A probe that fails
+    raises, so Temporal retries rather than the run going ahead blind.
+    """
+    from astrolift_clusters.edge_install import edge_controllers_to_add
+    from core.cluster_management import probe_cluster_capabilities_dispatch
+    from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY
+
+    if EDGE_COMPONENT_KEY not in selected_set:
+        return set()
+    recipe_keys = {c.key for c in components}
+    capabilities = probe_cluster_capabilities_dispatch(cluster=cluster)
+    added = edge_controllers_to_add(recipe_keys, capabilities)
+    if added:
+        log.info(
+            "install_cluster_prereqs: the edge install adds %s, which the cluster does not run",
+            sorted(added),
+        )
+    return added
+
+
 def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
@@ -669,6 +696,9 @@ def _install_cluster_prereqs_sync(
     components = bootstrap_components_dispatch(cluster=cluster)
     selected_set = set(selected_keys)
     target_namespace = "astrolift-system"
+
+    if additive:
+        selected_set |= _edge_controllers_for_additive_run(cluster, components, selected_set)
 
     # Self-provision the AWS controllers' IRSA roles before their HelmReleases
     # land, so each controller can assume its role as soon as its pods start
