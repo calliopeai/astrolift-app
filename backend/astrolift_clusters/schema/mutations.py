@@ -331,6 +331,12 @@ class UpdateTenantClusterInput:
     # Write-only: the read side comes back redacted on TenantClusterType
     # because this carries the oauth2-proxy cookie secret (#1616).
     oidc_auth_config: JSON | None = strawberry.UNSET
+    # Also commit the new gate to every bound app's astrolift.toml when the
+    # class changes. Off by default: that commit redeploys every app at once
+    # through its CI, and the deploy path renders from this row, not from
+    # the manifest, so a class change moves each app on its next deploy
+    # without it (#2122).
+    sync_manifests: bool = False
 
 
 @strawberry.input
@@ -870,11 +876,14 @@ class ClustersMutation:
         # ingress_class flip counts as a change even when neither config
         # was touched: the class decides which gate is in force, so the
         # manifest's [ingress.auth] describes a different gate after it
-        # (#1539). This
+        # (#1539), but only when the operator asks (``syncManifests``): the
+        # commit lands on every app's deploy branch and each one redeploys,
+        # which turned one class flip into a cluster-wide migration (#2122).
+        # This
         # is best-effort and must never block the UI save — a missing
         # source connection is a graceful skip, and any SCM failure is
         # swallowed here and surfaced only in the logs.
-        if auth_config_changed or oidc_changed or class_changing:
+        if auth_config_changed or oidc_changed or (class_changing and input.sync_manifests):
             try:
                 from astrolift_clusters.services.toml_writeback import (
                     write_auth_config_for_cluster,
@@ -887,6 +896,13 @@ class ClustersMutation:
                     "auth config TOML write-back failed for cluster %s",
                     cluster.slug,
                 )
+
+        # Moving onto the Envoy edge installs it (#2130). Additive, and a
+        # no-op once a recipe run has it, so saving again changes nothing.
+        if class_changing or oidc_changed:
+            from astrolift_clusters.edge_install import ensure_edge_installed
+
+            ensure_edge_installed(cluster)
 
         return gql_success(cluster_to_type(cluster))
 

@@ -10375,6 +10375,7 @@ export type UpdateTenantClusterInput = {
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   oidcAuthConfig: InputMaybe<Scalars['JSON']['input']>;
   region: InputMaybe<Scalars['String']['input']>;
+  syncManifests: Scalars['Boolean']['input'];
 };
 
 export type UpdateWebhookSubscriptionInput = {

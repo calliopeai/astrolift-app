@@ -76,6 +76,7 @@ class InstallClusterPrereqsWorkflow:
                     input.cluster_id,
                     list(input.selected_components),
                     dict(input.option_overrides),
+                    input.additive,
                 ],
                 start_to_close_timeout=_APPLY_TIMEOUT,
                 retry_policy=_APPLY_RETRY,

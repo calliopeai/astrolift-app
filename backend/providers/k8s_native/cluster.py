@@ -1008,7 +1008,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                 chart_repo_type="default",
                 chart_version="0.19.1",
             ),
-            central_auth_component(getattr(cluster, "oidc_auth_config", None)),
+            central_auth_component(
+                getattr(cluster, "oidc_auth_config", None),
+                ingress_class=getattr(cluster, "ingress_class", "") or "",
+            ),
         ]
 
     # ---- Cluster health (#68 slice 1) -----------------------------

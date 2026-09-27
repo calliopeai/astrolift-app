@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- The Envoy edge comes up from the installer with no hand steps (#2130).
+  `register_tenant_cluster` accepts the OIDC client secret without an
+  oauth2-proxy cookie secret, and a cluster on class `envoy` with a complete
+  config gets `envoy-gateway` installed on start, or when an update moves it
+  there. That install is additive: it deletes no other release, and it never
+  runs for a cluster on any other class, so existing nginx and ALB installs
+  are unchanged.
+- A cluster's class flip no longer redeploys every app (#2122). The flip
+  used to commit the new gate to every bound app's `astrolift.toml`, and
+  each commit started that app's deploy. The deploy path renders from the
+  cluster, not the manifest, so each app now moves on its own next deploy;
+  `updateTenantCluster(syncManifests: true)` still commits it.
+- The recipe pre-checks oauth2-proxy only on an nginx-family cluster
+  (#2121). On an Envoy or ALB cluster it had nothing to gate and needed a
+  Secret nothing writes.
 - Central auth on an Envoy Gateway edge (#2055). A cluster with
   `ingressClass: "envoy"` and a complete `oidcAuthConfig` serves every
   platform-assigned app hostname through one Gateway in `astrolift-edge`,

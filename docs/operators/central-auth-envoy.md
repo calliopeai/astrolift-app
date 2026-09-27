@@ -27,7 +27,20 @@ names). A deploy of an app that declares them is refused with a message,
 because a per-app mapping needs a policy of its own and that would give the
 app its own session.
 
-## Turning it on
+## From the installer
+
+An install that chooses the Envoy edge needs none of the steps below. The
+control plane's environment carries `ASTROLIFT_CLUSTER_INGRESS_CLASS=envoy`
+and the `ASTROLIFT_CLUSTER_OIDC_*` values (discovery URL, client id, client
+secret, auth host; no cookie secret). On start, `register_tenant_cluster`
+writes them to the cluster and starts an **additive** install of
+`envoy-gateway`: it applies the edge and deletes no other release. A
+restart once the edge is installed starts nothing (#2130).
+
+None of this happens on a cluster whose class is not `envoy`, so an existing
+install on nginx or ALB auth is left as it is until an operator moves it.
+
+## Turning it on by hand
 
 The cluster's `oidcAuthConfig` needs `discovery_url`, `client_id`,
 `client_secret` and `auth_proxy_host`. The client must have exactly one
@@ -38,11 +51,13 @@ not serve `<issuer>/.well-known/jwks.json`.
 1. **Set the config, keep the current class.**
    `updateTenantCluster(id, oidcAuthConfig: {...})`. `client_secret` is
    write-only; the read side reports `client_secret_set`.
-2. **Install the edge.** `installClusterPrereqs` with `envoy-gateway` in
+2. **Install the edge.** Flipping the class (step 4) installs it on its
+   own, additively. To install it first and check it before moving
+   anything, run `installClusterPrereqs` with `envoy-gateway` in
    `selectedComponents`, **plus every component the cluster already runs
-   through the recipe**. The install deletes the recipe HelmRelease of any
-   component it is not given, so check the cluster status tab first and
-   carry the whole current set forward.
+   through the recipe**: an operator's install deletes the recipe
+   HelmRelease of any component it is not given, so check the cluster
+   status tab first and carry the whole current set forward.
 3. **Check the edge before moving anything.**
    - `https://<auth host>/` redirects to the IdP with
      `redirect_uri=https://<auth host>/oauth2/callback`.
@@ -52,7 +67,10 @@ not serve `<issuer>/.well-known/jwks.json`.
      that still has its own ALB Ingress keeps its own, more specific
      record, so nothing has moved yet.
 4. **Flip the cluster.** `updateTenantCluster(id, ingressClass: "envoy")`.
-   Nothing changes for running apps until each is redeployed.
+   Nothing changes for running apps until each is redeployed. The flip no
+   longer commits the new gate to every app's `astrolift.toml`, because
+   that commit redeployed every app at once (#2122). Pass
+   `syncManifests: true` to commit it anyway.
 5. **Move apps one at a time.** Redeploy an app. Its routes are applied on
    the edge, and once the Gateway is `Programmed` its old ALB Ingress is
    deleted. external-dns (`policy=sync`) then removes the app's own record

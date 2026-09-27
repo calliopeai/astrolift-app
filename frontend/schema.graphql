@@ -7262,6 +7262,7 @@ input UpdateTenantClusterInput {
   ingressMode: String = null
   albAuthConfig: JSON
   oidcAuthConfig: JSON
+  syncManifests: Boolean! = false
 }
 
 input UpdateWebhookSubscriptionInput {

@@ -650,6 +650,7 @@ def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     from astrolift_clusters.models import TenantCluster
     from core.app_deploy import AppDeployError
@@ -880,6 +881,8 @@ def _install_cluster_prereqs_sync(
     # desired state for selected components.
     deleted: list[str] = []
 
+    # An additive run applies its selection and removes nothing: the other
+    # recipe releases were not deselected, just not part of this run (#2130).
     # Deselected components that had charts (skipped components without
     # chart_repo_url never emitted a HelmRelease, so nothing to delete).
     deselected_releases = [
@@ -906,7 +909,7 @@ def _install_cluster_prereqs_sync(
         for name in to_delete_repos
     ]
 
-    if stale_manifests:
+    if stale_manifests and not additive:
         try:
             del_result = driver.delete_manifests(ctx.slug, target_namespace, stale_manifests)
             deleted = list(del_result.deleted)
@@ -1058,6 +1061,7 @@ async def install_cluster_prereqs(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     """Apply Flux ``HelmRelease`` CRDs for each selected bootstrap
     component to the cluster. Idempotent — re-run converges; an
@@ -1075,6 +1079,7 @@ async def install_cluster_prereqs(
         cluster_id,
         selected_keys,
         option_overrides,
+        additive,
     )
     log.info(
         "install_cluster_prereqs applied=%d skipped=%d",

@@ -465,8 +465,13 @@ class Command(BaseCommand):
         _oidc_discovery_url = _env("ASTROLIFT_CLUSTER_OIDC_DISCOVERY_URL")
         _oidc_client_id = _env("ASTROLIFT_CLUSTER_OIDC_CLIENT_ID")
         _oidc_cookie_secret = _env("ASTROLIFT_CLUSTER_OIDC_COOKIE_SECRET")
+        # Either secret completes the config: oauth2-proxy (the nginx edge)
+        # needs its cookie secret, the Envoy edge needs only the client
+        # secret and keeps its own session keys (#2130). Requiring the cookie
+        # secret left an Envoy install with no declarative way to register.
+        _oidc_client_secret_env = _env("ASTROLIFT_CLUSTER_OIDC_CLIENT_SECRET")
         oidc_auth_config = None
-        if _oidc_discovery_url and _oidc_client_id and _oidc_cookie_secret:
+        if _oidc_discovery_url and _oidc_client_id and (_oidc_cookie_secret or _oidc_client_secret_env):
             # auth_proxy_host is the hostname of the in-cluster oauth2-proxy
             # (e.g. auth.cluster.example.com). If not set explicitly, derive
             # it from the discovery URL by replacing the "dex" subdomain with
@@ -485,7 +490,6 @@ class Command(BaseCommand):
             oidc_auth_config = {
                 "discovery_url": _oidc_discovery_url,
                 "client_id": _oidc_client_id,
-                "cookie_secret": _oidc_cookie_secret,
                 "upstream_connector": _env("ASTROLIFT_CLUSTER_OIDC_UPSTREAM_CONNECTOR") or "google",
                 "auth_proxy_host": _oidc_auth_proxy_host,
             }
@@ -512,6 +516,13 @@ class Command(BaseCommand):
             if _existing_row is not None:
                 _existing_oidc = _existing_row.oidc_auth_config or {}
 
+            # ``cookie_secret`` -- the oauth2-proxy session key. Optional
+            # since #2130, so an Envoy install's environment omits it; carry
+            # an operator-set one forward rather than dropping it.
+            _cookie_secret = _oidc_cookie_secret or _existing_oidc.get("cookie_secret", "")
+            if _cookie_secret:
+                oidc_auth_config["cookie_secret"] = _cookie_secret
+
             _oidc_gateway_secret = _env("ASTROLIFT_CLUSTER_OIDC_GATEWAY_SECRET") or _existing_oidc.get(
                 "gateway_secret", ""
             )
@@ -521,9 +532,7 @@ class Command(BaseCommand):
             # ``client_secret`` (#2055) -- the install writes the auth host's
             # credentials Secret from it, so losing it on a restart leaves the
             # next install unable to.
-            _oidc_client_secret = _env("ASTROLIFT_CLUSTER_OIDC_CLIENT_SECRET") or _existing_oidc.get(
-                "client_secret", ""
-            )
+            _oidc_client_secret = _oidc_client_secret_env or _existing_oidc.get("client_secret", "")
             if _oidc_client_secret:
                 oidc_auth_config["client_secret"] = _oidc_client_secret
 
@@ -835,3 +844,11 @@ class Command(BaseCommand):
                 f"endpoint={endpoint or 'n/a'})"
             )
         )
+
+        # A cluster declared onto the Envoy edge gets it installed with no
+        # operator step (#2130). Only for class ``envoy`` with a complete
+        # config, and additive, so any other install is untouched.
+        from astrolift_clusters.edge_install import ensure_edge_installed
+
+        if ensure_edge_installed(obj):
+            self.stdout.write(f"started the Envoy edge install on {slug!r}")

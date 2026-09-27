@@ -1693,7 +1693,10 @@ class EKSClusterDriver(ClusterDriver):
             # complete oidc_auth_config, and it needs an nginx-family
             # controller to gate against, so it is inert on an ALB-only
             # cluster rather than harmful.
-            central_auth_component(getattr(cluster, "oidc_auth_config", None)),
+            central_auth_component(
+                getattr(cluster, "oidc_auth_config", None),
+                ingress_class=getattr(cluster, "ingress_class", "") or "",
+            ),
             # The Envoy Gateway edge (#2055): central auth with no nginx. The
             # ALB in front keeps TLS on the zone's ACM certificate and hands
             # plain HTTP to Envoy, which the release installs into this same
