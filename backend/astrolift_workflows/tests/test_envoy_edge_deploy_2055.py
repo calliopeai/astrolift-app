@@ -62,8 +62,14 @@ PROGRAMMED = {
 }
 
 
-def _cluster(config=None, ingress_class="envoy"):
-    return SimpleNamespace(oidc_auth_config=config, ingress_class=ingress_class, slug="c")
+def _cluster(config=None, ingress_class="envoy", plugin="aws", mode="shared_ingress"):
+    return SimpleNamespace(
+        oidc_auth_config=config,
+        ingress_class=ingress_class,
+        slug="c",
+        provider_plugin=SimpleNamespace(slug=plugin),
+        ingress_mode=mode,
+    )
 
 
 # ---- install ---------------------------------------------------------------
@@ -131,7 +137,12 @@ def test_webhook_not_serving_is_retried_like_a_missing_crd():
 
 
 def _app(edge=None):
-    return SimpleNamespace(slug="veruus", manifest_normalized={"edge": edge} if edge else {})
+    return SimpleNamespace(
+        slug="veruus",
+        manifest_normalized={"edge": edge} if edge else {},
+        organization_id=1,
+        organization=SimpleNamespace(slug="conflict"),
+    )
 
 
 def test_gated_cluster_renders_gated_routes():
@@ -223,7 +234,10 @@ def test_teardown_prunes_every_route_of_the_environment():
         }
     )
     prune_edge_leftovers(api, "c", app_slug="veruus", namespace="ns", rendered=[])
-    assert api.deleted == [("astrolift-edge", ["HTTPRoute/ns-web", "HTTPRouteFilter/ns-web"])]
+    assert api.deleted == [
+        ("astrolift-edge", ["HTTPRoute/ns-web"]),
+        ("astrolift-edge", ["HTTPRouteFilter/ns-web"]),
+    ]
 
 
 def test_prune_failure_never_fails_the_deploy():
@@ -236,3 +250,62 @@ def test_prune_failure_never_fails_the_deploy():
 
 def test_reconcile_is_a_no_op_on_the_envoy_edge():
     assert reconcile_cluster_ingresses(_cluster(COGNITO)) == {"reconciled": 0, "skipped": 0, "errors": []}
+
+
+# ---- #2124: the app keeps a rule on its own ALB group ----------------------
+
+
+def _front(out):
+    return [r for r in out if r["kind"] == "Ingress"]
+
+
+def test_shared_ingress_aws_app_gets_a_rule_on_its_alb_group():
+    out = envoy_edge_routes(
+        _app(),
+        namespace="conflict-veruus",
+        workloads={"web": (["veruus-demo.astro.example.net"], 8080)},
+        cluster=_cluster(COGNITO),
+        paused=False,
+    )
+    [ingress] = _front(out)
+    assert ingress["metadata"]["namespace"] == "astrolift-system"
+    assert ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"] == "astrolift-conflict"
+
+
+def test_no_group_rule_off_aws_or_outside_shared_ingress():
+    for cluster in (_cluster(COGNITO, plugin="gcp"), _cluster(COGNITO, mode="per_app")):
+        out = envoy_edge_routes(
+            _app(), namespace="ns", workloads={"web": (["a.z.example"], 80)}, cluster=cluster, paused=False
+        )
+        assert _front(out) == []
+
+
+def test_prune_keeps_the_rendered_group_rule_and_drops_a_stale_one():
+    rendered = [{"kind": "Ingress", "metadata": {"name": "ns-alb"}}]
+    front = {"astrolift.dev/namespace": "ns", "astrolift.dev/edge-front": "true"}
+    api = _Api(
+        listings={
+            ("astrolift-system", "networking.k8s.io/v1/Ingress"): [
+                {"metadata": {"name": "ns-alb", "labels": front}},
+                {"metadata": {"name": "ns-old", "labels": front}},
+                # The edge's own wildcard front, and anything else in the
+                # platform namespace, never carries the marker.
+                {"metadata": {"name": "astrolift-edge", "labels": {"astrolift.dev/namespace": "ns"}}},
+            ]
+        }
+    )
+    prune_edge_leftovers(api, "c", app_slug="veruus", namespace="ns", rendered=rendered)
+    assert api.deleted == [("astrolift-system", ["Ingress/ns-old"])]
+
+
+def test_teardown_drops_the_group_rule_too():
+    front = {"astrolift.dev/namespace": "ns", "astrolift.dev/edge-front": "true"}
+    api = _Api(
+        listings={
+            ("astrolift-system", "networking.k8s.io/v1/Ingress"): [
+                {"metadata": {"name": "ns-alb", "labels": front}}
+            ]
+        }
+    )
+    prune_edge_leftovers(api, "c", app_slug="veruus", namespace="ns", rendered=[])
+    assert api.deleted == [("astrolift-system", ["Ingress/ns-alb"])]

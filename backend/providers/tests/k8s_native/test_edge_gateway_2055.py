@@ -227,3 +227,26 @@ def test_route_names_are_unique_per_environment_and_bounded():
     name = route_name(long_ns, "web")
     assert len(name) <= 63
     assert name != route_name(long_ns + "x", "web")
+
+
+def test_app_alb_rule_joins_the_apps_group_and_points_at_the_edge():
+    from k8s_native.edge_gateway import EDGE_FRONT_LABEL, alb_host_ingress
+
+    ingress = alb_host_ingress(
+        app_slug="veruus",
+        namespace="conflict-veruus",
+        hostnames=["veruus-demo.astro.example.net"],
+        platform_namespace="astrolift-system",
+        group_annotations={"alb.ingress.kubernetes.io/group.name": "astrolift-conflict"},
+    )
+    meta = ingress["metadata"]
+    assert meta["namespace"] == "astrolift-system"
+    assert meta["labels"][EDGE_FRONT_LABEL] == "true"
+    assert meta["labels"][ROUTE_NAMESPACE_LABEL] == "conflict-veruus"
+    assert "astrolift.dev/managed-subdomain" not in meta["labels"]
+    assert meta["annotations"]["alb.ingress.kubernetes.io/group.name"] == "astrolift-conflict"
+    assert not [k for k in meta["annotations"] if "auth" in k]
+    [rule] = ingress["spec"]["rules"]
+    assert rule["host"] == "veruus-demo.astro.example.net"
+    assert rule["http"]["paths"][0]["backend"]["service"]["name"] == EDGE_SERVICE_NAME
+    assert ingress["spec"]["tls"] == [{"hosts": ["veruus-demo.astro.example.net"]}]

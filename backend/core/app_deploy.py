@@ -1499,7 +1499,7 @@ def envoy_edge_routes(
             "Read X-Auth-Request-User and X-Auth-Request-Email instead, or keep this app on a cluster "
             "with the nginx edge.",
         )
-    return render_app_routes(
+    out = render_app_routes(
         app_slug=app.slug,
         namespace=namespace,
         workloads=workloads,
@@ -1507,6 +1507,46 @@ def envoy_edge_routes(
         paused=paused,
         gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
         gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
+    )
+    front = _edge_alb_front_for_app(app, namespace=namespace, workloads=workloads, cluster=cluster)
+    return [*out, front] if front else out
+
+
+def _edge_alb_front_for_app(
+    app: Any, *, namespace: str, workloads: dict[str, tuple[list[str], int]], cluster: Any
+) -> dict[str, Any] | None:
+    """The environment's own rule on its ALB group, pointing at the edge (#2124).
+
+    Only on AWS in shared-ingress mode, where the app's old Ingress was a rule
+    on a named ALB group this one can join. Moving then never changes the
+    host's DNS target: the old rule is pruned while this one, on the same load
+    balancer, keeps answering. A per-app-ALB cluster has no named group to
+    join, so its apps rely on the edge's wildcard and see a short gap while
+    their old record ages out.
+    """
+    from _sdk._kube_health import PLATFORM_NAMESPACE
+
+    from astrolift_clusters.ingress_modes import IngressMode, shared_annotations_for
+    from astrolift_clusters.status_routing import IngressDriver
+    from providers.k8s_native.edge_gateway import alb_host_ingress
+
+    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    if plugin_slug != "aws" or getattr(cluster, "ingress_mode", "") != IngressMode.SHARED_INGRESS:
+        return None
+    hostnames = sorted({h for hosts, _port in workloads.values() for h in hosts})
+    org_slug = app.organization.slug if getattr(app, "organization_id", None) else ""
+    if not hostnames or not org_slug:
+        return None
+    ann = shared_annotations_for(driver=IngressDriver.AWS_ALB, org_slug=org_slug, app_slug=app.slug)
+    group = {ann.group_name_key: ann.group_name_value}
+    if ann.group_order_key:
+        group[ann.group_order_key] = ann.group_order_value
+    return alb_host_ingress(
+        app_slug=app.slug,
+        namespace=namespace,
+        hostnames=hostnames,
+        platform_namespace=PLATFORM_NAMESPACE,
+        group_annotations=group,
     )
 
 
@@ -1533,7 +1573,14 @@ def prune_edge_leftovers(
     Best-effort: returns what was removed, and a failure is logged, never
     raised, because the apply that just succeeded is what serves the app.
     """
-    from providers.k8s_native.edge_gateway import EDGE_NAMESPACE, GATEWAY_NAME, ROUTE_NAMESPACE_LABEL
+    from _sdk._kube_health import PLATFORM_NAMESPACE
+
+    from providers.k8s_native.edge_gateway import (
+        EDGE_FRONT_LABEL,
+        EDGE_NAMESPACE,
+        GATEWAY_NAME,
+        ROUTE_NAMESPACE_LABEL,
+    )
 
     def _labels(obj: dict[str, Any]) -> dict[str, Any]:
         return (obj.get("metadata") or {}).get("labels") or {}
@@ -1548,10 +1595,10 @@ def prune_edge_leftovers(
         conditions = ((gateway or {}).get("status") or {}).get("conditions") or []
         return any(c.get("type") == "Programmed" and c.get("status") == "True" for c in conditions)
 
-    keep_routes = {
-        (r.get("metadata") or {}).get("name")
+    keep = {
+        (r.get("kind"), (r.get("metadata") or {}).get("name"))
         for r in rendered
-        if r.get("kind") in ("HTTPRoute", "HTTPRouteFilter")
+        if r.get("kind") in ("HTTPRoute", "HTTPRouteFilter", "Ingress")
     }
     removed: list[str] = []
     try:
@@ -1577,18 +1624,23 @@ def prune_edge_leftovers(
         if legacy:
             result = driver.delete_manifests(ctx_slug, namespace, legacy)
             removed.extend(getattr(result, "deleted", []) or [])
-        stale = []
-        for kind, api in (
-            ("HTTPRoute", "gateway.networking.k8s.io/v1"),
-            ("HTTPRouteFilter", "gateway.envoyproxy.io/v1alpha1"),
+        for where, kind, api, marker in (
+            (EDGE_NAMESPACE, "HTTPRoute", "gateway.networking.k8s.io/v1", None),
+            (EDGE_NAMESPACE, "HTTPRouteFilter", "gateway.envoyproxy.io/v1alpha1", None),
+            # The environment's own ALB rule onto the edge (#2124).
+            (PLATFORM_NAMESPACE, "Ingress", "networking.k8s.io/v1", EDGE_FRONT_LABEL),
         ):
-            for obj in driver.list_manifests(ctx_slug, EDGE_NAMESPACE, f"{api}/{kind}"):
+            stale = []
+            for obj in driver.list_manifests(ctx_slug, where, f"{api}/{kind}"):
                 name = (obj.get("metadata") or {}).get("name")
-                if _labels(obj).get(ROUTE_NAMESPACE_LABEL) == namespace and name not in keep_routes:
+                labels = _labels(obj)
+                if marker and labels.get(marker) != "true":
+                    continue
+                if labels.get(ROUTE_NAMESPACE_LABEL) == namespace and (kind, name) not in keep:
                     stale.append({"apiVersion": api, "kind": kind, "metadata": {"name": name}})
-        if stale:
-            result = driver.delete_manifests(ctx_slug, EDGE_NAMESPACE, stale)
-            removed.extend(getattr(result, "deleted", []) or [])
+            if stale:
+                result = driver.delete_manifests(ctx_slug, where, stale)
+                removed.extend(getattr(result, "deleted", []) or [])
     except Exception:  # noqa: BLE001 - best-effort cleanup, see docstring
         log.warning("prune_edge_leftovers: cleanup failed for %s/%s", namespace, app_slug, exc_info=True)
     return removed
