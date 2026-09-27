@@ -990,7 +990,23 @@ def _render_app_ingresses_and_tls(
             cert_arn: str | None = (
                 managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None
             )
-            if computed:
+            if computed and cluster.ingress_class == "envoy":
+                # Same routes core.app_deploy renders (#2055); one helper so the
+                # two paths cannot disagree about an app's gate.
+                from core.app_deploy import envoy_edge_routes
+
+                # Every hostname on the primary Service, as the generic branch
+                # below renders them.
+                out.extend(
+                    envoy_edge_routes(
+                        d.registered_app,
+                        namespace=namespace,
+                        workloads={backend_service: ([wh.hostname for wh in computed], backend_port)},
+                        cluster=cluster,
+                        paused=ingress_paused,
+                    )
+                )
+            elif computed:
                 if cluster.ingress_class == "alb":
                     from core.app_deploy import (
                         cognito_auth_for_cluster,
@@ -1271,6 +1287,15 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
         # already render.
         raise AppDeployError(
             f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.errors),
+        )
+    cluster = getattr(d.app_environment, "tenant_cluster", None)
+    if getattr(cluster, "ingress_class", None) == "envoy":
+        # After the apply, never before: the edge route has to be serving
+        # before the app's old Ingress stops (#2055).
+        from core.app_deploy import prune_edge_leftovers
+
+        prune_edge_leftovers(
+            driver, ctx.slug, app_slug=d.registered_app.slug, namespace=namespace, rendered=resources
         )
     return {
         "created": list(result.created),

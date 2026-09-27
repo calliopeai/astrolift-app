@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Central auth on an Envoy Gateway edge (#2055). A cluster with
+  `ingressClass: "envoy"` and a complete `oidcAuthConfig` serves every
+  platform-assigned app hostname through one Gateway in `astrolift-edge`,
+  with Envoy's own OIDC filter owning the single IdP callback on the auth
+  host and a session scoped to its parent zone. A new app needs no Cognito
+  callback, load balancer or DNS record; on EKS an ALB in front keeps TLS on
+  the zone's ACM certificate. It replaces the ingress-nginx edge, which is
+  past end of maintenance, and closes a leak that edge had: oauth2-proxy
+  forwarded its session cookie to every app backend, where Envoy removes
+  the session's HMAC, expiry and refresh cookies and keeps the token cookies
+  encrypted. Identity reaches apps as `X-Auth-Request-User` and
+  `X-Auth-Request-Email`, dropped at the listener when a client sends them.
+  An app moves on its next deploy, and its old ALB Ingress is removed only
+  once the edge Gateway is serving. `oidcAuthConfig` now accepts a
+  write-only `client_secret`, read back as `client_secret_set`. See
+  `docs/operators/central-auth-envoy.md`.
 - GCP ownership checks no longer key on a name the tenant chooses (#2086,
   follow-up to #2074). Spanner Graph proved a database was Astrolift's with
   a schema marker that named no service, and on a shared instance the

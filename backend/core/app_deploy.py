@@ -1469,6 +1469,131 @@ def custom_domain_edge_auth_state(cluster: Any, hostname: str, *, opted_in: bool
     return EDGE_AUTH_GATED if covered else EDGE_AUTH_UNGATED
 
 
+def envoy_edge_routes(
+    app: Any,
+    *,
+    namespace: str,
+    workloads: dict[str, tuple[list[str], int]],
+    cluster: Any,
+    paused: bool,
+) -> list[dict[str, Any]]:
+    """An environment's routes on a cluster whose edge is Envoy Gateway (#2055).
+
+    Gated by the same definition as the nginx edge (``oidc_auth_for_cluster``),
+    so moving a cluster between edges never changes which apps need a login.
+    Both render paths call this, for the reason the ALB branch warns about:
+    an app's authentication must not depend on which path ran.
+    """
+    from core.ingress_reconcile import _edge_config
+    from providers.k8s_native.edge_gateway import render_app_routes
+
+    oidc_auth = oidc_auth_for_cluster(cluster)
+    edge = _edge_config(app) or {}
+    if oidc_auth is not None and edge.get("identity_headers"):
+        # The shared policy sets the identity headers for every gated route,
+        # under one set of names. A per-app mapping would need a policy of
+        # its own, which gives the app its own session and ends single
+        # sign-on, so it is refused rather than silently dropped.
+        raise AppDeployError(
+            f"app {app.slug!r} declares [edge] identity_headers, which the Envoy edge does not map per app. "
+            "Read X-Auth-Request-User and X-Auth-Request-Email instead, or keep this app on a cluster "
+            "with the nginx edge.",
+        )
+    return render_app_routes(
+        app_slug=app.slug,
+        namespace=namespace,
+        workloads=workloads,
+        gated=oidc_auth is not None,
+        paused=paused,
+        gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
+        gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
+    )
+
+
+def prune_edge_leftovers(
+    driver: Any,
+    ctx_slug: str,
+    *,
+    app_slug: str,
+    namespace: str,
+    rendered: list[dict[str, Any]],
+) -> list[str]:
+    """Remove what an environment no longer serves through, on an Envoy edge.
+
+    Two kinds of leftover, both found by label and both scoped to this one
+    environment's namespace:
+
+    * The app's own managed-subdomain Ingress from before the cluster moved
+      to the edge. Left in place, its ALB rule keeps answering and its DNS
+      record, more specific than the edge's wildcard, keeps pointing at it,
+      so the app would never actually move. Deleting it lets external-dns
+      (policy=sync) drop that record and the wildcard take over.
+    * Routes for a workload the app no longer has.
+
+    Best-effort: returns what was removed, and a failure is logged, never
+    raised, because the apply that just succeeded is what serves the app.
+    """
+    from providers.k8s_native.edge_gateway import EDGE_NAMESPACE, GATEWAY_NAME, ROUTE_NAMESPACE_LABEL
+
+    def _labels(obj: dict[str, Any]) -> dict[str, Any]:
+        return (obj.get("metadata") or {}).get("labels") or {}
+
+    def _edge_serving() -> bool:
+        # The old Ingress is the only thing serving the app until the edge
+        # is. A cluster flipped to envoy before its install ran would
+        # otherwise lose the app on its first redeploy.
+        gateway = driver.get_manifest(
+            ctx_slug, EDGE_NAMESPACE, "gateway.networking.k8s.io/v1/Gateway", GATEWAY_NAME
+        )
+        conditions = ((gateway or {}).get("status") or {}).get("conditions") or []
+        return any(c.get("type") == "Programmed" and c.get("status") == "True" for c in conditions)
+
+    keep_routes = {
+        (r.get("metadata") or {}).get("name")
+        for r in rendered
+        if r.get("kind") in ("HTTPRoute", "HTTPRouteFilter")
+    }
+    removed: list[str] = []
+    try:
+        legacy = [
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {"name": obj["metadata"]["name"]},
+            }
+            for obj in driver.list_manifests(ctx_slug, namespace, "networking.k8s.io/v1/Ingress")
+            if _labels(obj).get("astrolift.dev/app") == app_slug
+            and _labels(obj).get("astrolift.dev/managed-subdomain") == "true"
+        ]
+        if legacy and not _edge_serving():
+            log.warning(
+                "prune_edge_leftovers: edge Gateway %s/%s is not Programmed; keeping %d Ingress(es) in %s",
+                EDGE_NAMESPACE,
+                GATEWAY_NAME,
+                len(legacy),
+                namespace,
+            )
+            legacy = []
+        if legacy:
+            result = driver.delete_manifests(ctx_slug, namespace, legacy)
+            removed.extend(getattr(result, "deleted", []) or [])
+        stale = []
+        for kind, api in (
+            ("HTTPRoute", "gateway.networking.k8s.io/v1"),
+            ("HTTPRouteFilter", "gateway.envoyproxy.io/v1alpha1"),
+        ):
+            for obj in driver.list_manifests(ctx_slug, EDGE_NAMESPACE, f"{api}/{kind}"):
+                name = (obj.get("metadata") or {}).get("name")
+                if _labels(obj).get(ROUTE_NAMESPACE_LABEL) == namespace and name not in keep_routes:
+                    stale.append({"apiVersion": api, "kind": kind, "metadata": {"name": name}})
+        if stale:
+            result = driver.delete_manifests(ctx_slug, EDGE_NAMESPACE, stale)
+            removed.extend(getattr(result, "deleted", []) or [])
+    except Exception:  # noqa: BLE001 - best-effort cleanup, see docstring
+        log.warning("prune_edge_leftovers: cleanup failed for %s/%s", namespace, app_slug, exc_info=True)
+    return removed
+
+
 def _render_managed_subdomain_ingress(
     deployment: Deployment,
     manifest: Any,
@@ -1561,6 +1686,21 @@ def _render_managed_subdomain_ingress(
                 if val:
                     return val
         return "/"
+
+    if getattr(cluster, "ingress_class", None) == "envoy":
+        by_workload_port: dict[str, tuple[list[str], int]] = {}
+        for wh in computed:
+            if wh.workload_slug in serviceless_workloads:
+                continue
+            hostnames, _ = by_workload_port.get(wh.workload_slug, ([], 0))
+            by_workload_port[wh.workload_slug] = ([*hostnames, wh.hostname], _backend_port(wh.workload_slug))
+        return envoy_edge_routes(
+            app,
+            namespace=namespace,
+            workloads=by_workload_port,
+            cluster=cluster,
+            paused=ingress_paused,
+        )
 
     if getattr(cluster, "ingress_class", None) == "alb":
         from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
