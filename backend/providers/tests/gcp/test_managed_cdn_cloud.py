@@ -760,3 +760,21 @@ def test_provider_operation_error_surfaces_without_partial_success(
     fake.operation_error = {"errors": [{"code": "INVALID_FIELD", "message": "bad"}]}
     result = driver.provision(spec())
     assert not result.ok and "INVALID_FIELD" in result.message
+
+
+def test_a_resource_adopted_before_2074_keeps_its_marker_through_reprovision_and_update(
+    driver: CloudCdnDriver,
+    fake: FakeCompute,
+) -> None:
+    """#2086: ``_ensure_resource`` diffed every desired field, so the next
+    reconcile patched the description back to the plain marker and
+    ``delete_adopted_resources`` stopped guarding the resource."""
+    assert driver.provision(spec()).ok
+    fake.resources["urlMaps"]["portal-cdn-map"]["description"] = marker(adopted=True)
+
+    assert driver.provision(spec()).ok
+    assert driver.update(UpdateSpec("cdn/portal-cdn", config=spec().config)).ok
+
+    assert fake.resources["urlMaps"]["portal-cdn-map"]["description"] == marker(adopted=True)
+    blocked = driver.deprovision(DeprovisionSpec("cdn/portal-cdn", {"deletion_protection": False}))
+    assert not blocked.ok and "delete_adopted_resources=true" in blocked.message

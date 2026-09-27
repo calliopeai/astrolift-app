@@ -1,0 +1,204 @@
+{
+  "events": [
+    {
+      "eventId": "1",
+      "eventTime": "2026-09-26T23:14:48.208Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+      "workflowExecutionStartedEventAttributes": {
+        "workflowType": {
+          "name": "DeployPromotedAppWorkflow"
+        },
+        "taskQueue": {
+          "name": "astrolift-test"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJkZXZfZW52aXJvbm1lbnRfaWQiOjQyLCJzdG9yYWdlX2NsYXNzIjoiZ3AzIn0="
+            }
+          ]
+        },
+        "workflowExecutionTimeout": "315360000s",
+        "workflowRunTimeout": "315360000s",
+        "workflowTaskTimeout": "10s",
+        "originalExecutionRunId": "a60b4348-8e98-49fa-82f2-c306562c6240",
+        "identity": "11@2e954ddc0f4d",
+        "firstExecutionRunId": "a60b4348-8e98-49fa-82f2-c306562c6240",
+        "attempt": 1,
+        "firstWorkflowTaskBackoff": "0s",
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "2",
+      "eventTime": "2026-09-26T23:14:48.208Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "astrolift-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "3",
+      "eventTime": "2026-09-26T23:14:48.209Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "11@2e954ddc0f4d",
+        "historySizeBytes": "310"
+      }
+    },
+    {
+      "eventId": "4",
+      "eventTime": "2026-09-26T23:14:48.256Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "11@2e954ddc0f4d",
+        "binaryChecksum": "43b5996c5aca0158b962c6d5812dc6fe",
+        "sdkMetadata": {
+          "coreUsedFlags": [
+            1,
+            2,
+            3
+          ],
+          "sdkName": "temporal-python",
+          "sdkVersion": "1.27.2"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "5",
+      "eventTime": "2026-09-26T23:14:48.256Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "1",
+        "activityType": {
+          "name": "astrolift.builder.deploy_promoted_app"
+        },
+        "taskQueue": {
+          "name": "astrolift-test",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "NDI="
+            },
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "ImdwMyI="
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "600s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "3",
+        "retryPolicy": {
+          "initialInterval": "2s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s",
+          "maximumAttempts": 5
+        },
+        "priority": {}
+      }
+    },
+    {
+      "eventId": "6",
+      "eventTime": "2026-09-26T23:14:48.256Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "5",
+        "identity": "11@2e954ddc0f4d",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "7",
+      "eventTime": "2026-09-26T23:14:48.257Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJhcHBfdXJsIjoiaHR0cHM6Ly9hY21lLXNob3AuZXhhbXBsZS50ZXN0IiwibmFtZXNwYWNlIjoiYWNtZS1zaG9wIn0="
+            }
+          ]
+        },
+        "scheduledEventId": "5",
+        "startedEventId": "6",
+        "identity": "11@2e954ddc0f4d"
+      }
+    },
+    {
+      "eventId": "8",
+      "eventTime": "2026-09-26T23:14:48.257Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "astrolift-test"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "9",
+      "eventTime": "2026-09-26T23:14:48.257Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "8",
+        "identity": "11@2e954ddc0f4d",
+        "historySizeBytes": "879"
+      }
+    },
+    {
+      "eventId": "10",
+      "eventTime": "2026-09-26T23:14:48.259Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "8",
+        "identity": "11@2e954ddc0f4d",
+        "binaryChecksum": "43b5996c5aca0158b962c6d5812dc6fe",
+        "sdkMetadata": {},
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "11",
+      "eventTime": "2026-09-26T23:14:48.259Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+      "workflowExecutionCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJkYXRhIjp7ImFwcF91cmwiOiJodHRwczovL2FjbWUtc2hvcC5leGFtcGxlLnRlc3QiLCJuYW1lc3BhY2UiOiJhY21lLXNob3AifSwibWVzc2FnZSI6InByb21vdGVkIGFwcCBkZXBsb3llZCIsIm9rIjp0cnVlfQ=="
+            }
+          ]
+        },
+        "workflowTaskCompletedEventId": "9"
+      }
+    }
+  ]
+}

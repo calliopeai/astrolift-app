@@ -47,6 +47,17 @@ class ProvisionSpec:
     isolation: str = "shared"  # shared | dedicated
     binding_id: str = ""
     managed_service_id: str = ""
+    recorded_handle: str = ""
+    """The handle the platform already records for this service (the row's
+    ``backend_ref``), empty for one that never finished provisioning.
+
+    A re-provision reaches the driver as a fresh spec, so a driver whose name
+    derivation changed would otherwise derive a new name for a live service and
+    create a second, empty resource beside it. Drivers that changed one keep a
+    service on the name its record holds (#2086)."""
+    recorded_handle_exclusive: bool = False
+    """Whether ``recorded_handle`` is this service's and no other live one's.
+    See ``UpdateSpec.recorded_handle_exclusive``."""
 
 
 @dataclass(frozen=True)
@@ -77,6 +88,17 @@ class UpdateSpec:
     # collide.
     binding_id: str = ""
     managed_service_id: str = ""
+    recorded_handle_exclusive: bool = False
+    """Whether ``handle`` is recorded for this service and for no other live one (#2086).
+
+    ``handle`` is the platform's record of which resource the service owns. For a
+    resource that predates a driver's identity marker, that record is the only
+    ownership evidence there is, and it is evidence only while it is unique: two
+    live rows recording one handle is the cross-tenant collision #2086 describes,
+    and the squatter's row was written on its own request. The lifecycle sets this
+    after checking every live service the same GCP driver resolves to in the same
+    project. ``False`` means "not established", never "contested", so a caller that
+    leaves it unset gets a refusal rather than a pass."""
 
 
 @dataclass(frozen=True)
@@ -132,6 +154,8 @@ class DeprovisionSpec:
     config: dict[str, Any] = field(default_factory=dict)
     binding_id: str = ""
     managed_service_id: str = ""
+    recorded_handle_exclusive: bool = False
+    """See ``UpdateSpec.recorded_handle_exclusive``."""
 
 
 @dataclass(frozen=True)
@@ -155,6 +179,8 @@ class ServiceHandle:
     handle: str
     binding_id: str = ""
     managed_service_id: str = ""
+    recorded_handle_exclusive: bool = False
+    """See ``UpdateSpec.recorded_handle_exclusive``."""
 
 
 @dataclass(frozen=True)

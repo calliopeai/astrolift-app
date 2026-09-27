@@ -94,6 +94,9 @@ _OUTPUT_ONLY = {
     "updateTime",
 }
 _PROTECTED_RAW_FIELDS = _OUTPUT_ONLY | {"labels"}
+#: Read by the ``delete_adopted`` teardown guard. Nothing writes it any more
+#: (#2074), so a resource adopted before then keeps the one it has (#2086).
+_ADOPTED_LABEL = "astrolift-io-adopted"
 _CLUSTER_STRUCTURED_FIELDS = {
     "capacityConfig",
     "gcpConfig",
@@ -435,7 +438,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
         labels = dict(cluster.get("labels") or {})
-        if labels.get("astrolift-io-adopted") == "true" and not cfg.get("delete_adopted"):
+        if labels.get(_ADOPTED_LABEL) == "true" and not cfg.get("delete_adopted"):
             return DeprovisionResult(
                 False,
                 spec.handle,
@@ -1279,6 +1282,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             desired_ids.add(connect_id)
             name = self._connect_name(location, connect_id)
             labels = dict(parent_labels)
+            # On update ``parent_labels`` is the cluster's live map. A Connect
+            # cluster's adopted marker is its own, carried by ``_patch_lro``.
+            labels.pop(_ADOPTED_LABEL, None)
             labels["astrolift-io-resource-parent"] = _label_value(kafka_cluster.rsplit("/", 1)[-1])
             body = self._connect_body(declaration, kafka_cluster, labels)
             current = self._get(name)
@@ -1440,6 +1446,11 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         self._patch_lro(name, current, desired)
 
     def _patch_lro(self, name: str, current: dict[str, Any], desired: dict[str, Any]) -> None:
+        # Provision builds the label map from the spec alone, so without this a
+        # cluster adopted before #2074 lost its marker, and with it the
+        # ``delete_adopted`` guard, on its next provision (#2086).
+        if "labels" in desired and (current.get("labels") or {}).get(_ADOPTED_LABEL) == "true":
+            desired = {**desired, "labels": {**desired["labels"], _ADOPTED_LABEL: "true"}}
         changed = _changed_fields(current, desired)
         if changed:
             self._wait_operation(self._kafka.patch(name, changed, update_mask=list(changed)))

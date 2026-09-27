@@ -11,6 +11,7 @@ stays off the activity event loop.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Any
 
@@ -170,7 +171,64 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         # among them — had a path to a resource (#1505). Validated on the
         # way into the org, so it is portable by the time it lands here.
         tags=dict(getattr(org, "default_resource_tags", None) or {}),
+        recorded_handle=str(svc.backend_ref or ""),
     )
+
+
+def _recorded_handle_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
+    """Whether ``svc.backend_ref`` is recorded for ``svc`` and no other live service (#2086).
+
+    A driver whose identity marker postdates some of its resources can prove one
+    of those older resources is this service's only by the platform's record, and
+    the record proves that only while it is unique. Two live rows recording one
+    handle is the collision #2086 describes: the second row recorded it because
+    its own provision accepted a resource keyed by a tenant-settable id. Neither
+    record then proves anything, so the driver refuses both until an operator
+    decides which service owns the resource.
+
+    Scoped the way a GCP handle is. A handle names a resource inside one project,
+    so another row counts only when it resolves to the same driver in the same
+    project. Established for GCP drivers only, the ones that read it; ``False``
+    elsewhere means "not established". A row that cannot be placed counts against
+    exclusivity, because unknown is not unique.
+    """
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_services.models import ManagedService
+    from core.cluster_observability import managed_config_for
+
+    handle = str(svc.backend_ref or "")
+    project = str(getattr(cfg, "project_id", "") or "")
+    if not handle or not project or resolved.plugin_slug != "gcp":
+        return False
+    others = (
+        ManagedService.objects.filter(kind=svc.kind, backend_ref=handle)
+        .exclude(pk=svc.pk)
+        .select_related(
+            "app_environment__tenant_cluster__provider_plugin",
+            "tenant_cluster__provider_plugin",
+        )
+    )
+    for other in others:
+        cluster = _service_cluster(other)
+        if cluster is None:
+            return False
+        variant = str(getattr(other, "variant", "") or "")
+        try:
+            other_resolved = resolve_managed_driver(
+                cluster_plugin_slug=cluster.provider_plugin.slug,
+                kind=other.kind,
+                variant=variant,
+            )
+            if other_resolved.driver_cls is not resolved.driver_cls:
+                continue
+            other_cfg = managed_config_for(
+                other_resolved.plugin_slug, cluster, kind=other.kind, variant=variant
+            )
+        except Exception:  # noqa: BLE001 - a row that cannot be placed may still be the same resource
+            return False
+        if str(getattr(other_cfg, "project_id", "") or "") == project:
+            return False
+    return True
 
 
 def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
@@ -525,6 +583,7 @@ def _deprovision_sync(
 
     from _sdk.managed_service import DeprovisionSpec, ServiceHandle
 
+    exclusive = _recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg)
     # ``delete_data=False`` is a preservation claim, not just a driver flag.
     # Complete and record a provider-backed snapshot/export before allowing the
     # destructive half of teardown to start. Unsupported snapshot methods fail
@@ -535,6 +594,7 @@ def _deprovision_sync(
             ServiceHandle(
                 handle=svc.backend_ref,
                 managed_service_id=_service_identity(svc),
+                recorded_handle_exclusive=exclusive,
             )
         )
         snapshot_id = str(getattr(retained, "snapshot_id", "") or "")
@@ -559,6 +619,7 @@ def _deprovision_sync(
         handle=svc.backend_ref or "",
         config=deprovision_config,
         managed_service_id=_service_identity(svc),
+        recorded_handle_exclusive=exclusive,
     )
     try:
         result = driver.deprovision(
@@ -741,6 +802,10 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
 
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
+    spec = dataclasses.replace(
+        spec,
+        recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+    )
 
     if source is not None:
         from _sdk.managed_service import SnapshotHandle
@@ -807,6 +872,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             size=str(desired["size"]) if "size" in desired else None,
             config=desired,
             managed_service_id=_service_identity(svc),
+            recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
         ),
     )
     return {
@@ -1049,7 +1115,11 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     from _sdk.managed_service import ServiceHandle
 
-    handle = ServiceHandle(handle=svc.backend_ref, managed_service_id=_service_identity(svc))
+    handle = ServiceHandle(
+        handle=svc.backend_ref,
+        managed_service_id=_service_identity(svc),
+        recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+    )
     # Thread the operator-supplied ``ManagedService.config`` into the
     # binding so config-driven binding fields render (#1038): the SES
     # driver folds ``from_name``/``reply_to``/``return_path``/

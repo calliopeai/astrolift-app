@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from typing import Any
 
 import pytest
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp.managed.private_endpoint_psc import (
     ComputePscRestClient,
     PrivateServiceConnectConfig,
@@ -171,6 +173,9 @@ def driver(fake: FakeCompute) -> PrivateServiceConnectDriver:
     )
 
 
+MSID = "service-id"
+
+
 def service_spec(**config: Any) -> ProvisionSpec:
     return ProvisionSpec(
         organization_id="org-id",
@@ -188,7 +193,7 @@ def service_spec(**config: Any) -> ProvisionSpec:
             "service_attachment": ("projects/payments-prod/regions/us-central1/serviceAttachments/payments"),
             **config,
         },
-        managed_service_id="service-id",
+        managed_service_id=MSID,
     )
 
 
@@ -210,7 +215,7 @@ def api_spec(**config: Any) -> ProvisionSpec:
             "ip_address": "10.100.0.10",
             **config,
         },
-        managed_service_id="service-id",
+        managed_service_id=MSID,
     )
 
 
@@ -298,6 +303,7 @@ def test_global_access_is_the_only_in_place_provider_update(
     result = driver.update(
         UpdateSpec(
             "private_endpoint/us-central1/payments-psc",
+            managed_service_id=MSID,
             config=service_spec(allow_global_access=True).config,
         ),
     )
@@ -315,6 +321,7 @@ def test_immutable_target_change_requires_reprovision(
     result = driver.update(
         UpdateSpec(
             "private_endpoint/us-central1/payments-psc",
+            managed_service_id=MSID,
             config=service_spec(
                 service_attachment=("projects/payments-prod/regions/us-central1/serviceAttachments/payments-v2"),
             ).config,
@@ -347,7 +354,8 @@ def test_explicit_external_address_is_validated_and_retained(
     deleted = driver.deprovision(
         DeprovisionSpec(
             result.handle,
-            {**request.config, "deletion_protection": False},
+            managed_service_id=MSID,
+            config={**request.config, "deletion_protection": False},
         ),
     )
     assert deleted.ok
@@ -399,14 +407,16 @@ def test_resources_adopted_before_2074_stay_protected_on_delete(
     blocked = driver.deprovision(
         DeprovisionSpec(
             result.handle,
-            {**request.config, "deletion_protection": False},
+            managed_service_id=MSID,
+            config={**request.config, "deletion_protection": False},
         ),
     )
     assert not blocked.ok and "delete_adopted_resources" in blocked.message
     accepted = driver.deprovision(
         DeprovisionSpec(
             result.handle,
-            {
+            managed_service_id=MSID,
+            config={
                 **request.config,
                 "deletion_protection": False,
                 "delete_adopted_resources": True,
@@ -423,11 +433,11 @@ def test_status_maps_provider_connection_states(
     result = driver.provision(service_spec())
     endpoint = fake.forwarding[("us-central1", "payments-psc")]
     endpoint["pscConnectionStatus"] = "PENDING"
-    assert driver.status(ServiceHandle(result.handle)).state == "provisioning"
+    assert driver.status(ServiceHandle(result.handle, managed_service_id=MSID)).state == "provisioning"
     endpoint["pscConnectionStatus"] = "REJECTED"
-    assert driver.status(ServiceHandle(result.handle)).state == "error"
+    assert driver.status(ServiceHandle(result.handle, managed_service_id=MSID)).state == "error"
     endpoint["pscConnectionStatus"] = "ACCEPTED"
-    assert driver.status(ServiceHandle(result.handle)).state == "available"
+    assert driver.status(ServiceHandle(result.handle, managed_service_id=MSID)).state == "available"
 
 
 def test_status_missing_is_deprovisioned(driver: PrivateServiceConnectDriver) -> None:
@@ -444,7 +454,7 @@ def test_binding_emits_portable_and_gcp_contract(
         port=8443,
     )
     result = driver.provision(request)
-    binding = driver.binding(ServiceHandle(result.handle), request.config)
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID), request.config)
 
     assert binding.env_vars["PRIVATE_ENDPOINT_URL"].literal == ("https://payments.internal.example.com:8443")
     assert binding.env_vars["PRIVATE_ENDPOINT_IPS"].literal == '["10.42.0.10"]'
@@ -459,14 +469,15 @@ def test_deprovision_enforces_protection_and_deletes_rule_before_address(
     fake: FakeCompute,
 ) -> None:
     result = driver.provision(service_spec())
-    protected = driver.deprovision(DeprovisionSpec(result.handle, service_spec().config))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, service_spec().config, managed_service_id=MSID))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     assert fake.deleted == []
 
     deleted = driver.deprovision(
         DeprovisionSpec(
             result.handle,
-            {**service_spec().config, "deletion_protection": False},
+            managed_service_id=MSID,
+            config={**service_spec().config, "deletion_protection": False},
         ),
     )
     assert deleted.ok
@@ -487,7 +498,8 @@ def test_deprovision_blocks_address_with_external_dependents(
     blocked = driver.deprovision(
         DeprovisionSpec(
             result.handle,
-            {**service_spec().config, "deletion_protection": False},
+            managed_service_id=MSID,
+            config={**service_spec().config, "deletion_protection": False},
         ),
     )
     assert not blocked.ok and blocked.errors == ["address_in_use"]
@@ -501,7 +513,8 @@ def test_deprovision_missing_stack_is_idempotent(
     result = driver.deprovision(
         DeprovisionSpec(
             "private_endpoint/us-central1/missing",
-            {
+            managed_service_id=MSID,
+            config={
                 **service_spec(endpoint_id="missing").config,
                 "deletion_protection": False,
             },
@@ -590,6 +603,7 @@ def test_update_rejects_handle_location_or_id_drift(
     moved = driver.update(
         UpdateSpec(
             "private_endpoint/us-central1/payments-psc",
+            managed_service_id=MSID,
             config=service_spec(region="us-east1").config,
         ),
     )
@@ -690,3 +704,196 @@ def test_provider_operation_error_is_not_reported_as_success(
 def test_snapshot_is_explicitly_unsupported(driver: PrivateServiceConnectDriver) -> None:
     with pytest.raises(PrivateServiceConnectError, match="no durable snapshot"):
         driver.snapshot(ServiceHandle("private_endpoint/us-central1/payments-psc"))
+
+
+# ---- #2086: ownership is the managed-service id, not the tenant-chosen endpoint id ----
+
+VICTIM = "01996b1a-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
+STRANGER = "01996b1a-ffff-7e8f-9a0b-aaaaaaaaaaaa"
+
+
+def _as(spec: ProvisionSpec, managed_service_id: str, **identity: Any) -> ProvisionSpec:
+    return replace(spec, managed_service_id=managed_service_id, **identity)
+
+
+def _derived(spec: ProvisionSpec) -> ProvisionSpec:
+    """The same spec with no ``endpoint_id``, so the driver derives one."""
+    return replace(spec, config={key: value for key, value in spec.config.items() if key != "endpoint_id"})
+
+
+def _strip_identity(fake: FakeCompute, endpoint_id: str, *, description: str | None = None) -> None:
+    """Make the stack look provisioned before #2086: no managed-service label."""
+    for resource in (
+        fake.forwarding[("us-central1", endpoint_id)],
+        fake.addresses[("us-central1", f"{endpoint_id}-ip")],
+    ):
+        resource["labels"] = {k: v for k, v in resource["labels"].items() if k != MANAGED_SERVICE_ID_LABEL}
+        if description is not None:
+            resource["description"] = description
+
+
+def _identity_labels(fake: FakeCompute, endpoint_id: str) -> list[str]:
+    return [
+        str(resource["labels"].get(MANAGED_SERVICE_ID_LABEL, ""))
+        for resource in (
+            fake.forwarding[("us-central1", endpoint_id)],
+            fake.addresses[("us-central1", f"{endpoint_id}-ip")],
+        )
+    ]
+
+
+def _mutations(fake: FakeCompute) -> tuple[int, int, int, int]:
+    return len(fake.inserted), len(fake.patched), len(fake.deleted), len(fake.label_updates)
+
+
+def test_new_endpoints_carry_the_managed_service_id(driver: PrivateServiceConnectDriver, fake: FakeCompute) -> None:
+    assert driver.provision(_as(service_spec(), VICTIM)).ok
+    assert _identity_labels(fake, "payments-psc") == [VICTIM, VICTIM]
+
+
+def test_a_tenant_naming_another_orgs_endpoint_id_is_refused_and_it_is_left_untouched(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    victim = driver.provision(_as(service_spec(), VICTIM))
+    assert victim.ok
+    endpoint_before = deepcopy(fake.forwarding[("us-central1", "payments-psc")])
+    address_before = deepcopy(fake.addresses[("us-central1", "payments-psc-ip")])
+    before = _mutations(fake)
+
+    # The attack names the victim's endpoint id and asks for changes that
+    # would land on it: new labels and global access.
+    attack = _as(
+        service_spec(labels={"team": "globex"}, allow_global_access=True), STRANGER, organization_slug="globex"
+    )
+    denied = driver.provision(attack)
+    assert not denied.ok and "another managed service" in denied.message
+
+    stranger: dict[str, Any] = {"managed_service_id": STRANGER, "recorded_handle_exclusive": True}
+    updated = driver.update(UpdateSpec(victim.handle, config=attack.config, **stranger))
+    assert not updated.ok and "another managed service" in updated.message
+    with pytest.raises(PrivateServiceConnectError, match="another managed service"):
+        driver.binding(ServiceHandle(victim.handle, **stranger), attack.config)
+    assert driver.status(ServiceHandle(victim.handle, **stranger)).state == "error"
+    deleted = driver.deprovision(
+        DeprovisionSpec(victim.handle, {**attack.config, "deletion_protection": False}, **stranger),
+        force_destroy=True,
+    )
+    assert not deleted.ok and deleted.errors == ["resource_not_owned"] and deleted.retryable is False
+
+    assert _mutations(fake) == before
+    assert fake.forwarding[("us-central1", "payments-psc")] == endpoint_before
+    assert fake.addresses[("us-central1", "payments-psc-ip")] == address_before
+
+
+def test_two_orgs_whose_slugs_join_alike_derive_separate_endpoints(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    first = driver.provision(_as(_derived(service_spec()), VICTIM, organization_slug="acme", app_slug="web-prod"))
+    second = driver.provision(_as(_derived(service_spec()), STRANGER, organization_slug="acme-web", app_slug="prod"))
+    assert first.ok and second.ok
+    assert first.handle != second.handle
+
+    apis_first = driver.provision(_as(_derived(api_spec()), VICTIM, organization_slug="acme", app_slug="web-prod"))
+    apis_second = driver.provision(
+        _as(_derived(api_spec(ip_address="10.100.0.11")), STRANGER, organization_slug="acme-web", app_slug="prod"),
+    )
+    assert apis_first.ok and apis_second.ok
+    assert apis_first.handle != apis_second.handle
+
+
+def test_an_endpoint_from_before_2086_is_proven_by_its_create_time_description(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    request = _as(service_spec(), VICTIM)
+    created = driver.provision(request)
+    _strip_identity(fake, "payments-psc")
+
+    # The description written at create names the victim, so no record is
+    # needed for it, and no record, however exclusive, gets anyone else in.
+    taken = driver.update(
+        UpdateSpec(created.handle, config=request.config, managed_service_id=STRANGER, recorded_handle_exclusive=True),
+    )
+    assert not taken.ok and "created for another managed service" in taken.message
+    assert _identity_labels(fake, "payments-psc") == ["", ""]
+
+    updated = driver.update(UpdateSpec(created.handle, config=request.config, managed_service_id=VICTIM))
+    assert updated.ok
+    assert _identity_labels(fake, "payments-psc") == [VICTIM, VICTIM]
+
+
+def test_an_endpoint_without_create_time_evidence_needs_an_exclusive_record(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    request = _as(service_spec(), VICTIM)
+    created = driver.provision(request)
+    # Adopted before #2074: the description is whatever its creator wrote.
+    _strip_identity(fake, "payments-psc", description="network team")
+    before = _mutations(fake)
+
+    assert "exclusive platform record" in driver.provision(request).message
+    unproven = driver.update(UpdateSpec(created.handle, config=request.config, managed_service_id=VICTIM))
+    assert not unproven.ok and "exclusive platform record" in unproven.message
+    with pytest.raises(PrivateServiceConnectError, match="exclusive platform record"):
+        driver.binding(ServiceHandle(created.handle, managed_service_id=VICTIM), request.config)
+    deleted = driver.deprovision(
+        DeprovisionSpec(created.handle, {**request.config, "deletion_protection": False}, managed_service_id=VICTIM),
+    )
+    assert not deleted.ok and deleted.errors == ["resource_not_owned"]
+    assert _mutations(fake) == before
+
+    proven = driver.provision(replace(request, recorded_handle=created.handle, recorded_handle_exclusive=True))
+    assert proven.ok
+    assert _identity_labels(fake, "payments-psc") == [VICTIM, VICTIM]
+    # Backfilled: the label decides from here, whatever anyone's record says.
+    taken = driver.update(
+        UpdateSpec(created.handle, config=request.config, managed_service_id=STRANGER, recorded_handle_exclusive=True),
+    )
+    assert not taken.ok and "another managed service" in taken.message
+
+
+def test_a_service_named_before_2086_keeps_its_recorded_endpoint(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    legacy_id = "astrolift-acme-portal-prod-payments"
+    legacy_handle = f"private_endpoint/us-central1/{legacy_id}"
+    assert driver.provision(_as(service_spec(endpoint_id=legacy_id), VICTIM)).handle == legacy_handle
+    _strip_identity(fake, legacy_id)
+    inserted = len(fake.inserted)
+
+    kept = driver.provision(
+        replace(_as(_derived(service_spec()), VICTIM), recorded_handle=legacy_handle, recorded_handle_exclusive=True),
+    )
+    assert kept.ok and kept.handle == legacy_handle
+    assert len(fake.inserted) == inserted
+    assert _identity_labels(fake, legacy_id) == [VICTIM, VICTIM]
+
+    # Without that record the same spec derives a new-style name.
+    fresh = driver.provision(_as(_derived(service_spec()), VICTIM))
+    assert fresh.ok and fresh.handle != legacy_handle
+
+
+@pytest.mark.parametrize(
+    "key", [MANAGED_SERVICE_ID_LABEL, "astrolift-managed-service-id", "astrolift-io-managed-service-id"]
+)
+def test_tenant_labels_cannot_plant_a_managed_service_id(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+    key: str,
+) -> None:
+    result = driver.provision(_as(service_spec(labels={key: VICTIM}), STRANGER))
+    assert not result.ok and "ownership labels" in result.message
+    assert not fake.inserted
+
+
+def test_provision_without_a_managed_service_id_fails_closed(
+    driver: PrivateServiceConnectDriver,
+    fake: FakeCompute,
+) -> None:
+    result = driver.provision(_as(service_spec(), ""))
+    assert not result.ok and "managed-service id" in result.message
+    assert not fake.inserted

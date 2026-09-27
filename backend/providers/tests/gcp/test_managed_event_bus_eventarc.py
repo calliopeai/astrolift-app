@@ -940,3 +940,36 @@ def test_operation_error_is_never_reported_as_success(
     }
     with pytest.raises(EventarcError, match="quota exhausted"):
         driver._wait_operation({"name": "operations/wait", "done": False})
+
+
+def test_a_bus_adopted_before_2074_keeps_its_marker_through_reprovision_and_update(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+) -> None:
+    """#2086: provision built the label map from the spec alone, so the next
+    one dropped the marker, and with it the ``delete_adopted`` guard."""
+    config = {**_full_config(), "deletion_protection": False}
+    result = driver.provision(replace(SPEC, config=config))
+    bus = "projects/project-1/locations/us-central1/messageBuses/astrolift"
+    trigger = next(name for name in client.resources if "/triggers/" in name)
+    for name in (bus, trigger):
+        client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.provision(replace(SPEC, config=config)).ok
+    assert driver.update(UpdateSpec(result.handle, config={"labels": {"team": "platform"}})).ok
+
+    assert client.resources[bus]["labels"]["astrolift-io-adopted"] == "true"
+    assert client.resources[trigger]["labels"]["astrolift-io-adopted"] == "true"
+    denied = driver.deprovision(DeprovisionSpec(result.handle, {"deletion_protection": False}), force_destroy=True)
+    assert not denied.ok and denied.errors == ["adopted_resource_guard"]
+
+
+def test_children_do_not_inherit_an_adopted_buss_marker(driver: EventarcDriver, client: FakeEventarc) -> None:
+    result = _provision(driver, message_bus_id="astrolift", deletion_protection=False)
+    bus = "projects/project-1/locations/us-central1/messageBuses/astrolift"
+    client.resources[bus]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.update(UpdateSpec(result.handle, config={"pipelines": _full_config()["pipelines"]})).ok
+
+    pipeline = client.resources["projects/project-1/locations/us-central1/pipelines/to-run"]
+    assert "astrolift-io-adopted" not in pipeline["labels"]

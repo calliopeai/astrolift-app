@@ -104,6 +104,9 @@ _PROTECTED_PROVIDER_FIELDS = _OUTPUT_ONLY_FIELDS | {"labels"}
 # may set them, where the account is checked against the install policy; a
 # raw or cleared field would replace the checked value (#2087).
 _IDENTITY_FIELDS = {"pipelines": {"destinations"}, "triggers": {"serviceAccount"}}
+#: Read by the ``delete_adopted`` teardown guard. Nothing writes it any more
+#: (#2074), so a resource adopted before then keeps the one it has (#2086).
+_ADOPTED_LABEL = "astrolift-io-adopted"
 
 
 class EventarcError(RuntimeError):
@@ -395,7 +398,7 @@ class EventarcDriver(ManagedServiceDriver):
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
         labels = dict(current.get("labels") or {})
-        if labels.get("astrolift-io-adopted") == "true" and not cfg.get("delete_adopted"):
+        if labels.get(_ADOPTED_LABEL) == "true" and not cfg.get("delete_adopted"):
             return DeprovisionResult(
                 False,
                 spec.handle,
@@ -1101,6 +1104,9 @@ class EventarcDriver(ManagedServiceDriver):
         parent_label = labels.get("astrolift-io-resource-parent") or _label_value(bus_name.rsplit("/", 1)[-1])
         service_id = labels.get("astrolift-io-managed-service-id", "")
         child_labels = dict(labels)
+        # On update ``labels`` is the bus's live map. A child's adopted marker
+        # is its own, carried by ``_patch_resource``; it is not the bus's.
+        child_labels.pop(_ADOPTED_LABEL, None)
         child_labels["astrolift-io-resource-parent"] = parent_label
         parent = self._parent(location)
         for config_key, collection in _DECLARATION_KEYS.items():
@@ -1243,6 +1249,11 @@ class EventarcDriver(ManagedServiceDriver):
         current: dict[str, Any],
         desired: dict[str, Any],
     ) -> None:
+        # Provision builds the label map from the spec alone, so without this a
+        # resource adopted before #2074 lost its marker, and with it the
+        # ``delete_adopted`` guard, on its next provision (#2086).
+        if "labels" in desired and (current.get("labels") or {}).get(_ADOPTED_LABEL) == "true":
+            desired = {**desired, "labels": {**desired["labels"], _ADOPTED_LABEL: "true"}}
         changed = {
             key: value for key, value in desired.items() if key not in _OUTPUT_ONLY_FIELDS and value != current.get(key)
         }
