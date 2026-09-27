@@ -845,10 +845,12 @@ class ClustersMutation:
         if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         if oidc_changed:
+            from providers.k8s_native.central_auth import validate_acme_email
             from providers.k8s_native.logout import configured_logout_url
 
             try:
                 configured_logout_url(input.oidc_auth_config)
+                validate_acme_email(input.oidc_auth_config)
             except ValueError as exc:
                 return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="oidcAuthConfig")
             cluster.oidc_auth_config = input.oidc_auth_config
