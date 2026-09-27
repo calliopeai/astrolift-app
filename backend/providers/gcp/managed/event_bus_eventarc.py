@@ -33,6 +33,13 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp.managed._ownership import (
+    is_marked_for,
+    is_platform_label_key,
+    label_identity_refusal,
+    managed_service_ids,
+    reserved_label_keys,
+)
 
 KIND = "event_bus"
 _API_ROOT = "https://eventarc.googleapis.com/v1"
@@ -102,6 +109,7 @@ _PROTECTED_PROVIDER_FIELDS = _OUTPUT_ONLY_FIELDS | {"labels"}
 #: Read by the ``delete_adopted`` teardown guard. Nothing writes it any more
 #: (#2074), so a resource adopted before then keeps the one it has (#2086).
 _ADOPTED_LABEL = "astrolift-io-adopted"
+_MISSING_IDENTITY = "Eventarc needs the managed-service id to mark the resources it owns"
 
 
 class EventarcError(RuntimeError):
@@ -286,11 +294,14 @@ class EventarcDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_eventarc_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_eventarc_config"])
         location = str(cfg.get("location") or self._config.location)
         bus_id = str(cfg.get("message_bus_id") or self._config.message_bus_id)
         bus_name = self._resource_name(location, "messageBuses", bus_id)
         handle = _handle(location, bus_id)
         labels = self._labels(spec, cfg)
+        record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == handle
         try:
             current = self._get(bus_name)
             if current is None:
@@ -305,16 +316,18 @@ class EventarcDriver(ManagedServiceDriver):
                     current = self._eventarc.get(bus_name)
                 except EventarcConflict:
                     current = self._eventarc.get(bus_name)
-                    self._assert_adoptable(
+                    self._assert_owned(
                         current,
                         managed_service_id=spec.managed_service_id,
+                        record_proves=record_proves,
                         resource="message bus",
                     )
                     self._patch_resource(bus_name, current, self._bus_body(cfg, labels))
             else:
-                self._assert_adoptable(
+                self._assert_owned(
                     current,
                     managed_service_id=spec.managed_service_id,
+                    record_proves=record_proves,
                     resource="message bus",
                 )
                 self._patch_resource(bus_name, current, self._bus_body(cfg, labels))
@@ -323,6 +336,7 @@ class EventarcDriver(ManagedServiceDriver):
                 bus_name=bus_name,
                 cfg=cfg,
                 labels=labels,
+                managed_service_id=spec.managed_service_id,
             )
         except Exception as exc:
             return ProvisionResult(False, handle, f"provision Eventarc: {exc}", [str(exc)])
@@ -346,8 +360,19 @@ class EventarcDriver(ManagedServiceDriver):
         bus_name = self._resource_name(location, "messageBuses", bus_id)
         try:
             current = self._eventarc.get(bus_name)
-            self._assert_managed(current, resource="message bus")
-            labels = dict(current.get("labels") or {})
+            self._assert_owned(
+                current,
+                managed_service_id=spec.managed_service_id,
+                record_proves=spec.recorded_handle_exclusive,
+                resource="message bus",
+            )
+            # The live map is the base, but the identity comes from the spec:
+            # a service id or parent planted on the bus is written over here,
+            # never read back as this service's (#2098).
+            labels = _platform_last(
+                {**dict(current.get("labels") or {}), **_identity_labels(bus_id, spec.managed_service_id)},
+                _normalized_labels(cfg.get("labels") or {}),
+            )
             desired_bus = self._bus_body(cfg, labels, partial=True)
             self._patch_resource(bus_name, current, desired_bus)
             self._reconcile_children(
@@ -355,6 +380,7 @@ class EventarcDriver(ManagedServiceDriver):
                 bus_name=bus_name,
                 cfg=cfg,
                 labels=labels,
+                managed_service_id=spec.managed_service_id,
             )
         except EventarcNotFound:
             return UpdateResult(False, spec.handle, "Eventarc message bus not found", ["not_found"])
@@ -386,7 +412,12 @@ class EventarcDriver(ManagedServiceDriver):
         if current is None:
             return DeprovisionResult(True, spec.handle, f"Eventarc bus {bus_id} already gone")
         try:
-            self._assert_managed(current, resource="message bus")
+            self._assert_owned(
+                current,
+                managed_service_id=spec.managed_service_id,
+                record_proves=spec.recorded_handle_exclusive,
+                resource="message bus",
+            )
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
         labels = dict(current.get("labels") or {})
@@ -407,14 +438,15 @@ class EventarcDriver(ManagedServiceDriver):
                 ["deletion_protection_enabled"],
                 retryable=False,
             )
-        parent_label = labels.get("astrolift-io-resource-parent") or _label_value(bus_id)
-        service_id = labels.get("astrolift-io-managed-service-id", "")
+        # Which children are this service's comes from its own identity and
+        # handle, not from labels on the bus a tenant could have set (#2098).
+        parent_label = _label_value(bus_id)
         try:
             external = self._external_bus_dependents(
                 location,
                 bus_name,
                 parent_label,
-                service_id,
+                spec.managed_service_id,
             )
             if external and not (force_destroy and cfg.get("delete_external_dependents")):
                 return DeprovisionResult(
@@ -433,7 +465,7 @@ class EventarcDriver(ManagedServiceDriver):
                     location,
                     collection,
                     parent_label,
-                    service_id,
+                    spec.managed_service_id,
                 ):
                     self._delete_named(str(resource["name"]), resource=resource)
             self._delete_named(bus_name, resource=current)
@@ -450,9 +482,10 @@ class EventarcDriver(ManagedServiceDriver):
             return ServiceStatus(handle.handle, "deprovisioned", "Eventarc message bus does not exist")
         except Exception as exc:
             return ServiceStatus(handle.handle, "error", f"describe Eventarc bus: {exc}")
-        labels = dict(bus.get("labels") or {})
-        parent_label = labels.get("astrolift-io-resource-parent") or _label_value(bus_id)
-        service_id = labels.get("astrolift-io-managed-service-id", "")
+        owners = managed_service_ids(bus.get("labels") or {})
+        if handle.managed_service_id and owners and not is_marked_for(bus.get("labels"), handle.managed_service_id):
+            return ServiceStatus(handle.handle, "error", "Eventarc message bus belongs to another managed service")
+        parent_label = _label_value(bus_id)
         counts: dict[str, int] = {}
         try:
             for collection in _DELETE_ORDER:
@@ -460,7 +493,7 @@ class EventarcDriver(ManagedServiceDriver):
                     location,
                     collection,
                     parent_label,
-                    service_id,
+                    handle.managed_service_id,
                 )
                 counts[collection] = len(resources)
                 for resource in resources:
@@ -499,7 +532,13 @@ class EventarcDriver(ManagedServiceDriver):
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         location, bus_id = _parse_handle(handle.handle)
         bus_name = self._resource_name(location, "messageBuses", bus_id)
-        self._eventarc.get(bus_name)
+        # The grants below are the payoff of a handle two services record.
+        self._assert_owned(
+            self._eventarc.get(bus_name),
+            managed_service_id=handle.managed_service_id,
+            record_proves=handle.recorded_handle_exclusive,
+            resource="message bus",
+        )
         access_mode = str((config or {}).get("access_mode") or "publish")
         role = "roles/eventarc.messageBusAdmin" if access_mode == "manage" else "roles/eventarc.messageBusUser"
         publish_url = f"{self._config.publishing_endpoint.rstrip('/')}/{bus_name}:publish"
@@ -554,18 +593,29 @@ class EventarcDriver(ManagedServiceDriver):
             raise EventarcError("Eventarc channel connection requires an activation token")
         location, bus_id = _parse_handle(handle.handle)
         bus = self._eventarc.get(self._resource_name(location, "messageBuses", bus_id))
-        self._assert_managed(bus, resource="message bus")
+        self._assert_owned(
+            bus,
+            managed_service_id=handle.managed_service_id,
+            record_proves=handle.recorded_handle_exclusive,
+            resource="message bus",
+        )
         name = self._resource_name(location, "channelConnections", connection_id)
         resolved_channel = self._resolve_name(location, "channels", channel)
         current = self._get(name)
         if current is not None:
-            self._assert_managed(current, resource="channel connection")
+            self._assert_owned(
+                current,
+                managed_service_id=handle.managed_service_id,
+                record_proves=False,
+                resource="channel connection",
+            )
             if current.get("channel") != resolved_channel:
                 raise EventarcError(
                     "Eventarc channel connection target is immutable; create a replacement connection",
                 )
             return ServiceStatus(handle.handle, "available", f"Eventarc connection {connection_id} exists")
-        labels = dict(bus.get("labels") or {})
+        labels = {key: value for key, value in dict(bus.get("labels") or {}).items() if key != _ADOPTED_LABEL}
+        labels.update(_identity_labels(bus_id, handle.managed_service_id))
         operation = self._eventarc.create(
             self._parent(location),
             "channelConnections",
@@ -589,7 +639,12 @@ class EventarcDriver(ManagedServiceDriver):
         name = self._resource_name(location, "channelConnections", connection_id)
         current = self._get(name)
         if current is not None:
-            self._assert_managed(current, resource="channel connection")
+            self._assert_owned(
+                current,
+                managed_service_id=handle.managed_service_id,
+                record_proves=False,
+                resource="channel connection",
+            )
             self._delete_named(name, resource=current)
         return ServiceStatus(handle.handle, "available", f"Eventarc connection {connection_id} removed")
 
@@ -902,6 +957,9 @@ class EventarcDriver(ManagedServiceDriver):
         severity = str((cfg.get("logging_config") or {}).get("log_severity") or "NONE")
         if severity not in _LOG_SEVERITIES:
             return f"invalid Eventarc log severity {severity!r}"
+        reserved = reserved_label_keys(cfg.get("labels") or {})
+        if reserved:
+            return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved)}"
         for config_key, collection in _DECLARATION_KEYS.items():
             declarations = list(cfg.get(config_key) or [])
             ids = [str(item.get("id") or "") for item in declarations]
@@ -911,6 +969,12 @@ class EventarcDriver(ManagedServiceDriver):
                 resource_id = str(declaration.get("id") or "")
                 if not _ID_RE.fullmatch(resource_id):
                     return f"invalid Eventarc {collection} ID {resource_id!r}"
+                reserved = reserved_label_keys(declaration.get("labels") or {})
+                if reserved:
+                    return (
+                        f"Eventarc {collection} {resource_id} labels cannot set Astrolift-reserved keys: "
+                        f"{', '.join(reserved)}"
+                    )
                 # Google's JSON parser accepts a field's proto name as well as
                 # its lowerCamelCase JSON name, so a raw or cleared field
                 # spelled in proto form bypassed the exact-match checks below
@@ -1055,14 +1119,15 @@ class EventarcDriver(ManagedServiceDriver):
         bus_name: str,
         cfg: dict[str, Any],
         labels: dict[str, str],
+        managed_service_id: str,
     ) -> None:
-        parent_label = labels.get("astrolift-io-resource-parent") or _label_value(bus_name.rsplit("/", 1)[-1])
-        service_id = labels.get("astrolift-io-managed-service-id", "")
+        bus_id = bus_name.rsplit("/", 1)[-1]
+        parent_label = _label_value(bus_id)
         child_labels = dict(labels)
         # On update ``labels`` is the bus's live map. A child's adopted marker
         # is its own, carried by ``_patch_resource``; it is not the bus's.
         child_labels.pop(_ADOPTED_LABEL, None)
-        child_labels["astrolift-io-resource-parent"] = parent_label
+        child_labels.update(_identity_labels(bus_id, managed_service_id))
         parent = self._parent(location)
         for config_key, collection in _DECLARATION_KEYS.items():
             if config_key not in cfg:
@@ -1086,17 +1151,19 @@ class EventarcDriver(ManagedServiceDriver):
                         self._wait_operation(operation)
                     except EventarcConflict:
                         current = self._eventarc.get(name)
-                        self._assert_adoptable(
+                        self._assert_owned(
                             current,
-                            managed_service_id=labels.get("astrolift-io-managed-service-id", ""),
+                            managed_service_id=managed_service_id,
+                            record_proves=False,
                             resource=collection,
                         )
                         self._assert_child_immutable(collection, current, body)
                         self._patch_resource(name, current, body)
                 else:
-                    self._assert_adoptable(
+                    self._assert_owned(
                         current,
-                        managed_service_id=labels.get("astrolift-io-managed-service-id", ""),
+                        managed_service_id=managed_service_id,
+                        record_proves=False,
                         resource=collection,
                     )
                     self._assert_child_immutable(collection, current, body)
@@ -1107,7 +1174,7 @@ class EventarcDriver(ManagedServiceDriver):
                     location,
                     collection,
                     parent_label,
-                    service_id,
+                    managed_service_id,
                 ):
                     resource_id = str(resource.get("name") or "").rsplit("/", 1)[-1]
                     if resource_id not in desired_ids:
@@ -1135,10 +1202,11 @@ class EventarcDriver(ManagedServiceDriver):
             body.update(dict(cfg["raw_fields"] or {}))
         for field in cfg.get("clear_fields") or []:
             body[str(field)] = None
-        if not partial or "labels" in cfg:
-            desired_labels = dict(labels)
-            desired_labels.update(_normalized_labels(cfg.get("labels") or {}))
-            body["labels"] = desired_labels
+        # ``labels`` is already the whole map, platform labels last. On update
+        # it is sent even when the tenant's own labels did not change, so an
+        # identity planted before #2098 is written over; ``_patch_resource``
+        # sends nothing when it already matches.
+        body["labels"] = dict(labels)
         if not partial and "displayName" not in body:
             body["displayName"] = "Astrolift shared event bus"
         return body
@@ -1193,9 +1261,7 @@ class EventarcDriver(ManagedServiceDriver):
         body.update(raw_fields)
         for field in declaration.get("clear_fields") or []:
             body[str(field)] = None
-        desired_labels = dict(labels)
-        desired_labels.update(_normalized_labels(declaration.get("labels") or {}))
-        body["labels"] = desired_labels
+        body["labels"] = _platform_last(labels, _normalized_labels(declaration.get("labels") or {}))
         return body
 
     def _patch_resource(
@@ -1221,11 +1287,12 @@ class EventarcDriver(ManagedServiceDriver):
         mask = [key for key in changed if key != "etag"]
         self._wait_operation(self._eventarc.patch(name, changed, update_mask=mask))
 
-    def _assert_adoptable(
-        self,
+    @staticmethod
+    def _assert_owned(
         current: dict[str, Any],
         *,
         managed_service_id: str,
+        record_proves: bool,
         resource: str,
     ) -> None:
         # The bus id and every child id are tenant-settable, so an existing
@@ -1233,24 +1300,26 @@ class EventarcDriver(ManagedServiceDriver):
         # never provisioned nor another managed service's may be claimed from
         # here. Adoption of an existing resource is a separate,
         # operator-authorized operation (#1365) that no tenant config flag may
-        # grant (#2021).
-        labels = dict(current.get("labels") or {})
-        if labels.get("astrolift-io-managed-by") == "platform":
-            current_service_id = str(labels.get("astrolift-io-managed-service-id") or "")
-            if current_service_id and managed_service_id and current_service_id != managed_service_id:
-                raise EventarcError(f"Eventarc {resource} belongs to another managed service")
-            return
-        quota_hint = " Eventarc Advanced allows one bus per project and region." if resource == "message bus" else ""
-        raise EventarcError(
-            f"existing Eventarc {resource} is not Astrolift-owned; adoption is a separate, "
-            f"operator-authorized operation and cannot be granted by tenant config.{quota_hint}",
-        )
-
-    @staticmethod
-    def _assert_managed(current: dict[str, Any], *, resource: str) -> None:
+        # grant (#2021). A resource with no managed-service id is this
+        # service's only when the platform's exclusive record of the handle
+        # says so (#2086); a child has no record of its own.
         labels = dict(current.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            raise EventarcError(f"Eventarc {resource} is not owned by Astrolift")
+            quota_hint = (
+                " Eventarc Advanced allows one bus per project and region." if resource == "message bus" else ""
+            )
+            raise EventarcError(
+                f"existing Eventarc {resource} is not Astrolift-owned; adoption is a separate, "
+                f"operator-authorized operation and cannot be granted by tenant config.{quota_hint}",
+            )
+        refusal = label_identity_refusal(
+            labels,
+            managed_service_id,
+            record_proves=record_proves,
+            resource=f"Eventarc {resource}",
+        )
+        if refusal:
+            raise EventarcError(refusal)
 
     @staticmethod
     def _assert_child_immutable(
@@ -1281,7 +1350,7 @@ class EventarcDriver(ManagedServiceDriver):
         location: str,
         bus_name: str,
         parent_label: str,
-        service_id: str,
+        managed_service_id: str,
     ) -> list[str]:
         candidates = set(self._eventarc.list_bus_enrollments(bus_name))
         parent = self._parent(location)
@@ -1298,7 +1367,7 @@ class EventarcDriver(ManagedServiceDriver):
             if (
                 labels.get("astrolift-io-managed-by") != "platform"
                 or labels.get("astrolift-io-resource-parent") != parent_label
-                or (service_id and labels.get("astrolift-io-managed-service-id") != service_id)
+                or not is_marked_for(labels, managed_service_id)
             ):
                 external.append(name)
         return external
@@ -1308,14 +1377,17 @@ class EventarcDriver(ManagedServiceDriver):
         location: str,
         collection: str,
         parent_label: str,
-        service_id: str,
+        managed_service_id: str,
     ) -> list[dict[str, Any]]:
+        # ``parent_label`` and ``managed_service_id`` come from this service's
+        # handle and spec. Read back from the bus they were a tenant's to set,
+        # and aimed prune and teardown at another service's routes (#2098).
         return [
             resource
             for resource in self._eventarc.list_resources(self._parent(location), collection)
             if (resource.get("labels") or {}).get("astrolift-io-managed-by") == "platform"
             and (resource.get("labels") or {}).get("astrolift-io-resource-parent") == parent_label
-            and (not service_id or (resource.get("labels") or {}).get("astrolift-io-managed-service-id") == service_id)
+            and is_marked_for(resource.get("labels"), managed_service_id)
         ]
 
     def _delete_named(self, name: str, *, resource: dict[str, Any] | None = None) -> None:
@@ -1366,19 +1438,14 @@ class EventarcDriver(ManagedServiceDriver):
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         bus_id = str(cfg.get("message_bus_id") or self._config.message_bus_id)
         labels = {
-            "astrolift-io-managed-by": "platform",
             "astrolift-io-organization": _label_value(spec.organization_slug),
             "astrolift-io-app": _label_value(spec.app_slug),
             "astrolift-io-environment": _label_value(spec.environment_name),
-            "astrolift-io-resource-parent": _label_value(bus_id),
+            **_identity_labels(bus_id, spec.managed_service_id),
         }
         if spec.binding_id:
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
-        if spec.managed_service_id:
-            labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
-            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
-        labels.update(_normalized_labels(cfg.get("labels") or {}))
-        return labels
+        return _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
 
 
 def _logging_schema() -> dict[str, Any]:
@@ -1402,6 +1469,24 @@ def _parse_handle(handle: str) -> tuple[str, str]:
 
 def _normalized_labels(labels: dict[str, Any]) -> dict[str, str]:
     return {_label_key(str(key)): _label_value(str(value)) for key, value in labels.items()}
+
+
+def _identity_labels(bus_id: str, managed_service_id: str) -> dict[str, str]:
+    """The labels prune, teardown and ownership decide on, from the handle and the spec only."""
+    return {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-resource-parent": _label_value(bus_id),
+        "astrolift-io-managed-service-id": _label_value(managed_service_id),
+        MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
+    }
+
+
+def _platform_last(base: dict[str, str], tenant: dict[str, str]) -> dict[str, str]:
+    """``base`` with ``tenant`` applied to its tenant keys only: platform labels always win (#2098)."""
+    merged = {key: value for key, value in base.items() if not is_platform_label_key(key)}
+    merged.update({key: value for key, value in tenant.items() if not is_platform_label_key(key)})
+    merged.update({key: value for key, value in base.items() if is_platform_label_key(key)})
+    return merged
 
 
 def _label_key(value: str) -> str:

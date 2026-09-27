@@ -37,6 +37,12 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp.managed._ownership import (
+    is_marked_for,
+    is_platform_label_key,
+    label_identity_refusal,
+    reserved_label_keys,
+)
 
 KIND = "event_stream"
 _API_ROOT = "https://managedkafka.googleapis.com/v1"
@@ -97,6 +103,7 @@ _PROTECTED_RAW_FIELDS = _OUTPUT_ONLY | {"labels"}
 #: Read by the ``delete_adopted`` teardown guard. Nothing writes it any more
 #: (#2074), so a resource adopted before then keeps the one it has (#2086).
 _ADOPTED_LABEL = "astrolift-io-adopted"
+_MISSING_IDENTITY = "Managed Kafka needs the managed-service id to mark the resources it owns"
 _CLUSTER_STRUCTURED_FIELDS = {
     "capacityConfig",
     "gcpConfig",
@@ -337,13 +344,14 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=spec.size)
         if error:
             return ProvisionResult(False, "", error, ["invalid_managed_kafka_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_managed_kafka_config"])
         location = str(cfg.get("location") or self._config.location)
         cluster_id = self._cluster_id(spec, cfg)
         handle = _handle(location, cluster_id)
         name = self._cluster_name(location, cluster_id)
         labels = self._labels(spec, cfg)
-        labels.setdefault("astrolift-io-managed-service-id", _label_value(cluster_id))
-        labels.setdefault(MANAGED_SERVICE_ID_LABEL, _label_value(cluster_id))
+        record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == handle
         try:
             cluster = self._get(name, full=True)
             if cluster is None:
@@ -361,10 +369,10 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                     cluster = self._kafka.get(name, params={"view": "FULL"})
                 except ManagedKafkaConflict:
                     cluster = self._kafka.get(name, params={"view": "FULL"})
-                    self._assert_adoptable(cluster, spec.managed_service_id, "cluster")
+                    self._assert_owned(cluster, spec.managed_service_id, "cluster", record_proves=record_proves)
                     self._patch_cluster(name, cluster, self._cluster_body(cfg, spec.size, labels))
             else:
-                self._assert_adoptable(cluster, spec.managed_service_id, "cluster")
+                self._assert_owned(cluster, spec.managed_service_id, "cluster", record_proves=record_proves)
                 self._patch_cluster(name, cluster, self._cluster_body(cfg, spec.size, labels))
             self._reconcile_cluster_children(name, cfg)
             self._reconcile_schema_registries(location, cfg, spec.managed_service_id)
@@ -397,14 +405,24 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         name = self._cluster_name(location, cluster_id)
         try:
             cluster = self._kafka.get(name, params={"view": "FULL"})
-            self._assert_managed(cluster, "cluster")
-            labels = dict(cluster.get("labels") or {})
+            self._assert_owned(
+                cluster,
+                spec.managed_service_id,
+                "cluster",
+                record_proves=spec.recorded_handle_exclusive,
+            )
+            # The live map is the base, but the identity comes from the spec:
+            # an id planted on the cluster is written over, never read back as
+            # the one prune and the schema-registry checks act for (#2098).
+            labels = _platform_last(
+                {**dict(cluster.get("labels") or {}), **_identity_labels(spec.managed_service_id)},
+                _normalized_labels(cfg.get("labels") or {}),
+            )
             desired = self._cluster_body(cfg, spec.size or "custom", labels, partial=True)
             self._patch_cluster(name, cluster, desired)
             self._reconcile_cluster_children(name, cfg)
-            service_id = str(labels.get("astrolift-io-managed-service-id") or _label_value(cluster_id))
-            self._reconcile_schema_registries(location, cfg, service_id)
-            self._reconcile_connect_clusters(location, name, cfg, labels, service_id)
+            self._reconcile_schema_registries(location, cfg, spec.managed_service_id)
+            self._reconcile_connect_clusters(location, name, cfg, labels, spec.managed_service_id)
         except ManagedKafkaNotFound:
             return UpdateResult(False, spec.handle, "Managed Kafka cluster not found", ["not_found"])
         except Exception as exc:
@@ -434,7 +452,12 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         if cluster is None:
             return DeprovisionResult(True, spec.handle, f"Managed Kafka cluster {cluster_id} already gone")
         try:
-            self._assert_managed(cluster, "cluster")
+            self._assert_owned(
+                cluster,
+                spec.managed_service_id,
+                "cluster",
+                record_proves=spec.recorded_handle_exclusive,
+            )
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
         labels = dict(cluster.get("labels") or {})
@@ -462,10 +485,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 ["kafka_data_requires_delete_data"],
                 retryable=False,
             )
-        service_id = str(labels.get("astrolift-io-managed-service-id") or _label_value(cluster_id))
         try:
             connect_clusters = self._connect_clusters_for_kafka(location, name)
-            owned, external = self._partition_owned(connect_clusters, service_id)
+            owned, external = self._partition_owned(connect_clusters, spec.managed_service_id)
             if external and not (force_destroy and cfg.get("delete_external_dependents")):
                 return DeprovisionResult(
                     False,
@@ -477,7 +499,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 )
             for connect in [*owned, *external]:
                 self._delete_connect_cluster(str(connect["name"]))
-            for registry in self._owned_schema_registries(location, service_id):
+            for registry in self._owned_schema_registries(location, spec.managed_service_id):
                 self._kafka.delete(str(registry["name"]))
             self._wait_operation(self._kafka.delete(name))
         except Exception as exc:
@@ -505,10 +527,12 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         }.get(provider_state, "error")
         if state != "available":
             return ServiceStatus(handle.handle, state, f"Managed Kafka reports {provider_state}")
-        labels = dict(cluster.get("labels") or {})
-        service_id = str(labels.get("astrolift-io-managed-service-id") or _label_value(cluster_id))
         try:
-            connect_clusters = self._owned_connect_clusters(location, service_id)
+            connect_clusters = self._owned_connect_clusters(
+                location,
+                str(cluster.get("name") or self._cluster_name(location, cluster_id)),
+                handle.managed_service_id,
+            )
             connector_counts = {"RUNNING": 0, "PAUSED": 0, "STOPPED": 0}
             for connect in connect_clusters:
                 connect_state = str(connect.get("state") or "STATE_UNSPECIFIED")
@@ -544,7 +568,12 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         cfg = dict(config or {})
         name = self._cluster_name(location, cluster_id)
         cluster = self._kafka.get(name, params={"view": "FULL"})
-        self._assert_managed(cluster, "cluster")
+        self._assert_owned(
+            cluster,
+            handle.managed_service_id,
+            "cluster",
+            record_proves=handle.recorded_handle_exclusive,
+        )
         bootstrap = str(cluster.get("bootstrapAddress") or cfg.get("bootstrap_address") or "")
         if not bootstrap:
             raise ManagedKafkaError(
@@ -580,9 +609,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 raise ManagedKafkaError(f"invalid schema_registry_id {registry_id!r}")
             registry_name = self._registry_name(location, registry_id)
             self._kafka.get(registry_name)
-            owner = self._registry_owner(registry_name)
-            service_id = str((cluster.get("labels") or {}).get("astrolift-io-managed-service-id") or cluster_id)
-            if owner != service_id:
+            if self._registry_owner(registry_name) != handle.managed_service_id:
                 raise ManagedKafkaError("selected schema registry is not owned by this Managed Kafka declaration")
             registry_url = f"{self._config.api_endpoint.rstrip('/')}/{registry_name}"
             env_vars["SCHEMA_REGISTRY_URL"] = ValueRef(literal=registry_url)
@@ -624,10 +651,15 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             raise ManagedKafkaError(f"invalid Managed Kafka connector ID {connector_id!r}")
         location, cluster_id = _parse_handle(handle.handle)
         cluster = self._kafka.get(self._cluster_name(location, cluster_id))
-        self._assert_managed(cluster, "cluster")
+        self._assert_owned(
+            cluster,
+            handle.managed_service_id,
+            "cluster",
+            record_proves=handle.recorded_handle_exclusive,
+        )
         connect_name = self._connect_name(location, connect_cluster_id)
         connect = self._kafka.get(connect_name)
-        self._assert_managed(connect, "Connect cluster")
+        self._assert_owned(connect, handle.managed_service_id, "Connect cluster", record_proves=False)
         if connect.get("kafkaCluster") != self._cluster_name(location, cluster_id):
             raise ManagedKafkaError("Connect cluster is not attached to the selected Kafka cluster")
         name = f"{connect_name}/connectors/{connector_id}"
@@ -993,6 +1025,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         raw_error = _raw_fields_error(cfg, protected=_CLUSTER_STRUCTURED_FIELDS)
         if raw_error:
             return raw_error
+        reserved = reserved_label_keys(cfg.get("labels") or {})
+        if reserved:
+            return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved)}"
         tls = cfg.get("tls_config") or {}
         cas = (tls.get("trust_config") or {}).get("cas_configs") or []
         if len(cas) > 10:
@@ -1096,6 +1131,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             raw_error = _raw_fields_error(connect, protected=_CONNECT_STRUCTURED_FIELDS)
             if raw_error:
                 return f"Connect cluster {connect_id}: {raw_error}"
+            reserved = reserved_label_keys(connect.get("labels") or {})
+            if reserved:
+                return f"Connect cluster {connect_id} labels cannot set Astrolift-reserved keys: {', '.join(reserved)}"
             connector_ids: set[str] = set()
             for connector in connect.get("connectors") or []:
                 connector_id = str(connector.get("id") or "")
@@ -1285,7 +1323,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             # On update ``parent_labels`` is the cluster's live map. A Connect
             # cluster's adopted marker is its own, carried by ``_patch_lro``.
             labels.pop(_ADOPTED_LABEL, None)
+            labels.update(_identity_labels(service_id))
             labels["astrolift-io-resource-parent"] = _label_value(kafka_cluster.rsplit("/", 1)[-1])
+            labels = _platform_last(labels, _normalized_labels(declaration.get("labels") or {}))
             body = self._connect_body(declaration, kafka_cluster, labels)
             current = self._get(name)
             if current is None:
@@ -1302,9 +1342,9 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                     current = self._kafka.get(name)
                 except ManagedKafkaConflict:
                     current = self._kafka.get(name)
-                    self._assert_adoptable(current, service_id, "Connect cluster")
+                    self._assert_owned(current, service_id, "Connect cluster", record_proves=False)
             else:
-                self._assert_adoptable(current, service_id, "Connect cluster")
+                self._assert_owned(current, service_id, "Connect cluster", record_proves=False)
             if str(current.get("kafkaCluster") or "") != kafka_cluster:
                 raise ManagedKafkaError(
                     f"Connect cluster {connect_id} kafka_cluster is immutable; create a replacement",
@@ -1313,7 +1353,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             self._patch_lro(name, current, body)
             self._reconcile_connectors(name, declaration)
         if cfg.get("prune_connect_clusters"):
-            for connect in self._owned_connect_clusters(location, service_id):
+            for connect in self._owned_connect_clusters(location, kafka_cluster, service_id):
                 connect_id = str(connect.get("name") or "").rsplit("/", 1)[-1]
                 if connect_id not in desired_ids:
                     self._delete_connect_cluster(str(connect["name"]))
@@ -1390,10 +1430,11 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         body.update(dict(cfg.get("raw_fields") or {}))
         for field in cfg.get("clear_fields") or []:
             body[str(field)] = None
-        if not partial or "labels" in cfg:
-            desired_labels = dict(labels)
-            desired_labels.update(_normalized_labels(cfg.get("labels") or {}))
-            body["labels"] = desired_labels
+        # ``labels`` is already the whole map, platform labels last. On update
+        # it is sent even when the tenant's own labels did not change, so an
+        # identity planted before #2098 is written over; ``_patch_lro`` sends
+        # nothing when it already matches.
+        body["labels"] = dict(labels)
         return body
 
     def _connect_body(
@@ -1415,17 +1456,14 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 },
                 "secretPaths": [str(value) for value in declaration.get("secret_paths") or []],
             },
-            "labels": {
-                **labels,
-                **_normalized_labels(declaration.get("labels") or {}),
-            },
+            "labels": dict(labels),
         }
         if declaration.get("config"):
             body["config"] = {str(key): str(value) for key, value in declaration["config"].items()}
         body.update(dict(declaration.get("raw_fields") or {}))
         for field in declaration.get("clear_fields") or []:
             body[str(field)] = None
-        body["labels"] = {**labels, **_normalized_labels(declaration.get("labels") or {})}
+        body["labels"] = dict(labels)
         return body
 
     def _patch_cluster(
@@ -1486,7 +1524,15 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             if item.get("kafkaCluster") == kafka_cluster
         ]
 
-    def _owned_connect_clusters(self, location: str, service_id: str) -> list[dict[str, Any]]:
+    def _owned_connect_clusters(
+        self,
+        location: str,
+        kafka_cluster: str,
+        managed_service_id: str,
+    ) -> list[dict[str, Any]]:
+        # Scoped by this service's own id and cluster, never by labels read
+        # back from the cluster: those were a tenant's to set, and aimed prune
+        # at another service's Connect clusters (#2098).
         return [
             item
             for item in self._kafka.list_resources(
@@ -1494,7 +1540,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
                 "connectClusters",
                 "connectClusters",
             )
-            if _is_owned(item, service_id)
+            if item.get("kafkaCluster") == kafka_cluster and _is_owned(item, managed_service_id)
         ]
 
     @staticmethod
@@ -1506,13 +1552,15 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         external = [item for item in resources if item not in owned]
         return owned, external
 
-    def _owned_schema_registries(self, location: str, service_id: str) -> list[dict[str, Any]]:
+    def _owned_schema_registries(self, location: str, managed_service_id: str) -> list[dict[str, Any]]:
+        if not managed_service_id:
+            return []
         rows = self._kafka.list_resources(
             self._parent(location),
             "schemaRegistries",
             "schemaRegistries",
         )
-        return [item for item in rows if self._registry_owner(str(item["name"])) == service_id]
+        return [item for item in rows if self._registry_owner(str(item["name"])) == managed_service_id]
 
     def _registry_owner(self, registry_name: str) -> str:
         try:
@@ -1567,32 +1615,36 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         except ManagedKafkaNotFound:
             return None
 
-    def _assert_adoptable(
-        self,
+    @staticmethod
+    def _assert_owned(
         current: dict[str, Any],
-        service_id: str,
+        managed_service_id: str,
         resource: str,
+        *,
+        record_proves: bool,
     ) -> None:
         # Cluster and Connect ids are tenant-settable, so an existing resource
         # is either this service's or refused: neither one Astrolift never
         # provisioned nor another managed service's may be claimed from here.
         # Adoption of an existing resource is a separate, operator-authorized
-        # operation (#1365) that no tenant config flag may grant (#2021).
+        # operation (#1365) that no tenant config flag may grant (#2021). A
+        # resource with no managed-service id is this service's only when the
+        # platform's exclusive record of the handle says so (#2086); a Connect
+        # cluster has no record of its own.
         labels = dict(current.get("labels") or {})
-        if labels.get("astrolift-io-managed-by") == "platform":
-            current_service = str(labels.get("astrolift-io-managed-service-id") or "")
-            if current_service and service_id and current_service != service_id:
-                raise ManagedKafkaError(f"Managed Kafka {resource} belongs to another managed service")
-            return
-        raise ManagedKafkaError(
-            f"existing Managed Kafka {resource} is not Astrolift-owned; adoption is a separate, "
-            "operator-authorized operation and cannot be granted by tenant config",
+        if labels.get("astrolift-io-managed-by") != "platform":
+            raise ManagedKafkaError(
+                f"existing Managed Kafka {resource} is not Astrolift-owned; adoption is a separate, "
+                "operator-authorized operation and cannot be granted by tenant config",
+            )
+        refusal = label_identity_refusal(
+            labels,
+            managed_service_id,
+            record_proves=record_proves,
+            resource=f"Managed Kafka {resource}",
         )
-
-    @staticmethod
-    def _assert_managed(current: dict[str, Any], resource: str) -> None:
-        if (current.get("labels") or {}).get("astrolift-io-managed-by") != "platform":
-            raise ManagedKafkaError(f"Managed Kafka {resource} is not owned by Astrolift")
+        if refusal:
+            raise ManagedKafkaError(refusal)
 
     def _cluster_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
         if cfg.get("cluster_id"):
@@ -1614,18 +1666,14 @@ class ManagedKafkaDriver(ManagedServiceDriver):
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {
-            "astrolift-io-managed-by": "platform",
             "astrolift-io-organization": _label_value(spec.organization_slug),
             "astrolift-io-app": _label_value(spec.app_slug),
             "astrolift-io-environment": _label_value(spec.environment_name),
+            **_identity_labels(spec.managed_service_id),
         }
         if spec.binding_id:
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
-        if spec.managed_service_id:
-            labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
-            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
-        labels.update(_normalized_labels(cfg.get("labels") or {}))
-        return labels
+        return _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
 
 
 def _handle(location: str, cluster_id: str) -> str:
@@ -1660,11 +1708,26 @@ def _normalized_labels(labels: dict[str, Any]) -> dict[str, str]:
     return {_label_key(str(key)): _label_value(str(value)) for key, value in labels.items()}
 
 
-def _is_owned(resource: dict[str, Any], service_id: str) -> bool:
+def _identity_labels(managed_service_id: str) -> dict[str, str]:
+    """The labels ownership, prune and teardown decide on, from the spec only."""
+    return {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": _label_value(managed_service_id),
+        MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
+    }
+
+
+def _platform_last(base: dict[str, str], tenant: dict[str, str]) -> dict[str, str]:
+    """``base`` with ``tenant`` applied to its tenant keys only: platform labels always win (#2098)."""
+    merged = {key: value for key, value in base.items() if not is_platform_label_key(key)}
+    merged.update({key: value for key, value in tenant.items() if not is_platform_label_key(key)})
+    merged.update({key: value for key, value in base.items() if is_platform_label_key(key)})
+    return merged
+
+
+def _is_owned(resource: dict[str, Any], managed_service_id: str) -> bool:
     labels = dict(resource.get("labels") or {})
-    return labels.get("astrolift-io-managed-by") == "platform" and (
-        not service_id or labels.get("astrolift-io-managed-service-id") == service_id
-    )
+    return labels.get("astrolift-io-managed-by") == "platform" and is_marked_for(labels, managed_service_id)
 
 
 def _capacity_values(cfg: dict[str, Any], size: str) -> tuple[int, int]:

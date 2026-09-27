@@ -31,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeEventarc:
@@ -248,7 +249,7 @@ def test_provision_composes_advanced_and_standard_eventarc_resources(
     channel = client.resources[f"{parent}/channels/partner-events"]
     assert channel["provider"] == f"{parent}/providers/partner-provider"
 
-    binding = driver.binding(ServiceHandle(result.handle), {"access_mode": "manage"})
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID), {"access_mode": "manage"})
     assert binding.env_vars["EVENT_BUS_NAME"].literal == bus_name
     assert binding.env_vars["EVENT_BUS_PUBLISH_URL"].literal == (
         f"https://eventarcpublishing.googleapis.com/v1/{bus_name}:publish"
@@ -281,6 +282,7 @@ def test_update_is_partial_and_prunes_only_declared_managed_children(
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "display_name": "Renamed",
                 "pipelines": [],
@@ -297,7 +299,7 @@ def test_update_is_partial_and_prunes_only_declared_managed_children(
 
 def test_missing_child_list_does_not_prune(driver: EventarcDriver, client: FakeEventarc) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    updated = driver.update(UpdateSpec(result.handle, config={"display_name": "Only bus"}))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"display_name": "Only bus"}))
     assert updated.ok
     assert any("/pipelines/to-run" in name for name in client.resources)
 
@@ -317,6 +319,7 @@ def test_immutable_trigger_type_requires_replacement(driver: EventarcDriver) -> 
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "triggers": [
                     {
@@ -347,7 +350,7 @@ def test_pruning_does_not_cross_managed_service_ownership(
         },
         "destinations": [{"topic": "projects/p/topics/external"}],
     }
-    updated = driver.update(UpdateSpec(result.handle, config={"pipelines": []}))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"pipelines": []}))
     assert updated.ok and other in client.resources
 
 
@@ -365,7 +368,7 @@ def test_clear_fields_explicitly_removes_mutable_provider_values(
 ) -> None:
     result = _provision(driver, display_name="Named")
     updated = driver.update(
-        UpdateSpec(result.handle, config={"clear_fields": ["displayName"]}),
+        UpdateSpec(result.handle, managed_service_id=MSID, config={"clear_fields": ["displayName"]}),
     )
     assert updated.ok
     bus = client.resources["projects/project-1/locations/us-central1/messageBuses/astrolift"]
@@ -434,11 +437,11 @@ def test_deprovision_requires_protection_override_and_removes_children_first(
     client: FakeEventarc,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    blocked = driver.deprovision(DeprovisionSpec(result.handle, _full_config()))
+    blocked = driver.deprovision(DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID))
     assert not blocked.ok and not blocked.retryable
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, _full_config()),
+        DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID),
         force_destroy=True,
     )
     assert deleted.ok
@@ -474,7 +477,7 @@ def test_external_enrollment_requires_double_confirmation(
         "labels": {"owner": "customer"},
     }
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not blocked.ok and blocked.errors == ["external_dependents_present"]
@@ -482,6 +485,7 @@ def test_external_enrollment_requires_double_confirmation(
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_external_dependents": True},
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -500,7 +504,7 @@ def test_adopted_bus_requires_separate_deletion_consent(
     # asks for the second acknowledgement.
     client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
     denied = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not denied.ok and denied.errors == ["adopted_resource_guard"]
@@ -508,6 +512,7 @@ def test_adopted_bus_requires_separate_deletion_consent(
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_adopted": True},
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -518,7 +523,7 @@ def test_status_reports_child_condition_failure(driver: EventarcDriver, client: 
     result = driver.provision(replace(SPEC, config=_full_config()))
     trigger = next(row for name, row in client.resources.items() if "/triggers/" in name)
     trigger["conditions"] = {"transport": {"code": "FAILED_PRECONDITION", "message": "topic denied"}}
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
     assert status.state == "error"
     assert "topic denied" in status.message
 
@@ -537,7 +542,7 @@ def test_status_surfaces_partner_channel_readiness(
     channel = next(row for name, row in client.resources.items() if "/channels/" in name)
     channel["state"] = channel_state
 
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
 
     assert status.state == expected_state
     assert channel_state.lower() in status.message.lower() or "partner connection" in status.message
@@ -663,7 +668,7 @@ def test_update_rejects_immutable_location_and_bus_id(driver: EventarcDriver) ->
 def test_publish_test_event_uses_publishing_contract(driver: EventarcDriver, client: FakeEventarc) -> None:
     result = _provision(driver)
     driver.publish_test_event(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         json_message='{"specversion":"1.0","type":"test","source":"astrolift","id":"1"}',
     )
     publish = next(call for call in client.calls if call[0] == "publish")
@@ -676,7 +681,7 @@ def test_partner_connection_consumes_token_without_persisting_it(
     client: FakeEventarc,
 ) -> None:
     result = _provision(driver)
-    handle = ServiceHandle(result.handle)
+    handle = ServiceHandle(result.handle, managed_service_id=MSID)
     status = driver.connect_partner_channel(
         handle,
         connection_id="provider-link",
@@ -823,11 +828,13 @@ def test_a_bus_adopted_before_2074_keeps_its_marker_through_reprovision_and_upda
         client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
 
     assert driver.provision(replace(SPEC, config=config)).ok
-    assert driver.update(UpdateSpec(result.handle, config={"labels": {"team": "platform"}})).ok
+    assert driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"labels": {"team": "platform"}})).ok
 
     assert client.resources[bus]["labels"]["astrolift-io-adopted"] == "true"
     assert client.resources[trigger]["labels"]["astrolift-io-adopted"] == "true"
-    denied = driver.deprovision(DeprovisionSpec(result.handle, {"deletion_protection": False}), force_destroy=True)
+    denied = driver.deprovision(
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID), force_destroy=True
+    )
     assert not denied.ok and denied.errors == ["adopted_resource_guard"]
 
 
@@ -836,7 +843,9 @@ def test_children_do_not_inherit_an_adopted_buss_marker(driver: EventarcDriver, 
     bus = "projects/project-1/locations/us-central1/messageBuses/astrolift"
     client.resources[bus]["labels"]["astrolift-io-adopted"] = "true"
 
-    assert driver.update(UpdateSpec(result.handle, config={"pipelines": _full_config()["pipelines"]})).ok
+    assert driver.update(
+        UpdateSpec(result.handle, managed_service_id=MSID, config={"pipelines": _full_config()["pipelines"]})
+    ).ok
 
     pipeline = client.resources["projects/project-1/locations/us-central1/pipelines/to-run"]
     assert "astrolift-io-adopted" not in pipeline["labels"]
