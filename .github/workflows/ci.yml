@@ -622,6 +622,9 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      # Despite the job's name, it also typechecks and runs vitest (#2128).
+      - name: Typecheck
+        run: npm run typecheck
       - name: Test
         run: npm test
       - name: Verify generated GraphQL client types

@@ -13,6 +13,7 @@
     "codegen:watch": "graphql-codegen --config codegen.ts --watch",
     "routes:dict": "node scripts/route-dictionary.mjs",
     "docs:corpus": "node scripts/docs-corpus.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
