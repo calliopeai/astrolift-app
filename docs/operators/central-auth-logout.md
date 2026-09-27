@@ -50,9 +50,9 @@ See [Cognito logout](https://docs.aws.amazon.com/cognito/latest/developerguide/l
 
 `updateTenantCluster` accepts `logout_url` inside its existing `oidcAuthConfig`
 JSON object and requires `cluster.update`. Supply the complete intended config:
-the mutation replaces that object. In particular, retain the existing cookie
-and gateway secrets; the API's redacted read view cannot be written back as a
-complete replacement. The public read view and `[ingress.auth]` GitOps write-back
+the mutation replaces that object. In particular, retain the existing cookie,
+client and gateway secrets; the API's redacted read view cannot be written back
+as a complete replacement. The public read view and `[ingress.auth]` GitOps write-back
 include the logout URL, which must contain only public routing parameters, never
 tokens or secrets. Fixed HTTPS URLs are supported; per-session token templates
 are not.

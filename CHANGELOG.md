@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Central auth installs on EKS through the product alone (#2055, follow-up
+  to #1539). The EKS recipe offered the oauth2-proxy auth host and none of
+  what it stands on: no nginx controller to gate through, no ClusterIssuer
+  for the `letsencrypt-prod` every nginx-class Ingress names, no credentials
+  Secret, and a `dependsOn` on a Dex release EKS never has, which held the
+  auth host forever. A cluster with a complete `oidc_auth_config` or an
+  nginx-family ingress class now gets an `ingress-nginx` component (one
+  internet-facing NLB through the AWS Load Balancer Controller, TLS passed
+  through to nginx, `large-client-header-buffers: 8 64k`, the platform's
+  snippet annotations accepted), and its `cert-manager` component applies a
+  `letsencrypt-prod` ClusterIssuer solving HTTP-01 through nginx, with the
+  ACME contact from `oidc_auth_config.acme_email` when set. An ALB-only
+  cluster's recipe is unchanged. `installClusterPrereqs` writes the
+  `astrolift-central-auth` Secret (`client-id`, `client-secret`,
+  `cookie-secret`) from the cluster row before the release that reads it,
+  never through the recipe, which operators read over GraphQL, and rolls the
+  proxy when it changes. When the row carries no secrets an existing Secret
+  is kept, and the install refuses only if there is none. `oidc_auth_config`
+  takes `client_secret`, read back only as `client_secret_set`, and
+  `register_tenant_cluster` keeps it and `acme_email` across restarts. A
+  HelmRelease no longer names a dependency the same run does not render: the
+  run deletes that release, so the wait never ended. Post-install objects
+  also retry while their operator's admission webhook starts. On the nginx
+  path, a managed domain's ACM certificate ARN no longer suppresses
+  cert-manager: nginx cannot present an ACM certificate, so those Ingresses
+  were served nginx's default certificate.
 - GCP ownership checks no longer key on a name the tenant chooses (#2086,
   follow-up to #2074). Spanner Graph proved a database was Astrolift's with
   a schema marker that named no service, and on a shared instance the
