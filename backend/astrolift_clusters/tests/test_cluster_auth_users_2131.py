@@ -6,8 +6,8 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
-
 from _sdk.identity_users import IdentityUser
+
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_clusters.schema.auth_users import (
     ClusterAuthUserRefInput,
