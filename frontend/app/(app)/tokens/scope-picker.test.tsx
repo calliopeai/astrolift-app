@@ -94,7 +94,9 @@ describe("ScopePicker (#2120)", () => {
     render(<Harness />);
 
     expect(screen.getByRole("checkbox", { name: /Operate clusters/ })).toBeDisabled();
-    expect(screen.getByText("Your roles grant none of what this scope unlocks.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your roles grant none of what this scope unlocks.")
+    ).toBeInTheDocument();
   });
 
   it("a preset selects only the scopes the caller can use", () => {

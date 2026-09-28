@@ -166,7 +166,7 @@ function ScopeRow({
             <CollapsibleContent>
               <ul className="mt-1 flex flex-wrap gap-1">
                 {scope.permissions.map((p) => (
-                  <li key={p} className="bg-muted rounded px-1.5 py-0.5 font-mono text-2xs">
+                  <li key={p} className="bg-muted text-2xs rounded px-1.5 py-0.5 font-mono">
                     {p}
                   </li>
                 ))}
