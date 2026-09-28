@@ -18,7 +18,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
-import { LiveLogTerminal } from "@/components/observability/LiveLogTerminal";
+import { LiveLogTerminalContainer } from "../../_components/live-log-terminal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
@@ -360,7 +360,12 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
           }
         >
           {running || logs.length > 0 ? (
-            <LiveLogTerminal taskId={taskId} running={running} tail={200} className="h-[28rem]" />
+            <LiveLogTerminalContainer
+              taskId={taskId}
+              running={running}
+              tail={200}
+              className="h-[28rem]"
+            />
           ) : failureMessage ? (
             <p className="text-muted-foreground text-sm">
               No pod logs — the run failed before a pod started. See the failure above.

@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LiveLogTerminal } from "@/components/observability/LiveLogTerminal";
+import { LiveLogTerminalContainer } from "../../_components/live-log-terminal";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
@@ -412,7 +412,7 @@ export function RunContent({
             <DialogDescription className="font-mono text-xs">{watchingLogs?.id}</DialogDescription>
           </DialogHeader>
           {watchingLogs && (
-            <LiveLogTerminal
+            <LiveLogTerminalContainer
               taskId={watchingLogs.id}
               running={watchingLogsLive ? isRunning(watchingLogsLive) : false}
               className="min-h-0 flex-1"
