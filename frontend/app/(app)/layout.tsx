@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LiveRegionProvider } from "@/providers/LiveRegion";
-import { PlatformIncidentBanner } from "@/components/PlatformIncidentBanner";
+import { PlatformIncidentBannerContainer } from "./_shell/platform-incident-banner";
 import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
@@ -87,7 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <ActiveOrgProvider>
         <SkipToContent />
         <div className="flex min-h-svh flex-col">
-          <PlatformIncidentBanner />
+          <PlatformIncidentBannerContainer />
           <SidebarProvider className="flex-1">
             <AppSidebar ssrUser={ssrUser} />
             <SidebarInset className="overflow-x-hidden">
