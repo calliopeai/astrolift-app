@@ -5,14 +5,9 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useLocaleSwitch } from "@/components/use-locale-switch";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -23,10 +18,7 @@ import {
 } from "@/components/ui/select";
 import { UPDATE_MY_PROFILE } from "@/graphql/identity/identity.mutations";
 import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
-import type {
-  AstroliftMyProfile,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import type { AstroliftMyProfile, MutationResult } from "@/graphql/identity/identity.types";
 
 interface ProfileResp {
   astroliftMyProfile: AstroliftMyProfile | null;
@@ -40,13 +32,16 @@ interface MutationResp {
 // new array on every render.
 const TIMEZONES: string[] = (() => {
   try {
-    return [...(Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf!("timeZone")].sort();
+    return [
+      ...(Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf!("timeZone"),
+    ].sort();
   } catch {
     return [];
   }
 })();
 
 export function AppearanceClient() {
+  const localeSwitch = useLocaleSwitch();
   // Theme moved to Settings → Appearance (the full style page); this
   // page keeps the profile-scoped cards only.
   return (
@@ -59,7 +54,7 @@ export function AppearanceClient() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <LanguageSwitcher />
+          <LanguageSwitcher {...localeSwitch} />
         </CardContent>
       </Card>
 
@@ -70,18 +65,15 @@ export function AppearanceClient() {
 
 function TimezoneCard() {
   const { data } = useQuery<ProfileResp>(GET_MY_PROFILE);
-  const [updateProfile, { loading: saving }] = useMutation<MutationResp>(
-    UPDATE_MY_PROFILE,
-    { refetchQueries: [{ query: GET_MY_PROFILE }], awaitRefetchQueries: true },
-  );
+  const [updateProfile, { loading: saving }] = useMutation<MutationResp>(UPDATE_MY_PROFILE, {
+    refetchQueries: [{ query: GET_MY_PROFILE }],
+    awaitRefetchQueries: true,
+  });
 
   const profile = data?.astroliftMyProfile ?? null;
 
   // Detect the browser's current timezone for the placeholder / default.
-  const browserTz = React.useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-    [],
-  );
+  const browserTz = React.useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
 
   // savedTz is the persisted server value (null/empty = no override).
   const savedTz = profile?.timezone ?? null;
@@ -117,9 +109,7 @@ function TimezoneCard() {
       }
       toast.success("Timezone saved");
     } else {
-      toast.error(
-        res?.updateMyProfile.errors[0]?.message ?? "Failed to save timezone",
-      );
+      toast.error(res?.updateMyProfile.errors[0]?.message ?? "Failed to save timezone");
     }
   }
 
@@ -128,12 +118,12 @@ function TimezoneCard() {
       <CardHeader>
         <CardTitle className="text-base">Timezone</CardTitle>
         <CardDescription>
-          Override the browser-detected timezone for all timestamps in the
-          dashboard. Leave blank to use the zone your browser reports (
-          <span className="font-mono text-2xs">{browserTz}</span>).
+          Override the browser-detected timezone for all timestamps in the dashboard. Leave blank to
+          use the zone your browser reports (<span className="text-2xs font-mono">{browserTz}</span>
+          ).
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 max-w-sm">
+      <CardContent className="max-w-sm space-y-3">
         <div className="space-y-2">
           <Label htmlFor="timezone">Timezone</Label>
           <Select
@@ -141,9 +131,7 @@ function TimezoneCard() {
             onValueChange={(v) => setPicked(v === NO_TZ_OVERRIDE ? "" : v)}
           >
             <SelectTrigger id="timezone">
-              <SelectValue
-                placeholder={`${browserTz} (browser-detected)`}
-              />
+              <SelectValue placeholder={`${browserTz} (browser-detected)`} />
             </SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value={NO_TZ_OVERRIDE}>
@@ -159,11 +147,7 @@ function TimezoneCard() {
             </SelectContent>
           </Select>
         </div>
-        <Button
-          size="sm"
-          disabled={!dirty || saving}
-          onClick={save}
-        >
+        <Button size="sm" disabled={!dirty || saving} onClick={save}>
           {saving ? "Saving…" : "Save"}
         </Button>
       </CardContent>
