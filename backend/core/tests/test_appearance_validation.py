@@ -63,3 +63,29 @@ def test_true_is_not_accepted_as_corners_one():
 def test_non_mapping_is_refused():
     with pytest.raises(AppearanceError, match="must be an object"):
         validate_appearance("black")
+
+
+def test_custom_accent_is_allowed_as_lowercase_hex():
+    """Palette option A: any colour an org picks, stored as #rrggbb."""
+    assert validate_appearance({"accent": "#3fa7d6"}) == {"accent": "#3fa7d6"}
+
+
+@pytest.mark.parametrize("bad", ["#3FA7D6", "3fa7d6", "#3fa7d", "#3fa7d6ff", "blue"])
+def test_malformed_custom_accent_is_refused(bad):
+    with pytest.raises(AppearanceError, match="#rrggbb"):
+        validate_appearance({"accent": bad})
+
+
+def test_custom_accent_must_clear_contrast_on_a_pinned_ground():
+    """A near-black accent on the black ground would vanish; refuse it."""
+    with pytest.raises(AppearanceError, match="3:1"):
+        validate_appearance({"ground": "black", "accent": "#111111"})
+    assert validate_appearance({"ground": "black", "accent": "#8fd82a"}) == {
+        "ground": "black",
+        "accent": "#8fd82a",
+    }
+
+
+def test_custom_accent_without_a_ground_is_checked_by_the_client():
+    """No ground pinned: each person's ground varies, so the client re-checks."""
+    assert validate_appearance({"accent": "#111111"}) == {"accent": "#111111"}

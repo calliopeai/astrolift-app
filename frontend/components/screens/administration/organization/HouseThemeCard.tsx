@@ -3,13 +3,15 @@
 import { LockIcon } from "lucide-react";
 import * as React from "react";
 
+import { CustomAccentPicker } from "@/components/settings/CustomAccentPicker";
 import { SettingsSection } from "@/components/settings/SettingsPage";
 import {
   ACCENTS,
   GROUNDS,
   isAccent,
+  isCustomAccent,
   normalizePartial,
-  type Accent,
+  type AccentChoice,
   type Ground,
 } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
@@ -30,8 +32,9 @@ export type HouseThemeCardProps = ReturnType<typeof useHouseTheme>;
  * density and corners to each person, which is why the payload is a partial
  * and "Not set" is a real choice rather than a placeholder.
  *
- * The accent here is a preset only. A custom accent colour is personal
- * (Settings › Appearance) until the org's appearance validation accepts one.
+ * The accent is a preset or a custom colour (palette option A). The org's
+ * accent is the default; anyone who picks their own under Settings ›
+ * Appearance overrides it, unless the theme is locked.
  */
 export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
   const current = React.useMemo(
@@ -39,8 +42,9 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
     [org.appearanceDefault]
   );
   const [ground, setGround] = React.useState<Ground | "">(current.ground ?? "");
-  const currentAccent = isAccent(current.accent) ? current.accent : "";
-  const [accent, setAccent] = React.useState<Accent | "">(currentAccent);
+  const currentAccent: AccentChoice | "" =
+    isAccent(current.accent) || isCustomAccent(current.accent) ? current.accent : "";
+  const [accent, setAccent] = React.useState<AccentChoice | "">(currentAccent);
   const [locked, setLocked] = React.useState(Boolean(org.appearanceLocked));
 
   React.useEffect(() => {
@@ -68,7 +72,7 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
         <>
           Applies to anyone who hasn&apos;t picked their own under Settings › Appearance. Leave an
           option on <span className="font-medium">Not set</span> to let people choose it for
-          themselves. A custom accent colour is set per person there.
+          themselves. People can still pick their own accent there unless the theme is locked.
         </>
       }
       dirty={dirty}
@@ -94,12 +98,18 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
       <Choice
         label="Accent"
         value={accent}
-        onChange={(v) => setAccent(v as Accent | "")}
-        options={(Object.keys(ACCENTS) as Accent[]).map((k) => ({
+        onChange={(v) => setAccent(v as AccentChoice | "")}
+        options={(Object.keys(ACCENTS) as (keyof typeof ACCENTS)[]).map((k) => ({
           value: k,
           label: ACCENTS[k].label,
           swatch: ACCENTS[k].swatch,
         }))}
+      />
+      <CustomAccentPicker
+        id="house-custom-accent"
+        value={isCustomAccent(accent) ? accent : null}
+        ground={ground || null}
+        onChange={(hex) => setAccent(hex)}
       />
 
       <label className="border-border flex min-w-0 cursor-pointer items-start gap-2.5 rounded-lg border p-3">
