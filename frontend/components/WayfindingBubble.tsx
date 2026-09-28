@@ -25,8 +25,11 @@ type Turn = {
   routes: string[];
 };
 
+// The install's own cloud model is the default (#2138), so "not configured"
+// now means the cloud could not be reached, not that a key is missing.
 const NOT_CONFIGURED =
-  "Wayfinding isn't switched on for this install. Ask an operator to set the platform's model key.";
+  "Wayfinding can't reach a model on this install. Ask an operator to check the platform model settings.";
+const TURNED_OFF = "Wayfinding is turned off for this install.";
 
 export function WayfindingBubble() {
   const [open, setOpen] = useState(false);
@@ -77,7 +80,8 @@ export function WayfindingBubble() {
         body: JSON.stringify({ question: asked }),
       });
       if (res.status === 503) {
-        setError(NOT_CONFIGURED);
+        const body = await res.json().catch(() => null);
+        setError(body?.error === "wayfinding off" ? TURNED_OFF : NOT_CONFIGURED);
         return;
       }
       if (!res.ok) {
