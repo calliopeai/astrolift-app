@@ -175,6 +175,68 @@ const designTokensPlugin = {
   },
 };
 
+/**
+ * Storybook-first guardrail (spec 44 §8; the rule in frontend/bootstrap.md).
+ *
+ * Every component and every screen is built in the catalog first; a route
+ * under `app/` only fetches data and renders a screen from `components/`.
+ * So `app/` holds no markup of its own:
+ *
+ *   - `no-markup-in-app` — no intrinsic JSX (`<div>`, `<span>`, `<table>`…).
+ *     The document shell (`html`, `head`, `body`) is the one exception; the
+ *     root layout has to render it.
+ *   - `no-ui-in-app` — no `@/components/ui/*` imports. Primitives compose
+ *     into screens in `components/`, where they have stories; a route that
+ *     reaches for them is building UI outside the catalog.
+ *
+ * Both at `error`, no allowlist: Leo chose "hard now".
+ */
+const DOCUMENT_TAGS = new Set(["html", "head", "body"]);
+
+const screensPlugin = {
+  rules: {
+    "no-markup-in-app": {
+      meta: {
+        type: "problem",
+        messages: {
+          markup:
+            "<{{tag}}> in app/: build the markup as a screen in components/ with a story, and render that screen here.",
+        },
+        schema: [],
+      },
+      create(context) {
+        return {
+          JSXOpeningElement(node) {
+            if (node.name.type !== "JSXIdentifier") return;
+            const tag = node.name.name;
+            if (!/^[a-z]/.test(tag) || DOCUMENT_TAGS.has(tag)) return;
+            context.report({ node, messageId: "markup", data: { tag } });
+          },
+        };
+      },
+    },
+    "no-ui-in-app": {
+      meta: {
+        type: "problem",
+        messages: {
+          ui: "{{source}} in app/: primitives compose into screens in components/, not in routes.",
+        },
+        schema: [],
+      },
+      create(context) {
+        return {
+          ImportDeclaration(node) {
+            const source = node.source.value;
+            if (typeof source === "string" && source.startsWith("@/components/ui/")) {
+              context.report({ node, messageId: "ui", data: { source } });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -223,6 +285,16 @@ const eslintConfig = defineConfig([
       // `error`: the sweep is done, every call site is a ConfirmDialog, and
       // there is no legitimate reason to add a new one.
       "astroliftData/no-native-confirm": "error",
+    },
+  },
+  // Storybook-first guardrail — see the rule's doc block above.
+  {
+    files: ["app/**/*.tsx"],
+    ignores: ["app/**/*.test.tsx"],
+    plugins: { astroliftScreens: screensPlugin },
+    rules: {
+      "astroliftScreens/no-markup-in-app": "error",
+      "astroliftScreens/no-ui-in-app": "error",
     },
   },
   // Override default ignores of eslint-config-next.
