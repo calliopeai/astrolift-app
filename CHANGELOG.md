@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Bedrock bindings on an inference profile grant what the call needs (#2137).
+  A `model_id` such as `us.anthropic.claude-sonnet-4-6` (or a profile ARN) is
+  resolved with `GetInferenceProfile` when the binding is built, and the
+  workload's role is granted invoke on the profile and on every foundation
+  model it routes to. Before, it got `foundation-model/us.anthropic...`, which
+  is not a resource, so the call was always denied. A direct foundation model
+  keeps its one grant, and a profile that cannot be resolved is refused
+  rather than granted on nothing. Redeploy (or reconcile) a consuming app to
+  pick up the new grants.
 - Per-app access on the Envoy edge (#2132). An app lists the identity
   provider groups and users (by email) that may enter, from its Security tab,
   `astro app access`, or `[ingress.access]` in `astrolift.toml` (which then
