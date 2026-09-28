@@ -1789,6 +1789,7 @@ type AstroliftDeployment {
   abortedReason: String!
   triggeredByUserId: String
   triggeredByMe: Boolean!
+  statusReason: String!
 }
 
 type AstroliftDeploymentApprovalHistoryEntry {

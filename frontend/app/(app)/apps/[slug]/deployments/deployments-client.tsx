@@ -560,7 +560,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
 // ─── Row ───────────────────────────────────────────────────────────────
 
-function DeploymentRow({
+export function DeploymentRow({
   deployment,
   isOpen,
   selected,
@@ -593,13 +593,22 @@ function DeploymentRow({
           onChange={onToggleSelect}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="max-w-64">
         <DeploymentStatusPill status={d.status} />
+        {d.statusReason && (
+          // Why it failed or what it waits on, without opening the row (#2123).
+          <p
+            className="text-muted-foreground text-2xs mt-1 line-clamp-2 [overflow-wrap:anywhere]"
+            title={d.statusReason}
+          >
+            {d.statusReason}
+          </p>
+        )}
       </TableCell>
       <TableCell>
         <div className="font-mono text-xs">{d.imageTag || "—"}</div>
         {d.workloadSlug && (
-          <div className="text-muted-foreground mt-0.5 font-mono text-2xs">{d.workloadSlug}</div>
+          <div className="text-muted-foreground text-2xs mt-0.5 font-mono">{d.workloadSlug}</div>
         )}
       </TableCell>
       <TableCell>
@@ -711,7 +720,12 @@ function RowActions({
         </Button>
       )}
       {showRedeploy && (
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmRedeploy(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => setConfirmRedeploy(true)}
+        >
           <RotateCcwIcon className="size-3.5" />
           Redeploy
         </Button>
@@ -903,12 +917,25 @@ function DeploymentExpandPanel({
             <div className="border-destructive/30 bg-destructive/10 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
               <XCircleIcon className="text-destructive size-4" />
               <span className="font-medium">Deployment failed.</span>
-              {d.abortedReason && (
-                <span className="text-destructive/90 font-mono text-xs break-words">
-                  {d.abortedReason}
+              {(d.abortedReason || d.statusReason) && (
+                <span className="text-destructive/90 font-mono text-xs [overflow-wrap:anywhere]">
+                  {d.abortedReason || d.statusReason}
                 </span>
               )}
             </div>
+          )}
+          {!failed && !success && d.statusReason && (
+            <div className="border-warning-border bg-warning-bg text-warning-fg flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
+              <ClockIcon className="size-4" />
+              <span className="[overflow-wrap:anywhere]">{d.statusReason}</span>
+            </div>
+          )}
+          {d.buildError && <ErrorBlock title="Build output" body={d.buildError} />}
+          {d.manifestResyncError && (
+            <ErrorBlock
+              title={`Manifest not refreshed (${d.manifestResyncStatus || "error"})`}
+              body={d.manifestResyncError}
+            />
           )}
 
           {/* Applied manifests */}
@@ -925,6 +952,19 @@ function DeploymentExpandPanel({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+function ErrorBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <section className="space-y-2">
+      <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        {title}
+      </h4>
+      <pre className="bg-muted/40 max-h-64 overflow-auto rounded-md p-3 font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+        {body}
+      </pre>
+    </section>
   );
 }
 
@@ -1180,7 +1220,7 @@ function CommitMetaRow({
   }
   const sha = d.commitSha ? d.commitSha.slice(0, 7) : null;
   return (
-    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs">
+    <div className="text-muted-foreground text-2xs flex flex-wrap items-center gap-x-4 gap-y-1">
       {sha && (
         <span className="inline-flex items-center gap-1">
           <GitCommitIcon className="size-3" />
@@ -1272,11 +1312,7 @@ function DeploymentStatsBar({ deployments }: { deployments: AstroliftDeployment[
   return (
     <div className="flex flex-wrap items-stretch gap-3">
       <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Deployments"
-          value={stats.total.toString()}
-          sub="in current view"
-        />
+        <StatCard label="Deployments" value={stats.total.toString()} sub="in current view" />
         <StatCard
           label="Success rate"
           value={stats.successRate == null ? "—" : `${stats.successRate}%`}
@@ -1313,7 +1349,7 @@ function StatCard({
 }) {
   return (
     <div className="bg-muted/30 border-border rounded-lg border px-4 py-3">
-      <div className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
+      <div className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
         {label}
       </div>
       <div className={cn("text-xl font-semibold tabular-nums", valueClassName)}>{value}</div>
@@ -1351,7 +1387,7 @@ function FrequencyBars({ deployments }: { deployments: AstroliftDeployment[] }) 
 
   return (
     <div className="bg-muted/30 border-border flex min-w-[200px] flex-col rounded-lg border px-4 py-3">
-      <div className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
+      <div className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
         Last 7 days
       </div>
       <div className="mt-2 flex h-10 items-end gap-1">
@@ -1376,7 +1412,7 @@ function FrequencyBars({ deployments }: { deployments: AstroliftDeployment[] }) 
           );
         })}
       </div>
-      <div className="text-muted-foreground mt-1 text-2xs">{total} this week</div>
+      <div className="text-muted-foreground text-2xs mt-1">{total} this week</div>
     </div>
   );
 }
@@ -1493,15 +1529,11 @@ function ManifestDiffRow({
 }) {
   const badge =
     entry.op === "add" ? (
-      <Badge className="border-success-border bg-success/15 text-success-fg">
-        + add
-      </Badge>
+      <Badge className="border-success-border bg-success/15 text-success-fg">+ add</Badge>
     ) : entry.op === "remove" ? (
       <Badge variant="destructive">− remove</Badge>
     ) : (
-      <Badge className="border-warning-border bg-warning/15 text-warning-fg">
-        ~ replace
-      </Badge>
+      <Badge className="border-warning-border bg-warning/15 text-warning-fg">~ replace</Badge>
     );
 
   return (
@@ -1511,7 +1543,7 @@ function ManifestDiffRow({
         <code className="break-all">{entry.path}</code>
       </div>
       {entry.op === "add" && (
-        <pre className="break-all whitespace-pre-wrap text-success-fg">
+        <pre className="text-success-fg break-all whitespace-pre-wrap">
           {jsonValue(entry.after)}
         </pre>
       )}
@@ -1525,7 +1557,7 @@ function ManifestDiffRow({
           <pre className="text-destructive break-all whitespace-pre-wrap">
             − {jsonValue(entry.before)}
           </pre>
-          <pre className="break-all whitespace-pre-wrap text-success-fg">
+          <pre className="text-success-fg break-all whitespace-pre-wrap">
             + {jsonValue(entry.after)}
           </pre>
         </div>

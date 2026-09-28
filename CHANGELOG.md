@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- A deploy says why it failed or what it is waiting on (#2123). Each row of an
+  app's Deployments tab shows `statusReason`: the abort reason or the first
+  line of the build or manifest error for a failed deploy, and for a pending
+  one whether it waits on approval, is queued behind a named deploy, or has
+  not started with nothing ahead of it (which past ten minutes reads as a
+  missing worker). The opened row shows the full build output and the
+  manifest resync error beside the log.
 - Central auth and the ingress class on the cluster settings page (#2119).
   A Central auth card sets `oidcAuthConfig` with secrets write-only (set or
   not set badges; a blank field keeps the stored value, and the server now

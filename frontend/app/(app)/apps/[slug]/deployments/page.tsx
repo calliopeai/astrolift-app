@@ -16,10 +16,7 @@ export default async function AppDeploymentsPage({
   const { slug } = await params;
   return (
     <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery
-        query={LIST_DEPLOYMENTS}
-        variables={{ appSlug: slug, limit: 100 }}
-      >
+      <PreloadQuery query={LIST_DEPLOYMENTS} variables={{ appSlug: slug, limit: 100 }}>
         <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
           <AppDeploymentsClient slug={slug} />
         </PreloadQuery>

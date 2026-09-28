@@ -1786,6 +1786,7 @@ export type AstroliftDeployment = {
   requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  statusReason: Scalars['String']['output'];
   strategy: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
   triggerKind: Scalars['String']['output'];
