@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Status colours no longer follow the accent (#2126, spec 35 §A.1). A
+  healthy dot and a running deployment were coloured with the selectable
+  accent, so with the copper, ice, periwinkle or amber accent they turned that
+  colour. `StatusDot`, `DeploymentStatusPill` and `RunStatusBadge` now share
+  one tone map (`lib/status-tones.ts`) built only from the status tokens: ok is
+  the success lime whatever the accent, and in-flight states stop pulsing
+  under reduced motion.
 - One tab bar for every entity detail page (#2126, spec 35 §A.5). App, agent,
   cluster and workflow detail drew four copies of the same link strip; they
   now render `components/DetailPageTabs.tsx`, one row of tabs, and keep only
