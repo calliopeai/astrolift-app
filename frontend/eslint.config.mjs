@@ -59,8 +59,7 @@ const dataSurfacePlugin = {
       meta: {
         type: "problem",
         docs: {
-          description:
-            "Disallow importing the raw table primitives outside components/data-table.",
+          description: "Disallow importing the raw table primitives outside components/data-table.",
         },
         messages: {
           rawTable:
@@ -210,7 +209,9 @@ const eslintConfig = defineConfig([
   // Data-surface guardrail — see the rule's doc block above.
   {
     files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
-    ignores: ["components/data-table/**"],
+    // DataTable is the one surface built on the primitives; the table's own
+    // story is its catalog entry (Storybook first), not a data surface.
+    ignores: ["components/data-table/**", "components/ui/table.stories.tsx"],
     plugins: { astroliftData: dataSurfacePlugin },
     rules: {
       // `error`: at `warn` the count went 59 → 38 → 35 across three waves
