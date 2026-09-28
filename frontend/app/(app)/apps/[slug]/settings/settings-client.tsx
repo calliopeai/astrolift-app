@@ -33,7 +33,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useAppearance } from "@/components/AppearanceProvider";
+import { useAppearance } from "@/providers/AppearanceProvider";
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";

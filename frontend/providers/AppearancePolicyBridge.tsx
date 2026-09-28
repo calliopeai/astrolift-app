@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { useAppearance } from "@/components/AppearanceProvider";
+import { useAppearance } from "@/providers/AppearanceProvider";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { normalizePartial, type Appearance } from "@/lib/appearance";
 

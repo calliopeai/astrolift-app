@@ -4,7 +4,7 @@ import { LockIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";
 
-import { useAppearance } from "@/components/AppearanceProvider";
+import { useAppearance } from "@/providers/AppearanceProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

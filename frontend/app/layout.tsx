@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { ApolloWrapper } from "@/lib/apollo";
-import { AppearanceProvider } from "@/components/AppearanceProvider";
+import { AppearanceProvider } from "@/providers/AppearanceProvider";
 import { STORAGE_KEY } from "@/lib/appearance";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/hooks/use-confirm";
@@ -9,7 +9,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/Toaster";
-import { TimezoneDetector } from "@/components/TimezoneDetector";
+import { TimezoneDetector } from "@/providers/TimezoneDetector";
 import { getDirection } from "@/lib/i18n/direction";
 import "./globals.css";
 
