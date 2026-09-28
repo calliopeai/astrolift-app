@@ -75,7 +75,10 @@ export const RUN_AUDIT_LIST: ListDefinition = {
   ],
   searchPlaceholder: "Search runs, agents, apps, ids…",
   defaultSort: [{ key: "at", dir: "desc" }],
-  views: standardViews({ startedBy: "me" }),
+  views: standardViews({ startedBy: "me" }, [], {
+    mineNote:
+      "Mine covers deployments you triggered. Agent, workflow and job runs don't record who started them yet.",
+  }),
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };

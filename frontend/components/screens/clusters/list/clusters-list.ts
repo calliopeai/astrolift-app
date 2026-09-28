@@ -63,9 +63,14 @@ export const CLUSTERS_LIST: ListDefinition = {
   // The server matches name, slug, endpoint, region and provider slug.
   searchPlaceholder: "Search clusters...",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews({ setupBy: MINE }, [
-    { key: "offline", label: "Offline", filters: { live: "offline" } },
-  ]),
+  views: standardViews(
+    { setupBy: MINE },
+    [{ key: "offline", label: "Offline", filters: { live: "offline" } }],
+    {
+      mineNote:
+        "Mine means clusters whose last setup you ran, until clusters record who registered them.",
+    }
+  ),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };

@@ -250,6 +250,11 @@ export function ListPage<TRow>({
         tabsAriaLabel="Views"
       />
 
+      {view?.note && (
+        <p className="text-muted-foreground -mt-2 min-w-0 text-xs [overflow-wrap:anywhere]">
+          {view.note}
+        </p>
+      )}
       <FilterBar list={list} columns={barColumns} cards={Boolean(renderCard)} menu={menu} />
 
       {newRows && newRows.count > 0 && (

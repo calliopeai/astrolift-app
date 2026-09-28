@@ -45,6 +45,11 @@ export interface ListView {
   label: string;
   /** Applied under the person's own filters; not shown as chips. */
   filters: Record<string, string>;
+  /**
+   * Said under the tabs while the view is active, when it means less than
+   * its name: a Mine the backend cannot fully answer yet says what it covers.
+   */
+  note?: string;
 }
 
 export type ListPaging = "numbered" | "cursor";
@@ -68,10 +73,14 @@ export interface ListDefinition {
  * Every list has All and Mine (spec 44 §4.4, decision 18). The caller says
  * what Mine filters on (`{ owner: "me" }`, `{ startedBy: "me" }`).
  */
-export function standardViews(mine: Record<string, string>, extra: ListView[] = []): ListView[] {
+export function standardViews(
+  mine: Record<string, string>,
+  extra: ListView[] = [],
+  { mineNote }: { mineNote?: string } = {}
+): ListView[] {
   return [
     { key: "all", label: "All", filters: {} },
-    { key: "mine", label: "Mine", filters: mine },
+    { key: "mine", label: "Mine", filters: mine, note: mineNote },
     ...extra,
   ];
 }
