@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Token scopes for the cluster surface and a picker that explains itself
+  (#2120). `write:clusters` (update a cluster's settings) and
+  `manage:clusters` (run its recipe, refresh, reconcile) replace the admin
+  token a script used to need; registering and removing a cluster stay
+  admin-only. The picker reads `astroliftApiTokenScopeCatalog`, derived from
+  enforcement: scopes grouped by surface, what each unlocks, presets, the
+  scopes your roles can never exercise shown disabled with the reason, and a
+  plain warning on `admin`. Each token lists its effective permissions
+  (scopes narrowed by the owner's roles), and a long-lived admin token is
+  flagged. A device login with client kind `cli-operator` asks for the CLI's
+  scopes plus the cluster pair.
 - The Envoy edge comes up from the installer with no hand steps (#2130).
   `register_tenant_cluster` accepts the OIDC client secret without an
   oauth2-proxy cookie secret, and a cluster on class `envoy` with a complete

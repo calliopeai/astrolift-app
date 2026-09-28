@@ -34,10 +34,10 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema.types import (
+    ActiveSessionType,
     ApiTokenScopeCatalogType,
     ApiTokenScopePresetType,
     ApiTokenScopeType,
-    ActiveSessionType,
     ApiTokenType,
     ApproverUserType,
     AppSummaryType,
