@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { ElevationIndicator } from "@/components/ElevationIndicator";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { useMyNotifications } from "@/hooks/use-my-notifications";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,6 +22,8 @@ const toLabel = (segment: string) =>
 
 export const PageHeader = () => {
   const pathname = usePathname();
+  // Until the new shell replaces this header, it wires the bell's data itself.
+  const notifications = useMyNotifications();
 
   const segments = pathname.split("/").filter(Boolean);
 
@@ -55,7 +58,7 @@ export const PageHeader = () => {
           </BreadcrumbList>
         </Breadcrumb>
         <ElevationIndicator />
-        <NotificationsBell />
+        <NotificationsBell {...notifications} />
       </div>
     </header>
   );
