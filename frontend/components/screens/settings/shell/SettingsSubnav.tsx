@@ -1,4 +1,4 @@
-import { BellIcon, PaletteIcon, ShieldCheckIcon, UserIcon } from "lucide-react";
+import { BellIcon, OrbitIcon, PaletteIcon, ShieldCheckIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -22,6 +22,11 @@ const LINKS: SubnavLink[] = [
     icon: <BellIcon className="size-4" />,
   },
   { href: "/settings/appearance", label: "Appearance", icon: <PaletteIcon className="size-4" /> },
+  {
+    href: "/settings/visualizations",
+    label: "Visualizations",
+    icon: <OrbitIcon className="size-4" />,
+  },
 ];
 
 /** The Settings sub-navigation. Pure: the current path comes from the container. */
