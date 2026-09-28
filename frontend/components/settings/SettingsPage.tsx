@@ -37,7 +37,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { type RestrictedSettings } from "@/lib/display-prefs";
 import { cn } from "@/lib/utils";
+
+import { useRestrictedMode } from "./Restricted";
 
 const DANGER_ID = "danger-zone";
 
@@ -61,10 +64,23 @@ export interface SettingsPageProps {
   /** `DangerAction`s; the section is left out when absent. */
   dangerZone?: React.ReactNode;
   readOnly?: ReadOnlyReason;
+  /** Overrides the person's "settings you can't change" preference (stories). */
+  restrictedMode?: RestrictedSettings;
   className?: string;
 }
 
-export function SettingsPage({ sections, dangerZone, readOnly, className }: SettingsPageProps) {
+export function SettingsPage({
+  sections: allSections,
+  dangerZone: danger,
+  readOnly,
+  restrictedMode,
+  className,
+}: SettingsPageProps) {
+  // A person who hides what they can't change sees only the notice on a
+  // page that is read-only as a whole.
+  const hideAll = useRestrictedMode(restrictedMode) === "hide" && Boolean(readOnly);
+  const sections = hideAll ? [] : allSections;
+  const dangerZone = hideAll ? undefined : danger;
   const nav = [
     ...sections.map((s) => ({ id: s.id, title: s.title })),
     ...(dangerZone ? [{ id: DANGER_ID, title: "Danger zone" }] : []),

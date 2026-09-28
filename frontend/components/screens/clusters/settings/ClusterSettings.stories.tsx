@@ -211,6 +211,24 @@ export const PartialAccess: Story = {
   ),
 };
 
+/**
+ * The same viewer with "Settings you can't change: Hide" chosen under
+ * Settings > Appearance: the parts they lack permission for are left out, and
+ * sections left empty (Ingress class, Central auth, Ingress auth, Users,
+ * Danger zone) leave the nav.
+ */
+export const ReadOnlyHidden: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      access={NO_ACCESS}
+      cards={cards}
+      bootstrapHistory={history}
+      restrictedMode="hide"
+    />
+  ),
+};
+
 /** The decommission confirm: what goes and what stays. */
 export const Decommission: Story = {
   render: () => <ClusterSettingsScreen {...SETTINGS} cards={cards} />,

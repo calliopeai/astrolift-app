@@ -16,6 +16,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
+import { PermissionNote, Restricted, useRestrictedMode } from "@/components/settings/Restricted";
 import { DangerAction, SettingsPage } from "@/components/settings/SettingsPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,8 @@ export type ClusterSettingsScreenProps = ReturnType<typeof useClusterSettings> &
   cards?: ClusterSettingsCards;
   /** The bootstrap history list, mounted only while its disclosure is open. */
   bootstrapHistory?: React.ReactNode;
+  /** Overrides the person's "settings you can't change" preference (stories). */
+  restrictedMode?: "show" | "hide";
 };
 
 /**
@@ -75,8 +78,10 @@ export type ClusterSettingsScreenProps = ReturnType<typeof useClusterSettings> &
  * section per concern, each saving on its own, and decommission in the
  * Danger zone behind a ConfirmDialog. The lifecycle actions (Bring into
  * management, Refresh, Re-run preflight, Force retrigger) are the header's
- * primary action and `⋯` menu. A section the viewer may not change shows
- * the same fields disabled and names the permission that would allow it.
+ * primary action and `⋯` menu. A part the viewer may not change shows the
+ * same fields disabled and names the permission, or, when the person has
+ * chosen to hide what they can't change, is left out (and a section left
+ * empty leaves the nav).
  */
 export function ClusterSettingsScreen({
   slug,
@@ -91,8 +96,10 @@ export function ClusterSettingsScreen({
   access,
   cards = {},
   bootstrapHistory,
+  restrictedMode,
 }: ClusterSettingsScreenProps) {
   const fmt = useFormatters();
+  const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
 
   if (loading && !cluster) {
     return (
@@ -187,9 +194,13 @@ export function ClusterSettingsScreen({
                     <Field label="Registered" mono value={fmt.formatDateTime(cluster.createdAt)} />
                   </dl>
                 </Section>
-                <Gated allowed={access.manage} permission="cluster.manage">
+                <Restricted
+                  mode={restrictedMode}
+                  allowed={access.manage}
+                  permission="cluster.manage"
+                >
                   {cards.agent}
-                </Gated>
+                </Restricted>
               </div>
             ),
           },
@@ -197,27 +208,27 @@ export function ClusterSettingsScreen({
             id: "ingress-class",
             title: "Ingress class",
             content: (
-              <Gated allowed={access.update} permission="cluster.update">
+              <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.ingressClass}
-              </Gated>
+              </Restricted>
             ),
           },
           {
             id: "central-auth",
             title: "Central auth",
             content: (
-              <Gated allowed={access.update} permission="cluster.update">
+              <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.centralAuth}
-              </Gated>
+              </Restricted>
             ),
           },
           {
             id: "ingress-auth",
             title: "Ingress auth",
             content: (
-              <Gated allowed={access.update} permission="cluster.update">
+              <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.ingressAuth}
-              </Gated>
+              </Restricted>
             ),
           },
           {
@@ -249,48 +260,66 @@ export function ClusterSettingsScreen({
                   run={cluster.lastBootstrapRun ?? null}
                   history={bootstrapHistory}
                 />
-                <Gated allowed={access.manage} permission="cluster.manage">
+                <Restricted
+                  mode={restrictedMode}
+                  allowed={access.manage}
+                  permission="cluster.manage"
+                >
                   {cards.bootstrapPlan}
-                </Gated>
+                </Restricted>
               </div>
             ),
           },
-        ]}
+        ].filter(
+          (section) =>
+            !hideRestricted ||
+            !(
+              (["ingress-class", "central-auth", "ingress-auth"].includes(section.id) &&
+                !access.update) ||
+              (section.id === "users" && !access.users)
+            )
+        )}
         dangerZone={
-          <Gated allowed={access.unregister} permission="cluster.unregister">
-            <div className="flex min-w-0 flex-col divide-y">
-              <DangerAction
-                title="Decommission"
-                description="The platform stops managing this cluster; the cluster keeps running. Apps already bound here must be migrated first: the workflow refuses while bindings are active."
-                actionLabel="Decommission"
-                confirmTitle={
-                  <>
-                    Decommission <span className="font-mono">{cluster.slug}</span>?
-                  </>
-                }
-                confirmDescription="Its lifecycle flips to decommissioned and it leaves the active-cluster picker for new app deploys. The cluster and its cloud infrastructure keep running."
-                onConfirm={() => onDecommission(false)}
-              />
-              <DangerAction
-                title="Decommission and delete the cluster"
-                description={
-                  <>
-                    Also calls the {cluster.providerPluginSlug} driver&apos;s{" "}
-                    <code className="font-mono text-xs">teardown_cluster</code>, which irreversibly
-                    deletes the underlying managed cluster.
-                  </>
-                }
-                actionLabel="Decommission + delete cluster"
-                confirmTitle={
-                  <>
-                    Decommission and delete <span className="font-mono">{cluster.slug}</span>?
-                  </>
-                }
-                confirmDescription="Node groups and Fargate profiles cascade-delete with the managed cluster. The cloud-controlled VPC, IAM and DNS roots remain operator-owned. Apps already bound here must be migrated first."
-                onConfirm={() => onDecommission(true)}
-              />
-            </div>
-          </Gated>
+          hideRestricted && !access.unregister ? undefined : (
+            <Restricted
+              mode={restrictedMode}
+              allowed={access.unregister}
+              permission="cluster.unregister"
+            >
+              <div className="flex min-w-0 flex-col divide-y">
+                <DangerAction
+                  title="Decommission"
+                  description="The platform stops managing this cluster; the cluster keeps running. Apps already bound here must be migrated first: the workflow refuses while bindings are active."
+                  actionLabel="Decommission"
+                  confirmTitle={
+                    <>
+                      Decommission <span className="font-mono">{cluster.slug}</span>?
+                    </>
+                  }
+                  confirmDescription="Its lifecycle flips to decommissioned and it leaves the active-cluster picker for new app deploys. The cluster and its cloud infrastructure keep running."
+                  onConfirm={() => onDecommission(false)}
+                />
+                <DangerAction
+                  title="Decommission and delete the cluster"
+                  description={
+                    <>
+                      Also calls the {cluster.providerPluginSlug} driver&apos;s{" "}
+                      <code className="font-mono text-xs">teardown_cluster</code>, which
+                      irreversibly deletes the underlying managed cluster.
+                    </>
+                  }
+                  actionLabel="Decommission + delete cluster"
+                  confirmTitle={
+                    <>
+                      Decommission and delete <span className="font-mono">{cluster.slug}</span>?
+                    </>
+                  }
+                  confirmDescription="Node groups and Fargate profiles cascade-delete with the managed cluster. The cloud-controlled VPC, IAM and DNS roots remain operator-owned. Apps already bound here must be migrated first."
+                  onConfirm={() => onDecommission(true)}
+                />
+              </div>
+            </Restricted>
+          )
         }
       />
     </div>
@@ -354,41 +383,6 @@ function lifecycleActions({
       </Button>
     ),
   };
-}
-
-/**
- * A part of a section the viewer may not change: the same fields, disabled,
- * and the permission that would allow it (spec 44 §5.3). Per part, not per
- * page, because the tab's sections answer to four permissions.
- */
-function Gated({
-  allowed,
-  permission,
-  children,
-}: {
-  allowed: boolean;
-  permission: string;
-  children: React.ReactNode;
-}) {
-  if (allowed) return <>{children}</>;
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <PermissionNote permission={permission} verb="Changing these" />
-      <fieldset disabled className="min-w-0">
-        {children}
-      </fieldset>
-    </div>
-  );
-}
-
-function PermissionNote({ permission, verb }: { permission: string; verb: string }) {
-  return (
-    <p className="bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm">
-      {verb} needs the{" "}
-      <code className="text-foreground font-mono [overflow-wrap:anywhere]">{permission}</code>{" "}
-      permission.
-    </p>
-  );
 }
 
 function CapabilitiesSection({

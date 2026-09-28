@@ -14,6 +14,7 @@ import {
   isCustomAccent,
   modeFor,
 } from "@/lib/appearance";
+import { RESTRICTED_SETTINGS, type RestrictedSettings } from "@/lib/display-prefs";
 import { cn } from "@/lib/utils";
 import { CustomAccentPicker } from "@/components/settings/CustomAccentPicker";
 
@@ -65,6 +66,8 @@ export function AppearanceSettings({
   reset,
   chooseTheme,
   chooseGround,
+  restrictedSettings,
+  setRestrictedSettings,
 }: ReturnType<typeof useAppearanceSettings>) {
   const activeTheme = THEMES.find(
     (t) => t.ground === appearance.ground && t.accent === appearance.accent
@@ -223,6 +226,43 @@ export function AppearanceSettings({
                 </button>
               ))}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Settings you can&apos;t change</CardTitle>
+          <CardDescription>
+            On settings pages, parts you don&apos;t have the permission to change.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            role="radiogroup"
+            aria-label="Settings you can't change"
+            className="grid gap-2 sm:grid-cols-2"
+          >
+            {(Object.keys(RESTRICTED_SETTINGS) as RestrictedSettings[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={restrictedSettings === key}
+                onClick={() => setRestrictedSettings(key)}
+                className={cn(
+                  "border-border hover:border-primary min-w-0 rounded-md border p-3 text-left transition-colors",
+                  restrictedSettings === key && "border-primary ring-primary ring-1"
+                )}
+              >
+                <span className="block text-sm font-semibold">
+                  {RESTRICTED_SETTINGS[key].label}
+                </span>
+                <span className="text-muted-foreground block text-xs">
+                  {RESTRICTED_SETTINGS[key].blurb}
+                </span>
+              </button>
+            ))}
           </div>
         </CardContent>
       </Card>

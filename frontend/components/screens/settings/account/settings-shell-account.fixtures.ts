@@ -59,6 +59,8 @@ export const APPEARANCE: ReturnType<typeof useAppearanceSettings> = {
   appearance: DEFAULT_APPEARANCE,
   locked: false,
   setAppearance: noop,
+  restrictedSettings: "show",
+  setRestrictedSettings: noop,
   reset: noop,
   chooseTheme: noop,
   chooseGround: noop,
