@@ -5,6 +5,7 @@ import { useEndpointMetrics } from "@/components/observability/use-endpoint-metr
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePromql } from "@/components/observability/use-promql";
 import { useGoldenSignals } from "@/components/observability/use-golden-signals";
+import { ManagedServiceMetrics } from "../components/managed-service-metrics";
 import { useTraceExplorer } from "@/components/observability/use-trace-explorer";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
 import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
@@ -849,6 +850,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       {/* ─── #645 / #646 managed-service metric tiles ─────────────── */}
       <ManagedServiceMetricsList
         managedServices={managedServices.data?.astroliftManagedServices ?? []}
+        renderPanel={(id) => <ManagedServiceMetrics managedServiceId={id} />}
       />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}

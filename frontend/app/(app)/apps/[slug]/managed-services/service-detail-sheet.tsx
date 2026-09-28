@@ -27,7 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ManagedServiceMetricsPanel } from "@/components/observability/ManagedServiceMetricsPanel";
+import { ManagedServiceMetrics } from "../components/managed-service-metrics";
 
 interface ManagedServiceRow {
   id: string;
@@ -75,7 +75,7 @@ export function ServiceDetailSheet({ service, onOpenChange }: Props) {
             </SheetHeader>
 
             <div className="mt-6 space-y-6">
-              <ManagedServiceMetricsPanel managedServiceId={service.id} />
+              <ManagedServiceMetrics managedServiceId={service.id} />
             </div>
           </>
         )}
