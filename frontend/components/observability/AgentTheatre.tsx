@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@apollo/client/react";
 import { BotIcon, ExpandIcon, Loader2Icon, MonitorPlayIcon, RefreshCwIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -17,9 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VncViewer } from "@/components/observability/VncViewer";
-import { AGENT_GALLERY } from "@/graphql/agents/agents.queries";
-import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { cn } from "@/lib/utils";
+
+import type { useAgentGallery } from "./use-agent-gallery";
 
 // Roster refresh cadence. Doubles as the snapshot-frame cadence: each poll
 // re-mints the presigned snapshot GET URL, so a fresh (signed) URL string
@@ -27,7 +26,7 @@ import { cn } from "@/lib/utils";
 // the pod-side uploader overwrote in place. (We can't cache-bust a single
 // presigned URL with an extra query param — that breaks the signature — so
 // re-presigning on the poll is the frame-advance mechanism.)
-const POLL_MS = 5000;
+export const GALLERY_POLL_MS = 5000;
 
 // A watchable agent task as returned by the agentGallery query.
 export interface GalleryTask {
@@ -37,10 +36,6 @@ export interface GalleryTask {
   vncEnabled: boolean;
   vncUrl: string;
   snapshotUrl: string | null;
-}
-
-interface AgentGalleryData {
-  agentGallery: GalleryTask[];
 }
 
 function shortId(id: string): string {
@@ -62,39 +57,24 @@ function elapsedLabel(startedAt: string | null): string {
  * snapshot tiles that explode into a live RFB session.
  *
  * Tiles show the latest framebuffer JPEG (polled via a re-minted presigned
- * GET every {@link POLL_MS}). Clicking a tile opens a fullscreen theatre
+ * GET every {@link GALLERY_POLL_MS}). Clicking a tile opens a fullscreen theatre
  * modal that connects the live noVNC session at the task's ``vncUrl`` via
  * the existing {@link VncViewer}. Each tile also offers a pop-out into
  * ``/agents/runs/<task>/vnc`` for a dedicated tab.
  */
-export function AgentTheatre() {
-  // Reactive org id (#1022): the synchronous cookie read races the
-  // post-render effect that sets it, leaving orgId "" on cold load.
-  const { org } = useActiveOrg();
-  const orgId = org?.id ?? "";
-  const { data, loading, error, refetch } = useQuery<AgentGalleryData>(AGENT_GALLERY, {
-    variables: { orgId },
-    fetchPolicy: "cache-and-network",
-    pollInterval: POLL_MS,
-    skip: !orgId,
-  });
+export type AgentTheatreProps = ReturnType<typeof useAgentGallery>;
 
+export function AgentTheatre({
+  hasOrg,
+  tasks: roster,
+  loading,
+  error,
+  refreshing,
+  onRefresh,
+  onRetry,
+}: AgentTheatreProps) {
   // The task whose live session is exploded into the theatre modal.
   const [watching, setWatching] = React.useState<GalleryTask | null>(null);
-
-  // Manual refresh feedback. refetch() resolves fast and the roster often
-  // looks identical (same tasks, snapshot still pending), so without a
-  // spinner the button reads as dead ("doesn't do anything"). Drive the
-  // icon spin + disable off an explicit in-flight flag.
-  const [refreshing, setRefreshing] = React.useState(false);
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refetch]);
 
   // Tick once a second so the "running for" labels advance between polls.
   const [, force] = React.useReducer((n: number) => n + 1, 0);
@@ -103,7 +83,7 @@ export function AgentTheatre() {
     return () => clearInterval(t);
   }, []);
 
-  const tasks = React.useMemo(() => data?.agentGallery ?? [], [data?.agentGallery]);
+  const tasks = React.useMemo(() => roster ?? [], [roster]);
 
   // Keep the open theatre's task object fresh as the roster re-polls; if the
   // task drops out of the gallery (no longer RUNNING/watchable), surface that
@@ -114,7 +94,7 @@ export function AgentTheatre() {
   );
   const watchingGone = watching !== null && watchingLive === null && !loading;
 
-  if (!orgId) {
+  if (!hasOrg) {
     return (
       <EmptyState
         icon={<BotIcon className="size-5" />}
@@ -138,9 +118,9 @@ export function AgentTheatre() {
     return (
       <div className="space-y-3">
         <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          Couldn&apos;t load the agent theatre: {error.message}
+          Couldn&apos;t load the agent theatre: {error}
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
+        <Button variant="outline" size="sm" onClick={onRetry}>
           <RefreshCwIcon className="size-3.5" />
           Retry
         </Button>
@@ -165,7 +145,7 @@ export function AgentTheatre() {
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
           {tasks.length} live {tasks.length === 1 ? "agent" : "agents"} · snapshots refresh every{" "}
-          {POLL_MS / 1000}s
+          {GALLERY_POLL_MS / 1000}s
         </p>
         <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
           <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />

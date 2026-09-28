@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { AgentTheatre } from "@/components/observability/AgentTheatre";
+import { AgentTheatreContainer } from "../../_components/agent-theatre";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ export function ObserveContent({ orgId }: { orgId: string }) {
             Running watchable agents across the org
           </span>
         </div>
-        <AgentTheatre />
+        <AgentTheatreContainer />
       </section>
 
       {/* Per-run logs. */}

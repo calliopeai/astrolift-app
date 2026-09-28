@@ -49,7 +49,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AgentTheatre } from "@/components/observability/AgentTheatre";
+import { AgentTheatreContainer } from "./_components/agent-theatre";
 import { VncViewer } from "@/components/observability/VncViewer";
 import {
   LIST_AGENT_FLEET,
@@ -864,7 +864,7 @@ export function AgentsClient() {
       {tab === "dispatch" && <DispatchTab orgId={orgId} />}
       {tab === "history" && <HistoryTab orgId={orgId} />}
       {tab === "registry" && <RegistryTab orgId={orgId} />}
-      {tab === "theatre" && <AgentTheatre />}
+      {tab === "theatre" && <AgentTheatreContainer />}
       {tab === "metrics" && (
         <EmptyState icon={<BarChart3Icon className="size-5" />} title="Agent Metrics" description="Dispatch rate, run duration (p50/p95), retry rate, and success counts — aggregated across all agent workloads." />
       )}
