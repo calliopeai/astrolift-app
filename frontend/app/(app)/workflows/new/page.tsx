@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { AgentWorkloadPicker } from "@/components/workflows/pickers";
+import { useAgentWorkloadOptions } from "@/components/workflows/use-picker-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ function ConfigureFromDefinition({ definitionSlug }: { definitionSlug: string })
   const router = useRouter();
   const { org } = useActiveOrg();
   const orgScoped = org?.id ?? null;
+  const agentWorkloads = useAgentWorkloadOptions(orgScoped);
   const { canCreate, loading: entitlementLoading } = useWorkflowsEntitlement();
   const { definition, loading: definitionLoading, error } =
     useWorkflowDefinition(definitionSlug);
@@ -222,6 +224,7 @@ function ConfigureFromDefinition({ definitionSlug }: { definitionSlug: string })
                         setBindings((prev) => ({ ...prev, [stage.order]: workloadId }))
                       }
                       orgScoped={orgScoped}
+                      {...agentWorkloads}
                     />
                   )}
                 </li>

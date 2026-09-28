@@ -2,7 +2,7 @@
 
 import { Loader2Icon } from "lucide-react";
 
-import { StageBuilder } from "@/components/workflows/StageBuilder";
+import { StageBuilderContainer } from "../../_components/stage-builder";
 import { useTieredWorkflow } from "@/graphql/workflows/tiered.hooks";
 
 import { DefinitionWorkflowPillar } from "./definition-workflow-content";
@@ -42,7 +42,7 @@ export function WorkflowPillarPage({ slug, pillar }: { slug: string; pillar: Wor
       {({ workflow, refetch }) => {
         switch (pillar) {
           case "build":
-            return <StageBuilder slug={workflow.definitionSlug} />;
+            return <StageBuilderContainer slug={workflow.definitionSlug} />;
           case "run":
             return <RunContent workflow={workflow} refetch={refetch} />;
           case "observe":
