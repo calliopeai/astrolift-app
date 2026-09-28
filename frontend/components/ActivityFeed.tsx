@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
 import {
   ActivityIcon,
   BoxIcon,
@@ -18,19 +17,15 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GET_RECENT_ACTIVITY } from "@/graphql/operations/operations.queries";
-import type {
-  AstroliftActivityItem,
-  AstroliftActivityPage,
-} from "@/graphql/operations/operations.types";
+import type { AstroliftActivityItem } from "@/graphql/operations/operations.types";
 
-interface RecentActivityResp {
-  astroliftRecentActivity: AstroliftActivityPage;
-}
-
-interface ActivityFeedProps {
-  /** Items per page when first fetching / when loading the next page. */
-  pageSize?: number;
+export interface ActivityFeedProps {
+  items: AstroliftActivityItem[];
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }
 
 /**
@@ -45,48 +40,18 @@ interface ActivityFeedProps {
  * ``/apps/<slug>/deployments/<id>``, cluster → ``/clusters/<id>``,
  * secret rotation → ``/apps/<slug>/secrets``, etc.
  *
- * "Load more" uses ``fetchMore`` so we don't re-fetch the entire
- * history when the operator wants the next page — the cursor encodes
- * ``(occurred_at, guid)`` over the underlying ``Event`` table.
+ * Pure (Storybook first): the page and its load-more come from
+ * useRecentActivity, which pages by cursor over ``(occurred_at, guid)``.
  */
-export function ActivityFeed({ pageSize = 10 }: ActivityFeedProps) {
+export function ActivityFeed({
+  items,
+  loading,
+  error,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+}: ActivityFeedProps) {
   const t = useTranslations("overview.activity");
-  const { data, loading, error, fetchMore } = useQuery<RecentActivityResp>(GET_RECENT_ACTIVITY, {
-    variables: { limit: pageSize },
-    fetchPolicy: "cache-and-network",
-  });
-
-  const page = data?.astroliftRecentActivity;
-  const items = page?.items ?? [];
-  const nextCursor = page?.nextCursor ?? null;
-  const [loadingMore, setLoadingMore] = React.useState(false);
-
-  const handleLoadMore = React.useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      await fetchMore({
-        variables: { limit: pageSize, cursor: nextCursor },
-        // Merge page-by-page so the rendered list grows; nextCursor
-        // always reflects the *latest* fetch so a third click works.
-        updateQuery: (prev, { fetchMoreResult }) => {
-          if (!fetchMoreResult) return prev;
-          return {
-            astroliftRecentActivity: {
-              ...fetchMoreResult.astroliftRecentActivity,
-              items: [
-                ...prev.astroliftRecentActivity.items,
-                ...fetchMoreResult.astroliftRecentActivity.items,
-              ],
-            },
-          };
-        },
-      });
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [fetchMore, loadingMore, nextCursor, pageSize]);
-
   if (loading && items.length === 0) {
     return (
       <div className="space-y-2">
@@ -102,7 +67,7 @@ export function ActivityFeed({ pageSize = 10 }: ActivityFeedProps) {
       <EmptyState
         icon={<ActivityIcon className="size-5" />}
         title={t("errorTitle")}
-        description={error.message}
+        description={error}
       />
     );
   }
@@ -124,9 +89,9 @@ export function ActivityFeed({ pageSize = 10 }: ActivityFeedProps) {
           <ActivityRow key={item.id} item={item} />
         ))}
       </ul>
-      {nextCursor && (
+      {hasMore && (
         <div className="mt-3 flex justify-center">
-          <Button variant="ghost" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+          <Button variant="ghost" size="sm" onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore ? t("loadingMore") : t("loadMore")}
           </Button>
         </div>

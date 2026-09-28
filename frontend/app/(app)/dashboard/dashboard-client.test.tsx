@@ -89,6 +89,7 @@ vi.mock("@/components/KpiTile", () => ({
 
 vi.mock("./onboarding-host", () => ({ OnboardingHost: () => null }));
 vi.mock("@/components/ActivityFeed", () => ({ ActivityFeed: () => <div>Activity feed</div> }));
+vi.mock("@/components/use-recent-activity", () => ({ useRecentActivity: () => ({}) }));
 
 vi.mock("@dnd-kit/core", () => ({
   DndContext: ({ children }: { children: ReactNode }) => <>{children}</>,

@@ -42,6 +42,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { useRecentActivity } from "@/components/use-recent-activity";
 import { EmptyState } from "@/components/EmptyState";
 import { KpiTile } from "@/components/KpiTile";
 import { OnboardingHost } from "./onboarding-host";
@@ -152,6 +153,7 @@ function saveTileOrder(order: KpiTileId[]) {
 }
 
 export function DashboardClient() {
+  const activity = useRecentActivity();
   const t = useTranslations("overview");
   const modules = useModules();
   const permissions = useMyPermissions();
@@ -692,7 +694,7 @@ export function DashboardClient() {
                 <CardDescription>{t("activity.description")}</CardDescription>
               </CardHeader>
               <CardContent>
-                <ActivityFeed />
+                <ActivityFeed {...activity} />
               </CardContent>
             </Card>
           )}
