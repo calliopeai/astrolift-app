@@ -44,7 +44,7 @@ import { useTranslations } from "next-intl";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { EmptyState } from "@/components/EmptyState";
 import { KpiTile } from "@/components/KpiTile";
-import { OnboardingHost } from "@/components/onboarding/OnboardingHost";
+import { OnboardingHost } from "./onboarding-host";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

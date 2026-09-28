@@ -87,7 +87,7 @@ vi.mock("@/components/KpiTile", () => ({
   ),
 }));
 
-vi.mock("@/components/onboarding/OnboardingHost", () => ({ OnboardingHost: () => null }));
+vi.mock("./onboarding-host", () => ({ OnboardingHost: () => null }));
 vi.mock("@/components/ActivityFeed", () => ({ ActivityFeed: () => <div>Activity feed</div> }));
 
 vi.mock("@dnd-kit/core", () => ({

@@ -6,8 +6,14 @@ import * as React from "react";
 
 import { GET_ONBOARDING_STATE } from "@/graphql/identity/identity.queries";
 
-import { OnboardingWizard } from "./OnboardingWizard";
-import { SpotlightTour } from "./SpotlightTour";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { SpotlightTour } from "@/components/onboarding/SpotlightTour";
+import {
+  DEFAULT_ONBOARDING_STATE,
+  type OnboardingWizardState,
+} from "@/components/onboarding/types";
+import { useOnboardingActions } from "@/components/onboarding/use-onboarding-actions";
+import { useRepoStepData } from "@/components/onboarding/use-repo-step-data";
 
 interface OnboardingStateResp {
   astroliftOrganizations: Array<{
@@ -39,6 +45,7 @@ const SPOTLIGHT_DONE_KEY = "astrolift-spotlight-complete-v1";
  * on the dashboard's existing query budget instead of spinning up a
  * second SSR fan-out.
  */
+/** The dashboard's onboarding wiring: when to open the wizard and the tour, and their data. */
 export function OnboardingHost() {
   const router = useRouter();
   const pathname = usePathname();
@@ -49,7 +56,16 @@ export function OnboardingHost() {
     fetchPolicy: "cache-and-network",
   });
 
-  const [wizardOpen, setWizardOpen] = React.useState(false);
+  const [wizardOpen, setWizardOpenRaw] = React.useState(false);
+  // The wizard is controlled (Storybook first): its form state lives here so
+  // the repo step's data can follow the chosen connection. Reset on every
+  // open, so a cancel-then-reopen never shows the prior run's answers.
+  const [wizardState, setWizardState] =
+    React.useState<OnboardingWizardState>(DEFAULT_ONBOARDING_STATE);
+  const setWizardOpen = React.useCallback((next: boolean) => {
+    if (next) setWizardState(DEFAULT_ONBOARDING_STATE);
+    setWizardOpenRaw(next);
+  }, []);
   const [tourOpen, setTourOpen] = React.useState(false);
 
   const org = React.useMemo(() => {
@@ -77,7 +93,7 @@ export function OnboardingHost() {
       setWizardOpen(true);
       openedRef.current = true;
     }
-  }, [manualTrigger, shouldAutoOpen, org]);
+  }, [manualTrigger, shouldAutoOpen, org, setWizardOpen]);
 
   // Strip the manual-trigger query param so a refresh doesn't keep
   // re-opening the wizard once the operator has dismissed it.
@@ -107,6 +123,9 @@ export function OnboardingHost() {
     setTourOpen(true);
   }
 
+  const actions = useOnboardingActions(org?.id ?? "");
+  const repo = useRepoStepData(wizardState.sourceConnectionId);
+
   if (org == null) return null;
 
   return (
@@ -120,7 +139,10 @@ export function OnboardingHost() {
             setWizardOpen(true);
           }
         }}
-        organizationId={org.id}
+        state={wizardState}
+        setState={setWizardState}
+        actions={actions}
+        repo={repo}
         onComplete={() => {
           // onComplete fires AFTER the dialog has been closed by
           // the wizard itself; handleWizardClose already armed the
