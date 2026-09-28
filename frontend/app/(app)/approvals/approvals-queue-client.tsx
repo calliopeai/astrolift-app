@@ -1,20 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  CheckIcon,
-  GitCommitIcon,
-  Loader2Icon,
-  ShieldCheckIcon,
-  XCircleIcon,
-} from "lucide-react";
+import { CheckIcon, GitCommitIcon, Loader2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -73,9 +66,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
     pollInterval: 30_000,
   });
 
-  const pending = (data?.astroliftDeployments ?? []).filter(
-    (d) => d.status === "pending_approval",
-  );
+  const pending = (data?.astroliftDeployments ?? []).filter((d) => d.status === "pending_approval");
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
 
@@ -88,7 +79,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
   // react-hooks/set-state-in-effect.
   const selectedDeploys = React.useMemo(
     () => pending.filter((d) => selected.has(d.id)),
-    [pending, selected],
+    [pending, selected]
   );
 
   // Same-env constraint: bulk CTA disables when the selection spans
@@ -108,18 +99,12 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
   const [confirmApprove, setConfirmApprove] = React.useState(false);
   const [confirmReject, setConfirmReject] = React.useState(false);
 
-  const [bulkApprove, bulkApproveState] = useMutation<BulkApproveResp>(
-    BULK_APPROVE_DEPLOYMENTS,
-    {
-      refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }],
-    },
-  );
-  const [bulkReject, bulkRejectState] = useMutation<BulkRejectResp>(
-    BULK_REJECT_DEPLOYMENTS,
-    {
-      refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }],
-    },
-  );
+  const [bulkApprove, bulkApproveState] = useMutation<BulkApproveResp>(BULK_APPROVE_DEPLOYMENTS, {
+    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }],
+  });
+  const [bulkReject, bulkRejectState] = useMutation<BulkRejectResp>(BULK_REJECT_DEPLOYMENTS, {
+    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }],
+  });
 
   const busy = bulkApproveState.loading || bulkRejectState.loading;
 
@@ -146,7 +131,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
 
   function reportBulkResult(
     label: string,
-    data: AstroliftBulkDeploymentResultData | null | undefined,
+    data: AstroliftBulkDeploymentResultData | null | undefined
   ) {
     if (!data) {
       throw new Error(t("toasts.unexpected"));
@@ -159,7 +144,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
           label,
           count: data.failedCount,
           message: data.results[0]?.errors[0]?.message ?? "",
-        }),
+        })
       );
     } else {
       toast.warning(
@@ -167,7 +152,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
           label,
           succeeded: data.succeededCount,
           failed: data.failedCount,
-        }),
+        })
       );
     }
   }
@@ -221,7 +206,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
   }
 
   const summaryApps = Array.from(
-    new Set(selectedDeploys.map((d) => `${d.registeredAppSlug}/${d.environmentName}`)),
+    new Set(selectedDeploys.map((d) => `${d.registeredAppSlug}/${d.environmentName}`))
   ).join(", ");
 
   return (
@@ -270,9 +255,7 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
                 {t("footer.selected", { count: selectedDeploys.length })}
               </p>
               {crossEnvSelection ? (
-                <p className="text-destructive mt-0.5 text-xs">
-                  {t("footer.crossEnvWarning")}
-                </p>
+                <p className="text-destructive mt-0.5 text-xs">{t("footer.crossEnvWarning")}</p>
               ) : (
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {t("footer.summary", { envs: summaryApps })}
@@ -319,20 +302,22 @@ export function ApprovalsQueueClient({ children }: { children?: React.ReactNode 
         confirmLabel={t("confirmApprove.confirm")}
         onConfirm={handleBulkApprove}
       />
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("confirmReject.reasonLabel"),
+          placeholder: t("confirmReject.reasonPlaceholder"),
+          requiredError: t("confirmReject.reasonRequired"),
+        }}
         open={confirmReject}
         onOpenChange={setConfirmReject}
         title={t("confirmReject.title", { count: selectedDeploys.length })}
         description={t("confirmReject.description", { envs: summaryApps })}
-        reasonLabel={t("confirmReject.reasonLabel")}
-        reasonPlaceholder={t("confirmReject.reasonPlaceholder")}
-        reasonRequiredError={t("confirmReject.reasonRequired")}
         confirmLabel={t("confirmReject.confirm")}
         destructive
         onConfirm={handleBulkReject}
       />
-        {children}
-      </PageShell>
+      {children}
+    </PageShell>
   );
 }
 
@@ -372,18 +357,14 @@ function QueueRow({
         <GitCommitIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/approvals/${deployment.id}`}
-              className="font-medium hover:underline"
-            >
+            <Link href={`/approvals/${deployment.id}`} className="font-medium hover:underline">
               {deployment.registeredAppSlug} → {deployment.environmentName}
             </Link>
             <span className="font-mono text-xs">{shortTag}</span>
             <Badge variant="outline" className="text-2xs">
               {t("approvalsCount", {
                 received: deployment.approvalsReceived,
-                required:
-                  deployment.requiredApproverCount || deployment.approvalsRequired || 1,
+                required: deployment.requiredApproverCount || deployment.approvalsRequired || 1,
               })}
             </Badge>
           </div>
@@ -394,12 +375,7 @@ function QueueRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button
-          asChild
-          size="sm"
-          variant="outline"
-          className="min-h-11 w-full sm:w-auto"
-        >
+        <Button asChild size="sm" variant="outline" className="min-h-11 w-full sm:w-auto">
           <Link href={`/approvals/${deployment.id}`}>{t("review")}</Link>
         </Button>
       </div>

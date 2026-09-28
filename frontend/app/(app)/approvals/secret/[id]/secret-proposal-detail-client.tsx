@@ -8,7 +8,6 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -229,14 +228,16 @@ export function SecretProposalDetailClient({ proposalId }: { proposalId: string 
         confirmLabel={t("confirmApprove.confirm")}
         onConfirm={handleApprove}
       />
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("confirmReject.reasonLabel"),
+          placeholder: t("confirmReject.reasonPlaceholder"),
+          requiredError: t("confirmReject.reasonRequired"),
+        }}
         open={confirmReject}
         onOpenChange={setConfirmReject}
         title={t("confirmReject.title")}
         description={t("confirmReject.description")}
-        reasonLabel={t("confirmReject.reasonLabel")}
-        reasonPlaceholder={t("confirmReject.reasonPlaceholder")}
-        reasonRequiredError={t("confirmReject.reasonRequired")}
         confirmLabel={t("confirmReject.confirm")}
         destructive
         onConfirm={handleReject}

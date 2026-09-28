@@ -25,7 +25,6 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DataTable, useCursorTable, useRowSelection } from "@/components/data-table";
 import type { Column } from "@/components/data-table";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
@@ -404,7 +403,7 @@ export function DeploymentsClient() {
       reportResult("approveDeployment", data?.approveDeployment);
     } else if (kind === "abort") {
       // abort/reject now require a non-empty reason at the backend
-      // boundary (#419). Routed through ConfirmDialogWithReason below.
+      // boundary (#419). Routed through ConfirmDialog (with a reason) below.
       const { data } = await abort({
         variables: { input: { id: d.id, reason: reason ?? "" } },
       });
@@ -804,7 +803,12 @@ export function DeploymentsClient() {
         }}
       />
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("confirm.abortReasonLabel"),
+          placeholder: t("confirm.abortReasonPlaceholder"),
+          requiredError: t("confirm.reasonRequired"),
+        }}
         open={pendingAction?.kind === "abort"}
         onOpenChange={(next) => {
           if (!next) setPendingAction(null);
@@ -817,9 +821,6 @@ export function DeploymentsClient() {
             ? ACTION_COPY.abort.description(pendingAction.deployment)
             : ""
         }
-        reasonLabel={t("confirm.abortReasonLabel")}
-        reasonPlaceholder={t("confirm.abortReasonPlaceholder")}
-        reasonRequiredError={t("confirm.reasonRequired")}
         confirmLabel={t("confirm.abortConfirm")}
         destructive
         onConfirm={async (reason) => {
@@ -831,7 +832,12 @@ export function DeploymentsClient() {
 
       {/* Bulk-cancel confirm dialog: requires a reason — same backend
           boundary as the per-row abort. */}
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("bulk.confirmCancel.reasonLabel"),
+          placeholder: t("bulk.confirmCancel.reasonPlaceholder"),
+          requiredError: t("confirm.reasonRequired"),
+        }}
         open={pendingBulk?.kind === "abort"}
         onOpenChange={(next) => {
           if (!next) setPendingBulk(null);
@@ -846,9 +852,6 @@ export function DeploymentsClient() {
             ? t("bulk.confirmCancel.description", { envs: summaryEnvs })
             : ""
         }
-        reasonLabel={t("bulk.confirmCancel.reasonLabel")}
-        reasonPlaceholder={t("bulk.confirmCancel.reasonPlaceholder")}
-        reasonRequiredError={t("confirm.reasonRequired")}
         confirmLabel={t("bulk.confirmCancel.confirm")}
         destructive
         onConfirm={async (reason) => {

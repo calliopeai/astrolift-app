@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -56,17 +55,17 @@ export function PendingDeployments({ appSlug }: Props) {
   if (pending.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-info-border bg-info/5 p-4">
+    <section className="border-info-border bg-info/5 flex flex-col gap-3 rounded-lg border p-4">
       <div className="flex items-center gap-2">
-        <ShieldCheckIcon className="size-4 text-info-fg" />
+        <ShieldCheckIcon className="text-info-fg size-4" />
         <h2 className="text-sm font-semibold">Pending approval</h2>
         <span className="text-muted-foreground text-xs">({pending.length})</span>
         {canApprove ? (
-          <Badge variant="secondary" className="ml-auto text-2xs">
+          <Badge variant="secondary" className="text-2xs ml-auto">
             You can approve
           </Badge>
         ) : (
-          <span className="text-muted-foreground ml-auto text-2xs italic">Read-only</span>
+          <span className="text-muted-foreground text-2xs ml-auto italic">Read-only</span>
         )}
       </div>
       <p className="text-muted-foreground text-xs">
@@ -206,13 +205,16 @@ function PendingRow({
         onConfirm={handleApprove}
       />
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: "Reason for rejection",
+          placeholder:
+            "Why is this deploy being rejected? Stored on the audit log + history sidebar.",
+        }}
         open={confirmReject}
         onOpenChange={setConfirmReject}
         title={`Reject ${shortTag}?`}
         description="The pending deployment is aborted. CI must re-trigger to create a fresh deployment for review."
-        reasonLabel="Reason for rejection"
-        reasonPlaceholder="Why is this deploy being rejected? Stored on the audit log + history sidebar."
         confirmLabel="Reject"
         destructive
         onConfirm={handleReject}

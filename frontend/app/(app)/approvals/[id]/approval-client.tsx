@@ -20,7 +20,6 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
 import { QuorumWidget } from "@/components/QuorumWidget";
@@ -233,7 +232,7 @@ export function ApprovalClient({ id }: { id: string }) {
               )}
 
               {needsApproval ? (
-                <div className="rounded-md border border-warning-border bg-warning/10 p-4 text-sm">
+                <div className="border-warning-border bg-warning/10 rounded-md border p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <ClockIcon className="size-4" /> {t("awaiting")}
                   </div>
@@ -284,7 +283,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </div>
                 </div>
               ) : alreadyDecided ? (
-                <div className="rounded-md border border-success-border bg-success/10 p-4 text-sm">
+                <div className="border-success-border bg-success/10 rounded-md border p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <CheckCircle2Icon className="size-4" /> {t("alreadyApproved")}
                   </div>
@@ -296,7 +295,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </Button>
                 </div>
               ) : failed ? (
-                <div className="rounded-md border border-danger-border bg-danger/10 p-4 text-sm">
+                <div className="border-danger-border bg-danger/10 rounded-md border p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <XCircleIcon className="size-4" /> {t("failed")}
                   </div>
@@ -329,7 +328,12 @@ export function ApprovalClient({ id }: { id: string }) {
         onConfirm={handleApprove}
       />
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("confirmReject.reasonLabel"),
+          placeholder: t("confirmReject.reasonPlaceholder"),
+          requiredError: t("confirmReject.reasonRequired"),
+        }}
         open={confirmReject}
         onOpenChange={setConfirmReject}
         title={t("confirmReject.title", { tag: d.imageTag || d.id })}
@@ -337,9 +341,6 @@ export function ApprovalClient({ id }: { id: string }) {
           app: d.registeredAppSlug,
           env: d.environmentName,
         })}
-        reasonLabel={t("confirmReject.reasonLabel")}
-        reasonPlaceholder={t("confirmReject.reasonPlaceholder")}
-        reasonRequiredError={t("confirmReject.reasonRequired")}
         confirmLabel={t("confirmReject.confirm")}
         destructive
         onConfirm={handleReject}
@@ -355,7 +356,7 @@ function SelfTriggerBadge({ label }: { label: string }) {
   return (
     <span
       data-slot="badge"
-      className="inline-flex h-5 items-center gap-1 rounded-4xl border border-warning-border bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-fg"
+      className="border-warning-border bg-warning/10 text-warning-fg inline-flex h-5 items-center gap-1 rounded-4xl border px-2 py-0.5 text-xs font-medium"
     >
       <AlertTriangleIcon className="size-3" />
       {label}

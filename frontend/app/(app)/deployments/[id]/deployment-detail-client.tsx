@@ -23,7 +23,6 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
 import { StaleManifestNotice } from "@/components/StaleManifestNotice";
@@ -422,13 +421,13 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         <CardHeader>
           <CardTitle className="text-base">Release notes</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-3">
+        <CardContent className="space-y-3 text-sm">
           {releaseNotes ? (
             <>
               {releaseNotes.pullRequests.length > 0 && (
                 <ul className="space-y-2">
                   {releaseNotes.pullRequests.map((pr) => (
-                    <li key={pr.number} className="border-l-2 border-muted pl-3">
+                    <li key={pr.number} className="border-muted border-l-2 pl-3">
                       <span className="font-medium">{pr.title}</span>
                       {pr.prUrl && (
                         <a
@@ -673,8 +672,8 @@ export function DeploymentDetailClient({ id }: { id: string }) {
       }
     >
       {/* #1553: say so when this rollout rendered the stored manifest
-        * instead of the repo's. Above the status card because it changes
-        * what a green deploy means. */}
+       * instead of the repo's. Above the status card because it changes
+       * what a green deploy means. */}
       <StaleManifestNotice
         status={d.manifestResyncStatus}
         error={d.manifestResyncError}
@@ -812,14 +811,16 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{
+          label: t("confirmAbort.reasonLabel"),
+          placeholder: t("confirmAbort.reasonPlaceholder"),
+          requiredError: t("confirmAbort.reasonRequired"),
+        }}
         open={confirmAbort}
         onOpenChange={setConfirmAbort}
         title={t("confirmAbort.title", { app: d.registeredAppSlug, env: d.environmentName })}
         description={t("confirmAbort.description")}
-        reasonLabel={t("confirmAbort.reasonLabel")}
-        reasonPlaceholder={t("confirmAbort.reasonPlaceholder")}
-        reasonRequiredError={t("confirmAbort.reasonRequired")}
         confirmLabel={t("confirmAbort.confirm")}
         destructive
         onConfirm={async (reason) => {

@@ -25,7 +25,6 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -764,13 +763,12 @@ function RowActions({
         </Button>
       )}
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{ label: "Reason for abort", placeholder: "Why are you aborting this deploy?" }}
         open={confirmAbort}
         onOpenChange={setConfirmAbort}
         title={`Abort deploy to ${d.environmentName}?`}
         description="The in-flight rollout will be marked failed. Tell the team what changed."
-        reasonLabel="Reason for abort"
-        reasonPlaceholder="Why are you aborting this deploy?"
         confirmLabel="Abort deploy"
         destructive
         onConfirm={async (reason) => {
@@ -813,13 +811,12 @@ function RowActions({
         }}
       />
 
-      <ConfirmDialogWithReason
+      <ConfirmDialog
+        reason={{ label: "Reason for discard", placeholder: "Why are you discarding this deploy?" }}
         open={confirmTrash}
         onOpenChange={setConfirmTrash}
         title={`Discard failed deploy ${(d.imageTag || d.id).slice(0, 8)}?`}
         description="The row stays in history but the rollout is marked aborted. Tell the team what changed."
-        reasonLabel="Reason for discard"
-        reasonPlaceholder="Why are you discarding this deploy?"
         confirmLabel="Discard"
         destructive
         onConfirm={async (reason) => {
