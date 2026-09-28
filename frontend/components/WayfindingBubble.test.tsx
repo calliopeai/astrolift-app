@@ -88,7 +88,18 @@ describe("WayfindingBubble", () => {
     ask("anything");
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toMatch(/isn't switched on/i);
+      expect(screen.getByRole("alert").textContent).toMatch(/can't reach a model/i);
+    });
+  });
+
+  it("says when an operator turned it off (#2138)", async () => {
+    mockAsk({ error: "wayfinding off", reason: "turned off for this install" }, 503);
+    open();
+
+    ask("anything");
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/turned off/i);
     });
   });
 
