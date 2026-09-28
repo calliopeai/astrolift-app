@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { cn } from "@/lib/utils";
+import { DetailTabRow } from "@/components/DetailPageTabs";
 
 /**
  * Per-workflow BROCS pillar nav — the workflow-detail clone of `AgentTabs`
@@ -61,31 +60,16 @@ export function WorkflowTabs({ workflowSlug }: WorkflowTabsProps) {
   const activePillar = resolveActivePillar(pathname, workflowSlug);
 
   return (
-    <div className="-mx-6">
-      <nav
-        aria-label="Workflow pillars"
-        className="border-border flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
-      >
-        {PILLARS.map((pillar) => {
-          const active = pillar.key === activePillar;
-          return (
-            <Link
-              key={pillar.key}
-              href={at(workflowSlug, pillar.segment)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {pillar.label}
-              {active && (
-                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+    <div className="-mx-6 min-w-0">
+      <DetailTabRow
+        ariaLabel="Workflow pillars"
+        tabs={PILLARS.map((pillar) => ({
+          key: pillar.key,
+          label: pillar.label,
+          href: at(workflowSlug, pillar.segment),
+          active: pillar.key === activePillar,
+        }))}
+      />
     </div>
   );
 }

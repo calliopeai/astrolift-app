@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- One tab bar for every entity detail page (#2126, spec 35 §A.5). App, agent,
+  cluster and workflow detail drew four copies of the same link strip; they
+  now render `components/DetailPageTabs.tsx` and keep only their own route
+  models. Each tab row is `min-w-0`, so a long label scrolls inside the strip
+  instead of widening the page. Cluster tabs gain the edge fade the others
+  had, and the app's sub-tab row matches the others' height.
 - Bedrock bindings on an inference profile grant what the call needs (#2137).
   A `model_id` such as `us.anthropic.claude-sonnet-4-6` (or a profile ARN) is
   resolved with `GetInferenceProfile` when the binding is built, and the

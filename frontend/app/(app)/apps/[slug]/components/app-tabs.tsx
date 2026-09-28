@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-import { cn } from "@/lib/utils";
+import { DetailPageTabs } from "@/components/DetailPageTabs";
 
 import { useAppChrome } from "./app-chrome-context";
 
@@ -264,74 +263,22 @@ export function AppTabs({ slug, active }: AppTabsProps) {
   const current = PILLARS.find((p) => p.key === activePillar) ?? PILLARS[1];
 
   return (
-    <div className="-mx-6">
-      {/* Primary: BROCS pillars as a segmented mode-switcher. Contained
-          chips read as "which layer am I in", categorically distinct from
-          the page-level underline tabs below — two stacked underline rows
-          were indistinguishable at a glance. Mono uppercase because BROCS
-          is the brand vocabulary, not a page name. */}
-      <nav
-        aria-label={t("pillarAriaLabel")}
-        className="scrollbar-none flex gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6 pt-1 pb-2"
-      >
-        <div className="bg-muted/40 border-border flex shrink-0 gap-0.5 rounded-sm border p-0.5">
-          {PILLARS.map((pillar) => {
-            const isActive = pillar.key === activePillar;
-            // Land on the pillar's first sub-tab; Run leads with Overview.
-            const href = pillar.subs[0].href(basePath, slug);
-            const label = t(`pillars.${pillar.label}`);
-            return (
-              <Link
-                key={pillar.key}
-                href={href}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "shrink-0 rounded-sm px-3.5 py-1.5 font-mono text-sm font-medium tracking-wider uppercase transition-colors",
-                  isActive
-                    ? "text-foreground bg-[var(--brand-primary)]/12 shadow-[inset_0_0_0_1px_var(--brand-primary)]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                )}
-              >
-                {/* The initial carries the brand: the five of them spell
-                    BROCS. Split inside one element so the accessible name is
-                    still the whole word. */}
-                <span className="text-[var(--brand-primary)]">{label.charAt(0)}</span>
-                {label.slice(1)}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Secondary: pages of the active pillar as quiet underline tabs.
-          Always rendered, even when a pillar has a single sub-route, so
-          the two-level rhythm stays stable across pillars. */}
-      <nav
-        aria-label={t("ariaLabel")}
-        className="border-border scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
-      >
-        {current.subs.map((sub) => {
-          const isActive = sub.label === activeSub;
-          return (
-            <Link
-              key={sub.label}
-              href={sub.href(basePath, slug)}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "relative shrink-0 px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t(sub.label)}
-              {isActive && (
-                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    <DetailPageTabs
+      pillars={PILLARS.map((pillar) => ({
+        key: pillar.key,
+        // Land on the pillar's first sub-tab; Run leads with Overview.
+        href: pillar.subs[0].href(basePath, slug),
+        label: t(`pillars.${pillar.label}`),
+        active: pillar.key === activePillar,
+      }))}
+      pillarsAriaLabel={t("pillarAriaLabel")}
+      tabs={current.subs.map((sub) => ({
+        key: sub.label,
+        href: sub.href(basePath, slug),
+        label: t(sub.label),
+        active: sub.label === activeSub,
+      }))}
+      tabsAriaLabel={t("ariaLabel")}
+    />
   );
 }
