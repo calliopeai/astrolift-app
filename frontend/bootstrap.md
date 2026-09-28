@@ -193,6 +193,9 @@ app/**/page.tsx       fetch data → map it to the screen's props → <Screen {.
   strings, 768px wide.
 - **Order of work**: story and fixtures first, reviewed in Storybook
   (`npm run storybook`); then the route wires the real data.
+  Restart `npm run storybook` after adding a new component file: the running
+  server's Tailwind scan does not pick up classes used only in files created
+  after it started, so they render unstyled until it restarts.
 - **Enforced**:
   - every `.tsx` under `components/` (not tests or hooks) has a sibling
     `.stories.tsx`, and every story renders (`components/stories.test.tsx`);
