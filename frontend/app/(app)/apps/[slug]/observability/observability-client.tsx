@@ -3,6 +3,7 @@
 import { useDnsRecords } from "@/components/observability/use-dns-records";
 import { useEndpointMetrics } from "@/components/observability/use-endpoint-metrics";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
+import { useTraceExplorer } from "@/components/observability/use-trace-explorer";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
 import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
 import { useMutation, useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
@@ -460,6 +461,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   const scopedEnv = envParam;
   const scopedWorkload = workloadParam;
   const scopeOptions = useMetricScopeOptions(slug);
+  const traces = useTraceExplorer(slug, scopedEnv);
   const endpointMetrics = useEndpointMetrics({
     appSlug: slug,
     environmentName: scopedEnv,
@@ -840,7 +842,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       <EndpointMetricsPanel {...endpointMetrics} />
 
       {/* ─── #644 distributed trace explorer ───────────────────────── */}
-      <TraceExplorerPanel appSlug={a.slug} environmentName={scopedEnv} />
+      <TraceExplorerPanel {...traces} />
 
       {/* ─── #647 ad-hoc PromQL panel ──────────────────────────────── */}
       <PromqlQueryPanel appSlug={a.slug} environmentName={scopedEnv} />

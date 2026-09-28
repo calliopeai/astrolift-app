@@ -1,6 +1,5 @@
 "use client";
 
-import { useLazyQuery, useQuery } from "@apollo/client/react";
 import { ChevronDownIcon, ChevronRightIcon, GitBranchIcon } from "lucide-react";
 import * as React from "react";
 
@@ -22,56 +21,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { GET_APP_TRACES, GET_TRACE_SPANS } from "@/graphql/observability/observability.queries";
 import type { AstroliftAppTrace, AstroliftTraceSpan } from "@/graphql/__generated__/schema";
 
-interface TracesResp {
-  astroliftAppTraces: AstroliftAppTrace[];
+/** One trace's spans, loaded on first expand. */
+export interface TraceSpans {
+  loading: boolean;
+  spans: AstroliftTraceSpan[];
 }
 
-interface SpansResp {
-  astroliftTraceSpans: AstroliftTraceSpan[];
-}
+export type TraceStatusFilter = "ALL" | "OK" | "ERROR";
 
 export interface TraceExplorerPanelProps {
-  appSlug: string;
-  environmentName?: string | null;
+  traces: AstroliftAppTrace[];
+  loading: boolean;
+  statusFilter: TraceStatusFilter;
+  onStatusFilterChange: (filter: TraceStatusFilter) => void;
+  spans: Record<string, TraceSpans>;
+  onExpand: (traceId: string) => void;
 }
 
-type StatusFilter = "ALL" | "OK" | "ERROR";
+type StatusFilter = TraceStatusFilter;
 
-const TRACE_LOOKBACK_SECONDS = 3600;
-const TRACE_LIMIT = 50;
-
-export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPanelProps) {
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("ALL");
-
-  // Snapshot the range on mount via lazy state init so the query
-  // variables stay stable across re-renders (Date.now is impure and
-  // can't be called during render).
-  const [{ since, until }] = React.useState(() => {
-    const nowSec = Math.floor(Date.now() / 1000);
-    return {
-      since: String(nowSec - TRACE_LOOKBACK_SECONDS),
-      until: String(nowSec),
-    };
-  });
-
-  const { data, loading } = useQuery<TracesResp>(GET_APP_TRACES, {
-    variables: {
-      appSlug,
-      since,
-      until,
-      environmentName: environmentName ?? null,
-      status: statusFilter === "ALL" ? null : statusFilter,
-      limit: TRACE_LIMIT,
-    },
-    fetchPolicy: "cache-and-network",
-  });
-
-  const traces = data?.astroliftAppTraces ?? [];
-  const isInitialLoading = loading && !data;
-
+/** Pure (Storybook first): traces, filter and spans come from useTraceExplorer. */
+export function TraceExplorerPanel({
+  traces,
+  loading: isInitialLoading,
+  statusFilter,
+  onStatusFilterChange: setStatusFilter,
+  spans,
+  onExpand,
+}: TraceExplorerPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -144,8 +123,8 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
                 <TraceRow
                   key={trace.traceId}
                   trace={trace}
-                  appSlug={appSlug}
-                  environmentName={environmentName ?? null}
+                  spans={spans[trace.traceId]}
+                  onExpand={onExpand}
                 />
               ))
             )}
@@ -158,33 +137,21 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
 
 interface TraceRowProps {
   trace: AstroliftAppTrace;
-  appSlug: string;
-  environmentName: string | null;
+  spans: TraceSpans | undefined;
+  onExpand: (traceId: string) => void;
 }
 
-function TraceRow({ trace, appSlug, environmentName }: TraceRowProps) {
+function TraceRow({ trace, spans: loaded, onExpand }: TraceRowProps) {
   const [expanded, setExpanded] = React.useState(false);
-  const [fetchSpans, spansQuery] = useLazyQuery<SpansResp>(GET_TRACE_SPANS);
 
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && !spansQuery.called) {
-      void fetchSpans({
-        variables: {
-          appSlug,
-          traceId: trace.traceId,
-          environmentName,
-        },
-      });
-    }
+    if (next) onExpand(trace.traceId);
   };
 
   const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
-  // useLazyQuery returns DeepPartial<TData>; coerce here since the whole
-  // span shape lands or `data` is undefined (mirrors the settings panel
-  // helper).
-  const spans = (spansQuery.data?.astroliftTraceSpans as AstroliftTraceSpan[] | undefined) ?? [];
+  const spans = loaded?.spans ?? [];
 
   return (
     <>
@@ -209,7 +176,7 @@ function TraceRow({ trace, appSlug, environmentName }: TraceRowProps) {
       {expanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/20">
           <TableCell colSpan={6} className="py-3">
-            <SpanList loading={spansQuery.loading && !spansQuery.data} spans={spans} />
+            <SpanList loading={loaded?.loading ?? true} spans={spans} />
           </TableCell>
         </TableRow>
       )}
