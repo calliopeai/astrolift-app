@@ -64,6 +64,9 @@ ON_STARTUP = [
     # is truthy. Lets operators register their first cluster at deploy time
     # rather than clicking through the UI form before the dashboard works.
     "register_tenant_cluster",
+    # The install's apps zone, handed over by the installer (#374). Create-only
+    # and a no-op when ASTROLIFT_MANAGED_DOMAIN_ZONE is unset.
+    "bootstrap_managed_domain",
 ]
 
 logger.warning("[STARTUP] Running startup... ==================================")

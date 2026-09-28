@@ -60,6 +60,8 @@ export const LIST_DEPLOYMENTS = gql`
       abortedReason
       manifestResyncStatus
       manifestResyncError
+      buildError
+      statusReason
       triggeredByUserId
       triggeredByMe
       approvedBy {
@@ -217,6 +219,8 @@ export const GET_DEPLOYMENT = gql`
       abortedReason
       manifestResyncStatus
       manifestResyncError
+      buildError
+      statusReason
       triggeredByUserId
       triggeredByMe
       approvedBy {

@@ -108,12 +108,24 @@ def proxy_extra_args(oidc_auth_config: dict[str, Any] | None) -> dict[str, str]:
     return out
 
 
-def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> BootstrapComponent:
+# The classes whose Ingresses gate through oauth2-proxy's auth_request.
+NGINX_FAMILY_CLASSES = frozenset({"nginx", "ingress-nginx"})
+
+
+def central_auth_component(
+    oidc_auth_config: dict[str, Any] | None,
+    *,
+    ingress_class: str = "nginx",
+) -> BootstrapComponent:
     """The ``oauth2-proxy`` component rendered from a cluster's config.
 
-    Enabled once the config is complete; with nothing to render from it
-    stays disabled and omits the host-derived flags rather than shipping
-    placeholders an operator then has to hand-correct.
+    Enabled by default once the config is complete **and** the cluster is on
+    an nginx-family class. The Envoy edge and the ALB gate read the same
+    config but have no auth_request for the proxy to answer, so pre-checking
+    it there installs a release with nothing to gate and a Secret nobody
+    writes (#2121). With nothing to render from it stays disabled and omits
+    the host-derived flags rather than shipping placeholders an operator
+    then has to hand-correct.
     """
     config = oidc_auth_config or {}
     auth_proxy_host = str(config.get("auth_proxy_host") or "")
@@ -159,15 +171,16 @@ def central_auth_component(oidc_auth_config: dict[str, Any] | None) -> Bootstrap
     return BootstrapComponent(
         key="oauth2-proxy",
         title="oauth2-proxy (central auth host)",
-        default_enabled=configured,
+        default_enabled=configured and (ingress_class or "nginx") in NGINX_FAMILY_CLASSES,
         rationale=(
             "The central auth host. It owns the single OIDC callback for the "
             "whole cluster and issues a session cookie scoped to the parent "
             "zone, so every nginx-class Ingress gates on it via an "
             "auth_request sub-request and a new public app needs no callback "
             "registration of its own. Rendered from the cluster's "
-            "oidc_auth_config; enabled once that config is complete. Works "
-            "against Dex in-cluster or any external OIDC provider."
+            "oidc_auth_config; on by default once that config is complete on an "
+            "nginx-class cluster. Works against Dex in-cluster or any "
+            "external OIDC provider."
         ),
         helm_values={
             "config": {

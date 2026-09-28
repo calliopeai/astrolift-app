@@ -75,8 +75,8 @@ def test_returns_output_on_valid_description(auth_client):
     fake_client.messages.create.return_value = _fake_message(generated)
 
     with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
-        with patch("astrolift_agents.views.skill_ai_assist.anthropic") as mock_anthropic:
-            mock_anthropic.Anthropic.return_value = fake_client
+        with patch("anthropic.Anthropic") as mock_anthropic_client:
+            mock_anthropic_client.return_value = fake_client
             resp = auth_client.post(
                 _URL,
                 data=json.dumps({"description": "review pull requests"}),
@@ -94,8 +94,8 @@ def test_anthropic_called_with_correct_args(auth_client):
     fake_client.messages.create.return_value = _fake_message("some prompt")
 
     with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
-        with patch("astrolift_agents.views.skill_ai_assist.anthropic") as mock_anthropic:
-            mock_anthropic.Anthropic.return_value = fake_client
+        with patch("anthropic.Anthropic") as mock_anthropic_client:
+            mock_anthropic_client.return_value = fake_client
             auth_client.post(
                 _URL,
                 data=json.dumps({"description": "monitor infrastructure"}),
@@ -179,11 +179,22 @@ def test_unauthenticated_request_returns_401():
 
 @pytest.mark.django_db
 def test_missing_api_key_returns_503(auth_client, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # No key and no cloud to fall back on (#2138): the install's own cloud
+    # model is the default, so both have to be absent for this to be off.
+    for name in (
+        "ANTHROPIC_API_KEY",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+        "GOOGLE_CLOUD_PROJECT",
+        "AZURE_OPENAI_ENDPOINT",
+        "ASTROLIFT_PLATFORM_MODEL_URL",
+        "ASTROLIFT_PLATFORM_MODEL_PROVIDER",
+    ):
+        monkeypatch.delenv(name, raising=False)
     resp = auth_client.post(
         _URL,
         data=json.dumps({"description": "something"}),
         content_type="application/json",
     )
     assert resp.status_code == 503
-    assert resp.json() == {"error": "AI assist not configured"}
+    assert resp.json()["error"] == "AI assist not configured"

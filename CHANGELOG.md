@@ -2,6 +2,87 @@
 
 ## Unreleased
 
+- Bedrock bindings on an inference profile grant what the call needs (#2137).
+  A `model_id` such as `us.anthropic.claude-sonnet-4-6` (or a profile ARN) is
+  resolved with `GetInferenceProfile` when the binding is built, and the
+  workload's role is granted invoke on the profile and on every foundation
+  model it routes to. Before, it got `foundation-model/us.anthropic...`, which
+  is not a resource, so the call was always denied. A direct foundation model
+  keeps its one grant, and a profile that cannot be resolved is refused
+  rather than granted on nothing. Redeploy (or reconcile) a consuming app to
+  pick up the new grants.
+- Per-app access on the Envoy edge (#2132). An app lists the identity
+  provider groups and users (by email) that may enter, from its Security tab,
+  `astro app access`, or `[ingress.access]` in `astrolift.toml` (which then
+  manages it, and the UI only shows it). The edge enforces it before the app
+  sees a request: the one shared SecurityPolicy gains per-host `authorization`
+  rules on the ID token's groups and email claims, so single sign-on stays,
+  and a user turned away gets a page naming the app instead of Envoy's bare
+  403, while an app's own 403 passes through. An app with no rule is open to
+  every signed-in user, as before. Saving shows how many users could enter
+  and who would lose access. Proven on Envoy Gateway 1.9.1 before building.
+- Manage who can sign in to the apps behind central auth, from cluster
+  settings and `astro auth-users` (#2131). A new `identity_users` driver
+  capability, Amazon Cognito first (Entra ID, Identity Platform and Keycloak
+  are on the availability matrix as planned), lists, creates, disables,
+  enables, deletes and resets users, sets passwords, and manages groups on
+  the install's own pool. Passwords are write-only: no response carries one,
+  the audit log masks them, and a provider error that echoes one is
+  scrubbed. A shared cluster's pool holds every org's logins, so reading it
+  is the platform operator's. New permission `cluster.users` (Cluster Owner)
+  and token scope `manage:auth-users`; `app.access` and `write:app-access`
+  land for #2132.
+- A deploy says why it failed or what it is waiting on (#2123). Each row of an
+  app's Deployments tab shows `statusReason`: the abort reason or the first
+  line of the build or manifest error for a failed deploy, and for a pending
+  one whether it waits on approval, is queued behind a named deploy, or has
+  not started with nothing ahead of it (which past ten minutes reads as a
+  missing worker). The opened row shows the full build output and the
+  manifest resync error beside the log.
+- Central auth and the ingress class on the cluster settings page (#2119).
+  A Central auth card sets `oidcAuthConfig` with secrets write-only (set or
+  not set badges; a blank field keeps the stored value, and the server now
+  carries forward any secret, or `proxy_extra_args`, an update omits). An
+  Ingress class card warns before a change that would leave apps with no
+  gate and asks whether to also commit the gate to every app's manifest,
+  which redeploys them all. The recipe card keeps what the recipe installed
+  checked and no longer pre-checks a controller the probe found running
+  outside it, such as an ALB controller or external-dns installed by hand.
+  An additive edge install now records the recipe's whole set, so it never
+  makes the next operator run read the rest of the recipe as foreign.
+- Token scopes for the cluster surface and a picker that explains itself
+  (#2120). `write:clusters` (update a cluster's settings) and
+  `manage:clusters` (run its recipe, refresh, reconcile) replace the admin
+  token a script used to need; registering and removing a cluster stay
+  admin-only. The picker reads `astroliftApiTokenScopeCatalog`, derived from
+  enforcement: scopes grouped by surface, what each unlocks, presets, the
+  scopes your roles can never exercise shown disabled with the reason, and a
+  plain warning on `admin`. Each token lists its effective permissions
+  (scopes narrowed by the owner's roles), and a long-lived admin token is
+  flagged. A device login with client kind `cli-operator` asks for the CLI's
+  scopes plus the cluster pair.
+- The Envoy edge comes up from the installer with no hand steps (#2130).
+  `register_tenant_cluster` accepts the OIDC client secret without an
+  oauth2-proxy cookie secret, and a cluster on class `envoy` with a complete
+  config gets `envoy-gateway` installed on start, or when an update moves it
+  there. That install is additive: it deletes no other release, and it never
+  runs for a cluster on any other class, so existing nginx and ALB installs
+  are unchanged. On a cluster whose recipe offers them it also brings the
+  AWS Load Balancer Controller and external-dns, but only when a live probe
+  finds neither running, so a hand-installed controller never gets a twin.
+  The probe now sees an external-dns in `kube-system`.
+- A fresh install gets its apps zone from the installer
+  (`bootstrap_managed_domain`, from `ASTROLIFT_MANAGED_DOMAIN_ZONE`,
+  `_ZONE_ID` and `_CERTIFICATE_ARN`). It registers the zone once as the
+  platform default for tenant apps and never touches an existing row.
+- A cluster's class flip no longer redeploys every app (#2122). The flip
+  used to commit the new gate to every bound app's `astrolift.toml`, and
+  each commit started that app's deploy. The deploy path renders from the
+  cluster, not the manifest, so each app now moves on its own next deploy;
+  `updateTenantCluster(syncManifests: true)` still commits it.
+- The recipe pre-checks oauth2-proxy only on an nginx-family cluster
+  (#2121). On an Envoy or ALB cluster it had nothing to gate and needed a
+  Secret nothing writes.
 - Central auth on an Envoy Gateway edge (#2055). A cluster with
   `ingressClass: "envoy"` and a complete `oidcAuthConfig` serves every
   platform-assigned app hostname through one Gateway in `astrolift-edge`,

@@ -53,6 +53,9 @@ def normalize(
     # before the block existed, so nothing re-deploys on the upgrade alone.
     if raw.edge is not None:
         serialized["edge"] = _edge_dict(raw.edge)
+    # Same rule for ``[ingress.access]`` (#2132).
+    if raw.ingress_access is not None:
+        serialized["ingress_access"] = raw.ingress_access
     return NormalizedManifest(
         name=raw.name,
         workloads=workloads,

@@ -109,6 +109,7 @@ export const LIST_CLUSTERS = gql`
       authMethod
       ingressClass
       albAuthConfig
+      oidcAuthConfig
       isActive
       capabilities
       capabilitiesProbedAt
@@ -224,6 +225,7 @@ export const UPDATE_TENANT_CLUSTER = gql`
         slug
         ingressClass
         albAuthConfig
+        oidcAuthConfig
       }
     }
   }
@@ -517,6 +519,8 @@ export const CLUSTER_BOOTSTRAP_PLAN = gql`
         key
         title
         defaultEnabled
+        installedByRecipe
+        runningOutsideRecipe
         rationale
         helmValues
         requires
@@ -791,6 +795,123 @@ export const DNS_CERTIFICATES = gql`
         name
         domainName
         status
+      }
+    }
+  }
+`;
+
+// The users of a cluster's central auth (#2131). Passwords go in and never
+// come back: no selection below can carry one.
+export const CLUSTER_AUTH_USERS = gql`
+  query ClusterAuthUsers($clusterId: GUID!, $search: String) {
+    astroliftClusterAuthUsers(clusterId: $clusterId, search: $search) {
+      supported
+      reason
+      provider
+      reachNote
+      groups
+      users {
+        username
+        email
+        enabled
+        status
+        createdAt
+        groups
+      }
+    }
+  }
+`;
+
+export const CREATE_CLUSTER_AUTH_USER = gql`
+  mutation CreateClusterAuthUser($input: CreateClusterAuthUserInput!) {
+    createClusterAuthUser(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        username
+        email
+      }
+    }
+  }
+`;
+
+export const SET_CLUSTER_AUTH_USER_PASSWORD = gql`
+  mutation SetClusterAuthUserPassword($input: SetClusterAuthUserPasswordInput!) {
+    setClusterAuthUserPassword(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const RESET_CLUSTER_AUTH_USER_PASSWORD = gql`
+  mutation ResetClusterAuthUserPassword($input: ClusterAuthUserRefInput!) {
+    resetClusterAuthUserPassword(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const SET_CLUSTER_AUTH_USER_ENABLED = gql`
+  mutation SetClusterAuthUserEnabled($input: SetClusterAuthUserEnabledInput!) {
+    setClusterAuthUserEnabled(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const DELETE_CLUSTER_AUTH_USER = gql`
+  mutation DeleteClusterAuthUser($input: ClusterAuthUserRefInput!) {
+    deleteClusterAuthUser(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const SET_CLUSTER_AUTH_USER_GROUPS = gql`
+  mutation SetClusterAuthUserGroups($input: SetClusterAuthUserGroupsInput!) {
+    setClusterAuthUserGroups(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const CREATE_CLUSTER_AUTH_GROUP = gql`
+  mutation CreateClusterAuthGroup($input: CreateClusterAuthGroupInput!) {
+    createClusterAuthGroup(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
       }
     }
   }

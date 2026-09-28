@@ -108,6 +108,9 @@ def check_matrix(
     # reverse direction: every executable matrix entry must back a real PLUGIN
     plugin_index = {p.id: p for p in plugins}
     for entry in matrix.drivers:
+        # Planned entries are roadmap metadata, as for managed services below.
+        if entry.status in {"planned", "deprecated"}:
+            continue
         plugin = plugin_index.get(entry.plugin_id)
         if plugin is None:
             issues.append(

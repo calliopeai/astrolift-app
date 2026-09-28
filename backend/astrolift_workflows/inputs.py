@@ -190,6 +190,10 @@ class InstallClusterPrereqsInput:
     # Defaulted so a workflow started before the field existed still
     # decodes.
     organization_id: int | None = None
+    # Apply the selection and delete nothing (#2130). The control plane's
+    # own edge install uses it, so a run it starts can never remove a
+    # release the operator installed.
+    additive: bool = False
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

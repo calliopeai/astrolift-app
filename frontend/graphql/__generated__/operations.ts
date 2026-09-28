@@ -701,6 +701,7 @@ export type AstroliftAnonymizeUserPayloadMutationResult = {
 
 export type AstroliftApiToken = {
   createdAt: Scalars['DateTime']['output'];
+  effectivePermissions: Array<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
@@ -732,6 +733,49 @@ export type AstroliftApiTokenPlaintextMutationResult = {
   data?: Maybe<AstroliftApiTokenPlaintext>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftApiTokenScope = {
+  available: Scalars['Boolean']['output'];
+  description: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  sensitive: Scalars['Boolean']['output'];
+  surface: Scalars['String']['output'];
+  unavailableReason: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftApiTokenScopeCatalog = {
+  presets: Array<AstroliftApiTokenScopePreset>;
+  scopes: Array<AstroliftApiTokenScope>;
+};
+
+export type AstroliftApiTokenScopePreset = {
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  scopes: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftAppAccess = {
+  appSlug: Scalars['String']['output'];
+  enforcedOn: Array<Scalars['String']['output']>;
+  groups: Array<Scalars['String']['output']>;
+  managedByManifest: Scalars['Boolean']['output'];
+  restricted: Scalars['Boolean']['output'];
+  users: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftAppAccessMutationResult = {
+  data?: Maybe<AstroliftAppAccess>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAppAccessPreview = {
+  allowed?: Maybe<Scalars['Int']['output']>;
+  losing: Array<Scalars['String']['output']>;
+  total?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftAppAutowireStatus = {
@@ -1384,13 +1428,50 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftClusterAuthUser = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  email: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  groups: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  username: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAuthUserChange = {
+  done: Scalars['Boolean']['output'];
+  username: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAuthUserChangeMutationResult = {
+  data?: Maybe<AstroliftClusterAuthUserChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAuthUserMutationResult = {
+  data?: Maybe<AstroliftClusterAuthUser>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAuthUsers = {
+  groups: Array<Scalars['String']['output']>;
+  provider: Scalars['String']['output'];
+  reachNote: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  supported: Scalars['Boolean']['output'];
+  users: Array<AstroliftClusterAuthUser>;
+};
+
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
+  installedByRecipe: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   options: Array<AstroliftClusterBootstrapOption>;
   rationale: Scalars['String']['output'];
   requires: Array<Scalars['String']['output']>;
+  runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 
@@ -1761,6 +1842,7 @@ export type AstroliftDeployment = {
   requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  statusReason: Scalars['String']['output'];
   strategy: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
   triggerKind: Scalars['String']['output'];
@@ -4502,6 +4584,11 @@ export type CloudOrphanType = {
   reason: Scalars['String']['output'];
 };
 
+export type ClusterAuthUserRefInput = {
+  clusterId: Scalars['GUID']['input'];
+  username: Scalars['String']['input'];
+};
+
 export type Clusteragentkeyissuedpayload = {
   agentKey: Scalars['String']['output'];
   clusterId: Scalars['GUID']['output'];
@@ -4632,6 +4719,20 @@ export type CreateApiTokenInput = {
   name: Scalars['String']['input'];
   scopes: InputMaybe<Array<Scalars['String']['input']>>;
   teamSlug: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CreateClusterAuthGroupInput = {
+  clusterId: Scalars['GUID']['input'];
+  description: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CreateClusterAuthUserInput = {
+  clusterId: Scalars['GUID']['input'];
+  email: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  password: InputMaybe<Scalars['String']['input']>;
+  permanent: Scalars['Boolean']['input'];
 };
 
 export type CreateDeployTokenInput = {
@@ -5319,6 +5420,8 @@ export type Mutation = {
   createAgentTrigger: AstroliftAgentTriggerResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
+  createClusterAuthGroup: AstroliftClusterAuthUserChangeMutationResult;
+  createClusterAuthUser: AstroliftClusterAuthUserMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
   createEmailTemplate: AstroliftEmailTemplateMutationResult;
   createFormDefinition: AstroliftFormDefinitionMutationResult;
@@ -5358,6 +5461,7 @@ export type Mutation = {
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIngress: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
+  deleteClusterAuthUser: AstroliftClusterAuthUserChangeMutationResult;
   deleteDeployment: AstroliftDeploymentMutationResult;
   deleteEmailTemplate: EmailtemplatedeletedpayloadMutationResult;
   deleteFormDefinition: AstroliftFormDefinitionMutationResult;
@@ -5508,6 +5612,7 @@ export type Mutation = {
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
+  resetClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
@@ -5553,9 +5658,13 @@ export type Mutation = {
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
+  setAppAccess: AstroliftAppAccessMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
+  setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
+  setClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
   setDomainPathRoutes: AstroliftAppDomainMutationResult;
   setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -5946,6 +6055,16 @@ export type MutationCreateApiTokenArgs = {
 };
 
 
+export type MutationCreateClusterAuthGroupArgs = {
+  input: CreateClusterAuthGroupInput;
+};
+
+
+export type MutationCreateClusterAuthUserArgs = {
+  input: CreateClusterAuthUserInput;
+};
+
+
 export type MutationCreateDeployTokenArgs = {
   input: CreateDeployTokenInput;
 };
@@ -6143,6 +6262,11 @@ export type MutationDeleteAppIngressArgs = {
 
 export type MutationDeleteAppSecretArgs = {
   input: DeleteAppSecretInput;
+};
+
+
+export type MutationDeleteClusterAuthUserArgs = {
+  input: ClusterAuthUserRefInput;
 };
 
 
@@ -6783,6 +6907,11 @@ export type MutationResendInvitationArgs = {
 };
 
 
+export type MutationResetClusterAuthUserPasswordArgs = {
+  input: ClusterAuthUserRefInput;
+};
+
+
 export type MutationRestartAstroliftWorkloadArgs = {
   input: RestartWorkloadInput;
 };
@@ -7008,6 +7137,11 @@ export type MutationSetAlertSubscriptionArgs = {
 };
 
 
+export type MutationSetAppAccessArgs = {
+  input: SetAppAccessInput;
+};
+
+
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
 };
@@ -7020,6 +7154,21 @@ export type MutationSetAppSecretMetadataArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetClusterAuthUserEnabledArgs = {
+  input: SetClusterAuthUserEnabledInput;
+};
+
+
+export type MutationSetClusterAuthUserGroupsArgs = {
+  input: SetClusterAuthUserGroupsInput;
+};
+
+
+export type MutationSetClusterAuthUserPasswordArgs = {
+  input: SetClusterAuthUserPasswordInput;
 };
 
 
@@ -7832,10 +7981,13 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage. */
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftAlertRulesPage: AstroliftAlertRulePage;
+  astroliftApiTokenScopeCatalog: AstroliftApiTokenScopeCatalog;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage. */
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApiTokensPage: AstroliftApiTokenPage;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
+  astroliftAppAccess?: Maybe<AstroliftAppAccess>;
+  astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
@@ -7871,6 +8023,7 @@ export type Query = {
   astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
+  astroliftClusterAuthUsers?: Maybe<AstroliftClusterAuthUsers>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
   astroliftClusterCertificates: AstroliftClusterCertificates;
   astroliftClusterCount: Scalars['Int']['output'];
@@ -8341,6 +8494,18 @@ export type QueryAstroliftAppArgs = {
 };
 
 
+export type QueryAstroliftAppAccessArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppAccessPreviewArgs = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftAppCertificatesArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -8565,6 +8730,12 @@ export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftClusterAuthUsersArgs = {
+  clusterId: Scalars['GUID']['input'];
+  search?: Scalars['String']['input'];
 };
 
 
@@ -9932,6 +10103,12 @@ export type SetAlertSubscriptionInput = {
   enabled: Scalars['Boolean']['input'];
 };
 
+export type SetAppAccessInput = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
+};
+
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -9954,6 +10131,26 @@ export type SetAppSecretMetadataInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserEnabledInput = {
+  clusterId: Scalars['GUID']['input'];
+  enabled: Scalars['Boolean']['input'];
+  username: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserGroupsInput = {
+  add: Array<Scalars['String']['input']>;
+  clusterId: Scalars['GUID']['input'];
+  remove: Array<Scalars['String']['input']>;
+  username: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserPasswordInput = {
+  clusterId: Scalars['GUID']['input'];
+  password: Scalars['String']['input'];
+  permanent: Scalars['Boolean']['input'];
+  username: Scalars['String']['input'];
 };
 
 export type SetDomainPathRoutesInput = {
@@ -10375,6 +10572,7 @@ export type UpdateTenantClusterInput = {
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   oidcAuthConfig: InputMaybe<Scalars['JSON']['input']>;
   region: InputMaybe<Scalars['String']['input']>;
+  syncManifests: Scalars['Boolean']['input'];
 };
 
 export type UpdateWebhookSubscriptionInput = {
@@ -11092,7 +11290,7 @@ export type ClusterCountQuery = { astroliftClusterCount: number };
 export type ListClustersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListClustersQuery = { astroliftClusters: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> };
+export type ListClustersQuery = { astroliftClusters: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, oidcAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> };
 
 export type ClusterFieldsFragment = { id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null };
 
@@ -11110,7 +11308,7 @@ export type UpdateTenantClusterMutationVariables = Exact<{
 }>;
 
 
-export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null } | null } };
+export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, oidcAuthConfig?: Record<string, unknown> | null } | null } };
 
 export type ReconcileClusterIngressesMutationVariables = Exact<{
   input: ReconcileClusterIngressesInput;
@@ -11209,7 +11407,7 @@ export type ClusterBootstrapPlanQueryVariables = Exact<{
 }>;
 
 
-export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, rationale: string, helmValues: Record<string, unknown>, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
+export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, installedByRecipe: boolean, runningOutsideRecipe: boolean, rationale: string, helmValues: Record<string, unknown>, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
 
 export type InstallClusterPrereqsMutationVariables = Exact<{
   input: InstallClusterPrereqsInputType;
@@ -11305,6 +11503,63 @@ export type DnsCertificatesQueryVariables = Exact<{
 
 
 export type DnsCertificatesQuery = { astroliftDnsCertificates: { supported: boolean, certificates: Array<{ arn: string, name: string, domainName: string, status: string }> } };
+
+export type ClusterAuthUsersQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ClusterAuthUsersQuery = { astroliftClusterAuthUsers?: { supported: boolean, reason: string, provider: string, reachNote: string, groups: Array<string>, users: Array<{ username: string, email: string, enabled: boolean, status: string, createdAt?: string | null, groups: Array<string> }> } | null };
+
+export type CreateClusterAuthUserMutationVariables = Exact<{
+  input: CreateClusterAuthUserInput;
+}>;
+
+
+export type CreateClusterAuthUserMutation = { createClusterAuthUser: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { username: string, email: string } | null } };
+
+export type SetClusterAuthUserPasswordMutationVariables = Exact<{
+  input: SetClusterAuthUserPasswordInput;
+}>;
+
+
+export type SetClusterAuthUserPasswordMutation = { setClusterAuthUserPassword: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
+
+export type ResetClusterAuthUserPasswordMutationVariables = Exact<{
+  input: ClusterAuthUserRefInput;
+}>;
+
+
+export type ResetClusterAuthUserPasswordMutation = { resetClusterAuthUserPassword: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
+
+export type SetClusterAuthUserEnabledMutationVariables = Exact<{
+  input: SetClusterAuthUserEnabledInput;
+}>;
+
+
+export type SetClusterAuthUserEnabledMutation = { setClusterAuthUserEnabled: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
+
+export type DeleteClusterAuthUserMutationVariables = Exact<{
+  input: ClusterAuthUserRefInput;
+}>;
+
+
+export type DeleteClusterAuthUserMutation = { deleteClusterAuthUser: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
+
+export type SetClusterAuthUserGroupsMutationVariables = Exact<{
+  input: SetClusterAuthUserGroupsInput;
+}>;
+
+
+export type SetClusterAuthUserGroupsMutation = { setClusterAuthUserGroups: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
+
+export type CreateClusterAuthGroupMutationVariables = Exact<{
+  input: CreateClusterAuthGroupInput;
+}>;
+
+
+export type CreateClusterAuthGroupMutation = { createClusterAuthGroup: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
 
 export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string, deletedAt?: string | null };
 
@@ -11475,7 +11730,12 @@ export type ListApiTokensQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ListApiTokensQuery = { astroliftApiTokens: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } }> };
 
-export type ApiTokenFieldsFragment = { id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } };
+export type ApiTokenFieldsFragment = { id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, effectivePermissions: Array<string>, user: { id: string, username: string, email: string } };
+
+export type GetApiTokenScopeCatalogQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetApiTokenScopeCatalogQuery = { astroliftApiTokenScopeCatalog: { scopes: Array<{ value: string, label: string, surface: string, description: string, sensitive: boolean, permissions: Array<string>, available: boolean, unavailableReason: string }>, presets: Array<{ key: string, label: string, scopes: Array<string> }> } };
 
 export type ListApiTokensPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -11484,7 +11744,7 @@ export type ListApiTokensPageQueryVariables = Exact<{
 }>;
 
 
-export type ListApiTokensPageQuery = { astroliftApiTokensPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } }> } };
+export type ListApiTokensPageQuery = { astroliftApiTokensPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, effectivePermissions: Array<string>, user: { id: string, username: string, email: string } }> } };
 
 export type GetMyProfileQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -11558,7 +11818,7 @@ export type ListDeploymentsQueryVariables = Exact<{
 }>;
 
 
-export type ListDeploymentsQuery = { astroliftDeployments: Array<{ id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, commitSha: string, commitMessage: string, commitAuthor: string, commitAuthorAvatarUrl: string, branch: string, prNumber: number, prUrl: string, ciActorKind: string, ciProvider: string, ciRunUrl: string, repoUrl: string, abortedReason: string, manifestResyncStatus: string, manifestResyncError: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> }> };
+export type ListDeploymentsQuery = { astroliftDeployments: Array<{ id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, commitSha: string, commitMessage: string, commitAuthor: string, commitAuthorAvatarUrl: string, branch: string, prNumber: number, prUrl: string, ciActorKind: string, ciProvider: string, ciRunUrl: string, repoUrl: string, abortedReason: string, manifestResyncStatus: string, manifestResyncError: string, buildError: string, statusReason: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> }> };
 
 export type DeploymentFieldsFragment = { id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, commitSha: string, commitMessage: string, commitAuthor: string, commitAuthorAvatarUrl: string, branch: string, prNumber: number, prUrl: string, ciActorKind: string, ciProvider: string, ciRunUrl: string, repoUrl: string, abortedReason: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> };
 
@@ -11580,7 +11840,7 @@ export type GetDeploymentQueryVariables = Exact<{
 }>;
 
 
-export type GetDeploymentQuery = { astroliftDeployment?: { id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, ciActorKind: string, commitSha: string, commitMessage: string, commitAuthor: string, branch: string, ciRunUrl: string, ciProvider: string, repoUrl: string, abortedReason: string, manifestResyncStatus: string, manifestResyncError: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> } | null };
+export type GetDeploymentQuery = { astroliftDeployment?: { id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, ciActorKind: string, commitSha: string, commitMessage: string, commitAuthor: string, branch: string, ciRunUrl: string, ciProvider: string, repoUrl: string, abortedReason: string, manifestResyncStatus: string, manifestResyncError: string, buildError: string, statusReason: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> } | null };
 
 export type GetDeploymentReleaseNotesQueryVariables = Exact<{
   deploymentId: Scalars['String']['input'];
@@ -12213,6 +12473,29 @@ export type GetAppDoctorQueryVariables = Exact<{
 
 
 export type GetAppDoctorQuery = { astroliftAppDoctor: { healthy: boolean, checks: Array<{ key: string, status: string, detail: string, fix: string }> } };
+
+export type GetAppAccessQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+}>;
+
+
+export type GetAppAccessQuery = { astroliftAppAccess?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string> } | null };
+
+export type PreviewAppAccessQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  users: Array<Scalars['String']['input']> | Scalars['String']['input'];
+}>;
+
+
+export type PreviewAppAccessQuery = { astroliftAppAccessPreview?: { allowed?: number | null, total?: number | null, losing: Array<string> } | null };
+
+export type SetAppAccessMutationVariables = Exact<{
+  input: SetAppAccessInput;
+}>;
+
+
+export type SetAppAccessMutation = { setAppAccess: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string> } | null } };
 
 export type ConnectSourceMutationVariables = Exact<{
   input: ConnectSourceInput;

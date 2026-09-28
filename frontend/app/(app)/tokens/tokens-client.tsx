@@ -31,8 +31,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
+
+import { ScopePicker } from "./scope-picker";
 import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftApiToken,
@@ -48,86 +49,12 @@ interface Resp {
   };
 }
 
-// Mirror of backend ALLOWED_SCOPES (astrolift_identity/api_tokens.py).
-// Keep in sync — server validates and rejects unknowns; clients picking
-// up new scopes need both halves landed.
-const SCOPE_CHOICES = [
-  {
-    value: "read:apps",
-    label: "Read apps",
-    hint: "List apps, deployments, environments, secrets metadata.",
-  },
-  {
-    value: "write:apps",
-    label: "Write apps",
-    hint: "Trigger deploys, edit env vars, manage app config.",
-  },
-  {
-    value: "read:clusters",
-    label: "Read clusters",
-    hint: "List clusters, view kubeconfig metadata, read provider state.",
-  },
-  {
-    value: "agent-env-spec:write",
-    label: "Write agent environments",
-    hint: "Create, update, and delete agent environment specs without broader app writes.",
-  },
-  {
-    value: "project:write",
-    label: "Write projects",
-    hint: "Create, update, and delete projects and project-owned shared resources without broader app writes.",
-  },
-  {
-    value: "team:write",
-    label: "Write teams",
-    hint: "Create, update, and delete teams without broader org administration.",
-  },
-  {
-    value: "secret:read",
-    label: "Reveal secrets",
-    hint: "Reveal stored secret values. Sensitive; grant only when required.",
-  },
-  {
-    value: "secret:write",
-    label: "Write secrets",
-    hint: "Set, rotate, and delete stored secret values without revealing them.",
-  },
-  {
-    value: "mcp:read",
-    label: "MCP read",
-    hint: "List agent packages and inspect run status through remote MCP.",
-  },
-  {
-    value: "mcp:dispatch",
-    label: "MCP dispatch",
-    hint: "Run and hard-stop agents through remote MCP.",
-  },
-  {
-    value: "mcp:write",
-    label: "MCP write",
-    hint: "Sync agent repositories and package definitions through remote MCP.",
-  },
-  {
-    value: "workflow:write",
-    label: "Write workflows",
-    hint: "Create, update, and delete workflows without broader app writes.",
-  },
-  {
-    value: "workflow:trigger",
-    label: "Run workflows",
-    hint: "Start workflow runs without granting workflow configuration writes.",
-  },
-  {
-    value: "app:onboard",
-    label: "Onboard apps",
-    hint: "Register apps and run CI setup (webhook, secrets, workflow) without deploy or delete rights.",
-  },
-  {
-    value: "admin",
-    label: "Admin",
-    hint: "Full power — implies every other scope. Use sparingly.",
-  },
-] as const;
+/** An admin token with no expiry, or one more than 90 days out (#2120). */
+function isLongLivedAdmin(t: AstroliftApiToken): boolean {
+  if (!t.scopes.includes("admin") || t.isRevoked) return false;
+  if (!t.expiresAt) return true;
+  return new Date(t.expiresAt).getTime() - Date.now() > 90 * 24 * 60 * 60 * 1000;
+}
 
 const DEFAULT_SELECTED_SCOPES: string[] = ["read:apps", "read:clusters", "mcp:read"];
 
@@ -174,12 +101,6 @@ export function TokensClient() {
     setName("");
     setExpiresInDays("90");
     setSelectedScopes(DEFAULT_SELECTED_SCOPES);
-  }
-
-  function toggleScope(value: string) {
-    setSelectedScopes((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
-    );
   }
 
   async function submit(e: React.FormEvent) {
@@ -255,6 +176,39 @@ export function TokensClient() {
             ))
           )}
         </div>
+      ),
+    },
+    {
+      id: "canDo",
+      header: "Can do",
+      width: "w-36",
+      cell: (t) => (
+        <Tooltip>
+          {/* Above the row's stretched link, or the overlay eats the hover. */}
+          <TooltipTrigger asChild>
+            <span className="relative z-10 inline-flex cursor-help items-center gap-1 text-xs">
+              {isLongLivedAdmin(t) && (
+                <AlertTriangleIcon
+                  className="text-warning-fg size-3.5"
+                  aria-label="Long-lived admin token"
+                />
+              )}
+              {t.effectivePermissions.length} permission
+              {t.effectivePermissions.length === 1 ? "" : "s"}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-sm">
+            {isLongLivedAdmin(t) && (
+              <p className="mb-1 font-medium">
+                Admin with no near expiry. Replace it with a narrower token.
+              </p>
+            )}
+            <p className="opacity-75">What its scopes allow and its owner&apos;s roles grant:</p>
+            <p className="text-2xs font-mono [overflow-wrap:anywhere]">
+              {t.effectivePermissions.join(", ") || "nothing"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
       ),
     },
     {
@@ -443,38 +397,11 @@ export function TokensClient() {
               </div>
               <div className="space-y-2">
                 <Label>Scopes</Label>
-                <div className="flex flex-wrap gap-2">
-                  {SCOPE_CHOICES.map((scope) => {
-                    const active = selectedScopes.includes(scope.value);
-                    return (
-                      <Tooltip key={scope.value}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => toggleScope(scope.value)}
-                            aria-pressed={active}
-                            className={cn(
-                              "rounded-md border px-2.5 py-1 font-mono text-xs transition",
-                              active
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-input text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-                            )}
-                          >
-                            {scope.value}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-medium">{scope.label}</p>
-                          <p className="opacity-75">{scope.hint}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
                 <p className="text-muted-foreground text-xs">
-                  Token may only exercise these scopes. <code>admin</code> is the full-power
-                  wildcard and is never selected by default.
+                  A token can only narrow what you can do: it gets the permissions below that your
+                  roles also grant.
                 </p>
+                <ScopePicker value={selectedScopes} onChange={setSelectedScopes} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="token-expires">Expires in (days)</Label>

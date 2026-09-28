@@ -35,6 +35,9 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.types import (
     ActiveSessionType,
+    ApiTokenScopeCatalogType,
+    ApiTokenScopePresetType,
+    ApiTokenScopeType,
     ApiTokenType,
     ApproverUserType,
     AppSummaryType,
@@ -1329,6 +1332,41 @@ class IdentityQuery:
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
         return [api_token_to_type(t) for t in _api_tokens_qs().order_by("-created_at")[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
+    def astrolift_api_token_scope_catalog(self, info: Info) -> ApiTokenScopeCatalogType:
+        """The scopes a token may carry, what each unlocks, and which the
+        caller's roles let them use (#2120). The picker's only source."""
+        from astrolift_identity.api_tokens import SCOPE_CATALOG, SCOPE_PRESETS, permissions_for_scopes
+        from core.schema.types.permission_analysis import _held_slugs
+        from core.tenancy import get_current_tenant
+
+        held = set(_held_slugs(info.context.user, get_current_tenant().organization_id))
+        scopes = []
+        for scope in SCOPE_CATALOG:
+            grants = sorted(permissions_for_scopes([scope.value]))
+            usable = bool(set(grants) & held)
+            scopes.append(
+                ApiTokenScopeType(
+                    value=scope.value,
+                    label=scope.label,
+                    surface=scope.surface,
+                    description=scope.description,
+                    sensitive=scope.sensitive,
+                    permissions=grants,
+                    available=usable,
+                    unavailable_reason="" if usable else "Your roles grant none of what this scope unlocks.",
+                )
+            )
+        return ApiTokenScopeCatalogType(
+            scopes=scopes,
+            presets=[
+                ApiTokenScopePresetType(key=key, label=label, scopes=list(values))
+                for key, label, values in SCOPE_PRESETS
+            ],
+        )
 
     @strawberry.field
     @require_permission(Permission.API_TOKEN_CREATE)

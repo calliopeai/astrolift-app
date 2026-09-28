@@ -450,6 +450,23 @@ def test_probe_detects_metrics_server_via_kube_system_pod():
     assert caps["metrics_server"] is True
 
 
+def test_probe_detects_external_dns_installed_by_hand_in_kube_system():
+    """Read as absent, the recipe offered a second external-dns (#2119)."""
+    backend = FakeManagementBackend(
+        pods_by_namespace={
+            "kube-system": [
+                {
+                    "name": "external-dns-6d5b8f7c9-xk2lp",
+                    "labels": {"app.kubernetes.io/name": "external-dns"},
+                    "image": "registry.k8s.io/external-dns/external-dns:v0.15.0",
+                }
+            ]
+        },
+    )
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+    assert caps["external_dns"]["installed"] is True
+
+
 def test_probe_auto_discovers_prometheus_endpoint_from_pod_ip():
     """When Prometheus is detected and the candidate pod has a podIP,
     the probe surfaces ``prometheus_endpoint`` so the metrics resolver

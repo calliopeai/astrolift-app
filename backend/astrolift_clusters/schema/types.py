@@ -281,6 +281,7 @@ def redact_oidc_auth_config(config: dict | None) -> dict | None:
     view = {k: config[k] for k in _OIDC_PUBLIC_KEYS if k in config}
     view["cookie_secret_set"] = bool(config.get("cookie_secret"))
     view["client_secret_set"] = bool(config.get("client_secret"))
+    view["gateway_secret_set"] = bool(config.get("gateway_secret"))
     return view
 
 
@@ -420,6 +421,13 @@ class BootstrapComponentType:
     helm_values: JSON
     requires: list[str]
     options: list[BootstrapOptionType]
+    # The last successful recipe run applied it. It must stay selected: an
+    # operator run deletes the release of every component it is not given.
+    installed_by_recipe: bool = False
+    # The capability probe found it running, and the recipe did not install
+    # it (for example the ALB controller installed by hand into kube-system).
+    # Never pre-selected: a second copy fights the first (#2119).
+    running_outside_recipe: bool = False
 
 
 @strawberry.type(name="AstroliftClusterBootstrapPlan")
@@ -447,8 +455,12 @@ def _bootstrap_option_to_type(opt) -> BootstrapOptionType:
     )
 
 
-def _bootstrap_component_to_type(component) -> BootstrapComponentType:
+def _bootstrap_component_to_type(
+    component, *, installed_by_recipe: bool = False, running_outside_recipe: bool = False
+) -> BootstrapComponentType:
     return BootstrapComponentType(
+        installed_by_recipe=installed_by_recipe,
+        running_outside_recipe=running_outside_recipe,
         key=component.key,
         title=component.title,
         default_enabled=component.default_enabled,
@@ -460,10 +472,19 @@ def _bootstrap_component_to_type(component) -> BootstrapComponentType:
 
 
 def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
+    from astrolift_clusters.recipe_detection import components_installed_by_recipe, components_running
+
+    recipe = components_installed_by_recipe(cluster)
+    outside = components_running(getattr(cluster, "capabilities", None)) - recipe
     return BootstrapPlanType(
         cluster_id=GUID(str(cluster.guid)),
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
-        components=[_bootstrap_component_to_type(c) for c in components],
+        components=[
+            _bootstrap_component_to_type(
+                c, installed_by_recipe=c.key in recipe, running_outside_recipe=c.key in outside
+            )
+            for c in components
+        ],
     )
 
 

@@ -646,10 +646,38 @@ def _apply_edge_oidc_secret(driver: Any, ctx_slug: str, cluster: Any, selected_s
     )
 
 
+def _edge_controllers_for_additive_run(
+    cluster: Any, components: list[Any], selected_set: set[str]
+) -> set[str]:
+    """The controllers the control plane's own edge install brings along (#2130).
+
+    Probed live, not read from the stored capabilities: on a fresh cluster the
+    probe may never have run, and guessing "absent" there would install a
+    second copy of a controller someone put in by hand. A probe that fails
+    raises, so Temporal retries rather than the run going ahead blind.
+    """
+    from astrolift_clusters.edge_install import edge_controllers_to_add
+    from core.cluster_management import probe_cluster_capabilities_dispatch
+    from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY
+
+    if EDGE_COMPONENT_KEY not in selected_set:
+        return set()
+    recipe_keys = {c.key for c in components}
+    capabilities = probe_cluster_capabilities_dispatch(cluster=cluster)
+    added = edge_controllers_to_add(recipe_keys, capabilities)
+    if added:
+        log.info(
+            "install_cluster_prereqs: the edge install adds %s, which the cluster does not run",
+            sorted(added),
+        )
+    return added
+
+
 def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     from astrolift_clusters.models import TenantCluster
     from core.app_deploy import AppDeployError
@@ -668,6 +696,9 @@ def _install_cluster_prereqs_sync(
     components = bootstrap_components_dispatch(cluster=cluster)
     selected_set = set(selected_keys)
     target_namespace = "astrolift-system"
+
+    if additive:
+        selected_set |= _edge_controllers_for_additive_run(cluster, components, selected_set)
 
     # Self-provision the AWS controllers' IRSA roles before their HelmReleases
     # land, so each controller can assume its role as soon as its pods start
@@ -880,6 +911,8 @@ def _install_cluster_prereqs_sync(
     # desired state for selected components.
     deleted: list[str] = []
 
+    # An additive run applies its selection and removes nothing: the other
+    # recipe releases were not deselected, just not part of this run (#2130).
     # Deselected components that had charts (skipped components without
     # chart_repo_url never emitted a HelmRelease, so nothing to delete).
     deselected_releases = [
@@ -906,7 +939,7 @@ def _install_cluster_prereqs_sync(
         for name in to_delete_repos
     ]
 
-    if stale_manifests:
+    if stale_manifests and not additive:
         try:
             del_result = driver.delete_manifests(ctx.slug, target_namespace, stale_manifests)
             deleted = list(del_result.deleted)
@@ -958,8 +991,25 @@ def _install_cluster_prereqs_sync(
             non_retryable=False,
         )
 
+    # What the bootstrap-run row records as the recipe's set. An additive run
+    # added to the recipe rather than replacing it, so it records what it
+    # applied on top of what the last run left. Recording only its own
+    # releases would make the next operator run read every other recipe
+    # release as running outside the recipe, leave it unchecked, and delete it.
+    recorded = applied
+    if additive:
+        from astrolift_clusters.recipe_detection import components_installed_by_recipe
+
+        mine = {a["name"] for a in applied}
+        recorded = applied + [
+            {"name": key, "version": ""}
+            for key in sorted(components_installed_by_recipe(cluster))
+            if key not in mine
+        ]
+
     return {
         "applied": applied,
+        "recorded": recorded,
         "skipped": skipped,
         "deleted": deleted,
         "namespace": target_namespace,
@@ -1058,6 +1108,7 @@ async def install_cluster_prereqs(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     """Apply Flux ``HelmRelease`` CRDs for each selected bootstrap
     component to the cluster. Idempotent — re-run converges; an
@@ -1075,6 +1126,7 @@ async def install_cluster_prereqs(
         cluster_id,
         selected_keys,
         option_overrides,
+        additive,
     )
     log.info(
         "install_cluster_prereqs applied=%d skipped=%d",

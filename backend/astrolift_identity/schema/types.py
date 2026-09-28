@@ -281,6 +281,38 @@ class ApiTokenType:
     last_used_agent: str | None
     is_revoked: bool
     created_at: dt.datetime
+    # What the token can actually do: the permissions its scopes allow that
+    # its owner's roles also grant (#2120). Scopes only ever narrow the owner.
+    effective_permissions: list[str] = strawberry.field(default_factory=list)
+
+
+@strawberry.type(name="AstroliftApiTokenScope")
+class ApiTokenScopeType:
+    """One scope, as the token picker explains it (#2120)."""
+
+    value: str
+    label: str
+    surface: str
+    description: str
+    sensitive: bool
+    permissions: list[str]
+    # Whether the caller's roles grant anything this scope unlocks. A scope
+    # they can never exercise is shown greyed with the reason, not offered.
+    available: bool
+    unavailable_reason: str
+
+
+@strawberry.type(name="AstroliftApiTokenScopePreset")
+class ApiTokenScopePresetType:
+    key: str
+    label: str
+    scopes: list[str]
+
+
+@strawberry.type(name="AstroliftApiTokenScopeCatalog")
+class ApiTokenScopeCatalogType:
+    scopes: list[ApiTokenScopeType]
+    presets: list[ApiTokenScopePresetType]
 
 
 @strawberry.type(name="AstroliftApiTokenPlaintext")
@@ -305,7 +337,17 @@ def api_token_to_type(token) -> ApiTokenType:
         last_used_agent=token.last_used_agent or None,
         is_revoked=token.is_revoked,
         created_at=token.created_at,
+        effective_permissions=token_effective_permissions(token),
     )
+
+
+def token_effective_permissions(token) -> list[str]:
+    """Scopes ∩ the owner's roles in the token's org, sorted."""
+    from astrolift_identity.api_tokens import permissions_for_scopes
+    from core.schema.types.permission_analysis import _held_slugs
+
+    held = set(_held_slugs(token.user, token.organization_id))
+    return sorted(permissions_for_scopes(token.scopes or []) & held)
 
 
 @strawberry.type(name="AstroliftEnrollmentQrPayload")

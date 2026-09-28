@@ -256,6 +256,12 @@ class DeploymentType:
     is the row's ``triggered_by_user``. The approval CTA hides on this
     so a deployer can't approve their own deploy from the UI."""
 
+    status_reason: str = ""
+    """One line saying why the row is where it is (#2123): what a failed
+    deploy died of, or what a pending one is waiting on. Empty for a deploy
+    that is running or has succeeded. The full text stays in
+    ``abortedReason``, ``buildError`` and ``manifestResyncError``."""
+
 
 @strawberry.type(name="AstroliftDeploymentLogEntry")
 class DeploymentLogEntryType:
@@ -515,7 +521,57 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         aborted_reason=getattr(d, "aborted_reason", "") or "",
         triggered_by_user_id=(str(triggered_by_user_id) if triggered_by_user_id is not None else None),
         triggered_by_me=triggered_by_me,
+        status_reason=deployment_status_reason(d),
     )
+
+
+# A pending deploy that has not started this long after it was created has
+# probably lost its worker, not merely queued.
+_STUCK_AFTER_SECONDS = 10 * 60
+
+
+def _first_line(text: str, limit: int = 240) -> str:
+    line = next((ln.strip() for ln in (text or "").splitlines() if ln.strip()), "")
+    return line if len(line) <= limit else line[: limit - 1] + "…"
+
+
+def deployment_status_reason(d) -> str:
+    """Why a deploy is failed or still pending, in one line (#2123)."""
+    from django.utils import timezone
+
+    from astrolift_lifecycle.models import Deployment
+
+    status = d.status
+    if status == Deployment.Status.FAILED:
+        for text in (d.aborted_reason, d.build_error, d.manifest_resync_error):
+            if text:
+                return _first_line(text)
+        return "Failed with no recorded reason. Check the deployment log."
+    if status == Deployment.Status.PENDING_APPROVAL:
+        return f"Waiting for approval: {d.approvals_received} of {d.approvals_required}."
+    if status != Deployment.Status.PENDING:
+        return ""
+    ahead = (
+        Deployment.objects.filter(
+            registered_app_id=d.registered_app_id,
+            app_environment_id=d.app_environment_id,
+            status__in=(Deployment.Status.DEPLOYING, Deployment.Status.REDEPLOYING),
+            created_at__lt=d.created_at,
+            deleted_at__isnull=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if ahead is not None:
+        label = ahead.image_tag or str(ahead.guid)[:8]
+        return f"Queued behind deploy {label}, still {ahead.status}."
+    waited = (timezone.now() - d.created_at).total_seconds()
+    if waited > _STUCK_AFTER_SECONDS:
+        return (
+            f"Not started after {int(waited // 60)} minutes and nothing ahead of it. The deploy "
+            "workflow may not be running: check the worker, then redeploy."
+        )
+    return "Waiting for the deploy workflow to start."
 
 
 # ---------------------------------------------------------------------------

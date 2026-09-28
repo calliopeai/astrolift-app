@@ -60,6 +60,8 @@ class Permission(enum.StrEnum):
     APP_READ_LOGS = "app.read_logs"
     APP_READ_METRICS = "app.read_metrics"
     APP_EXEC_POD = "app.exec_pod"
+    # Who may enter an app behind central auth (#2132).
+    APP_ACCESS = "app.access"
 
     # --- Secrets ---------------------------------------------------
     SECRET_READ = "secret.read"
@@ -109,6 +111,10 @@ class Permission(enum.StrEnum):
     CLUSTER_UPDATE = "cluster.update"
     CLUSTER_UNREGISTER = "cluster.unregister"
     CLUSTER_MANAGE = "cluster.manage"
+    # The users of the cluster's edge identity provider: list, create,
+    # disable, delete, reset password, groups (#2131). Not ``cluster.manage``:
+    # adding a login is a people decision, not an infrastructure one.
+    CLUSTER_USERS = "cluster.users"
     PROVIDER_PLUGIN_READ = "provider_plugin.read"
     PROVIDER_PLUGIN_CONFIGURE = "provider_plugin.configure"
 
