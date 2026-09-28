@@ -4,7 +4,6 @@ import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { CommandPalette } from "@/components/CommandPalette";
 
 import { AppShellContainer } from "./_shell/app-shell";
-import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LiveRegionProvider } from "@/providers/LiveRegion";
 import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
@@ -84,7 +83,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <SkipToContent />
         <AppShellContainer>{children}</AppShellContainer>
         <CommandPalette />
-        <KeyboardShortcuts />
         <ScmCallbackToast />
         <SessionExpiredModal />
         <StepUpPrompt />

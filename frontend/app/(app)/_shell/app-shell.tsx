@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import * as React from "react";
 
 import { ElevationIndicator } from "@/components/ElevationIndicator";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppShell } from "@/components/shell/AppShell";
 import { BrandMark } from "@/components/shell/BrandMark";
@@ -12,6 +13,7 @@ import { MainRail } from "@/components/shell/MainRail";
 import { OrgMenu } from "@/components/shell/OrgMenu";
 import { ProjectsRail } from "@/components/shell/ProjectsRail";
 import { UserMenu } from "@/components/shell/UserMenu";
+import { useKeyboardShortcuts } from "@/components/use-keyboard-shortcuts";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { GET_MY_PROFILE, LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type { AstroliftMyProfile, AstroliftNavTree } from "@/graphql/identity/identity.types";
@@ -44,6 +46,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
   }>(LIST_NAV_TREE, { fetchPolicy: "cache-and-network" });
   const notifications = useMyNotifications();
   const elevation = useElevation();
+  const shortcuts = useKeyboardShortcuts();
 
   const [mainCollapsed, setMainCollapsed] = useRailState("astrolift.shell.main", () => false);
   const [projectsCollapsed, setProjectsCollapsed] = useRailState(
@@ -108,6 +111,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
+      <KeyboardShortcuts {...shortcuts} />
     </AppShell>
   );
 }
