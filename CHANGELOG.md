@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Status colours no longer follow the accent (#2126, spec 35 §A.1). A
+  healthy dot and a running deployment were coloured with the selectable
+  accent, so with the copper, ice, periwinkle or amber accent they turned that
+  colour. `StatusDot`, `DeploymentStatusPill` and `RunStatusBadge` now share
+  one tone map (`lib/status-tones.ts`) built only from the status tokens: ok is
+  the success lime whatever the accent, and in-flight states stop pulsing
+  under reduced motion.
 - Bedrock bindings on an inference profile grant what the call needs (#2137).
   A `model_id` such as `us.anthropic.claude-sonnet-4-6` (or a profile ARN) is
   resolved with `GetInferenceProfile` when the binding is built, and the
