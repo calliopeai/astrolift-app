@@ -40,13 +40,20 @@ const NO_PAGE_FIELD = [
     reason: "astroliftOrganizationAllowlistDomains is an unpaginated list field.",
   },
   {
-    file: "app/(app)/agents/[agentSlug]/components/run-content.tsx",
+    file: "components/screens/agents/detail/AgentRunScreen.tsx",
     reason: "agentTasks is an unpaginated list field.",
   },
   {
-    file: "app/(app)/agents/agents-client.tsx",
-    reason:
-      "Two of its three tables read agentTasks, unpaginated; the third is still on the legacy useListControls.",
+    file: "components/screens/agents/list/ActiveTasksPanel.tsx",
+    reason: "agentTasks is an unpaginated list field.",
+  },
+  {
+    file: "components/screens/agents/list/TaskHistoryPanel.tsx",
+    reason: "agentTasks is an unpaginated list field.",
+  },
+  {
+    file: "components/screens/agents/list/AgentRegistryPanel.tsx",
+    reason: "The registry table is still on the legacy useListControls.",
   },
   {
     file: "components/screens/apps/domains/DomainHandshakeCard.tsx",
@@ -79,11 +86,11 @@ const NO_PAGE_FIELD = [
     reason: "astroliftPipelineSecrets is an unpaginated list field.",
   },
   {
-    file: "app/(app)/settings/identity-provider/identity-provider-client.tsx",
+    file: "components/screens/settings/identity-provider/IdentityProvidersScreen.tsx",
     reason: "astroliftIdentityProviders is an unpaginated list field.",
   },
   {
-    file: "app/(app)/settings/security/security-settings-client.tsx",
+    file: "components/screens/settings/security/SecuritySettings.tsx",
     reason: "astroliftActiveSessions is an unpaginated list field.",
   },
   {
