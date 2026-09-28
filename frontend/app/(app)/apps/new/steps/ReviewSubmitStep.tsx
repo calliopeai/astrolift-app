@@ -9,7 +9,7 @@ import {
 
 import { isCiPushableKind } from "../ci-pushable";
 import type { WizardState } from "../wizard-client";
-import type { WizardStep } from "../components/WizardShell";
+import type { WizardStep } from "@/components/screens/apps/new/WizardShell";
 
 export type { SideEffectStep, StepStatus } from "@/components/screens/apps/new/ReviewSubmitStep";
 

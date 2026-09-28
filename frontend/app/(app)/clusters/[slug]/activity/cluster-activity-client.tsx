@@ -4,7 +4,7 @@ import { ClusterTabFrame } from "@/components/screens/clusters/status/ClusterTab
 import { useClusterBySlug } from "@/components/screens/clusters/status/use-cluster-by-slug";
 
 import { ClusterActivityContainer } from "../../_components/cluster-status-tabs";
-import { ClusterTabs } from "../components/cluster-tabs";
+import { ClusterTabs } from "@/components/screens/clusters/list/ClusterTabs";
 
 /**
  * Cluster activity tab — recent Temporal workflow runs targeting

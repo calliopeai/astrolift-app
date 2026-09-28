@@ -19,7 +19,7 @@ import type { AstroliftPushCiWorkflowResult, ScmConnectionKind } from "@/graphql
 import { isCiPushableKind } from "./ci-pushable";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
-import { WizardShell, type WizardStep } from "./components/WizardShell";
+import { WizardShell, type WizardStep } from "@/components/screens/apps/new/WizardShell";
 import { manifestRawForSubmit } from "./manifest-submit";
 import { AppDetailsStep } from "./steps/AppDetailsStep";
 import { DeployStrategyStep } from "./steps/DeployStrategyStep";

@@ -6,7 +6,7 @@ import { ControlContent } from "./control-content";
 import { ObserveContent } from "./observe-content";
 import { OverviewContent } from "./overview-content";
 import { RunContent } from "./run-content";
-import { SecureContent } from "./secure-content";
+import { AgentSecureScreen as SecureContent } from "@/components/screens/agents/detail/AgentSecure";
 
 export type AgentPillar = "overview" | "build" | "run" | "observe" | "control" | "secure";
 

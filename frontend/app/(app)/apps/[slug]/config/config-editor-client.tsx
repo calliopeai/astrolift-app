@@ -4,7 +4,7 @@ import { ConfigEditorScreen } from "@/components/screens/apps/config/ConfigEdito
 import { useConfigEditor } from "@/components/screens/apps/config/use-config-editor";
 
 import { AppTabs } from "../components/app-tabs";
-import { AgentConfigFormPane } from "./agent-config-form-pane";
+import { AgentConfigFormPane } from "@/components/screens/apps/config/AgentConfigFormPane";
 
 /**
  * App config tab. The screen owns the markup; the agent-config builder pane

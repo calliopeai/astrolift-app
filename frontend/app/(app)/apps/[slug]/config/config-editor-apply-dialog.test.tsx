@@ -102,7 +102,9 @@ vi.mock("../components/app-tabs", () => ({ AppTabs: () => null }));
 vi.mock("@/components/screens/apps/config/ManifestFormPane", () => ({
   ManifestFormPane: () => null,
 }));
-vi.mock("./agent-config-form-pane", () => ({ AgentConfigFormPane: () => null }));
+vi.mock("@/components/screens/apps/config/AgentConfigFormPane", () => ({
+  AgentConfigFormPane: () => null,
+}));
 
 beforeEach(() => {
   state.stagedEnvChanges = [];

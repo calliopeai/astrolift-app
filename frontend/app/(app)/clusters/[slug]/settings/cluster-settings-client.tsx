@@ -16,7 +16,7 @@ import { useClusterAgent } from "@/components/screens/clusters/settings/use-clus
 import { useClusterSettings } from "@/components/screens/clusters/settings/use-cluster-settings";
 import { useIngressAuth } from "@/components/screens/clusters/settings/use-ingress-auth";
 
-import { ClusterTabs } from "../components/cluster-tabs";
+import { ClusterTabs } from "@/components/screens/clusters/list/ClusterTabs";
 
 import { AuthUsersCard } from "./auth-users-card";
 import { CentralAuthCard, IngressClassCard } from "./central-auth-card";

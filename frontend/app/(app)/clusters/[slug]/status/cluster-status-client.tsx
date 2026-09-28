@@ -4,7 +4,7 @@ import { ClusterTabFrame } from "@/components/screens/clusters/status/ClusterTab
 import { useClusterBySlug } from "@/components/screens/clusters/status/use-cluster-by-slug";
 
 import { ClusterStatusContainer } from "../../_components/cluster-status-tabs";
-import { ClusterTabs } from "../components/cluster-tabs";
+import { ClusterTabs } from "@/components/screens/clusters/list/ClusterTabs";
 
 /** Cluster status tab (#68, #808): connection, saturation, health, workflows, lifecycle. */
 export function ClusterStatusClient({ slug }: { slug: string }) {
