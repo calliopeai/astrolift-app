@@ -1,18 +1,11 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
-import { LIST_APPS } from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import type { AstroliftPermission } from "@/lib/permissions/astrolift-permissions";
-import { type ModuleKey, useModules } from "@/graphql/user/user.hooks";
+import type { ModuleKey } from "@/graphql/user/user.hooks";
 
-interface PaletteEntry {
+export interface PaletteEntry {
   label: string;
   href: string;
   group: string;
@@ -39,12 +32,11 @@ interface PaletteEntry {
 // `SHOW_RECENT_DEPLOYS` mirrors that gate for the dynamic "Recent deploys"
 // group (deployments are off-nav in step 1). Flip to `true` alongside the
 // nav's runExtras/observe flag to bring the deploy quick-jumps back.
-const SHOW_RECENT_DEPLOYS = false;
 
 // Quick Actions are imperative shortcuts the operator reaches for
 // constantly — they live at the top of the palette regardless of
 // query so they're always one Cmd-K away.
-const QUICK_ACTIONS: PaletteEntry[] = [
+export const QUICK_ACTIONS: PaletteEntry[] = [
   {
     label: "Register new app",
     href: "/apps/new",
@@ -79,36 +71,119 @@ const QUICK_ACTIONS: PaletteEntry[] = [
 // components/AstroliftNav.tsx; the duplication is small and the
 // palette is searched by free-text rather than the hierarchical nav
 // structure, so a flat list is the right shape.
-const PAGES: PaletteEntry[] = [
+export const PAGES: PaletteEntry[] = [
   // The flat module landings + Dashboard.
   { label: "Dashboard", href: "/dashboard", group: "Pages", keywords: ["overview", "home"] },
   { label: "Apps", href: "/apps", group: "Pages", module: "apps" },
   { label: "Agents", href: "/agents", group: "Pages", module: "agents" },
-  { label: "Workflows", href: "/workflows", group: "Pages", module: "workflows", keywords: ["definitions", "runs", "stages"] },
+  {
+    label: "Workflows",
+    href: "/workflows",
+    group: "Pages",
+    module: "workflows",
+    keywords: ["definitions", "runs", "stages"],
+  },
 
   // Admin — Infra.
-  { label: "Clusters", href: "/clusters", group: "Pages", module: "admin", permission: "cluster.update" },
+  {
+    label: "Clusters",
+    href: "/clusters",
+    group: "Pages",
+    module: "admin",
+    permission: "cluster.update",
+  },
   { label: "Domains", href: "/domains", group: "Pages", module: "admin" },
-  { label: "Providers", href: "/providers", group: "Pages", module: "admin", permission: "cluster.update" },
+  {
+    label: "Providers",
+    href: "/providers",
+    group: "Pages",
+    module: "admin",
+    permission: "cluster.update",
+  },
   { label: "Webhooks", href: "/webhooks", group: "Pages", module: "admin" },
 
   // Admin — Settings (org config + RBAC/governance). Destinations match
   // the sidebar's Admin group; /administration/* is canonical (except
   // /tokens, which stays top-level — shipped #893).
-  { label: "Members", href: "/administration/members", group: "Pages", module: "admin", permission: "org.manage_members" },
-  { label: "Teams", href: "/administration/teams", group: "Pages", module: "admin", permission: "team.read" },
-  { label: "Projects", href: "/administration/projects", group: "Pages", module: "admin", permission: "project.read" },
-  { label: "API Keys", href: "/tokens", group: "Pages", module: "admin", permission: "api_token.create" },
-  { label: "Metrics", href: "/administration/metrics", group: "Pages", module: "admin", permission: "app.read" },
-  { label: "Audit log", href: "/administration/audit", group: "Pages", module: "admin", permission: "audit_log.read" },
+  {
+    label: "Members",
+    href: "/administration/members",
+    group: "Pages",
+    module: "admin",
+    permission: "org.manage_members",
+  },
+  {
+    label: "Teams",
+    href: "/administration/teams",
+    group: "Pages",
+    module: "admin",
+    permission: "team.read",
+  },
+  {
+    label: "Projects",
+    href: "/administration/projects",
+    group: "Pages",
+    module: "admin",
+    permission: "project.read",
+  },
+  {
+    label: "API Keys",
+    href: "/tokens",
+    group: "Pages",
+    module: "admin",
+    permission: "api_token.create",
+  },
+  {
+    label: "Metrics",
+    href: "/administration/metrics",
+    group: "Pages",
+    module: "admin",
+    permission: "app.read",
+  },
+  {
+    label: "Audit log",
+    href: "/administration/audit",
+    group: "Pages",
+    module: "admin",
+    permission: "audit_log.read",
+  },
   { label: "Policies", href: "/administration/policies", group: "Pages", module: "admin" },
-  { label: "Permissions diagnostics", href: "/administration/permissions", group: "Pages", module: "admin", keywords: ["why", "denied", "rbac", "role"] },
-  { label: "Source providers", href: "/providers#source", group: "Pages", module: "admin", keywords: ["github", "scm", "git"] },
-  { label: "Identity provider", href: "/providers#identity", group: "Pages", module: "admin", keywords: ["sso", "oidc", "saml", "idp"] },
-  { label: "Organization", href: "/administration/organization", group: "Pages", module: "admin", permission: "org.update" },
+  {
+    label: "Permissions diagnostics",
+    href: "/administration/permissions",
+    group: "Pages",
+    module: "admin",
+    keywords: ["why", "denied", "rbac", "role"],
+  },
+  {
+    label: "Source providers",
+    href: "/providers#source",
+    group: "Pages",
+    module: "admin",
+    keywords: ["github", "scm", "git"],
+  },
+  {
+    label: "Identity provider",
+    href: "/providers#identity",
+    group: "Pages",
+    module: "admin",
+    keywords: ["sso", "oidc", "saml", "idp"],
+  },
+  {
+    label: "Organization",
+    href: "/administration/organization",
+    group: "Pages",
+    module: "admin",
+    permission: "org.update",
+  },
 
   // Always-visible (no module gate): docs + account pages.
-  { label: "Documentation", href: "/documentation", group: "Pages", keywords: ["docs", "help", "guide", "reference"] },
+  {
+    label: "Documentation",
+    href: "/documentation",
+    group: "Pages",
+    keywords: ["docs", "help", "guide", "reference"],
+  },
   { label: "Profile", href: "/settings/profile", group: "Pages" },
   { label: "Notifications", href: "/settings/notifications", group: "Pages" },
   { label: "Security", href: "/settings/security", group: "Pages" },
@@ -130,52 +205,21 @@ function matches(entry: PaletteEntry, q: string): boolean {
   return false;
 }
 
-interface AppsResp {
-  astroliftApps: AstroliftRegisteredApp[];
-}
-
-interface DeploymentsResp {
-  astroliftDeployments: AstroliftDeployment[];
-}
-
-export function CommandPalette() {
-  const [open, setOpen] = React.useState(false);
+/** Pure (Storybook first): open state and the gated entries come from useCommandPalette. */
+export function CommandPalette({
+  open,
+  onOpenChange: setOpen,
+  entries,
+  onNavigate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  entries: PaletteEntry[];
+  onNavigate: (href: string) => void;
+}) {
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState(0);
-  const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const { can, loading: permsLoading } = useMyPermissions();
-  const { canView, loading: modulesLoading } = useModules();
-
-  // Lazily load the org's apps so first-load doesn't pay for it. We
-  // pre-fetch on first palette open and then keep the cache warm with
-  // a network-only re-fetch each subsequent open — the list is small
-  // (capped at 5 entries shown) so the cost is negligible.
-  const apps = useQuery<AppsResp>(LIST_APPS, { skip: !open });
-  // #700 — fetch the 25 most recent deployments lazily so the palette
-  // can match by commit SHA / message / image tag / app slug. Same
-  // lazy pattern as apps — only fires when the palette is open. Gated by
-  // SHOW_RECENT_DEPLOYS for the step-1 IA (deployments are off-nav), so
-  // we don't even issue the query while the group is hidden.
-  const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { limit: 25 },
-    skip: !open || !SHOW_RECENT_DEPLOYS,
-  });
-
-  // Cmd-K / Ctrl-K toggles the palette. Esc closes via the dialog
-  // backdrop click handler. The keydown is attached at window scope
-  // so it fires regardless of focus position.
-  React.useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   React.useEffect(() => {
     if (open) {
@@ -186,76 +230,7 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  // Recent apps: first five of the org's registered apps. The backend
-  // sort defaults to (-created_at, name) so newer apps surface first
-  // — close enough to "recent activity" for a Cmd-K shortcut without
-  // round-tripping through astroliftEvents.
-  const appEntries = React.useMemo<PaletteEntry[]>(() => {
-    const list = apps.data?.astroliftApps ?? [];
-    return list.slice(0, 5).map((a) => ({
-      label: a.name,
-      href: `/apps/${a.slug}`,
-      group: "Apps",
-      hint: a.slug,
-      keywords: [a.slug, a.teamSlug, a.projectSlug, a.sourceRepo ?? ""].filter(
-        Boolean,
-      ),
-    }));
-  }, [apps.data?.astroliftApps]);
-
-  // #700 — recent deployments as palette entries. Searchable by short
-  // SHA, full SHA, image tag, commit message, author, app slug. Only
-  // shown when the user has typed something — without a query, the
-  // palette already has plenty without 25 deploy rows.
-  const deploymentEntries = React.useMemo<PaletteEntry[]>(() => {
-    const list = deployments.data?.astroliftDeployments ?? [];
-    return list.map((d) => {
-      const shortSha = (d.commitSha ?? "").slice(0, 7);
-      const label = shortSha
-        ? `${d.registeredAppSlug} · ${shortSha}${d.commitMessage ? ` — ${d.commitMessage.slice(0, 60)}` : ""}`
-        : `${d.registeredAppSlug} · ${d.imageTag || d.id.slice(0, 8)}`;
-      return {
-        label,
-        href: `/deployments/${d.id}`,
-        group: "Recent deploys",
-        hint: d.status,
-        keywords: [
-          d.registeredAppSlug,
-          d.commitSha ?? "",
-          shortSha,
-          d.imageTag ?? "",
-          d.commitMessage ?? "",
-          d.commitAuthor ?? "",
-          d.branch ?? "",
-        ].filter(Boolean),
-      };
-    });
-  }, [deployments.data?.astroliftDeployments]);
-
-  const allEntries = React.useMemo<PaletteEntry[]>(
-    () => [...QUICK_ACTIONS, ...appEntries, ...deploymentEntries, ...PAGES],
-    [appEntries, deploymentEntries],
-  );
-
-  const visible = React.useMemo(
-    () =>
-      allEntries
-        .filter((r) => {
-          // Permission-authoritative gating (spec 36): when an entry
-          // carries its own fine permission, that permission is the sole
-          // gate. The module `canView` manifest only reflects the coarse
-          // cluster/org-manage grants, so ANDing it in wrongly hides
-          // entries (cost / quota / audit-read) that a role legitimately
-          // holds. Module `canView` gates only the permission-less
-          // entries — matching the pre-change Can/useMyPermissions
-          // semantics.
-          if (r.permission) return permsLoading || can(r.permission);
-          if (r.module) return modulesLoading || canView(r.module);
-          return true;
-        })
-        .filter((r) => matches(r, query)),
-    [allEntries, query, can, permsLoading, canView, modulesLoading],
-  );
+  const visible = React.useMemo(() => entries.filter((r) => matches(r, query)), [entries, query]);
 
   const grouped = React.useMemo(() => {
     const out = new Map<string, PaletteEntry[]>();
@@ -266,11 +241,9 @@ export function CommandPalette() {
     // Sort sections by SECTION_ORDER, leaving unknowns at the end in
     // insertion order.
     const known = SECTION_ORDER.filter((g) => out.has(g)).map(
-      (g) => [g, out.get(g)!] as [string, PaletteEntry[]],
+      (g) => [g, out.get(g)!] as [string, PaletteEntry[]]
     );
-    const unknown = Array.from(out.entries()).filter(
-      ([g]) => !SECTION_ORDER.includes(g),
-    );
+    const unknown = Array.from(out.entries()).filter(([g]) => !SECTION_ORDER.includes(g));
     return [...known, ...unknown];
   }, [visible]);
 
@@ -281,8 +254,7 @@ export function CommandPalette() {
   if (!open) return null;
 
   function go(href: string) {
-    setOpen(false);
-    router.push(href);
+    onNavigate(href);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -325,13 +297,11 @@ export function CommandPalette() {
         />
         <div className="max-h-[60vh] overflow-y-auto">
           {grouped.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              No matches. Try a different query.
-            </p>
+            <p className="text-muted-foreground p-4 text-sm">No matches. Try a different query.</p>
           ) : (
             grouped.map(([group, routes]) => (
               <div key={group} className="py-1">
-                <div className="text-muted-foreground px-3 py-1 text-2xs font-semibold uppercase tracking-wider">
+                <div className="text-muted-foreground text-2xs px-3 py-1 font-semibold tracking-wider uppercase">
                   {group}
                 </div>
                 <ul>
@@ -344,9 +314,7 @@ export function CommandPalette() {
                           onMouseEnter={() => setActive(idx)}
                           onClick={() => go(r.href)}
                           className={`flex w-full items-center justify-between px-3 py-2 text-sm ${
-                            isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "hover:bg-accent/50"
+                            isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
                           }`}
                         >
                           <span>{r.label}</span>
@@ -362,7 +330,7 @@ export function CommandPalette() {
             ))
           )}
         </div>
-        <div className="text-muted-foreground border-t px-3 py-2 text-2xs">
+        <div className="text-muted-foreground text-2xs border-t px-3 py-2">
           ↑↓ navigate · ↵ open · esc close · ⌘K to toggle
         </div>
       </div>

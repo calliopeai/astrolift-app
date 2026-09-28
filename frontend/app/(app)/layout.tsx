@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
-import { CommandPalette } from "@/components/CommandPalette";
 
 import { AppShellContainer } from "./_shell/app-shell";
 import { LiveRegionProvider } from "@/providers/LiveRegion";
@@ -80,7 +79,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <ActiveOrgProvider>
         <SkipToContent />
         <AppShellContainer>{children}</AppShellContainer>
-        <CommandPalette />
         <ScmCallbackToast />
         <SessionExpiredModal />
       </ActiveOrgProvider>

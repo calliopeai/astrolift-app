@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
+import { CommandPalette } from "@/components/CommandPalette";
 import { ElevationIndicator } from "@/components/ElevationIndicator";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -14,6 +15,7 @@ import { OrgMenu } from "@/components/shell/OrgMenu";
 import { ProjectsRail } from "@/components/shell/ProjectsRail";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
 import { UserMenu } from "@/components/shell/UserMenu";
+import { useCommandPalette } from "@/components/use-command-palette";
 import { useKeyboardShortcuts } from "@/components/use-keyboard-shortcuts";
 import { useStepUp } from "@/components/use-step-up";
 import { useWayfinding } from "@/components/use-wayfinding";
@@ -53,6 +55,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
   const shortcuts = useKeyboardShortcuts();
   const wayfinding = useWayfinding();
   const stepUp = useStepUp();
+  const palette = useCommandPalette();
 
   const [mainCollapsed, setMainCollapsed] = useRailState("astrolift.shell.main", () => false);
   const [projectsCollapsed, setProjectsCollapsed] = useRailState(
@@ -117,6 +120,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
+      <CommandPalette {...palette} />
       <KeyboardShortcuts {...shortcuts} />
       <StepUpPrompt {...stepUp} />
       {/* Read-only help (#1101). Global chrome, not entitlement-gated: the
