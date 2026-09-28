@@ -547,6 +547,20 @@ def _config_for_capability_uncredentialed(
         )
 
     if plugin_slug == "aws":
+        if capability == "identity_users":
+            from aws.identity_users_cognito import CognitoUsersConfig, cognito_pool_from_issuer
+
+            # The pool the edge signs in against, from the cluster's central
+            # auth config (#2131). Not Cognito means the IdP is someone
+            # else's, and there is nothing here to manage.
+            oidc = cluster.oidc_auth_config or {}
+            pool = cognito_pool_from_issuer(str(oidc.get("discovery_url") or ""))
+            if pool is None:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: central auth does not sign in through Amazon Cognito, "
+                    "so its users are managed in that provider",
+                )
+            return CognitoUsersConfig(region=pool[0], pool_id=pool[1])
         if capability == "registry":
             from aws.registry_ecr import ECRConfig
 

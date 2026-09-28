@@ -89,6 +89,7 @@ import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
 import { ClusterTabs } from "../components/cluster-tabs";
 
+import { AuthUsersCard } from "./auth-users-card";
 import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
 
 // The committed codegen output lags the live backend, so the generated
@@ -373,6 +374,10 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
         <IngressClassCard cluster={cluster} />
         <CentralAuthCard cluster={cluster} />
         <IngressAuthCard cluster={cluster} />
+      </Can>
+
+      <Can permission="cluster.users">
+        <AuthUsersCard clusterId={cluster.id} />
       </Can>
 
       <Card>

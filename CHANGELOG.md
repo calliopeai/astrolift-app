@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Manage who can sign in to the apps behind central auth, from cluster
+  settings and `astro auth-users` (#2131). A new `identity_users` driver
+  capability, Amazon Cognito first (Entra ID, Identity Platform and Keycloak
+  are on the availability matrix as planned), lists, creates, disables,
+  enables, deletes and resets users, sets passwords, and manages groups on
+  the install's own pool. Passwords are write-only: no response carries one,
+  the audit log masks them, and a provider error that echoes one is
+  scrubbed. A shared cluster's pool holds every org's logins, so reading it
+  is the platform operator's. New permission `cluster.users` (Cluster Owner)
+  and token scope `manage:auth-users`; `app.access` and `write:app-access`
+  land for #2132.
 - A deploy says why it failed or what it is waiting on (#2123). Each row of an
   app's Deployments tab shows `statusReason`: the abort reason or the first
   line of the build or manifest error for a failed deploy, and for a pending

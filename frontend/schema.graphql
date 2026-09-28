@@ -1400,6 +1400,41 @@ type AstroliftCiWorkflowSyncStatusMutationResult {
   data: AstroliftCiWorkflowSyncStatus
 }
 
+type AstroliftClusterAuthUser {
+  username: String!
+  email: String!
+  enabled: Boolean!
+  status: String!
+  createdAt: DateTime
+  groups: [String!]!
+}
+
+type AstroliftClusterAuthUserChange {
+  username: String!
+  done: Boolean!
+}
+
+type AstroliftClusterAuthUserChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftClusterAuthUserChange
+}
+
+type AstroliftClusterAuthUserMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftClusterAuthUser
+}
+
+type AstroliftClusterAuthUsers {
+  supported: Boolean!
+  reason: String!
+  provider: String!
+  reachNote: String!
+  users: [AstroliftClusterAuthUser!]!
+  groups: [String!]!
+}
+
 type AstroliftClusterBootstrapComponent {
   key: String!
   title: String!
@@ -4577,6 +4612,11 @@ type CloudOrphanType {
   reason: String!
 }
 
+input ClusterAuthUserRefInput {
+  clusterId: GUID!
+  username: String!
+}
+
 type Clusteragentkeyissuedpayload {
   clusterId: GUID!
   agentKey: String!
@@ -4710,6 +4750,20 @@ input CreateApiTokenInput {
   scopes: [String!] = null
   expiresInDays: Int = null
   teamSlug: String = null
+}
+
+input CreateClusterAuthGroupInput {
+  clusterId: GUID!
+  name: String!
+  description: String! = ""
+}
+
+input CreateClusterAuthUserInput {
+  clusterId: GUID!
+  email: String!
+  password: String = null
+  permanent: Boolean! = false
+  groups: [String!]! = []
 }
 
 input CreateDeployTokenInput {
@@ -5600,6 +5654,13 @@ type Mutation {
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
   reissueManagedDomainCert(clusterId: GUID!, zone: String!): ReissueManagedDomainCertPayloadMutationResult!
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
+  createClusterAuthUser(input: CreateClusterAuthUserInput!): AstroliftClusterAuthUserMutationResult!
+  setClusterAuthUserPassword(input: SetClusterAuthUserPasswordInput!): AstroliftClusterAuthUserChangeMutationResult!
+  resetClusterAuthUserPassword(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
+  setClusterAuthUserEnabled(input: SetClusterAuthUserEnabledInput!): AstroliftClusterAuthUserChangeMutationResult!
+  deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
+  setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
+  createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
@@ -6322,6 +6383,7 @@ type Query {
   astroliftClusterCertificates(clusterId: GUID!): AstroliftClusterCertificates!
   astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!
   astroliftDnsCertificates(dnsDriver: String!): AstroliftClusterCertificates!
+  astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftBudgets: [AstroliftBudget!]!
@@ -6896,6 +6958,26 @@ input SetAppSecretMetadataInput {
 input SetAppSubdomainInput {
   id: GUID!
   subdomain: String!
+}
+
+input SetClusterAuthUserEnabledInput {
+  clusterId: GUID!
+  username: String!
+  enabled: Boolean!
+}
+
+input SetClusterAuthUserGroupsInput {
+  clusterId: GUID!
+  username: String!
+  add: [String!]! = []
+  remove: [String!]! = []
+}
+
+input SetClusterAuthUserPasswordInput {
+  clusterId: GUID!
+  username: String!
+  password: String!
+  permanent: Boolean! = false
 }
 
 input SetDomainPathRoutesInput {

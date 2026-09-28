@@ -43,6 +43,10 @@ SCOPE_READ_CLUSTERS = "read:clusters"
 # cluster stay admin-only: those change what the platform runs on.
 SCOPE_WRITE_CLUSTERS = "write:clusters"
 SCOPE_MANAGE_CLUSTERS = "manage:clusters"
+# Logins of a cluster's edge identity provider (#2131), and who may enter an
+# app behind it (#2132).
+SCOPE_MANAGE_AUTH_USERS = "manage:auth-users"
+SCOPE_WRITE_APP_ACCESS = "write:app-access"
 SCOPE_AGENT_ENV_SPEC_WRITE = "agent-env-spec:write"
 SCOPE_PROJECT_WRITE = "project:write"
 SCOPE_SECRET_READ = "secret:read"
@@ -63,6 +67,8 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_READ_CLUSTERS,
         SCOPE_WRITE_CLUSTERS,
         SCOPE_MANAGE_CLUSTERS,
+        SCOPE_MANAGE_AUTH_USERS,
+        SCOPE_WRITE_APP_ACCESS,
         SCOPE_AGENT_ENV_SPEC_WRITE,
         SCOPE_PROJECT_WRITE,
         SCOPE_SECRET_READ,
@@ -115,6 +121,8 @@ CLI_OPERATOR_DEVICE_SCOPES: tuple[str, ...] = (
     *CLI_DEVICE_SCOPES,
     SCOPE_WRITE_CLUSTERS,
     SCOPE_MANAGE_CLUSTERS,
+    SCOPE_MANAGE_AUTH_USERS,
+    SCOPE_WRITE_APP_ACCESS,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
@@ -180,6 +188,10 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     if SCOPE_WRITE_CLUSTERS in scopes and permission == "cluster.update":
         return True
     if SCOPE_MANAGE_CLUSTERS in scopes and permission == "cluster.manage":
+        return True
+    if SCOPE_MANAGE_AUTH_USERS in scopes and permission == "cluster.users":
+        return True
+    if SCOPE_WRITE_APP_ACCESS in scopes and permission == "app.access":
         return True
     if SCOPE_AGENT_ENV_SPEC_WRITE in scopes and permission in {
         "agent_env_spec.create",
@@ -261,6 +273,19 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
         "Run a cluster's recipe install, refresh its management state, reconcile its ingresses.",
     ),
     ScopeInfo(
+        SCOPE_MANAGE_AUTH_USERS,
+        "Manage sign-in users",
+        "clusters",
+        "Create, disable, delete and reset the users of a cluster's central auth, and their groups.",
+        sensitive=True,
+    ),
+    ScopeInfo(
+        SCOPE_WRITE_APP_ACCESS,
+        "Set app access",
+        "apps",
+        "Choose which users and groups may enter an app behind central auth.",
+    ),
+    ScopeInfo(
         SCOPE_SECRET_READ,
         "Reveal secrets",
         "secrets",
@@ -306,7 +331,7 @@ SCOPE_PRESETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "cluster_operator",
         "Cluster operator",
-        (SCOPE_READ_CLUSTERS, SCOPE_WRITE_CLUSTERS, SCOPE_MANAGE_CLUSTERS),
+        (SCOPE_READ_CLUSTERS, SCOPE_WRITE_CLUSTERS, SCOPE_MANAGE_CLUSTERS, SCOPE_MANAGE_AUTH_USERS),
     ),
 )
 """(key, label, scopes). Starting points in the picker, never extra power."""
