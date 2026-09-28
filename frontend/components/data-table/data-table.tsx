@@ -277,19 +277,14 @@ export function DataTable<TRow>({
           <Button variant="ghost" size="sm" onClick={selection.clear}>
             Clear
           </Button>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {bulkActions(selection)}
-          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">{bulkActions(selection)}</div>
         </div>
       )}
 
       {/* Rows persist across a refetch rather than blanking, so fade them
           while they are answering the previous question. */}
       <div
-        className={cn(
-          "rounded-md border transition-opacity",
-          controller.isStale && "opacity-60"
-        )}
+        className={cn("rounded-md border transition-opacity", controller.isStale && "opacity-60")}
         aria-busy={controller.isStale || undefined}
       >
         <Table>
