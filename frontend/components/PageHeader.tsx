@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 
 import { ElevationIndicator } from "@/components/ElevationIndicator";
+import { useElevation } from "@/hooks/use-elevation";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { useMyNotifications } from "@/hooks/use-my-notifications";
 import {
@@ -24,6 +25,7 @@ export const PageHeader = () => {
   const pathname = usePathname();
   // Until the new shell replaces this header, it wires the bell's data itself.
   const notifications = useMyNotifications();
+  const elevation = useElevation();
 
   const segments = pathname.split("/").filter(Boolean);
 
@@ -57,7 +59,7 @@ export const PageHeader = () => {
             ))}
           </BreadcrumbList>
         </Breadcrumb>
-        <ElevationIndicator />
+        <ElevationIndicator {...elevation} />
         <NotificationsBell {...notifications} />
       </div>
     </header>
