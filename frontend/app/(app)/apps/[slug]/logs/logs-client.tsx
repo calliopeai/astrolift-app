@@ -15,6 +15,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { AppLogExportDialog, LogViewer } from "@/components/observability";
+import { useLogExport } from "@/components/observability/use-log-export";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,11 @@ export function LogsClient({ slug }: { slug: string }) {
     podsLoading,
     noPods,
   } = usePodTarget(slug);
+  const logExport = useLogExport({
+    appSlug: slug,
+    podName: selectedPod,
+    container: selectedContainer,
+  });
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
@@ -261,9 +267,8 @@ export function LogsClient({ slug }: { slug: string }) {
       <AppLogExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        appSlug={a.slug}
         podName={selectedPod}
-        container={selectedContainer}
+        {...logExport}
       />
     </PageShell>
   );
