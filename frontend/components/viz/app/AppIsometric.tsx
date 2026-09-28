@@ -474,13 +474,13 @@ export function AppIsometric({
       role="group"
       aria-label={describeApp(snapshot)}
       data-motion={motion}
-      className={cn("w-full overflow-hidden", className)}
+      className={cn("h-full w-full overflow-hidden", className)}
     >
       <svg
         ref={svgRef}
         viewBox={layout.viewBox.map((v) => v.toFixed(1)).join(" ")}
         preserveAspectRatio="xMidYMid meet"
-        className="block h-auto w-full"
+        className="block h-full max-h-[70vh] w-full"
       >
         <g strokeWidth={1} stroke="var(--border)">
           <polygon points={deck.left} fill={shade("var(--card)", 0.35)} />

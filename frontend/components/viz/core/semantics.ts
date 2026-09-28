@@ -41,6 +41,8 @@ export const MOTION_CLASS = {
   phosphor: "viz-phosphor",
   /** Work moving along an edge; speed is set per edge with --viz-flow-duration. */
   flow: "viz-flow",
+  /** An event on a card or row: its outline lit, then fading once. */
+  flash: "viz-flash",
   /** Waiting: a slow breathing pulse (gates pressurizing, queued runs). */
   breathe: "viz-breathe",
 } as const;

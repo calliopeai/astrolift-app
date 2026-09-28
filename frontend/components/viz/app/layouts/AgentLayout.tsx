@@ -240,7 +240,7 @@ export function AgentLayout({
             <h3 className="text-muted-foreground text-2xs mb-1.5 font-mono tracking-wide uppercase">
               Diagram
             </h3>
-            <div className="max-h-64 overflow-hidden rounded-sm border">{diagram}</div>
+            <div className="h-64 overflow-hidden rounded-sm border">{diagram}</div>
           </section>
         )}
       </div>

@@ -119,7 +119,7 @@ export function JobsLayout(props: JobsLayoutProps) {
     >
       <div className="min-w-0">{body}</div>
       {diagram != null && (
-        <div className={cn("min-w-0 overflow-hidden rounded-sm border", wide && "max-h-56")}>
+        <div className={cn("min-w-0 overflow-hidden rounded-sm border", wide && "h-56")}>
           {diagram}
         </div>
       )}

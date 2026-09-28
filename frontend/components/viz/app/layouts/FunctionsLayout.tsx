@@ -159,7 +159,7 @@ export function FunctionsLayout({
         )}
       </svg>
       {diagram != null && (
-        <div className="max-h-56 min-w-0 overflow-hidden rounded-sm border">{diagram}</div>
+        <div className="h-56 min-w-0 overflow-hidden rounded-sm border">{diagram}</div>
       )}
     </div>
   );

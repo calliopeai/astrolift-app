@@ -305,13 +305,13 @@ export function AppGraph({
       role="group"
       aria-label={describeApp(snapshot)}
       data-motion={motion}
-      className={cn("w-full overflow-hidden", className)}
+      className={cn("h-full w-full overflow-hidden", className)}
     >
       <svg
         ref={svgRef}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         preserveAspectRatio="xMidYMin meet"
-        className="block h-auto w-full"
+        className="block h-full max-h-[70vh] w-full"
       >
         {layout.edges.map((path) => (
           <Edge

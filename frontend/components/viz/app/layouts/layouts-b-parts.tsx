@@ -102,7 +102,7 @@ export function Flash({
       aria-hidden
       className={cn(
         "pointer-events-none absolute inset-0 rounded-sm border-2",
-        motion === "full" && MOTION_CLASS.ripple
+        motion === "full" && MOTION_CLASS.flash
       )}
       style={{
         borderColor: color,

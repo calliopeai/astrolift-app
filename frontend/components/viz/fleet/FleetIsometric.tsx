@@ -320,12 +320,12 @@ export function FleetIsometric({
       data-motion={motion}
       role="group"
       aria-label={fleetAriaLabel(summary)}
-      className={cn("relative w-full", className)}
+      className={cn("relative h-full w-full", className)}
     >
       <svg
         viewBox={`${bounds.minX.toFixed(1)} ${bounds.minY.toFixed(1)} ${bounds.width.toFixed(1)} ${bounds.height.toFixed(1)}`}
         preserveAspectRatio="xMidYMid meet"
-        className="block h-auto w-full"
+        className="block h-full max-h-[70vh] w-full"
       >
         <g>
           {platforms.map((p) => {
