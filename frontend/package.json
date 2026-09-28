@@ -38,6 +38,7 @@
     "clsx": "^2.1.1",
     "croner": "^9.1.0",
     "cronstrue": "^2.59.0",
+    "gifenc": "^1.0.3",
     "graphql": "^16.12.0",
     "graphql-ws": "^6.0.8",
     "jwt-decode": "^4.0.0",

@@ -14,10 +14,9 @@ describe("RunReplay", () => {
     expect(screen.getByText(/Slowest stage/).closest("p")!.textContent).toContain(
       "Approve took 6m 20s, 42%"
     );
-    expect(screen.getByRole("button", { name: /export/i })).toHaveAttribute(
-      "title",
-      "GIF export coming"
-    );
+    const exportButton = screen.getByRole("button", { name: /export/i });
+    expect(exportButton).toBeEnabled();
+    expect(exportButton).toHaveAttribute("aria-haspopup", "menu");
   });
 
   it("steps between stage boundaries with the arrow keys", () => {

@@ -1,9 +1,16 @@
 "use client";
 
-import { Download, Pause, Play } from "lucide-react";
+import { Download, Loader2, Pause, Play } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS } from "../core/semantics";
@@ -20,6 +27,7 @@ import {
   stepBoundary,
   type PlacedStage,
 } from "./replay";
+import { canExportVideo, downloadBlob, exportGif, exportVideo, readPalette } from "./replay-export";
 
 /**
  * Run replay (spec 44 viz addendum, workflow styles): a run scrubbed like a
@@ -128,6 +136,8 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
   const headRef = React.useRef<HTMLDivElement>(null);
   const fillRef = React.useRef<HTMLDivElement>(null);
   const clockRef = React.useRef<HTMLSpanElement>(null);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = React.useState<"gif" | "video" | null>(null);
 
   const [playRequested, setPlaying] = React.useState(true);
   // Reduced motion never auto-plays.
@@ -260,6 +270,22 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
     onSelectStage?.(p.stage.id);
   };
 
+  const runExport = async (kind: "gif" | "video") => {
+    if (!rootRef.current || exporting) return;
+    setExporting(kind);
+    try {
+      const colors = readPalette(rootRef.current);
+      const opts = { label: timeline.label };
+      const blob =
+        kind === "gif" ? await exportGif(run, colors, opts) : await exportVideo(run, colors, opts);
+      downloadBlob(blob, `${timeline.runId}-replay.${kind === "gif" ? "gif" : "webm"}`);
+    } catch (e) {
+      toast.error(`Couldn't export the replay: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   const { idx, done } = view;
   const active = idx >= 0 ? run.stages[idx] : null;
   const total = run.total;
@@ -278,6 +304,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
 
   return (
     <div
+      ref={rootRef}
       data-motion={motion}
       role="figure"
       aria-label={describe(timeline, total)}
@@ -489,17 +516,32 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
             </Button>
           ))}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled
-          title="GIF export coming"
-          className="ml-auto"
-        >
-          <Download aria-hidden />
-          Export
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              disabled={exporting !== null || total <= 0}
+            >
+              {exporting ? (
+                <Loader2 aria-hidden className="animate-spin" />
+              ) : (
+                <Download aria-hidden />
+              )}
+              {exporting === "video" ? "Recording…" : exporting === "gif" ? "Encoding…" : "Export"}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => void runExport("gif")}>
+              GIF (6s time-lapse)
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!canExportVideo()} onSelect={() => void runExport("video")}>
+              Video, WebM (6s time-lapse)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
