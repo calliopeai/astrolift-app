@@ -161,10 +161,7 @@ function ProviderCard({
       <CardContent>
         <div className="flex items-center gap-2">
           {isConfigured ? (
-            <Badge
-              className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-              variant="secondary"
-            >
+            <Badge className="bg-success/15 text-success-fg gap-1" variant="secondary">
               <CheckCircle2Icon className="size-3" />
               configured
             </Badge>
@@ -200,7 +197,7 @@ function ProviderRow({ plugin, clusters }: { plugin: AstroliftProviderPlugin; cl
   return (
     <div className="hover:bg-accent/50 flex items-center gap-3 rounded-md border px-4 py-2.5 transition-colors">
       {isConfigured ? (
-        <CheckCircle2Icon className="size-4 shrink-0 text-emerald-600" />
+        <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
       ) : (
         <CloudIcon className="text-muted-foreground size-4 shrink-0" />
       )}

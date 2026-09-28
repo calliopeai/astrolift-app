@@ -175,7 +175,7 @@ export function IdentityProvidersScreen({
                       <div className="flex flex-col items-start gap-1">
                         {idp.isActive ? (
                           <Badge
-                            className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            className="bg-success/15 text-success-fg gap-1"
                             variant="secondary"
                           >
                             <CheckCircle2Icon className="size-3" />

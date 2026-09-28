@@ -238,16 +238,12 @@ export function ClusterDetail({ slug, cluster, loading, renderLiveStats }: Clust
                   <div
                     key={key}
                     className={`flex items-center gap-3 border p-3 ${
-                      installed
-                        ? "border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800/40"
-                        : "border-border bg-muted/30"
+                      installed ? "border-border bg-muted/40" : "border-border bg-muted/30"
                     }`}
                   >
                     <span
                       className={`shrink-0 p-1.5 ${
-                        installed
-                          ? "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
-                          : "bg-muted text-muted-foreground"
+                        installed ? "bg-muted text-foreground" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {meta.icon}

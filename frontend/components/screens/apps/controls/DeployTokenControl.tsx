@@ -119,7 +119,7 @@ export function DeployTokenControlView({
                   size="sm"
                   onClick={onCreate}
                   disabled={creating}
-                  className="gap-1.5 border-amber-400/60 bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+                  className="border-warning-border bg-warning hover:bg-warning/90 gap-1.5 text-white"
                 >
                   {creating ? (
                     <Loader2Icon className="size-3.5 animate-spin" />

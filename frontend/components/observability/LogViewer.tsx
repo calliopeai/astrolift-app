@@ -202,7 +202,7 @@ function segmentLine(
 const POD_BADGE_PALETTE = [
   "border-info-border bg-info/10 text-info-fg",
   "border-success-border bg-success/10 text-success-fg",
-  "border-lime-600/40 bg-lime-500/10 text-lime-700 dark:text-lime-300",
+  "border-success-border bg-success/10 text-success-fg",
   "border-warning-border bg-warning/10 text-warning-fg",
   "border-danger-border bg-danger/10 text-danger-fg",
   "border-border bg-muted text-muted-foreground",
@@ -653,8 +653,8 @@ export function LogViewer({
                     className={cn(
                       "rounded-sm px-0.5",
                       seg.matchIndex === currentMatch
-                        ? "bg-amber-400/70 text-amber-950 ring-1 ring-amber-500 dark:bg-amber-500/80 dark:text-amber-50"
-                        : "bg-yellow-300/40 text-inherit dark:bg-yellow-300/30"
+                        ? "bg-warning/70 text-foreground ring-warning ring-1"
+                        : "bg-warning/40 text-inherit"
                     )}
                   >
                     {seg.text}

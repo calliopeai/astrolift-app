@@ -211,7 +211,7 @@ function RatingWidget({ name, schema, control }: FieldWidgetProps) {
               key={star}
               type="button"
               onClick={() => field.onChange(star)}
-              className={`text-2xl transition-colors ${star <= (field.value || 0) ? "text-warning-fg" : "text-gray-300"}`}
+              className={`text-2xl transition-colors ${star <= (field.value || 0) ? "text-warning-fg" : "text-muted-foreground"}`}
             >
               ★
             </button>
@@ -284,11 +284,13 @@ function FileWidget({ name, schema, control }: FieldWidgetProps) {
                 handleFiles(e.dataTransfer.files);
               }}
               onClick={() => inputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${dragOver ? "border-primary bg-primary/5" : "border-gray-300 hover:border-gray-400"}`}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${dragOver ? "border-primary bg-primary/5" : "border-border hover:border-border"}`}
             >
-              <UploadIcon className="h-8 w-8 text-gray-400" />
-              <span className="text-sm text-gray-500">Drag files here or click to browse</span>
-              {accept && <span className="text-xs text-gray-400">Accepted: {accept}</span>}
+              <UploadIcon className="text-muted-foreground h-8 w-8" />
+              <span className="text-muted-foreground text-sm">
+                Drag files here or click to browse
+              </span>
+              {accept && <span className="text-muted-foreground text-xs">Accepted: {accept}</span>}
             </div>
             <input
               ref={inputRef}
@@ -393,7 +395,7 @@ function SignatureWidget({ name, control }: FieldWidgetProps) {
             <button
               type="button"
               onClick={clear}
-              className="self-start text-xs text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground self-start text-xs"
             >
               Clear signature
             </button>

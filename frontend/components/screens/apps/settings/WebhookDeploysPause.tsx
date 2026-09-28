@@ -191,7 +191,7 @@ export function WebhookDeploysPauseView({
                 void handlePauseConfirm();
               }}
               disabled={pausing}
-              className="bg-amber-600 text-white hover:bg-amber-700"
+              className="bg-warning hover:bg-warning/90 text-white"
             >
               {pausing ? <Loader2Icon className="size-4 animate-spin" /> : null}
               {t("confirmButton")}

@@ -41,7 +41,7 @@ function FlagSwitch({
       onClick={onToggle}
       className={cn(
         "focus-visible:ring-ring relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-        checked ? "bg-emerald-600" : "bg-muted-foreground/30",
+        checked ? "bg-success" : "bg-muted-foreground/30",
         (disabled || pending) && "cursor-not-allowed opacity-50"
       )}
     >

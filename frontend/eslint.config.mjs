@@ -28,6 +28,15 @@ const COLOR_FN = /\b(?:rgb|rgba|hsl|hsla)\(/;
 const TEXT_SIZE = /(?<![\w-])text-\[[0-9.]+px\]/;
 const ROUND_SIZE = /(?<![\w-])rounded-\[[0-9.]+px\]/;
 const VARIANT_HELPERS = new Set(["cva", "tv"]);
+// Tailwind's own palette (bg-emerald-500, text-gray-400): status and chrome
+// colours come from the semantic tokens so a theme or accent change reaches
+// them. Checked in every string, since class maps live in plain objects too.
+const RAW_PALETTE =
+  /(?<![\w-])(?:[a-z-]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|shadow|decoration|accent|caret)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b/;
+// Arbitrary padding, margin and gap in px or rem: use the spacing scale.
+// Positioning (inset, top, left) is geometry, not rhythm, and stays allowed.
+const ARBITRARY_SPACING =
+  /(?<![\w-])-?(?:p|px|py|pt|pb|pl|pr|ps|pe|m|mx|my|mt|mb|ml|mr|ms|me|gap|gap-x|gap-y|space-x|space-y)-\[[0-9.]+(?:px|rem)\]/;
 
 /**
  * Data-surface guardrail (#1231 / epic #1230).
@@ -148,6 +157,10 @@ const designTokensPlugin = {
             "Arbitrary text-[Npx] size. Use the type scale (text-2xs … text-2xl) — see frontend/bootstrap.md.",
           roundSize:
             "Arbitrary rounded-[Npx] radius. Use a radius token (rounded-md … rounded-2xl) — see frontend/bootstrap.md.",
+          palette:
+            "Raw Tailwind palette colour. Use a semantic token (text-success-fg, bg-warning/10, border-danger-border, text-muted-foreground, bg-muted …) — see frontend/bootstrap.md.",
+          spacing:
+            "Arbitrary px/rem padding, margin or gap. Use the spacing scale (p-3, gap-1.5 …).",
         },
         schema: [],
       },
@@ -158,6 +171,10 @@ const designTokensPlugin = {
           if (COLOR_FN.test(text)) context.report({ node, messageId: "colorFn" });
           if (TEXT_SIZE.test(text)) context.report({ node, messageId: "textSize" });
           if (ROUND_SIZE.test(text)) context.report({ node, messageId: "roundSize" });
+          if (ARBITRARY_SPACING.test(text)) context.report({ node, messageId: "spacing" });
+        };
+        const checkPalette = (node, text) => {
+          if (RAW_PALETTE.test(text)) context.report({ node, messageId: "palette" });
         };
         return {
           JSXAttribute(node) {
@@ -168,6 +185,12 @@ const designTokensPlugin = {
             if (node.callee?.type === "Identifier" && VARIANT_HELPERS.has(node.callee.name)) {
               check(node, sourceCode.getText(node));
             }
+          },
+          Literal(node) {
+            if (typeof node.value === "string") checkPalette(node, node.value);
+          },
+          TemplateElement(node) {
+            checkPalette(node, node.value.raw);
           },
         };
       },
@@ -285,6 +308,26 @@ const eslintConfig = defineConfig([
       // `error`: the sweep is done, every call site is a ConfirmDialog, and
       // there is no legitimate reason to add a new one.
       "astroliftData/no-native-confirm": "error",
+    },
+  },
+  // Radix is wrapped once, in components/ui; everything else composes those
+  // primitives so focus, motion and theming stay in one place.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["components/ui/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@radix-ui/*", "radix-ui", "radix-ui/*"],
+              message:
+                "Import the wrapped primitive from @/components/ui instead of Radix directly.",
+            },
+          ],
+        },
+      ],
     },
   },
   // Storybook-first guardrail — see the rule's doc block above.

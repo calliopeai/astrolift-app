@@ -481,8 +481,8 @@ function AppReadinessPill({
 }) {
   const tone: Tone = total === 0 ? "neutral" : ready >= total ? "ok" : ready === 0 ? "bad" : "warn";
   const classes: Record<Tone, string> = {
-    ok: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400",
-    warn: "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400",
+    ok: "bg-success/10 text-success-fg border-success-border",
+    warn: "bg-warning/10 text-warning-fg border-warning-border",
     bad: "bg-destructive/10 text-destructive border-destructive/30",
     neutral: "bg-muted text-muted-foreground border-border",
   };
@@ -717,8 +717,8 @@ function PrometheusUnavailableCard({
       : "Verify the endpoint is accessible from the control plane on port 9090 and that firewall rules allow inbound traffic from the ECS task security group.";
 
   return (
-    <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-      <Icon className="mt-0.5 size-5 shrink-0 text-amber-500" />
+    <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3">
+      <Icon className="text-warning mt-0.5 size-5 shrink-0" />
       <div className="space-y-1">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-muted-foreground text-sm">{body}</p>
@@ -887,10 +887,10 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
   const deficit = row.desiredReplicas - row.readyReplicas;
   const readyTone =
     deficit === 0
-      ? "text-emerald-600"
+      ? "text-success-fg"
       : deficit === row.desiredReplicas
         ? "text-destructive"
-        : "text-amber-600";
+        : "text-warning-fg";
 
   const deployedAge = row.lastImageDeployedAt ? formatRelativeAge(row.lastImageDeployedAt) : null;
 
@@ -901,7 +901,7 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
         {row.readyReplicas} / {row.desiredReplicas}
       </span>
       {row.restartCount24h > 0 ? (
-        <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-500">
+        <Badge variant="outline" className="border-warning-border text-warning-fg">
           {row.restartCount24h} restart{row.restartCount24h === 1 ? "" : "s"}
         </Badge>
       ) : (
@@ -994,8 +994,8 @@ export function StatusLiveHealthCard({
 function PodPhasePill({ phase, count }: { phase: string; count: number }) {
   const tone = POD_PHASE_TONE[phase] ?? "neutral";
   const classes: Record<Tone, string> = {
-    ok: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400",
-    warn: "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400",
+    ok: "bg-success/10 text-success-fg border-success-border",
+    warn: "bg-warning/10 text-warning-fg border-warning-border",
     bad: "bg-destructive/10 text-destructive border-destructive/30",
     neutral: "bg-muted text-muted-foreground border-border",
   };
@@ -1012,7 +1012,7 @@ function PodPhasePill({ phase, count }: { phase: string; count: number }) {
 function EventRow({ event }: { event: ClusterEvent }) {
   const isWarning = event.type === "Warning";
   const Icon = isWarning ? AlertTriangleIcon : InfoIcon;
-  const iconClass = isWarning ? "text-amber-500" : "text-muted-foreground";
+  const iconClass = isWarning ? "text-warning" : "text-muted-foreground";
   const lastSeen = event.lastSeen ? formatRelativeAge(event.lastSeen) : "";
 
   return (
@@ -1107,14 +1107,14 @@ function workflowStatusIcon(status: string): {
   if (norm === "COMPLETED") {
     return {
       Icon: CheckCircle2Icon,
-      iconClass: "text-emerald-600",
+      iconClass: "text-success-fg",
       label: "Completed",
     };
   }
   if (norm === "RUNNING") {
     return {
       Icon: Loader2Icon,
-      iconClass: "animate-spin text-amber-600",
+      iconClass: "animate-spin text-warning-fg",
       label: "Running",
     };
   }
@@ -1167,7 +1167,7 @@ export function StatusLifecycleCard({
 
 function LifecycleRow({ entry }: { entry: AuditRow }) {
   const ts = entry.timestamp ? formatRelativeAge(entry.timestamp) : "";
-  const dotClass = entry.success ? "text-emerald-500" : "text-destructive";
+  const dotClass = entry.success ? "text-success" : "text-destructive";
 
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">

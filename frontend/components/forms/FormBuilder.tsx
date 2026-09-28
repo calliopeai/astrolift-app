@@ -531,11 +531,11 @@ function SortableField({
           type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab text-gray-400 hover:text-gray-600"
+          className="text-muted-foreground hover:text-foreground cursor-grab"
         >
           <GripVerticalIcon className="h-4 w-4" />
         </button>
-        <span className="w-6 text-center text-xs text-gray-400" title={typeInfo?.hint}>
+        <span className="text-muted-foreground w-6 text-center text-xs" title={typeInfo?.hint}>
           {typeInfo?.icon}
         </span>
         <Input
@@ -587,11 +587,15 @@ function SortableField({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-muted-foreground hover:text-foreground"
         >
           {expanded ? <ChevronUpIcon className="h-4 w-4" /> : <SettingsIcon className="h-4 w-4" />}
         </button>
-        <button type="button" onClick={onDuplicate} className="text-gray-400 hover:text-gray-600">
+        <button
+          type="button"
+          onClick={onDuplicate}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <CopyIcon className="h-4 w-4" />
         </button>
         <button

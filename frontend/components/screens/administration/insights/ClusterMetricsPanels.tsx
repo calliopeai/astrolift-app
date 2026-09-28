@@ -251,8 +251,8 @@ function MetricsUnavailableCard({
     : "Verify the endpoint is reachable from the control plane on port 9090.";
 
   return (
-    <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-      <Icon className="mt-0.5 size-5 shrink-0 text-amber-500" />
+    <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3">
+      <Icon className="text-warning mt-0.5 size-5 shrink-0" />
       <div className="space-y-1">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-muted-foreground text-sm">{body}</p>
