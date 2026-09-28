@@ -130,6 +130,8 @@ export function LiveLogTerminal({
     // Scroll + reveal happen once xterm has parsed the chunk. setHasOutput is
     // idempotent — React bails out on the unchanged value after the first line.
     term.write(additions.join("\r\n") + "\r\n", () => {
+      // The chunk can finish parsing after unmount; a disposed xterm throws.
+      if (termRef.current !== term) return;
       if (atBottom) term.scrollToBottom();
       setHasOutput(true);
     });
