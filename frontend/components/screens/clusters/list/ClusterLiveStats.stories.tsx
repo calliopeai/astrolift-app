@@ -4,7 +4,7 @@ import { ClusterLiveStats } from "./ClusterLiveStats";
 import { LIVE_STATS } from "./fixtures";
 
 const meta: Meta = {
-  title: "Screens/Clusters/ClusterLiveStats",
+  title: "Screens/Clusters/List/ClusterLiveStats",
   parameters: { layout: "padded" },
 };
 export default meta;

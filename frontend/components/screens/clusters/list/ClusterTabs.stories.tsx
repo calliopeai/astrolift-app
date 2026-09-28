@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ClusterTabs } from "./ClusterTabs";
 
 const meta: Meta = {
-  title: "Screens/Clusters/ClusterTabs",
+  title: "Screens/Clusters/List/ClusterTabs",
   parameters: { layout: "padded" },
 };
 export default meta;

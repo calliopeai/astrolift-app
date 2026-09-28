@@ -20,16 +20,8 @@ import {
   summarize,
   truncate,
 } from "./layouts-b";
-import {
-  FOCUS_RING,
-  Flash,
-  HealthDot,
-  LoadBar,
-  fmtRps,
-  healthLabel,
-  selectProps,
-  tint,
-} from "./layouts-b-parts";
+import { FOCUS_RING, StatusDot, tint } from "./layout-parts";
+import { Flash, LoadBar, fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
 
 /**
  * Jobs and everything else without a front door (spec 44 viz addendum, auto
@@ -167,7 +159,7 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
             }}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <HealthDot health={job.health} />
+              <StatusDot health={job.health} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium" title={job.name}>
                 {job.name}
               </span>
@@ -256,7 +248,7 @@ function TaskView({ snapshot, onSelectNode }: JobsLayoutProps) {
     >
       <SectionTitle>Run</SectionTitle>
       <div className="flex min-w-0 items-center gap-2">
-        <HealthDot health={job.health} className="size-3" />
+        <StatusDot health={job.health} className="size-3" />
         <span className="min-w-0 flex-1 truncate text-lg font-medium" title={job.name}>
           {job.name}
         </span>
@@ -464,7 +456,7 @@ function MixedView({ snapshot, motion, onSelectNode }: JobsLayoutProps) {
                       motion={motion}
                       color={HEALTH_COLOR.ok}
                     />
-                    <HealthDot health={n.health} />
+                    <StatusDot health={n.health} />
                     <span className="truncate text-xs" title={n.name}>
                       {n.name}
                     </span>

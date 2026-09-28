@@ -18,7 +18,7 @@ const withView: Decorator = (Story, { parameters }) => {
 };
 
 const meta: Meta = {
-  title: "Screens/Clusters/ClustersList",
+  title: "Screens/Clusters/List/ClustersList",
   parameters: { layout: "fullscreen" },
   decorators: [withView],
 };

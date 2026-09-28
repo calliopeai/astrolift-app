@@ -19,7 +19,8 @@ import {
   truncate,
   type FunctionStat,
 } from "./layouts-b";
-import { fmtRps, healthLabel, selectProps, tint } from "./layouts-b-parts";
+import { tint } from "./layout-parts";
+import { fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
 
 /**
  * Functions as an invocation fan-out (spec 44 viz addendum, auto layout for

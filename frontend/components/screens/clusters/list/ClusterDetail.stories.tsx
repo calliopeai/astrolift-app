@@ -5,7 +5,7 @@ import { ClusterLiveStats } from "./ClusterLiveStats";
 import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, detailProps } from "./fixtures";
 
 const meta: Meta = {
-  title: "Screens/Clusters/ClusterDetail",
+  title: "Screens/Clusters/List/ClusterDetail",
   parameters: {
     layout: "fullscreen",
     nextjs: { navigation: { pathname: "/clusters/prd-us-west-2" } },

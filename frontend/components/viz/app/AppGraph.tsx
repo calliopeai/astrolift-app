@@ -5,7 +5,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 import type { AppSnapshot, AppViewProps } from "../core/app-model";
-import { HEALTH_COLOR, MOTION_CLASS, flowDuration, type Health } from "../core/semantics";
+import {
+  HEALTH_COLOR,
+  HEALTH_GLOWS,
+  MOTION_CLASS,
+  flowDuration,
+  type Health,
+} from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
@@ -54,9 +60,9 @@ export const APP_GRAPH_LEGEND: LegendItem[] = [
 
 const tint = (color: string, pct: number) => `color-mix(in oklab, ${color} ${pct}%, var(--card))`;
 
-/** Glow is for state worth noticing: failing or degraded, never the resting state. */
+/** Glow follows HEALTH_GLOWS, the one rule every viz style shares. */
 const alarm = (h: Health): React.CSSProperties | undefined =>
-  h === "failing" || h === "degraded"
+  HEALTH_GLOWS[h]
     ? { filter: `drop-shadow(0 0 4px color-mix(in oklab, ${HEALTH_COLOR[h]} 55%, transparent))` }
     : undefined;
 

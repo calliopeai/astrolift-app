@@ -5,43 +5,15 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 import type { AppNode } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_GLOWS, HEALTH_LABEL, MOTION_CLASS } from "../../core/semantics";
+import { HEALTH_COLOR, HEALTH_LABEL, MOTION_CLASS } from "../../core/semantics";
 
+import { FOCUS_RING, tint } from "./layout-parts";
 import { EVENT_WINDOW_MS, FLASH_MS, recency } from "./layouts-b";
 
 /**
  * Small pieces the layouts-b dashboards share. Each draws one piece of model
  * state and nothing decorative.
  */
-
-export function tint(color: string, pct: number): string {
-  return `color-mix(in oklab, ${color} ${pct}%, transparent)`;
-}
-
-/** Health as a dot; failing flickers, idle is dark. */
-export function HealthDot({
-  health,
-  className,
-}: {
-  health: AppNode["health"];
-  className?: string;
-}) {
-  const color = HEALTH_COLOR[health];
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "inline-block size-2 shrink-0 rounded-full",
-        health === "failing" && MOTION_CLASS.flicker,
-        className
-      )}
-      style={{
-        background: color,
-        boxShadow: HEALTH_GLOWS[health] && health !== "ok" ? `0 0 6px ${color}` : undefined,
-      }}
-    />
-  );
-}
 
 /** Utilisation 0..1 as a filled bar in the node's health colour. */
 export function LoadBar({ node, label = "load" }: { node: AppNode; label?: string }) {
@@ -73,9 +45,6 @@ export function selectProps(id: string, onSelect?: (id: string) => void) {
     },
   };
 }
-
-export const FOCUS_RING =
-  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
 
 /**
  * A ring that expands once when `eventId` changes: the node just got a call

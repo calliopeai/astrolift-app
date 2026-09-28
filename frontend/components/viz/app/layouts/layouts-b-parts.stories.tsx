@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { makeApp } from "../../core/app-model";
 import { HEALTH_COLOR } from "../../core/semantics";
 
-import { Flash, HealthDot, LoadBar, PhosphorDot } from "./layouts-b-parts";
+import { StatusDot } from "./layout-parts";
+import { Flash, LoadBar, PhosphorDot } from "./layouts-b-parts";
 
 const node = makeApp("functions").nodes[2];
 
@@ -11,10 +12,10 @@ function Parts({ motion }: { motion: "full" | "reduced" }) {
   return (
     <div data-motion={motion} className="grid max-w-sm gap-4">
       <div className="flex items-center gap-3">
-        <HealthDot health="ok" />
-        <HealthDot health="degraded" />
-        <HealthDot health="failing" />
-        <HealthDot health="idle" />
+        <StatusDot health="ok" />
+        <StatusDot health="degraded" />
+        <StatusDot health="failing" />
+        <StatusDot health="idle" />
       </div>
       <LoadBar node={node} />
       <LoadBar node={{ ...node, load: 0.97, health: "failing" }} label="concurrency" />

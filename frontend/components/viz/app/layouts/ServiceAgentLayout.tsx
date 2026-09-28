@@ -9,17 +9,8 @@ import { HEALTH_COLOR, MOTION_CLASS, flowDuration } from "../../core/semantics";
 import type { LegendItem } from "../../core/VizLegend";
 
 import { agentFeed, edgeFailing, lastCallByTarget, summarize, truncate } from "./layouts-b";
-import {
-  FOCUS_RING,
-  Flash,
-  HealthDot,
-  LoadBar,
-  PhosphorDot,
-  fmtRps,
-  healthLabel,
-  selectProps,
-  tint,
-} from "./layouts-b-parts";
+import { FOCUS_RING, StatusDot, tint } from "./layout-parts";
+import { Flash, LoadBar, PhosphorDot, fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
 
 /**
  * App and agent, side by side (spec 44 viz addendum, auto layout for the
@@ -253,7 +244,7 @@ function NodeTile({
         color="var(--brand-primary)"
       />
       <div className="flex min-w-0 items-center gap-2">
-        <HealthDot health={node.health} />
+        <StatusDot health={node.health} />
         <span className="min-w-0 flex-1 truncate text-sm" title={node.name}>
           {node.name}
         </span>

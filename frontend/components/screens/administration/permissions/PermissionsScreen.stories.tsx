@@ -18,7 +18,7 @@ import { PermissionsScreen } from "./PermissionsScreen";
 import { RolesView } from "./RolesView";
 
 const meta: Meta = {
-  title: "Screens/Administration/Permissions",
+  title: "Screens/Administration/Permissions/PermissionsScreen",
   parameters: { layout: "fullscreen" },
 };
 export default meta;

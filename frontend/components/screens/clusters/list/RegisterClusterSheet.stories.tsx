@@ -5,7 +5,7 @@ import { REGISTER } from "./fixtures";
 import { RegisterClusterSheet } from "./RegisterClusterSheet";
 
 const meta: Meta = {
-  title: "Screens/Clusters/RegisterClusterSheet",
+  title: "Screens/Clusters/List/RegisterClusterSheet",
   parameters: { layout: "fullscreen" },
 };
 export default meta;

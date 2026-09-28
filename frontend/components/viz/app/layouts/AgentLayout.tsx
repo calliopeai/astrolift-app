@@ -21,7 +21,8 @@ import {
   summarize,
   truncate,
 } from "./layouts-b";
-import { fmtRps, healthLabel, selectProps, tint } from "./layouts-b-parts";
+import { tint } from "./layout-parts";
+import { fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
 
 /**
  * An agent app (spec 44 viz addendum, auto layout for the agent topology).
