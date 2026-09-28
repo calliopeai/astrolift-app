@@ -8,6 +8,7 @@ import type { FleetSnapshot, FleetViewProps } from "./core/fleet-model";
 import { VizFrame } from "./core/VizFrame";
 import type { LegendItem } from "./core/VizLegend";
 import { FLEET_GRAPH_LEGEND, FleetGraph } from "./fleet/FleetGraph";
+import { FLEET_SWARM_LEGEND, FleetSwarm } from "./fleet/FleetSwarm";
 import { FLEET_HEARTBEAT_LEGEND, FleetHeartbeat } from "./fleet/FleetHeartbeat";
 import { FLEET_HIVE_LEGEND, FleetHive } from "./fleet/FleetHive";
 import { FLEET_ISOMETRIC_LEGEND, FleetIsometric } from "./fleet/FleetIsometric";
@@ -26,6 +27,7 @@ export const FLEET_RENDERERS: Record<
   manifest: { Component: FleetManifest, legend: FLEET_MANIFEST_LEGEND },
   isometric: { Component: FleetIsometric, legend: FLEET_ISOMETRIC_LEGEND },
   graph: { Component: FleetGraph, legend: FLEET_GRAPH_LEGEND },
+  swarm: { Component: FleetSwarm, legend: FLEET_SWARM_LEGEND },
   list: { Component: FleetList, legend: FLEET_LIST_LEGEND },
 };
 

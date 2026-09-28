@@ -19,6 +19,7 @@ export const FLEET_VIEWS = {
   manifest: { label: "Manifest", blurb: "The run queue as a departures board" },
   isometric: { label: "Isometric", blurb: "Clusters as platforms, load as height" },
   graph: { label: "Graph", blurb: "A live force graph with dispatch pulses" },
+  swarm: { label: "Swarm", blurb: "Agents swarming their clusters on tendrils" },
   list: { label: "List", blurb: "A plain table" },
 } as const;
 
