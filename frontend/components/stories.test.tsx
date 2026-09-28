@@ -2,7 +2,21 @@
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 
 type ComposedStory = { run: (context?: { canvasElement?: HTMLElement }) => Promise<void> };
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Storybook's Next framework mounts a mock app router; this run has none, so
+// stand one in the same way for components that navigate on click.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({
+    push: () => {},
+    replace: () => {},
+    back: () => {},
+    forward: () => {},
+    refresh: () => {},
+    prefetch: () => {},
+  }),
+}));
 
 import * as preview from "../.storybook/preview";
 
