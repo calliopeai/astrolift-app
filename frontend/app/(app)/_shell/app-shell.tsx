@@ -12,8 +12,10 @@ import { BrandMark } from "@/components/shell/BrandMark";
 import { MainRail } from "@/components/shell/MainRail";
 import { OrgMenu } from "@/components/shell/OrgMenu";
 import { ProjectsRail } from "@/components/shell/ProjectsRail";
+import { StepUpPrompt } from "@/components/StepUpPrompt";
 import { UserMenu } from "@/components/shell/UserMenu";
 import { useKeyboardShortcuts } from "@/components/use-keyboard-shortcuts";
+import { useStepUp } from "@/components/use-step-up";
 import { useWayfinding } from "@/components/use-wayfinding";
 import { WayfindingBubble } from "@/components/WayfindingBubble";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -50,6 +52,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
   const elevation = useElevation();
   const shortcuts = useKeyboardShortcuts();
   const wayfinding = useWayfinding();
+  const stepUp = useStepUp();
 
   const [mainCollapsed, setMainCollapsed] = useRailState("astrolift.shell.main", () => false);
   const [projectsCollapsed, setProjectsCollapsed] = useRailState(
@@ -115,6 +118,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
     >
       {children}
       <KeyboardShortcuts {...shortcuts} />
+      <StepUpPrompt {...stepUp} />
       {/* Read-only help (#1101). Global chrome, not entitlement-gated: the
           people who most need to ask where a thing is are the ones who have
           seen the least of the product. */}

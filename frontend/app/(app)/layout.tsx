@@ -8,7 +8,6 @@ import { LiveRegionProvider } from "@/providers/LiveRegion";
 import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
-import { StepUpPrompt } from "@/components/StepUpPrompt";
 import { getClient } from "@/lib/apollo";
 import { ActiveOrgProvider } from "@/graphql/identity/identity.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
@@ -84,7 +83,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <CommandPalette />
         <ScmCallbackToast />
         <SessionExpiredModal />
-        <StepUpPrompt />
       </ActiveOrgProvider>
     </LiveRegionProvider>
   );
