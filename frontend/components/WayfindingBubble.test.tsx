@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { useWayfinding } from "./use-wayfinding";
 import { WayfindingBubble } from "./WayfindingBubble";
+
+/** The bubble as the shell wires it. */
+function Wired() {
+  return <WayfindingBubble {...useWayfinding()} />;
+}
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -27,7 +33,7 @@ afterEach(() => {
 });
 
 function open() {
-  render(<WayfindingBubble />);
+  render(<Wired />);
   fireEvent.click(screen.getByRole("button", { name: /open help and wayfinding/i }));
 }
 
@@ -40,7 +46,7 @@ function ask(question: string) {
 
 describe("WayfindingBubble", () => {
   it("starts collapsed so it never covers the page uninvited", () => {
-    render(<WayfindingBubble />);
+    render(<Wired />);
 
     expect(screen.getByRole("button", { name: /open help and wayfinding/i })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();

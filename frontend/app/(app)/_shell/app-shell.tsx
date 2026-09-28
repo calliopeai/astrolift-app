@@ -14,6 +14,8 @@ import { OrgMenu } from "@/components/shell/OrgMenu";
 import { ProjectsRail } from "@/components/shell/ProjectsRail";
 import { UserMenu } from "@/components/shell/UserMenu";
 import { useKeyboardShortcuts } from "@/components/use-keyboard-shortcuts";
+import { useWayfinding } from "@/components/use-wayfinding";
+import { WayfindingBubble } from "@/components/WayfindingBubble";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { GET_MY_PROFILE, LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type { AstroliftMyProfile, AstroliftNavTree } from "@/graphql/identity/identity.types";
@@ -47,6 +49,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
   const notifications = useMyNotifications();
   const elevation = useElevation();
   const shortcuts = useKeyboardShortcuts();
+  const wayfinding = useWayfinding();
 
   const [mainCollapsed, setMainCollapsed] = useRailState("astrolift.shell.main", () => false);
   const [projectsCollapsed, setProjectsCollapsed] = useRailState(
@@ -112,6 +115,10 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
     >
       {children}
       <KeyboardShortcuts {...shortcuts} />
+      {/* Read-only help (#1101). Global chrome, not entitlement-gated: the
+          people who most need to ask where a thing is are the ones who have
+          seen the least of the product. */}
+      <WayfindingBubble {...wayfinding} />
     </AppShell>
   );
 }
