@@ -99,7 +99,9 @@ vi.mock("@/components/ConfirmDialog", () => ({
 }));
 
 vi.mock("../components/app-tabs", () => ({ AppTabs: () => null }));
-vi.mock("./manifest-form-pane", () => ({ ManifestFormPane: () => null }));
+vi.mock("@/components/screens/apps/config/ManifestFormPane", () => ({
+  ManifestFormPane: () => null,
+}));
 vi.mock("./agent-config-form-pane", () => ({ AgentConfigFormPane: () => null }));
 
 beforeEach(() => {

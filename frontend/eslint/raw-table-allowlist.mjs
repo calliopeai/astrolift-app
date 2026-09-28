@@ -49,16 +49,16 @@ const NO_PAGE_FIELD = [
       "Two of its three tables read agentTasks, unpaginated; the third is still on the legacy useListControls.",
   },
   {
-    file: "app/(app)/apps/[slug]/domains/domains-client.tsx",
+    file: "components/screens/apps/domains/DomainHandshakeCard.tsx",
     reason: "All three tables read astroliftAppDomains, an unpaginated list field.",
   },
   {
-    file: "app/(app)/apps/[slug]/observability/observability-client.tsx",
+    file: "components/screens/apps/tools/ObservabilityScreen.tsx",
     reason:
       "The pod table reads astroliftAppPods, unpaginated. The alert-rule and alert-event tables beside it are Page-capable and could move independently.",
   },
   {
-    file: "app/(app)/apps/[slug]/secrets/secrets-client.tsx",
+    file: "components/screens/apps/secrets/SecretsScreen.tsx",
     reason:
       "astroliftAppSecrets and astroliftAppSecretBundleAttachments are unpaginated list fields.",
   },
@@ -121,16 +121,16 @@ const NO_PAGE_FIELD = [
  */
 const NOT_A_SERVER_COLLECTION = [
   {
-    file: "app/(app)/apps/[slug]/managed-services/email-detail-sheet.tsx",
+    file: "components/screens/apps/managed-services/EmailDetailSheet.tsx",
     reason:
       "Four tables over arrays nested in the astroliftEmailServiceDetail payload (suppressions, messages, templates) — no collection of their own.",
   },
   {
-    file: "app/(app)/apps/[slug]/security/security-client.tsx",
+    file: "components/screens/apps/security/AppSecurityScreen.tsx",
     reason: "Findings are derived and sorted in the client from the app's event stream.",
   },
   {
-    file: "app/(app)/apps/[slug]/workloads/[workloadSlug]/workload-detail-client.tsx",
+    file: "components/screens/apps/workloads/WorkloadDetailScreen.tsx",
     reason: "Pod-status buckets, containers and probes all render off the single workload payload.",
   },
   {
@@ -158,7 +158,7 @@ const NOT_A_SERVER_COLLECTION = [
  */
 const UNSUPPORTED_ROW_SHAPE = [
   {
-    file: "app/(app)/apps/[slug]/deployments/deployments-client.tsx",
+    file: "components/screens/apps/deployments/AppDeploymentsScreen.tsx",
     reason:
       "Rows expand into a full-width detail panel row. DataTable's column model has no row-expansion slot, so migrating means designing one first.",
   },

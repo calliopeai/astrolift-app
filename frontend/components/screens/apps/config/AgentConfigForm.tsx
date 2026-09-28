@@ -3,7 +3,7 @@
 /**
  * Schema-driven visual editor for an agent config repo's astrolift.toml (#1172).
  *
- * Sibling to `manifest-form.tsx` (the app manifest builder): same controlled
+ * Sibling to `ManifestForm.tsx` (the app manifest builder): same controlled
  * `onChange`-bubbles-a-new-model discipline, same collapsible list→detail
  * sub-editors, same field primitives — but for the agent library schema
  * (`astrolift_version` + `[skills.<slug>]` / `[tools.<slug>]` + `[environment]`).
@@ -26,11 +26,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Section } from "@/components/ui/section";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,7 +51,7 @@ import {
   SelectField,
   TextField,
   ToggleField,
-} from "./manifest-fields";
+} from "./ManifestFields";
 
 type Props = {
   model: AgentConfigModel;
@@ -464,7 +460,9 @@ export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => patch({ skills: [...model.skills, emptySkill(`skill-${model.skills.length + 1}`)] })}
+            onClick={() =>
+              patch({ skills: [...model.skills, emptySkill(`skill-${model.skills.length + 1}`)] })
+            }
           >
             <PlusIcon className="size-3.5" /> {t("addSkill")}
           </Button>
@@ -484,7 +482,9 @@ export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
                 skill={s}
                 index={i}
                 errors={errors}
-                onChange={(next) => patch({ skills: model.skills.map((x, j) => (j === i ? next : x)) })}
+                onChange={(next) =>
+                  patch({ skills: model.skills.map((x, j) => (j === i ? next : x)) })
+                }
                 onRemove={() => patch({ skills: model.skills.filter((_, j) => j !== i) })}
               />
             ))}
@@ -500,7 +500,9 @@ export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => patch({ tools: [...model.tools, emptyTool(`tool-${model.tools.length + 1}`)] })}
+            onClick={() =>
+              patch({ tools: [...model.tools, emptyTool(`tool-${model.tools.length + 1}`)] })
+            }
           >
             <PlusIcon className="size-3.5" /> {t("addTool")}
           </Button>
@@ -516,7 +518,9 @@ export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
                 tool={tool}
                 index={i}
                 errors={errors}
-                onChange={(next) => patch({ tools: model.tools.map((x, j) => (j === i ? next : x)) })}
+                onChange={(next) =>
+                  patch({ tools: model.tools.map((x, j) => (j === i ? next : x)) })
+                }
                 onRemove={() => patch({ tools: model.tools.filter((_, j) => j !== i) })}
               />
             ))}
@@ -528,7 +532,7 @@ export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
         <Section title={t("preserved")} description={t("preservedHint")}>
           <div className="flex flex-wrap gap-1.5">
             {preservedKeys.map((k) => (
-              <Badge key={k} variant="outline" className="font-mono text-2xs">
+              <Badge key={k} variant="outline" className="text-2xs font-mono">
                 {k}
               </Badge>
             ))}
