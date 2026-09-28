@@ -1533,14 +1533,26 @@
         "statusFailed": "failed",
         "lastAction": "{action} · {when}",
         "actionLabels": {
-          "connection.reveal": "Connection revealed",
-          "test_email.send": "Test email sent"
+          "connection": {
+            "reveal": "Connection revealed"
+          },
+          "test_email": {
+            "send": "Test email sent"
+          }
         },
         "actions": {
-          "connection.reveal": "View connection details",
-          "objects.list": "List recent objects",
-          "email.send": "Send test email",
-          "queue.depth": "View queue depth"
+          "connection": {
+            "reveal": "View connection details"
+          },
+          "objects": {
+            "list": "List recent objects"
+          },
+          "email": {
+            "send": "Send test email"
+          },
+          "queue": {
+            "depth": "View queue depth"
+          }
         },
         "revealDialog": {
           "title": "Connection details · {name}",
