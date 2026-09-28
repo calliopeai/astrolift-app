@@ -6,6 +6,8 @@ import * as React from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/hooks/use-confirm";
 import messages from "@/messages/en.json";
+import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
+import { PermissionsProvider } from "@/providers/PermissionsProvider";
 
 import "../app/globals.css";
 
@@ -22,7 +24,11 @@ function AppProviders({
   globals: Record<string, string>;
   children: React.ReactNode;
 }) {
-  const { ground, accent, density, mode } = globals;
+  const { ground, accent, density, mode, permissions } = globals;
+  const granted = React.useMemo(
+    () => new Set<string>(permissions === "none" ? [] : ASTROLIFT_PERMISSIONS),
+    [permissions]
+  );
   React.useEffect(() => {
     const root = document.documentElement;
     root.dataset.ground = ground;
@@ -33,13 +39,15 @@ function AppProviders({
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <MockedProvider mocks={[]}>
-        <TooltipProvider>
-          <ConfirmProvider>
-            <div className="bg-background text-foreground min-h-screen p-6 font-sans">
-              {children}
-            </div>
-          </ConfirmProvider>
-        </TooltipProvider>
+        <PermissionsProvider value={{ granted, loading: false }}>
+          <TooltipProvider>
+            <ConfirmProvider>
+              <div className="bg-background text-foreground min-h-screen p-6 font-sans">
+                {children}
+              </div>
+            </ConfirmProvider>
+          </TooltipProvider>
+        </PermissionsProvider>
       </MockedProvider>
     </NextIntlClientProvider>
   );
@@ -63,8 +71,15 @@ const preview: Preview = {
     ground: toolbar("Ground", ["black", "charcoal", "emerald", "paper", "mist"]),
     accent: toolbar("Accent", ["green", "copper", "ice", "periwinkle", "amber"]),
     density: toolbar("Density", ["compact", "cards"]),
+    permissions: toolbar("Permissions", ["all", "none"]),
   },
-  initialGlobals: { mode: "dark", ground: "black", accent: "green", density: "compact" },
+  initialGlobals: {
+    mode: "dark",
+    ground: "black",
+    accent: "green",
+    density: "compact",
+    permissions: "all",
+  },
   parameters: {
     layout: "fullscreen",
     a11y: { test: "error" },

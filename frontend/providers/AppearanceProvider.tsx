@@ -52,7 +52,7 @@ export function AppearanceProvider({
 
   const { value, locked } = React.useMemo(
     () => resolveAppearance(hydrated ? personal : null, orgPolicy),
-    [hydrated, personal, orgPolicy],
+    [hydrated, personal, orgPolicy]
   );
 
   React.useEffect(() => {
@@ -68,7 +68,7 @@ export function AppearanceProvider({
         return next;
       });
     },
-    [locked],
+    [locked]
   );
 
   // Reset means "I have no preference", not "my preference is the shipped
@@ -85,7 +85,7 @@ export function AppearanceProvider({
 
   const ctx = React.useMemo(
     () => ({ appearance: value, locked, setAppearance, reset, setPolicy }),
-    [value, locked, setAppearance, reset, setPolicy],
+    [value, locked, setAppearance, reset, setPolicy]
   );
 
   return <AppearanceContext.Provider value={ctx}>{children}</AppearanceContext.Provider>;
