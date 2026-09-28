@@ -185,6 +185,16 @@ def test_a_client_secret_only_env_keeps_an_operator_set_cookie_secret(aws_plugin
     assert cluster.oidc_auth_config["cookie_secret"] == "operator-cookie"
 
 
+def test_a_restart_keeps_an_operator_set_jwks_uri(aws_plugin, monkeypatch, started):
+    cluster = _register(monkeypatch, ENVOY_ENV)
+    cluster.oidc_auth_config = {**cluster.oidc_auth_config, "jwks_uri": "https://keys.example.net/jwks"}
+    cluster.save(update_fields=["oidc_auth_config"])
+
+    cluster = _register(monkeypatch, ENVOY_ENV)
+
+    assert cluster.oidc_auth_config["jwks_uri"] == "https://keys.example.net/jwks"
+
+
 # ---- an existing install is left exactly as it is -------------------------
 
 

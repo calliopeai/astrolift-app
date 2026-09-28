@@ -542,6 +542,14 @@ class Command(BaseCommand):
             if _proxy_args:
                 oidc_auth_config["proxy_extra_args"] = _proxy_args
 
+            # ``jwks_uri`` -- where the Envoy edge reads signing keys, for a
+            # provider not serving them at <issuer>/.well-known/jwks.json. An
+            # installer-declared config would otherwise drop it on every start
+            # and the edge's next render would verify against nothing (#2130).
+            _jwks_uri = _env("ASTROLIFT_CLUSTER_OIDC_JWKS_URI") or _existing_oidc.get("jwks_uri")
+            if _jwks_uri:
+                oidc_auth_config["jwks_uri"] = _jwks_uri
+
             # Startup must not erase the logout URL set by an operator.
             _logout_url = _env("ASTROLIFT_CLUSTER_OIDC_LOGOUT_URL") or _existing_oidc.get("logout_url")
             if _logout_url:
