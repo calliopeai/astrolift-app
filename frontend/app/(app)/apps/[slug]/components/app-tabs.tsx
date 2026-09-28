@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-import { DetailPageTabs } from "@/components/DetailPageTabs";
+import { type DetailTab, DetailTabRow, EDGE_FADE } from "@/components/DetailPageTabs";
+import { cn } from "@/lib/utils";
 
 import { useAppChrome } from "./app-chrome-context";
 
@@ -263,22 +265,65 @@ export function AppTabs({ slug, active }: AppTabsProps) {
   const current = PILLARS.find((p) => p.key === activePillar) ?? PILLARS[1];
 
   return (
-    <DetailPageTabs
-      pillars={PILLARS.map((pillar) => ({
-        key: pillar.key,
-        // Land on the pillar's first sub-tab; Run leads with Overview.
-        href: pillar.subs[0].href(basePath, slug),
-        label: t(`pillars.${pillar.label}`),
-        active: pillar.key === activePillar,
-      }))}
-      pillarsAriaLabel={t("pillarAriaLabel")}
-      tabs={current.subs.map((sub) => ({
-        key: sub.label,
-        href: sub.href(basePath, slug),
-        label: t(sub.label),
-        active: sub.label === activeSub,
-      }))}
-      tabsAriaLabel={t("ariaLabel")}
-    />
+    <div className="-mx-6 min-w-0">
+      <AppPillarBar
+        pillars={PILLARS.map((pillar) => ({
+          key: pillar.key,
+          // Land on the pillar's first sub-tab; Run leads with Overview.
+          href: pillar.subs[0].href(basePath, slug),
+          label: t(`pillars.${pillar.label}`),
+          active: pillar.key === activePillar,
+        }))}
+        ariaLabel={t("pillarAriaLabel")}
+      />
+      <DetailTabRow
+        tabs={current.subs.map((sub) => ({
+          key: sub.label,
+          href: sub.href(basePath, slug),
+          label: t(sub.label),
+          active: sub.label === activeSub,
+        }))}
+        ariaLabel={t("ariaLabel")}
+      />
+    </div>
+  );
+}
+
+/**
+ * BROCS pillars as a segmented mode switcher, above a row of sub-tabs. Local to
+ * the app detail until its migration to one row of tabs by function (spec 44
+ * §5.2, §10.5), which removes it.
+ *
+ * Contained chips read as "which layer am I in", categorically distinct from
+ * the underline tabs below; two stacked underline rows were indistinguishable
+ * at a glance. Mono uppercase because BROCS is the brand vocabulary, and each
+ * initial carries the brand colour: the five of them spell BROCS. The initial
+ * is split inside one element so the accessible name is still the whole word.
+ */
+function AppPillarBar({ pillars, ariaLabel }: { pillars: DetailTab[]; ariaLabel: string }) {
+  return (
+    <nav
+      aria-label={ariaLabel}
+      className={cn("scrollbar-none flex min-w-0 gap-1 overflow-x-auto px-6 pt-1 pb-2", EDGE_FADE)}
+    >
+      <div className="bg-muted/40 border-border flex shrink-0 gap-0.5 rounded-sm border p-0.5">
+        {pillars.map((pillar) => (
+          <Link
+            key={pillar.key}
+            href={pillar.href}
+            aria-current={pillar.active ? "page" : undefined}
+            className={cn(
+              "shrink-0 rounded-sm px-3.5 py-1.5 font-mono text-sm font-medium tracking-wider uppercase transition-colors",
+              pillar.active
+                ? "text-foreground bg-[var(--brand-primary)]/12 shadow-[inset_0_0_0_1px_var(--brand-primary)]"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            <span className="text-[var(--brand-primary)]">{pillar.label.charAt(0)}</span>
+            {pillar.label.slice(1)}
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }

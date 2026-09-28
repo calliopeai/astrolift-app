@@ -23,22 +23,13 @@ describe("DetailPageTabs", () => {
     expect(within(nav).getByRole("link", { name: "Health" })).toHaveAttribute("href", "/x/health");
   });
 
-  it("keeps the whole pillar word as the link's name while its initial carries the brand", () => {
+  it("renders one row of tabs named by function", () => {
     render(
-      <DetailPageTabs
-        pillars={[tab("build"), tab("run", true)]}
-        pillarsAriaLabel="Pillars"
-        tabs={[tab("overview", true)]}
-        tabsAriaLabel="Run pages"
-      />
+      <DetailPageTabs ariaLabel="App pages" tabs={[tab("overview", true), tab("deployments")]} />
     );
-    const pillars = screen.getByRole("navigation", { name: "Pillars" });
+    const nav = screen.getByRole("navigation", { name: "App pages" });
 
-    expect(within(pillars).getByRole("link", { name: "Run" })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-    expect(screen.getByRole("navigation", { name: "Run pages" })).toBeInTheDocument();
+    expect(within(nav).getAllByRole("link")).toHaveLength(2);
   });
 
   it("lets a long label shrink inside its container rather than widen it", () => {
