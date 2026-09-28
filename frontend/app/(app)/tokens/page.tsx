@@ -1,3 +1,4 @@
+import { AdministrationShell } from "@/components/screens/administration/organization/AdministrationShell";
 import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
@@ -13,13 +14,10 @@ export const metadata = { title: "API keys · Astrolift" };
 // away — instead of stranding the operator on a page with no way back.
 export default function TokensPage() {
   return (
-    <div className="flex flex-1 flex-col">
-      <AdministrationSubnav />
-      <div className="flex-1">
-        <PreloadQuery query={LIST_API_TOKENS}>
-          <TokensClient />
-        </PreloadQuery>
-      </div>
-    </div>
+    <AdministrationShell subnav={<AdministrationSubnav />}>
+      <PreloadQuery query={LIST_API_TOKENS}>
+        <TokensClient />
+      </PreloadQuery>
+    </AdministrationShell>
   );
 }

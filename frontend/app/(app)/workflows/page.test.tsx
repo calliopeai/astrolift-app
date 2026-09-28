@@ -142,15 +142,6 @@ vi.mock("./instances-panel", () => ({
   WorkflowInstancesPanel: () => <div>Temporal instances panel</div>,
 }));
 
-vi.mock("./[slug]/components/workflow-detail-shell", () => ({
-  formatTriggerKind: (value: string) => value,
-}));
-
-vi.mock("./[slug]/components/run-content", () => ({
-  latestRun: () => null,
-  RunStateBadge: ({ state: value }: { state: string }) => <span>{value}</span>,
-}));
-
 describe("WorkflowsPage repository topology", () => {
   beforeEach(() => {
     state.tab = "";

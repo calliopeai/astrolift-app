@@ -3,7 +3,7 @@
 import { AssignmentsView } from "@/components/screens/administration/permissions/AssignmentsView";
 import { useAssignments } from "@/components/screens/administration/permissions/use-assignments";
 
-import { GrantRoleDialog } from "@/app/(app)/members/grant-role-dialog";
+import { GrantRoleDialog } from "@/components/screens/members/GrantRoleDialog";
 
 /** Mounted only while the Assignments tab is shown, so its queries run only then. */
 export function AssignmentsTab() {

@@ -1,14 +1,12 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import { PageShell } from "@/components/PageShell";
-import {
-  GitOpsCommitTimeline,
-  WorkflowTimeline,
-  type GitOpsCommit,
-  type WorkflowActivity,
-  type WorkflowRunSummary,
+import type {
+  GitOpsCommit,
+  WorkflowActivity,
+  WorkflowRunSummary,
 } from "@/components/observability";
+import { PlaygroundObservabilityScreen } from "@/components/screens/playground/PlaygroundObservabilityScreen";
 
 import { isRouteEnabled } from "@/lib/route-flags";
 
@@ -19,11 +17,13 @@ const DEMO_RUN: WorkflowRunSummary = {
   status: "failed",
   startedAt: "2026-05-09T18:42:11.123Z",
   endedAt: "2026-05-09T18:43:02.987Z",
-  errorMessage: "Activity ApplyManifest failed after 3 attempts (last error: 503 from cluster api-server)",
+  errorMessage:
+    "Activity ApplyManifest failed after 3 attempts (last error: 503 from cluster api-server)",
   errorStack: `Workflow execution failed
   at ApplyManifest:attempt-3
   at DeployAppWorkflow:execute (workflows/deploy_app.py:142)`,
-  temporalUiUrl: "http://localhost:8233/namespaces/default/workflows/deploy-app:acme%2Feng%2Fapi:abc12/01934f7c-deef-7e29-aafd-dac74e7ad913",
+  temporalUiUrl:
+    "http://localhost:8233/namespaces/default/workflows/deploy-app:acme%2Feng%2Fapi:abc12/01934f7c-deef-7e29-aafd-dac74e7ad913",
 };
 
 const DEMO_ACTIVITIES: WorkflowActivity[] = [
@@ -32,21 +32,42 @@ const DEMO_ACTIVITIES: WorkflowActivity[] = [
     name: "FetchManifest",
     status: "succeeded",
     durationMs: 412,
-    attempts: [{ attemptNumber: 1, startedAt: "2026-05-09T18:42:11.200Z", endedAt: "2026-05-09T18:42:11.612Z", status: "succeeded" }],
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: "2026-05-09T18:42:11.200Z",
+        endedAt: "2026-05-09T18:42:11.612Z",
+        status: "succeeded",
+      },
+    ],
   },
   {
     id: "act-2",
     name: "RenderManifest",
     status: "succeeded",
     durationMs: 1230,
-    attempts: [{ attemptNumber: 1, startedAt: "2026-05-09T18:42:11.700Z", endedAt: "2026-05-09T18:42:12.930Z", status: "succeeded" }],
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: "2026-05-09T18:42:11.700Z",
+        endedAt: "2026-05-09T18:42:12.930Z",
+        status: "succeeded",
+      },
+    ],
   },
   {
     id: "act-3",
     name: "ResolveSecrets",
     status: "succeeded",
     durationMs: 320,
-    attempts: [{ attemptNumber: 1, startedAt: "2026-05-09T18:42:13.000Z", endedAt: "2026-05-09T18:42:13.320Z", status: "succeeded" }],
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: "2026-05-09T18:42:13.000Z",
+        endedAt: "2026-05-09T18:42:13.320Z",
+        status: "succeeded",
+      },
+    ],
   },
   {
     id: "act-4",
@@ -54,8 +75,20 @@ const DEMO_ACTIVITIES: WorkflowActivity[] = [
     status: "failed",
     durationMs: 49500,
     attempts: [
-      { attemptNumber: 1, startedAt: "2026-05-09T18:42:13.500Z", endedAt: "2026-05-09T18:42:30.500Z", status: "failed", errorMessage: "503 from cluster api-server" },
-      { attemptNumber: 2, startedAt: "2026-05-09T18:42:35.000Z", endedAt: "2026-05-09T18:42:52.000Z", status: "failed", errorMessage: "503 from cluster api-server" },
+      {
+        attemptNumber: 1,
+        startedAt: "2026-05-09T18:42:13.500Z",
+        endedAt: "2026-05-09T18:42:30.500Z",
+        status: "failed",
+        errorMessage: "503 from cluster api-server",
+      },
+      {
+        attemptNumber: 2,
+        startedAt: "2026-05-09T18:42:35.000Z",
+        endedAt: "2026-05-09T18:42:52.000Z",
+        status: "failed",
+        errorMessage: "503 from cluster api-server",
+      },
       {
         attemptNumber: 3,
         startedAt: "2026-05-09T18:42:57.000Z",
@@ -110,24 +143,12 @@ export default function ObservabilityPlaygroundPage() {
   if (!isRouteEnabled("/playground")) notFound();
 
   return (
-    <PageShell
-      title="Observability components"
-      description="Demo of WorkflowTimeline (spec 06 §8) and GitOpsCommitTimeline (spec 07 §12). Real data wires in via the deployment-detail and workflow-detail pages."
-    >
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Workflow run</h2>
-        <WorkflowTimeline
-          run={DEMO_RUN}
-          activities={DEMO_ACTIVITIES}
-          onCancel={() => alert("Cancel run")}
-          onRetryActivity={(id) => alert(`Retry activity ${id}`)}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">GitOps commit timeline</h2>
-        <GitOpsCommitTimeline commits={DEMO_COMMITS} />
-      </section>
-    </PageShell>
+    <PlaygroundObservabilityScreen
+      run={DEMO_RUN}
+      activities={DEMO_ACTIVITIES}
+      commits={DEMO_COMMITS}
+      onCancel={() => alert("Cancel run")}
+      onRetryActivity={(id) => alert(`Retry activity ${id}`)}
+    />
   );
 }

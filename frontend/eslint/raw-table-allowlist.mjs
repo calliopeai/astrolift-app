@@ -70,19 +70,19 @@ const NO_PAGE_FIELD = [
       "astroliftAppSecrets and astroliftAppSecretBundleAttachments are unpaginated list fields.",
   },
   {
-    file: "app/(app)/domains/domains-client.tsx",
+    file: "components/screens/domains/ManagedDomainsScreen.tsx",
     reason: "astroliftManagedDomains is an unpaginated list field.",
   },
   {
-    file: "app/(app)/environments/environments-client.tsx",
+    file: "components/screens/environments/EnvironmentsScreen.tsx",
     reason: "astroliftEnvironments is an unpaginated list field.",
   },
   {
-    file: "app/(app)/metrics/metrics-client.tsx",
+    file: "components/screens/metrics/MetricsScreen.tsx",
     reason: "astroliftAppHealthSummary is an unpaginated list field.",
   },
   {
-    file: "app/(app)/pipelines/[id]/secrets-tab.tsx",
+    file: "components/screens/pipelines/PipelineSecrets.tsx",
     reason: "astroliftPipelineSecrets is an unpaginated list field.",
   },
   {
@@ -94,7 +94,7 @@ const NO_PAGE_FIELD = [
     reason: "astroliftActiveSessions is an unpaginated list field.",
   },
   {
-    file: "app/(app)/teams/[slug]/team-members-panel.tsx",
+    file: "components/screens/teams/TeamMembersPanel.tsx",
     reason: "astroliftTeamMembers is an unpaginated list field.",
   },
   {
@@ -146,15 +146,15 @@ const NOT_A_SERVER_COLLECTION = [
       "One table iterates the static CAPABILITY_KEYS constant; another iterates installedReleases nested in a bootstrap run.",
   },
   {
-    file: "app/(app)/documentation/configuration/page.tsx",
+    file: "components/screens/documentation/ConfigurationScreen.tsx",
     reason: "A static environment-variable reference. The page issues no query.",
   },
   {
-    file: "app/(app)/documentation/drivers/drivers-client.tsx",
+    file: "components/screens/documentation/DriversScreen.tsx",
     reason: "A capability matrix computed by crossing provider plugins with registered clusters.",
   },
   {
-    file: "app/(app)/projects/[slug]/project-detail-client.tsx",
+    file: "components/screens/projects/ProjectDetailScreen.tsx",
     reason:
       "The agents table is a client-side join across three queries; only the apps table beside it is a server collection.",
   },

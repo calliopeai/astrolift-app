@@ -1,9 +1,9 @@
 "use client";
 
 import { notFound, useParams, useRouter } from "next/navigation";
-import { DynamicForm } from "@/components/forms/DynamicForm";
-import { useDynamicForm } from "@/components/forms/use-dynamic-form";
 
+import { useDynamicForm } from "@/components/forms/use-dynamic-form";
+import { FormSubmitScreen } from "@/components/screens/forms/FormSubmitScreen";
 import { isRouteEnabled } from "@/lib/route-flags";
 
 export default function FormSubmitPage() {
@@ -14,14 +14,12 @@ export default function FormSubmitPage() {
   const form = useDynamicForm(slug);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <DynamicForm
-        slug={slug}
-        {...form}
-        onSuccess={() => {
-          setTimeout(() => router.push(`/forms/${slug}`), 2000);
-        }}
-      />
-    </div>
+    <FormSubmitScreen
+      slug={slug}
+      {...form}
+      onSuccess={() => {
+        setTimeout(() => router.push(`/forms/${slug}`), 2000);
+      }}
+    />
   );
 }
