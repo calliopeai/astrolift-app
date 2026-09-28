@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { HEALTH_COLOR } from "./semantics";
-import { VizLegend } from "./VizLegend";
+import { VizLegend, WORKFLOW_SHAPE_LEGEND } from "./VizLegend";
 
 const meta: Meta<typeof VizLegend> = {
   title: "Viz/Core/VizLegend",
@@ -42,4 +42,12 @@ export const LongLabels: Story = {
       },
     ],
   },
+};
+
+/** The loop, round, fanout, supervisor and nested-workflow encodings. */
+export const WorkflowShapes: Story = {
+  args: { items: Object.values(WORKFLOW_SHAPE_LEGEND) },
+};
+export const WorkflowShapesReduced: Story = {
+  args: { items: Object.values(WORKFLOW_SHAPE_LEGEND), motion: "reduced" },
 };

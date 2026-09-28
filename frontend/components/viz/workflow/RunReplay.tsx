@@ -14,17 +14,20 @@ import {
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS } from "../core/semantics";
-import type { LegendItem } from "../core/VizLegend";
+import { WORKFLOW_SHAPE_LEGEND, type LegendItem } from "../core/VizLegend";
 import type { RunTimeline } from "../core/workflow-model";
 
 import {
   STAGE_HEALTH,
   formatClock,
   formatDuration,
+  laneState,
   placeRun,
+  roundAt,
   slowestStage,
   stageIndexAt,
   stepBoundary,
+  type PlacedRun,
   type PlacedStage,
 } from "./replay";
 import { canExportVideo, downloadBlob, exportGif, exportVideo, readPalette } from "./replay-export";
@@ -41,8 +44,15 @@ import { canExportVideo, downloadBlob, exportGif, exportVideo, readPalette } fro
  * finished replay) and scrubbing or the arrow keys jump the playhead
  * instantly.
  *
+ * A run that looped is grouped by round: a band over the track names each
+ * round, a mark (a button that jumps there) shows where each loop sent work
+ * back, and the rounds are listed in words under the track ("Round 2: Code,
+ * Test failed"). A fan-out's branches run as parallel bars under the main
+ * track, each lighting and settling on its own times.
+ *
  * The playhead position is written to the DOM from refs on each animation
- * frame; React state changes only when the playhead crosses a stage boundary.
+ * frame; React state changes only when the playhead crosses a stage or branch
+ * boundary.
  */
 
 export interface RunReplayProps {
@@ -63,7 +73,22 @@ export const RUN_REPLAY_LEGEND: LegendItem[] = [
   { glyph: "glow", color: HEALTH_COLOR.failing, label: "Failed" },
   { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Gate waiting (breathes)" },
   { glyph: "ring", color: HEALTH_COLOR.idle, label: "Not reached or skipped" },
+  {
+    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
+    label: "Loop mark: where a loop sent work back and the next round began",
+  },
+  { ...WORKFLOW_SHAPE_LEGEND.roundBadge, label: "Round band: which round each stretch belongs to" },
+  {
+    glyph: "bar",
+    color: HEALTH_COLOR.ok,
+    label: "Parallel bars: a fan-out's branches, each on its own times",
+  },
 ];
+
+/** Main track height, and the branch bars under it, px. */
+const MAIN_H = 56;
+const LANE_GAP = 6;
+const LANE_H = 10;
 
 const SPEEDS = [1, 10, 60] as const;
 type Speed = (typeof SPEEDS)[number];
@@ -105,18 +130,40 @@ function gateNote(p: PlacedStage, reached: boolean, done: boolean): string | nul
   return `${p.stage.status === "failed" ? "denied" : "approved"} by ${p.stage.decidedBy}`;
 }
 
-function describe(timeline: RunTimeline, total: number): string {
-  const n = timeline.stages.length;
-  const failed = timeline.stages.filter((s) => s.status === "failed").length;
-  const waiting = timeline.stages.filter((s) => s.status === "waiting").length;
+function describe(timeline: RunTimeline, run: PlacedRun): string {
+  const main = timeline.stages.filter((s) => !s.branchId);
+  const n = main.length;
+  const failed = main.filter((s) => s.status === "failed").length;
+  const waiting = main.filter((s) => s.status === "waiting").length;
   const span =
     timeline.finishedAt === null
-      ? `running for ${formatDuration(total)}`
-      : `took ${formatDuration(total)}`;
+      ? `running for ${formatDuration(run.total)}`
+      : `took ${formatDuration(run.total)}`;
   const parts = [`${n} stage${n === 1 ? "" : "s"}`];
+  if (run.rounds.length > 1) parts.push(`${run.rounds.length} rounds`);
+  if (run.marks.length)
+    parts.push(`sent back ${run.marks.length} time${run.marks.length === 1 ? "" : "s"}`);
+  if (run.lanes) parts.push(`${run.lanes} parallel branches`);
   if (failed) parts.push(`${failed} failed`);
   if (waiting) parts.push(`${waiting} waiting at a gate`);
   return `Run ${timeline.label}: ${parts.join(", ")}, ${span}`;
+}
+
+/** "failed", or "rejected" for a gate, as a round's summary says it. */
+function outcomeWord(stage: PlacedStage["stage"]): string | null {
+  if (stage.status === "failed") return stage.kind === "gate" ? "rejected" : "failed";
+  if (stage.status === "waiting") return "waiting";
+  if (stage.status === "running") return "running";
+  if (stage.status === "skipped") return "skipped";
+  return null;
+}
+
+/** Every branch bar's state at `t`, as one key, so React re-renders only when one changes. */
+function laneKey(run: PlacedRun, t: number): string {
+  if (!run.lanes) return "";
+  let key = "";
+  for (const p of run.stages) if (p.lane > 0) key += laneState(p, t)[0];
+  return key;
 }
 
 export function RunReplay({ timeline, motion, now, onSelectStage, className }: RunReplayProps) {
@@ -146,7 +193,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
   const speedRef = React.useRef<Speed>(speed);
   const [view, setView] = React.useState(() => {
     const idx = stageIndexAt(run, t0);
-    return { idx, done: idx >= 0 && t0 >= run.stages[idx].end };
+    return { idx, done: idx >= 0 && t0 >= run.stages[idx].end, lanes: laneKey(run, t0), t: t0 };
   });
   const viewRef = React.useRef(view);
 
@@ -179,8 +226,10 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       }
     }
     if (clockRef.current) clockRef.current.textContent = formatClock(t);
-    if (viewRef.current.idx !== idx || viewRef.current.done !== done) {
-      viewRef.current = { idx, done };
+    const lanes = laneKey(r, t);
+    const v = viewRef.current;
+    if (v.idx !== idx || v.done !== done || v.lanes !== lanes) {
+      viewRef.current = { idx, done, lanes, t };
       setView(viewRef.current);
     }
   }, []);
@@ -288,6 +337,9 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
 
   const { idx, done } = view;
   const active = idx >= 0 ? run.stages[idx] : null;
+  const looped = run.rounds.length > 1;
+  const currentRound = active ? (active.stage.round ?? 1) : (roundAt(run, view.t)?.round ?? null);
+  const trackH = MAIN_H + (run.lanes ? LANE_GAP + run.lanes * LANE_H : 0);
   const total = run.total;
   const pctOf = (ms: number) => (total > 0 ? (ms / total) * 100 : 0);
   const ticks = [0, 0.25, 0.5, 0.75, 1];
@@ -307,7 +359,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       ref={rootRef}
       data-motion={motion}
       role="figure"
-      aria-label={describe(timeline, total)}
+      aria-label={describe(timeline, run)}
       onKeyDown={onKeyDown}
       className={cn("bg-card flex min-w-0 flex-col gap-3 p-4 text-sm", className)}
     >
@@ -345,6 +397,12 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
                 {active.stage.name}
               </span>
               <span className="text-muted-foreground"> · {status}</span>
+              {looped && (
+                <span className="text-muted-foreground font-mono">
+                  {" "}
+                  · round {active.stage.round ?? 1}
+                </span>
+              )}
               {note && <span className="text-muted-foreground font-mono"> · {note}</span>}
             </>
           ) : (
@@ -353,9 +411,61 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
         </span>
       </div>
 
+      {looped && (
+        <div className="relative h-5" aria-label="Rounds on the track">
+          {run.rounds.map((r) => (
+            <span
+              key={r.round}
+              aria-hidden
+              className={cn(
+                "text-2xs absolute top-0 truncate border-l pl-2.5 font-mono leading-5",
+                r.round === currentRound ? "text-foreground" : "text-muted-foreground"
+              )}
+              style={{
+                left: `${pctOf(r.start)}%`,
+                width: `${pctOf(r.end - r.start)}%`,
+                borderColor: r.causeIndex !== null ? HEALTH_COLOR.degraded : "var(--border)",
+              }}
+            >
+              Round {r.round}
+            </span>
+          ))}
+          {run.marks.map((m) => (
+            <button
+              key={m.index}
+              type="button"
+              aria-label={`Round ${m.round}: ${m.reason}, sent back to ${m.to}. Jump here`}
+              title={`${m.reason}, back to ${m.to} (round ${m.round})`}
+              onClick={() => {
+                setPlaying(false);
+                seek(m.at);
+              }}
+              className="focus-visible:ring-ring absolute top-0.5 z-10 flex size-4 -translate-x-1/2 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
+              style={{ left: `${pctOf(m.at)}%`, background: "var(--card)" }}
+            >
+              <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden>
+                <path
+                  d="M10 8 C10 2 3 2 3 6"
+                  fill="none"
+                  stroke={HEALTH_COLOR.degraded}
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M1 4 L3 7 L5 4"
+                  fill="none"
+                  stroke={HEALTH_COLOR.degraded}
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div
         ref={trackRef}
-        className="relative h-14 cursor-pointer touch-none select-none"
+        className="relative cursor-pointer touch-none select-none"
+        style={{ height: trackH }}
         onPointerDown={(e) => {
           dragRef.current = true;
           setPlaying(false);
@@ -374,6 +484,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
         }}
       >
         {run.stages.map((p, i) => {
+          if (p.lane > 0) return null;
           const state: SegmentState =
             p.stage.status === "skipped"
               ? "skipped"
@@ -390,8 +501,9 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           const gate = gateNote(p, reached, state === "settled");
           const dur = formatDuration(p.end - p.start);
           const tip = [
-            `${p.stage.name} (${p.stage.kind}): ${p.stage.status}, ${dur}`,
+            `${p.stage.name} (${p.stage.kind}${looped ? `, round ${p.stage.round ?? 1}` : ""}): ${p.stage.status}, ${dur}`,
             p.stage.decidedBy ? `decided by ${p.stage.decidedBy}` : null,
+            p.stage.causedBy ? `sent back: ${p.stage.causedBy.reason}` : null,
           ]
             .filter(Boolean)
             .join(", ");
@@ -411,7 +523,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
                 }
               }}
               className={cn(
-                "focus-visible:ring-ring absolute top-0 flex h-full flex-col justify-center overflow-hidden rounded-sm border px-1.5 outline-none focus-visible:z-10 focus-visible:ring-2",
+                "focus-visible:ring-ring absolute top-0 flex h-14 flex-col justify-center overflow-hidden rounded-sm border px-1.5 outline-none focus-visible:z-10 focus-visible:ring-2",
                 holding && MOTION_CLASS.breathe
               )}
               style={{
@@ -438,10 +550,52 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
             </div>
           );
         })}
+        {run.stages.map((p) => {
+          if (p.lane === 0) return null;
+          const state = laneState(p, view.t);
+          const dur = formatDuration(p.end - p.start);
+          const tip = `${p.stage.name} (branch): ${p.stage.status}, ${dur}`;
+          return (
+            <div
+              key={p.stage.id}
+              data-stage={p.stage.id}
+              role="button"
+              tabIndex={0}
+              aria-label={tip}
+              title={tip}
+              onClick={() => onSelectStage?.(p.stage.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.stopPropagation();
+                  selectStage(p);
+                }
+              }}
+              className="focus-visible:ring-ring absolute rounded-sm border outline-none focus-visible:z-10 focus-visible:ring-2"
+              style={{
+                top: MAIN_H + LANE_GAP + (p.lane - 1) * LANE_H,
+                height: LANE_H - 2,
+                left: `${pctOf(p.start)}%`,
+                width: `${pctOf(p.end - p.start)}%`,
+                minWidth: 2,
+                transition,
+                ...segmentStyle(p, state),
+              }}
+            />
+          );
+        })}
+        {run.marks.map((m) => (
+          // Where the loop sent work back: a line through the track at that moment.
+          <div
+            key={m.index}
+            aria-hidden
+            className="pointer-events-none absolute top-0 z-10 h-full w-px"
+            style={{ left: `${pctOf(m.at)}%`, background: HEALTH_COLOR.degraded }}
+          />
+        ))}
         <div
           ref={fillRef}
           aria-hidden
-          className="pointer-events-none absolute top-0 h-full"
+          className="pointer-events-none absolute top-0 h-14"
           style={{ display: "none" }}
         />
         <div
@@ -485,6 +639,67 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           <span className="font-mono">{formatDuration(slow.ms)}</span>,{" "}
           <span className="font-mono">{Math.round(slow.share * 100)}%</span> of the run
         </p>
+      )}
+
+      {looped && (
+        <ol aria-label="Rounds" className="flex flex-col gap-1 text-xs">
+          {run.rounds.map((r) => {
+            const stages = run.stages.filter(
+              (p) => p.lane === 0 && (p.stage.round ?? 1) === r.round
+            );
+            const cause = r.causeIndex !== null ? run.stages[r.causeIndex].stage.causedBy : null;
+            const current = r.round === currentRound;
+            return (
+              <li
+                key={r.round}
+                aria-current={current ? "step" : undefined}
+                className={cn(
+                  "flex min-w-0 flex-wrap items-baseline gap-x-1.5",
+                  !current && "text-muted-foreground"
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlaying(false);
+                    seek(r.start);
+                  }}
+                  className="focus-visible:ring-ring rounded-sm font-mono font-medium outline-none focus-visible:ring-2"
+                >
+                  Round {r.round}
+                </button>
+                {cause && (
+                  <span className="text-muted-foreground">
+                    (sent back: <span style={{ color: HEALTH_COLOR.degraded }}>{cause.reason}</span>
+                    )
+                  </span>
+                )}
+                <span className="min-w-0">
+                  <span aria-hidden>: </span>
+                  {stages.map((p, k) => {
+                    const word = outcomeWord(p.stage);
+                    return (
+                      <React.Fragment key={p.stage.id}>
+                        {k > 0 && ", "}
+                        {p.stage.name}
+                        {word && (
+                          <span
+                            style={{
+                              color: HEALTH_COLOR[STAGE_HEALTH[p.stage.status]],
+                            }}
+                          >
+                            {" "}
+                            {word}
+                          </span>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
 
       <div className="flex flex-wrap items-center gap-2">

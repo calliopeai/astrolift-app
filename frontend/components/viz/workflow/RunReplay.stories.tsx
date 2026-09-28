@@ -2,9 +2,9 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useSimulation } from "../core/use-simulation";
 import { VizLegend } from "../core/VizLegend";
-import { makeTimeline, type RunTimeline } from "../core/workflow-model";
+import { makeFeatureTimeline, makeTimeline, type RunTimeline } from "../core/workflow-model";
 
-import { makeLiveRun, stepLiveRun } from "./replay";
+import { makeFanoutTimeline, makeLiveRun, stepLiveRun } from "./replay";
 import { RUN_REPLAY_LEGEND, RunReplay, type RunReplayProps } from "./RunReplay";
 
 const NOW = Date.UTC(2026, 8, 28, 14, 0, 0);
@@ -116,3 +116,26 @@ export const Large: Story = { args: { timeline: largeTimeline() } };
 export const Reduced: Story = { args: { motion: "reduced" } };
 
 export const LongStrings: Story = { args: { timeline: longStrings() } };
+
+/** Feature delivery went round three times (Test failed twice, Review rejected once), then shipped. */
+export const Rounds: Story = { args: { timeline: makeFeatureTimeline({ now: NOW }) } };
+
+/** Research digest fanned out to six sources: parallel bars under the track, one failed. */
+export const FanOut: Story = { args: { timeline: makeFanoutTimeline({ now: NOW }) } };
+
+/** The rounds still: opens settled, every round listed and every loop mark in place. */
+export const RoundsReduced: Story = {
+  args: { timeline: makeFeatureTimeline({ now: NOW }), motion: "reduced" },
+};
+
+export const RoundsNarrow: Story = {
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <Shell {...args} timeline={makeFeatureTimeline({ now: NOW })} />
+    </div>
+  ),
+};
+
+export const FanOutReduced: Story = {
+  args: { timeline: makeFanoutTimeline({ now: NOW }), motion: "reduced" },
+};

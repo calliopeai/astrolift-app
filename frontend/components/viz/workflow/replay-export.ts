@@ -2,13 +2,24 @@
 
 import { HEALTH_COLOR } from "../core/semantics";
 
-import { STAGE_HEALTH, formatClock, formatDuration, stageIndexAt, type PlacedRun } from "./replay";
+import {
+  STAGE_HEALTH,
+  formatClock,
+  formatDuration,
+  laneState,
+  roundAt,
+  stageIndexAt,
+  type PlacedRun,
+  type PlacedStage,
+} from "./replay";
 
 /**
  * Export a run replay as a GIF or a WebM video. The on-screen replay is HTML,
  * so frames are painted here from the same placed run onto an offscreen
  * canvas: the export shows exactly the replay's states (stages lighting as the
- * playhead enters, settling to their outcome), time-lapsed to `seconds`.
+ * playhead enters, settling to their outcome), time-lapsed to `seconds`. A
+ * run that looped carries its round band and the marks where loops sent work
+ * back; a fan-out's branches are parallel bars under the track.
  */
 
 export interface ExportOptions {
@@ -18,6 +29,14 @@ export interface ExportOptions {
   /** Length of the exported time-lapse. */
   seconds?: number;
   fps?: number;
+}
+
+const BRANCH_GAP = 6;
+const BRANCH_H = 10;
+
+/** Canvas height for a run: the base, plus room for its branch bars. */
+export function exportHeight(run: PlacedRun, base: number): number {
+  return base + (run.lanes ? BRANCH_GAP + run.lanes * BRANCH_H : 0);
 }
 
 /** Playhead positions for each frame, ending on the finished run. */
@@ -83,11 +102,16 @@ export function drawFrame(
   ctx.fillText(clock, w - pad - ctx.measureText(clock).width, 34);
 
   const idx = stageIndexAt(run, t);
-  run.stages.forEach((p, i) => {
+  const paint = (
+    p: PlacedStage,
+    y: number,
+    hgt: number,
+    active: boolean,
+    settled: boolean,
+    showText: boolean
+  ) => {
     const x0 = x(p.start);
     const width = Math.max(2, x(p.end) - x0);
-    const settled = i < idx || (i === idx && t >= p.end);
-    const active = i === idx && !settled;
     const skipped = p.stage.status === "skipped";
     const outcome = colors[STAGE_HEALTH[p.stage.status]];
     const live = p.stage.kind === "gate" ? colors.degraded : colors.ok;
@@ -95,30 +119,86 @@ export function drawFrame(
 
     ctx.globalAlpha = skipped ? 0 : active ? 0.2 : settled ? 0.28 : 0.08;
     ctx.fillStyle = color;
-    ctx.fillRect(x0, trackY, width, trackH);
+    ctx.fillRect(x0, y, width, hgt);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = active || settled ? color : colors.border;
     ctx.setLineDash(skipped ? [4, 3] : []);
     ctx.lineWidth = 1;
-    ctx.strokeRect(x0 + 0.5, trackY + 0.5, width - 1, trackH - 1);
+    ctx.strokeRect(x0 + 0.5, y + 0.5, width - 1, hgt - 1);
     ctx.setLineDash([]);
 
-    if (width > 40) {
+    if (showText && width > 40) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x0 + 4, trackY, width - 8, trackH);
+      ctx.rect(x0 + 4, y, width - 8, hgt);
       ctx.clip();
       ctx.fillStyle = active || settled ? colors.fg : colors.muted;
       ctx.font = `${p.stage.kind === "gate" ? 600 : 400} 12px system-ui, sans-serif`;
-      ctx.fillText(p.stage.name, x0 + 6, trackY + 26);
+      ctx.fillText(p.stage.name, x0 + 6, y + 26);
       if (active || settled) {
         ctx.fillStyle = colors.muted;
         ctx.font = `11px ${MONO}`;
-        ctx.fillText(formatDuration(Math.min(t, p.end) - p.start), x0 + 6, trackY + 44);
+        ctx.fillText(formatDuration(Math.min(t, p.end) - p.start), x0 + 6, y + 44);
       }
       ctx.restore();
     }
+  };
+
+  const branchY = trackY + trackH + BRANCH_GAP;
+  run.stages.forEach((p, i) => {
+    if (p.lane > 0) {
+      const state = laneState(p, t);
+      paint(
+        p,
+        branchY + (p.lane - 1) * BRANCH_H,
+        BRANCH_H - 2,
+        state === "active",
+        state === "settled",
+        false
+      );
+      return;
+    }
+    const settled = i < idx || (i === idx && t >= p.end);
+    paint(p, trackY, trackH, i === idx && !settled, settled, true);
   });
+
+  // Rounds: a band over the track naming each, the current one in full colour.
+  const current = roundAt(run, t);
+  if (run.rounds.length > 1) {
+    ctx.font = `10px ${MONO}`;
+    for (const r of run.rounds) {
+      const rx = Math.round(x(r.start)) + 0.5;
+      ctx.strokeStyle = r.causeIndex !== null ? colors.degraded : colors.border;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rx, 50);
+      ctx.lineTo(rx, trackY - 2);
+      ctx.stroke();
+      ctx.fillStyle = r.round === current?.round ? colors.fg : colors.muted;
+      const room = x(r.end) - x(r.start) - 8;
+      const text = room > 52 ? `Round ${r.round}` : `R${r.round}`;
+      if (room > 14) ctx.fillText(text, rx + 5, 62);
+    }
+  }
+  // Loop marks: where each loop sent work back, through the whole track.
+  const bottom = trackY + trackH + (run.lanes ? BRANCH_GAP + run.lanes * BRANCH_H : 0);
+  for (const m of run.marks) {
+    const mx = Math.round(x(m.at)) + 0.5;
+    ctx.strokeStyle = colors.degraded;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(mx, 50);
+    ctx.lineTo(mx, bottom);
+    ctx.stroke();
+    // A small hook pointing back, the return glyph.
+    ctx.beginPath();
+    ctx.moveTo(mx + 6, 56);
+    ctx.quadraticCurveTo(mx + 6, 48, mx, 48);
+    ctx.moveTo(mx + 3, 45);
+    ctx.lineTo(mx, 48);
+    ctx.lineTo(mx + 3, 51);
+    ctx.stroke();
+  }
 
   // The playhead: the one moving thing, because replay time is passing.
   const hx = Math.round(x(t)) + 0.5;
@@ -126,7 +206,7 @@ export function drawFrame(
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(hx, trackY - 6);
-  ctx.lineTo(hx, trackY + trackH + 6);
+  ctx.lineTo(hx, bottom + 6);
   ctx.stroke();
   ctx.fillStyle = colors.fg;
   ctx.beginPath();
@@ -136,9 +216,10 @@ export function drawFrame(
   const active = idx >= 0 ? run.stages[idx] : null;
   ctx.font = `12px system-ui, sans-serif`;
   ctx.fillStyle = colors.muted;
+  const round = run.rounds.length > 1 && current ? `Round ${current.round} · ` : "";
   ctx.fillText(
     active
-      ? `${active.stage.name} · ${t >= active.end ? active.stage.status : "running"}`
+      ? `${round}${active.stage.name} · ${t >= active.end ? active.stage.status : "running"}`
       : "Queued",
     pad,
     h - 20
@@ -157,7 +238,7 @@ function canvasFor(width: number, height: number): CanvasRenderingContext2D {
 export async function exportGif(
   run: PlacedRun,
   colors: ExportPalette,
-  { label, width = 720, height = 180, seconds = 6, fps = 12 }: ExportOptions
+  { label, width = 720, height = exportHeight(run, 180), seconds = 6, fps = 12 }: ExportOptions
 ): Promise<Blob> {
   const { GIFEncoder, quantize, applyPalette } = await import("gifenc");
   const ctx = canvasFor(width, height);
@@ -186,7 +267,7 @@ export function canExportVideo(): boolean {
 export async function exportVideo(
   run: PlacedRun,
   colors: ExportPalette,
-  { label, width = 1280, height = 320, seconds = 6, fps = 30 }: ExportOptions
+  { label, width = 1280, height = exportHeight(run, 320), seconds = 6, fps = 30 }: ExportOptions
 ): Promise<Blob> {
   if (!canExportVideo()) throw new Error("This browser cannot record video.");
   const ctx = canvasFor(width, height);

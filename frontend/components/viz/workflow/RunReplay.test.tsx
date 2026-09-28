@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { makeTimeline } from "../core/workflow-model";
+import { makeFeatureTimeline, makeTimeline } from "../core/workflow-model";
+
+import { makeFanoutTimeline } from "./replay";
 
 import { RunReplay } from "./RunReplay";
 
@@ -44,5 +46,32 @@ describe("RunReplay", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: /^Scan/ }), { key: "Enter" });
     expect(onSelectStage).toHaveBeenCalledWith("st2");
     expect(screen.getByRole("slider").getAttribute("aria-valuenow")).toBe("306");
+  });
+
+  it("groups a looping run by round and jumps to where a loop sent work back", () => {
+    render(<RunReplay timeline={makeFeatureTimeline()} motion="reduced" />);
+    const rounds = screen.getByRole("list", { name: "Rounds" }).querySelectorAll("li");
+    expect(rounds).toHaveLength(4);
+    expect(rounds[0].textContent).toBe("Round 1: Plan, Code, Test failed");
+    expect(rounds[2].textContent).toContain("Review rejected");
+    expect(rounds[3].getAttribute("aria-current")).toBe("step");
+    expect(screen.getByRole("figure").getAttribute("aria-label")).toMatch(
+      /4 rounds, sent back 3 times/
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Round 3: Test failed: 1 spec in checkout, sent back to Code/,
+      })
+    );
+    expect(screen.getByRole("slider").getAttribute("aria-valuetext")).toContain("Code");
+    expect(rounds[2].getAttribute("aria-current")).toBe("step");
+  });
+
+  it("draws a fan-out's branches as parallel bars", () => {
+    render(<RunReplay timeline={makeFanoutTimeline()} motion="reduced" />);
+    const bars = screen.getAllByRole("button", { name: /\(branch\)/ });
+    expect(bars).toHaveLength(6);
+    expect(bars[4].getAttribute("aria-label")).toBe("Source 5 (branch): failed, 1m 30s");
+    expect(screen.queryByRole("list", { name: "Rounds" })).toBeNull();
   });
 });

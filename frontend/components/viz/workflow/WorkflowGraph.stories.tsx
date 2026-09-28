@@ -33,6 +33,40 @@ function LiveDemo({ lines = 3, trainsPerLine = 3 }: { lines?: number; trainsPerL
   return <Shell snapshot={snapshot} />;
 }
 
+function Shaped({
+  initial,
+  motion = "full",
+  live = true,
+}: {
+  initial: WorkflowSnapshot;
+  motion?: "full" | "reduced";
+  live?: boolean;
+}) {
+  const snapshot = useSimulation(initial, stepWorkflows, {
+    intervalMs: 1200,
+    seed: 7,
+    paused: !live,
+  });
+  return <Shell snapshot={snapshot} motion={motion} />;
+}
+
+/** The shaped lines only: a loop, a fanout, a supervisor and a nested workflow. */
+function shapes(): WorkflowSnapshot {
+  return makeWorkflows({ lines: 0, shapes: true });
+}
+
+/** Feature delivery alone: Test and Review loop back to Code, Deploy retries itself. */
+function featureDelivery(): WorkflowSnapshot {
+  const s = shapes();
+  const id = s.lines[0].id;
+  return {
+    ...s,
+    lines: s.lines.filter((l) => l.id === id),
+    trains: s.trains.filter((t) => t.lineId === id),
+    segments: s.segments.filter((g) => g.lineId === id),
+  };
+}
+
 function quiet(): WorkflowSnapshot {
   const s = makeWorkflows({ trainsPerLine: 0 });
   return { ...s, segments: s.segments.map((g) => ({ ...g, rate: 0, backlog: 0 })) };
@@ -103,4 +137,28 @@ export const Narrow: Story = {
       <Shell snapshot={incident()} />
     </div>
   ),
+};
+
+/** Test failed and Review rejected send work back to Code on their own tracks, each with its bound. */
+export const FeatureDelivery: Story = { render: () => <Shaped initial={featureDelivery()} /> };
+
+/** Every shape at once, live: loops, a fan-out and its join, a supervisor's workers, a nested workflow. */
+export const Shapes: Story = { render: () => <Shaped initial={shapes()} /> };
+
+/** The same shapes still: tracks, bounds, branch states and busy workers read without motion. */
+export const ShapesReduced: Story = {
+  render: () => <Shaped initial={shapes()} motion="reduced" live={false} />,
+};
+
+export const ShapesNarrow: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Shaped initial={shapes()} />
+    </div>
+  ),
+};
+
+/** Classic lines and shaped lines together, as a real workspace would mix them. */
+export const Mixed: Story = {
+  render: () => <Shaped initial={makeWorkflows({ shapes: true })} />,
 };
