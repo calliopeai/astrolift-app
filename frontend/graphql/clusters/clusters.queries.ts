@@ -109,6 +109,7 @@ export const LIST_CLUSTERS = gql`
       authMethod
       ingressClass
       albAuthConfig
+      oidcAuthConfig
       isActive
       capabilities
       capabilitiesProbedAt
@@ -224,6 +225,7 @@ export const UPDATE_TENANT_CLUSTER = gql`
         slug
         ingressClass
         albAuthConfig
+        oidcAuthConfig
       }
     }
   }
@@ -517,6 +519,8 @@ export const CLUSTER_BOOTSTRAP_PLAN = gql`
         key
         title
         defaultEnabled
+        installedByRecipe
+        runningOutsideRecipe
         rationale
         helmValues
         requires

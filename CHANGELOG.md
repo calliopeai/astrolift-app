@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Central auth and the ingress class on the cluster settings page (#2119).
+  A Central auth card sets `oidcAuthConfig` with secrets write-only (set or
+  not set badges; a blank field keeps the stored value, and the server now
+  carries forward any secret, or `proxy_extra_args`, an update omits). An
+  Ingress class card warns before a change that would leave apps with no
+  gate and asks whether to also commit the gate to every app's manifest,
+  which redeploys them all. The recipe card keeps what the recipe installed
+  checked and no longer pre-checks a controller the probe found running
+  outside it, such as an ALB controller or external-dns installed by hand.
+  An additive edge install now records the recipe's whole set, so it never
+  makes the next operator run read the rest of the recipe as foreign.
 - Token scopes for the cluster surface and a picker that explains itself
   (#2120). `write:clusters` (update a cluster's settings) and
   `manage:clusters` (run its recipe, refresh, reconcile) replace the admin

@@ -991,8 +991,25 @@ def _install_cluster_prereqs_sync(
             non_retryable=False,
         )
 
+    # What the bootstrap-run row records as the recipe's set. An additive run
+    # added to the recipe rather than replacing it, so it records what it
+    # applied on top of what the last run left. Recording only its own
+    # releases would make the next operator run read every other recipe
+    # release as running outside the recipe, leave it unchecked, and delete it.
+    recorded = applied
+    if additive:
+        from astrolift_clusters.recipe_detection import components_installed_by_recipe
+
+        mine = {a["name"] for a in applied}
+        recorded = applied + [
+            {"name": key, "version": ""}
+            for key in sorted(components_installed_by_recipe(cluster))
+            if key not in mine
+        ]
+
     return {
         "applied": applied,
+        "recorded": recorded,
         "skipped": skipped,
         "deleted": deleted,
         "namespace": target_namespace,

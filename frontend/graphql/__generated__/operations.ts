@@ -1410,10 +1410,12 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
+  installedByRecipe: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   options: Array<AstroliftClusterBootstrapOption>;
   rationale: Scalars['String']['output'];
   requires: Array<Scalars['String']['output']>;
+  runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 
@@ -11500,7 +11502,12 @@ export type ListApiTokensQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ListApiTokensQuery = { astroliftApiTokens: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } }> };
 
-export type ApiTokenFieldsFragment = { id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } };
+export type ApiTokenFieldsFragment = { id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, effectivePermissions: Array<string>, user: { id: string, username: string, email: string } };
+
+export type GetApiTokenScopeCatalogQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetApiTokenScopeCatalogQuery = { astroliftApiTokenScopeCatalog: { scopes: Array<{ value: string, label: string, surface: string, description: string, sensitive: boolean, permissions: Array<string>, available: boolean, unavailableReason: string }>, presets: Array<{ key: string, label: string, scopes: Array<string> }> } };
 
 export type ListApiTokensPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -11509,7 +11516,7 @@ export type ListApiTokensPageQueryVariables = Exact<{
 }>;
 
 
-export type ListApiTokensPageQuery = { astroliftApiTokensPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, user: { id: string, username: string, email: string } }> } };
+export type ListApiTokensPageQuery = { astroliftApiTokensPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, name: string, teamSlug?: string | null, tokenLast4: string, scopes: Array<string>, expiresAt?: string | null, lastUsedAt?: string | null, lastUsedIp?: string | null, lastUsedAgent?: string | null, isRevoked: boolean, createdAt: string, effectivePermissions: Array<string>, user: { id: string, username: string, email: string } }> } };
 
 export type GetMyProfileQueryVariables = Exact<{ [key: string]: never; }>;
 

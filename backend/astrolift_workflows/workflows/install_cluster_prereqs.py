@@ -111,6 +111,10 @@ class InstallClusterPrereqsWorkflow:
         skipped = (
             result.get("skipped", []) if isinstance(result, dict) else []
         )
+        # An additive run records the recipe's whole set (#2130).
+        recorded = (
+            result.get("recorded", applied) if isinstance(result, dict) else applied
+        )
 
         try:
             await workflow.execute_activity(
@@ -119,7 +123,7 @@ class InstallClusterPrereqsWorkflow:
                     input.cluster_id,
                     actor_user_id,
                     "succeeded",
-                    applied,
+                    recorded,
                     "",
                     started_at.isoformat(),
                     workflow.now().isoformat(),

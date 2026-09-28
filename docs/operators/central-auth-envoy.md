@@ -48,9 +48,10 @@ callback, `https://<auth_proxy_host>/oauth2/callback`. `jwks_uri`
 overrides where the signing keys are read from, for a provider that does
 not serve `<issuer>/.well-known/jwks.json`.
 
-1. **Set the config, keep the current class.**
-   `updateTenantCluster(id, oidcAuthConfig: {...})`. `client_secret` is
-   write-only; the read side reports `client_secret_set`.
+1. **Set the config, keep the current class.** Cluster settings, Central
+   auth, or `updateTenantCluster(id, oidcAuthConfig: {...})`.
+   `client_secret` is write-only; the read side reports `client_secret_set`,
+   and an update that omits a secret keeps the stored one.
 2. **Install the edge.** Flipping the class (step 4) installs it on its
    own, additively. To install it first and check it before moving
    anything, run `installClusterPrereqs` with `envoy-gateway` in
@@ -66,7 +67,8 @@ not serve `<issuer>/.well-known/jwks.json`.
    - Route53 has a `*.<zone>` record pointing at the new ALB. Every app
      that still has its own ALB Ingress keeps its own, more specific
      record, so nothing has moved yet.
-4. **Flip the cluster.** `updateTenantCluster(id, ingressClass: "envoy")`.
+4. **Flip the cluster.** Cluster settings, Ingress class, or
+   `updateTenantCluster(id, ingressClass: "envoy")`.
    Nothing changes for running apps until each is redeployed. The flip no
    longer commits the new gate to every app's `astrolift.toml`, because
    that commit redeployed every app at once (#2122). Pass

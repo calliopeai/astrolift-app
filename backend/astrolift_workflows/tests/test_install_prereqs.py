@@ -869,7 +869,9 @@ def _chart_component(key, *, chart="thechart", repo="https://charts.example/", v
     )
 
 
-def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=None, additive=False):  # noqa: ANN001
+def _run_install_sync(  # noqa: ANN001
+    monkeypatch, components, driver, selected_keys, overrides=None, additive=False, recipe_before=frozenset()
+):
     """Drive ``_install_cluster_prereqs_sync`` with the DB row, dispatch, driver,
     and context all mocked, returning its result dict. The IRSA-provision helpers
     short-circuit because none of the test component keys are the AWS controller
@@ -896,6 +898,9 @@ def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=
     monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)  # noqa: ARG005
     monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: fake_ctx)  # noqa: ARG005
     monkeypatch.setattr(cm, "bootstrap_components_dispatch", lambda cluster: components)  # noqa: ARG005
+    import astrolift_clusters.recipe_detection as rd
+
+    monkeypatch.setattr(rd, "components_installed_by_recipe", lambda cluster: set(recipe_before))  # noqa: ARG005
 
     return _install_cluster_prereqs_sync(1, list(selected_keys), overrides or {}, additive)
 
@@ -1084,3 +1089,35 @@ def test_an_operator_run_never_probes_or_adds_controllers(monkeypatch):
     result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"})
 
     assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+
+
+def test_an_additive_run_records_the_whole_recipe_not_just_its_own_releases(monkeypatch):
+    """Recording only the edge would make the next operator run read the rest
+    of the recipe as foreign, leave it unchecked, and delete it."""
+    _probe_reports(
+        monkeypatch,
+        {"installed_crds": ["targetgroupbindings.elbv2.k8s.aws"], "external_dns": {"installed": True}},
+    )
+    driver = _FakeDriver()
+
+    result = _run_install_sync(
+        monkeypatch,
+        _edge_recipe(),
+        driver,
+        {"envoy-gateway"},
+        additive=True,
+        recipe_before={"cert-manager", "external-dns"},
+    )
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+    assert {r["name"] for r in result["recorded"]} == {"envoy-gateway", "cert-manager", "external-dns"}
+
+
+def test_an_operator_run_records_what_it_applied(monkeypatch):
+    driver = _FakeDriver()
+
+    result = _run_install_sync(
+        monkeypatch, _edge_recipe(), driver, {"cert-manager"}, recipe_before={"external-dns"}
+    )
+
+    assert result["recorded"] == result["applied"]

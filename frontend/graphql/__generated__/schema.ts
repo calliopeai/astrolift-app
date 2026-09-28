@@ -1410,10 +1410,12 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
+  installedByRecipe: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   options: Array<AstroliftClusterBootstrapOption>;
   rationale: Scalars['String']['output'];
   requires: Array<Scalars['String']['output']>;
+  runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 

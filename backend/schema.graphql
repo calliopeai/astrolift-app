@@ -1408,6 +1408,8 @@ type AstroliftClusterBootstrapComponent {
   helmValues: JSON!
   requires: [String!]!
   options: [AstroliftClusterBootstrapOption!]!
+  installedByRecipe: Boolean!
+  runningOutsideRecipe: Boolean!
 }
 
 type AstroliftClusterBootstrapOption {

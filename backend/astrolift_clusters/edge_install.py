@@ -23,12 +23,8 @@ logger = logging.getLogger(__name__)
 EDGE_INGRESS_CLASS = "envoy"
 
 
-# What the edge needs beside itself on a cluster whose recipe offers it, and
-# how each shows up whoever installed it: the ALB controller by its CRD, and
-# external-dns through the capability probe's own classifier.
 _LBC_KEY = "aws-load-balancer-controller"
 _EXTERNAL_DNS_KEY = "external-dns"
-_LBC_CRD = "targetgroupbindings.elbv2.k8s.aws"
 
 
 def controllers_present(capabilities: dict[str, Any] | None) -> set[str]:
@@ -39,13 +35,9 @@ def controllers_present(capabilities: dict[str, Any] | None) -> set[str]:
     recipe, because two ALB controllers or two external-dns fight over the
     same load balancers and records.
     """
-    caps = capabilities or {}
-    present: set[str] = set()
-    if _LBC_CRD in set(caps.get("installed_crds") or ()):
-        present.add(_LBC_KEY)
-    if (caps.get("external_dns") or {}).get("installed"):
-        present.add(_EXTERNAL_DNS_KEY)
-    return present
+    from astrolift_clusters.recipe_detection import components_running
+
+    return components_running(capabilities) & {_LBC_KEY, _EXTERNAL_DNS_KEY}
 
 
 def edge_controllers_to_add(recipe_keys: set[str], capabilities: dict[str, Any] | None) -> set[str]:
@@ -61,26 +53,14 @@ def edge_controllers_to_add(recipe_keys: set[str], capabilities: dict[str, Any] 
 
 def edge_install_wanted(cluster: Any) -> bool:
     """The cluster is on the Envoy edge and still has no install of it."""
-    from astrolift_clusters.models import ClusterBootstrapRun
+    from astrolift_clusters.recipe_detection import components_installed_by_recipe
     from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY, edge_configured
 
     if (cluster.ingress_class or "") != EDGE_INGRESS_CLASS:
         return False
     if not edge_configured(cluster.oidc_auth_config):
         return False
-    last = (
-        ClusterBootstrapRun.objects.filter(
-            tenant_cluster=cluster,
-            status=ClusterBootstrapRun.Status.SUCCEEDED,
-        )
-        .order_by("-ended_at")
-        .first()
-    )
-    if last is None:
-        return True
-    names = {str(r.get("name") if isinstance(r, dict) else r) for r in last.installed_releases or []}
-    # The recipe records component keys; the CLI records release names.
-    return not names & {EDGE_COMPONENT_KEY, f"astrolift-{EDGE_COMPONENT_KEY}"}
+    return EDGE_COMPONENT_KEY not in components_installed_by_recipe(cluster)
 
 
 def ensure_edge_installed(cluster: Any) -> bool:

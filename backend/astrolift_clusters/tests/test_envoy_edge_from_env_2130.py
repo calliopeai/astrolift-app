@@ -293,3 +293,70 @@ def test_oauth2_proxy_defaults_on_only_where_it_has_something_to_gate(ingress_cl
 
 def test_oauth2_proxy_stays_off_without_a_config():
     assert central_auth_component({}, ingress_class="nginx").default_enabled is False
+
+
+# ---- the settings page edits the config without holding a secret (#2119) ---
+
+
+def test_an_update_that_omits_the_secrets_keeps_them(permission_resolver, writebacks, started):
+    permission_resolver.grant(Permission.CLUSTER_UPDATE)
+    cluster = _cluster(ingress_class="nginx", oidc_auth_config=NGINX_OIDC)
+    routing_only = {k: v for k, v in NGINX_OIDC.items() if not k.endswith("_secret")}
+
+    result = _update(cluster, oidc_auth_config={**routing_only, "auth_proxy_host": "auth.new.example.net"})
+
+    assert result.ok is True, result.errors
+    cluster.refresh_from_db()
+    assert cluster.oidc_auth_config["auth_proxy_host"] == "auth.new.example.net"
+    assert cluster.oidc_auth_config["client_secret"] == NGINX_OIDC["client_secret"]
+    assert cluster.oidc_auth_config["cookie_secret"] == NGINX_OIDC["cookie_secret"]
+
+
+def test_an_empty_secret_clears_it(permission_resolver, writebacks, started):
+    permission_resolver.grant(Permission.CLUSTER_UPDATE)
+    cluster = _cluster(ingress_class="envoy", oidc_auth_config=NGINX_OIDC)
+
+    result = _update(cluster, oidc_auth_config={**NGINX_OIDC, "cookie_secret": ""})
+
+    assert result.ok is True, result.errors
+    cluster.refresh_from_db()
+    assert "cookie_secret" not in cluster.oidc_auth_config
+    assert cluster.oidc_auth_config["client_secret"] == NGINX_OIDC["client_secret"]
+
+
+# ---- the recipe card knows what the recipe installed (#2119) --------------
+
+
+def test_the_plan_marks_a_controller_running_outside_the_recipe(started):
+    from astrolift_clusters.schema.types import bootstrap_plan_to_type
+
+    cluster = _cluster(ingress_class="alb", oidc_auth_config={})
+    cluster.capabilities = {
+        "installed_crds": ["targetgroupbindings.elbv2.k8s.aws"],
+        "external_dns": {"installed": True},
+        "cert_manager": {"installed": True},
+    }
+    cluster.save(update_fields=["capabilities"])
+    ClusterBootstrapRun.objects.create(
+        tenant_cluster=cluster,
+        status=ClusterBootstrapRun.Status.SUCCEEDED,
+        installed_releases=[{"name": "cert-manager", "version": "v1"}],
+        started_at=timezone.now(),
+        ended_at=timezone.now(),
+    )
+    components = [
+        SimpleNamespace(
+            key=k, title=k, default_enabled=True, rationale="", helm_values={}, requires=[], options=[]
+        )
+        for k in ("aws-load-balancer-controller", "external-dns", "cert-manager", "metrics-server")
+    ]
+
+    plan = {c.key: c for c in bootstrap_plan_to_type(cluster, components).components}
+
+    # Hand-installed: found, and not the recipe's.
+    assert plan["aws-load-balancer-controller"].running_outside_recipe is True
+    assert plan["external-dns"].running_outside_recipe is True
+    # The recipe's own: stays selected, never read as foreign.
+    assert plan["cert-manager"].installed_by_recipe is True
+    assert plan["cert-manager"].running_outside_recipe is False
+    assert plan["metrics-server"].running_outside_recipe is False

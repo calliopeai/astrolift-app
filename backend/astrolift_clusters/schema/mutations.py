@@ -17,6 +17,7 @@ import hashlib
 import logging
 import secrets
 from collections.abc import Callable, Mapping
+from typing import Any
 
 import strawberry
 from django.db import transaction
@@ -602,6 +603,29 @@ def _has_auth_gate(ingress_class: str, cluster) -> bool:
     return all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host"))
 
 
+# Write-only in the API: the read side reports only ``<key>_set`` (#1616,
+# #2055), so a client editing the config has no secret to send back.
+_OIDC_SECRET_KEYS = ("client_secret", "cookie_secret", "gateway_secret")
+# Not secret, but absent from the read side too (#1716), so the same rule.
+_OIDC_UNREAD_KEYS = (*_OIDC_SECRET_KEYS, "proxy_extra_args")
+
+
+def _carry_oidc_secrets(existing: Any, incoming: Any) -> Any:
+    """``incoming`` with each secret it omits carried over from ``existing``.
+
+    Omitted means "keep": the settings page edits the routing fields without
+    ever holding a secret (#2119). An explicit empty string clears one. A
+    ``None`` config is a deliberate removal of the gate and carries nothing.
+    """
+    if not isinstance(incoming, dict):
+        return incoming
+    merged = dict(incoming)
+    for key in _OIDC_UNREAD_KEYS:
+        if key not in merged and isinstance(existing, dict) and existing.get(key):
+            merged[key] = existing[key]
+    return {k: v for k, v in merged.items() if not (k in _OIDC_SECRET_KEYS and v == "")}
+
+
 @strawberry.type
 class ClustersMutation:
     @strawberry.field
@@ -857,7 +881,7 @@ class ClustersMutation:
                 configured_logout_url(input.oidc_auth_config)
             except ValueError as exc:
                 return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="oidcAuthConfig")
-            cluster.oidc_auth_config = input.oidc_auth_config
+            cluster.oidc_auth_config = _carry_oidc_secrets(cluster.oidc_auth_config, input.oidc_auth_config)
         if class_changing and had_gate and not _has_auth_gate(cluster.ingress_class, cluster):
             needs = "oidcAuthConfig" if cluster.ingress_class != "alb" else "albAuthConfig"
             return gql_failure(

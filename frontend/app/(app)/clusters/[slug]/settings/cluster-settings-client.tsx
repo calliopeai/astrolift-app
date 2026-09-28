@@ -89,6 +89,8 @@ import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
 import { ClusterTabs } from "../components/cluster-tabs";
 
+import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
+
 // The committed codegen output lags the live backend, so the generated
 // AstroliftTenantCluster doesn't yet carry the heartbeat fields the
 // LIST_CLUSTERS query now selects (#808). Intersect them in locally.
@@ -368,6 +370,8 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
       </Can>
 
       <Can permission="cluster.update">
+        <IngressClassCard cluster={cluster} />
+        <CentralAuthCard cluster={cluster} />
         <IngressAuthCard cluster={cluster} />
       </Can>
 
@@ -656,6 +660,8 @@ interface BootstrapComponent {
   key: string;
   title: string;
   defaultEnabled: boolean;
+  installedByRecipe: boolean;
+  runningOutsideRecipe: boolean;
   rationale: string;
   requires: string[];
   options: BootstrapOption[];
@@ -670,6 +676,23 @@ interface BootstrapPlan {
 
 interface BootstrapPlanResp {
   astroliftClusterBootstrapPlan: BootstrapPlan | null;
+}
+
+/**
+ * What the recipe card checks before the operator touches it (#2119).
+ *
+ * A component the recipe installed stays checked: an install deletes the
+ * release of everything it is not given. One the probe found running outside
+ * the recipe (a controller installed by hand) is never pre-checked, or
+ * accepting the defaults installs a second copy that fights the first.
+ */
+export function preselected(c: {
+  defaultEnabled: boolean;
+  installedByRecipe: boolean;
+  runningOutsideRecipe: boolean;
+}): boolean {
+  if (c.installedByRecipe) return true;
+  return c.defaultEnabled && !c.runningOutsideRecipe;
 }
 
 function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
@@ -691,7 +714,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
     const nextSel: Record<string, boolean> = {};
     const nextOpts: Record<string, Record<string, string>> = {};
     for (const c of plan.components) {
-      nextSel[c.key] = c.defaultEnabled;
+      nextSel[c.key] = preselected(c);
       const opts: Record<string, string> = {};
       for (const o of c.options) opts[o.key] = o.default || o.choices[0]?.value || "";
       nextOpts[c.key] = opts;
@@ -778,7 +801,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
         </CardTitle>
         <CardDescription>
           Driver recipe from{" "}
-          <Badge variant="outline" className="mx-1 font-mono text-2xs">
+          <Badge variant="outline" className="text-2xs mx-1 font-mono">
             {plan.providerPluginSlug || "unknown"}
           </Badge>
           — pre-tuned helm values per component. Re-installing converges via Flux; un-checking a
@@ -796,12 +819,24 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
                 className="mt-1 size-4 cursor-pointer"
               />
               <div className="flex-1">
-                <div className="font-medium">{c.title}</div>
+                <div className="flex flex-wrap items-center gap-2 font-medium">
+                  {c.title}
+                  {c.installedByRecipe && (
+                    <Badge variant="secondary" className="text-2xs">
+                      installed by the recipe
+                    </Badge>
+                  )}
+                  {c.runningOutsideRecipe && (
+                    <Badge variant="outline" className="text-2xs">
+                      already running outside the recipe
+                    </Badge>
+                  )}
+                </div>
                 <div className="text-muted-foreground mt-0.5 text-xs">{c.rationale}</div>
                 {c.requires.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.requires.map((r) => (
-                      <Badge key={r} variant="secondary" className="font-mono text-2xs">
+                      <Badge key={r} variant="secondary" className="text-2xs font-mono">
                         requires: {r}
                       </Badge>
                     ))}
@@ -947,7 +982,7 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
             {fmt.formatRelativeTime(run.endedAt)}
           </span>
           {run.cliVersion && (
-            <Badge variant="outline" className="font-mono text-2xs">
+            <Badge variant="outline" className="text-2xs font-mono">
               {run.cliVersion}
             </Badge>
           )}
@@ -1153,7 +1188,9 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
       variables: { input: { clusterId: cluster.id } },
     });
     if (data?.deployClusterAgent.ok) {
-      toast.success("Agent deployed — the cluster connects within a couple of heartbeat intervals.");
+      toast.success(
+        "Agent deployed — the cluster connects within a couple of heartbeat intervals."
+      );
     } else {
       toast.error(data?.deployClusterAgent.errors?.[0]?.message ?? "Failed to deploy agent");
     }
@@ -1200,8 +1237,8 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
       <CardContent className="space-y-3">
         {issued ? (
           <>
-            <div className="rounded-md border border-warning-border bg-warning/10 p-3">
-              <p className="text-xs font-medium text-warning-fg">
+            <div className="border-warning-border bg-warning/10 rounded-md border p-3">
+              <p className="text-warning-fg text-xs font-medium">
                 Copy this key now — it won&apos;t be shown again.
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -1588,7 +1625,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               {enabled ? (
-                <ShieldIcon className="size-4 text-success-fg" />
+                <ShieldIcon className="text-success-fg size-4" />
               ) : (
                 <KeyRoundIcon className="size-4" />
               )}
@@ -1735,9 +1772,9 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-3">
-              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-warning-fg" />
-              <p className="text-sm text-warning-fg">
+            <div className="border-warning-border bg-warning/10 flex items-start gap-2 rounded-md border p-3">
+              <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
+              <p className="text-warning-fg text-sm">
                 All apps on this cluster are publicly accessible. Enable the auth gate to put every
                 managed-subdomain Ingress behind {authMeta.label}.
               </p>
@@ -1814,7 +1851,7 @@ function CognitoPoolCombobox({
               <ComboboxItem key={item.poolId} value={item}>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm">{item.name || item.poolId}</span>
-                  <span className="text-muted-foreground truncate font-mono text-2xs">
+                  <span className="text-muted-foreground text-2xs truncate font-mono">
                     {item.poolId}
                     {item.domain ? ` · ${item.domain}` : ""}
                   </span>
@@ -1873,14 +1910,16 @@ function CognitoClientCombobox({
       />
       <ComboboxContent>
         <ComboboxEmpty>
-          {clientId ? `Use "${clientId}" (paste client ID directly)` : "No app clients in this pool."}
+          {clientId
+            ? `Use "${clientId}" (paste client ID directly)`
+            : "No app clients in this pool."}
         </ComboboxEmpty>
         <ComboboxList>
           {(item: CognitoUserPoolClient) => (
             <ComboboxItem key={item.clientId} value={item}>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span className="truncate text-sm">{item.clientName || item.clientId}</span>
-                <span className="text-muted-foreground truncate font-mono text-2xs">
+                <span className="text-muted-foreground text-2xs truncate font-mono">
                   {item.clientId}
                 </span>
               </div>
