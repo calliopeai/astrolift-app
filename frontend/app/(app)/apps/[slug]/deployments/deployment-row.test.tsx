@@ -1,10 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  AstroliftDeployment,
-  AstroliftRegisteredApp,
-} from "@/graphql/lifecycle/lifecycle.types";
+import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
+import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import { DeploymentRow } from "./deployments-client";
 
