@@ -12,7 +12,6 @@
  * hedged "either/or" copy.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { GlobeIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -35,13 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIST_APP_DNS_RECORDS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppDnsRecord,
   DnsPropagationStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-interface Resp {
+export interface DnsRecordsCardData {
   astroliftAppDnsRecords: {
     reason: ObservabilityPanelReason;
     records: AstroliftAppDnsRecord[];
@@ -66,13 +64,18 @@ export interface DnsRecordsCardProps {
   environmentName?: string;
 }
 
-export function DnsRecordsCard({ appSlug, environmentName }: DnsRecordsCardProps) {
-  const { data, loading, refetch } = useQuery<Resp>(LIST_APP_DNS_RECORDS, {
-    variables: { appSlug, environmentName: environmentName ?? null },
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
-  });
-
+/** Pure (Storybook first): the data comes from useDnsRecords. */
+export function DnsRecordsCard({
+  appSlug,
+  environmentName,
+  data,
+  loading,
+  onRefresh,
+}: DnsRecordsCardProps & {
+  data: DnsRecordsCardData | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   const records = data?.astroliftAppDnsRecords?.records ?? [];
   const reason = data?.astroliftAppDnsRecords?.reason;
   const isEmptyAfterLoad = !loading && records.length === 0;
@@ -104,7 +107,7 @@ export function DnsRecordsCard({ appSlug, environmentName }: DnsRecordsCardProps
             size="sm"
             variant="outline"
             onClick={() => {
-              void refetch();
+              onRefresh();
             }}
             disabled={loading}
           >
@@ -148,7 +151,7 @@ export function DnsRecordsCard({ appSlug, environmentName }: DnsRecordsCardProps
               actionLabel={showSetupAction ? "Set up DNS" : undefined}
               secondary={
                 reason === "ERROR" ? (
-                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                  <Button size="sm" variant="outline" onClick={() => onRefresh()}>
                     Try again
                   </Button>
                 ) : undefined

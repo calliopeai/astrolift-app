@@ -8,7 +8,6 @@
  * badge.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { RefreshCwIcon, RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -31,13 +30,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIST_APP_CERTIFICATES } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppCertificate,
   CertificateRenewalStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-interface Resp {
+export interface TlsCertificatesCardData {
   astroliftAppCertificates: {
     reason: ObservabilityPanelReason;
     certificates: AstroliftAppCertificate[];
@@ -90,13 +88,18 @@ export interface TlsCertificatesCardProps {
   environmentName?: string;
 }
 
-export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificatesCardProps) {
-  const { data, loading, refetch } = useQuery<Resp>(LIST_APP_CERTIFICATES, {
-    variables: { appSlug, environmentName: environmentName ?? null },
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
-  });
-
+/** Pure (Storybook first): the data comes from useTlsCertificates. */
+export function TlsCertificatesCard({
+  appSlug,
+  environmentName,
+  data,
+  loading,
+  onRefresh,
+}: TlsCertificatesCardProps & {
+  data: TlsCertificatesCardData | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   const certs = data?.astroliftAppCertificates?.certificates ?? [];
   const reason = data?.astroliftAppCertificates?.reason;
   const isEmptyAfterLoad = !loading && certs.length === 0;
@@ -125,7 +128,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
             size="sm"
             variant="outline"
             onClick={() => {
-              void refetch();
+              onRefresh();
             }}
             disabled={loading}
           >
@@ -167,7 +170,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
               actionLabel={showIssueAction ? "Issue cert" : undefined}
               secondary={
                 reason === "ERROR" ? (
-                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                  <Button size="sm" variant="outline" onClick={() => onRefresh()}>
                     Try again
                   </Button>
                 ) : undefined
@@ -195,7 +198,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
                   <TableCell className="font-mono text-xs">{formatNotAfter(c.notAfter)}</TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-2xs ${expiryChipClass(c.daysUntilExpiry)}`}
+                      className={`text-2xs inline-flex items-center rounded border px-2 py-0.5 font-mono ${expiryChipClass(c.daysUntilExpiry)}`}
                     >
                       {formatDays(c.daysUntilExpiry)}
                     </span>

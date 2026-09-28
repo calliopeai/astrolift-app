@@ -288,7 +288,9 @@ function SnapshotTile({ task, onWatch }: { task: GalleryTask; onWatch: () => voi
           <p className="truncate font-mono text-xs font-medium" title={task.id}>
             {shortId(task.id)}
           </p>
-          <p className="text-muted-foreground text-xs">running for {elapsedLabel(task.startedAt)}</p>
+          <p className="text-muted-foreground text-xs">
+            running for {elapsedLabel(task.startedAt)}
+          </p>
         </div>
         <Button size="sm" variant="outline" onClick={onWatch}>
           <MonitorPlayIcon className="size-4" />

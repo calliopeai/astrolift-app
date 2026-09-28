@@ -1,5 +1,8 @@
 "use client";
 
+import { useDnsRecords } from "@/components/observability/use-dns-records";
+import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
+import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
 import { useMutation, useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
@@ -380,6 +383,9 @@ function formatRemaining(iso: string): string {
 }
 
 export function ObservabilityClient({ slug }: { slug: string }) {
+  const dns = useDnsRecords(slug);
+  const tls = useTlsCertificates(slug);
+  const identity = useWorkloadIdentity(slug);
   const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.observability");
@@ -840,9 +846,9 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
-      <DnsRecordsCard appSlug={a.slug} />
-      <TlsCertificatesCard appSlug={a.slug} />
-      <WorkloadIdentityCard appSlug={a.slug} />
+      <DnsRecordsCard appSlug={a.slug} {...dns} />
+      <TlsCertificatesCard appSlug={a.slug} {...tls} />
+      <WorkloadIdentityCard appSlug={a.slug} {...identity} />
 
       {/* ─── log viewer ────────────────────────────────────────────────── */}
       <Card>
@@ -859,7 +865,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               ) : selectedPod ? (
                 <>
                   {t("logs.streaming")}{" "}
-                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
+                  <code className="bg-muted text-2xs rounded px-1 py-0.5 font-mono">
                     {selectedPod}
                   </code>{" "}
                   {t("logs.fromCluster")}
@@ -970,7 +976,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               We render before the LogViewer so the operator sees the
               reason for the empty pane immediately. */}
           {isHistorical && historicalUnavailable ? (
-            <div className="mb-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-2 text-xs text-warning-fg">
+            <div className="border-warning-border bg-warning/10 text-warning-fg mb-3 flex items-start gap-2 rounded-md border p-2 text-xs">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
               <div>
                 <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>
@@ -1007,7 +1013,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           />
           <p className="text-muted-foreground mt-2 text-xs">
             {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
-            <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
+            <code className="bg-muted text-2xs rounded px-1 py-0.5 font-mono">
               astro logs --app={a.slug} --follow
             </code>
             .{" "}
@@ -1158,7 +1164,7 @@ function AlertRulesPanel({ appId, appName }: { appId: string; appName: string })
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
                             <span>{r.name}</span>
-                            <span className="text-muted-foreground font-mono text-2xs">
+                            <span className="text-muted-foreground text-2xs font-mono">
                               {predicateSummary(r.predicate)}
                             </span>
                           </div>
@@ -1362,7 +1368,7 @@ function AlertEventsList({ ruleId }: { ruleId: string }) {
 
   return (
     <div className="p-4">
-      <p className="text-muted-foreground mb-2 text-2xs tracking-wide uppercase">
+      <p className="text-muted-foreground text-2xs mb-2 tracking-wide uppercase">
         Last {eventList.length} event{eventList.length === 1 ? "" : "s"}
       </p>
       <Table>

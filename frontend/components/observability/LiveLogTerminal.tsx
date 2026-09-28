@@ -187,12 +187,14 @@ export function LiveLogTerminal({
         {!hasOutput && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {running || loading ? (
-              <span className="inline-flex items-center gap-2 text-muted-foreground text-xs">
+              <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
                 <Loader2Icon className="size-3.5 animate-spin" />
                 Waiting for output…
               </span>
             ) : (
-              <span className="text-muted-foreground text-xs">No output was recorded for this run.</span>
+              <span className="text-muted-foreground text-xs">
+                No output was recorded for this run.
+              </span>
             )}
           </div>
         )}

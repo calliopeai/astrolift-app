@@ -17,11 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -31,10 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  APP_METRIC_NAMES,
-  EXECUTE_PROMQL,
-} from "@/graphql/observability/observability.queries";
+import { APP_METRIC_NAMES, EXECUTE_PROMQL } from "@/graphql/observability/observability.queries";
 import type {
   AstroliftExecutePromqlResult,
   AstroliftPromqlSeries,
@@ -159,7 +152,7 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
             key={name}
             type="button"
             onClick={() => onPick(name)}
-            className="border-border hover:bg-accent rounded border px-2 py-0.5 font-mono text-2xs"
+            className="border-border hover:bg-accent text-2xs rounded border px-2 py-0.5 font-mono"
           >
             {name}
           </button>
@@ -314,9 +307,7 @@ function PromqlBody({ loading, transportError, result }: PromqlBodyProps) {
   }
   if (result.series.length === 0) {
     return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        Query returned no series.
-      </p>
+      <p className="text-muted-foreground py-8 text-center text-sm">Query returned no series.</p>
     );
   }
   return <PromqlChart series={result.series} />;

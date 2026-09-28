@@ -19,16 +19,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-import type {
-  ActivityStatus,
-  WorkflowActivity,
-  WorkflowRunSummary,
-  WorkflowStatus,
-} from "./types";
+import type { ActivityStatus, WorkflowActivity, WorkflowRunSummary, WorkflowStatus } from "./types";
 
 // ─── status presentation ──────────────────────────────────────────────────────
 
-const RUN_STATUS_VARIANT: Record<WorkflowStatus, "default" | "secondary" | "destructive" | "outline"> = {
+const RUN_STATUS_VARIANT: Record<
+  WorkflowStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   running: "secondary",
   completed: "default",
   failed: "destructive",
@@ -94,7 +92,7 @@ export function WorkflowTimeline({
   const isTerminal = run.status !== "running";
 
   return (
-    <div className={cn("rounded-md border bg-card", className)}>
+    <div className={cn("bg-card rounded-md border", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -103,10 +101,10 @@ export function WorkflowTimeline({
               {run.status}
             </Badge>
           </div>
-          <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+          <div className="text-muted-foreground mt-1 truncate font-mono text-xs">
             {run.workflowId} · run {run.runId.slice(0, 12)}…
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground mt-1 text-xs">
             started {new Date(run.startedAt).toLocaleString()}
             {run.endedAt && ` · ended ${new Date(run.endedAt).toLocaleString()}`}
           </div>
@@ -130,14 +128,14 @@ export function WorkflowTimeline({
       </div>
 
       {run.status === "failed" && run.errorMessage && (
-        <div className="border-b bg-destructive/5 p-4">
+        <div className="bg-destructive/5 border-b p-4">
           <div className="flex items-start gap-2 text-sm">
-            <AlertTriangleIcon className="mt-0.5 size-4 text-destructive" />
+            <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-destructive">Workflow failed</p>
-              <p className="mt-1 break-words text-muted-foreground">{run.errorMessage}</p>
+              <p className="text-destructive font-medium">Workflow failed</p>
+              <p className="text-muted-foreground mt-1 break-words">{run.errorMessage}</p>
               {run.errorStack && (
-                <pre className="mt-2 overflow-x-auto rounded bg-muted/40 p-2 font-mono text-2xs leading-relaxed text-muted-foreground">
+                <pre className="bg-muted/40 text-2xs text-muted-foreground mt-2 overflow-x-auto rounded p-2 font-mono leading-relaxed">
                   {run.errorStack}
                 </pre>
               )}
@@ -156,7 +154,7 @@ export function WorkflowTimeline({
           />
         ))}
         {activities.length === 0 && (
-          <li className="p-6 text-center text-sm text-muted-foreground">
+          <li className="text-muted-foreground p-6 text-center text-sm">
             No activities recorded yet.
           </li>
         )}
@@ -194,14 +192,14 @@ function ActivityRow({
                 {retryCount} retr{retryCount === 1 ? "y" : "ies"}
               </Badge>
             )}
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {fmtDuration(activity.durationMs)}
             </span>
           </div>
           {expandable && (
             <button
               onClick={() => setExpanded((v) => !v)}
-              className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1 text-xs"
             >
               {expanded ? (
                 <ChevronDownIcon className="size-3" />
@@ -217,20 +215,23 @@ function ActivityRow({
                 {activity.attempts.map((attempt) => (
                   <li
                     key={attempt.attemptNumber}
-                    className="flex items-center gap-2 text-xs text-muted-foreground"
+                    className="text-muted-foreground flex items-center gap-2 text-xs"
                   >
                     <span className="font-mono">#{attempt.attemptNumber}</span>
                     <span className="capitalize">{attempt.status}</span>
-                    <Separator orientation="vertical" className="h-3 data-vertical:h-3 data-vertical:self-auto" />
+                    <Separator
+                      orientation="vertical"
+                      className="h-3 data-vertical:h-3 data-vertical:self-auto"
+                    />
                     <span>{new Date(attempt.startedAt).toLocaleTimeString()}</span>
                     {attempt.errorMessage && (
-                      <span className="truncate text-destructive">{attempt.errorMessage}</span>
+                      <span className="text-destructive truncate">{attempt.errorMessage}</span>
                     )}
                   </li>
                 ))}
               </ul>
               {lastFailedAttempt?.errorStack && (
-                <pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-2xs leading-relaxed text-muted-foreground">
+                <pre className="bg-muted/40 text-2xs text-muted-foreground overflow-x-auto rounded p-2 font-mono leading-relaxed">
                   {lastFailedAttempt.errorStack}
                 </pre>
               )}
@@ -238,12 +239,7 @@ function ActivityRow({
           )}
         </div>
         {activity.status === "failed" && onRetry && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onRetry(activity.id)}
-            disabled={busy}
-          >
+          <Button variant="ghost" size="sm" onClick={() => onRetry(activity.id)} disabled={busy}>
             <RefreshCwIcon className="size-3.5" />
             Retry
           </Button>

@@ -86,10 +86,7 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">Status</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-            >
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
               <SelectTrigger size="sm" className="h-8 w-28">
                 <SelectValue />
               </SelectTrigger>
@@ -255,9 +252,7 @@ function SpanList({ loading, spans }: SpanListProps) {
         >
           <span className="font-mono">{span.operation}</span>
           <span className="text-muted-foreground font-mono">{span.service}</span>
-          <span className="text-muted-foreground font-mono">
-            {formatDuration(span.durationMs)}
-          </span>
+          <span className="text-muted-foreground font-mono">{formatDuration(span.durationMs)}</span>
           <StatusBadge code={span.statusCode} />
         </div>
       ))}

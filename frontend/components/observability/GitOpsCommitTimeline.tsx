@@ -31,8 +31,8 @@ export function GitOpsCommitTimeline({
     return (
       <div
         className={cn(
-          "rounded-md border border-dashed bg-card p-6 text-center text-sm text-muted-foreground",
-          className,
+          "bg-card text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm",
+          className
         )}
       >
         {emptyMessage}
@@ -44,16 +44,16 @@ export function GitOpsCommitTimeline({
     <ol className={cn("relative space-y-4 border-l pl-6", className)}>
       {commits.map((commit) => (
         <li key={commit.hash} className="relative">
-          <span className="absolute -left-[31px] flex size-6 items-center justify-center rounded-full border bg-card">
-            <GitCommitIcon className="size-3 text-muted-foreground" />
+          <span className="bg-card absolute -left-[31px] flex size-6 items-center justify-center rounded-full border">
+            <GitCommitIcon className="text-muted-foreground size-3" />
           </span>
           <div className="flex flex-wrap items-baseline gap-2">
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
               {commit.hash.slice(0, 8)}
             </code>
             <span className="truncate text-sm">{commit.message}</span>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span>{commit.author}</span>
             <span>{new Date(commit.occurredAt).toLocaleString()}</span>
             {commit.workflowRunId && (
