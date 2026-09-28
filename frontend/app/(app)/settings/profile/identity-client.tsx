@@ -6,21 +6,12 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UPDATE_MY_PROFILE } from "@/graphql/identity/identity.mutations";
 import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
-import type {
-  AstroliftMyProfile,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import type { AstroliftMyProfile, MutationResult } from "@/graphql/identity/identity.types";
 
 interface ProfileResp {
   astroliftMyProfile: AstroliftMyProfile | null;
@@ -32,13 +23,10 @@ interface MutationResp {
 
 export function ProfileIdentityClient() {
   const { data, loading } = useQuery<ProfileResp>(GET_MY_PROFILE);
-  const [updateProfile, { loading: saving }] = useMutation<MutationResp>(
-    UPDATE_MY_PROFILE,
-    {
-      refetchQueries: [{ query: GET_MY_PROFILE }],
-      awaitRefetchQueries: true,
-    },
-  );
+  const [updateProfile, { loading: saving }] = useMutation<MutationResp>(UPDATE_MY_PROFILE, {
+    refetchQueries: [{ query: GET_MY_PROFILE }],
+    awaitRefetchQueries: true,
+  });
 
   const profile = data?.astroliftMyProfile ?? null;
   const [firstName, setFirstName] = React.useState("");
@@ -68,9 +56,7 @@ export function ProfileIdentityClient() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Identity</CardTitle>
-          <CardDescription>
-            Sign in to edit your profile.
-          </CardDescription>
+          <CardDescription>Sign in to edit your profile.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -82,13 +68,10 @@ export function ProfileIdentityClient() {
   // A field is editable when the org allows edits AND the IdP didn't
   // claim it. When the org disables edits entirely, the whole form
   // is read-only with the explanatory description below.
-  const canEdit = (field: "first_name" | "last_name" | "email") =>
-    orgAllows && !locked.has(field);
+  const canEdit = (field: "first_name" | "last_name" | "email") => orgAllows && !locked.has(field);
 
   const dirty =
-    firstName !== profile.firstName ||
-    lastName !== profile.lastName ||
-    email !== profile.email;
+    firstName !== profile.firstName || lastName !== profile.lastName || email !== profile.email;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -110,9 +93,7 @@ export function ProfileIdentityClient() {
     if (data?.updateMyProfile.ok) {
       toast.success("Profile updated");
     } else {
-      toast.error(
-        data?.updateMyProfile.errors[0]?.message ?? "Update failed",
-      );
+      toast.error(data?.updateMyProfile.errors[0]?.message ?? "Update failed");
     }
   }
 
@@ -123,16 +104,13 @@ export function ProfileIdentityClient() {
         <CardDescription>
           {orgAllows ? (
             <>
-              Your name and email shown across the platform. Fields locked
-              by your identity provider can&apos;t be edited locally — they
-              sync from the IdP.
+              Your name and email shown across the platform. Fields locked by your identity provider
+              can&apos;t be edited locally — they sync from the IdP.
             </>
           ) : (
             <>
-              Profile editing is disabled by your organization administrator.
-              Ask your admin to flip{" "}
-              <code>allowUserProfileEdit</code> on{" "}
-              <code>/settings/organization</code>.
+              Profile editing is disabled by your organization administrator. Ask your admin to flip{" "}
+              <code>allowUserProfileEdit</code> on <code>/settings/organization</code>.
             </>
           )}
         </CardDescription>
@@ -141,12 +119,7 @@ export function ProfileIdentityClient() {
         <form onSubmit={submit} className="grid gap-4 sm:max-w-sm">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={profile.username}
-              readOnly
-              className="font-mono text-xs"
-            />
+            <Input id="username" value={profile.username} readOnly className="font-mono text-xs" />
             <p className="text-muted-foreground text-2xs">
               Username is the auth identifier; it never changes.
             </p>
@@ -214,7 +187,7 @@ function FieldRow({
         {label}
         {locked && (
           <span
-            className="text-muted-foreground inline-flex items-center gap-1 text-2xs"
+            className="text-muted-foreground text-2xs inline-flex items-center gap-1"
             title="Managed by your identity provider — local edits would be overwritten on next sign-in"
           >
             <LockIcon className="size-3" />

@@ -4,7 +4,9 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConnectedAccountsSection } from "@/components/ConnectedAccountsSection";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useConnectedAccounts } from "@/components/use-connected-accounts";
 import { useLocaleSwitch } from "@/components/use-locale-switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +41,11 @@ const TIMEZONES: string[] = (() => {
     return [];
   }
 })();
+
+/** Linked source accounts (#395), which only the old account drawer showed. */
+export function ConnectedAccountsClient() {
+  return <ConnectedAccountsSection {...useConnectedAccounts()} />;
+}
 
 export function AppearanceClient() {
   const localeSwitch = useLocaleSwitch();

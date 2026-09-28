@@ -1,9 +1,8 @@
-import { ConnectedAccountsSection } from "@/components/ConnectedAccountsSection";
 import { PageShell } from "@/components/PageShell";
 import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
-import { AppearanceClient } from "./profile-client";
+import { AppearanceClient, ConnectedAccountsClient } from "./profile-client";
 import { ProfileIdentityClient } from "./identity-client";
 
 export const metadata = { title: "Profile · Settings · Astrolift" };
@@ -18,7 +17,7 @@ export default function ProfileSettingsPage() {
         <ProfileIdentityClient />
         {/* Linked source accounts (#395). Lived only in the old account
             drawer; the profile is its one home now. */}
-        <ConnectedAccountsSection />
+        <ConnectedAccountsClient />
         <AppearanceClient />
       </PageShell>
     </PreloadQuery>
