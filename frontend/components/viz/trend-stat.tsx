@@ -51,11 +51,12 @@ export function TrendStat({
   const Arrow = rising ? ArrowUpIcon : falling ? ArrowDownIcon : ArrowRightIcon;
   // "good" = rising unless inverted. Flat → muted.
   const good = rising !== invert; // XOR: rising && !invert, or falling && invert
-  const tone = !hasDelta || (!rising && !falling)
-    ? "text-muted-foreground"
-    : good
-      ? "text-success-fg"
-      : "text-danger-fg";
+  const tone =
+    !hasDelta || (!rising && !falling)
+      ? "text-muted-foreground"
+      : good
+        ? "text-success-fg"
+        : "text-danger-fg";
 
   return (
     <div className={cn("flex items-end justify-between gap-3", className)}>
