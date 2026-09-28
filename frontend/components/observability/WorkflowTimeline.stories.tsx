@@ -1,0 +1,78 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { WorkflowActivity, WorkflowRunSummary } from "@/components/observability/types";
+import { WorkflowTimeline } from "@/components/observability/WorkflowTimeline";
+
+const meta: Meta = { title: "Patterns/Observability/WorkflowTimeline" };
+export default meta;
+
+const RUN: WorkflowRunSummary = {
+  workflowId: "nightly-sync",
+  runId: "7d02e5f7-4b1a-4c9e-9f3a-1d2c3b4a5f60",
+  workflowKind: "WorkflowRun",
+  status: "running",
+  startedAt: "2026-09-28T12:00:00Z",
+};
+
+const ACTIVITIES: WorkflowActivity[] = [
+  {
+    id: "a1",
+    name: "fetch",
+    status: "succeeded",
+    durationMs: 12000,
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: "2026-09-28T12:00:00Z",
+        endedAt: "2026-09-28T12:00:12Z",
+        status: "succeeded",
+      },
+    ],
+  },
+  {
+    id: "a2",
+    name: "transform",
+    status: "failed",
+    durationMs: 51000,
+    attempts: [
+      {
+        attemptNumber: 1,
+        startedAt: "2026-09-28T12:00:12Z",
+        endedAt: "2026-09-28T12:00:40Z",
+        status: "failed",
+        errorMessage: "tool timeout after 45s",
+      },
+      {
+        attemptNumber: 2,
+        startedAt: "2026-09-28T12:00:41Z",
+        endedAt: "2026-09-28T12:01:03Z",
+        status: "failed",
+        errorMessage: "tool timeout after 45s",
+      },
+    ],
+  },
+  { id: "a3", name: "publish", status: "pending", attempts: [] },
+];
+
+export const Running: StoryObj = {
+  render: () => (
+    <WorkflowTimeline
+      run={RUN}
+      activities={ACTIVITIES}
+      onCancel={() => {}}
+      onRetryActivity={() => {}}
+    />
+  ),
+};
+export const Failed: StoryObj = {
+  render: () => (
+    <WorkflowTimeline
+      run={{
+        ...RUN,
+        status: "failed",
+        endedAt: "2026-09-28T12:01:03Z",
+        errorMessage: "activity transform failed after 2 attempts",
+      }}
+      activities={ACTIVITIES}
+    />
+  ),
+};
