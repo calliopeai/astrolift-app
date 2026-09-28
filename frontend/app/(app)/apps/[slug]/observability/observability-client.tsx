@@ -1,6 +1,8 @@
 "use client";
 
 import { useDnsRecords } from "@/components/observability/use-dns-records";
+import { useEndpointMetrics } from "@/components/observability/use-endpoint-metrics";
+import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
 import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
 import { useMutation, useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
@@ -457,6 +459,12 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   // renders both selects above the ``GoldenSignalsPanel``.
   const scopedEnv = envParam;
   const scopedWorkload = workloadParam;
+  const scopeOptions = useMetricScopeOptions(slug);
+  const endpointMetrics = useEndpointMetrics({
+    appSlug: slug,
+    environmentName: scopedEnv,
+    workloadSlug: scopedWorkload,
+  });
 
   const updateScopeParam = React.useCallback(
     (key: "env" | "workload", value: string | null) => {
@@ -819,6 +827,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             environmentPlaceholder: t("scope.environmentPlaceholder"),
             workloadPlaceholder: t("scope.workloadPlaceholder"),
           }}
+          {...scopeOptions}
         />
       </div>
       <GoldenSignalsPanel
@@ -828,11 +837,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       />
 
       {/* ─── #641 per-endpoint HTTP metrics ────────────────────────── */}
-      <EndpointMetricsPanel
-        appSlug={a.slug}
-        environmentName={scopedEnv}
-        workloadSlug={scopedWorkload}
-      />
+      <EndpointMetricsPanel {...endpointMetrics} />
 
       {/* ─── #644 distributed trace explorer ───────────────────────── */}
       <TraceExplorerPanel appSlug={a.slug} environmentName={scopedEnv} />

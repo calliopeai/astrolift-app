@@ -28,7 +28,6 @@
  *  - If the app has zero workloads, hide the workload picker.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { LayersIcon, GlobeIcon } from "lucide-react";
 import * as React from "react";
 
@@ -40,19 +39,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/__generated__/schema";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
 const ALL_WORKLOADS_VALUE = "__all__";
 
-interface EnvResp {
-  astroliftEnvironments: AstroliftAppEnvironment[];
-}
-
-interface WorkloadResp {
-  astroliftWorkloads: AstroliftWorkload[];
+/** The picker's choices, from useMetricScopeOptions. */
+export interface MetricScopeOptions {
+  environments: AstroliftAppEnvironment[];
+  environmentsLoading: boolean;
+  workloads: AstroliftWorkload[];
+  workloadsLoading: boolean;
 }
 
 export interface MetricScopePickerProps {
@@ -96,28 +93,23 @@ export function MetricScopePicker({
   onEnvironmentChange,
   onWorkloadChange,
   labels = DEFAULT_LABELS,
-}: MetricScopePickerProps) {
-  const envs = useQuery<EnvResp>(LIST_ENVIRONMENTS, {
-    variables: { appSlug },
-    fetchPolicy: "cache-and-network",
-  });
-  const workloads = useQuery<WorkloadResp>(LIST_WORKLOADS, {
-    variables: { appSlug },
-    fetchPolicy: "cache-and-network",
-  });
-
+  environments,
+  environmentsLoading,
+  workloads,
+  workloadsLoading: workloadsLoadingRaw,
+}: MetricScopePickerProps & MetricScopeOptions) {
   // Sort env list alphabetically so the default ("first env") is
   // deterministic across renders. Backend resolver applies the same
   // rule when ``environmentName`` is null.
   const sortedEnvs = React.useMemo(() => {
-    const rows = envs.data?.astroliftEnvironments ?? [];
+    const rows = environments;
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
-  }, [envs.data]);
+  }, [environments]);
 
   const sortedWorkloads = React.useMemo(() => {
-    const rows = workloads.data?.astroliftWorkloads ?? [];
+    const rows = workloads;
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
-  }, [workloads.data]);
+  }, [workloads]);
 
   // Effective env: if the parent didn't pick one yet, default to the
   // alphabetically-first env (so the UI label matches what the backend
@@ -131,8 +123,8 @@ export function MetricScopePicker({
   // calls for env-scoped filtering when the data shape grows. For
   // v1, the workload picker lists every workload under the app.
 
-  const envsLoading = envs.loading && sortedEnvs.length === 0;
-  const workloadsLoading = workloads.loading && sortedWorkloads.length === 0;
+  const envsLoading = environmentsLoading && sortedEnvs.length === 0;
+  const workloadsLoading = workloadsLoadingRaw && sortedWorkloads.length === 0;
 
   if (envsLoading && workloadsLoading) {
     return (

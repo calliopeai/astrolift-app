@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
 import { BarChart2Icon } from "lucide-react";
 import * as React from "react";
 
@@ -14,45 +13,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { GET_APP_ENDPOINT_METRICS } from "@/graphql/observability/observability.queries";
 import type { AstroliftAppEndpointMetric } from "@/graphql/__generated__/schema";
 
-interface EndpointMetricsResp {
-  astroliftAppEndpointMetrics: AstroliftAppEndpointMetric[];
-}
-
-export interface EndpointMetricsPanelProps {
-  appSlug: string;
-  environmentName?: string | null;
-  workloadSlug?: string | null;
-  rangeSeconds?: number;
-}
-
-const DEFAULT_RANGE_SECONDS = 3600;
-
+/** Pure (Storybook first): the metrics come from useEndpointMetrics. */
 export function EndpointMetricsPanel({
-  appSlug,
-  environmentName,
-  workloadSlug,
-  rangeSeconds = DEFAULT_RANGE_SECONDS,
-}: EndpointMetricsPanelProps) {
-  const { data, loading } = useQuery<EndpointMetricsResp>(GET_APP_ENDPOINT_METRICS, {
-    variables: {
-      appSlug,
-      environmentName: environmentName ?? null,
-      workloadSlug: workloadSlug ?? null,
-      rangeSeconds,
-    },
-    fetchPolicy: "cache-and-network",
-    pollInterval: 30_000,
-  });
-
+  metrics,
+  loading,
+}: {
+  metrics: AstroliftAppEndpointMetric[];
+  loading: boolean;
+}) {
   const rows = React.useMemo(() => {
-    const items = data?.astroliftAppEndpointMetrics ?? [];
+    const items = metrics ?? [];
     return [...items].sort((a, b) => b.requestRate - a.requestRate);
-  }, [data]);
+  }, [metrics]);
 
-  const isInitialLoading = loading && !data;
+  const isInitialLoading = loading && metrics.length === 0;
 
   return (
     <Card>
