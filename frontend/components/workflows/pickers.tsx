@@ -156,8 +156,7 @@ export function SkillRefsPicker({
   const selected = React.useMemo<SkillOption[]>(
     () =>
       value.map(
-        (slug) =>
-          options.find((o) => o.slug === slug) ?? { slug, name: slug, isGlobal: false }
+        (slug) => options.find((o) => o.slug === slug) ?? { slug, name: slug, isGlobal: false }
       ),
     [value, options]
   );
@@ -184,9 +183,7 @@ export function SkillRefsPicker({
                 </ComboboxChip>
               ))}
               <ComboboxChipsInput
-                placeholder={
-                  vals.length > 0 ? "" : loading ? "Loading skills…" : "Add skills"
-                }
+                placeholder={vals.length > 0 ? "" : loading ? "Loading skills…" : "Add skills"}
                 disabled={disabled || !orgScoped}
               />
             </React.Fragment>
