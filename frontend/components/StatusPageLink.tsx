@@ -17,8 +17,12 @@
 
 import { ActivityIcon } from "lucide-react";
 
-export function StatusPageLink() {
-  const url = process.env.NEXT_PUBLIC_STATUS_PAGE_URL;
+export function StatusPageLink({
+  url = process.env.NEXT_PUBLIC_STATUS_PAGE_URL,
+}: {
+  /** Defaults to the build's NEXT_PUBLIC_STATUS_PAGE_URL; passed in by stories. */
+  url?: string;
+} = {}) {
   if (!url) return null;
   return (
     <a
