@@ -1705,6 +1705,8 @@ class EKSClusterDriver(ClusterDriver):
                 getattr(cluster, "oidc_auth_config", None),
                 ingress_class=getattr(cluster, "ingress_class", "") or "",
                 front=alb_front(getattr(cluster, "oidc_auth_config", None), namespace=PLATFORM_NAMESPACE),
+                # Per-app access (#2132), kept current by the control plane.
+                access_rules=list((getattr(cluster, "edge_access_rules", None) or {}).values()),
             ),
         ]
 

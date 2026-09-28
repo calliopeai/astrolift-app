@@ -1297,6 +1297,10 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
         prune_edge_leftovers(
             driver, ctx.slug, app_slug=d.registered_app.slug, namespace=namespace, rendered=resources
         )
+        # The hostnames this environment now serves, for its access rule (#2132).
+        from core.edge_access import record_environment
+
+        record_environment(cluster, d.registered_app, namespace, resources)
     return {
         "created": list(result.created),
         "updated": list(result.updated),

@@ -174,6 +174,10 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
                 from core.app_deploy import prune_edge_leftovers
 
                 prune_edge_leftovers(driver, ctx.slug, app_slug=app.slug, namespace=namespace, rendered=[])
+                # And its access rule, which named hostnames it no longer holds (#2132).
+                from core.edge_access import record_environment
+
+                record_environment(cluster, app, namespace, [])
             pv_refs = [
                 ref
                 for ref in cleanup_binding_resources(

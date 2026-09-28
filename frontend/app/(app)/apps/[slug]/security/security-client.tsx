@@ -18,13 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -44,6 +38,8 @@ import type {
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import { AppTabs } from "../components/app-tabs";
+
+import { AccessCard } from "./access-card";
 
 const DEFAULT_POLICY = {
   blockOnCriticalCves: true,
@@ -164,10 +160,7 @@ export function AppSecurityClient({ slug }: { slug: string }) {
 
   if (!a) {
     return (
-      <PageShell
-        title={tCommon("notFound")}
-        description={tCommon("notFoundPermission")}
-      >
+      <PageShell title={tCommon("notFound")} description={tCommon("notFoundPermission")}>
         <EmptyState
           icon={<ShieldCheckIcon className="size-5" />}
           title={tCommon("notFoundSlug", { slug })}
@@ -189,6 +182,7 @@ export function AppSecurityClient({ slug }: { slug: string }) {
     >
       <AppTabs slug={a.slug} active="security" />
 
+      <AccessCard appSlug={a.slug} />
       <SigningCard event={latestSigning} loading={events.loading && !events.data} />
       <SbomCard event={latestSbom} loading={events.loading && !events.data} />
       <ScanCard event={latestScan} loading={events.loading && !events.data} />
@@ -206,16 +200,14 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div className="flex items-start gap-3">
-          <ShieldCheckIcon className="mt-0.5 size-4 text-success-fg" />
+          <ShieldCheckIcon className="text-success-fg mt-0.5 size-4" />
           <div>
             <CardTitle className="text-sm">{t("title")}</CardTitle>
             <CardDescription>{t("description")}</CardDescription>
           </div>
         </div>
         {hasEvent ? (
-          <Badge className="bg-success/15 text-success-fg">
-            {t("signed")}
-          </Badge>
+          <Badge className="bg-success/15 text-success-fg">{t("signed")}</Badge>
         ) : (
           <Badge variant="outline">{t("noData")}</Badge>
         )}
@@ -232,11 +224,7 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
               label={t("signedAt")}
               value={formatTime(payload.signed_at ?? event?.occurredAt ?? null)}
             />
-            <Field
-              label={t("signerIdentity")}
-              mono
-              value={payload.signer_identity || "—"}
-            />
+            <Field label={t("signerIdentity")} mono value={payload.signer_identity || "—"} />
             <Field
               label={t("imageDigest")}
               mono
@@ -250,7 +238,7 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
             />
             {payload.rekor_entry_url && (
               <div className="sm:col-span-2">
-                <dt className="text-muted-foreground text-xs uppercase tracking-wide">
+                <dt className="text-muted-foreground text-xs tracking-wide uppercase">
                   {t("rekor")}
                 </dt>
                 <dd className="mt-0.5">
@@ -305,11 +293,7 @@ function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: b
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <dl className="grid flex-1 grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-              <Field
-                label={t("format")}
-                mono
-                value={payload.format || "—"}
-              />
+              <Field label={t("format")} mono value={payload.format || "—"} />
               <Field
                 label={t("generatedAt")}
                 value={formatTime(payload.generated_at ?? event?.occurredAt ?? null)}
@@ -356,9 +340,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
       medium: 2,
       low: 3,
     };
-    return [...findings].sort(
-      (a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9),
-    );
+    return [...findings].sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
   }, [findings]);
 
   return (
@@ -392,7 +374,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
           <p className="text-muted-foreground p-6 text-sm">{t("noEvent")}</p>
         ) : sortedFindings.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm">
-            <CheckCircle2Icon className="size-4 text-success-fg" />
+            <CheckCircle2Icon className="text-success-fg size-4" />
             <span className="text-muted-foreground">
               {t("noVulns", { at: formatTime(payload.scanned_at ?? event?.occurredAt ?? null) })}
             </span>
@@ -421,15 +403,11 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
                     </a>
                   </TableCell>
                   <TableCell>
-                    <Badge className={SEVERITY_TONE[f.severity]}>
-                      {f.severity}
-                    </Badge>
+                    <Badge className={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     {f.package_name}
-                    <span className="text-muted-foreground">
-                      {" "}@ {f.package_version}
-                    </span>
+                    <span className="text-muted-foreground"> @ {f.package_version}</span>
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     {f.fixed_in_version ? (
@@ -489,7 +467,7 @@ function PolicyCard({
 
   function update<K extends keyof typeof DEFAULT_POLICY>(
     key: K,
-    value: (typeof DEFAULT_POLICY)[K],
+    value: (typeof DEFAULT_POLICY)[K]
   ) {
     setPolicy((p) => ({ ...p, [key]: value }));
     setDirty(true);
@@ -556,10 +534,7 @@ function PolicyCard({
               value={policy.blockOnHighCveThreshold ?? ""}
               disabled={saving}
               onChange={(e) =>
-                update(
-                  "blockOnHighCveThreshold",
-                  e.target.value ? Number(e.target.value) : null,
-                )
+                update("blockOnHighCveThreshold", e.target.value ? Number(e.target.value) : null)
               }
             >
               <option value="">{t("noThreshold")}</option>
@@ -616,20 +591,10 @@ function ToggleRow({
   );
 }
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-muted-foreground text-xs uppercase tracking-wide">
-        {label}
-      </dt>
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
       <dd className={mono ? "font-mono text-sm" : "text-sm"}>{value}</dd>
     </div>
   );

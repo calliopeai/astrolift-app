@@ -757,6 +757,27 @@ export type AstroliftApiTokenScopePreset = {
   scopes: Array<Scalars['String']['output']>;
 };
 
+export type AstroliftAppAccess = {
+  appSlug: Scalars['String']['output'];
+  enforcedOn: Array<Scalars['String']['output']>;
+  groups: Array<Scalars['String']['output']>;
+  managedByManifest: Scalars['Boolean']['output'];
+  restricted: Scalars['Boolean']['output'];
+  users: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftAppAccessMutationResult = {
+  data?: Maybe<AstroliftAppAccess>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAppAccessPreview = {
+  allowed?: Maybe<Scalars['Int']['output']>;
+  losing: Array<Scalars['String']['output']>;
+  total?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftAppAutowireStatus = {
   checkedAt?: Maybe<Scalars['DateTime']['output']>;
   ciWorkflow: Scalars['String']['output'];
@@ -5637,6 +5658,7 @@ export type Mutation = {
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
+  setAppAccess: AstroliftAppAccessMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -7115,6 +7137,11 @@ export type MutationSetAlertSubscriptionArgs = {
 };
 
 
+export type MutationSetAppAccessArgs = {
+  input: SetAppAccessInput;
+};
+
+
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
 };
@@ -7959,6 +7986,8 @@ export type Query = {
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApiTokensPage: AstroliftApiTokenPage;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
+  astroliftAppAccess?: Maybe<AstroliftAppAccess>;
+  astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
@@ -8462,6 +8491,18 @@ export type QueryAstroliftApiTokensPageArgs = {
 export type QueryAstroliftAppArgs = {
   includeDrift?: Scalars['Boolean']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppAccessArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppAccessPreviewArgs = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
 };
 
 
@@ -10060,6 +10101,12 @@ export type SetAlertSubscriptionInput = {
   appSlug: Scalars['String']['input'];
   channel: Scalars['String']['input'];
   enabled: Scalars['Boolean']['input'];
+};
+
+export type SetAppAccessInput = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
 };
 
 export type SetAppSecretInput = {

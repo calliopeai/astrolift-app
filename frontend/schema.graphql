@@ -745,6 +745,27 @@ type AstroliftApiTokenScopePreset {
   scopes: [String!]!
 }
 
+type AstroliftAppAccess {
+  appSlug: String!
+  groups: [String!]!
+  users: [String!]!
+  restricted: Boolean!
+  managedByManifest: Boolean!
+  enforcedOn: [String!]!
+}
+
+type AstroliftAppAccessMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppAccess
+}
+
+type AstroliftAppAccessPreview {
+  allowed: Int
+  total: Int
+  losing: [String!]!
+}
+
 type AstroliftAppAutowireStatus {
   connected: Boolean!
   ciWorkflow: String!
@@ -5602,6 +5623,7 @@ type Mutation {
   setRetentionPolicy(input: SetRetentionPolicyInput!): AstroliftRetentionPolicyMutationResult!
   archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
   restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
+  setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -6327,6 +6349,8 @@ type Query {
   assignableAstroliftProjects: [AstroliftProject!]!
   astroliftAppDoctor(appSlug: String!): AstroliftAppDoctorReport!
   scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
+  astroliftAppAccess(appSlug: String!): AstroliftAppAccess
+  astroliftAppAccessPreview(appSlug: String!, groups: [String!]!, users: [String!]!): AstroliftAppAccessPreview
   scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")
@@ -6934,6 +6958,12 @@ input SetAlertSubscriptionInput {
   alertKind: String!
   channel: String!
   enabled: Boolean!
+}
+
+input SetAppAccessInput {
+  appSlug: String!
+  groups: [String!]! = []
+  users: [String!]! = []
 }
 
 input SetAppSecretInput {

@@ -545,3 +545,48 @@ export const GET_APP_DOCTOR = gql`
     }
   }
 `;
+
+// Who may enter the app behind central auth (#2132).
+export const GET_APP_ACCESS = gql`
+  query GetAppAccess($appSlug: String!) {
+    astroliftAppAccess(appSlug: $appSlug) {
+      appSlug
+      groups
+      users
+      restricted
+      managedByManifest
+      enforcedOn
+    }
+  }
+`;
+
+export const PREVIEW_APP_ACCESS = gql`
+  query PreviewAppAccess($appSlug: String!, $groups: [String!]!, $users: [String!]!) {
+    astroliftAppAccessPreview(appSlug: $appSlug, groups: $groups, users: $users) {
+      allowed
+      total
+      losing
+    }
+  }
+`;
+
+export const SET_APP_ACCESS = gql`
+  mutation SetAppAccess($input: SetAppAccessInput!) {
+    setAppAccess(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        groups
+        users
+        restricted
+        managedByManifest
+        enforcedOn
+      }
+    }
+  }
+`;

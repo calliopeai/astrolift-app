@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 from typing import Any
 
 from _sdk.cluster import BootstrapComponent
@@ -109,7 +110,129 @@ def _manifest(api_version: str, kind: str, name: str, namespace: str | None = No
     return {"apiVersion": api_version, "kind": kind, "metadata": metadata, **body}
 
 
-def edge_security_policy(oidc_auth_config: dict[str, Any]) -> dict[str, Any]:
+JWT_PROVIDER_NAME = "idp"
+ACCESS_DENIED_POLICY_NAME = "edge-access-denied"
+
+
+def groups_claim(oidc_auth_config: dict[str, Any] | None) -> str:
+    """The ID token claim carrying the user's groups.
+
+    ``cognito:groups`` on Cognito, ``groups`` for most other providers; an
+    operator on one that names it differently sets ``groups_claim``.
+    """
+    config = oidc_auth_config or {}
+    if config.get("groups_claim"):
+        return str(config["groups_claim"])
+    return "cognito:groups" if "cognito-idp." in str(config.get("discovery_url") or "") else "groups"
+
+
+def _rule_name(name: str, suffix: str) -> str:
+    base = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-") or "app"
+    return f"{base[:50]}-{suffix}"
+
+
+def edge_authorization(
+    access_rules: list[dict[str, Any]] | None, oidc_auth_config: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """Per-app access, inside the one shared policy (#2132).
+
+    Each restricted app gets an Allow rule per kind of grant (its groups,
+    then its users by email), matched on the request's ``:authority`` and the
+    verified ID token's claims, then a Deny on the same hosts. Everything
+    else is allowed, so an app with no rule is open to every signed-in user,
+    as before. Kept in the shared policy, not one per app, because a second
+    policy on a route gets its own session and ends single sign-on.
+    """
+    claim = groups_claim(oidc_auth_config)
+    rules: list[dict[str, Any]] = []
+    for access in access_rules or []:
+        hosts = sorted({str(h) for h in access.get("hosts") or [] if h})
+        groups = sorted({str(g) for g in access.get("groups") or [] if g})
+        users = sorted({str(u).lower() for u in access.get("users") or [] if u})
+        if not hosts or not (groups or users):
+            continue
+        on_hosts = [{"name": ":authority", "values": hosts}]
+        name = str(access.get("name") or hosts[0])
+        if groups:
+            rules.append(
+                {
+                    "name": _rule_name(name, "groups"),
+                    "action": "Allow",
+                    "principal": {
+                        "headers": on_hosts,
+                        "jwt": {
+                            "provider": JWT_PROVIDER_NAME,
+                            "claims": [{"name": claim, "valueType": "StringArray", "values": groups}],
+                        },
+                    },
+                }
+            )
+        if users:
+            rules.append(
+                {
+                    "name": _rule_name(name, "users"),
+                    "action": "Allow",
+                    "principal": {
+                        "headers": on_hosts,
+                        "jwt": {
+                            "provider": JWT_PROVIDER_NAME,
+                            "claims": [{"name": "email", "values": users}],
+                        },
+                    },
+                }
+            )
+        rules.append({"name": _rule_name(name, "deny"), "action": "Deny", "principal": {"headers": on_hosts}})
+    if not rules:
+        return None
+    return {"defaultAction": "Allow", "rules": rules}
+
+
+def edge_access_denied_policy() -> dict[str, Any]:
+    """A page for a signed-in user an app's access rule turns away (#2132).
+
+    Only Envoy's own 403 (``source: Local``) is replaced, so an app's own 403
+    reaches the client untouched.
+    """
+    return _manifest(
+        "gateway.envoyproxy.io/v1alpha1",
+        "BackendTrafficPolicy",
+        ACCESS_DENIED_POLICY_NAME,
+        EDGE_NAMESPACE,
+        spec={
+            "targetSelectors": [
+                {
+                    "group": "gateway.networking.k8s.io",
+                    "kind": "HTTPRoute",
+                    "matchLabels": {GATE_LABEL: GATE_LABEL_GATED},
+                }
+            ],
+            "responseOverride": [
+                {
+                    "source": "Local",
+                    "match": {"statusCodes": [{"type": "Value", "value": 403}]},
+                    "response": {
+                        "contentType": "text/html",
+                        "body": {"type": "Inline", "inline": ACCESS_DENIED_PAGE},
+                    },
+                }
+            ],
+        },
+    )
+
+
+ACCESS_DENIED_PAGE = (
+    "<!doctype html><html lang=en><meta charset=utf-8><title>No access</title>"
+    '<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 1rem">'
+    "<h1>You don't have access to %REQ(:AUTHORITY)%</h1>"
+    "<p>You are signed in as %REQ(X-AUTH-REQUEST-EMAIL)%, which this app does not let in. "
+    "Ask the app's owner to add you or one of your groups to its access list.</p>"
+    '<p><a href="/oauth2/logout">Sign in as someone else</a></p></body></html>'
+)
+
+
+def edge_security_policy(
+    oidc_auth_config: dict[str, Any], access_rules: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """The one OIDC + JWT policy every gated route shares."""
     config = oidc_auth_config
     issuer = issuer_from_discovery_url(str(config["discovery_url"]))
@@ -146,7 +269,7 @@ def edge_security_policy(oidc_auth_config: dict[str, Any]) -> dict[str, Any]:
             "jwt": {
                 "providers": [
                     {
-                        "name": "idp",
+                        "name": JWT_PROVIDER_NAME,
                         "issuer": issuer,
                         # Only ID tokens minted for this client. The listener
                         # already drops a client-supplied token header; this
@@ -161,6 +284,7 @@ def edge_security_policy(oidc_auth_config: dict[str, Any]) -> dict[str, Any]:
                     }
                 ]
             },
+            **({"authorization": authz} if (authz := edge_authorization(access_rules, config)) else {}),
         },
     )
 
@@ -178,6 +302,7 @@ def edge_post_install_manifests(
     oidc_auth_config: dict[str, Any] | None,
     *,
     front: list[dict[str, Any]] | None = None,
+    access_rules: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Everything the edge needs beyond the controller's chart.
 
@@ -267,7 +392,8 @@ def edge_post_install_manifests(
         auth_host = str(config["auth_proxy_host"])
         out.extend(
             [
-                edge_security_policy(config),
+                edge_security_policy(config, access_rules),
+                edge_access_denied_policy(),
                 # The auth host exists so the callback has a route to run
                 # on. Past the login it has nothing to serve.
                 _manifest(
@@ -359,6 +485,7 @@ def edge_component(
     *,
     ingress_class: str,
     front: list[dict[str, Any]] | None = None,
+    access_rules: list[dict[str, Any]] | None = None,
 ) -> BootstrapComponent:
     """The ``envoy-gateway`` bootstrap component.
 
@@ -388,7 +515,7 @@ def edge_component(
         chart_repo_url="oci://docker.io/envoyproxy",
         chart_repo_type="oci",
         chart_version=EDGE_CHART_VERSION,
-        post_install_manifests=edge_post_install_manifests(oidc_auth_config, front=front),
+        post_install_manifests=edge_post_install_manifests(oidc_auth_config, front=front, access_rules=access_rules),
     )
 
 

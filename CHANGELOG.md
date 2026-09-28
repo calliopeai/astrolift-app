@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Per-app access on the Envoy edge (#2132). An app lists the identity
+  provider groups and users (by email) that may enter, from its Security tab,
+  `astro app access`, or `[ingress.access]` in `astrolift.toml` (which then
+  manages it, and the UI only shows it). The edge enforces it before the app
+  sees a request: the one shared SecurityPolicy gains per-host `authorization`
+  rules on the ID token's groups and email claims, so single sign-on stays,
+  and a user turned away gets a page naming the app instead of Envoy's bare
+  403, while an app's own 403 passes through. An app with no rule is open to
+  every signed-in user, as before. Saving shows how many users could enter
+  and who would lose access. Proven on Envoy Gateway 1.9.1 before building.
 - Manage who can sign in to the apps behind central auth, from cluster
   settings and `astro auth-users` (#2131). A new `identity_users` driver
   capability, Amazon Cognito first (Entra ID, Identity Platform and Keycloak
