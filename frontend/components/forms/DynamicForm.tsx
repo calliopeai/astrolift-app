@@ -8,18 +8,33 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useFormDefinition, useSubmitForm } from "@/graphql/forms/forms.hooks";
+import type { FormDefinition, MutationError } from "@/graphql/forms/forms.types";
 import { DynamicField } from "./field-registry";
 import { evaluateLogicRules, type LogicRule, type LogicState } from "./logic-engine";
 
+export type DynamicFormSubmitResult = {
+  ok: boolean;
+  submissionId: string | null;
+  errors: MutationError[];
+};
+
 type DynamicFormProps = {
   slug: string;
+  formDef: FormDefinition | null;
+  loading: boolean;
+  error: string | null;
+  onSubmit: (payload: Record<string, unknown>) => Promise<DynamicFormSubmitResult>;
   onSuccess?: (submissionId: string) => void;
 };
 
-export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
-  const { form: formDef, loading, error } = useFormDefinition(slug);
-  const [submitForm] = useSubmitForm();
+export function DynamicForm({
+  slug,
+  formDef,
+  loading,
+  error,
+  onSubmit: submit,
+  onSuccess,
+}: DynamicFormProps) {
   const [submitted, setSubmitted] = useState(false);
 
   const {
@@ -81,7 +96,7 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
     return (
       <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
         {error
-          ? `Error loading form: ${error.message}`
+          ? `Error loading form: ${error}`
           : `Form "${slug}" not found or not published.`}
       </div>
     );
@@ -120,18 +135,16 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
       }
     }
 
-    const { data: result } = await submitForm({
-      variables: { slug, payload },
-    });
+    const result = await submit(payload);
 
-    if (result?.submitForm.ok) {
+    if (result.ok) {
       setSubmitted(true);
       toast.success("Form submitted", { description: formDef.name });
-      if (result.submitForm.data?.id && onSuccess) {
-        onSuccess(result.submitForm.data.id);
+      if (result.submissionId && onSuccess) {
+        onSuccess(result.submissionId);
       }
-    } else if (result?.submitForm.errors?.length) {
-      for (const err of result.submitForm.errors) {
+    } else if (result.errors.length) {
+      for (const err of result.errors) {
         setError(err.field || "root", {
           type: "server",
           message: err.message,

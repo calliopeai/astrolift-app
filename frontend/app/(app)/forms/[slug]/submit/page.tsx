@@ -2,6 +2,7 @@
 
 import { notFound, useParams, useRouter } from "next/navigation";
 import { DynamicForm } from "@/components/forms/DynamicForm";
+import { useDynamicForm } from "@/components/forms/use-dynamic-form";
 
 import { isRouteEnabled } from "@/lib/route-flags";
 
@@ -10,11 +11,13 @@ export default function FormSubmitPage() {
 
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
+  const form = useDynamicForm(slug);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <DynamicForm
         slug={slug}
+        {...form}
         onSuccess={() => {
           setTimeout(() => router.push(`/forms/${slug}`), 2000);
         }}
