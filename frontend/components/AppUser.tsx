@@ -1,13 +1,12 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { useMe } from "@/graphql/user/user.hooks";
 
-export default function AppUser() {
-  const { user, loading } = useMe();
-
-  if (loading) return null;
-  if (!user) return null;
-
-  return <Badge variant="secondary">{user.profile?.username ?? user.id}</Badge>;
+/**
+ * The signed-in user as a badge. Pure (Storybook first). Imported nowhere
+ * today: on the cut list for the migration's last phase (spec 44 §9).
+ */
+export default function AppUser({ name }: { name: string | null | undefined }) {
+  if (!name) return null;
+  return <Badge variant="secondary">{name}</Badge>;
 }
