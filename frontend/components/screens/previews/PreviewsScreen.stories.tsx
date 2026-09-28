@@ -1,59 +1,71 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { LONG_PREVIEW, previewsProps } from "../pipelines/pipelines-previews.fixtures";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
-import { PreviewsScreen } from "./PreviewsScreen";
+import { LONG_PREVIEW, PREVIEWS, previewsProps } from "./previews.fixtures";
+import { narrowPreviews, PREVIEWS_LIST } from "./previews-list";
+import { PreviewsScreen, type PreviewsScreenProps } from "./PreviewsScreen";
 
 const meta: Meta = {
   title: "Screens/Previews/PreviewsScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-export const Full: Story = { render: () => <PreviewsScreen {...previewsProps()} /> };
-
-export const Loading: Story = {
-  render: () => (
-    <PreviewsScreen {...previewsProps({ state: "loading", rows: [], totalCount: null })} />
-  ),
+type Props = Partial<Omit<PreviewsScreenProps, "list">> & {
+  all?: AstroliftPreviewEnvironment[];
+  initial?: Partial<ListState>;
 };
 
-export const Empty: Story = {
-  render: () => <PreviewsScreen {...previewsProps({ state: "empty", rows: [], totalCount: 0 })} />,
-};
+/** The screen over fixture previews, narrowed the way the hook does it. */
+function Previews({ all = PREVIEWS, initial, ...patch }: Props) {
+  const list = useLocalListState(PREVIEWS_LIST, initial);
+  const f = list.filters;
+  const served = all.filter((p) => !f.app || p.registeredAppSlug === f.app);
+  return (
+    <PreviewsScreen {...previewsProps({ rows: narrowPreviews(served, f), ...patch })} list={list} />
+  );
+}
+
+export const Full: Story = { render: () => <Previews /> };
+
+export const Loading: Story = { render: () => <Previews all={[]} loading /> };
+
+export const Empty: Story = { render: () => <Previews all={[]} totalCount={0} /> };
 
 export const EmptyFiltered: Story = {
-  render: () => (
-    <PreviewsScreen
-      {...previewsProps({ state: "emptyFiltered", rows: [], isFiltered: true, search: "zzz" })}
-    />
-  ),
+  render: () => <Previews initial={{ filters: { app: "no-such-app" } }} />,
 };
 
 export const ErrorState: Story = {
-  render: () => (
-    <PreviewsScreen
-      {...previewsProps({
-        state: "error",
-        rows: [],
-        error: new globalThis.Error("upstream timed out"),
-      })}
-    />
-  ),
+  render: () => <Previews all={[]} error={{ message: "upstream timed out" }} />,
+};
+
+/** Mine: empty, with the note saying why. */
+export const Mine: Story = { render: () => <Previews initial={{ view: "mine" }} /> };
+
+/** The status chip: only the running previews. */
+export const Running: Story = {
+  render: () => <Previews initial={{ filters: { status: "running" } }} />,
 };
 
 /** Without app.deploy there is no Tear down action. */
-export const ReadOnly: Story = {
-  render: () => <PreviewsScreen {...previewsProps({}, { canTearDown: false })} />,
-};
+export const ReadOnly: Story = { render: () => <Previews canTearDown={false} /> };
 
-/** A teardown in flight: every Tear down button is disabled. */
-export const TearingDown: Story = {
-  render: () => <PreviewsScreen {...previewsProps({}, { tearingDown: true })} />,
-};
+/** A teardown in flight: every Tear down is disabled. */
+export const TearingDown: Story = { render: () => <Previews tearingDown /> };
 
 export const LongStrings: Story = {
-  render: () => <PreviewsScreen {...previewsProps({ rows: [LONG_PREVIEW], totalCount: 1 })} />,
+  render: () => <Previews all={[LONG_PREVIEW, ...PREVIEWS]} nextCursor="c:25" />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Previews all={[LONG_PREVIEW, ...PREVIEWS]} />
+    </div>
+  ),
 };

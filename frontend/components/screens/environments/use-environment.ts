@@ -16,7 +16,7 @@ interface Resp {
  * /environments list. The data half of EnvironmentDetail.
  */
 export function useEnvironment(id: string) {
-  const { data, loading } = useQuery<Resp>(LIST_ENVIRONMENTS, {
+  const { data, loading, error, refetch } = useQuery<Resp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: null },
     fetchPolicy: "cache-and-network",
   });
@@ -26,7 +26,14 @@ export function useEnvironment(id: string) {
     [data, id]
   );
 
-  return { loading, environment };
+  return {
+    loading: loading && !data,
+    environment,
+    error: error && !data ? { message: error.message } : null,
+    onRetry: () => {
+      void refetch();
+    },
+  };
 }
 
 export type EnvironmentState = ReturnType<typeof useEnvironment>;

@@ -4,14 +4,15 @@ import { AlertTriangleIcon, ChartSplineIcon, ExternalLinkIcon } from "lucide-rea
 import Link from "next/link";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import type { ObservabilitySummary, SparkPoint } from "./use-observability-summary";
 
 export interface ObservabilitySectionViewProps extends ObservabilitySummary {
   appSlug: string;
+  span?: PanelSpan;
 }
 
 /**
@@ -31,50 +32,46 @@ export function ObservabilitySectionView({
   unresolvedCount,
   criticalCount,
   alertsLoading,
+  span = 6,
 }: ObservabilitySectionViewProps) {
   return (
-    <Section
-      // Rendered inside the page-level "Insights" Section — nest the outline.
-      headingLevel="h3"
-      title={
-        <span className="flex items-center gap-2">
-          <ChartSplineIcon className="text-muted-foreground size-4" />
-          Observability
-        </span>
-      }
+    <Panel
+      title="Observability"
+      icon={<ChartSplineIcon className="size-4" />}
       description={`Last ${days} days · deploy throughput, failure rate, unresolved alerts.`}
-      action={
+      span={span}
+      actions={
         <>
           <Link
             href={`/administration/metrics?app=${appSlug}`}
-            className="inline-flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline"
+            className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
           >
-            Open metrics
+            Metrics
             <ExternalLinkIcon className="size-3" />
           </Link>
           <Link
             href={`/alerts?app=${appSlug}`}
-            className="inline-flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline"
+            className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
           >
-            Open alerts
+            Alerts
             <ExternalLinkIcon className="size-3" />
           </Link>
         </>
       }
     >
       {deploysLoading && totalDeploys === 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
           <SparkCard
             label="Deploys / day"
             value={totalDeploys}
             sublabel={`across ${days} days`}
-            color="rgb(8 212 184)"
+            color="var(--primary)"
             data={deploysSeries}
             empty={totalDeploys === 0 ? "No deploys" : undefined}
           />
@@ -86,7 +83,7 @@ export function ObservabilitySectionView({
                 ? `${formatPct(failedCount / totalDeploys)} of rollouts`
                 : "no rollouts yet"
             }
-            color="rgb(239 68 68)"
+            color="var(--danger)"
             data={errorSeries}
             empty={failedCount === 0 ? "No failures" : undefined}
           />
@@ -98,7 +95,7 @@ export function ObservabilitySectionView({
           />
         </div>
       )}
-    </Section>
+    </Panel>
   );
 }
 
@@ -118,9 +115,9 @@ function SparkCard({
   empty?: string;
 }) {
   return (
-    <div className="bg-card flex flex-col rounded-md border p-3">
+    <div className="flex min-w-0 flex-col rounded-md border p-3">
       <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">{label}</p>
-      <p className="mt-0.5 text-2xl font-semibold">{value}</p>
+      <p className="mt-0.5 font-mono text-2xl font-semibold">{value}</p>
       <p className="text-muted-foreground text-2xs">{sublabel}</p>
       <div className="mt-2 h-12">
         {empty ? (
@@ -180,13 +177,13 @@ function AlertSummaryCard({
   return (
     <Link
       href={`/alerts?app=${appSlug}`}
-      className="bg-card hover:bg-muted/40 group flex flex-col rounded-md border p-3 transition-colors"
+      className="hover:bg-muted/40 group flex min-w-0 flex-col rounded-md border p-3 transition-colors"
     >
       <p className="text-muted-foreground text-2xs flex items-center gap-1 font-medium tracking-wide uppercase">
         <AlertTriangleIcon className="size-3" />
         Unresolved alerts
       </p>
-      <p className="mt-0.5 text-2xl font-semibold">{loading ? "—" : unresolved}</p>
+      <p className="mt-0.5 font-mono text-2xl font-semibold">{loading ? "…" : unresolved}</p>
       <p className="text-muted-foreground text-2xs">
         {critical > 0 ? (
           <Badge variant="outline" className="border-danger-border text-danger-fg">
@@ -199,7 +196,7 @@ function AlertSummaryCard({
         )}
       </p>
       <div className="mt-auto flex items-center justify-end pt-3">
-        <span className="text-muted-foreground text-2xs inline-flex items-center gap-1 group-hover:text-[var(--brand-primary)]">
+        <span className="text-muted-foreground text-2xs group-hover:text-primary inline-flex items-center gap-1">
           Open
           <ExternalLinkIcon className="size-3" />
         </span>

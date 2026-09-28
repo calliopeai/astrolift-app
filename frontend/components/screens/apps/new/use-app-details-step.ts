@@ -77,5 +77,5 @@ export function useAppDetailsStep<S extends AppDetailsFields>(
     setValid(nameValid && slugValid && projectValid);
   }, [nameValid, slugValid, projectValid, setValid]);
 
-  return { allTeams, allProjects, slugValid };
+  return { allTeams, allProjects, slugValid, projectsLoading: projects.loading && !projects.data };
 }

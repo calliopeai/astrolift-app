@@ -13,9 +13,9 @@ import {
 import * as React from "react";
 
 import { Can } from "@/components/Can";
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -27,6 +27,7 @@ export type UrlCardViewProps = ReturnType<typeof useUrlCard> & {
    * routable (UrlHealthBadge polls, so it is a slot and mounts only then).
    */
   healthBadge?: React.ReactNode;
+  span?: PanelSpan;
 };
 
 /**
@@ -95,6 +96,7 @@ export function UrlCardView({
   onSave,
   onCopy,
   healthBadge,
+  span = 6,
 }: UrlCardViewProps) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(subdomain);
@@ -132,30 +134,22 @@ export function UrlCardView({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-        <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
-          <GlobeIcon className="size-5" />
-        </div>
-        <div className="flex-1">
-          <CardTitle className="text-base">Public URL</CardTitle>
-          <CardDescription className="mt-1">
-            The platform-issued host for this app. Edit the subdomain to rename it; DNS and
-            certificates re-issue automatically.
-          </CardDescription>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+    <Panel
+      title="Public URL"
+      icon={<GlobeIcon className="size-4" />}
+      description="The platform-issued host for this app. Edit the subdomain to rename it; DNS and certificates re-issue automatically."
+      span={span}
+    >
+      <div className="min-w-0 space-y-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <a
             href={`https://${fullHost}`}
             target="_blank"
             rel="noreferrer"
-            className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-mono text-sm transition-colors"
+            className="text-foreground hover:text-primary inline-flex min-w-0 items-center gap-1.5 font-mono text-sm [overflow-wrap:anywhere] transition-colors"
           >
-            {fullHost}
-            <ExternalLinkIcon className="size-3.5" />
+            <span className="min-w-0">{fullHost}</span>
+            <ExternalLinkIcon className="size-3.5 shrink-0" />
           </a>
           {isRoutable ? (
             healthBadge
@@ -250,10 +244,13 @@ export function UrlCardView({
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-0.5">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="min-w-0 space-y-0.5">
                 <p className="text-muted-foreground text-xs">Subdomain</p>
-                <Badge variant="outline" className="gap-1 font-mono text-xs">
+                <Badge
+                  variant="outline"
+                  className="h-auto max-w-full gap-1 font-mono text-xs [overflow-wrap:anywhere] whitespace-normal"
+                >
                   {subdomain}
                 </Badge>
               </div>
@@ -270,7 +267,7 @@ export function UrlCardView({
             </div>
           )}
         </Can>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

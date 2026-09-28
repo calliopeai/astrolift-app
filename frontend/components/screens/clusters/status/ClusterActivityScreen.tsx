@@ -8,11 +8,10 @@
 
 import { CheckIcon, ClockIcon, GitBranchIcon, XIcon } from "lucide-react";
 
+import { Panel, PanelGrid, SkeletonRows } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
-
-import { SkeletonRows, StatusPanel, StatusPanelGrid } from "./StatusPanel";
 
 import type { useClusterLifecycleAudit } from "./use-cluster-lifecycle-audit";
 import type { useRecentClusterWorkflows } from "./use-recent-cluster-workflows";
@@ -25,10 +24,10 @@ export interface ClusterActivityBodyProps {
 /** The Activity tab body: recent workflows beside the lifecycle timeline. */
 export function ClusterActivityBody({ workflows, lifecycle }: ClusterActivityBodyProps) {
   return (
-    <StatusPanelGrid>
+    <PanelGrid>
       <ActivityWorkflowsCard {...workflows} />
       <ActivityLifecycleCard {...lifecycle} />
-    </StatusPanelGrid>
+    </PanelGrid>
   );
 }
 
@@ -56,8 +55,8 @@ function ActivityWorkflowsCard({
   const fmt = useFormatters();
 
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<GitBranchIcon className="size-4" />}
       title="Recent workflows"
       description="Temporal runs targeting this cluster — BringClusterInto- Management, Refresh, Decommission, InstallClusterPrereqs, DriftDetection. Polls every 15s while a run is in flight."
@@ -106,7 +105,7 @@ function ActivityWorkflowsCard({
           );
         })}
       </ul>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -124,8 +123,8 @@ function ActivityLifecycleCard({
   const fmt = useFormatters();
 
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<ClockIcon className="size-4" />}
       title="Lifecycle + activity"
       description="Every mutation that targeted this cluster — registered → managing → managed transitions, refreshes, prereq installs, decommission attempts. Sourced from the platform audit log."
@@ -175,6 +174,6 @@ function ActivityLifecycleCard({
           </li>
         ))}
       </ol>
-    </StatusPanel>
+    </Panel>
   );
 }

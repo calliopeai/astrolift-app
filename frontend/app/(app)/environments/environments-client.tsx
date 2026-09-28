@@ -6,12 +6,12 @@ import { EnvironmentsScreen } from "@/components/screens/environments/Environmen
 import { useEnvironments } from "@/components/screens/environments/use-environments";
 
 /**
- * Global /environments list, and the per-app (and per-agent) environments
- * tab when appSlug and tabs are passed.
+ * Apps › Environments, and the list embedded on an app's Settings tab
+ * (and an agent's environments page, with its tabs) when appSlug is set.
  */
 export function EnvironmentsClient({
   appSlug,
   tabs,
 }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
-  return <EnvironmentsScreen {...useEnvironments(appSlug)} appSlug={appSlug} tabs={tabs} />;
+  return <EnvironmentsScreen {...useEnvironments(appSlug)} tabs={tabs} />;
 }

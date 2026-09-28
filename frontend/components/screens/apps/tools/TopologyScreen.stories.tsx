@@ -7,14 +7,16 @@ import {
 } from "./app-observability-shell-topology-commands.fixtures";
 import { TopologyScreen } from "./TopologyScreen";
 
+/** The overview's topology panel: AppView over the app's real nodes. */
 const meta: Meta = {
   title: "Screens/Apps/Tools/TopologyScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
+/** Web and worker on one database; the worker failed. */
 export const Full: Story = {
   render: () => <TopologyScreen {...TOPOLOGY} />,
 };
@@ -28,16 +30,16 @@ export const WorkloadsLoading: Story = {
   render: () => <TopologyScreen {...TOPOLOGY} workloadsLoading />,
 };
 
-/** No workloads yet: nothing to draw. */
+/** No workloads yet: nothing to draw, and the way to add one. */
 export const Empty: Story = {
   render: () => <TopologyScreen {...TOPOLOGY} nodes={[]} edges={[]} />,
 };
 
 /**
- * The screen has no query-error state; an unknown slug (or no permission)
- * is the closest real one.
+ * The panel has no query-error state of its own: the frame above it owns a
+ * failed app query, and a failed workloads query reads as no workloads.
  */
-export const NotFound: Story = {
+export const NoApp: Story = {
   render: () => <TopologyScreen {...TOPOLOGY} slug="no-such-app" app={null} />,
 };
 
@@ -50,5 +52,13 @@ export const LongStrings: Story = {
       nodes={LONG_NODES}
       edges={[]}
     />
+  ),
+};
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <TopologyScreen {...TOPOLOGY} />
+    </div>
   ),
 };

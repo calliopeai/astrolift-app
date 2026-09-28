@@ -1,17 +1,13 @@
 "use client";
 
 import {
-  BarChart3Icon,
   BoxIcon,
   CheckIcon,
-  ClockIcon,
+  CopyIcon,
   ExternalLinkIcon,
-  GitBranchIcon,
   Loader2Icon,
-  MoreHorizontalIcon,
   PlusIcon,
   RotateCcwIcon,
-  ScrollIcon,
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
@@ -22,81 +18,23 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable } from "@/components/data-table";
-import type { Column } from "@/components/data-table";
+import type { Column, RowSelection } from "@/components/data-table";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { ListPage } from "@/components/list/ListPage";
 import { formatDuration } from "@/components/screens/apps/deployments/app-deployments-format";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
-import {
-  DEPLOYMENT_TABS,
-  IN_FLIGHT,
-  signalTab,
-  statusToDot,
-  TERMINAL,
-  type ActionKind,
-  type FleetTab,
-  type SignalTab,
-} from "./deployments-format";
+import { appsListCrumbs } from "./apps-area";
+import { IN_FLIGHT, statusToDot, TERMINAL, type ActionKind } from "./deployments-format";
+import { deploySha } from "./deployments-list";
 import type { useDeployments } from "./use-deployments";
 
-export interface StartDialogSlotProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export type DeploymentsScreenProps = ReturnType<typeof useDeployments> & {
-  /** The start-deployment sheet, a container so its queries run only while it is open. */
-  renderStartDialog: (props: StartDialogSlotProps) => React.ReactNode;
-};
-
-const SIGNAL_COPY: Record<
-  SignalTab,
-  { label: string; icon: React.ReactNode; description: string; actionHref: string }
-> = {
-  metrics: {
-    label: "Metrics",
-    icon: <BarChart3Icon className="size-5" />,
-    description:
-      "Rollout success rate, request latency (p50/p95/p99), error rate, and pod restart counts across all deployment workloads.",
-    actionHref: "/administration/metrics",
-  },
-  logs: {
-    label: "Logs",
-    icon: <ScrollIcon className="size-5" />,
-    description:
-      "Fleet-wide log search across all deployment container stdout/stderr. Filter by app, workload, severity, or time range.",
-    actionHref: "/logs",
-  },
-  traces: {
-    label: "Traces",
-    icon: <GitBranchIcon className="size-5" />,
-    description:
-      "Distributed trace explorer for deployment workloads — latency, downstream errors, and service dependencies.",
-    actionHref: "/traces",
-  },
-};
-
-// DataTable stretches the row's link across the whole row (an ::after on
-// the first cell), and that overlay paints above the un-positioned cells
-// beside it. The selection checkbox and the action buttons have to be
-// lifted back on top of it or the only thing a click in those cells can
-// do is navigate.
-const INTERACTIVE_CELLS =
-  "[&>td:has([role=checkbox])]:relative [&>td:has([role=checkbox])]:z-10 " +
-  "[&>td:last-child]:relative [&>td:last-child]:z-10";
+export type DeploymentsScreenProps = ReturnType<typeof useDeployments>;
 
 interface PendingAction {
   kind: ActionKind;
@@ -106,67 +44,87 @@ interface PendingAction {
 interface BulkAction {
   kind: "abort" | "redeploy";
   deployments: AstroliftDeployment[];
+  selection: RowSelection;
 }
 
-/** The fleet deployments list: tabs, the paged table, bulk actions and their confirms. */
+/** Which of the four lifecycle actions a row offers the viewer. */
+function rowActionsFor(
+  d: AstroliftDeployment,
+  {
+    canDeploy,
+    canApprove,
+    canRollback,
+  }: Record<"canDeploy" | "canApprove" | "canRollback", boolean>
+): ActionKind[] {
+  const inFlight = IN_FLIGHT.has(d.status);
+  const out: ActionKind[] = [];
+  if (d.status === "pending_approval" && canApprove && !d.triggeredByMe) out.push("approve");
+  if (inFlight && canDeploy) out.push("abort");
+  if ((d.status === "running" || d.status === "failed") && canRollback) out.push("rollback");
+  if (!inFlight && d.status !== "running" && canDeploy) out.push("redeploy");
+  return out;
+}
+
+const ACTION_ICON: Record<ActionKind, React.ReactNode> = {
+  approve: <CheckIcon className="size-4" />,
+  abort: <StopCircleIcon className="size-4" />,
+  rollback: <UndoIcon className="size-4" />,
+  redeploy: <RotateCcwIcon className="size-4" />,
+};
+
+/**
+ * Apps › Deployments (spec 44 §5.1): every rollout across apps on the
+ * shared list. Views All · Mine · Waiting approval · Failed · Today, filters
+ * app, environment, status, trigger and since, cursor paged, live behind the
+ * "new" pill. Row actions and the bulk bar keep the lifecycle mutations
+ * behind their confirms. Pure view; the data half is useDeployments.
+ */
 export function DeploymentsScreen({
-  tab,
-  setTab,
-  table,
-  tabCounts,
-  selection,
-  selectedDeploys,
+  list,
+  rows,
+  newRows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
+  deploymentsById,
   canDeploy,
   canApprove,
   canRollback,
-  hasAnyAction,
   busy,
   bulkRunning,
   runAction,
   runBulk,
-  renderStartDialog,
+  startHref,
 }: DeploymentsScreenProps) {
   const t = useTranslations("lists.deployments");
-  const [openCreate, setOpenCreate] = React.useState(false);
-  const signal = signalTab(tab);
-
+  const fmt = useFormatters();
   const [pendingAction, setPendingAction] = React.useState<PendingAction | null>(null);
   const [pendingBulk, setPendingBulk] = React.useState<BulkAction | null>(null);
+  const perms = { canDeploy, canApprove, canRollback };
+  const hasAnyAction = canDeploy || canApprove || canRollback;
 
   const ACTION_COPY: Record<
-    ActionKind,
+    Exclude<ActionKind, "abort">,
     {
       title: (d: AstroliftDeployment) => string;
       description: (d: AstroliftDeployment) => string;
       confirmLabel: string;
-      destructive: boolean;
     }
   > = {
     approve: {
       title: (d) => t("confirm.approveTitle", { tag: d.imageTag }),
       description: (d) =>
-        t("confirm.approveDescription", {
-          app: d.registeredAppSlug,
-          env: d.environmentName,
-        }),
+        t("confirm.approveDescription", { app: d.registeredAppSlug, env: d.environmentName }),
       confirmLabel: t("confirm.approveConfirm"),
-      destructive: false,
-    },
-    abort: {
-      title: (d) => t("confirm.abortTitle", { app: d.registeredAppSlug, env: d.environmentName }),
-      description: () => t("confirm.abortDescription"),
-      confirmLabel: t("confirm.abortConfirm"),
-      destructive: true,
     },
     rollback: {
       title: (d) =>
-        t("confirm.rollbackTitle", {
-          app: d.registeredAppSlug,
-          env: d.environmentName,
-        }),
+        t("confirm.rollbackTitle", { app: d.registeredAppSlug, env: d.environmentName }),
       description: () => t("confirm.rollbackDescription"),
       confirmLabel: t("confirm.rollbackConfirm"),
-      destructive: false,
     },
     redeploy: {
       title: (d) =>
@@ -177,45 +135,39 @@ export function DeploymentsScreen({
         }),
       description: () => t("confirm.redeployDescription"),
       confirmLabel: t("confirm.redeployConfirm"),
-      destructive: false,
     },
   };
+  const ACTION_LABEL: Record<ActionKind, string> = {
+    approve: t("actions.approve"),
+    abort: t("actions.abort"),
+    rollback: t("actions.rollback"),
+    redeploy: t("actions.redeploy"),
+  };
 
-  const allInFlight =
-    selectedDeploys.length > 0 && selectedDeploys.every((d) => IN_FLIGHT.has(d.status));
-  const allTerminal =
-    selectedDeploys.length > 0 && selectedDeploys.every((d) => TERMINAL.has(d.status));
-  const mixedSelection = selectedDeploys.length > 0 && !allInFlight && !allTerminal;
-
-  // Per #420's "explain why the CTA is disabled" pattern: a mixed
-  // selection (some in-flight + some terminal) disables both bulk
-  // CTAs with an inline hint, since neither action is valid for the
-  // whole set.
-  const summaryEnvs = Array.from(
-    new Set(selectedDeploys.map((d) => `${d.registeredAppSlug}/${d.environmentName}`))
-  ).join(", ");
-
-  // No sort controls: `astroliftDeploymentsPage` has no sort argument
-  // (its seek key is `-created_at, -guid`), and sorting the page in hand
-  // while the rest of the result set sits on the server is wrong at
-  // every page boundary.
   const columns: Column<AstroliftDeployment>[] = [
     {
-      id: "app",
+      id: "deployment",
       header: t("columns.appEnv"),
+      cellClassName: "max-w-80",
+      // The status dot folds into the linking cell: a link whose only
+      // content is a dot has no name.
       cell: (d) => (
-        <span className="flex items-start gap-2">
+        <span className="flex min-w-0 items-start gap-2">
           <StatusDot status={statusToDot[d.status]} className="mt-1.5 shrink-0" />
-          <span className="block">
-            <span className="block font-medium">{d.registeredAppSlug}</span>
-            <span className="text-muted-foreground block text-xs">
-              env <span className="font-mono">{d.environmentName}</span>
+          <span className="block min-w-0">
+            <span className="block truncate font-medium" title={d.registeredAppSlug}>
+              {d.registeredAppSlug}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs">
+              <span className="font-mono">{d.environmentName}</span>
               {d.workloadSlug && (
                 <>
-                  {" "}
-                  · workload <span className="font-mono">{d.workloadSlug}</span>
+                  {" · "}
+                  <span className="font-mono">{d.workloadSlug}</span>
                 </>
               )}
+              {" · "}
+              <span className="font-mono">{deploySha(d)}</span>
             </span>
           </span>
         </span>
@@ -224,13 +176,21 @@ export function DeploymentsScreen({
     {
       id: "image",
       header: t("columns.image"),
-      cellClassName: "font-mono text-xs",
-      cell: (d) => d.imageTag || "—",
+      cellClassName: "max-w-56",
+      cell: (d) => (
+        <span className="block truncate font-mono text-xs" title={d.imageTag}>
+          {d.imageTag || "—"}
+        </span>
+      ),
     },
     {
       id: "trigger",
       header: t("columns.trigger"),
-      cell: (d) => <Badge variant="outline">{d.triggerKind}</Badge>,
+      cell: (d) => (
+        <Badge variant="outline" className="font-mono">
+          {d.triggerKind}
+        </Badge>
+      ),
     },
     {
       id: "status",
@@ -239,12 +199,12 @@ export function DeploymentsScreen({
         <>
           <DeploymentStatusPill status={d.status} label={t(`statusOptions.${d.status}`)} />
           {d.approvalsRequired > 0 && (
-            <div className="text-muted-foreground mt-1 text-xs">
+            <span className="text-muted-foreground mt-1 block font-mono text-xs">
               {t("approvalsCount", {
                 received: d.approvalsReceived,
                 required: d.approvalsRequired,
               })}
-            </div>
+            </span>
           )}
         </>
       ),
@@ -252,215 +212,173 @@ export function DeploymentsScreen({
     {
       id: "duration",
       header: t("columns.duration"),
-      cellClassName: "font-mono text-xs",
       cell: (d) => (
-        <span className="inline-flex items-center gap-1">
-          <ClockIcon className="size-3" />
-          {formatDuration(d.durationSeconds)}
-        </span>
+        <span className="font-mono text-xs tabular-nums">{formatDuration(d.durationSeconds)}</span>
       ),
     },
     {
       id: "started",
       header: t("columns.started"),
-      cellClassName: "text-muted-foreground text-sm",
-      cell: (d) =>
-        d.startedAt
-          ? new Date(d.startedAt).toLocaleString()
-          : new Date(d.createdAt).toLocaleString(),
-    },
-    {
-      id: "actions",
-      header: t("columns.actions"),
-      width: "w-44",
-      align: "right",
       cell: (d) => (
-        <FleetDeploymentRowActions
-          deployment={d}
-          canDeploy={canDeploy}
-          canApprove={canApprove}
-          canRollback={canRollback}
-          busy={busy || bulkRunning}
-          onAction={(kind) => setPendingAction({ kind, deployment: d })}
-        />
+        <span className="text-muted-foreground font-mono text-xs">
+          {fmt.formatDateTime(d.startedAt ?? d.createdAt)}
+        </span>
       ),
     },
   ];
 
-  return (
-    <PageShell
-      title={t("title")}
-      description={t("description")}
-      actions={
-        <Can permission="app.deploy">
-          <Button onClick={() => setOpenCreate(true)}>
-            <PlusIcon className="size-4" />
-            {t("start")}
-          </Button>
-        </Can>
-      }
-    >
-      {/* Sub-navigation: Active | Previews | Pending | History (#797),
-          plus the Metrics | Logs | Traces signal gateways (#892).
-          Sits directly under the page header, above the table. Each
-          fleet tab carries a live count badge sourced from the server's
-          own totalCount; Pending's badge is the approval-queue size.
-          Signal tabs carry no badge. */}
-      <div
-        role="tablist"
-        aria-label={t("tabs.ariaLabel")}
-        className="bg-muted/40 inline-flex flex-wrap rounded-md border p-1"
-      >
-        {DEPLOYMENT_TABS.map((tabKey) => {
-          const active = tab === tabKey;
-          const sig = signalTab(tabKey);
-          const count = sig ? null : (tabCounts?.[tabKey as FleetTab]?.totalCount ?? null);
-          return (
-            <button
-              key={tabKey}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(tabKey)}
-              className={
-                "inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm font-medium transition " +
-                (active
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground")
-              }
+  function rowActions(d: AstroliftDeployment) {
+    const kinds = rowActionsFor(d, perms);
+    return (
+      <>
+        {kinds.map((kind) => (
+          <DropdownMenuItem
+            key={kind}
+            variant={kind === "abort" ? "destructive" : undefined}
+            disabled={busy || bulkRunning}
+            onSelect={() => setPendingAction({ kind, deployment: d })}
+          >
+            {ACTION_ICON[kind]}
+            {ACTION_LABEL[kind]}
+          </DropdownMenuItem>
+        ))}
+        {d.repoUrl && d.commitSha && (
+          <DropdownMenuItem asChild>
+            <a
+              href={`${d.repoUrl.replace(/\/$/, "")}/commit/${d.commitSha}`}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <span>{sig ? SIGNAL_COPY[sig].label : t(`tabs.${tabKey}`)}</span>
-              {count !== null && count > 0 && (
-                <span
-                  className={
-                    "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs tabular-nums " +
-                    (active ? "bg-muted text-foreground" : "bg-muted/70 text-muted-foreground")
-                  }
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+              <ExternalLinkIcon className="size-4" />
+              {t("actions.viewCommit")}
+            </a>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onSelect={() => {
+            navigator.clipboard
+              .writeText(d.id)
+              .then(() => toast.success(t("actions.copyOk")))
+              .catch(() => toast.error(t("actions.copyFail")));
+          }}
+        >
+          <CopyIcon className="size-4" />
+          {t("actions.copyGuid")}
+        </DropdownMenuItem>
+      </>
+    );
+  }
 
-      {tab === "active" && (
-        // Clarify that Active is the live + in-flight set, not a
-        // deploy-progress queue, and point operators at History for the
-        // rows the supersede transition retires. Hardcoded copy mirrors
-        // the signal-tab strings above (#892).
-        <p className="text-muted-foreground text-xs">
-          Active shows the current live and in-progress rollouts, one live deployment per app and
-          environment. Superseded, failed, and rolled-back rollouts move to History.
-        </p>
-      )}
+  function bulkActions(selection: RowSelection) {
+    const picked = selection.selectedIds
+      .map((id) => deploymentsById.get(id))
+      .filter((d): d is AstroliftDeployment => Boolean(d));
+    const allInFlight = picked.length > 0 && picked.every((d) => IN_FLIGHT.has(d.status));
+    const allTerminal = picked.length > 0 && picked.every((d) => TERMINAL.has(d.status));
+    // Neither action is valid for a mixed set, so both say why they are off.
+    const mixed = picked.length > 0 && !allInFlight && !allTerminal;
+    const envs = summarize(picked);
+    return (
+      <>
+        <span
+          className={
+            mixed
+              ? "text-danger-fg min-w-0 text-xs"
+              : "text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]"
+          }
+        >
+          {mixed ? t("bulk.mixedWarning") : t("bulk.summary", { envs })}
+        </span>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={!allInFlight || bulkRunning || !canDeploy}
+          onClick={() => setPendingBulk({ kind: "abort", deployments: picked, selection })}
+        >
+          {bulkRunning ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <StopCircleIcon className="size-4" />
+          )}
+          {t("bulk.cancelButton", { count: picked.length })}
+        </Button>
+        <Button
+          size="sm"
+          disabled={!allTerminal || bulkRunning || !canDeploy}
+          onClick={() => setPendingBulk({ kind: "redeploy", deployments: picked, selection })}
+        >
+          {bulkRunning ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <RotateCcwIcon className="size-4" />
+          )}
+          {t("bulk.redeployButton", { count: picked.length })}
+        </Button>
+      </>
+    );
+  }
 
-      {signal ? (
-        // Gateway placeholder ported from /observe/deployments (#892).
-        <EmptyState
-          icon={SIGNAL_COPY[signal].icon}
-          title={`Deployment ${SIGNAL_COPY[signal].label}`}
-          description={SIGNAL_COPY[signal].description}
-          actionHref={SIGNAL_COPY[signal].actionHref}
-          actionLabel={`Open ${SIGNAL_COPY[signal].label} explorer`}
-        />
-      ) : (
-        <TooltipProvider delayDuration={300}>
-          <DataTable
-            label="Deployments"
-            controller={table}
-            columns={columns}
-            getRowId={(d) => d.id}
-            rowHref={(d) => `/deployments/${d.id}`}
-            rowClassName={() => INTERACTIVE_CELLS}
-            searchPlaceholder={t("filterApp")}
-            // Selection drives the bulk bar, which has nothing to offer
-            // an operator who holds none of the deploy permissions.
-            selection={hasAnyAction ? selection : undefined}
-            bulkActions={() => (
-              <>
-                {mixedSelection ? (
-                  <span className="text-destructive text-xs">{t("bulk.mixedWarning")}</span>
-                ) : (
-                  <span className="text-muted-foreground text-xs">
-                    {t("bulk.summary", { envs: summaryEnvs })}
-                  </span>
-                )}
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={!allInFlight || bulkRunning || !canDeploy}
-                  onClick={() => setPendingBulk({ kind: "abort", deployments: selectedDeploys })}
-                >
-                  {bulkRunning ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <StopCircleIcon className="size-4" />
-                  )}
-                  {t("bulk.cancelButton", { count: selectedDeploys.length })}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!allTerminal || bulkRunning || !canDeploy}
-                  onClick={() => setPendingBulk({ kind: "redeploy", deployments: selectedDeploys })}
-                >
-                  {bulkRunning ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <RotateCcwIcon className="size-4" />
-                  )}
-                  {t("bulk.redeployButton", { count: selectedDeploys.length })}
-                </Button>
-              </>
-            )}
-            empty={{
-              icon: <BoxIcon className="size-5" />,
-              title: t("emptyTitle"),
-              description: t("emptyDescription"),
-              actionHref: "/apps",
-              actionLabel: t("openApps"),
-            }}
-            emptyFiltered={{
-              title: "No matching deployments",
-              description:
-                "No deployment in this tab matches that search. It looks at the app, environment, branch, image tag, and commit — try another term, or clear the search to see the whole tab.",
-            }}
-          />
-        </TooltipProvider>
-      )}
+  const confirmable =
+    pendingAction && pendingAction.kind !== "abort"
+      ? { kind: pendingAction.kind, deployment: pendingAction.deployment }
+      : null;
+  const bulkEnvs = pendingBulk ? summarize(pendingBulk.deployments) : "";
 
-      {renderStartDialog({ open: openCreate, onOpenChange: setOpenCreate })}
+  return (
+    <>
+      <ListPage<AstroliftDeployment>
+        header={{
+          crumbs: appsListCrumbs("deployments"),
+          title: t("title"),
+          primaryAction: (
+            <Can permission="app.deploy">
+              <Button size="sm" asChild>
+                <Link href={startHref}>
+                  <PlusIcon className="size-4" />
+                  {t("start")}
+                </Link>
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
+        label="Deployments"
+        columns={columns}
+        rows={rows}
+        getRowId={(d) => d.id}
+        rowHref={(d) => `/deployments/${d.id}`}
+        rowActions={rowActions}
+        // Selection drives the bulk bar, which offers nothing to a viewer
+        // who holds none of the deploy permissions.
+        bulkActions={hasAnyAction ? bulkActions : undefined}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        empty={{
+          icon: <BoxIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          actionHref: "/apps",
+          actionLabel: t("openApps"),
+        }}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        newRows={newRows}
+      />
 
       <ConfirmDialog
-        open={pendingAction !== null && pendingAction.kind !== "abort"}
+        open={confirmable !== null}
         onOpenChange={(next) => {
           if (!next) setPendingAction(null);
         }}
-        title={
-          pendingAction && pendingAction.kind !== "abort"
-            ? ACTION_COPY[pendingAction.kind].title(pendingAction.deployment)
-            : ""
-        }
+        title={confirmable ? ACTION_COPY[confirmable.kind].title(confirmable.deployment) : ""}
         description={
-          pendingAction && pendingAction.kind !== "abort"
-            ? ACTION_COPY[pendingAction.kind].description(pendingAction.deployment)
-            : ""
+          confirmable ? ACTION_COPY[confirmable.kind].description(confirmable.deployment) : ""
         }
-        confirmLabel={
-          pendingAction && pendingAction.kind !== "abort"
-            ? ACTION_COPY[pendingAction.kind].confirmLabel
-            : "Confirm"
-        }
-        destructive={
-          pendingAction && pendingAction.kind !== "abort"
-            ? ACTION_COPY[pendingAction.kind].destructive
-            : false
-        }
+        confirmLabel={confirmable ? ACTION_COPY[confirmable.kind].confirmLabel : "Confirm"}
         onConfirm={async () => {
-          if (pendingAction && pendingAction.kind !== "abort") {
-            await runAction(pendingAction.kind, pendingAction.deployment);
-          }
+          if (confirmable) await runAction(confirmable.kind, confirmable.deployment);
         }}
       />
 
@@ -475,13 +393,14 @@ export function DeploymentsScreen({
           if (!next) setPendingAction(null);
         }}
         title={
-          pendingAction?.kind === "abort" ? ACTION_COPY.abort.title(pendingAction.deployment) : ""
-        }
-        description={
           pendingAction?.kind === "abort"
-            ? ACTION_COPY.abort.description(pendingAction.deployment)
+            ? t("confirm.abortTitle", {
+                app: pendingAction.deployment.registeredAppSlug,
+                env: pendingAction.deployment.environmentName,
+              })
             : ""
         }
+        description={t("confirm.abortDescription")}
         confirmLabel={t("confirm.abortConfirm")}
         destructive
         onConfirm={async (reason) => {
@@ -491,8 +410,7 @@ export function DeploymentsScreen({
         }}
       />
 
-      {/* Bulk-cancel confirm dialog: requires a reason — same backend
-          boundary as the per-row abort. */}
+      {/* Bulk cancel needs a reason, the same backend boundary as a row's abort. */}
       <ConfirmDialog
         reason={{
           label: t("bulk.confirmCancel.reasonLabel"),
@@ -508,16 +426,13 @@ export function DeploymentsScreen({
             ? t("bulk.confirmCancel.title", { count: pendingBulk.deployments.length })
             : ""
         }
-        description={
-          pendingBulk?.kind === "abort"
-            ? t("bulk.confirmCancel.description", { envs: summaryEnvs })
-            : ""
-        }
+        description={t("bulk.confirmCancel.description", { envs: bulkEnvs })}
         confirmLabel={t("bulk.confirmCancel.confirm")}
         destructive
         onConfirm={async (reason) => {
           if (pendingBulk?.kind === "abort") {
             await runBulk("abort", pendingBulk.deployments, reason);
+            pendingBulk.selection.clear();
           }
         }}
       />
@@ -532,178 +447,21 @@ export function DeploymentsScreen({
             ? t("bulk.confirmRedeploy.title", { count: pendingBulk.deployments.length })
             : ""
         }
-        description={
-          pendingBulk?.kind === "redeploy"
-            ? t("bulk.confirmRedeploy.description", { envs: summaryEnvs })
-            : ""
-        }
+        description={t("bulk.confirmRedeploy.description", { envs: bulkEnvs })}
         confirmLabel={t("bulk.confirmRedeploy.confirm")}
         onConfirm={async () => {
           if (pendingBulk?.kind === "redeploy") {
             await runBulk("redeploy", pendingBulk.deployments);
+            pendingBulk.selection.clear();
           }
         }}
       />
-    </PageShell>
+    </>
   );
 }
 
-// The action cluster is broken out so the inline tooltip / icon-button
-// row doesn't blow up the parent's render. ``onAction`` hoists state up
-// to the parent so the confirm dialogs stay singletons. (The per-app
-// DeploymentRowActionsView gates and renders differently, so it is not
-// reused here.)
-interface FleetDeploymentRowActionsProps {
-  deployment: AstroliftDeployment;
-  canDeploy: boolean;
-  canApprove: boolean;
-  canRollback: boolean;
-  busy: boolean;
-  onAction: (kind: ActionKind) => void;
-}
-
-function FleetDeploymentRowActions({
-  deployment: d,
-  canDeploy,
-  canApprove,
-  canRollback,
-  busy,
-  onAction,
-}: FleetDeploymentRowActionsProps) {
-  const t = useTranslations("lists.deployments");
-
-  const inFlight = IN_FLIGHT.has(d.status);
-  const canApproveThis = d.status === "pending_approval" && canApprove && !d.triggeredByMe;
-  const canAbortThis = inFlight && canDeploy;
-  const canRollbackThis = (d.status === "running" || d.status === "failed") && canRollback;
-  const canRedeployThis = !inFlight && d.status !== "running" && canDeploy;
-  const hasCommitLink = Boolean(d.repoUrl && d.commitSha);
-
-  return (
-    <div className="inline-flex items-center justify-end gap-1">
-      {canApproveThis && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              disabled={busy}
-              onClick={() => onAction("approve")}
-              aria-label={t("actions.approve")}
-            >
-              <CheckIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("actions.approve")}</TooltipContent>
-        </Tooltip>
-      )}
-      {canAbortThis && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive hover:text-destructive size-8"
-              disabled={busy}
-              onClick={() => onAction("abort")}
-              aria-label={t("actions.abort")}
-            >
-              <StopCircleIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("actions.abort")}</TooltipContent>
-        </Tooltip>
-      )}
-      {canRollbackThis && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              disabled={busy}
-              onClick={() => onAction("rollback")}
-              aria-label={t("actions.rollback")}
-            >
-              <UndoIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("actions.rollback")}</TooltipContent>
-        </Tooltip>
-      )}
-      {canRedeployThis && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              disabled={busy}
-              onClick={() => onAction("redeploy")}
-              aria-label={t("actions.redeploy")}
-            >
-              <RotateCcwIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("actions.redeploy")}</TooltipContent>
-        </Tooltip>
-      )}
-      {/* The whole row links here too; the explicit button keeps the
-          affordance discoverable and keyboard-reachable from the action
-          cluster. */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8" asChild>
-            <Link href={`/deployments/${d.id}`} aria-label={t("actions.viewLogs")}>
-              <ExternalLinkIcon className="size-4" />
-            </Link>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{t("actions.viewLogs")}</TooltipContent>
-      </Tooltip>
-      {/* Overflow kebab: rare actions stay one click deep so the row's
-          inline-action row doesn't grow as we add things. */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            disabled={busy}
-            aria-label={t("actions.more")}
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {hasCommitLink && (
-            <DropdownMenuItem
-              onClick={() => {
-                window.open(
-                  `${d.repoUrl.replace(/\/$/, "")}/commit/${d.commitSha}`,
-                  "_blank",
-                  "noopener,noreferrer"
-                );
-              }}
-            >
-              <ExternalLinkIcon className="size-4" />
-              {t("actions.viewCommit")}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            onClick={() => {
-              navigator.clipboard
-                .writeText(d.id)
-                .then(() => toast.success(t("actions.copyOk")))
-                .catch(() => toast.error(t("actions.copyFail")));
-            }}
-          >
-            <BoxIcon className="size-4" />
-            {t("actions.copyGuid")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
+function summarize(deployments: AstroliftDeployment[]): string {
+  return Array.from(
+    new Set(deployments.map((d) => `${d.registeredAppSlug}/${d.environmentName}`))
+  ).join(", ");
 }

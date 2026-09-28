@@ -13,7 +13,7 @@ export default meta;
 
 type Story = StoryObj<typeof AppTabsView>;
 
-/** Run › Overview, the landing tab. The bar has no loading, empty or error state. */
+/** Overview, the landing tab. The row has no loading, empty or error state. */
 export const Overview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -24,14 +24,19 @@ export const Overview: Story = {
   },
 };
 
-/** Observe › Logs, resolved from the pathname. */
-export const ObserveLogs: Story = {
+/** Logs & metrics, resolved from the pathname. */
+export const LogsAndMetrics: Story = {
   args: { pathname: "/apps/checkout/logs" },
 };
 
-/** A legacy `active="console"` key on an unknown path lands on Observe › Logs. */
+/** A former route's name as `active` on an unknown path lands on the tab that absorbed it. */
 export const LegacyConsoleKey: Story = {
-  args: { pathname: "/apps/checkout/console", active: "console" },
+  args: { pathname: "/somewhere/else", active: "console" },
+};
+
+/** A nested detail lights up its tab. */
+export const WorkloadDetail: Story = {
+  args: { pathname: "/apps/checkout/workloads/web" },
 };
 
 /** Under the agent base path the links stay in agent context. */
@@ -41,4 +46,12 @@ export const AgentBasePath: Story = {
 
 export const LongSlug: Story = {
   args: { slug: LONG, pathname: `/apps/${LONG}/domains` },
+};
+
+export const At768: Story = {
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <AppTabsView {...args} pathname="/apps/checkout/access" />
+    </div>
+  ),
 };

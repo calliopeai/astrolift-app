@@ -1,139 +1,110 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
 import {
   HISTORY_ROWS,
   LIST_LONG_ROWS,
   listProps,
-  selectionOf,
-  START,
+  ROWS,
   TRIGGERED_BY_OTHER,
 } from "./deployments.fixtures";
-import { DeploymentsScreen } from "./DeploymentsScreen";
-import { StartDeploymentSheet } from "./StartDeploymentSheet";
+import { DEPLOYMENTS_LIST, narrowDeployments, narrows } from "./deployments-list";
+import { DeploymentsScreen, type DeploymentsScreenProps } from "./DeploymentsScreen";
+
+/** Fixed for the story: the fixtures are minutes old relative to module load. */
+const NOW = new Date().getTime();
 
 const meta: Meta = {
   title: "Screens/Deployments/DeploymentsScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-/** The Active tab with a page of rows and badge counts. */
-export const Full: Story = { render: () => <DeploymentsScreen {...listProps()} /> };
+type Props = Partial<Omit<DeploymentsScreenProps, "list">> & { initial?: Partial<ListState> };
 
-export const Loading: Story = {
-  render: () => (
-    <DeploymentsScreen {...listProps({ tabCounts: undefined }, { rows: [], state: "loading" })} />
-  ),
-};
+/**
+ * The screen over fixture rows, filtered the way the hook does it: status by
+ * the "server" (here, in memory), trigger, since and Mine by narrowDeployments.
+ */
+function Deployments({ initial, rows = ROWS, ...patch }: Props) {
+  const list = useLocalListState(DEPLOYMENTS_LIST, initial);
+  const f = list.filters;
+  const served = rows.filter((d) => !f.status || d.status === f.status);
+  const shown = narrows(f) ? narrowDeployments(served, f, NOW) : served;
+  return <DeploymentsScreen {...listProps({ rows: shown, ...patch })} list={list} />;
+}
 
-export const Empty: Story = {
-  render: () => (
-    <DeploymentsScreen
-      {...listProps(
-        {
-          tabCounts: {
-            active: { totalCount: 0 },
-            previews: { totalCount: 0 },
-            pending: { totalCount: 0 },
-            history: { totalCount: 0 },
-          },
-        },
-        { rows: [], totalCount: 0, state: "empty" }
-      )}
-    />
-  ),
-};
+/** All: a page of rows, newest first, cursor paged. */
+export const Full: Story = { render: () => <Deployments /> };
 
-/** The search excluded every row in the tab. */
+export const Loading: Story = { render: () => <Deployments rows={[]} loading /> };
+
+export const Empty: Story = { render: () => <Deployments rows={[]} totalCount={0} /> };
+
+/** A search or chip that matches nothing: "No deployments match" and Clear. */
 export const EmptyFiltered: Story = {
-  render: () => (
-    <DeploymentsScreen
-      {...listProps({}, { rows: [], totalCount: 0, state: "emptyFiltered", search: "nope" })}
-    />
-  ),
+  render: () => <Deployments initial={{ filters: { trigger: "rollback" } }} />,
 };
 
-export const LoadFailed: Story = {
-  render: () => (
-    <DeploymentsScreen
-      {...listProps(
-        {},
-        { rows: [], state: "error", error: new Error("Network error: failed to fetch") }
-      )}
-    />
-  ),
+/** Waiting approval with nothing waiting. */
+export const EmptyView: Story = {
+  render: () => <Deployments rows={HISTORY_ROWS.slice(2)} initial={{ view: "waiting" }} />,
 };
 
-export const History: Story = {
-  render: () => (
-    <DeploymentsScreen {...listProps({ tab: "history" }, { rows: HISTORY_ROWS, totalCount: 38 })} />
-  ),
+export const ErrorState: Story = {
+  render: () => <Deployments rows={[]} error={{ message: "Network error: failed to fetch" }} />,
 };
 
-/** A signal tab: a gateway placeholder into the fleet explorer, no rows. */
-export const MetricsTab: Story = {
-  render: () => <DeploymentsScreen {...listProps({ tab: "metrics" })} />,
+/** Mine: the deployments the viewer triggered, with the view's note. */
+export const Mine: Story = { render: () => <Deployments initial={{ view: "mine" }} /> };
+
+export const WaitingApproval: Story = {
+  render: () => <Deployments initial={{ view: "waiting" }} />,
 };
 
-/** An in-flight and a terminal row selected: both bulk CTAs disabled with a hint. */
-export const MixedSelection: Story = {
-  render: () => {
-    const rows = listProps().table.rows;
-    const picked = [rows[0], rows[4]];
-    return (
-      <DeploymentsScreen
-        {...listProps({
-          selection: selectionOf(picked.map((d) => d.id)),
-          selectedDeploys: picked,
-        })}
-      />
-    );
-  },
+export const Failed: Story = { render: () => <Deployments initial={{ view: "failed" }} /> };
+
+/** Today: started since local midnight. */
+export const Today: Story = { render: () => <Deployments initial={{ view: "today" }} /> };
+
+/** App and trigger chips together. */
+export const Filtered: Story = {
+  render: () => <Deployments initial={{ filters: { app: "storefront", trigger: "push" } }} />,
 };
 
-/** Two in-flight rows selected while a bulk abort runs. */
+/** Live: two new deployments wait behind the pill; the rows on screen stay put. */
+export const NewRows: Story = {
+  render: () => <Deployments newRows={{ count: 2, onReveal: () => {} }} />,
+};
+
+/** Rows answer the previous search while the next loads. */
+export const Refetching: Story = { render: () => <Deployments stale /> };
+
+/** Page two: Newer goes back. */
+export const OlderPage: Story = { render: () => <Deployments initial={{ after: "c:25" }} /> };
+
+/** A bulk cancel in flight. */
 export const BulkRunning: Story = {
-  render: () => {
-    const picked = [listProps().table.rows[0], TRIGGERED_BY_OTHER];
-    return (
-      <DeploymentsScreen
-        {...listProps({
-          selection: selectionOf(picked.map((d) => d.id)),
-          selectedDeploys: picked,
-          bulkRunning: true,
-        })}
-      />
-    );
-  },
+  render: () => <Deployments rows={[ROWS[0], TRIGGERED_BY_OTHER]} bulkRunning />,
 };
 
-/** No deploy permissions: no selection column, no row actions but view and more. */
+/** No deploy permissions: no selection column, no lifecycle row actions, no Start. */
 export const ReadOnly: Story = {
-  render: () => (
-    <DeploymentsScreen
-      {...listProps({
-        canDeploy: false,
-        canApprove: false,
-        canRollback: false,
-        hasAnyAction: false,
-      })}
-    />
-  ),
+  render: () => <Deployments canDeploy={false} canApprove={false} canRollback={false} />,
 };
 
+/** A 64-char SHA, a long app, workload and image tag. */
 export const LongStrings: Story = {
-  render: () => <DeploymentsScreen {...listProps({}, { rows: LIST_LONG_ROWS, totalCount: 2 })} />,
+  render: () => <Deployments rows={LIST_LONG_ROWS} totalCount={2} nextCursor={null} />,
 };
 
-/** The start sheet open over the list, as the page wires it. */
-export const StartSheetOpen: Story = {
+export const Width768: Story = {
   render: () => (
-    <DeploymentsScreen
-      {...listProps({
-        renderStartDialog: () => <StartDeploymentSheet {...START} />,
-      })}
-    />
+    <div style={{ width: 768 }}>
+      <Deployments />
+    </div>
   ),
 };

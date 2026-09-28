@@ -32,3 +32,12 @@ export const SingleDeployment: Story = {
 export const LongStrings: Story = {
   args: { appHref: `/apps/${LONG}`, count: 123456 },
 };
+
+export const At768: Story = {
+  args: { appHref: `/apps/${LONG}`, count: 123456 },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <QuickLinksGrid {...args} />
+    </div>
+  ),
+};

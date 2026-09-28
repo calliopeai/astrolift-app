@@ -12,7 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
+import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
+
+import { deployPreview } from "./deploy-preview";
 
 export type StepStatus = "pending" | "running" | "done" | "failed" | "skipped";
 
@@ -43,6 +46,8 @@ export interface ReviewSubmitFields {
   approverUserIds: string[];
   approverTeamId: string;
   minimumApprovals: number;
+  manifestRaw: string;
+  manifestLater: boolean;
   connectionIsAppInstall: boolean;
   pushCiWorkflow: boolean;
   triggerFirstDeploy: boolean;
@@ -50,9 +55,8 @@ export interface ReviewSubmitFields {
 
 export interface ReviewSubmitStepViewProps {
   state: ReviewSubmitFields;
-  /** Step labels, in wizard order; the summary cards title themselves from 0-3. */
-  steps: Array<{ label: string }>;
-  onJumpToStep: (idx: number) => void;
+  /** Back to step 1 (Source) or 2 (Run) to change something. */
+  onJumpToStep: (step: 1 | 2) => void;
   /** The selected connection can push commits (#908). */
   canPushCiWorkflow: boolean;
   onPushCiWorkflowChange: (checked: boolean) => void;
@@ -83,7 +87,7 @@ function describeApprovalPolicy(state: ReviewSubmitFields): string {
   if (state.approverUserIds.length > 0) {
     return `${state.minimumApprovals} of ${state.approverUserIds.length} selected user(s)`;
   }
-  return "Required — no approvers selected (fix on step 4)";
+  return "Required, no approvers selected (fix on Run)";
 }
 
 function ciWorkflowPathFor(sourceKind: SourceKind): string {
@@ -91,10 +95,12 @@ function ciWorkflowPathFor(sourceKind: SourceKind): string {
   return ".github/workflows/astrolift-deploy.yml";
 }
 
-/** Wizard step 5: summary of steps 1-4, the side-effect checklist, and submit progress. */
+/**
+ * New app step 3, Review: what Source and Run set, what will deploy, the
+ * side-effect checklist, and submit progress.
+ */
 export function ReviewSubmitStepView({
   state,
-  steps,
   onJumpToStep,
   canPushCiWorkflow,
   onPushCiWorkflowChange,
@@ -105,58 +111,38 @@ export function ReviewSubmitStepView({
 }: ReviewSubmitStepViewProps) {
   return (
     <div className="flex flex-col gap-5">
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid min-w-0 gap-3 sm:grid-cols-2">
         <SummaryCard
           stepIdx={1}
-          title={steps[0].label}
+          title="Source"
           onJump={onJumpToStep}
           rows={[
             { label: "Repository", value: state.sourceRepo, mono: true },
             { label: "Default branch", value: state.defaultBranch, mono: true },
             { label: "Source kind", value: state.sourceKind },
+            { label: "Manifest path", value: state.manifestPath, mono: true },
+            {
+              label: "Manifest",
+              value: state.manifestLater
+                ? "Set up later"
+                : `${state.manifestFromRepo ? "Loaded from repo" : "Drafted here"}, ${
+                    state.manifestValid ? "valid shape" : "invalid"
+                  }`,
+            },
           ]}
         />
         <SummaryCard
           stepIdx={2}
-          title={steps[1].label}
-          onJump={onJumpToStep}
-          rows={[
-            { label: "Manifest path", value: state.manifestPath, mono: true },
-            {
-              label: "Source",
-              value: state.manifestFromRepo ? "Loaded from repo" : "Drafted in wizard",
-            },
-            {
-              label: "Validity",
-              value: state.manifestValid ? "Valid shape" : "Invalid",
-            },
-          ]}
-        />
-        <SummaryCard
-          stepIdx={3}
-          title={steps[2].label}
+          title="Run"
           onJump={onJumpToStep}
           rows={[
             { label: "Name", value: state.name },
             { label: "Slug", value: state.slug, mono: true },
             ...(state.description ? [{ label: "Description", value: state.description }] : []),
-          ]}
-        />
-        <SummaryCard
-          stepIdx={4}
-          title={steps[3].label}
-          onJump={onJumpToStep}
-          rows={
-            state.deployTiming === "skip"
+            ...(state.deployTiming === "skip"
               ? [
-                  {
-                    label: "Deploy timing",
-                    value: DEPLOY_TIMING_LABELS[state.deployTiming],
-                  },
-                  {
-                    label: "Trigger",
-                    value: "Manual (configure later)",
-                  },
+                  { label: "Deploy timing", value: DEPLOY_TIMING_LABELS[state.deployTiming] },
+                  { label: "Trigger", value: "Manual (configure later)" },
                 ]
               : [
                   {
@@ -167,28 +153,17 @@ export function ReviewSubmitStepView({
                     label: "Trigger",
                     value: TRIGGER_LABELS[state.triggerMode] ?? state.triggerMode,
                   },
-                  {
-                    label: "Deploy branch",
-                    value: state.deployBranch,
-                    mono: true,
-                  },
+                  { label: "Deploy branch", value: state.deployBranch, mono: true },
                   ...(state.triggerMode === "cron"
-                    ? [
-                        {
-                          label: "Cron",
-                          value: state.cronExpression,
-                          mono: true,
-                        },
-                      ]
+                    ? [{ label: "Cron", value: state.cronExpression, mono: true }]
                     : []),
-                  {
-                    label: "Approval gate",
-                    value: describeApprovalPolicy(state),
-                  },
-                ]
-          }
+                  { label: "Approval gate", value: describeApprovalPolicy(state) },
+                ]),
+          ]}
         />
       </section>
+
+      <WhatWillDeploy state={state} />
 
       <section className="flex flex-col gap-3">
         <div>
@@ -307,13 +282,13 @@ function SummaryCard({
   onJump,
   rows,
 }: {
-  stepIdx: number;
+  stepIdx: 1 | 2;
   title: string;
-  onJump: (idx: number) => void;
+  onJump: (step: 1 | 2) => void;
   rows: Array<{ label: string; value: string; mono?: boolean }>;
 }) {
   return (
-    <Card className="border-muted-foreground/20">
+    <Card className="border-muted-foreground/20 min-w-0">
       <CardContent className="flex flex-col gap-2 p-4 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
@@ -335,7 +310,10 @@ function SummaryCard({
           {rows.map((r) => (
             <div key={r.label} className="grid grid-cols-3 gap-2">
               <dt className="text-muted-foreground text-xs">{r.label}</dt>
-              <dd className={cn("col-span-2 truncate", r.mono && "font-mono text-xs")}>
+              <dd
+                className={cn("col-span-2 min-w-0 truncate", r.mono && "font-mono text-xs")}
+                title={r.value}
+              >
                 {r.value || "—"}
               </dd>
             </div>
@@ -400,5 +378,73 @@ function StatusBadge({ status, error }: { status: StepStatus; error?: string }) 
     <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
       <CircleDashedIcon className="size-3.5" /> Pending
     </span>
+  );
+}
+
+/**
+ * What registering will run (spec 44 §5.4): the manifest's workloads and
+ * managed services, the app's shape, and whether a first deploy follows.
+ */
+function WhatWillDeploy({ state }: { state: ReviewSubmitFields }) {
+  const preview = state.manifestLater ? null : deployPreview(state.manifestRaw);
+  const deploys = state.deployTiming !== "skip" && state.triggerFirstDeploy;
+  return (
+    <section className="flex min-w-0 flex-col gap-3">
+      <div>
+        <h3 className="font-medium">What will deploy</h3>
+        <p className="text-muted-foreground text-xs">
+          {deploys
+            ? "A first deploy runs once onboarding lands the app in ready."
+            : "Nothing deploys yet: registration only. Start a deploy from the app page."}
+        </p>
+      </div>
+      {state.manifestLater ? (
+        <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+          No manifest yet, so there is nothing to deploy until you add one on the app&apos;s
+          Manifest tab.
+        </p>
+      ) : !preview || preview.workloads.length === 0 ? (
+        <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+          The manifest declares no workloads Astrolift can read here. The server validates it on
+          create.
+        </p>
+      ) : (
+        <div className="min-w-0 rounded-md border">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 border-b p-3 text-sm">
+            <span className="font-medium">{TOPOLOGY_META[preview.topology].label}</span>
+            <span className="text-muted-foreground text-xs">
+              {TOPOLOGY_META[preview.topology].blurb}
+            </span>
+          </div>
+          <ul className="divide-y">
+            {preview.workloads.map((w, i) => (
+              <li key={`${w.name}-${i}`} className="flex min-w-0 items-center gap-3 p-3 text-sm">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs" title={w.name}>
+                  {w.name}
+                </span>
+                <Badge variant="outline" className="shrink-0 font-mono">
+                  {w.kind}
+                </Badge>
+                {w.replicas !== null && (
+                  <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                    x{w.replicas}
+                  </span>
+                )}
+              </li>
+            ))}
+            {preview.services.map((svc, i) => (
+              <li key={`${svc}-${i}`} className="flex min-w-0 items-center gap-3 p-3 text-sm">
+                <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+                  Managed service
+                </span>
+                <Badge variant="secondary" className="shrink-0 font-mono">
+                  {svc}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

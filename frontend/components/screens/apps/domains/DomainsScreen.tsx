@@ -8,6 +8,8 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  RefreshCwIcon,
+  Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -15,18 +17,24 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import { type Column, DataTable } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { staticController } from "@/components/viz/core/static-table";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
 import { AddDomainSheet } from "./AddDomainSheet";
-import { DomainHandshakeCard } from "./DomainHandshakeCard";
+import {
+  CERT_LABEL_KEYS,
+  CERT_TONE,
+  CertExpiryBadge,
+  DomainHandshakeCard,
+  EdgeAuthBadge,
+} from "./DomainHandshakeCard";
 import { UploadCertSheet } from "./UploadCertSheet";
 import type { AppDomain, AppDomainsState } from "./use-app-domains";
 
@@ -37,15 +45,33 @@ export type DomainsScreenProps = AppDomainsState & {
 };
 
 /**
- * The app's custom domains tab: env-scoped ingress controls, one handshake
- * card per domain, and the add / remove / BYO-cert flows. Data and
- * mutations come from useAppDomains; this holds only UI state (which
- * domain is being removed or given a certificate).
+ * The domain the panel under the list shows: the one picked, else the first
+ * still waiting on DNS (the handshake the operator came to finish), else the
+ * first.
+ */
+export function pickShownDomain(list: AppDomain[], pickedId: string | null): AppDomain | null {
+  return (
+    list.find((d) => d.id === pickedId) ??
+    list.find((d) => d.certState !== "validated") ??
+    list[0] ??
+    null
+  );
+}
+
+/**
+ * The app's Domains tab (spec 44 §5.1, §5.2): the domains on a DataTable in
+ * a Panel, the picked domain's handshake panel under it (DNS records to add,
+ * certificate, redirects, path routes), then one ingress panel per
+ * environment. Add domain and a certificate upload open sheets (§5.4). Data
+ * and mutations come from useAppDomains; this holds only UI state (which
+ * domain is shown, removed or given a certificate).
  */
 export function DomainsScreen({
   slug,
   tabs,
   loading,
+  error,
+  refetch,
   domains: list,
   environments: envList,
   workloadOptions,
@@ -67,14 +93,116 @@ export function DomainsScreen({
   toggleIngress,
 }: DomainsScreenProps) {
   const t = useTranslations("apps.domains");
+  const tCert = useTranslations("apps.domains.cert");
   const [removeTarget, setRemoveTarget] = React.useState<AppDomain | null>(null);
   const [byoTarget, setByoTarget] = React.useState<AppDomain | null>(null);
+  const [pickedId, setPickedId] = React.useState<string | null>(null);
+  const shown = pickShownDomain(list, pickedId);
+
+  const controller = React.useMemo(() => {
+    const base = staticController(list);
+    if (loading && list.length === 0) return { ...base, state: "loading" as const };
+    if (error && list.length === 0)
+      return { ...base, state: "error" as const, error, retry: refetch };
+    return base;
+  }, [list, loading, error, refetch]);
+
+  const columns: Column<AppDomain>[] = [
+    {
+      id: "hostname",
+      header: t("columns.hostname"),
+      cellClassName: "whitespace-normal",
+      cell: (d) => (
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+            {d.isWildcard ? `*.${d.hostname}` : d.hostname}
+          </code>
+          {d.isWildcard && (
+            <Badge variant="outline" className="text-2xs">
+              wildcard
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: t("columns.status"),
+      width: "w-40",
+      cell: (d) => {
+        const key = CERT_LABEL_KEYS[d.certState];
+        return (
+          <span className="inline-flex items-center gap-2 text-xs">
+            <StatusDot status={CERT_TONE[d.certState] ?? "pending"} />
+            {key ? tCert(key) : d.certState}
+          </span>
+        );
+      },
+    },
+    {
+      id: "certificate",
+      header: t("columns.certificate"),
+      cellClassName: "whitespace-normal",
+      cell: (d) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <CertExpiryBadge
+            expiresAt={d.certExpiresAt ?? null}
+            status={d.certObservabilityStatus ?? ""}
+          />
+          <EdgeAuthBadge state={d.edgeAuthState} />
+        </span>
+      ),
+    },
+    {
+      id: "checked",
+      header: t("columns.lastChecked"),
+      width: "w-44",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (d) =>
+        d.lastCheckedAt ? new Date(d.lastCheckedAt).toLocaleString() : tCert("notChecked"),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("columns.actions")}</span>,
+      align: "right",
+      width: "w-24",
+      cell: (d) => (
+        <Can permission="app.deploy">
+          {/* Above the row's stretched activator, so these act, not select. */}
+          <span className="relative z-10 inline-flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() => recheckDomain(d)}
+              disabled={busy}
+              aria-label={`${tCert("recheck")} ${d.hostname}`}
+              title={tCert("recheck")}
+            >
+              <RefreshCwIcon className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() => setRemoveTarget(d)}
+              disabled={busy}
+              aria-label={`${tCert("remove")} ${d.hostname}`}
+              title={tCert("remove")}
+            >
+              <Trash2Icon className="size-4" />
+            </Button>
+          </span>
+        </Can>
+      ),
+    },
+  ];
 
   return (
     <PageShell
       title={t("title")}
       description={
-        <span className="text-muted-foreground font-mono text-xs">
+        <span className="font-mono text-xs [overflow-wrap:anywhere]">
           {t("description", { slug })}
         </span>
       }
@@ -91,7 +219,7 @@ export function DomainsScreen({
             </Link>
           </Button>
           <Can permission="app.deploy">
-            <Button onClick={() => setAddOpen(true)}>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
               <PlusIcon className="size-4" />
               {t("addDomain")}
             </Button>
@@ -101,56 +229,60 @@ export function DomainsScreen({
     >
       {tabs}
 
-      <div className="space-y-4">
-        {envList.length > 0 && (
-          <div className="space-y-3">
-            {envList.map((env) => (
-              <IngressStatusCard
-                key={env.id}
-                env={env}
-                domains={list}
-                busy={busy}
-                onToggle={() => toggleIngress(env)}
-              />
-            ))}
-          </div>
+      <PanelGrid>
+        <Panel
+          title={t("listTitle")}
+          icon={<GlobeIcon className="size-4" />}
+          description={
+            list.length > 0 ? (
+              <span className="font-mono tabular-nums">{list.length}</span>
+            ) : undefined
+          }
+          flush
+        >
+          <DataTable
+            chrome="table"
+            className="[&>div]:rounded-none [&>div]:border-0"
+            label={t("listTitle")}
+            controller={controller}
+            columns={columns}
+            getRowId={(d) => d.id}
+            onRowActivate={(d) => setPickedId(d.id)}
+            rowLabel={(d) => (d.isWildcard ? `*.${d.hostname}` : d.hostname)}
+            rowClassName={(d) => (d.id === shown?.id ? "bg-muted/50" : undefined)}
+            empty={{
+              icon: <GlobeIcon className="size-5" />,
+              title: t("emptyTitle"),
+              description: t("emptyDescription"),
+              learnMoreHref: DOC_LINKS.customDomains,
+            }}
+          />
+        </Panel>
+
+        {shown && (
+          <DomainHandshakeCard
+            key={shown.id}
+            domain={shown}
+            busy={busy}
+            workloadOptions={workloadOptions}
+            onRecheck={() => recheckDomain(shown)}
+            onRemove={() => setRemoveTarget(shown)}
+            onUploadCert={() => setByoTarget(shown)}
+            onSaveRedirects={(rules) => saveRedirects(shown, rules)}
+            onSavePathRoutes={(routes) => savePathRoutes(shown, routes)}
+          />
         )}
 
-        {loading && list.length === 0 ? (
-          <Card>
-            <CardContent className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </CardContent>
-          </Card>
-        ) : list.length === 0 ? (
-          <Card>
-            <CardContent className="p-6">
-              <EmptyState
-                icon={<GlobeIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {list.map((d) => (
-              <DomainHandshakeCard
-                key={d.id}
-                domain={d}
-                busy={busy}
-                workloadOptions={workloadOptions}
-                onRecheck={() => recheckDomain(d)}
-                onRemove={() => setRemoveTarget(d)}
-                onUploadCert={() => setByoTarget(d)}
-                onSaveRedirects={(rules) => saveRedirects(d, rules)}
-                onSavePathRoutes={(routes) => savePathRoutes(d, routes)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        {envList.map((env) => (
+          <IngressStatusCard
+            key={env.id}
+            env={env}
+            domains={list}
+            busy={busy}
+            onToggle={() => toggleIngress(env)}
+          />
+        ))}
+      </PanelGrid>
 
       <AddDomainSheet
         open={addOpen}
@@ -202,14 +334,11 @@ export function DomainsScreen({
 }
 
 // ─── IngressStatusCard (#378) ───────────────────────────────────────────
-// Env-scoped ingress control. Renders above the per-domain handshake
-// list. Operator-facing pause / resume of all ingresses bound to the
-// environment (managed hostname + custom domains alike). When paused
-// the env's ingresses return HTTP 503 — used for planned maintenance
-// windows where you want to freeze traffic without tearing the
-// workload down. Per-domain delete still lives on the
-// DomainHandshakeCard below; this card complements that with the
-// env-wide toggle.
+// Env-scoped ingress control, one panel per environment under the domains:
+// pause or resume every ingress bound to the environment (managed hostname
+// and custom domains alike). Paused ingresses return HTTP 503, for planned
+// maintenance that freezes traffic without tearing the workload down.
+// Removing one domain stays on its row.
 
 function IngressStatusCard({
   env,
@@ -236,12 +365,13 @@ function IngressStatusCard({
   const customHosts = domains.map((d) => d.hostname);
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-5">
-        <div className="flex flex-wrap items-baseline gap-3">
-          <StatusDot status={tone} />
-          <span className="text-sm font-semibold capitalize">{env.name}</span>
-          <span className="text-muted-foreground text-xs">{t("label")}</span>
+    <Panel
+      span={6}
+      title={`${env.name} ${t("label")}`}
+      icon={<StatusDot status={tone} />}
+      description={t("description")}
+      actions={
+        <>
           {paused ? (
             <Badge
               variant="outline"
@@ -265,7 +395,6 @@ function IngressStatusCard({
               variant={paused ? "default" : "outline"}
               onClick={onToggle}
               disabled={busy}
-              className="ml-auto"
             >
               {busy ? (
                 <Loader2Icon className="size-3.5 animate-spin" />
@@ -277,42 +406,40 @@ function IngressStatusCard({
               {paused ? t("resume") : t("pause")}
             </Button>
           </Can>
+        </>
+      }
+    >
+      {/* Maintenance is chosen, not failed: warning tone, never danger. */}
+      {paused && (
+        <div className="border-warning-border bg-warning/5 mb-3 flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs">
+          <AlertTriangleIcon className="text-warning-fg size-3.5 shrink-0" />
+          <span className="text-muted-foreground min-w-0">
+            <span className="text-warning-fg font-medium">{t("maintenance")}</span>{" "}
+            {t("maintenanceDesc")}
+          </span>
         </div>
-
-        <p className="text-muted-foreground text-xs">{t("description")}</p>
-
-        <div className="border-border bg-muted/30 space-y-1.5 rounded-md border p-3 text-xs">
-          <div className="text-muted-foreground">{t("bound")}</div>
-          {managedHost && (
-            <div className="flex items-center gap-2">
-              <code className="font-mono break-all">{managedHost}</code>
-              <Badge variant="outline" className="text-2xs">
-                {tCert("managed")}
-              </Badge>
-            </div>
-          )}
-          {customHosts.length === 0
-            ? !managedHost && <p className="text-muted-foreground italic">{t("noneBound")}</p>
-            : customHosts.map((h) => (
-                <div key={h} className="flex items-center gap-2">
-                  <code className="font-mono break-all">{h}</code>
-                  <Badge variant="outline" className="text-2xs">
-                    {tCert("custom")}
-                  </Badge>
-                </div>
-              ))}
-        </div>
-
-        {paused && (
-          <div className="border-warning-border bg-warning/5 flex items-start gap-2 rounded-md border p-2 text-xs">
-            <AlertTriangleIcon className="text-warning-fg size-3.5 shrink-0" />
-            <span className="text-muted-foreground">
-              <span className="text-warning-fg font-medium">{t("maintenance")}</span>{" "}
-              {t("maintenanceDesc")}
-            </span>
+      )}
+      <div className="min-w-0 space-y-1.5 text-xs">
+        <div className="text-muted-foreground">{t("bound")}</div>
+        {managedHost && (
+          <div className="flex min-w-0 items-center gap-2">
+            <code className="min-w-0 font-mono [overflow-wrap:anywhere]">{managedHost}</code>
+            <Badge variant="outline" className="text-2xs shrink-0">
+              {tCert("managed")}
+            </Badge>
           </div>
         )}
-      </CardContent>
-    </Card>
+        {customHosts.length === 0
+          ? !managedHost && <p className="text-muted-foreground italic">{t("noneBound")}</p>
+          : customHosts.map((h) => (
+              <div key={h} className="flex min-w-0 items-center gap-2">
+                <code className="min-w-0 font-mono [overflow-wrap:anywhere]">{h}</code>
+                <Badge variant="outline" className="text-2xs shrink-0">
+                  {tCert("custom")}
+                </Badge>
+              </div>
+            ))}
+      </div>
+    </Panel>
   );
 }

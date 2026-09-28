@@ -1,33 +1,23 @@
 "use client";
 
-import {
-  CheckCircle2Icon,
-  CircleIcon,
-  ListChecksIcon,
-  Loader2Icon,
-  XCircleIcon,
-} from "lucide-react";
-import * as React from "react";
+import { HistoryIcon, ListChecksIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { Timeline, type StepState, type TimelineStep } from "@/components/run/Timeline";
 import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
 import { formatRelativeAge } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
 import type { useTaskRuns } from "./use-task-runs";
 
 export type TaskHomeScreenProps = ReturnType<typeof useTaskRuns> & {
+  /** The app's name; the frame above shows it. */
   name: string;
-  /** The app's tab bar. */
-  tabs?: React.ReactNode;
 };
 
-// The one-off execution lifecycle, shown as a checklist. `stageIndex` maps a
-// run status onto how far it got so the checklist reflects the latest run.
+// The one-off execution lifecycle. `stageIndex` maps a run status onto how
+// far it got, so the timeline reflects the latest run.
 const STAGES = ["Queued", "Provisioning", "Running", "Completed"] as const;
 function stageIndex(status: string): number {
   switch (status.toLowerCase()) {
@@ -53,121 +43,94 @@ function isFailed(status: string): boolean {
   return ["failed", "error", "timed_out"].includes(status.toLowerCase());
 }
 
-/**
- * Primitive home for a **task** — a one-off run as a checklist. The latest run's
- * status drives the checklist; prior runs list below. Real data from TaskRun.
- */
-export function TaskHomeScreen({ name, runs, loading, tabs }: TaskHomeScreenProps) {
-  const latest = runs[0] ?? null;
+/** The latest run's lifecycle as the shared run Timeline's steps. */
+export function taskStages(latest: AstroliftTaskRun | null): TimelineStep[] {
   const reached = latest ? stageIndex(latest.status) : -1;
+  const failed = latest ? isFailed(latest.status) : false;
+  return STAGES.map((stage, i) => {
+    let state: StepState = "pending";
+    if (i === 3 && reached === 3) state = failed ? "failed" : "ok";
+    else if (reached > i) state = "ok";
+    else if (reached === i) state = "running";
+    return {
+      id: stage,
+      name: failed && i === 3 ? "Failed" : stage,
+      state,
+      durationMs:
+        i === 3 && reached === 3 && latest?.durationSeconds != null
+          ? latest.durationSeconds * 1000
+          : null,
+    };
+  });
+}
+
+/**
+ * The Overview for a **task**: a one-off run. The latest run's lifecycle on
+ * the shared run Timeline, a failure's exit code first, and the prior runs
+ * below. Real data from TaskRun.
+ */
+export function TaskHomeScreen({ runs, loading }: TaskHomeScreenProps) {
+  const latest = runs[0] ?? null;
   const failed = latest ? isFailed(latest.status) : false;
 
   return (
-    <PageShell
-      title={
-        <span className="flex items-center gap-3">
-          <span className="bg-muted flex size-9 items-center justify-center rounded-md">
-            <ListChecksIcon className="text-muted-foreground size-5" />
-          </span>
-          <span>{name}</span>
-          <Badge variant="outline" className="gap-1.5">
-            <ListChecksIcon className="size-3" />
-            Task
-          </Badge>
-          {latest && (
-            <Badge variant={failed ? "destructive" : "secondary"} className="gap-1.5">
-              <StatusDot status={runStatusDot(latest.status)} />
-              {titleCaseStatus(latest.status)}
-            </Badge>
-          )}
-        </span>
-      }
-      description={<span className="text-muted-foreground text-xs">Runs once, on demand.</span>}
-    >
-      {tabs}
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {latest ? "Latest run" : "Execution checklist"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-3">
-              {STAGES.map((stage, i) => {
-                const done = reached > i || (reached === 3 && i === 3 && !failed);
-                const current = reached === i && !(i === 3);
-                const failHere = failed && i === 3;
-                return (
-                  <li key={stage} className="flex items-center gap-3">
-                    {failHere ? (
-                      <XCircleIcon className="text-danger-fg size-5 shrink-0" />
-                    ) : done ? (
-                      <CheckCircle2Icon className="text-success-fg size-5 shrink-0" />
-                    ) : current ? (
-                      <Loader2Icon className="size-5 shrink-0 animate-spin text-[var(--brand-primary)]" />
-                    ) : (
-                      <CircleIcon className="text-muted-foreground/40 size-5 shrink-0" />
-                    )}
-                    <span
-                      className={cn(
-                        "text-sm",
-                        done || current ? "text-foreground" : "text-muted-foreground"
-                      )}
-                    >
-                      {failHere ? "Failed" : stage}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-            {!latest && !loading && (
-              <p className="text-muted-foreground mt-4 text-xs">
-                No run recorded yet — a one-off task moves through these stages each time it runs.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+    <PanelGrid>
+      <Panel
+        title={latest ? "Latest run" : "Execution"}
+        icon={<ListChecksIcon className="size-4" />}
+        span={4}
+        loading={loading && runs.length === 0}
+        failure={
+          latest && failed
+            ? {
+                title: `Run ${titleCaseStatus(latest.status).toLowerCase()}`,
+                reason:
+                  latest.exitCode != null
+                    ? `Exited with code ${latest.exitCode}${latest.k8sJobName ? ` · ${latest.k8sJobName}` : ""}`
+                    : latest.k8sJobName || "No reason recorded",
+              }
+            : null
+        }
+      >
+        <Timeline steps={taskStages(latest)} label="Run stages" />
+        {!latest && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            No run recorded yet. A one-off task moves through these stages each time it runs.
+          </p>
+        )}
+      </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Run history</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && runs.length === 0 ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2Icon className="size-4 animate-spin" /> Loading runs…
-              </div>
-            ) : runs.length === 0 ? (
-              <EmptyState
-                icon={<ListChecksIcon className="size-5" />}
-                title="No runs yet"
-                description="Each one-off execution of this task appears here."
-              />
-            ) : (
-              <ul className="divide-y">
-                {runs.map((r) => (
-                  <li key={r.id} className="flex items-center gap-3 py-2 text-sm">
-                    <StatusDot status={runStatusDot(r.status)} />
-                    <Badge
-                      variant={runStatusDot(r.status) === "error" ? "destructive" : "secondary"}
-                      className="text-xs"
-                    >
-                      {titleCaseStatus(r.status)}
-                    </Badge>
-                    <span className="text-muted-foreground text-xs">
-                      {r.startedAt ? formatRelativeAge(r.startedAt) : "—"}
-                    </span>
-                    <span className="text-muted-foreground ml-auto text-xs tabular-nums">
-                      {formatDuration(r.durationSeconds)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </PageShell>
+      <Panel
+        title="Run history"
+        icon={<HistoryIcon className="size-4" />}
+        span={8}
+        loading={loading && runs.length === 0}
+        flush
+        empty={
+          runs.length === 0
+            ? {
+                icon: <ListChecksIcon className="size-5" />,
+                title: "No runs yet",
+                description: "Each one-off execution of this task appears here.",
+              }
+            : null
+        }
+      >
+        <ul className="divide-y">
+          {runs.map((r) => (
+            <li key={r.id} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm">
+              <StatusDot status={runStatusDot(r.status)} />
+              <span className="w-24 shrink-0">{titleCaseStatus(r.status)}</span>
+              <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
+                {r.startedAt ? formatRelativeAge(r.startedAt) : "not started"}
+              </span>
+              <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                {formatDuration(r.durationSeconds)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    </PanelGrid>
   );
 }

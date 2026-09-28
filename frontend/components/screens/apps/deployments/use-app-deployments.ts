@@ -1,125 +1,93 @@
 "use client";
 
+import { NetworkStatus } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
-import { LIST_DEPLOYMENTS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { useHeldRows } from "@/components/list/use-held-rows";
+import { useListState } from "@/components/list/use-list-state";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppEnvironment,
   AstroliftDeployment,
 } from "@/graphql/lifecycle/lifecycle.types";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
-import { STATUS_BUCKET_KEYS, type StatusBucket } from "./app-deployments-format";
+import { appDeploymentsList, pageVariables, selectPage } from "./app-deployments-list";
+import { APP_DEPLOYMENTS_PAGE } from "./app-deployments-query";
 
-interface AppResp {
-  astroliftApp: AstroliftRegisteredApp | null;
-}
-interface DeploymentsResp {
-  astroliftDeployments: AstroliftDeployment[];
+interface PageResp {
+  astroliftDeploymentsPage: {
+    items: AstroliftDeployment[];
+    nextCursor: string | null;
+    totalCount: number | null;
+  };
 }
 interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
 
+const POLL_MS = 30_000;
+
 /**
- * The data half of AppDeploymentsScreen: the app, its deployments (polled
- * every 30s) and environments, plus the filters and the open row, which
- * live in the URL so a refresh or a shared link keeps the operator's view.
+ * The data half of AppDeploymentsScreen: list state in the URL (view, chips,
+ * search, cursor), the page query, the app's environments as the env chip's
+ * options, and new rows held behind the pill while the reader is on the
+ * first page. Rows seen on any page stay resolvable, so two selected on
+ * different pages can still be compared.
  */
-export function useAppDeployments(slug: string) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+export function useAppDeployments(slug: string, { previews = true }: { previews?: boolean } = {}) {
+  const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: slug } });
+  const envKey = (envs.data?.astroliftEnvironments ?? []).map((e) => e.name).join("\n");
+  const definition = React.useMemo(
+    () => appDeploymentsList(envKey ? envKey.split("\n") : [], { previews }),
+    [envKey, previews]
+  );
+  const list = useListState(definition);
+  const { state, filters } = list;
+  const firstPage = state.after === null;
+  const [now] = React.useState(() => Date.now());
 
-  const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
-  const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { appSlug: slug, limit: 100 },
-    pollInterval: 30000,
+  const page = useQuery<PageResp>(APP_DEPLOYMENTS_PAGE, {
+    variables: pageVariables(slug, filters, state.q, state.pageSize, state.after),
+    fetchPolicy: "cache-and-network",
+    pollInterval: firstPage ? POLL_MS : 0,
   });
-  const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
-    variables: { appSlug: slug },
+
+  const data = page.data?.astroliftDeploymentsPage;
+  const selected = selectPage(data?.items ?? [], data?.nextCursor ?? null, filters, now);
+
+  const held = useHeldRows(selected.rows, (d) => d.id, {
+    live: firstPage,
+    resetKey: JSON.stringify(filters) + state.q + state.pageSize,
   });
 
-  // Filters and the open-row id are persisted to URL search params so a
-  // page refresh or shared link preserves the operator's view exactly.
-  const rawBucket = searchParams.get("status") as StatusBucket | null;
-  const statusBucket: StatusBucket =
-    rawBucket && STATUS_BUCKET_KEYS.some((k) => k.value === rawBucket) ? rawBucket : "all";
-  const envFilter = searchParams.get("env") ?? "all";
-  const openId = searchParams.get("open");
-
-  const [search, setSearch] = React.useState<string>(() => searchParams.get("q") ?? "");
-
-  const writeParams = React.useCallback(
-    (mutate: (p: URLSearchParams) => void) => {
-      const params = new URLSearchParams(searchParams.toString());
-      mutate(params);
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    },
-    [pathname, router, searchParams]
-  );
-
-  function updateFilter(key: string, value: string) {
-    writeParams((params) => {
-      if (value && value !== "all" && value !== "") {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-    });
-  }
-
-  const setStatusBucket = (v: StatusBucket) => updateFilter("status", v);
-  const setEnvFilter = (v: string) => updateFilter("env", v);
-
-  const setOpenId = React.useCallback(
-    (id: string | null) => {
-      writeParams((params) => {
-        if (id) params.set("open", id);
-        else params.delete("open");
-      });
-    },
-    [writeParams]
-  );
-
-  const toggleOpen = React.useCallback(
-    (id: string) => {
-      setOpenId(openId === id ? null : id);
-    },
-    [openId, setOpenId]
-  );
-
-  // Debounce search → URL (300 ms gives snappy typing without thrashing history).
+  const [seen, setSeen] = React.useState<ReadonlyMap<string, AstroliftDeployment>>(() => new Map());
+  const items = data?.items;
   React.useEffect(() => {
-    const id = setTimeout(() => updateFilter("q", search), 300);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+    if (!items?.length) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- folds each fetched page into the index the compare selection reads
+    setSeen((prev) => {
+      const next = new Map(prev);
+      for (const d of items) next.set(d.id, d);
+      return next;
+    });
+  }, [items]);
 
-  const a = app.data?.astroliftApp ?? null;
-  const allDeployments = React.useMemo(
-    () => deployments.data?.astroliftDeployments ?? [],
-    [deployments.data?.astroliftDeployments]
-  );
+  // Mine and Today narrow the page here, so the server's count is not theirs.
+  const narrowed = Boolean(filters.startedBy || filters.since);
 
   return {
-    app: a,
-    /** First load of the app only. */
-    loading: app.loading && !a,
-    deployments: allDeployments,
-    deploymentsLoading: deployments.loading,
-    environments: envs.data?.astroliftEnvironments ?? [],
-    statusBucket,
-    setStatusBucket,
-    envFilter,
-    setEnvFilter,
-    search,
-    setSearch,
-    openId,
-    setOpenId,
-    toggleOpen,
+    list,
+    rows: held.rows,
+    newRows: { count: held.newCount, onReveal: held.reveal },
+    loading: page.loading && !data,
+    stale: page.networkStatus === NetworkStatus.setVariables && Boolean(data),
+    error: page.error && !data ? { message: page.error.message } : null,
+    onRetry: () => {
+      void page.refetch();
+    },
+    nextCursor: selected.nextCursor,
+    totalCount: narrowed ? null : (data?.totalCount ?? null),
+    lookup: (id: string) => seen.get(id) ?? null,
   };
 }

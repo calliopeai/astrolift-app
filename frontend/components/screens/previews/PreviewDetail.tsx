@@ -1,29 +1,34 @@
 "use client";
 
-import { AlertTriangleIcon, ExternalLinkIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CpuIcon,
+  ExternalLinkIcon,
+  GitPullRequestIcon,
+  InfoIcon,
+  MoreHorizontalIcon,
+} from "lucide-react";
 import Link from "next/link";
 
-import {
-  DetailStatusBadge,
-  DetailTimestamp,
-  EntityDetailShell,
-  type Dot,
-} from "@/components/detail/EntityDetailShell";
+import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
+import { Identifier } from "@/components/Identifier";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
+import { ShellHeader } from "@/components/shell/ShellHeader";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
-import type { PreviewStatus } from "@/graphql/lifecycle/lifecycle.types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
+import { PREVIEW_DOT } from "./previews-list";
 import type { usePreviewDetail } from "./use-preview-detail";
-
-// Preview status colour, matching the /previews list (a "running" preview is
-// healthy/teal, not in-flight) so the badge reads the same across surfaces.
-const STATUS_TONE: Record<PreviewStatus, Dot> = {
-  building: "pending",
-  running: "ok",
-  failed: "error",
-  torn_down: "muted",
-};
 
 function formatMemory(bytes: number): string {
   if (!bytes) return "0 MiB";
@@ -34,157 +39,248 @@ function formatMemory(bytes: number): string {
 
 export type PreviewDetailScreenProps = ReturnType<typeof usePreviewDetail>;
 
-/** Preview environment detail (#1106), the drill-in target for a /previews row. */
-export function PreviewDetailScreen({ id, preview: p, loading }: PreviewDetailScreenProps) {
-  const tone = p ? STATUS_TONE[p.status] : undefined;
+/** Previews ▾ › checkout-api › PR #412 (spec 44 §4.4). */
+function crumbs(id: string, p: AstroliftPreviewEnvironment | null) {
+  if (!p) return appsDetailCrumbs("previews", { label: `preview ${id.slice(0, 8)}` });
+  return appsDetailCrumbs(
+    "previews",
+    { label: p.registeredAppSlug, href: `/apps/${p.registeredAppSlug}/deployments?view=previews` },
+    { label: `PR #${p.prNumber}` }
+  );
+}
+
+/**
+ * One preview environment on the detail language (spec 44 §5.2, #1106): its
+ * status and branch in the header, Open preview as the action while it
+ * runs, a failure first, then its fields and resources in panels. Pure
+ * view; the data half is usePreviewDetail.
+ */
+export function PreviewDetailScreen({
+  id,
+  preview: p,
+  loading,
+  error,
+  onRetry,
+}: PreviewDetailScreenProps) {
+  if (!p) {
+    const title = loading || error ? "Preview" : "Preview not found";
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <ShellHeader crumbs={crumbs(id, null)} title={title} />
+        <PanelGrid>
+          <Panel
+            title="Preview"
+            icon={<GitPullRequestIcon className="size-4" />}
+            span={6}
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            empty={{
+              icon: <GitPullRequestIcon className="size-5" />,
+              title: "Preview not found",
+              description:
+                "No preview environment has this id in the recent window, or you do not have permission to see it.",
+              actionHref: "/previews",
+              actionLabel: "Open previews",
+            }}
+          />
+          {loading && (
+            <Panel title="Resources" icon={<CpuIcon className="size-4" />} span={6} loading />
+          )}
+        </PanelGrid>
+      </div>
+    );
+  }
+
+  const running = p.status === "running";
 
   return (
-    <EntityDetailShell
-      loading={loading}
-      notFound={!p}
-      breadcrumb={{ label: "Previews", href: "/previews" }}
-      heading={p ? `PR #${p.prNumber}` : `Preview ${id.slice(0, 8)}`}
-      status={p?.status}
-      statusTone={tone}
-      notFoundLabel="preview environment"
-      overview={
-        p
-          ? [
-              { term: "Status", description: <DetailStatusBadge status={p.status} tone={tone} /> },
+    <div className="flex min-w-0 flex-1 flex-col gap-4">
+      <ShellHeader
+        crumbs={crumbs(id, p)}
+        title={`PR #${p.prNumber}`}
+        status={
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-sm capitalize">
+            <StatusDot status={PREVIEW_DOT[p.status]} />
+            {p.status.replace(/_/g, " ")}
+          </span>
+        }
+        context={
+          <>
+            <span className="font-mono">{p.branch}</span>
+            {p.commitSha && (
+              <>
+                {" · "}
+                <span className="font-mono">{p.commitSha.slice(0, 8)}</span>
+              </>
+            )}
+          </>
+        }
+        primaryAction={
+          running ? (
+            <Button size="sm" variant="outline" asChild>
+              <a href={`https://${p.hostname}`} target="_blank" rel="noreferrer">
+                <ExternalLinkIcon className="size-4" />
+                Open preview
+              </a>
+            </Button>
+          ) : undefined
+        }
+        menu={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+                <MoreHorizontalIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              {p.prUrl && (
+                <DropdownMenuItem asChild>
+                  <a href={p.prUrl} target="_blank" rel="noreferrer">
+                    Open pull request
+                  </a>
+                </DropdownMenuItem>
+              )}
+              {p.sourceUrl && (
+                <DropdownMenuItem asChild>
+                  <a href={p.sourceUrl} target="_blank" rel="noreferrer">
+                    Open repository
+                  </a>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem asChild>
+                <Link href={`/apps/${p.registeredAppSlug}`}>Open app</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
+
+      <PanelGrid className="items-start">
+        <Panel
+          title="Overview"
+          icon={<InfoIcon className="size-4" />}
+          span={6}
+          // No reason field on a preview yet: say where to look.
+          failure={
+            p.status === "failed"
+              ? {
+                  title: "Preview failed",
+                  reason: "The preview did not build or deploy. Its app's logs hold the reason.",
+                  action: (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/apps/${p.registeredAppSlug}/logs`}>Open logs</Link>
+                    </Button>
+                  ),
+                }
+              : null
+          }
+        >
+          <DefinitionList
+            items={[
               {
                 term: "App",
                 description: (
-                  <Link
-                    href={`/apps/${p.registeredAppSlug}`}
-                    className="text-[var(--brand-primary)] hover:underline"
-                  >
+                  <Link href={`/apps/${p.registeredAppSlug}`} className="hover:underline">
                     {p.registeredAppSlug}
                   </Link>
                 ),
               },
               {
-                term: "Pull request",
-                description: p.prUrl ? (
-                  <a
-                    href={p.prUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[var(--brand-primary)] hover:underline"
-                  >
-                    #{p.prNumber} <ExternalLinkIcon className="size-3" />
-                  </a>
-                ) : (
-                  <span className="font-mono">#{p.prNumber}</span>
+                term: "Hostname",
+                description: (
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">{p.hostname}</span>
                 ),
               },
               {
-                term: "Branch",
+                term: "Namespace",
                 description: (
-                  <span>
-                    <span className="font-mono text-xs">{p.branch}</span>
-                    {p.commitSha ? (
-                      <span className="text-muted-foreground font-mono text-xs">
-                        {" "}
-                        · {p.commitSha.slice(0, 7)}
-                      </span>
-                    ) : null}
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">{p.namespace}</span>
+                ),
+              },
+              {
+                term: "Commit",
+                description: p.commitSha ? (
+                  <Identifier value={p.commitSha} kind="sha" form="full" />
+                ) : (
+                  "—"
+                ),
+              },
+              { term: "Trigger", description: p.isManual ? "Manual" : "Automatic" },
+              {
+                term: "Pinned",
+                description: p.isPinned ? (
+                  <span className="[overflow-wrap:anywhere]">
+                    {p.pinnedByEmail ?? "yes"}
+                    {p.pinReason && ` · ${p.pinReason}`}
+                  </span>
+                ) : (
+                  "No"
+                ),
+              },
+              { term: "TTL until", description: <DetailTimestamp iso={p.ttlUntil} /> },
+              { term: "Last deployed", description: <DetailTimestamp iso={p.lastDeployedAt} /> },
+              { term: "Torn down", description: <DetailTimestamp iso={p.tornDownAt} /> },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Resources" icon={<CpuIcon className="size-4" />} span={6}>
+          <DefinitionList
+            items={[
+              {
+                term: "vCPU (aggregate)",
+                description: (
+                  <span className="font-mono">{p.aggregateResources.cpuCores.toFixed(2)}</span>
+                ),
+              },
+              {
+                term: "Memory (aggregate)",
+                description: (
+                  <span className="font-mono">
+                    {formatMemory(p.aggregateResources.memoryBytes)}
                   </span>
                 ),
               },
               {
-                term: "Hostname",
+                term: "Pods",
+                description: <span className="font-mono">{p.aggregateResources.podCount}</span>,
+              },
+              {
+                term: "Est. daily cost",
+                // The figure and what the driver said about it (#1509): a
+                // GCP variant's total is an over-count by construction, and
+                // an operator must not read it as exact.
                 description:
-                  p.status === "running" ? (
-                    <a
-                      href={`https://${p.hostname}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-sm hover:underline"
-                    >
-                      {p.hostname} <ExternalLinkIcon className="size-3" />
-                    </a>
+                  p.estimatedDailyCostUsd == null ? (
+                    "—"
                   ) : (
-                    <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
-                  ),
-              },
-              {
-                term: "Namespace",
-                description: <span className="font-mono text-xs">{p.namespace}</span>,
-              },
-              {
-                term: "Source",
-                description: p.sourceUrl ? (
-                  <a
-                    href={p.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
-                  >
-                    Repository <ExternalLinkIcon className="size-3" />
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                ),
-              },
-              { term: "Trigger", description: p.isManual ? "Manual" : "Automatic" },
-              { term: "TTL until", description: <DetailTimestamp iso={p.ttlUntil} /> },
-              { term: "Last deployed", description: <DetailTimestamp iso={p.lastDeployedAt} /> },
-              { term: "Torn down", description: <DetailTimestamp iso={p.tornDownAt} /> },
-            ]
-          : []
-      }
-    >
-      {p ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resources</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DefinitionList
-              items={[
-                { term: "vCPU (aggregate)", description: p.aggregateResources.cpuCores.toFixed(2) },
-                {
-                  term: "Memory (aggregate)",
-                  description: formatMemory(p.aggregateResources.memoryBytes),
-                },
-                { term: "Pods", description: String(p.aggregateResources.podCount) },
-                {
-                  term: "Est. daily cost",
-                  // The figure and what the driver said about it. Every
-                  // caveat used to be dropped before it reached here
-                  // (#1509), including the label on GCP variants whose
-                  // total is an over-count by construction — so an
-                  // operator read a confident number that could be out by
-                  // an order of magnitude with nothing saying so.
-                  description:
-                    p.estimatedDailyCostUsd == null ? (
-                      "—"
-                    ) : (
-                      <span className="flex flex-col gap-1">
-                        <span className="flex items-center gap-1.5">
-                          {`$${p.estimatedDailyCostUsd.toFixed(2)}`}
-                          {p.estimatedCostApproximate && (
-                            <Badge variant="outline" className="text-2xs gap-1 uppercase">
-                              <AlertTriangleIcon className="size-3" />
-                              approximate
-                            </Badge>
-                          )}
-                        </span>
-                        {p.estimatedCostNotes.length > 0 && (
-                          <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
-                            {p.estimatedCostNotes.map((note) => (
-                              <span key={note}>{note}</span>
-                            ))}
-                          </span>
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-mono">{`$${p.estimatedDailyCostUsd.toFixed(2)}`}</span>
+                        {p.estimatedCostApproximate && (
+                          <Badge variant="outline" className="text-2xs gap-1 uppercase">
+                            <AlertTriangleIcon className="size-3" />
+                            approximate
+                          </Badge>
                         )}
                       </span>
-                    ),
-                },
-              ]}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-    </EntityDetailShell>
+                      {p.estimatedCostNotes.length > 0 && (
+                        <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+                          {p.estimatedCostNotes.map((note) => (
+                            <span key={note} className="[overflow-wrap:anywhere]">
+                              {note}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  ),
+              },
+            ]}
+          />
+        </Panel>
+      </PanelGrid>
+    </div>
   );
 }

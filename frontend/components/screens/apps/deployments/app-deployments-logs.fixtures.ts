@@ -2,14 +2,12 @@ import type {
   AstroliftAppLogLine,
   AstroliftDeployment,
   AstroliftDeploymentComparison,
-  AstroliftDeploymentLogEntry,
 } from "@/graphql/lifecycle/lifecycle.types";
 
 import type { AppDeploymentsScreenProps } from "./AppDeploymentsScreen";
 import type { AppLogsScreenProps } from "./AppLogsScreen";
 import type { CompareDeploymentsSheetViewProps } from "./CompareDeploymentsSheet";
-import type { DeploymentExpandPanelViewProps } from "./DeploymentExpandPanel";
-import type { DeploymentRowActionsViewProps } from "./DeploymentRowActions";
+import type { DeploymentActions } from "./DeploymentRowActions";
 
 /** Hand-typed fixtures for the app deployments and logs tabs. */
 
@@ -145,30 +143,22 @@ export const DEPLOY_LONG: AstroliftDeployment = {
 
 // ---------------------------------------------------------------- screen
 
-export const SCREEN: AppDeploymentsScreenProps = {
-  slug: "storefront",
-  app: APP,
+/** Everything but the list state, which stories build with `useLocalListState`. */
+export const SCREEN: Omit<AppDeploymentsScreenProps, "list"> = {
+  rows: DEPLOYMENTS,
   loading: false,
-  deployments: DEPLOYMENTS,
-  deploymentsLoading: false,
-  environments: [{ name: "prod" }, { name: "stg" }],
-  statusBucket: "all",
-  setStatusBucket: noop,
-  envFilter: "all",
-  setEnvFilter: noop,
-  search: "",
-  setSearch: noop,
-  openId: null,
-  setOpenId: noop,
-  toggleOpen: noop,
+  error: null,
+  onRetry: noop,
+  nextCursor: "cursor-2",
+  totalCount: 48,
+  lookup: (id) => [...DEPLOYMENTS, DEPLOY_LONG].find((d) => d.id === id) ?? null,
   environmentsHref: "/apps/storefront/environments",
+  rowHref: (d) => `#deployment-${d.id}`,
 };
 
 // ---------------------------------------------------------------- row actions
 
-export const ACTIONS: DeploymentRowActionsViewProps = {
-  deployment: DEPLOY_RUNNING,
-  appSlug: "storefront",
+export const ACTIONS: DeploymentActions = {
   canApprove: true,
   canDeploy: true,
   canRollback: true,
@@ -177,106 +167,6 @@ export const ACTIONS: DeploymentRowActionsViewProps = {
   onAbort: asyncNoop,
   onRedeploy: asyncNoop,
   onRollback: asyncNoop,
-};
-
-// ---------------------------------------------------------------- expand panel
-
-const LOG_ENTRIES: AstroliftDeploymentLogEntry[] = [
-  {
-    id: "l1",
-    deploymentId: DEPLOY_RUNNING.id,
-    occurredAt: minutesAgo(42),
-    status: "pending",
-    message: "Deployment queued.",
-    detail: {},
-  },
-  {
-    id: "l2",
-    deploymentId: DEPLOY_RUNNING.id,
-    occurredAt: minutesAgo(41),
-    status: "deploying",
-    message: "Applying manifests to prod-west.",
-    detail: {},
-  },
-  {
-    id: "l3",
-    deploymentId: DEPLOY_RUNNING.id,
-    occurredAt: minutesAgo(39),
-    status: "running",
-    message: "3 of 3 replicas ready.",
-    detail: {},
-  },
-];
-
-export const DETAIL: DeploymentExpandPanelViewProps = {
-  deployment: DEPLOY_RUNNING,
-  repoFullName: APP.sourceRepo,
-  onClose: noop,
-  logEntries: LOG_ENTRIES,
-  logLoading: false,
-  manifest: {
-    appSlug: "storefront",
-    environmentName: "prod",
-    imageTag: DEPLOY_RUNNING.imageTag,
-    namespace: "storefront-prod",
-    resources: [
-      {
-        kind: "Deployment",
-        metadata: { name: "web" },
-        spec: { replicas: 3, template: { spec: { containers: [{ name: "web" }] } } },
-      },
-      { kind: "Service", metadata: { name: "web" }, spec: { ports: [{ port: 80 }] } },
-      { kind: "Ingress", metadata: { name: "web" } },
-      { kind: "ConfigMap", metadata: { name: "web-env" } },
-      { kind: "ConfigMap", metadata: { name: "web-flags" } },
-    ],
-  },
-  manifestLoading: false,
-  envUrl: "https://storefront.astrolift.app",
-};
-
-export const DETAIL_LOADING: DeploymentExpandPanelViewProps = {
-  ...DETAIL,
-  logEntries: [],
-  logLoading: true,
-  manifest: null,
-  manifestLoading: true,
-};
-
-export const DETAIL_EMPTY: DeploymentExpandPanelViewProps = {
-  ...DETAIL,
-  deployment: {
-    ...DEPLOY_DEPLOYING,
-    commitSha: "",
-    branch: "",
-    commitAuthor: "",
-    ciRunUrl: "",
-    prNumber: 0,
-    repoUrl: "",
-  },
-  logEntries: [],
-  manifest: null,
-  envUrl: null,
-};
-
-export const DETAIL_ERROR: DeploymentExpandPanelViewProps = {
-  ...DETAIL,
-  deployment: DEPLOY_FAILED,
-  manifest: {
-    appSlug: "storefront",
-    namespace: "storefront-prod",
-    resources: null,
-    error: "yaml: line 14: mapping values are not allowed in this context",
-    errorPath: "astrolift/manifest.yaml",
-    errorLine: 14,
-  },
-};
-
-export const DETAIL_LONG: DeploymentExpandPanelViewProps = {
-  ...DETAIL,
-  deployment: DEPLOY_LONG,
-  repoFullName: `example/${LONG}`,
-  logEntries: LOG_ENTRIES.map((e) => ({ ...e, message: `${e.message} ${LONG}` })),
 };
 
 // ---------------------------------------------------------------- compare
@@ -334,6 +224,9 @@ export const LOGS: AppLogsScreenProps = {
   toggleStreaming: noop,
   lines: LOG_LINES,
   clearLines: noop,
+  error: null,
+  retry: noop,
+  downloadLines: noop,
   podRows: [{ name: POD }, { name: "storefront-web-7d9f8b6c4-q8m1z" }],
   selectedPod: POD,
   setPickedPod: noop,

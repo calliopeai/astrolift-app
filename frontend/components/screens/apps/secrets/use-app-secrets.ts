@@ -366,6 +366,11 @@ export function useAppSecrets(slug: string) {
     environments: envList,
     secrets: list,
     secretsLoading: secrets.loading && list.length === 0,
+    /** The secrets query failed with nothing cached. */
+    secretsError: secrets.data ? null : (secrets.error ?? null),
+    retrySecrets: (): void => {
+      void secrets.refetch();
+    },
     attachments: attachmentList,
     attachmentsLoading: attachments.loading && attachmentList.length === 0,
     pendingProposals: pendingProposals.data?.astroliftSecretChangeProposals ?? [],

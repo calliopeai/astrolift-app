@@ -1,16 +1,18 @@
 "use client";
 
-import { AlertTriangleIcon, BoxIcon, NetworkIcon } from "lucide-react";
+import { BoxIcon, NetworkIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
-import { AppTopologyMap } from "@/components/topology";
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import type { TopologyEdge, TopologyNode } from "@/components/topology/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppView } from "@/components/viz/AppView";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { TOPOLOGY_META } from "@/lib/topology";
+import { cn } from "@/lib/utils";
+
+import { topologySnapshot } from "./topology-snapshot";
 
 export interface TopologyScreenProps {
   slug: string;
@@ -21,17 +23,17 @@ export interface TopologyScreenProps {
   edges: TopologyEdge[];
   /** Where the empty state's "add a workload" action goes (chrome-aware). */
   workloadsHref: string;
-  /** The app tab bar. */
-  tabs?: React.ReactNode;
+  /** A node was picked: the route opens its workload, service or domain. */
+  onSelectNode?: (node: TopologyNode) => void;
+  span?: PanelSpan;
 }
 
 /**
- * App > Topology tab (#705). Promotes the topology graph from a small
- * Overview thumbnail to a first-class screen — full-page rendering at
- * a fixed-tall height, room for legend + future drill-in. The Overview
- * keeps a compact thumbnail with "Open Topology" so an operator
- * scanning the landing page sees the graph at a glance and clicks
- * here for the full view.
+ * The overview's topology panel (spec 44 §5.2; the former Topology tab,
+ * #705). The app's workloads, ingress and managed services drawn by AppView
+ * in the person's chosen view style, with the style picker and the legend
+ * for what colour and motion mean. The picture carries health and wiring
+ * only; see topology-snapshot for why traffic reads zero.
  */
 export function TopologyScreen({
   slug,
@@ -41,100 +43,65 @@ export function TopologyScreen({
   nodes,
   edges,
   workloadsHref,
-  tabs,
+  onSelectNode,
+  span = 12,
 }: TopologyScreenProps) {
-  const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.topology");
+  const tDetail = useTranslations("apps.detail.topology");
+  const snapshot = React.useMemo(
+    () => topologySnapshot({ slug: a?.slug ?? slug, name: a?.name ?? slug }, nodes, edges),
+    [a?.slug, a?.name, slug, nodes, edges]
+  );
 
-  if (loading) {
+  if (loading || workloadsLoading || !a || nodes.length === 0) {
     return (
-      <PageShell title={tCommon("loading")}>
-        <Skeleton className="h-32 w-full" />
-      </PageShell>
+      <Panel
+        title={tDetail("title")}
+        icon={<NetworkIcon className="size-4" />}
+        span={span}
+        loading={loading || workloadsLoading}
+        skeleton={<Skeleton className="h-64 w-full" />}
+        empty={{
+          icon: <BoxIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          actionHref: workloadsHref,
+          actionLabel: t("emptyAction"),
+        }}
+      />
     );
   }
 
-  if (!a) {
-    return (
-      <PageShell title={tCommon("notFound")}>
-        <EmptyState
-          icon={<AlertTriangleIcon className="size-5" />}
-          title={tCommon("notFoundSlug", { slug })}
-          description={tCommon("notFoundDescription")}
-          actionHref="/apps"
-          actionLabel={tCommon("backToApps")}
-        />
-      </PageShell>
-    );
-  }
-
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   return (
-    <PageShell
-      title={t("title", { name: a.name })}
-      description={
-        <span className="text-muted-foreground font-mono text-xs">
-          {t("description", { slug: a.slug })}
-        </span>
-      }
-    >
-      {tabs}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <NetworkIcon className="size-4" /> {t("graphTitle")}
-          </CardTitle>
-          <CardDescription>{t("graphDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {workloadsLoading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-[640px] w-full" />
-            </div>
-          ) : nodes.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BoxIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-                actionHref={workloadsHref}
-                actionLabel={t("emptyAction")}
-              />
-            </div>
-          ) : (
-            <div className="p-4">
-              <AppTopologyMap nodes={nodes} edges={edges} height={640} variant="telemetry" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("legendTitle")}</CardTitle>
-          <CardDescription>{t("legendDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="text-muted-foreground grid gap-2 text-xs sm:grid-cols-2">
-            <li>
-              <span className="text-foreground font-medium">{t("legend.ingress")}</span> —{" "}
-              {t("legend.ingressBody")}
-            </li>
-            <li>
-              <span className="text-foreground font-medium">{t("legend.service")}</span> —{" "}
-              {t("legend.serviceBody")}
-            </li>
-            <li>
-              <span className="text-foreground font-medium">{t("legend.workload")}</span> —{" "}
-              {t("legend.workloadBody")}
-            </li>
-            <li>
-              <span className="text-foreground font-medium">{t("legend.status")}</span> —{" "}
-              {t("legend.statusBody")}
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
-    </PageShell>
+    <div className={cn("col-span-12 min-w-0", SPAN_CLASS[span])}>
+      <AppView
+        snapshot={snapshot}
+        title={<span className="[overflow-wrap:anywhere]">{tDetail("title")}</span>}
+        description={
+          <span className="[overflow-wrap:anywhere]">
+            {TOPOLOGY_META[snapshot.topology].label} · {t("graphDescription")}
+          </span>
+        }
+        onSelectNode={
+          onSelectNode
+            ? (id) => {
+                const node = byId.get(id);
+                if (node) onSelectNode(node);
+              }
+            : undefined
+        }
+      />
+    </div>
   );
 }
+
+/** Matches Panel's spans, for the AppView frame that stands in for one. */
+const SPAN_CLASS: Record<PanelSpan, string> = {
+  12: "",
+  9: "xl:col-span-9",
+  8: "xl:col-span-8",
+  6: "xl:col-span-6",
+  4: "xl:col-span-4",
+  3: "lg:col-span-6 xl:col-span-3",
+};

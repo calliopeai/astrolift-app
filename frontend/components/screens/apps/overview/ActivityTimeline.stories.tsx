@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
+import { DeployActivityStrip } from "../detail/DeployActivityStrip";
+import { ACTIVITY as DEPLOY_ACTIVITY } from "../detail/app-detail-shell.fixtures";
 import { ActivityTimelineView } from "./ActivityTimeline";
 import { ACTIVITY, ACTIVITY_LONG } from "./app-overview-cards-b.fixtures";
 
@@ -24,11 +26,18 @@ export const Full: Story = {};
 
 export const Loading: Story = { args: { events: [], loading: true } };
 
-/**
- * The card has no error state: a failed load leaves the feed empty, so this
- * is also what an error looks like.
- */
+/** Nothing has happened to this app yet. */
 export const Empty: Story = { args: { events: [] } };
+
+/** The events query failed: the error and Retry sit inside the panel. */
+export const QueryError: Story = {
+  args: { events: [], error: "Network error: upstream timed out", onRetry: () => {} },
+};
+
+/** On the overview the deploy heatmap leads the panel. */
+export const WithDeployStrip: Story = {
+  args: { strip: <DeployActivityStrip {...DEPLOY_ACTIVITY} /> },
+};
 
 /** A chip that matches nothing shows the filter in the empty line. */
 export const NoMatches: Story = {
@@ -41,3 +50,12 @@ export const NoMatches: Story = {
 };
 
 export const LongStrings: Story = { args: ACTIVITY_LONG };
+
+export const At768: Story = {
+  args: { ...ACTIVITY_LONG, strip: <DeployActivityStrip {...DEPLOY_ACTIVITY} /> },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <ActivityTimelineView {...args} />
+    </div>
+  ),
+};

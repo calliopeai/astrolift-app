@@ -5,10 +5,9 @@ import { HistoryIcon, RepeatIcon, TimerIcon } from "lucide-react";
 import * as React from "react";
 
 import { DataTable, type Column } from "@/components/data-table";
-import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { nextCronRun } from "@/lib/cron";
@@ -18,11 +17,17 @@ import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
 import type { useCronjobRuns } from "./use-cronjob-runs";
 
 export type CronjobHomeScreenProps = ReturnType<typeof useCronjobRuns> & {
+  /** The app's name; the frame above shows it. */
   name: string;
   workload: Pick<AstroliftWorkload, "schedule" | "concurrencyPolicy">;
-  /** The app's tab bar. */
-  tabs?: React.ReactNode;
 };
+
+/** Why the newest run failed: the last lines of its log, else its exit code. */
+function failureReason(run: AstroliftScheduledJobRun): string {
+  const tail = (run.logExcerpt ?? "").trim().split("\n").slice(-3).join("\n");
+  if (tail) return tail;
+  return run.exitCode != null ? `Exited with code ${run.exitCode}` : "No reason recorded";
+}
 
 function describe(schedule: string): string {
   try {
@@ -82,12 +87,11 @@ const columns: Column<AstroliftScheduledJobRun>[] = [
 ];
 
 /**
- * Primitive home for a **cronjob** — schedule-first ("watch"): the cron
- * expression front and centre, a plain-English reading, and a live countdown to
- * the next fire time. Run history slots below (graceful empty state until the
- * per-run feed is wired).
+ * The Overview for a **cronjob**, schedule first: the cron expression, a
+ * plain-English reading and a live countdown to the next fire time, then the
+ * run history. A failed newest run puts its reason in the first panel.
  */
-export function CronjobHomeScreen({ name, workload, table, tabs }: CronjobHomeScreenProps) {
+export function CronjobHomeScreen({ workload, table }: CronjobHomeScreenProps) {
   const schedule = workload.schedule || "";
   const [now, setNow] = React.useState<number | null>(null);
   React.useEffect(() => {
@@ -100,102 +104,85 @@ export function CronjobHomeScreen({ name, workload, table, tabs }: CronjobHomeSc
     () => (schedule && now != null ? nextCronRun(schedule, new Date(now)) : null),
     [schedule, now]
   );
+  const latest = table.search ? undefined : table.rows[0];
 
   return (
-    <PageShell
-      title={
-        <span className="flex items-center gap-3">
-          <span className="bg-muted flex size-9 items-center justify-center rounded-md">
-            <TimerIcon className="text-muted-foreground size-5" />
-          </span>
-          <span>{name}</span>
-          <Badge variant="outline" className="gap-1.5">
-            <TimerIcon className="size-3" />
-            Scheduled job
-          </Badge>
-        </span>
-      }
-      description={
-        <span className="text-muted-foreground text-xs">
-          {schedule ? describe(schedule) : "No schedule set"}
-        </span>
-      }
-    >
-      {tabs}
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <RepeatIcon className="size-4" />
-              Schedule
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-1">
-              <div className="text-muted-foreground text-xs tracking-wide uppercase">Cron</div>
-              <div className="font-mono text-lg">{schedule || "—"}</div>
-              {schedule ? (
-                <div className="text-muted-foreground text-sm">{describe(schedule)}</div>
-              ) : null}
-              {workload.concurrencyPolicy ? (
-                <div className="text-muted-foreground pt-1 text-xs">
-                  Concurrency: <span className="font-medium">{workload.concurrencyPolicy}</span>
-                </div>
-              ) : null}
+    <PanelGrid>
+      <Panel
+        title="Schedule"
+        icon={<RepeatIcon className="size-4" />}
+        span={6}
+        failure={
+          latest && runStatusDot(latest.status) === "error"
+            ? {
+                title: "Last run failed",
+                reason: <span className="whitespace-pre-wrap">{failureReason(latest)}</span>,
+              }
+            : null
+        }
+      >
+        <div className="min-w-0 space-y-1">
+          <div className="font-mono text-lg [overflow-wrap:anywhere]">
+            {schedule || "No schedule set"}
+          </div>
+          {schedule ? (
+            <div className="text-muted-foreground text-sm">{describe(schedule)}</div>
+          ) : null}
+          {workload.concurrencyPolicy ? (
+            <div className="text-muted-foreground pt-1 text-xs [overflow-wrap:anywhere]">
+              Concurrency: <span className="font-mono">{workload.concurrencyPolicy}</span>
             </div>
-            <div className="space-y-1">
-              <div className="text-muted-foreground text-xs tracking-wide uppercase">Next run</div>
-              {next ? (
-                <>
-                  <div className="text-2xl font-semibold tabular-nums">
-                    {now != null ? formatCountdown(next.getTime() - now) : "—"}
-                  </div>
-                  <div className="text-muted-foreground text-sm" title={next.toISOString()}>
-                    {next.toLocaleString()}
-                  </div>
-                </>
-              ) : (
-                <div className="text-muted-foreground text-sm">
-                  {schedule ? "Couldn't compute the next run for this expression." : "—"}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          ) : null}
+        </div>
+      </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HistoryIcon className="size-4" />
-              Run history
-              {table.totalCount != null && (
-                <span className="text-muted-foreground text-xs font-normal tabular-nums">
-                  {table.totalCount} total
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              label="Run history"
-              controller={table}
-              columns={columns}
-              getRowId={(r) => r.id}
-              searchPlaceholder="Search runs by status or Job name…"
-              empty={{
-                icon: <HistoryIcon className="size-5" />,
-                title: "No runs recorded yet",
-                description: "Each scheduled execution will appear here once it fires.",
-              }}
-              emptyFiltered={{
-                title: "No matching runs",
-                description:
-                  "No run of this job matches that search. The server matches the status and the batch/v1 Job name.",
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </PageShell>
+      <Panel title="Next run" icon={<TimerIcon className="size-4" />} span={6}>
+        {next ? (
+          <div className="space-y-1">
+            <div className="font-mono text-2xl font-semibold tabular-nums">
+              {now != null ? formatCountdown(next.getTime() - now) : "…"}
+            </div>
+            <div className="text-muted-foreground text-sm" title={next.toISOString()}>
+              {next.toLocaleString()}
+            </div>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            {schedule ? "Couldn't compute the next run for this expression." : "No schedule set."}
+          </p>
+        )}
+      </Panel>
+
+      <Panel
+        title="Run history"
+        icon={<HistoryIcon className="size-4" />}
+        actions={
+          table.totalCount != null ? (
+            <span className="text-muted-foreground font-mono text-xs tabular-nums">
+              {table.totalCount} total
+            </span>
+          ) : undefined
+        }
+        flush
+      >
+        <DataTable
+          label="Run history"
+          controller={table}
+          columns={columns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search runs by status or Job name…"
+          empty={{
+            icon: <HistoryIcon className="size-5" />,
+            title: "No runs recorded yet",
+            description: "Each scheduled execution will appear here once it fires.",
+          }}
+          emptyFiltered={{
+            title: "No matching runs",
+            description:
+              "No run of this job matches that search. The server matches the status and the batch/v1 Job name.",
+          }}
+        />
+      </Panel>
+    </PanelGrid>
   );
 }

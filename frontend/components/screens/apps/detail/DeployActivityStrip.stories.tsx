@@ -30,3 +30,11 @@ export const LongStrings: Story = {
     deployments: DEPLOYMENTS.map((d) => ({ ...d, imageTag: LONG, environmentName: LONG })),
   },
 };
+
+export const At768: Story = {
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <DeployActivityStrip {...args} />
+    </div>
+  ),
+};

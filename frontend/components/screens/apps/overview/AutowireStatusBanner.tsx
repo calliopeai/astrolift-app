@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AutowireStatusBannerView (#1108) — surfaces whether a git push will actually
+ * AutowireStatusBannerView (#1108): surfaces whether a git push will actually
  * auto-deploy this app.
  *
  * Registration completes the autowire (CI workflow → source webhook → deploy
@@ -18,11 +18,11 @@
  */
 
 import { AlertTriangleIcon, Loader2Icon, PlugZapIcon, RefreshCwIcon } from "lucide-react";
-import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import type { AstroliftAppAutowireStatus } from "@/graphql/registry/registry.types";
 
+import { Notice } from "./OverviewNotices";
 import type { useAutowireRetry } from "./use-autowire-retry";
 
 export type AutowireStatusBannerViewProps = ReturnType<typeof useAutowireRetry> & {
@@ -61,23 +61,17 @@ export function AutowireStatusBannerView({
   // Not connected: the "connect for auto-deploy" callout.
   if (!autowire.connected) {
     return (
-      <section className="border-warning-border bg-warning/5 flex flex-wrap items-start gap-3 rounded-lg border p-4">
-        <PlugZapIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Connect for auto-deploy</p>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-xs">
-            This app is registered but not wired to its repo. Connect the GitHub App (or an org
-            GitHub connection) so Astrolift can push the CI workflow, install the webhook, and
-            deploy on every push.
-          </p>
-        </div>
-        <a
-          href="/settings/source-providers"
-          className="bg-foreground text-background hover:bg-foreground/90 shrink-0 rounded-md px-3 py-1.5 text-xs font-medium"
-        >
-          Connect
-        </a>
-      </section>
+      <Notice
+        tone="warning"
+        icon={PlugZapIcon}
+        title="Connect for auto-deploy"
+        description="This app is registered but not wired to its repo. Connect the GitHub App (or an org GitHub connection) so Astrolift can push the CI workflow, install the webhook, and deploy on every push."
+        actions={
+          <Button asChild size="sm" variant="outline">
+            <a href="/settings/source-providers">Connect</a>
+          </Button>
+        }
+      />
     );
   }
 
@@ -88,39 +82,21 @@ export function AutowireStatusBannerView({
   // Connected + fully wired: nothing to show.
   if (failing.length === 0) return null;
 
-  // Connected but incomplete: the repair banner.
+  // Connected but incomplete: the repair notice.
   return (
-    <section
-      className="border-warning-border bg-warning/10 rounded-md border p-4"
-      aria-live="polite"
-    >
-      <div className="flex items-start gap-3">
-        <AlertTriangleIcon aria-hidden className="text-warning-fg size-5 shrink-0" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <p className="text-warning-fg text-sm font-semibold">Autowire incomplete</p>
-            <p className="text-warning-fg text-xs leading-snug">
-              A git push won&apos;t auto-deploy until every step is wired. Retry to complete the
-              setup.
-            </p>
-          </div>
-          <ul className="text-warning-fg list-disc space-y-0.5 pl-5 text-xs">
-            {failing.map((s) => (
-              <li key={s.key}>
-                {s.label}: {STATUS_COPY[s.status] ?? s.status}
-              </li>
-            ))}
-          </ul>
-          {autowire.detail ? (
-            <p className="text-muted-foreground text-2xs font-mono break-all">{autowire.detail}</p>
-          ) : null}
-        </div>
+    <Notice
+      tone="warning"
+      icon={AlertTriangleIcon}
+      title="Autowire incomplete"
+      description="A git push won't auto-deploy until every step is wired. Retry to complete the setup."
+      actions={
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={onRetry}
           disabled={retrying}
-          className="shrink-0 gap-1"
+          className="gap-1"
         >
           {retrying ? (
             <Loader2Icon className="size-4 animate-spin" />
@@ -129,7 +105,20 @@ export function AutowireStatusBannerView({
           )}
           Retry autowire
         </Button>
-      </div>
-    </section>
+      }
+    >
+      <ul className="flex flex-wrap gap-x-4 gap-y-1">
+        {failing.map((s) => (
+          <li key={s.key}>
+            {s.label}: <span className="font-mono">{STATUS_COPY[s.status] ?? s.status}</span>
+          </li>
+        ))}
+      </ul>
+      {autowire.detail ? (
+        <p className="text-muted-foreground text-2xs mt-1 font-mono [overflow-wrap:anywhere]">
+          {autowire.detail}
+        </p>
+      ) : null}
+    </Notice>
   );
 }

@@ -25,11 +25,12 @@ import {
 import * as React from "react";
 
 import { Can } from "@/components/Can";
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Button } from "@/components/ui/button";
 
 import { REPAIRS, type useAppDoctor } from "./use-app-doctor";
 
-export type AppDoctorPanelViewProps = ReturnType<typeof useAppDoctor>;
+export type AppDoctorPanelViewProps = ReturnType<typeof useAppDoctor> & { span?: PanelSpan };
 
 /** Human labels for the service's check keys. */
 // Falls back to the raw key, which is why three checks added since this map
@@ -104,20 +105,18 @@ export function AppDoctorPanelView({
   runChecks,
   repair,
   running,
+  span = 12,
 }: AppDoctorPanelViewProps) {
   return (
-    <div className="border-border flex flex-col gap-3 rounded-md border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <StethoscopeIcon className="size-4" />
-            App doctor
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Checks each dependency this app needs and reports whether it is actually usable. Runs
-            live probes, so it only runs when you ask.
-          </p>
-        </div>
+    <Panel
+      title="App doctor"
+      icon={<StethoscopeIcon className="size-4" />}
+      description="Checks each dependency this app needs and reports whether it is actually usable. Runs live probes, so it only runs when you ask."
+      span={span}
+      loading={loading && !report}
+      error={errorMessage || null}
+      onRetry={runChecks}
+      actions={
         <Can permission="app.read">
           <Button
             size="sm"
@@ -134,50 +133,62 @@ export function AppDoctorPanelView({
             {called ? "Run again" : "Run checks"}
           </Button>
         </Can>
-      </div>
-
-      {errorMessage ? <p className="text-danger-fg text-xs">{errorMessage}</p> : null}
-
-      {report ? (
-        <>
-          <p className="text-xs font-medium">
-            {report.healthy ? (
-              <span className="text-success-fg">Everything this app needs checks out.</span>
-            ) : (
-              <span className="text-warning-fg">Some dependencies need attention — see below.</span>
-            )}
+      }
+    >
+      <div className="flex min-w-0 flex-col gap-3">
+        {!called && !report ? (
+          <p className="text-muted-foreground text-xs">
+            Nothing has run yet. Run checks to probe the manifest, registry, push role, DNS and
+            deployments.
           </p>
-          <ul className="flex flex-col gap-2">
-            {report.checks.map((check) => {
-              const presentation = STATUS_PRESENTATION[check.status] ?? STATUS_PRESENTATION.unknown;
-              const Icon = presentation.icon;
-              return (
-                <li key={check.key} className="flex items-start gap-2 text-xs">
-                  <Icon className={`mt-0.5 size-3.5 shrink-0 ${presentation.className}`} />
-                  <span className="min-w-0">
-                    <span className="font-medium">{CHECK_LABELS[check.key] ?? check.key}</span>
-                    <span className="text-muted-foreground"> — {presentation.label}</span>
-                    {check.detail ? (
-                      <span className="text-muted-foreground block">{check.detail}</span>
-                    ) : null}
-                    {check.fix ? (
-                      <RepairButton
-                        verb={check.fix}
-                        running={running}
-                        onRun={(verb) => void repair(verb)}
-                      />
-                    ) : null}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      ) : null}
+        ) : null}
 
-      {called && !loading && !errorMessage && report && report.checks.length === 0 ? (
-        <p className="text-muted-foreground text-xs">Nothing to report for this app.</p>
-      ) : null}
-    </div>
+        {report ? (
+          <>
+            <p className="text-xs font-medium">
+              {report.healthy ? (
+                <span className="text-success-fg">Everything this app needs checks out.</span>
+              ) : (
+                <span className="text-warning-fg">
+                  Some dependencies need attention; see below.
+                </span>
+              )}
+            </p>
+            <ul className="flex flex-col gap-2">
+              {report.checks.map((check) => {
+                const presentation =
+                  STATUS_PRESENTATION[check.status] ?? STATUS_PRESENTATION.unknown;
+                const Icon = presentation.icon;
+                return (
+                  <li key={check.key} className="flex items-start gap-2 text-xs">
+                    <Icon className={`mt-0.5 size-3.5 shrink-0 ${presentation.className}`} />
+                    <span className="min-w-0">
+                      <span className="font-medium">{CHECK_LABELS[check.key] ?? check.key}</span>
+                      <span className="text-muted-foreground"> · {presentation.label}</span>
+                      {check.detail ? (
+                        <span className="text-muted-foreground block font-mono [overflow-wrap:anywhere]">
+                          {check.detail}
+                        </span>
+                      ) : null}
+                      {check.fix ? (
+                        <RepairButton
+                          verb={check.fix}
+                          running={running}
+                          onRun={(verb) => void repair(verb)}
+                        />
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : null}
+
+        {called && !loading && !errorMessage && report && report.checks.length === 0 ? (
+          <p className="text-muted-foreground text-xs">Nothing to report for this app.</p>
+        ) : null}
+      </div>
+    </Panel>
   );
 }

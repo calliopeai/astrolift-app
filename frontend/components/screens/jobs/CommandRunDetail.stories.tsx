@@ -5,15 +5,13 @@ import { CommandRunDetail } from "./CommandRunDetail";
 
 const meta: Meta = {
   title: "Screens/Jobs/CommandRunDetail",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-export const Full: Story = {
-  render: () => <CommandRunDetail {...COMMAND_RUN_DETAIL} />,
-};
+export const Full: Story = { render: () => <CommandRunDetail {...COMMAND_RUN_DETAIL} /> };
 
 /** Still running: no exit code, no end time. */
 export const Running: Story = {
@@ -33,12 +31,19 @@ export const Loading: Story = {
   render: () => <CommandRunDetail {...COMMAND_RUN_DETAIL} loading run={null} />,
 };
 
-/**
- * No run with this id. The detail has no separate error state: a failed
- * fetch with nothing cached resolves to this same not-found view.
- */
+/** No run with this id, or no permission to see it. */
 export const NotFound: Story = {
   render: () => <CommandRunDetail {...COMMAND_RUN_DETAIL} run={null} />,
+};
+
+export const ErrorState: Story = {
+  render: () => (
+    <CommandRunDetail
+      {...COMMAND_RUN_DETAIL}
+      run={null}
+      error={{ message: "upstream timed out" }}
+    />
+  ),
 };
 
 export const LongStrings: Story = {
@@ -48,5 +53,13 @@ export const LongStrings: Story = {
       id={LONG_COMMAND_RUNS[0].id}
       run={LONG_COMMAND_RUNS[0]}
     />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <CommandRunDetail {...COMMAND_RUN_DETAIL} />
+    </div>
   ),
 };

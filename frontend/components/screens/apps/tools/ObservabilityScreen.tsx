@@ -13,7 +13,6 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
-  TerminalIcon,
   Trash2Icon,
   Volume2Icon,
 } from "lucide-react";
@@ -24,20 +23,23 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import {
-  LogViewer,
-  MetricScopePicker,
-  PodEventsPanel,
-  PodExpander,
-} from "@/components/observability";
+import { MetricScopePicker, PodEventsPanel, PodExpander } from "@/components/observability";
 import type { MetricScopeOptions } from "@/components/observability/MetricScopePicker";
 import type { PodEventRow } from "@/components/observability/PodEventsPanel";
 import type { PodResourceUsage } from "@/components/observability/use-pod-resource-usage";
 import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { LogView } from "@/components/run/LogView";
+import {
+  countLevels,
+  filterLogLines,
+  type LogLevelFilter,
+  toLogLines,
+} from "@/components/screens/apps/deployments/app-log-lines";
+import { LogFilters } from "@/components/screens/apps/deployments/LogFilters";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -137,6 +139,8 @@ export interface ObservabilityScreenProps {
   // Logs
   logBuffer: AstroliftAppLogLine[];
   onClearLogs: () => void;
+  /** Saves the whole buffer as a file. */
+  onDownloadLogs: () => void;
   streaming: boolean;
   onToggleStreaming: () => void;
   allReplicas: boolean;
@@ -164,7 +168,11 @@ export interface ObservabilityScreenProps {
   alertRules?: React.ReactNode;
 }
 
-/** App › Observability: pods, metric scope + panels, logs, platform events, alert rules. */
+/**
+ * Logs & metrics › Metrics (spec 44 §5.2): pods, the metric scope and its
+ * panels, the scoped log in the shared LogView, platform events and alert
+ * rules, each on a Panel.
+ */
 export function ObservabilityScreen({
   slug,
   app: a,
@@ -184,6 +192,7 @@ export function ObservabilityScreen({
   scopeOptions,
   logBuffer,
   onClearLogs,
+  onDownloadLogs,
   streaming,
   onToggleStreaming,
   allReplicas,
@@ -237,33 +246,28 @@ export function ObservabilityScreen({
     >
       {tabs}
 
-      {/* ─── pod list ──────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BoxIcon className="size-4" /> {t("pods.title")}
-          </CardTitle>
-          <CardDescription>
-            {t("pods.description", { seconds: POD_POLL_MS / 1000 })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {podsLoading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : podRows.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BoxIcon className="size-5" />}
-                title={t("pods.emptyTitle")}
-                description={t("pods.emptyDescription")}
-                actionHref={deploymentsHref}
-                actionLabel={t("pods.emptyAction")}
-              />
-            </div>
-          ) : (
+      <PanelGrid>
+        <Panel
+          title={t("pods.title")}
+          icon={<BoxIcon className="size-4" />}
+          description={t("pods.description", { seconds: POD_POLL_MS / 1000 })}
+          loading={podsLoading}
+          empty={
+            podRows.length === 0
+              ? {
+                  icon: <BoxIcon className="size-5" />,
+                  title: t("pods.emptyTitle"),
+                  description: t("pods.emptyDescription"),
+                  actionHref: deploymentsHref,
+                  actionLabel: t("pods.emptyAction"),
+                }
+              : null
+          }
+          flush
+        >
+          {/* The pod list is unpaginated (astroliftAppPods), and a picked row
+              expands in place, which DataTable has no slot for yet. */}
+          <div className="min-w-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -281,13 +285,9 @@ export function ObservabilityScreen({
                   const readyCount = pod.containerStatuses.filter((c) => c.ready).length;
                   const total = pod.containerStatuses.length;
                   const isSelected = pod.name === selectedPod;
-                  // #713 — when the operator picks a pod row, an
-                  // expander follows immediately under it with
-                  // per-pod CPU + mem sparkline, restart count, and
-                  // an Open-in-Console deep link. The expander is
-                  // an extra TableRow with colspan so it lives in
-                  // the same table semantics (no separate widget
-                  // breaking the row striping).
+                  // #713: picking a pod row opens an expander under it with
+                  // per-pod CPU and memory, restarts and a console deep link,
+                  // as a colspan row in the same table.
                   return (
                     <React.Fragment key={pod.name}>
                       <TableRow
@@ -295,7 +295,19 @@ export function ObservabilityScreen({
                         data-selected={isSelected}
                         className="hover:bg-muted/40 data-[selected=true]:bg-muted/60 cursor-pointer"
                       >
-                        <TableCell className="font-mono text-xs">{pod.name}</TableCell>
+                        <TableCell className="font-mono text-xs [overflow-wrap:anywhere] whitespace-normal">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPickPod(pod.name);
+                            }}
+                            aria-pressed={isSelected}
+                            className="text-left"
+                          >
+                            {pod.name}
+                          </button>
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{pod.workload || "—"}</TableCell>
                         <TableCell>
                           <span className="inline-flex items-center gap-2 text-xs">
@@ -321,7 +333,7 @@ export function ObservabilityScreen({
                       </TableRow>
                       {isSelected ? (
                         <TableRow className="hover:bg-transparent">
-                          <TableCell colSpan={7} className="p-0">
+                          <TableCell colSpan={7} className="p-0 whitespace-normal">
                             <PodExpander
                               appSlug={a.slug}
                               podName={pod.name}
@@ -337,13 +349,12 @@ export function ObservabilityScreen({
                 })}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </Panel>
+      </PanelGrid>
 
-      {/* ─── #380 SRE golden signals + status-code breakdown ───────────── */}
-      {/* #422 env + workload pickers above the panel; persists via URL. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* #380 golden signals and the panels below read this scope; #422 keeps it in the URL. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-medium">{t("scope.title")}</h3>
         <MetricScopePicker
           environmentName={scopedEnv}
@@ -363,105 +374,244 @@ export function ObservabilityScreen({
 
       {panels}
 
-      {/* ─── log viewer ────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TerminalIcon className="size-4" /> {t("logs.title")}
-            </CardTitle>
-            <CardDescription>
-              {isHistorical ? (
-                t("logs.historicalDescription", { range: historicalRange })
-              ) : allReplicas ? (
-                t("logs.allReplicasDescription")
-              ) : selectedPod ? (
-                <>
-                  {t("logs.streaming")}{" "}
-                  <code className="bg-muted text-2xs rounded px-1 py-0.5 font-mono">
-                    {selectedPod}
-                  </code>{" "}
-                  {t("logs.fromCluster")}
-                </>
-              ) : (
-                t("logs.selectPrompt")
-              )}
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* #482 — aggregated-vs-per-pod toggle. Disabled in
-                historical mode because the historical query always
-                runs against the whole replica set. */}
-            <Button
+      <ScopedLogs
+        appSlug={a.slug}
+        logBuffer={logBuffer}
+        onClearLogs={onClearLogs}
+        onDownloadLogs={onDownloadLogs}
+        streaming={streaming}
+        onToggleStreaming={onToggleStreaming}
+        allReplicas={allReplicas}
+        onToggleAllReplicas={onToggleAllReplicas}
+        historicalRange={historicalRange}
+        onHistoricalRangeChange={onHistoricalRangeChange}
+        isHistorical={isHistorical}
+        historicalUnavailable={historicalUnavailable}
+        historicalLoading={historicalLoading}
+        onRefreshHistorical={onRefreshHistorical}
+        selectedPod={selectedPod}
+        podContainers={podContainers}
+        selectedContainer={selectedContainer}
+        onPickContainer={onPickContainer}
+      />
+
+      {/* #422 platform events: auto-expands on warnings. */}
+      <PodEventsPanel appEvents={appEvents} loading={eventsLoading} />
+
+      {/* #648 alert rules. */}
+      {alertRules}
+    </PageShell>
+  );
+}
+
+interface ScopedLogsProps extends Pick<
+  ObservabilityScreenProps,
+  | "logBuffer"
+  | "onClearLogs"
+  | "onDownloadLogs"
+  | "streaming"
+  | "onToggleStreaming"
+  | "allReplicas"
+  | "onToggleAllReplicas"
+  | "historicalRange"
+  | "onHistoricalRangeChange"
+  | "isHistorical"
+  | "historicalUnavailable"
+  | "historicalLoading"
+  | "onRefreshHistorical"
+  | "selectedPod"
+  | "podContainers"
+  | "selectedContainer"
+  | "onPickContainer"
+> {
+  appSlug: string;
+}
+
+const ALL_CONTAINERS = "__all__";
+
+/**
+ * The scoped log in the shared LogView (spec 44 §5.5): the picked pod live,
+ * every replica live (#482), or a past window (#482). Lines from many pods
+ * carry the pod name in front.
+ */
+function ScopedLogs({
+  appSlug,
+  logBuffer,
+  onClearLogs,
+  onDownloadLogs,
+  streaming,
+  onToggleStreaming,
+  allReplicas,
+  onToggleAllReplicas,
+  historicalRange,
+  onHistoricalRangeChange,
+  isHistorical,
+  historicalUnavailable,
+  historicalLoading,
+  onRefreshHistorical,
+  selectedPod,
+  podContainers,
+  selectedContainer,
+  onPickContainer,
+}: ScopedLogsProps) {
+  const t = useTranslations("apps.observability");
+  const tViewer = useTranslations("apps.logViewer");
+  const [level, setLevel] = React.useState<LogLevelFilter>("all");
+  const [query, setQuery] = React.useState("");
+  const many = allReplicas || isHistorical;
+
+  const mapped = React.useMemo(
+    () => toLogLines(logBuffer, { withPodName: many }),
+    [logBuffer, many]
+  );
+  const shown = React.useMemo(() => filterLogLines(mapped, level, query), [mapped, level, query]);
+  const counts = React.useMemo(() => countLevels(mapped), [mapped]);
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+        {isHistorical ? (
+          t("logs.historicalDescription", { range: historicalRange })
+        ) : allReplicas ? (
+          t("logs.allReplicasDescription")
+        ) : selectedPod ? (
+          <span className="font-mono text-xs">
+            {t("logs.streaming")} {selectedPod} {t("logs.fromCluster")}
+          </span>
+        ) : (
+          t("logs.selectPrompt")
+        )}
+      </p>
+      <LogFilters
+        level={level}
+        onLevelChange={setLevel}
+        query={query}
+        onQueryChange={setQuery}
+        counts={counts}
+      >
+        {/* #482: all replicas or one pod. Off in historical mode, which
+            always reads the whole replica set. */}
+        <Button
+          size="sm"
+          variant={allReplicas ? "default" : "outline"}
+          onClick={onToggleAllReplicas}
+          disabled={isHistorical}
+          aria-pressed={allReplicas}
+        >
+          <BoxIcon className="size-3.5" /> {t("logs.allReplicas")}
+        </Button>
+        {/* #482 time range: Live streams, any other window pages the
+            aggregator. #649: the tooltip says what the window covers. */}
+        <div className="flex items-center gap-1">
+          <Select
+            value={historicalRange}
+            onValueChange={(v) => onHistoricalRangeChange(v as HistoricalRangeValue)}
+          >
+            <SelectTrigger size="sm" className="font-mono text-xs" aria-label="Time range">
+              <HistoryIcon className="size-3.5" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {HISTORICAL_RANGES.map((r) => (
+                <SelectItem key={r.value} value={r.value}>
+                  {t(`logs.range.${r.value}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md"
+                  aria-label="Retention scope"
+                >
+                  <InfoIcon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm">
+                Applies to logs, metrics, traces, and audit events. Data is stored in your cloud
+                account (CloudWatch, Cloud Logging, Log Analytics, or Loki depending on your
+                provider).
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        {!many && podContainers.length > 1 && (
+          <Select
+            value={selectedContainer ?? ALL_CONTAINERS}
+            onValueChange={(v) => onPickContainer(v === ALL_CONTAINERS ? null : v)}
+          >
+            <SelectTrigger
               size="sm"
-              variant={allReplicas ? "default" : "outline"}
-              onClick={onToggleAllReplicas}
-              disabled={isHistorical}
-              aria-pressed={allReplicas}
+              aria-label={tViewer("containerLabel")}
+              className="max-w-full min-w-0 font-mono text-xs"
             >
-              <BoxIcon className="size-3" /> {t("logs.allReplicas")}
-            </Button>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CONTAINERS}>{tViewer("containerAll")}</SelectItem>
+              {podContainers.map((c) => (
+                <SelectItem key={c} value={c} className="font-mono">
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </LogFilters>
 
-            {/* #482 — time-range picker. "Live" keeps the streaming
-                path; any other value swaps to the paginated query.
-                #649 — retention scope tooltip clarifies which signals
-                the window covers + where the data lives. */}
-            <div className="flex items-center gap-1">
-              <Select
-                value={historicalRange}
-                onValueChange={(v) => onHistoricalRangeChange(v as HistoricalRangeValue)}
-              >
-                <SelectTrigger size="sm" className="font-mono text-xs">
-                  <HistoryIcon className="size-3" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HISTORICAL_RANGES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {t(`logs.range.${r.value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md"
-                      aria-label="Retention scope"
-                    >
-                      <InfoIcon className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-sm">
-                    Applies to logs, metrics, traces, and audit events. Data is stored in your cloud
-                    account (CloudWatch, Cloud Logging, Log Analytics, or Loki depending on your
-                    provider).
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+      {/* No aggregator on this cluster: say so before the empty pane. */}
+      {isHistorical && historicalUnavailable ? (
+        <div
+          role="status"
+          className="border-warning-border bg-warning/10 text-warning-fg flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"
+        >
+          <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>
+            <p className="text-muted-foreground">{t("logs.historicalUnavailableHint")}</p>
+          </div>
+        </div>
+      ) : null}
 
+      <LogView
+        title={t("logs.title")}
+        lines={shown}
+        loading={isHistorical && historicalLoading}
+        onDownload={onDownloadLogs}
+        emptyHint={
+          shown.length !== mapped.length
+            ? tViewer("filteredEmpty")
+            : isHistorical
+              ? historicalUnavailable
+                ? t("logs.historicalUnavailableEmpty")
+                : historicalLoading
+                  ? t("logs.waiting")
+                  : t("logs.historicalNoResults")
+              : streaming
+                ? t("logs.waiting")
+                : allReplicas
+                  ? t("logs.pressStreamAll")
+                  : selectedPod
+                    ? t("logs.pressStream")
+                    : t("logs.pickPod")
+        }
+        actions={
+          <>
             <Button
               size="sm"
               variant="outline"
               onClick={onClearLogs}
               disabled={logBuffer.length === 0}
             >
-              <Trash2Icon className="size-3" /> {t("logs.clear")}
+              <Trash2Icon className="size-3.5" /> {t("logs.clear")}
             </Button>
-
-            {/* Live-mode stream/pause; historical mode shows a
-                refetch button instead. */}
+            {/* Live streams or pauses; a past window refetches instead. */}
             {isHistorical ? (
-              <Button
-                size="sm"
-                variant="default"
-                onClick={onRefreshHistorical}
-                disabled={historicalLoading}
-              >
-                <HistoryIcon className="size-3" /> {t("logs.refreshHistorical")}
+              <Button size="sm" onClick={onRefreshHistorical} disabled={historicalLoading}>
+                <HistoryIcon className="size-3.5" /> {t("logs.refreshHistorical")}
               </Button>
             ) : (
               <Button
@@ -472,78 +622,27 @@ export function ObservabilityScreen({
               >
                 {streaming ? (
                   <>
-                    <PauseIcon className="size-3" /> {t("logs.pause")}
+                    <PauseIcon className="size-3.5" /> {t("logs.pause")}
                   </>
                 ) : (
                   <>
-                    <PlayIcon className="size-3" /> {t("logs.stream")}
+                    <PlayIcon className="size-3.5" /> {t("logs.stream")}
                   </>
                 )}
               </Button>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Historical-mode badge — surfaces "live tail only on this
-              cluster" when the aggregator backend isn't configured.
-              We render before the LogViewer so the operator sees the
-              reason for the empty pane immediately. */}
-          {isHistorical && historicalUnavailable ? (
-            <div className="border-warning-border bg-warning/10 text-warning-fg mb-3 flex items-start gap-2 rounded-md border p-2 text-xs">
-              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
-              <div>
-                <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>
-                <p className="text-muted-foreground">{t("logs.historicalUnavailableHint")}</p>
-              </div>
-            </div>
-          ) : null}
-          <LogViewer
-            lines={logBuffer}
-            appSlug={a.slug}
-            environmentName={scopedEnv}
-            podName={allReplicas || isHistorical ? null : selectedPod}
-            containers={allReplicas || isHistorical ? [] : podContainers}
-            selectedContainer={allReplicas || isHistorical ? null : selectedContainer}
-            onContainerChange={allReplicas || isHistorical ? undefined : onPickContainer}
-            bufferLimit={LOG_BUFFER_LIMIT}
-            showPodBadge={allReplicas || isHistorical}
-            loading={isHistorical && historicalLoading}
-            emptyHint={
-              isHistorical
-                ? historicalUnavailable
-                  ? t("logs.historicalUnavailableEmpty")
-                  : historicalLoading
-                    ? t("logs.waiting")
-                    : t("logs.historicalNoResults")
-                : streaming
-                  ? t("logs.waiting")
-                  : allReplicas
-                    ? t("logs.pressStreamAll")
-                    : selectedPod
-                      ? t("logs.pressStream")
-                      : t("logs.pickPod")
-            }
-          />
-          <p className="text-muted-foreground mt-2 text-xs">
-            {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
-            <code className="bg-muted text-2xs rounded px-1 py-0.5 font-mono">
-              astro logs --app={a.slug} --follow
-            </code>
-            .{" "}
-            <Link href="/downloads" className="underline">
-              {t("logs.installCli")}
-            </Link>
-            .
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* ─── #422 platform events panel — auto-expands on warnings ─── */}
-      <PodEventsPanel appEvents={appEvents} loading={eventsLoading} />
-
-      {/* ─── #648 alert-rules panel ────────────────────────────────── */}
-      {alertRules}
-    </PageShell>
+          </>
+        }
+      />
+      <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+        {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
+        <code className="font-mono">astro logs --app={appSlug} --follow</code>.{" "}
+        <Link href="/downloads" className="underline">
+          {t("logs.installCli")}
+        </Link>
+        .
+      </p>
+    </div>
   );
 }
 
@@ -716,154 +815,146 @@ export function AlertRulesPanelView({
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BellIcon className="size-4" /> Alert rules
-            </CardTitle>
-            <CardDescription>
-              Thresholds that page on-call when {appName} crosses them. Mute to silence without
-              losing the definition; delete to retire it.
-            </CardDescription>
-          </div>
+      <Panel
+        title="Alert rules"
+        icon={<BellIcon className="size-4" />}
+        description={`Thresholds that page on-call when ${appName} crosses them. Mute to silence without losing the definition; delete to retire it.`}
+        actions={
           <Button size="sm" onClick={() => setCreateOpen(true)} disabled={busy}>
             <PlusIcon className="size-3.5" /> Add alert rule
           </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : ruleList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BellIcon className="size-5" />}
-                title="No alert rules for this app"
-                description="Add a rule to page on-call when latency, error rate, or saturation crosses a threshold."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Name</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ruleList.map((r) => {
-                  const isOpen = expanded.has(r.id);
-                  const sev = severityBadgeProps(r.severity);
-                  const muted = r.activeMute != null;
-                  return (
-                    <React.Fragment key={r.id}>
-                      <TableRow className={muted ? "opacity-75" : undefined}>
-                        <TableCell className="w-8">
-                          <button
-                            type="button"
-                            onClick={() => toggleExpanded(r.id)}
-                            className="text-muted-foreground hover:text-foreground inline-flex"
-                            aria-label={isOpen ? "Collapse" : "Expand"}
-                            aria-expanded={isOpen}
-                          >
-                            {isOpen ? (
-                              <ChevronDownIcon className="size-4" />
-                            ) : (
-                              <ChevronRightIcon className="size-4" />
-                            )}
-                          </button>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col">
-                            <span>{r.name}</span>
-                            <span className="text-muted-foreground text-2xs font-mono">
-                              {predicateSummary(r.predicate)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={sev.variant} className={sev.className}>
-                            {sev.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {muted && r.activeMute ? (
-                            <Badge
-                              variant="outline"
-                              className="border-muted-foreground/30 text-muted-foreground"
-                            >
-                              Muted · {formatRemaining(r.activeMute.ttlUntil)}
-                            </Badge>
-                          ) : r.isActive ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs">
-                              <StatusDot status="ok" />
-                              Active
-                            </span>
+        }
+        loading={loading}
+        empty={
+          ruleList.length === 0
+            ? {
+                icon: <BellIcon className="size-5" />,
+                title: "No alert rules for this app",
+                description:
+                  "Add a rule to page on-call when latency, error rate, or saturation crosses a threshold.",
+              }
+            : null
+        }
+        flush
+      >
+        <div className="min-w-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8" />
+                <TableHead>Name</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ruleList.map((r) => {
+                const isOpen = expanded.has(r.id);
+                const sev = severityBadgeProps(r.severity);
+                const muted = r.activeMute != null;
+                return (
+                  <React.Fragment key={r.id}>
+                    <TableRow className={muted ? "opacity-75" : undefined}>
+                      <TableCell className="w-8">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(r.id)}
+                          className="text-muted-foreground hover:text-foreground inline-flex"
+                          aria-label={isOpen ? "Collapse" : "Expand"}
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? (
+                            <ChevronDownIcon className="size-4" />
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs">
-                              <StatusDot status="muted" />
-                              Inactive
-                            </span>
+                            <ChevronRightIcon className="size-4" />
                           )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {new Date(r.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="inline-flex items-center gap-1">
-                            {muted ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => void onUnmute(r)}
-                                disabled={busy}
-                              >
-                                <Volume2Icon className="size-3.5" /> Unmute
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setMuteTarget(r)}
-                                disabled={busy}
-                              >
-                                <BellOffIcon className="size-3.5" /> Mute
-                              </Button>
-                            )}
+                        </button>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{r.name}</span>
+                          <span className="text-muted-foreground text-2xs font-mono">
+                            {predicateSummary(r.predicate)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={sev.variant} className={sev.className}>
+                          {sev.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {muted && r.activeMute ? (
+                          <Badge
+                            variant="outline"
+                            className="border-muted-foreground/30 text-muted-foreground"
+                          >
+                            Muted · {formatRemaining(r.activeMute.ttlUntil)}
+                          </Badge>
+                        ) : r.isActive ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs">
+                            <StatusDot status="ok" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs">
+                            <StatusDot status="muted" />
+                            Inactive
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {muted ? (
                             <Button
                               variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setDeleteTarget(r)}
+                              size="sm"
+                              onClick={() => void onUnmute(r)}
                               disabled={busy}
-                              aria-label={`Delete ${r.name}`}
                             >
-                              <Trash2Icon className="size-3.5" />
+                              <Volume2Icon className="size-3.5" /> Unmute
                             </Button>
-                          </div>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setMuteTarget(r)}
+                              disabled={busy}
+                            >
+                              <BellOffIcon className="size-3.5" /> Mute
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setDeleteTarget(r)}
+                            disabled={busy}
+                            aria-label={`Delete ${r.name}`}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isOpen ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={6} className="bg-muted/30 p-0">
+                          {renderEvents(r.id)}
                         </TableCell>
                       </TableRow>
-                      {isOpen ? (
-                        <TableRow className="hover:bg-transparent">
-                          <TableCell colSpan={6} className="bg-muted/30 p-0">
-                            {renderEvents(r.id)}
-                          </TableCell>
-                        </TableRow>
-                      ) : null}
-                    </React.Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </Panel>
 
       <CreateAlertRuleSheet
         open={createOpen}

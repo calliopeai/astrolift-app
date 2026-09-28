@@ -7,20 +7,15 @@ import type { useSecretHistory } from "./use-secret-history";
 
 export type SecretHistoryPanelViewProps = ReturnType<typeof useSecretHistory>;
 
-/** #714 — the audit history popover body for one secret key. */
-export function SecretHistoryPanelView({
-  secretKey,
-  entries,
-  loading,
-  error,
-}: SecretHistoryPanelViewProps) {
+/**
+ * #714: one secret key's audit history, newest first. The body of the side
+ * sheet the Secrets tab opens (spec 44 §5.4); the sheet's header names the
+ * key and the sheet scrolls.
+ */
+export function SecretHistoryPanelView({ entries, loading, error }: SecretHistoryPanelViewProps) {
   return (
-    <div className="flex flex-col">
-      <div className="border-b px-3 py-2">
-        <p className="text-xs font-medium">Audit history</p>
-        <p className="text-muted-foreground text-2xs font-mono">{secretKey}</p>
-      </div>
-      <div className="max-h-80 overflow-y-auto">
+    <div className="flex min-w-0 flex-col">
+      <div className="min-w-0">
         {loading && entries.length === 0 ? (
           <div className="p-3">
             <Skeleton className="mb-2 h-3 w-full" />
@@ -42,13 +37,13 @@ export function SecretHistoryPanelView({
                   {e.action}
                 </Badge>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate">
+                  <p className="[overflow-wrap:anywhere]">
                     {e.actor?.username ?? "system"}
                     {e.sourceIp ? (
                       <span className="text-muted-foreground font-mono"> · {e.sourceIp}</span>
                     ) : null}
                   </p>
-                  <p className="text-muted-foreground text-2xs">
+                  <p className="text-muted-foreground text-2xs font-mono">
                     {new Date(e.timestamp).toLocaleString()}
                     {!e.success && e.errorCode ? ` · ${e.errorCode}` : ""}
                   </p>

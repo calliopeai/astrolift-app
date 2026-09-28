@@ -262,6 +262,8 @@ export const CERTS: ClusterCertificate[] = [
 /** The full hook result, as the route would pass it. */
 export const APP_DOMAINS: AppDomainsState = {
   loading: false,
+  error: null,
+  refetch: noop,
   domains: [DOMAIN_ACTIVE, DOMAIN_PENDING, DOMAIN_CERT_FAILED, DOMAIN_BYO, DOMAIN_WILDCARD],
   environments: [ENV_PROD, ENV_STAGING_PAUSED],
   workloadOptions: WORKLOADS,

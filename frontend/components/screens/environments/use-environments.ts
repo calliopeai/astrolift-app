@@ -1,13 +1,15 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import { PAUSE_ENVIRONMENT, RESUME_ENVIRONMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { ENVIRONMENTS_LIST, selectEnvironments } from "./environments-list";
 
 interface MutationResultLite<T> {
   ok: boolean;
@@ -32,18 +34,27 @@ function reportResult(
 }
 
 /**
- * Environments across the org, or for one app when appSlug is set, plus
- * the pause / resume deploy mutations. Polls every 30s. The data half of
- * EnvironmentsScreen.
+ * Environments across the org (URL list state), or one app's when appSlug
+ * is set (in-memory list state: the host tab's own query must survive a
+ * filter change), plus pause / resume deploys. Polls every 30s. The data
+ * half of EnvironmentsScreen.
  */
 export function useEnvironments(appSlug?: string) {
+  const routed = useListState(ENVIRONMENTS_LIST);
+  const local = useLocalListState(ENVIRONMENTS_LIST);
+  const list = appSlug ? local : routed;
+  const { state } = list;
   const { can } = useMyPermissions();
-  const router = useRouter();
   const variables = { appSlug: appSlug ?? null };
 
-  const { data, loading } = useQuery<Resp>(LIST_ENVIRONMENTS, {
-    variables,
-    pollInterval: 30000,
+  const query = useQuery<Resp>(LIST_ENVIRONMENTS, { variables, pollInterval: 30000 });
+  const data = query.data ?? query.previousData;
+  const { rows, totalCount } = selectEnvironments(data?.astroliftEnvironments ?? [], {
+    filters: list.filters,
+    q: state.q,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
   });
 
   const refetch = [{ query: LIST_ENVIRONMENTS, variables }];
@@ -60,23 +71,30 @@ export function useEnvironments(appSlug?: string) {
     reportResult("pauseEnvironment", data?.pauseEnvironment);
   }
 
+  /** No confirm stands in front of resume, so a failure is a toast. */
   async function onResume(e: AstroliftAppEnvironment) {
-    const { data } = await resume({ variables: { input: { id: e.id } } });
-    reportResult("resumeEnvironment", data?.resumeEnvironment);
-  }
-
-  function onOpen(e: AstroliftAppEnvironment) {
-    router.push(`/environments/${e.id}`);
+    try {
+      const { data } = await resume({ variables: { input: { id: e.id } } });
+      reportResult("resumeEnvironment", data?.resumeEnvironment);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "resumeEnvironment failed");
+    }
   }
 
   return {
-    loading,
-    environments: data?.astroliftEnvironments ?? [],
+    list,
+    appSlug: appSlug ?? null,
+    rows,
+    totalCount,
+    loading: query.loading && !data,
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
     busy: pauseState.loading || resumeState.loading,
     canPause: can("app.deploy"),
     onPause,
     onResume,
-    onOpen,
   };
 }
 

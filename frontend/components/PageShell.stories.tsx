@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
 import { Button } from "@/components/ui/button";
 
 import { PageShell } from "@/components/PageShell";
@@ -29,5 +30,20 @@ export const LongTitle: StoryObj = {
         <p className="text-sm">Page content.</p>
       </PageShell>
     </div>
+  ),
+};
+
+/** Inside the app frame: no title (the frame names the app), description and actions stay. */
+export const InAppFrame: StoryObj = {
+  render: () => (
+    <AppChromeProvider framed>
+      <PageShell
+        title="Secrets"
+        description="Per-environment secrets, injected at deploy time."
+        actions={<Button size="sm">Add secret</Button>}
+      >
+        <p className="text-sm">Page content.</p>
+      </PageShell>
+    </AppChromeProvider>
   ),
 };

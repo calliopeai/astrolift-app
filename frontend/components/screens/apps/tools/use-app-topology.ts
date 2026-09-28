@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
 
 import { appTopology } from "@/components/topology";
+import type { TopologyNode } from "@/components/topology/types";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
@@ -24,8 +26,9 @@ interface ManagedServicesResp {
   }>;
 }
 
-/** App > Topology tab data: the app, its workloads and managed services, as a graph. */
+/** The overview topology panel's data: the app, its workloads and managed services, as a graph. */
 export function useAppTopology(slug: string) {
+  const router = useRouter();
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
@@ -48,5 +51,9 @@ export function useAppTopology(slug: string) {
     workloadsLoading: workloads.loading,
     nodes,
     edges,
+    /** A picked node opens its own page (workload, managed services, domains). */
+    onSelectNode: (node: TopologyNode) => {
+      if (node.href) router.push(node.href);
+    },
   };
 }

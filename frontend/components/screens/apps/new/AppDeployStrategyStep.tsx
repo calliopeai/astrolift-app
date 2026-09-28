@@ -186,11 +186,18 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
               onChange={(e) => setState((s) => ({ ...s, deployBranch: e.target.value }))}
               placeholder={state.defaultBranch || "main"}
               className="font-mono text-xs"
+              aria-invalid={!state.deployBranch.trim() || undefined}
             />
-            <p className="text-muted-foreground text-xs">
-              Pushes to this branch will trigger a deploy. Defaults to the repo&apos;s default
-              branch.
-            </p>
+            {state.deployBranch.trim() ? (
+              <p className="text-muted-foreground text-xs">
+                Pushes to this branch will trigger a deploy. Defaults to the repo&apos;s default
+                branch.
+              </p>
+            ) : (
+              <p role="alert" className="text-destructive text-xs">
+                Name the branch whose pushes deploy.
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -205,8 +212,17 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
               onChange={(e) => setState((s) => ({ ...s, cronExpression: e.target.value }))}
               placeholder="0 3 * * *"
               className="font-mono text-xs"
+              aria-invalid={!CRON_FIELD.test(state.cronExpression.trim()) || undefined}
             />
-            <p className="text-muted-foreground text-xs">
+            <p
+              role={CRON_FIELD.test(state.cronExpression.trim()) ? undefined : "alert"}
+              className={cn(
+                "text-xs",
+                CRON_FIELD.test(state.cronExpression.trim())
+                  ? "text-muted-foreground"
+                  : "text-destructive"
+              )}
+            >
               Five fields (minute hour day month weekday). {naturalCronHint(state.cronExpression)}
             </p>
           </div>

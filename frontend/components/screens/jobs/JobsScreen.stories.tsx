@@ -1,162 +1,78 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import {
-  COMMAND_RUNS,
-  CRON_TABLE,
-  JOBS,
-  LONG_COMMAND_RUNS,
-  LONG_JOB_RUNS,
-} from "./jobs-tasks.fixtures";
-import { CronWorkloadsTable, JobsScreen } from "./JobsScreen";
+import { CRON_WORKLOADS, jobsProps, LONG_CRON_WORKLOADS, RECENT } from "./jobs-tasks.fixtures";
+import { type CronWorkload, JOBS_LIST, selectJobs, withLastRuns } from "./jobs-list";
+import { JobsScreen, type JobsScreenProps } from "./JobsScreen";
 
 const meta: Meta = {
   title: "Screens/Jobs/JobsScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-const cron = <CronWorkloadsTable {...CRON_TABLE} />;
-
-/** Per-app Schedules tab: cron workloads with an env pick and Run now. */
-export const Full: Story = {
-  render: () => <JobsScreen {...JOBS} cronWorkloads={cron} />,
+type Props = Partial<Omit<JobsScreenProps, "list">> & {
+  jobs?: CronWorkload[];
+  initial?: Partial<ListState>;
 };
 
-export const Runs: Story = {
-  render: () => <JobsScreen {...JOBS} tab="runs" />,
+/** The screen over fixture jobs, filtered and paged the way the hook does it. */
+function Jobs({ jobs = CRON_WORKLOADS, initial, ...patch }: Props) {
+  const list = useLocalListState(JOBS_LIST, initial);
+  const { rows, totalCount } = selectJobs(withLastRuns(jobs, RECENT), {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  });
+  return <JobsScreen {...jobsProps({ rows, totalCount, ...patch })} list={list} />;
+}
+
+/** All: every cron job with its schedule, concurrency and last run. */
+export const Full: Story = { render: () => <Jobs /> };
+
+export const Loading: Story = { render: () => <Jobs jobs={[]} loading /> };
+
+/** No cron job declared anywhere: the manifest reference. */
+export const Empty: Story = { render: () => <Jobs jobs={[]} /> };
+
+export const EmptyFiltered: Story = {
+  render: () => <Jobs initial={{ filters: { concurrency: "queue" } }} />,
 };
 
-export const Failures: Story = {
-  render: () => <JobsScreen {...JOBS} tab="failures" />,
+export const ErrorState: Story = {
+  render: () => <Jobs jobs={[]} error={{ message: "upstream timed out" }} />,
 };
 
-export const Commands: Story = {
-  render: () => <JobsScreen {...JOBS} tab="commands" />,
+/** Failing: jobs whose latest run failed. */
+export const Failing: Story = { render: () => <Jobs initial={{ view: "failing" }} /> };
+
+/** Paused: no data behind it yet, so empty, with the note saying why. */
+export const Paused: Story = { render: () => <Jobs initial={{ view: "paused" }} /> };
+
+/** Mine: empty, with the note saying why. */
+export const Mine: Story = { render: () => <Jobs initial={{ view: "mine" }} /> };
+
+/** Embedded on an app's Workloads tab: no header, the views in the filter bar. */
+export const Embedded: Story = {
+  render: () => <Jobs embedded appSlug="billing" />,
 };
 
-export const Logs: Story = {
-  render: () => <JobsScreen {...JOBS} tab="logs" />,
-};
-
-/** Fleet-wide /jobs: no app to anchor schedules to, so the tab points at the per-app view. */
-export const FleetSchedules: Story = {
-  render: () => <JobsScreen {...JOBS} appSlug={undefined} />,
-};
-
-/** A job dispatching: its Run now shows a spinner; one environment hides the select. */
-export const RunPending: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      cronWorkloads={
-        <CronWorkloadsTable
-          {...CRON_TABLE}
-          envList={CRON_TABLE.envList.slice(0, 1)}
-          pendingSlug="nightly-report"
-        />
-      }
-    />
-  ),
-};
-
-/** First paint: badge counts unknown, the runs table skeleton. */
-export const Loading: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="runs"
-      summaryRuns={[]}
-      scheduleCount={null}
-      runCount={null}
-      failureCount={null}
-      commandCount={null}
-      runsTable={fakeController({ state: "loading" })}
-    />
-  ),
-};
-
-/** Empty schedules: the empty table plus the worked astrolift.toml example under it. */
-export const Empty: Story = {
-  render: () => {
-    const schedulesController = fakeController<never>({ state: "empty", searchEnabled: false });
-    return (
-      <JobsScreen
-        {...JOBS}
-        scheduleCount={0}
-        schedulesController={schedulesController}
-        cronWorkloads={<CronWorkloadsTable {...CRON_TABLE} controller={schedulesController} />}
-      />
-    );
-  },
-};
-
-export const EmptyRuns: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="runs"
-      summaryRuns={[]}
-      runCount={0}
-      runsTable={fakeController({ state: "empty" })}
-    />
-  ),
-};
-
-export const EmptyFailures: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="failures"
-      failureCount={0}
-      failuresController={fakeController({ state: "empty", searchEnabled: false })}
-    />
-  ),
-};
-
-export const NoMatchingCommands: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="commands"
-      commandsTable={fakeController({ state: "emptyFiltered", search: "rake", isFiltered: true })}
-    />
-  ),
-};
-
-export const LoadError: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="commands"
-      commandsTable={fakeController({
-        state: "error",
-        error: new globalThis.Error("upstream timed out"),
-      })}
-    />
-  ),
-};
+/** A run in flight from Run now. */
+export const Running: Story = { render: () => <Jobs pendingJob="billing/nightly-report" /> };
 
 export const LongStrings: Story = {
-  render: () => (
-    <JobsScreen
-      {...JOBS}
-      appSlug="customer-billing-reconciliation-service-with-an-unusually-long-slug"
-      tab="runs"
-      runsTable={fakeController({ rows: LONG_JOB_RUNS })}
-    />
-  ),
+  render: () => <Jobs jobs={[...LONG_CRON_WORKLOADS, ...CRON_WORKLOADS]} />,
 };
 
-export const LongCommands: Story = {
+export const Width768: Story = {
   render: () => (
-    <JobsScreen
-      {...JOBS}
-      tab="commands"
-      commandsTable={fakeController({ rows: [...LONG_COMMAND_RUNS, ...COMMAND_RUNS] })}
-    />
+    <div style={{ width: 768 }}>
+      <Jobs />
+    </div>
   ),
 };

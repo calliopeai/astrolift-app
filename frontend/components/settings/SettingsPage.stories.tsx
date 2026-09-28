@@ -10,6 +10,7 @@ import {
   SettingsSection,
   type SettingsPageProps,
 } from "./SettingsPage";
+import { useLocalSettingsSection } from "./use-settings-section";
 
 /** The settings archetype (spec 44 §5.3). */
 const meta: Meta = { title: "Settings/SettingsPage", parameters: { layout: "padded" } };
@@ -166,6 +167,48 @@ export const Width768: StoryObj = {
   render: () => (
     <div style={{ width: 768 }} className="border p-4">
       <Page arn={LONG_ARN} />
+    </div>
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// Single-section mode: only the active section is mounted, by ?section=
+// ---------------------------------------------------------------------------
+
+function Single({
+  initial = null,
+  ...props
+}: Partial<SettingsPageProps> & { initial?: string | null; arn?: string; error?: string }) {
+  const section = useLocalSettingsSection(initial);
+  return <Page single={section} {...props} />;
+}
+
+/** Heavy sections (a config editor, a shell console) mount one at a time. */
+export const SingleSection: StoryObj = { render: () => <Single /> };
+export const SingleSectionSelected: StoryObj = { render: () => <Single initial="ingress" /> };
+export const SingleSectionDangerZone: StoryObj = {
+  render: () => <Single initial="danger-zone" />,
+};
+/** An unknown `?section=` shows the first section. */
+export const SingleSectionUnknownId: StoryObj = {
+  render: () => <Single initial="no-such-section" />,
+};
+export const SingleSectionReadOnly: StoryObj = {
+  render: () => <Single initial="iam" readOnly={{ permission: "cluster.manage" }} />,
+};
+export const SingleSectionLongStrings: StoryObj = {
+  render: () => (
+    <Single
+      initial="iam"
+      arn={LONG_ARN}
+      error={`AccessDenied: ${LONG_ARN} is not authorized to perform sts:AssumeRole`}
+    />
+  ),
+};
+export const SingleSectionWidth768: StoryObj = {
+  render: () => (
+    <div style={{ width: 768 }} className="border p-4">
+      <Single initial="iam" arn={LONG_ARN} />
     </div>
   ),
 };

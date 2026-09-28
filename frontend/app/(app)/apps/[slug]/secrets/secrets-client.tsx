@@ -9,7 +9,7 @@ import { AppTabs } from "../components/app-tabs";
 import { PushAndRotateButton } from "../components/ci-setup-section";
 
 /**
- * App Secrets tab. The screen owns the markup; the history popover gets a
+ * App Secrets tab. The screen owns the markup; the history sheet gets a
  * container here so its query runs only while it is open.
  */
 export function SecretsClient({ slug }: { slug: string }) {

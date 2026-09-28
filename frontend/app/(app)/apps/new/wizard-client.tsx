@@ -19,7 +19,11 @@ import type { AstroliftPushCiWorkflowResult, ScmConnectionKind } from "@/graphql
 import { isCiPushableKind } from "./ci-pushable";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
-import { WizardShell, type WizardStep } from "@/components/screens/apps/new/WizardShell";
+import {
+  NewAppPage,
+  NewAppSection,
+  type NewAppStep,
+} from "@/components/screens/apps/new/NewAppPage";
 import { manifestRawForSubmit } from "./manifest-submit";
 import { AppDetailsStep } from "./steps/AppDetailsStep";
 import { DeployStrategyStep } from "./steps/DeployStrategyStep";
@@ -27,8 +31,9 @@ import { ManifestPreviewStep } from "./steps/ManifestPreviewStep";
 import { RepoPickerStep } from "./steps/RepoPickerStep";
 import { ReviewSubmitStep, type SideEffectStep } from "./steps/ReviewSubmitStep";
 
-// Step shape — five steps plus a virtual "0" we never render.
-type StepNumber = 1 | 2 | 3 | 4 | 5;
+// The three steps (spec 44 §5.4): 1 Source (repo + manifest), 2 Run (details
+// + deploy strategy), 3 Review. Each part still reports its own validity.
+type Part = "repo" | "manifest" | "details" | "strategy";
 
 // Connection kinds that hold a usable write-token. OAuth-app config
 // rows carry the app's client secret rather than a user token, so they
@@ -57,9 +62,9 @@ export type WizardTriggerMode = TriggerMode;
 export type DeployTiming = "now" | "later" | "skip";
 
 export interface WizardState {
-  step: StepNumber;
+  step: NewAppStep;
 
-  // Step 1
+  // Source: repository
   connectionId: string;
   // The full connection kind discriminant — drives review-step
   // affordances like the CI-workflow push checkbox, which only
@@ -73,7 +78,7 @@ export interface WizardState {
   // Read off the picked repo's webhook-support flags for review-step UX.
   connectionIsAppInstall: boolean;
 
-  // Step 2
+  // Source: manifest
   manifestPath: string;
   manifestRaw: string;
   manifestFromRepo: boolean; // false => either missing-on-repo or edited locally
@@ -86,14 +91,14 @@ export interface WizardState {
   // sends manifestRaw: null.
   manifestLater: boolean;
 
-  // Step 3
+  // Run: details
   name: string;
   slug: string;
   slugTouched: boolean;
   description: string;
   projectId: string;
 
-  // Step 4
+  // Run: deploy strategy
   deployTiming: DeployTiming;
   triggerMode: WizardTriggerMode;
   deployBranch: string;
@@ -106,7 +111,7 @@ export interface WizardState {
   // policy gates on a user set; bounded at >= 1 always.
   minimumApprovals: number;
 
-  // Step 5
+  // Review
   pushCiWorkflow: boolean;
   triggerFirstDeploy: boolean;
 }
@@ -145,50 +150,20 @@ export function initialWizardState(): WizardState {
   };
 }
 
-const STEPS: WizardStep[] = [
-  {
-    key: "repo",
-    label: "Repo",
-    description: "Pick a source connection and a repository.",
-  },
-  {
-    key: "manifest",
-    label: "Manifest",
-    description: "Review or draft the astrolift.toml manifest.",
-  },
-  {
-    key: "details",
-    label: "Details",
-    description: "Name, slug, description, and where this app lives.",
-  },
-  {
-    key: "strategy",
-    label: "Strategy",
-    description: "How and when deploys should run.",
-  },
-  {
-    key: "review",
-    label: "Review",
-    description: "Final summary and the things we'll do on submit.",
-  },
-];
-
 /**
- * Top-level state machine for the Register App wizard. Holds the
- * single `useState<WizardState>` mandated by the brief — every step
- * gets `state` and `setState` (or a focused setter) and decides for
- * itself when it's valid. The shell binds Back/Next based on per-step
- * validity, which each step reports through `setStepValid`.
+ * Top-level state machine for the New app flow. Holds the single
+ * `useState<WizardState>`: every part gets `state` and `setState` and
+ * decides for itself when it is valid, reporting through `setValid`; a
+ * step can continue once all of its parts are valid.
  */
 export function WizardClient() {
   const router = useRouter();
   const [state, setState] = React.useState<WizardState>(initialWizardState);
-  const [stepValid, setStepValid] = React.useState<Record<StepNumber, boolean>>({
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: true,
+  const [partValid, setPartValid] = React.useState<Record<Part, boolean>>({
+    repo: false,
+    manifest: false,
+    details: false,
+    strategy: false,
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -207,26 +182,20 @@ export function WizardClient() {
 
   // ---- Step movement ----
 
-  const goTo = React.useCallback((next: StepNumber) => {
+  const goTo = React.useCallback((next: NewAppStep) => {
     setState((s) => ({ ...s, step: next }));
   }, []);
 
   const goBack = React.useCallback(() => {
-    setState((s) => ({
-      ...s,
-      step: Math.max(1, s.step - 1) as StepNumber,
-    }));
+    setState((s) => ({ ...s, step: Math.max(1, s.step - 1) as NewAppStep }));
   }, []);
 
   const goNext = React.useCallback(() => {
-    setState((s) => ({
-      ...s,
-      step: Math.min(5, s.step + 1) as StepNumber,
-    }));
+    setState((s) => ({ ...s, step: Math.min(3, s.step + 1) as NewAppStep }));
   }, []);
 
-  const setValid = React.useCallback((step: StepNumber, valid: boolean) => {
-    setStepValid((prev) => (prev[step] === valid ? prev : { ...prev, [step]: valid }));
+  const setValid = React.useCallback((part: Part, valid: boolean) => {
+    setPartValid((prev) => (prev[part] === valid ? prev : { ...prev, [part]: valid }));
   }, []);
 
   // ---- Cancel ----
@@ -249,8 +218,9 @@ export function WizardClient() {
   // ---- Submit ----
 
   async function submit() {
+    // The project field says what is missing, beside itself, on Run.
     if (!state.projectId) {
-      toast.error("Pick a project before submitting.");
+      goTo(2);
       return;
     }
     setSubmitting(true);
@@ -411,39 +381,71 @@ export function WizardClient() {
 
   // ---- Step body + footer-binding ----
 
-  const isLast = state.step === 5;
-  const canGoNext = stepValid[state.step] ?? false;
+  const isLast = state.step === 3;
+  const canGoNext =
+    state.step === 1
+      ? partValid.repo && partValid.manifest
+      : state.step === 2
+        ? partValid.details && partValid.strategy
+        : true;
 
   return (
-    <WizardShell
+    <NewAppPage
       step={state.step}
-      steps={STEPS}
-      onStepClick={(idx) => goTo(idx as StepNumber)}
+      onStep={goTo}
       onBack={state.step > 1 && !submitting ? goBack : undefined}
-      onNext={isLast ? submit : canGoNext ? goNext : undefined}
+      onContinue={isLast ? submit : goNext}
       onCancel={!submitting ? handleCancel : undefined}
-      nextLabel={isLast ? (submitting ? "Submitting…" : "Submit") : "Next"}
-      nextDisabled={!canGoNext}
-      nextLoading={submitting}
+      continueLabel={isLast ? (submitting ? "Creating..." : "Create app") : "Continue"}
+      continueDisabled={!canGoNext}
+      busy={submitting}
     >
       {state.step === 1 && (
-        <RepoPickerStep state={state} setState={setState} setValid={(v) => setValid(1, v)} />
+        <>
+          <NewAppSection title="Repository">
+            <RepoPickerStep
+              state={state}
+              setState={setState}
+              setValid={(v) => setValid("repo", v)}
+            />
+          </NewAppSection>
+          {state.sourceRepo && (
+            <NewAppSection
+              title="Manifest"
+              description="The astrolift.toml that says what this app runs."
+            >
+              <ManifestPreviewStep
+                state={state}
+                setState={setState}
+                setValid={(v) => setValid("manifest", v)}
+              />
+            </NewAppSection>
+          )}
+        </>
       )}
       {state.step === 2 && (
-        <ManifestPreviewStep state={state} setState={setState} setValid={(v) => setValid(2, v)} />
+        <>
+          <NewAppSection title="App" description="Name, slug, description, and its project.">
+            <AppDetailsStep
+              state={state}
+              setState={setState}
+              setValid={(v) => setValid("details", v)}
+            />
+          </NewAppSection>
+          <NewAppSection title="Deploy strategy" description="How and when deploys run.">
+            <DeployStrategyStep
+              state={state}
+              setState={setState}
+              setValid={(v) => setValid("strategy", v)}
+            />
+          </NewAppSection>
+        </>
       )}
       {state.step === 3 && (
-        <AppDetailsStep state={state} setState={setState} setValid={(v) => setValid(3, v)} />
-      )}
-      {state.step === 4 && (
-        <DeployStrategyStep state={state} setState={setState} setValid={(v) => setValid(4, v)} />
-      )}
-      {state.step === 5 && (
         <ReviewSubmitStep
           state={state}
           setState={setState}
-          steps={STEPS}
-          onJumpToStep={(idx) => goTo(idx as StepNumber)}
+          onJumpToStep={goTo}
           submitting={submitting}
           submitError={submitError}
           sideEffects={sideEffects}
@@ -460,7 +462,7 @@ export function WizardClient() {
           router.push("/apps");
         }}
       />
-    </WizardShell>
+    </NewAppPage>
   );
 }
 

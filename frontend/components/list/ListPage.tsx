@@ -57,9 +57,22 @@
  * cannot hold: the first column carries the row link and is never hidden;
  * a field key must not be one of `RESERVED_PARAMS`; views come from
  * `standardViews`, so All and Mine lead.
+ *
+ * Embedded (a list on a detail page's tab, e.g. an app's Deployments tab):
+ * the one row of tabs there is the entity's, so the list draws no header and
+ * its views become a compact picker at the start of the filter bar. Views
+ * are still `?view=` in the URL (use `useListState`, as on a routed list):
+ *
+ *   <ListPage embedded list={list} label="Deployments" columns={…} rows={…} … />
  */
 
-import { AlertTriangleIcon, MoreHorizontalIcon, SearchXIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MoreHorizontalIcon,
+  SearchXIcon,
+} from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -77,6 +90,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,9 +101,22 @@ import { ListPagination } from "./ListPagination";
 import { NewRowsPill } from "./NewRowsPill";
 import type { ListStateController } from "./use-list-state";
 
-export interface ListPageProps<TRow> {
-  /** The page header; the list's views become its tabs. */
-  header: Omit<ShellHeaderProps, "tabs" | "tabsAriaLabel">;
+/** A routed list owns the page header; an embedded one sits under an entity's tabs. */
+type ListPageFrame =
+  | {
+      /** The page header; the list's views become its tabs. */
+      header: Omit<ShellHeaderProps, "tabs" | "tabsAriaLabel">;
+      embedded?: false;
+    }
+  | {
+      header?: never;
+      /** No header: the views are a picker at the start of the filter bar. */
+      embedded: true;
+    };
+
+export type ListPageProps<TRow> = ListPageFrame & ListPageBodyProps<TRow>;
+
+interface ListPageBodyProps<TRow> {
   list: ListStateController;
   /** Plural noun: the table caption and the state copy ("Could not load runs"). */
   label: string;
@@ -133,6 +160,7 @@ function columnLabel<TRow>(c: Column<TRow>): string {
 
 export function ListPage<TRow>({
   header,
+  embedded = false,
   list,
   label,
   columns,
@@ -239,23 +267,28 @@ export function ListPage<TRow>({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
-      <ShellHeader
-        {...header}
-        tabs={def.views.map((v) => ({
-          key: v.key,
-          label: v.label,
-          href: list.viewHref(v.key),
-          active: v.key === state.view,
-        }))}
-        tabsAriaLabel="Views"
-      />
-
-      {view?.note && (
-        <p className="text-muted-foreground -mt-2 min-w-0 text-xs [overflow-wrap:anywhere]">
-          {view.note}
-        </p>
+      {!embedded && header && (
+        <ShellHeader
+          {...header}
+          tabs={def.views.map((v) => ({
+            key: v.key,
+            label: v.label,
+            href: list.viewHref(v.key),
+            active: v.key === state.view,
+          }))}
+          tabsAriaLabel="Views"
+        />
       )}
-      <FilterBar list={list} columns={barColumns} cards={Boolean(renderCard)} menu={menu} />
+
+      {!embedded && view?.note && <ViewNote note={view.note} className="-mt-2" />}
+      <FilterBar
+        list={list}
+        columns={barColumns}
+        cards={Boolean(renderCard)}
+        menu={menu}
+        leading={embedded && def.views.length > 1 ? <ViewPicker list={list} /> : undefined}
+      />
+      {embedded && view?.note && <ViewNote note={view.note} className="-mt-2" />}
 
       {newRows && newRows.count > 0 && (
         <NewRowsPill count={newRows.count} onReveal={newRows.onReveal} />
@@ -325,6 +358,48 @@ export function ListPage<TRow>({
           />
         ))}
     </div>
+  );
+}
+
+function ViewNote({ note, className }: { note: string; className?: string }) {
+  return (
+    <p className={cn("text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]", className)}>
+      {note}
+    </p>
+  );
+}
+
+/** An embedded list's views: one compact menu, each view a link to `?view=`. */
+function ViewPicker({ list }: { list: ListStateController }) {
+  const { definition: def, state } = list;
+  const active = def.views.find((v) => v.key === state.view) ?? def.views[0];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="max-w-full min-w-0" aria-label="View">
+          <span className="text-muted-foreground shrink-0">View:</span>
+          <span className="min-w-0 truncate">{active?.label}</span>
+          <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-44">
+        {def.views.map((v) => (
+          <DropdownMenuItem key={v.key} asChild>
+            <Link
+              href={list.viewHref(v.key)}
+              aria-current={v.key === state.view ? "page" : undefined}
+              className="flex items-center gap-2"
+            >
+              <CheckIcon
+                className={cn("size-3.5", v.key !== state.view && "invisible")}
+                aria-hidden
+              />
+              {v.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

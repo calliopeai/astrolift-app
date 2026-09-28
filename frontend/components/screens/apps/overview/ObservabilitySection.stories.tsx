@@ -39,3 +39,11 @@ export const FailuresAndCritical: Story = {
 export const LongStrings: Story = {
   render: () => <ObservabilitySectionView {...OBSERVABILITY_LONG} />,
 };
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ObservabilitySectionView {...OBSERVABILITY_LONG} />
+    </div>
+  ),
+};

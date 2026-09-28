@@ -43,10 +43,16 @@ interface Resp {
 
 /** Data half of UptimeCardView: the app's uptime probe summary, polled every minute. */
 export function useUptime(appSlug: string) {
-  const { data, loading } = useQuery<Resp>(GET_APP_UPTIME, {
+  const { data, loading, error, refetch } = useQuery<Resp>(GET_APP_UPTIME, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
     pollInterval: 60000,
   });
-  return { uptime: data?.astroliftAppUptime ?? null, loading };
+  return {
+    uptime: data?.astroliftAppUptime ?? null,
+    loading,
+    /** Only when there is nothing cached to show. */
+    error: data ? null : (error?.message ?? null),
+    onRetry: () => void refetch(),
+  };
 }

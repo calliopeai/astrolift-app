@@ -39,6 +39,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
   allTeams,
   allProjects,
   slugValid,
+  projectsLoading = false,
 }: AppDetailsStepViewProps<S>) {
   // Local "team" selection is informational — it filters the project
   // list. The mutation takes a `projectId`, not a `teamId`. We default
@@ -71,8 +72,18 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
             placeholder="API Gateway"
             autoFocus
             required
+            aria-invalid={!state.name.trim() || undefined}
+            aria-describedby="name-help"
           />
-          <p className="text-muted-foreground text-xs">Human-readable name shown in the UI.</p>
+          {state.name.trim() ? (
+            <p id="name-help" className="text-muted-foreground text-xs">
+              Human-readable name shown in the UI.
+            </p>
+          ) : (
+            <p id="name-help" role="alert" className="text-destructive text-xs">
+              Give the app a name.
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -93,10 +104,15 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
             className="font-mono text-xs"
             maxLength={40}
             required
+            aria-invalid={(state.slug !== "" && !slugValid) || !state.slug || undefined}
           />
           <div className="flex items-start justify-between gap-2">
-            {state.slug && !slugValid ? (
-              <p className="text-destructive text-xs">
+            {!state.slug ? (
+              <p role="alert" className="text-destructive text-xs">
+                A slug is required.
+              </p>
+            ) : !slugValid ? (
+              <p role="alert" className="text-destructive text-xs">
                 Lowercase letters, digits, and hyphens only (max 40 chars).
               </p>
             ) : (
@@ -191,6 +207,13 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
               ))}
             </SelectContent>
           </Select>
+          {!state.projectId && !projectsLoading && (
+            <p role="alert" className="text-destructive text-xs">
+              {filteredProjects.length === 0
+                ? "No projects in this scope. Pick another team, or create a project first."
+                : "Pick the project this app belongs to."}
+            </p>
+          )}
         </div>
       </div>
     </div>

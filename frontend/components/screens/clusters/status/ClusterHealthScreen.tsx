@@ -9,11 +9,11 @@
 
 import { ActivityIcon, RocketIcon, ServerIcon, ServerOffIcon } from "lucide-react";
 
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import { StatusPanel, StatusPanelGrid } from "./StatusPanel";
 import type { useClusterHealth } from "./use-cluster-health";
 import type { useClusterWorkloadHealth } from "./use-cluster-workload-health";
 
@@ -25,10 +25,10 @@ export interface ClusterHealthBodyProps {
 /** The Health tab body: the live health panel over the workload health panel. */
 export function ClusterHealthBody({ health, workloads }: ClusterHealthBodyProps) {
   return (
-    <StatusPanelGrid>
+    <PanelGrid>
       <HealthLiveCard {...health} />
       <HealthWorkloadCard {...workloads} />
-    </StatusPanelGrid>
+    </PanelGrid>
   );
 }
 
@@ -57,7 +57,7 @@ function HealthLiveCard({
   const nothing = pods.length === 0 && events.length === 0;
 
   return (
-    <StatusPanel
+    <Panel
       icon={<ActivityIcon className="size-4" />}
       title="Live health"
       description={
@@ -147,7 +147,7 @@ function HealthLiveCard({
           )}
         </div>
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -180,7 +180,7 @@ function HealthWorkloadCard({
   });
 
   return (
-    <StatusPanel
+    <Panel
       icon={<ServerIcon className="size-4" />}
       title="Workload health"
       description={
@@ -269,6 +269,6 @@ function HealthWorkloadCard({
           </tbody>
         </table>
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }

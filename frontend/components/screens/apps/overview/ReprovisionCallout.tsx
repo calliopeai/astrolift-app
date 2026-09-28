@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * ReprovisionCalloutView (#407 A) — state-specific banner above the deploy
- * activity strip on the app overview.
+ * ReprovisionCalloutView (#407 A): a state-specific notice in the app
+ * overview's notices slot.
  *
  * Renders only when the backend's `astroliftApp.reprovision.needsReprovision`
  * is true. State copy + tone keyed on `reprovision.state`:
@@ -26,8 +26,8 @@ import * as React from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import type { AstroliftAppReprovisionState } from "@/graphql/registry/registry.types";
-import { cn } from "@/lib/utils";
 
+import { Notice } from "./OverviewNotices";
 import type { useForceReprovision } from "./use-force-reprovision";
 
 export type ReprovisionCalloutViewProps = ReturnType<typeof useForceReprovision> & {
@@ -80,55 +80,25 @@ export function ReprovisionCalloutView({
 
   return (
     <>
-      <section
-        className={cn(
-          "rounded-md border p-4",
-          tone === "error"
-            ? "border-destructive/40 bg-destructive/5"
-            : "border-warning-border bg-warning/10"
-        )}
-        aria-live="polite"
-      >
-        <div className="flex items-start gap-3">
-          <AlertTriangleIcon
-            className={cn(
-              "size-5 shrink-0",
-              tone === "error" ? "text-destructive" : "text-warning-fg"
-            )}
-            aria-hidden
-          />
-          <div className="min-w-0 flex-1 space-y-1">
-            <p
-              className={cn(
-                "text-sm font-semibold",
-                tone === "error" ? "text-destructive" : "text-warning-fg"
-              )}
-            >
-              {headline}
-            </p>
-            <p
-              className={cn(
-                "text-xs leading-snug",
-                tone === "error" ? "text-destructive/90" : "text-warning-fg"
-              )}
-            >
-              {description}
-              {elapsedLabel ? (
-                <>
-                  {" "}
-                  <span className="text-muted-foreground">· {elapsedLabel}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-          {!isInFlight && (
+      <Notice
+        tone={tone === "error" ? "danger" : "warning"}
+        icon={AlertTriangleIcon}
+        title={headline}
+        description={
+          <>
+            {description}
+            {elapsedLabel ? <span className="font-mono"> · {elapsedLabel}</span> : null}
+          </>
+        }
+        actions={
+          isInFlight ? undefined : (
             <Button
               type="button"
               size="sm"
-              variant={tone === "error" ? "destructive" : "default"}
+              variant={tone === "error" ? "destructive" : "outline"}
               onClick={() => setConfirmOpen(true)}
               disabled={redeploying}
-              className="shrink-0 gap-1"
+              className="gap-1"
             >
               {redeploying ? (
                 <Loader2Icon className="size-4 animate-spin" />
@@ -137,9 +107,9 @@ export function ReprovisionCalloutView({
               )}
               {t("cta")}
             </Button>
-          )}
-        </div>
-      </section>
+          )
+        }
+      />
 
       <ConfirmDialog
         open={confirmOpen}

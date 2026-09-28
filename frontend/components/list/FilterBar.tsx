@@ -63,12 +63,21 @@ export interface FilterBarProps {
   cards?: boolean;
   /** The overflow `⋯` menu, e.g. CSV export on Admin lists. */
   menu?: React.ReactNode;
+  /** Before the search box: an embedded list's view picker. */
+  leading?: React.ReactNode;
   className?: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
 
-export function FilterBar({ list, columns, cards = true, menu, className }: FilterBarProps) {
+export function FilterBar({
+  list,
+  columns,
+  cards = true,
+  menu,
+  leading,
+  className,
+}: FilterBarProps) {
   const { definition: def, state } = list;
   const chips = Object.entries(state.filters);
   const sortable = columns.filter((c) => c.sortKey);
@@ -76,6 +85,7 @@ export function FilterBar({ list, columns, cards = true, menu, className }: Filt
 
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
+      {leading}
       <SearchBox list={list} />
       <AddFilter fields={def.fields} onAdd={list.setFilter} />
 

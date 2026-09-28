@@ -51,11 +51,18 @@ export const Loading: Story = { render: () => <Screen {...SECRETS_LOADING} /> };
 
 export const Empty: Story = { render: () => <Screen {...SECRETS_EMPTY} /> };
 
-/**
- * The tab has no error state of its own: a failed query renders as the
- * empty table. This is the closest real state.
- */
-export const QueryFailed: Story = { render: () => <Screen {...SECRETS_EMPTY} /> };
+/** The secrets query failed with nothing cached: the error and Retry sit in the table's frame. */
+export const QueryFailed: Story = {
+  render: () => (
+    <Screen
+      {...SECRETS_EMPTY}
+      secretsError={{
+        name: "ApolloError",
+        message: "Network request failed: 503 Service Unavailable",
+      }}
+    />
+  ),
+};
 
 export const Revealed: Story = {
   render: () => (
@@ -93,4 +100,21 @@ export const NewSecretSheet: Story = {
   },
 };
 
+/** A key's audit history opens in a side sheet. */
+export const HistorySheet: Story = {
+  render: () => <Screen {...SECRETS_SCREEN} />,
+  play: async ({ canvasElement }) => {
+    const [first] = within(canvasElement).getAllByRole("button", { name: "History" });
+    await userEvent.click(first);
+  },
+};
+
 export const LongStrings: Story = { render: () => <Screen {...SECRETS_LONG} /> };
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Screen {...SECRETS_LONG} />
+    </div>
+  ),
+};

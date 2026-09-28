@@ -419,7 +419,62 @@
         "secure": "Secure"
       },
       "logs": "Logs",
-      "shell": "Shell"
+      "shell": "Shell",
+      "logsMetrics": "Logs & metrics",
+      "access": "Access"
+    },
+    "frame": {
+      "status": {
+        "ready": "Ready",
+        "live": "Live",
+        "pending": "Pending",
+        "provisioning": "Provisioning",
+        "failed": "Failed",
+        "archived": "Archived"
+      },
+      "failed": "Provisioning failed",
+      "moreEnvironments": "+{count} more",
+      "clusterTitle": "Open cluster {cluster} in Admin",
+      "loadError": "Could not load this app",
+      "retry": "Retry",
+      "menu": {
+        "label": "More actions",
+        "openApp": "Open app",
+        "openRepo": "Open repository",
+        "copyId": "Copy app ID",
+        "copied": "App ID copied",
+        "editConfig": "Edit configuration",
+        "archive": "Archive app",
+        "restore": "Restore app",
+        "delete": "Delete app"
+      },
+      "archive": {
+        "title": "Archive {name}?",
+        "description": "Scales every workload to zero replicas and suppresses deploys. Manifest, secrets, tokens and domains are kept; restoring returns each workload to its pre-archive replica count.",
+        "confirm": "Archive"
+      },
+      "sectionsAriaLabel": "Sections",
+      "sections": {
+        "deployments": "Deployments",
+        "previews": "Previews",
+        "workloads": "Workloads",
+        "jobs": "Scheduled jobs",
+        "managedServices": "Managed services",
+        "logs": "Logs",
+        "metrics": "Metrics",
+        "console": "Console",
+        "commands": "Commands",
+        "members": "Members",
+        "tokens": "Deploy tokens",
+        "security": "Security scans",
+        "edge": "Edge access",
+        "general": "General",
+        "configuration": "Configuration",
+        "manifest": "Manifest",
+        "webhooks": "Webhooks",
+        "environments": "Environments",
+        "dangerZone": "Danger zone"
+      }
     },
     "common": {
       "loading": "Loading…",
@@ -485,6 +540,8 @@
       "downloadEmpty": "Nothing to download — the buffer is empty.",
       "downloadStarted": "Downloading {filename}",
       "paneAriaLabel": "Log buffer",
+      "filterPlaceholder": "Filter lines…",
+      "filteredEmpty": "No lines match the level and text filters.",
       "levelGroupLabel": "Filter by log level",
       "bufferFootnote": "Showing {shown} of {buffered} buffered lines (cap {limit}).",
       "level": {
@@ -612,6 +669,107 @@
         "confirm": "Deploy",
         "started": "Deploy started: {tag} to {env}",
         "failed": "Deploy failed"
+      }
+    },
+    "overview": {
+      "latestDeploy": {
+        "title": "Latest deploy",
+        "open": "Open",
+        "rollback": "Roll back",
+        "failed": "Deploy failed",
+        "noReason": "No reason recorded. Open the deployment for the full log.",
+        "noLastGood": "No earlier successful deploy to roll back to.",
+        "emptyTitle": "Not deployed yet",
+        "emptyDescription": "Push to the deploy branch or deploy from the CLI to see status here.",
+        "emptyAction": "Open deployments",
+        "when": "When",
+        "elapsed": "elapsed",
+        "took": "took",
+        "commit": "Commit",
+        "trigger": "Trigger",
+        "all": "All deployments",
+        "confirmTitle": "Roll back to {tag}?",
+        "confirmDescription": "This starts a new deployment using the previous image and supersedes the failed one.",
+        "status": {
+          "running": "Running",
+          "failed": "Failed",
+          "rolled_back": "Rolled back",
+          "superseded": "Superseded",
+          "deploying": "Deploying",
+          "pending": "Pending",
+          "pending_approval": "Awaiting approval",
+          "redeploying": "Redeploying"
+        }
+      },
+      "health": {
+        "title": "Health",
+        "up": "Up",
+        "down": "Down",
+        "downReason": "The last probe failed. {pct}% uptime over the last {hours}h.",
+        "waiting": "Uptime monitoring is active. The first result appears within a couple of minutes.",
+        "window": "uptime · last {hours}h",
+        "checked": "checked",
+        "latency": "Latency",
+        "latencyAria": "Probe latency, recent"
+      },
+      "links": {
+        "title": "Go to",
+        "count": "{count, plural, one {# deployment} other {# deployments}}",
+        "deployments": {
+          "title": "Deployments",
+          "description": "Recent deploys, in-flight rollouts and rollback history."
+        },
+        "workloads": {
+          "title": "Workloads",
+          "description": "What this app runs: services, jobs and managed services."
+        },
+        "logs": {
+          "title": "Logs & metrics",
+          "description": "Logs, metrics, the console and commands."
+        },
+        "domains": {
+          "title": "Domains",
+          "description": "Hostnames, certificates and custom domains."
+        },
+        "access": {
+          "title": "Access",
+          "description": "Members, tokens, security scans and the edge rule."
+        },
+        "settings": {
+          "title": "Settings",
+          "description": "Project, deploy strategy, manifest, webhooks and teams."
+        }
+      },
+      "managedServices": {
+        "title": "Managed services",
+        "manage": "Manage",
+        "emptyTitle": "No managed services",
+        "emptyDescription": "Databases, caches, queues and buckets bound to this app appear here.",
+        "emptyAction": "Add a managed service"
+      },
+      "ownership": {
+        "title": "Teams & project",
+        "manage": "Manage",
+        "project": "Project",
+        "noProject": "Not in a project",
+        "homeTeam": "Home team",
+        "noTeam": "None",
+        "granted": "Granted",
+        "noGrants": "No other team has access"
+      },
+      "ci": {
+        "title": "CI setup",
+        "manage": "Manage",
+        "workflow": "Workflow",
+        "webhook": "Webhook",
+        "secret": "Deploy secret",
+        "installed": "installed {when}",
+        "notInstalled": "not installed",
+        "unknown": "unknown",
+        "tokens": "Deploy tokens",
+        "emptyTitle": "No source repo",
+        "emptyDescription": "Connect a repo so a push can build and deploy this app.",
+        "emptyAction": "Open settings"
       }
     },
     "wizard": {
@@ -877,6 +1035,14 @@
       "description": "Hostnames bound to {slug}. Add a domain, copy the validation TXT record into your DNS provider, then click Recheck once it propagates.",
       "learnMore": "Learn more",
       "addDomain": "Add domain",
+      "listTitle": "Domains",
+      "columns": {
+        "hostname": "Hostname",
+        "status": "DNS",
+        "certificate": "Certificate",
+        "lastChecked": "Last checked",
+        "actions": "Actions"
+      },
       "emptyTitle": "No custom domains yet",
       "emptyDescription": "Add a hostname like checkout.acme.com to point at this app's primary public workload. Removing a domain later detaches it from ingress — the platform stops routing traffic for that hostname and the cert is freed.",
       "addSheet": {
@@ -921,6 +1087,8 @@
         "notChecked": "Not checked yet",
         "recheck": "Recheck",
         "remove": "Remove",
+        "pendingTitle": "Pending verification",
+        "detailTitle": "DNS and certificate",
         "validationError": "Validation error:",
         "platformManagedHelp": "Platform-managed records — astrolift owns the zone and creates these via the DNS driver. No operator action needed; the recheck below is a probe.",
         "liveHelp": "These records are live in your DNS. Cert active.",
@@ -987,7 +1155,11 @@
         "source": "Source",
         "env": "Env",
         "lastEdited": "Last edited",
-        "value": "Value"
+        "value": "Value",
+        "actions": "Actions"
+      },
+      "history": {
+        "title": "Audit history"
       },
       "delete": {
         "title": "Delete {key}?",
@@ -1014,6 +1186,7 @@
       "reveal": {
         "show": "Reveal value",
         "hide": "Hide value",
+        "masked": "Value hidden",
         "revealing": "Revealing…",
         "failed": "Reveal failed",
         "toastRevealed": "Revealed by you — audit logged",
@@ -1333,6 +1506,30 @@
         "validAgentSummary": "Valid — {skills, plural, one {# skill} other {# skills}}, {tools, plural, one {# tool} other {# tools}}"
       }
     },
+    "settingsTab": {
+      "groups": {
+        "app": "App",
+        "source": "Source and build",
+        "deploys": "Deploys",
+        "traffic": "Traffic",
+        "data": "Data",
+        "managedServices": "Managed services"
+      },
+      "identity": {
+        "title": "Name and repository",
+        "description": "What the app is called, and where its source lives.",
+        "name": "Name",
+        "nameRequired": "The app needs a name.",
+        "descriptionLabel": "Description",
+        "repository": "Repository",
+        "noRepository": "No repository connected",
+        "defaultBranch": "Default branch",
+        "slug": "Slug",
+        "toastSaved": "App details saved",
+        "toastFailed": "Could not save the app details"
+      },
+      "empty": "Nothing here for this app."
+    },
     "settings": {
       "title": "Settings",
       "loading": "Loading…",
@@ -1484,7 +1681,7 @@
         "button": "Deregister app",
         "stillLive": "Last attempt left {count} resource class(es) live:",
         "retry": "Retry deregister",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
+        "softHint": "For a recoverable delete, use Delete app in the app's ⋯ menu (soft delete, 30-day recovery window).",
         "confirmTitle": "Deregister {name}?",
         "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
         "typeToConfirm": "To confirm, type the app's name:",

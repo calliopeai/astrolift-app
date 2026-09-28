@@ -21,11 +21,11 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import { type Column, DataTable } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,18 +43,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { staticController } from "@/components/viz/core/static-table";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 
 import type { AppSecret, AppSecretBundleAttachment } from "./secrets.types";
@@ -214,9 +205,12 @@ function RevertWarningBanner({ secrets }: { secrets: AppSecret[] }) {
 }
 
 /**
- * The app Secrets tab. Holds only UI state (which sheet, confirm, or history
- * popover is open); everything that talks to the server comes in from
- * useAppSecrets.
+ * The app Secrets tab (spec 44 §5.1, §5.2, §5.4): the keys on a DataTable in
+ * a Panel, keys in mono and values masked until revealed (reveal needs
+ * `secret.read`, as before), a key's audit history in a side sheet, and New
+ * secret as a sheet of three fields. Attached bundles sit in their own panel.
+ * Holds only UI state (which sheet, confirm or history is open); everything
+ * that talks to the server comes in from useAppSecrets.
  */
 export function SecretsScreen({
   slug,
@@ -225,6 +219,8 @@ export function SecretsScreen({
   environments: envList,
   secrets: list,
   secretsLoading,
+  secretsError,
+  retrySecrets,
   attachments: attachmentList,
   attachmentsLoading,
   pendingProposals,
@@ -254,38 +250,58 @@ export function SecretsScreen({
   const [bulkOpen, setBulkOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(null);
   const [detachTarget, setDetachTarget] = React.useState<AppSecretBundleAttachment | null>(null);
-  // #714 — historyKey: which (id, key) pair's audit popover is open.
-  const [historyTarget, setHistoryTarget] = React.useState<{
-    secretId: string;
-    key: string;
-  } | null>(null);
+  // #714: whose audit history is open in the side sheet.
+  const [historyTarget, setHistoryTarget] = React.useState<AppSecret | null>(null);
+
+  const controller = React.useMemo(() => {
+    const base = staticController(list);
+    if (secretsLoading) return { ...base, state: "loading" as const };
+    if (secretsError && list.length === 0) {
+      return { ...base, state: "error" as const, error: secretsError, retry: retrySecrets };
+    }
+    return base;
+  }, [list, secretsLoading, secretsError, retrySecrets]);
+
+  const columns = secretColumns({
+    t,
+    revealedValues,
+    editingId,
+    rotatingId,
+    revealingId,
+    historyId: historyTarget?.id ?? null,
+    busy: busy || rotating,
+    onToggleReveal,
+    onStartEdit,
+    onStartRotate,
+    onCancelEdit,
+    onInlineSave,
+    onRequestDelete: (s) => {
+      if (onRequestDelete(s)) setDeleteTarget(s);
+    },
+    onOpenHistory: setHistoryTarget,
+  });
 
   return (
     <PageShell
       title={t("title")}
       description={
-        <span className="text-muted-foreground font-mono text-xs">
+        <span className="font-mono text-xs [overflow-wrap:anywhere]">
           {t("description", { slug })}
         </span>
       }
       actions={
         <>
-          {/* #681 — mirror the Settings tab's "Push & rotate" affordance
-              here, where an operator's mental model says "I'm working
-              with secrets, that belongs in this view". The Settings card
-              wraps the same button with an explanatory blurb; the
-              toolbar surfaces the action without the prose since the
-              operator already knows what it does by the time they hit
-              this page. */}
+          {/* #681: the Settings tab's "Push & rotate", here too, where the
+              operator is already working with secrets. */}
           <Can permission="app.deploy">{pushToGitHub}</Can>
           <Can permission="app.deploy">
-            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
               <UploadIcon className="size-4" />
               {t("bulkImport")}
             </Button>
           </Can>
           <Can permission="app.deploy">
-            <Button onClick={() => setSetOpen(true)}>
+            <Button size="sm" onClick={() => setSetOpen(true)}>
               <PlusIcon className="size-4" />
               {t("newSecret")}
             </Button>
@@ -298,97 +314,77 @@ export function SecretsScreen({
       <PendingProposalsBanner proposals={pendingProposals} />
       <RevertWarningBanner secrets={list} />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-muted-foreground text-xs tracking-wide uppercase">
-          {t("environment")}
-        </Label>
-        <Select value={envName} onValueChange={setEnvName}>
-          <SelectTrigger className="w-56">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_ENVS}>{t("allEnvironments")}</SelectItem>
-            {envList.map((e) => (
-              <SelectItem key={e.id} value={e.name}>
-                {e.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-muted-foreground text-xs">
-          {t("keysCount", { count: list.length })}
-        </span>
-      </div>
+      <PanelGrid>
+        <Panel
+          title={t("title")}
+          icon={<KeyIcon className="size-4" />}
+          description={
+            <span className="font-mono tabular-nums">{t("keysCount", { count: list.length })}</span>
+          }
+          actions={
+            <Select value={envName} onValueChange={setEnvName}>
+              <SelectTrigger
+                size="sm"
+                aria-label={t("environment")}
+                className="w-44 max-w-full min-w-0 font-mono text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_ENVS}>{t("allEnvironments")}</SelectItem>
+                {envList.map((e) => (
+                  <SelectItem key={e.id} value={e.name} className="font-mono">
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+          flush
+        >
+          <TooltipProvider delayDuration={200}>
+            <DataTable
+              chrome="table"
+              className="[&>div]:rounded-none [&>div]:border-0"
+              label={t("title")}
+              controller={controller}
+              columns={columns}
+              getRowId={(s) => s.id}
+              empty={{
+                icon: <KeyIcon className="size-5" />,
+                title: t("emptyTitle"),
+                description: t("emptyDescription"),
+              }}
+            />
+          </TooltipProvider>
+        </Panel>
 
-      <AttachedBundlesSection
-        loading={attachmentsLoading}
-        attachments={attachmentList}
-        onDetach={(a) => setDetachTarget(a)}
-        busy={detaching}
-      />
+        <AttachedBundlesPanel
+          loading={attachmentsLoading}
+          attachments={attachmentList}
+          onDetach={(a) => setDetachTarget(a)}
+          busy={detaching}
+        />
+      </PanelGrid>
 
-      <Card>
-        <CardContent className="p-0">
-          {secretsLoading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<KeyIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-              />
-            </div>
-          ) : (
-            <TooltipProvider delayDuration={200}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("columns.key")}</TableHead>
-                    <TableHead>{t("columns.value")}</TableHead>
-                    <TableHead>{t("columns.source")}</TableHead>
-                    <TableHead>{t("columns.env")}</TableHead>
-                    <TableHead>{t("columns.lastEdited")}</TableHead>
-                    <TableHead className="w-12 text-right"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.map((s) => (
-                    <SecretRow
-                      key={s.id}
-                      secret={s}
-                      revealed={s.id in revealedValues ? revealedValues[s.id] : null}
-                      editing={editingId === s.id || rotatingId === s.id}
-                      isRotateMode={rotatingId === s.id}
-                      onToggleReveal={() => onToggleReveal(s)}
-                      onStartEdit={() => onStartEdit(s)}
-                      onStartRotate={() => onStartRotate(s)}
-                      onCancelEdit={onCancelEdit}
-                      onSave={(value) => onInlineSave(s, value)}
-                      onRequestDelete={() => {
-                        if (onRequestDelete(s)) setDeleteTarget(s);
-                      }}
-                      historyOpen={historyTarget?.secretId === s.id}
-                      history={historyTarget?.secretId === s.id ? renderHistory(s.key) : null}
-                      onToggleHistory={() =>
-                        setHistoryTarget((prev) =>
-                          prev?.secretId === s.id ? null : { secretId: s.id, key: s.key }
-                        )
-                      }
-                      busy={busy || rotating}
-                      revealing={revealingId === s.id}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </TooltipProvider>
-          )}
-        </CardContent>
-      </Card>
+      <Sheet
+        open={historyTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setHistoryTarget(null);
+        }}
+      >
+        <SheetContent className="flex flex-col sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{t("history.title")}</SheetTitle>
+            <SheetDescription className="font-mono [overflow-wrap:anywhere]">
+              {historyTarget?.key}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {historyTarget && renderHistory(historyTarget.key)}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <SetSecretSheet
         open={setOpen}
@@ -457,212 +453,243 @@ export function SecretsScreen({
   );
 }
 
-interface SecretRowProps {
-  secret: AppSecret;
-  revealed: string | null;
-  editing: boolean;
-  isRotateMode: boolean;
+type SecretsT = ReturnType<typeof useTranslations<"apps.secrets">>;
+
+interface SecretColumnsArgs {
+  t: SecretsT;
+  revealedValues: Record<string, string>;
+  editingId: string | null;
+  rotatingId: string | null;
+  revealingId: string | null;
+  historyId: string | null;
   busy: boolean;
-  revealing: boolean;
-  historyOpen: boolean;
-  /** The audit history popover body, rendered only while it is open. */
-  history: React.ReactNode;
-  onToggleReveal: () => void;
-  onStartEdit: () => void;
-  onStartRotate: () => void;
+  onToggleReveal: (s: AppSecret) => void;
+  onStartEdit: (s: AppSecret) => void;
+  onStartRotate: (s: AppSecret) => void;
   onCancelEdit: () => void;
-  onSave: (value: string) => Promise<boolean>;
-  onRequestDelete: () => void;
-  onToggleHistory: () => void;
+  onInlineSave: (s: AppSecret, value: string) => Promise<boolean>;
+  onRequestDelete: (s: AppSecret) => void;
+  onOpenHistory: (s: AppSecret) => void;
 }
 
-function SecretRow({
-  secret: s,
-  history,
-  revealed,
-  editing,
-  isRotateMode,
+/** The secrets table's columns; each cell reads the row plus the screen's edit state. */
+function secretColumns({
+  t,
+  revealedValues,
+  editingId,
+  rotatingId,
+  revealingId,
+  historyId,
   busy,
-  revealing,
-  historyOpen,
   onToggleReveal,
   onStartEdit,
   onStartRotate,
   onCancelEdit,
-  onSave,
+  onInlineSave,
   onRequestDelete,
-  onToggleHistory,
-}: SecretRowProps) {
-  const t = useTranslations("apps.secrets");
-  const isRevealed = revealed !== null;
-  const canEdit = s.source === "literal" && isRevealed;
-  const editorName = s.lastEditedBy?.displayName || s.lastEditedBy?.username;
-  const setViaLabel = SET_VIA_LABEL[s.setVia ?? "web"] ?? s.setVia ?? "web";
-  // Build a multi-line tooltip: "edited by X — set via Y". Drops the
-  // "by X" half when the writer is unknown (e.g. backfilled rows).
-  const lastEditedTooltip = editorName
-    ? `${t("lastEditedBy", { name: editorName })} · set via ${setViaLabel}`
-    : `${t("lastEditedByUnknown")} · set via ${setViaLabel}`;
-
-  return (
-    <TableRow>
-      <TableCell className="font-mono text-xs">
-        {s.key}
-        <SecretScopeBadge scope={s.scope} />
-        <SecretExpiryBadge expiresAt={s.expiresAt} />
-        <SecretPendingApprovalBadge source={s.source} deploysAsShown={s.deploysAsShown} />
-      </TableCell>
-      <TableCell className="font-mono text-xs">
-        {editing && canEdit ? (
+  onOpenHistory,
+}: SecretColumnsArgs): Column<AppSecret>[] {
+  const revealedOf = (s: AppSecret) => (s.id in revealedValues ? revealedValues[s.id] : null);
+  return [
+    {
+      id: "key",
+      header: t("columns.key"),
+      cellClassName: "whitespace-normal",
+      cell: (s) => (
+        <span className="flex min-w-0 flex-wrap items-center">
+          <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">{s.key}</code>
+          <SecretScopeBadge scope={s.scope} />
+          <SecretExpiryBadge expiresAt={s.expiresAt} />
+          <SecretPendingApprovalBadge source={s.source} deploysAsShown={s.deploysAsShown} />
+        </span>
+      ),
+    },
+    {
+      id: "value",
+      header: t("columns.value"),
+      cellClassName: "font-mono text-xs whitespace-normal",
+      cell: (s) => {
+        const revealed = revealedOf(s);
+        const isRevealed = revealed !== null;
+        const canEdit = s.source === "literal" && isRevealed;
+        const editing = editingId === s.id || rotatingId === s.id;
+        return editing && canEdit ? (
           <InlineValueEditor
             initial={revealed ?? ""}
             busy={busy}
-            onSave={onSave}
+            onSave={(value) => onInlineSave(s, value)}
             onCancel={onCancelEdit}
           />
         ) : isRevealed ? (
           <ValueRevealed
-            value={revealed!}
+            value={revealed}
             canEdit={s.source === "literal"}
-            onStartEdit={onStartEdit}
+            onStartEdit={() => onStartEdit(s)}
           />
         ) : (
-          <span className="text-muted-foreground select-none">••••••••</span>
-        )}
-      </TableCell>
-      <TableCell>
-        <Badge variant={SOURCE_TONE[s.source] ?? "outline"}>
-          {SOURCE_LABEL[s.source] ?? s.source}
-        </Badge>
-        {s.bundleSlug && (
-          <span className="text-muted-foreground text-2xs ml-2 font-mono">{s.bundleSlug}</span>
-        )}
-        {s.managedServiceKind && (
-          <span className="text-muted-foreground text-2xs ml-2 font-mono">
-            {s.managedServiceKind}
+          <span className="text-muted-foreground select-none" aria-label={t("reveal.masked")}>
+            ••••••••
           </span>
-        )}
-      </TableCell>
-      <TableCell>
-        <Badge variant="outline" className="text-2xs font-mono">
+        );
+      },
+    },
+    {
+      id: "source",
+      header: t("columns.source"),
+      cellClassName: "whitespace-normal",
+      cell: (s) => (
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <Badge variant={SOURCE_TONE[s.source] ?? "outline"}>
+            {SOURCE_LABEL[s.source] ?? s.source}
+          </Badge>
+          {s.bundleSlug && (
+            <span className="text-muted-foreground text-2xs min-w-0 font-mono [overflow-wrap:anywhere]">
+              {s.bundleSlug}
+            </span>
+          )}
+          {s.managedServiceKind && (
+            <span className="text-muted-foreground text-2xs font-mono">{s.managedServiceKind}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "env",
+      header: t("columns.env"),
+      cell: (s) => (
+        <Badge variant="outline" className="text-2xs max-w-48 truncate font-mono">
           {s.environmentName || "—"}
         </Badge>
-      </TableCell>
-      <TableCell className="text-muted-foreground text-xs">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">
-              {s.lastEditedAt ? new Date(s.lastEditedAt).toLocaleString() : "—"}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{lastEditedTooltip}</TooltipContent>
-        </Tooltip>
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="inline-flex items-center gap-1">
-          {s.source === "literal" && (
+      ),
+    },
+    {
+      id: "edited",
+      header: t("columns.lastEdited"),
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (s) => {
+        const editorName = s.lastEditedBy?.displayName || s.lastEditedBy?.username;
+        const setViaLabel = SET_VIA_LABEL[s.setVia ?? "web"] ?? s.setVia ?? "web";
+        // "edited by X · set via Y"; the "by X" half drops when the writer
+        // is unknown (backfilled rows).
+        const tip = editorName
+          ? `${t("lastEditedBy", { name: editorName })} · set via ${setViaLabel}`
+          : `${t("lastEditedByUnknown")} · set via ${setViaLabel}`;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help">
+                {s.lastEditedAt ? new Date(s.lastEditedAt).toLocaleString() : "—"}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{tip}</TooltipContent>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("columns.actions")}</span>,
+      align: "right",
+      width: "w-40",
+      cell: (s) => {
+        const revealed = revealedOf(s);
+        const isRevealed = revealed !== null;
+        const canEdit = s.source === "literal" && isRevealed;
+        const editing = editingId === s.id || rotatingId === s.id;
+        if (s.source !== "literal") return null;
+        return (
+          <div className="inline-flex items-center gap-1">
             <Can permission="secret.read">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={onToggleReveal}
-                    disabled={busy || revealing}
-                    aria-pressed={isRevealed}
-                  >
-                    {revealing ? (
-                      <Loader2Icon className="size-4 animate-spin" />
-                    ) : isRevealed ? (
-                      <EyeOffIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                    <span className="sr-only">
-                      {isRevealed ? t("reveal.hide") : t("reveal.show")}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isRevealed ? t("reveal.hide") : t("reveal.show")}</TooltipContent>
-              </Tooltip>
+              <IconAction
+                label={isRevealed ? t("reveal.hide") : t("reveal.show")}
+                onClick={() => onToggleReveal(s)}
+                disabled={busy || revealingId === s.id}
+                pressed={isRevealed}
+              >
+                {revealingId === s.id ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : isRevealed ? (
+                  <EyeOffIcon className="size-4" />
+                ) : (
+                  <EyeIcon className="size-4" />
+                )}
+              </IconAction>
             </Can>
-          )}
-          {/* #714 — Rotate button. Same flow as Edit (opens
-              InlineValueEditor) but routes save → rotateAppSecret so
-              the audit log carries action='app.secret.rotate'. Only
-              shown for revealed literal secrets to match Edit's
-              precondition. */}
-          {canEdit && (
-            <Can permission="app.deploy">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={onStartRotate}
-                    disabled={busy || editing}
-                    aria-pressed={isRotateMode}
-                  >
-                    <RotateCwIcon className="size-4" />
-                    <span className="sr-only">Rotate</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Rotate (distinct from edit in the audit log)</TooltipContent>
-              </Tooltip>
-            </Can>
-          )}
-          {/* #714 — History popover. Lazily fetches the per-key audit
-              timeline on open; renders newest-first list with actor,
-              action, timestamp. */}
-          {s.source === "literal" && (
+            {/* #714: Rotate edits like Edit but saves through rotateAppSecret,
+                so the audit log says app.secret.rotate. Revealed literals only,
+                as Edit. */}
+            {canEdit && (
+              <Can permission="app.deploy">
+                <IconAction
+                  label="Rotate"
+                  tooltip="Rotate (distinct from edit in the audit log)"
+                  onClick={() => onStartRotate(s)}
+                  disabled={busy || editing}
+                  pressed={rotatingId === s.id}
+                >
+                  <RotateCwIcon className="size-4" />
+                </IconAction>
+              </Can>
+            )}
+            {/* #714: the key's audit timeline, in a side sheet; its query runs only while open. */}
             <Can permission="secret.read">
-              <Popover open={historyOpen} onOpenChange={onToggleHistory}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        aria-pressed={historyOpen}
-                      >
-                        <HistoryIcon className="size-4" />
-                        <span className="sr-only">History</span>
-                      </Button>
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Audit history for this key</TooltipContent>
-                </Tooltip>
-                <PopoverContent align="end" className="w-96 p-0">
-                  {historyOpen && history}
-                </PopoverContent>
-              </Popover>
+              <IconAction
+                label="History"
+                tooltip="Audit history for this key"
+                onClick={() => onOpenHistory(s)}
+                pressed={historyId === s.id}
+              >
+                <HistoryIcon className="size-4" />
+              </IconAction>
             </Can>
-          )}
-          {s.source === "literal" && (
             <Can permission="app.deploy">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={onRequestDelete}
-                    disabled={busy}
-                  >
-                    <Trash2Icon className="size-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("delete.confirm")}</TooltipContent>
-              </Tooltip>
+              <IconAction
+                label={t("delete.confirm")}
+                onClick={() => onRequestDelete(s)}
+                disabled={busy}
+              >
+                <Trash2Icon className="size-4" />
+              </IconAction>
             </Can>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
+          </div>
+        );
+      },
+    },
+  ];
+}
+
+function IconAction({
+  label,
+  tooltip,
+  onClick,
+  disabled,
+  pressed,
+  children,
+}: {
+  label: string;
+  tooltip?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  pressed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={onClick}
+          disabled={disabled}
+          aria-pressed={pressed}
+          aria-label={label}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip ?? label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -782,7 +809,7 @@ function InlineValueEditor({
   );
 }
 
-function AttachedBundlesSection({
+function AttachedBundlesPanel({
   loading,
   attachments,
   onDetach,
@@ -794,101 +821,111 @@ function AttachedBundlesSection({
   busy: boolean;
 }) {
   const t = useTranslations("apps.secrets.attached");
+  const controller = React.useMemo(() => {
+    const base = staticController(attachments);
+    return loading ? { ...base, state: "loading" as const } : base;
+  }, [attachments, loading]);
+
+  const columns: Column<AppSecretBundleAttachment>[] = [
+    {
+      id: "bundle",
+      header: t("columns.bundle"),
+      cellClassName: "whitespace-normal",
+      cell: (a) => (
+        <span className="flex min-w-0 flex-wrap items-baseline gap-2 font-mono text-xs">
+          <span className="min-w-0 [overflow-wrap:anywhere]">{a.bundleName}</span>
+          <span className="text-muted-foreground text-2xs min-w-0 [overflow-wrap:anywhere]">
+            {a.bundleSlug}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "team",
+      header: t("columns.team"),
+      cell: (a) =>
+        a.teamSlug ? (
+          <Badge variant="outline" className="text-2xs max-w-48 truncate font-mono">
+            {a.teamSlug}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">{t("noTeam")}</span>
+        ),
+    },
+    {
+      id: "env",
+      header: t("columns.env"),
+      cell: (a) => (
+        <Badge variant="outline" className="text-2xs max-w-48 truncate font-mono">
+          {t("perEnvBadge", { env: a.environmentName })}
+        </Badge>
+      ),
+    },
+    {
+      id: "prefix",
+      header: t("columns.prefix"),
+      cellClassName: "font-mono text-xs",
+      cell: (a) => a.prefix || <span className="text-muted-foreground">{t("noPrefix")}</span>,
+    },
+    {
+      id: "keys",
+      header: t("columns.keys"),
+      cellClassName: "font-mono text-xs tabular-nums",
+      cell: (a) => (a.keyCount > 0 ? a.keyCount : t("keyCountUnknown")),
+    },
+    {
+      id: "order",
+      header: t("columns.order"),
+      cell: (a) => (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="secondary" className="font-mono">
+              {a.mergeOrder}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>{t("orderHint")}</TooltipContent>
+        </Tooltip>
+      ),
+    },
+    {
+      id: "attached",
+      header: t("columns.attached"),
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (a) => (a.attachedAt ? new Date(a.attachedAt).toLocaleString() : "—"),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("detach")}</span>,
+      align: "right",
+      cell: (a) => (
+        <Can permission="app.deploy">
+          <Button variant="ghost" size="sm" onClick={() => onDetach(a)} disabled={busy}>
+            {t("detach")}
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <LayersIcon className="size-4" />
-              {t("title")}
-            </h2>
-            <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : attachments.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t("empty")}</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("columns.bundle")}</TableHead>
-                <TableHead>{t("columns.team")}</TableHead>
-                <TableHead>{t("columns.env")}</TableHead>
-                <TableHead>{t("columns.prefix")}</TableHead>
-                <TableHead>{t("columns.keys")}</TableHead>
-                <TableHead>{t("columns.order")}</TableHead>
-                <TableHead>{t("columns.attached")}</TableHead>
-                <TableHead className="w-12 text-right" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {attachments.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-mono text-xs">
-                    {a.bundleName}
-                    <span className="text-muted-foreground text-2xs ml-2">{a.bundleSlug}</span>
-                  </TableCell>
-                  <TableCell>
-                    {a.teamSlug ? (
-                      <Badge variant="outline" className="text-2xs font-mono">
-                        {a.teamSlug}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">{t("noTeam")}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-2xs font-mono">
-                      {t("perEnvBadge", { env: a.environmentName })}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {a.prefix ? (
-                      a.prefix
-                    ) : (
-                      <span className="text-muted-foreground">{t("noPrefix")}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {a.keyCount > 0 ? a.keyCount : t("keyCountUnknown")}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant="secondary" className="font-mono">
-                            {a.mergeOrder}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("orderHint")}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {a.attachedAt ? new Date(a.attachedAt).toLocaleString() : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Can permission="app.deploy">
-                      <Button variant="ghost" size="sm" onClick={() => onDetach(a)} disabled={busy}>
-                        {t("detach")}
-                      </Button>
-                    </Can>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+    <Panel
+      title={t("title")}
+      icon={<LayersIcon className="size-4" />}
+      description={t("description")}
+      flush
+    >
+      <TooltipProvider delayDuration={200}>
+        <DataTable
+          chrome="table"
+          className="[&>div]:rounded-none [&>div]:border-0"
+          label={t("title")}
+          controller={controller}
+          columns={columns}
+          getRowId={(a) => a.id}
+          empty={{ icon: <LayersIcon className="size-5" />, title: t("empty") }}
+        />
+      </TooltipProvider>
+    </Panel>
   );
 }
 

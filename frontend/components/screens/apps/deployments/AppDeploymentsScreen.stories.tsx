@@ -1,121 +1,150 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
+import { PendingDeploymentsView } from "../controls/PendingDeployments";
+import { PENDING } from "../controls/app-controls.fixtures";
+import { appDeploymentsList } from "./app-deployments-list";
 import {
   ACTIONS,
   COMPARE,
   DEPLOY_LONG,
-  DEPLOY_RUNNING,
-  DETAIL,
-  DETAIL_LONG,
-  LONG,
+  DEPLOYMENTS,
   SCREEN,
 } from "./app-deployments-logs.fixtures";
-import type { StatusBucket } from "./app-deployments-format";
 import { AppDeploymentsScreen, type AppDeploymentsScreenProps } from "./AppDeploymentsScreen";
 import { CompareDeploymentsSheetView } from "./CompareDeploymentsSheet";
-import { DeploymentExpandPanelView } from "./DeploymentExpandPanel";
-import { DeploymentRowActionsView } from "./DeploymentRowActions";
+import { DeploymentActionDialog, DeploymentRowMenuItems } from "./DeploymentRowActions";
 
+/** An app's Deployments tab: the embedded list (spec 44 §4.4, §5.1). */
 const meta: Meta = {
   title: "Screens/Apps/Deployments/AppDeploymentsScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-const slots: Pick<
-  AppDeploymentsScreenProps,
-  "renderRowActions" | "renderExpandPanel" | "renderCompare"
-> = {
-  renderRowActions: (d) => <DeploymentRowActionsView {...ACTIONS} deployment={d} />,
-  renderExpandPanel: (d, onClose) => (
-    <DeploymentExpandPanelView
-      {...(d.id === DEPLOY_LONG.id ? DETAIL_LONG : DETAIL)}
-      deployment={d}
-      onClose={onClose}
-    />
-  ),
-  renderCompare: (args) => <CompareDeploymentsSheetView {...COMPARE} {...args} />,
-};
+const DEF = appDeploymentsList(["prod", "stg"]);
 
-/** Holds the URL-backed filters and open row in state, the way the hook does. */
-function Controlled(props: AppDeploymentsScreenProps) {
-  const [statusBucket, setStatusBucket] = React.useState<StatusBucket>(props.statusBucket);
-  const [envFilter, setEnvFilter] = React.useState(props.envFilter);
-  const [search, setSearch] = React.useState(props.search);
-  const [openId, setOpenId] = React.useState<string | null>(props.openId);
+type Props = Partial<Omit<AppDeploymentsScreenProps, "list">> & { initial?: Partial<ListState> };
+
+function Deployments({ initial, ...props }: Props) {
+  const list = useLocalListState(DEF, initial);
   return (
     <AppDeploymentsScreen
+      {...SCREEN}
+      list={list}
+      renderRowActions={(d, request) => (
+        <DeploymentRowMenuItems deployment={d} actions={ACTIONS} onRequest={request} />
+      )}
+      renderActionDialog={(target, onClose) => (
+        <DeploymentActionDialog
+          target={target}
+          appSlug="storefront"
+          onClose={onClose}
+          actions={ACTIONS}
+        />
+      )}
+      renderCompare={(args) => <CompareDeploymentsSheetView {...COMPARE} {...args} />}
       {...props}
-      {...slots}
-      statusBucket={statusBucket}
-      setStatusBucket={setStatusBucket}
-      envFilter={envFilter}
-      setEnvFilter={setEnvFilter}
-      search={search}
-      setSearch={setSearch}
-      openId={openId}
-      setOpenId={setOpenId}
-      toggleOpen={(id) => setOpenId((cur) => (cur === id ? null : id))}
     />
   );
 }
 
-/** Stats, filters, every row state, and the running deploy opened. */
-export const Full: Story = {
-  render: () => <Controlled {...SCREEN} openId={DEPLOY_RUNNING.id} />,
+/** Every row state, newest first, with the view picker in the filter bar. */
+export const Full: Story = { render: () => <Deployments /> };
+
+/** Approvals waiting on the viewer sit in a panel above the list. */
+export const WithApprovals: Story = {
+  render: () => (
+    <Deployments approvals={<PendingDeploymentsView {...PENDING} onlyForApprovers />} />
+  ),
 };
 
 /** Selecting two rows enables Compare. */
 export const CompareSelection: Story = {
-  render: () => <Controlled {...SCREEN} />,
+  render: () => <Deployments />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const boxes = await canvas.findAllByRole("checkbox", { name: /^Select sha-/ });
-    await userEvent.click(boxes[0]);
+    const boxes = await canvas.findAllByRole("checkbox", { name: /select/i });
+    // The first box is the page's select-all; pick two rows.
     await userEvent.click(boxes[1]);
-    await expect(canvas.getByText("2 selected")).toBeInTheDocument();
+    await userEvent.click(boxes[2]);
+    await expect(canvas.getByRole("button", { name: /^Compare$/ })).toBeEnabled();
   },
 };
 
 export const Loading: Story = {
-  render: () => <AppDeploymentsScreen {...SCREEN} app={null} loading />,
-};
-
-/** The app loaded; its deployments are still on the way. */
-export const DeploymentsLoading: Story = {
-  render: () => <AppDeploymentsScreen {...SCREEN} deployments={[]} deploymentsLoading />,
+  render: () => <Deployments rows={[]} loading nextCursor={null} totalCount={null} />,
 };
 
 export const Empty: Story = {
-  render: () => <AppDeploymentsScreen {...SCREEN} deployments={[]} />,
+  render: () => <Deployments rows={[]} nextCursor={null} totalCount={0} />,
 };
 
-/** Filters match nothing. */
-export const NoMatches: Story = {
-  render: () => <AppDeploymentsScreen {...SCREEN} {...slots} search="no-such-tag" />,
+/** A view with nothing in it: the view's own empty copy, not the create action. */
+export const EmptyView: Story = {
+  render: () => <Deployments rows={[]} nextCursor={null} initial={{ view: "waiting" }} />,
 };
 
-/**
- * The screen has no error state of its own: a failed app query lands on
- * not found, a failed deployments query on the empty table. Not found is
- * the closest.
- */
-export const NotFound: Story = {
-  render: () => <AppDeploymentsScreen {...SCREEN} slug="no-such-app" app={null} />,
+/** Chips and search match nothing. */
+export const EmptyFiltered: Story = {
+  render: () => (
+    <Deployments
+      rows={[]}
+      nextCursor={null}
+      initial={{ q: "no-such-tag", filters: { env: "stg" } }}
+    />
+  ),
 };
 
+export const Error: Story = {
+  render: () => (
+    <Deployments
+      rows={[]}
+      error={{ message: "upstream timed out after 30s (astroliftDeploymentsPage)" }}
+    />
+  ),
+};
+
+/** Mine is applied per page, and says so under the bar. */
+export const Mine: Story = {
+  render: () => (
+    <Deployments
+      rows={DEPLOYMENTS.slice(0, 2).map((d) => ({ ...d, triggeredByMe: true }))}
+      totalCount={null}
+      initial={{ view: "mine" }}
+    />
+  ),
+};
+
+export const NewRows: Story = {
+  render: () => <Deployments newRows={{ count: 3, onReveal: () => {} }} />,
+};
+
+/** A 64-char SHA, a 200-char tag and an unbroken URL never widen the page. */
 export const LongStrings: Story = {
   render: () => (
-    <Controlled
-      {...SCREEN}
-      app={{ name: LONG, slug: LONG }}
-      deployments={[DEPLOY_LONG, ...SCREEN.deployments]}
-      environments={[{ name: "prod" }, { name: DEPLOY_LONG.environmentName }]}
-      openId={DEPLOY_LONG.id}
+    <Deployments
+      rows={[
+        {
+          ...DEPLOY_LONG,
+          commitSha: "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          commitMessage: `https://example.com/${"a".repeat(200)}`,
+        },
+        ...DEPLOYMENTS,
+      ]}
     />
+  ),
+};
+
+/** The narrowest the web console goes (spec 44 §6): the table scrolls in its frame. */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Deployments rows={[DEPLOY_LONG, ...DEPLOYMENTS]} />
+    </div>
   ),
 };

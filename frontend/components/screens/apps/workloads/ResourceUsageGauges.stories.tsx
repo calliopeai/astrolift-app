@@ -42,3 +42,15 @@ export const LongStrings: Story = {
     },
   },
 };
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  args: USAGE_OVER,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 768 }}>
+        <Story />
+      </div>
+    ),
+  ],
+};

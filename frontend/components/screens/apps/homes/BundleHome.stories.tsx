@@ -39,3 +39,11 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <BundleHomeScreen {...BUNDLE} />
+    </div>
+  ),
+};

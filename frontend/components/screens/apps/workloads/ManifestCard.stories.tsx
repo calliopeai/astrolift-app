@@ -43,3 +43,15 @@ export const LongStrings: Story = {
     },
   },
 };
+
+/** The narrowest the web console goes (spec 44 §6): long lines scroll inside the panel. */
+export const Width768: Story = {
+  args: MANIFEST,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 768 }} className="overflow-hidden">
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -13,13 +13,12 @@ import * as React from "react";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyBadge } from "@/components/CopyBadge";
-import { DataTable, type Column } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { type Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,7 +29,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   AstroliftPreviewEnvironment,
@@ -43,8 +41,6 @@ import { isStale, STALE_DAYS, type useAppPreviews } from "./use-app-previews";
 export type AppPreviewsScreenProps = ReturnType<typeof useAppPreviews> & {
   /** Where "Enable previews" sends the operator: this app's config tab. */
   configHref: string;
-  /** The app detail tab row. */
-  tabs?: React.ReactNode;
 };
 
 const statusToDot: Record<PreviewStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
@@ -165,18 +161,27 @@ function CreatePreviewSheet({
 }
 
 /**
- * App previews tab: the per-PR (and manual) preview environments, their
- * TTL countdowns, footprint and spend, with create / extend / tear-down.
+ * The Previews view of an app's Deployments tab (spec 44 §4.4, §5.1): the
+ * per-PR (and manual) preview environments on the embedded list, sharing
+ * the deployments list's view picker, with their TTL countdowns, footprint
+ * and spend. Extend and tear down sit in each row's `⋯`; Create preview
+ * leads the toolbar. Pure.
  */
 export function AppPreviewsScreen({
-  slug,
   app: a,
-  loading,
   list,
+  rows,
+  newRows,
+  pageLoading,
+  pageError,
+  onRetry,
+  nextCursor,
+  totalCount,
+  previewCount,
   counts,
   spend,
-  stale,
-  table,
+  stalePreviews,
+  canDeploy,
   tearingDown,
   extending,
   creating,
@@ -184,91 +189,76 @@ export function AppPreviewsScreen({
   onTearDown: handleTearDown,
   onCreate,
   configHref,
-  tabs,
 }: AppPreviewsScreenProps) {
-  const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.previews");
 
   const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
     null
   );
 
-  // Live countdown ticker. Re-renders every 60s — that's the right
-  // cadence for "5d 3h" granularity; faster updates would flash the
-  // column without changing anything operators care about.
+  // Live countdown ticker. Re-renders every 60s: that's the right cadence
+  // for "5d 3h" granularity; faster updates would flash the column without
+  // changing anything operators care about.
   const [now, setNow] = React.useState<number>(() => Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  if (loading && !a) {
-    return (
-      <PageShell title={tCommon("loading")}>
-        <Skeleton className="h-32 w-full" />
-      </PageShell>
-    );
-  }
-
-  if (!a) {
-    return (
-      <PageShell title={tCommon("notFound")}>
-        <EmptyState
-          icon={<AlertTriangleIcon className="size-5" />}
-          title={tCommon("notFoundSlug", { slug })}
-          description={tCommon("notFoundDescription")}
-          actionHref="/apps"
-          actionLabel={tCommon("backToApps")}
-        />
-      </PageShell>
-    );
-  }
+  const enabled = a?.previewEnabled ?? true;
 
   const columns: Column<AstroliftPreviewEnvironment>[] = [
     {
-      id: "health",
-      header: <span className="sr-only">{t("columns.status")}</span>,
-      width: "w-6",
-      cell: (p) => <StatusDot status={statusToDot[p.status]} />,
-    },
-    {
       id: "pr",
       header: t("columns.pr"),
+      cellClassName: "max-w-72",
       cell: (p) => (
-        <>
-          {p.prNumber > 0 ? (
-            p.prUrl ? (
-              <a
-                href={p.prUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium hover:underline"
-                title={t("openPr", { pr: p.prNumber })}
+        <div className="flex min-w-0 items-start gap-2">
+          <StatusDot status={statusToDot[p.status]} className="mt-1.5 shrink-0" />
+          <div className="flex min-w-0 flex-col">
+            <span className="flex min-w-0 items-center gap-1">
+              {p.prNumber > 0 ? (
+                p.prUrl ? (
+                  <a
+                    href={p.prUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 font-mono font-medium hover:underline"
+                    title={t("openPr", { pr: p.prNumber })}
+                  >
+                    #{p.prNumber}
+                  </a>
+                ) : (
+                  <span className="shrink-0 font-mono font-medium">#{p.prNumber}</span>
+                )
+              ) : null}
+              <span
+                className={cn(
+                  "truncate font-mono text-xs",
+                  p.prNumber > 0 ? "text-muted-foreground" : "font-medium"
+                )}
+                title={p.branch}
               >
-                #{p.prNumber}
-              </a>
-            ) : (
-              <span className="font-medium">#{p.prNumber}</span>
-            )
-          ) : (
-            <span className="font-medium">{p.branch}</span>
-          )}
-          {p.prNumber > 0 && <span className="text-muted-foreground"> · {p.branch}</span>}
-          <div className="text-muted-foreground font-mono text-xs">
-            ns {p.namespace}
-            {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
+                {p.branch}
+              </span>
+              {p.isManual && (
+                <Badge variant="outline" className="text-2xs shrink-0 uppercase">
+                  manual
+                </Badge>
+              )}
+            </span>
+            <span className="text-muted-foreground truncate font-mono text-xs" title={p.namespace}>
+              ns {p.namespace}
+              {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
+            </span>
           </div>
-          {p.isManual && (
-            <Badge variant="outline" className="text-2xs mt-1 uppercase">
-              manual
-            </Badge>
-          )}
-        </>
+        </div>
       ),
     },
     {
       id: "hostname",
       header: t("columns.hostname"),
+      cellClassName: "relative z-10 max-w-72",
       cell: (p) =>
         p.status === "running" ? (
           <CopyBadge
@@ -278,62 +268,46 @@ export function AppPreviewsScreen({
             title={t("copyHostname")}
           />
         ) : (
-          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
+          <span
+            className="text-muted-foreground block truncate font-mono text-xs"
+            title={p.hostname}
+          >
+            {p.hostname}
+          </span>
         ),
     },
     {
       id: "ttl",
       header: t("columns.ttl"),
+      cellClassName: "relative z-10",
       cell: (p) => {
         if (p.status === "torn_down") {
           return <span className="text-muted-foreground text-xs">—</span>;
         }
         const countdown = formatCountdown(p.ttlUntil, now);
-        const ttlDate = new Date(p.ttlUntil);
         return (
-          <div className="flex flex-col gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "font-mono text-xs",
-                    countdown.expired ? "text-danger-fg" : "text-muted-foreground"
-                  )}
-                >
-                  {countdown.label}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{t("ttlTooltip", { date: ttlDate.toLocaleString() })}</TooltipContent>
-            </Tooltip>
-            <Can permission="app.deploy">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  disabled={extending}
-                  onClick={() => handleExtend(p, 1)}
-                >
-                  {t("extend.1d")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  disabled={extending}
-                  onClick={() => handleExtend(p, 7)}
-                >
-                  {t("extend.7d")}
-                </Button>
-              </div>
-            </Can>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className={cn(
+                  "font-mono text-xs",
+                  countdown.expired ? "text-danger-fg" : "text-muted-foreground"
+                )}
+              >
+                {countdown.label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("ttlTooltip", { date: new Date(p.ttlUntil).toLocaleString() })}
+            </TooltipContent>
+          </Tooltip>
         );
       },
     },
     {
       id: "footprint",
       header: t("columns.footprint"),
+      cellClassName: "relative z-10",
       cell: (p) => {
         const aggregate = p.aggregateResources;
         if (aggregate.podCount === 0) {
@@ -343,7 +317,7 @@ export function AppPreviewsScreen({
         return (
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="cursor-default">
+              <div className="cursor-default font-mono">
                 <div className="text-xs">
                   {formatCpuCores(aggregate.cpuCores)} · {formatMemoryBytes(aggregate.memoryBytes)}
                 </div>
@@ -372,7 +346,7 @@ export function AppPreviewsScreen({
     {
       id: "lastDeploy",
       header: t("columns.lastDeploy"),
-      cellClassName: "text-muted-foreground text-sm",
+      cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
       cell: (p) => (
         <>
           {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
@@ -387,152 +361,105 @@ export function AppPreviewsScreen({
     {
       id: "status",
       header: t("columns.status"),
-      cell: (p) => (
-        <Badge variant="secondary" className="capitalize">
-          {p.status.replace(/_/g, " ")}
-        </Badge>
-      ),
-    },
-    {
-      id: "actions",
-      header: t("columns.actions"),
-      align: "right",
-      width: "w-32",
-      cell: (p) =>
-        p.status === "torn_down" ? null : (
-          <Can permission="app.deploy">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={tearingDown}
-              onClick={() => setTearDownTarget(p)}
-            >
-              <TrashIcon className="size-3" /> {t("tearDown")}
-            </Button>
-          </Can>
-        ),
+      cellClassName: "font-mono text-xs",
+      cell: (p) => p.status.replace(/_/g, " "),
     },
   ];
 
-  return (
-    <PageShell
-      title={t("title", { name: a.name })}
-      description={
-        <span className="text-muted-foreground font-mono text-xs">
-          {t("description", { slug: a.slug, subdomain: a.subdomain })}
-        </span>
-      }
-    >
-      {tabs}
+  const rowActions = canDeploy
+    ? (p: AstroliftPreviewEnvironment) =>
+        p.status === "torn_down" ? (
+          <DropdownMenuItem disabled>Torn down: nothing to change</DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem disabled={extending} onSelect={() => void handleExtend(p, 1)}>
+              <CalendarClockIcon className="size-4" />
+              Extend TTL {t("extend.1d")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={extending} onSelect={() => void handleExtend(p, 7)}>
+              <CalendarClockIcon className="size-4" />
+              Extend TTL {t("extend.7d")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={tearingDown}
+              onSelect={() => setTearDownTarget(p)}
+            >
+              <TrashIcon className="size-4" />
+              {t("tearDown")}
+            </DropdownMenuItem>
+          </>
+        )
+    : undefined;
 
-      <div className="flex justify-end">
-        <CreatePreviewSheet disabled={!a.previewEnabled} creating={creating} onCreate={onCreate} />
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-4">
+      {a && !enabled && (
+        <Notice
+          icon={<AlertTriangleIcon className="size-4" />}
+          title={t("disabled.title")}
+          description={t("disabled.description")}
+        />
+      )}
+
+      {stalePreviews.length > 0 && (
+        <Notice
+          icon={<CalendarClockIcon className="size-4" />}
+          title={t("stale.title", { count: stalePreviews.length })}
+          description={t("stale.description", { days: STALE_DAYS })}
+        />
+      )}
+
+      <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+        <span className="text-muted-foreground font-mono text-xs">
+          {t("groupSummary", {
+            running: counts.running,
+            failed: counts.failed,
+            tornDown: counts.tornDown,
+          })}
+        </span>
+        {/* #660: preview spend roll-up, only when at least one live preview is priced. */}
+        {spend.liveCount > 0 && (spend.priced > 0 || spend.unpriced > 0) && (
+          <SpendSummary spend={spend} />
+        )}
+        <div className="ml-auto">
+          <CreatePreviewSheet disabled={!enabled} creating={creating} onCreate={onCreate} />
+        </div>
       </div>
 
-      {!a.previewEnabled && (
-        <Card className="border-warning-border bg-warning/5">
-          <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4" />
-            <div className="flex-1">
-              <CardTitle className="text-sm">{t("disabled.title")}</CardTitle>
-              <CardDescription>{t("disabled.description")}</CardDescription>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
-
-      {stale.length > 0 && (
-        <Card className="border-warning-border bg-warning/5">
-          <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <CalendarClockIcon className="text-warning-fg mt-0.5 size-4" />
-            <div className="flex-1">
-              <CardTitle className="text-sm">{t("stale.title", { count: stale.length })}</CardTitle>
-              <CardDescription>{t("stale.description", { days: STALE_DAYS })}</CardDescription>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
-
-      {/* #660 — monthly preview spend roll-up.  Only renders when at
-          least one live preview is priced.  Surfaces dailyTotal +
-          monthly projection + an unpriced-count caveat so the
-          operator knows the figure is partial when drivers haven't
-          returned a price. */}
-      {spend.liveCount > 0 && (spend.priced > 0 || spend.unpriced > 0) && (
-        <Card className="border-muted">
-          <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-4 text-sm">
-            <div>
-              <span className="text-muted-foreground text-xs">Daily spend</span>
-              <div className="font-mono text-lg">
-                ${spend.dailyTotal.toFixed(2)}
-                <span className="text-muted-foreground ml-1 text-xs">/ day</span>
-              </div>
-            </div>
-            <div>
-              <span className="text-muted-foreground text-xs">This month (projected)</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-lg">${spend.monthlyProjection.toFixed(2)}</span>
-                {spend.approximate > 0 && (
-                  <Badge variant="outline" className="text-2xs gap-1 uppercase">
-                    <AlertTriangleIcon className="size-3" />
-                    approximate
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="text-muted-foreground ml-auto text-xs">
-              {spend.priced} of {spend.liveCount} previews priced
-              {spend.unpriced > 0 && ` · ${spend.unpriced} not priced by this cluster's driver`}
-              {spend.approximate > 0 &&
-                ` · ${spend.approximate} priced by summing every SKU in the service, so the total is an over-count`}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <TooltipProvider delayDuration={200}>
-        <DataTable
-          label="Preview environments"
-          controller={table}
+        <ListPage<AstroliftPreviewEnvironment>
+          embedded
+          list={list}
+          label="Previews"
           columns={columns}
+          rows={rows}
           getRowId={(p) => p.id}
-          searchPlaceholder="Search by branch, host, commit, or status…"
-          toolbar={
-            <span className="text-muted-foreground text-xs">
-              {t("groupSummary", {
-                running: counts.running,
-                failed: counts.failed,
-                tornDown: counts.tornDown,
-              })}
-            </span>
-          }
+          rowActions={rowActions}
+          loading={pageLoading || !a}
+          error={pageError}
+          onRetry={onRetry}
+          nextCursor={nextCursor}
+          totalCount={totalCount}
+          newRows={newRows}
           empty={{
             icon: <GitPullRequestIcon className="size-5" />,
             title: t("empty.title"),
-            description: a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint"),
-            actionHref: a.previewEnabled ? (a.sourceUrl ?? undefined) : configHref,
-            actionLabel: a.previewEnabled
-              ? a.sourceUrl
-                ? t("openRepo")
-                : undefined
-              : t("enablePreviews"),
+            description: enabled ? t("empty.enabledHint") : t("empty.disabledHint"),
+            actionHref: enabled ? (a?.sourceUrl ?? undefined) : configHref,
+            actionLabel: enabled ? (a?.sourceUrl ? t("openRepo") : undefined) : t("enablePreviews"),
             learnMoreHref: DOCS_PREVIEWS_HREF,
             learnMoreLabel: t("empty.learnMore"),
-          }}
-          emptyFiltered={{
-            title: "No matching previews",
-            description:
-              "No preview matches that branch, hostname, commit, or status. Clear the search to see every preview for this app.",
           }}
         />
       </TooltipProvider>
 
-      {/* The onboarding steps used to ride along inside the empty state's
-          `secondary` slot, which DataTable's EmptyStateSpec has no room
-          for — so they follow the table while it is showing that state. */}
-      {table.state === "empty" && <EmptyStateSteps />}
+      {/* The onboarding steps follow the list while it is genuinely empty. */}
+      {a && !pageLoading && !pageError && previewCount === 0 && rows.length === 0 && (
+        <EmptyStateSteps />
+      )}
 
-      {list.length > 0 && (
+      {a && previewCount > 0 && (
         <p className="text-muted-foreground text-center text-xs">
           {t("footer", {
             count: a.previewMaxActive,
@@ -565,7 +492,64 @@ export function AppPreviewsScreen({
           if (tearDownTarget) await handleTearDown(tearDownTarget);
         }}
       />
-    </PageShell>
+    </div>
+  );
+}
+
+/** A warning strip above the list: previews off, or stale previews to sweep. */
+function Notice({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div
+      role="status"
+      className="border-warning-border bg-warning/5 flex min-w-0 items-start gap-3 rounded-md border px-4 py-3"
+    >
+      <span className="text-warning-fg mt-0.5 shrink-0" aria-hidden>
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-medium [overflow-wrap:anywhere]">{title}</p>
+        <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Daily spend, the month's projection, and how much of it is priced. */
+function SpendSummary({ spend }: { spend: AppPreviewsScreenProps["spend"] }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+      <span>
+        <span className="text-muted-foreground">Daily spend </span>
+        <span className="font-mono">${spend.dailyTotal.toFixed(2)}</span>
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="text-muted-foreground">This month (projected) </span>
+        <span className="font-mono">${spend.monthlyProjection.toFixed(2)}</span>
+        {spend.approximate > 0 && (
+          <Badge variant="outline" className="text-2xs gap-1 uppercase">
+            <AlertTriangleIcon className="size-3" />
+            approximate
+          </Badge>
+        )}
+      </span>
+      <span className="text-muted-foreground min-w-0 [overflow-wrap:anywhere]">
+        <span className="font-mono">
+          {spend.priced} of {spend.liveCount}
+        </span>{" "}
+        previews priced
+        {spend.unpriced > 0 && ` · ${spend.unpriced} not priced by this cluster's driver`}
+        {spend.approximate > 0 &&
+          ` · ${spend.approximate} priced by summing every SKU in the service, so the total is an over-count`}
+      </span>
+    </div>
   );
 }
 

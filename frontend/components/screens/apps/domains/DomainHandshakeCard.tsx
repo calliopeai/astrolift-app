@@ -4,6 +4,7 @@ import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   CopyIcon,
+  GlobeIcon,
   Loader2Icon,
   PlusIcon,
   RefreshCwIcon,
@@ -16,10 +17,10 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { Panel } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,7 +46,7 @@ import type {
   WorkloadOption,
 } from "./use-app-domains";
 
-const CERT_TONE: Record<string, "ok" | "warn" | "error" | "pending"> = {
+export const CERT_TONE: Record<string, "ok" | "warn" | "error" | "pending"> = {
   validated: "ok",
   active: "ok",
   pending: "warn",
@@ -53,7 +54,7 @@ const CERT_TONE: Record<string, "ok" | "warn" | "error" | "pending"> = {
   failed: "error",
 };
 
-const CERT_LABEL_KEYS: Record<string, string> = {
+export const CERT_LABEL_KEYS: Record<string, string> = {
   pending: "awaiting",
   validating: "validating",
   validated: "validated",
@@ -68,7 +69,13 @@ const CERT_LABEL_KEYS: Record<string, string> = {
  * `failed` we show "Renewal failed" in destructive tone regardless of
  * the days-remaining count.
  */
-function CertExpiryBadge({ expiresAt, status }: { expiresAt: string | null; status: string }) {
+export function CertExpiryBadge({
+  expiresAt,
+  status,
+}: {
+  expiresAt: string | null;
+  status: string;
+}) {
   const [now] = React.useState(() => Date.now());
   if (status === "failed") {
     return (
@@ -122,7 +129,7 @@ function CertExpiryBadge({ expiresAt, status }: { expiresAt: string | null; stat
  * custom domain is outside it by construction. The badge exists because
  * the alternative was finding out by opening the URL.
  */
-function EdgeAuthBadge({ state }: { state?: string }) {
+export function EdgeAuthBadge({ state }: { state?: string }) {
   const t = useTranslations("apps.domains.cert");
   if (state !== "ungated") return null;
   return (
@@ -137,11 +144,11 @@ function EdgeAuthBadge({ state }: { state?: string }) {
 }
 
 // ─── DomainHandshakeCard (#397) ──────────────────────────────────────────
-// One card per CustomDomain row. Renders the operator-facing handshake:
-// the required DNS records + per-record propagation status. When the
-// parent zone is platform-managed the records still render but with
-// "Platform-managed" copy explaining the operator doesn't need to do
-// anything.
+// The picked domain's panel under the domains list (spec 44 §5.2). Until the
+// domain validates it is the pending-verification panel: the DNS records to
+// add, each in mono with a copy button, and their propagation. When the
+// parent zone is platform-managed the records still render, with copy saying
+// the operator has nothing to do. A validation error leads the panel.
 
 export interface DomainHandshakeCardProps {
   domain: AppDomain;
@@ -170,19 +177,19 @@ export function DomainHandshakeCard({
   const label = labelKey ? t(labelKey) : domain.certState;
   const records = domain.requiredDnsRecords ?? [];
   const allPropagated = records.length > 0 && records.every((r) => r.propagated);
+  const pending = domain.certState !== "validated";
+  const host = domain.isWildcard ? `*.${domain.hostname}` : domain.hostname;
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex flex-wrap items-baseline gap-3">
+    <Panel
+      title={pending ? t("pendingTitle") : t("detailTitle")}
+      icon={<GlobeIcon className="size-4" />}
+      description={
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
           <StatusDot status={tone} />
-          <code className="font-mono text-base">
-            {domain.isWildcard ? `*.${domain.hostname}` : domain.hostname}
-          </code>
+          <code className="text-foreground font-mono text-sm [overflow-wrap:anywhere]">{host}</code>
           <Badge variant="secondary">{label}</Badge>
-          {/* #682 — wildcard marker. Distinct from the cert-state badge
-              so an operator can scan the list and see at a glance which
-              domains cover a subtree vs a single host. */}
+          {/* #682: wildcard, apart from the cert state, so a subtree reads at a glance. */}
           {domain.isWildcard && (
             <Badge variant="outline" className="text-2xs">
               wildcard
@@ -193,60 +200,61 @@ export function DomainHandshakeCard({
               {t("platformZone")}
             </Badge>
           )}
-          {/* #731 — cert expiry badge. Hidden when the backend hasn't
-              read the cert yet (certExpiresAt null). Warning tone when
-              within 14d of expiry; danger tone when within 7d. */}
+          {/* #731: expiry, warning inside 14d, danger inside 7d. */}
           <CertExpiryBadge
             expiresAt={domain.certExpiresAt ?? null}
             status={domain.certObservabilityStatus ?? ""}
           />
-          {/* #1621 — gated on the managed subdomain, not here. */}
+          {/* #1621: gated on the managed subdomain, not here. */}
           <EdgeAuthBadge state={domain.edgeAuthState} />
-          <span className="text-muted-foreground ml-auto text-xs">
+          <span className="font-mono">
             {domain.lastCheckedAt
               ? t("lastChecked", { at: new Date(domain.lastCheckedAt).toLocaleString() })
               : t("notChecked")}
           </span>
-          <Can permission="app.deploy">
-            <Button size="sm" variant="ghost" onClick={onRecheck} disabled={busy}>
-              <RefreshCwIcon className="size-3.5" />
-              {t("recheck")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={onRemove}
-              disabled={busy}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">{t("remove")}</span>
-            </Button>
-          </Can>
-        </div>
-
-        {/* #682 — surface the operator-provided SNI cert ref. Empty
-            string means "platform-managed", which is already the
-            default messaging in CertStateBlock — don't render this row
-            in that case so the card stays compact. */}
+        </span>
+      }
+      actions={
+        <Can permission="app.deploy">
+          <Button size="sm" variant="outline" onClick={onRecheck} disabled={busy}>
+            <RefreshCwIcon className="size-3.5" />
+            {t("recheck")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={onRemove}
+            disabled={busy}
+            aria-label={t("remove")}
+            title={t("remove")}
+          >
+            <Trash2Icon className="size-4" />
+          </Button>
+        </Can>
+      }
+      failure={
+        domain.lastValidationError
+          ? { title: t("validationError"), reason: domain.lastValidationError }
+          : null
+      }
+    >
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* #682: the operator's SNI cert ref. Empty means platform-managed,
+            which CertStateBlock already says, so the row is left out. */}
         {domain.sniCertRef && domain.sniCertRef.length > 0 && (
-          <div className="text-muted-foreground flex items-baseline gap-2 text-xs">
-            <span>SNI cert ref:</span>
-            <code className="text-foreground font-mono break-all">{domain.sniCertRef}</code>
-          </div>
-        )}
-
-        {domain.lastValidationError && (
-          <div className="border-destructive/30 bg-destructive/5 rounded-md border p-2 text-xs">
-            <span className="text-destructive font-medium">{t("validationError")}</span>{" "}
-            <span className="text-muted-foreground">{domain.lastValidationError}</span>
+          <div className="text-muted-foreground flex min-w-0 items-baseline gap-2 text-xs">
+            <span className="shrink-0">SNI cert ref:</span>
+            <code className="text-foreground min-w-0 font-mono [overflow-wrap:anywhere]">
+              {domain.sniCertRef}
+            </code>
           </div>
         )}
 
         <CertStateBlock domain={domain} busy={busy} onUploadCert={onUploadCert} />
 
         {records.length > 0 ? (
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <div className="text-muted-foreground text-xs">
               {domain.isPlatformManagedZone
                 ? t("platformManagedHelp")
@@ -254,7 +262,7 @@ export function DomainHandshakeCard({
                   ? t("liveHelp")
                   : t("needsHelp")}
             </div>
-            <div className="border-border rounded-md border">
+            <div className="border-border min-w-0 overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -263,7 +271,6 @@ export function DomainHandshakeCard({
                     <TableHead>{t("dnsColumns.name")}</TableHead>
                     <TableHead>{t("dnsColumns.value")}</TableHead>
                     <TableHead className="w-16">{t("dnsColumns.ttl")}</TableHead>
-                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -273,20 +280,14 @@ export function DomainHandshakeCard({
                         <StatusDot status={r.propagated ? "ok" : "pending"} />
                       </TableCell>
                       <TableCell className="font-mono text-xs">{r.kind}</TableCell>
-                      <TableCell className="font-mono text-xs break-all">{r.name}</TableCell>
-                      <TableCell className="font-mono text-xs break-all">{r.value}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{r.ttl}s</TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(r.value);
-                            toast.success(`${r.kind} value copied`);
-                          }}
-                          className="hover:bg-muted rounded p-1"
-                          title="Copy value"
-                        >
-                          <CopyIcon className="size-3.5" />
-                        </button>
+                      <TableCell className="font-mono text-xs whitespace-normal">
+                        <CopyValue value={r.name} label={`${r.kind} name`} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs whitespace-normal">
+                        <CopyValue value={r.value} label={`${r.kind} value`} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {r.ttl}s
                       </TableCell>
                     </TableRow>
                   ))}
@@ -308,8 +309,29 @@ export function DomainHandshakeCard({
           workloadOptions={workloadOptions}
           onSave={onSavePathRoutes}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
+  );
+}
+
+/** A DNS record field in mono, wrapping anywhere, with its copy button. */
+function CopyValue({ value, label }: { value: string; label: string }) {
+  return (
+    <span className="flex min-w-0 items-start gap-1">
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{value}</span>
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(value);
+          toast.success(`${label} copied`);
+        }}
+        className="hover:bg-muted shrink-0 rounded p-1"
+        aria-label={`Copy ${label}`}
+        title={`Copy ${label}`}
+      >
+        <CopyIcon className="size-3.5" />
+      </button>
+    </span>
   );
 }
 

@@ -12,10 +12,10 @@
 
 import { CircleSlashIcon, Loader2Icon, ShieldAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 
+import { Notice } from "./OverviewNotices";
 import type { useDeregisterPending } from "./use-deregister-pending";
 
 export type DeregisterPendingBannerViewProps = ReturnType<typeof useDeregisterPending>;
@@ -38,32 +38,21 @@ export function DeregisterPendingBannerView({
   if (msRemaining == null || msRemaining <= 0) return null;
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="border-warning-border bg-warning/10 text-warning-fg flex items-center gap-3 rounded-md border p-3"
-    >
-      <ShieldAlertIcon className="size-5 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{t("title")}</p>
-        <p className="text-xs opacity-80">
-          {t("body", { countdown: formatCountdown(msRemaining) })}
-        </p>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="border-warning-border hover:bg-warning/20"
-        onClick={() => void onCancel()}
-        disabled={cancelling}
-      >
-        {cancelling ? (
-          <Loader2Icon className="size-4 animate-spin" />
-        ) : (
-          <CircleSlashIcon className="size-4" />
-        )}
-        {t("cancel")}
-      </Button>
-    </div>
+    <Notice
+      tone="warning"
+      icon={ShieldAlertIcon}
+      title={t("title")}
+      description={t("body", { countdown: formatCountdown(msRemaining) })}
+      actions={
+        <Button size="sm" variant="outline" onClick={() => void onCancel()} disabled={cancelling}>
+          {cancelling ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <CircleSlashIcon className="size-4" />
+          )}
+          {t("cancel")}
+        </Button>
+      }
+    />
   );
 }

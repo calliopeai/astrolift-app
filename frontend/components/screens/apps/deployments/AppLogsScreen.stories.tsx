@@ -11,7 +11,7 @@ export default meta;
 
 type Story = StoryObj;
 
-/** Streaming a pod's log. */
+/** Streaming a pod's log in the shared LogView: follow, level filter, download. */
 export const Full: Story = { render: () => <AppLogsScreen {...LOGS} /> };
 
 export const Paused: Story = {
@@ -43,12 +43,41 @@ export const Empty: Story = {
   ),
 };
 
-/**
- * The screen has no error state: a failed subscription leaves the waiting
- * hint, a failed app query lands on not found. Not found is the closest.
- */
+/** The log subscription failed before a line arrived: Retry restarts it. */
+export const SubscriptionError: Story = {
+  render: () => (
+    <AppLogsScreen
+      {...LOGS}
+      lines={[]}
+      error={{ name: "Error", message: "Subscription closed: pod storefront-web is gone" }}
+    />
+  ),
+};
+
+/** A failed app query lands on not found. */
 export const NotFound: Story = {
   render: () => <AppLogsScreen {...LOGS} slug="no-such-app" app={null} />,
 };
 
+/** 5000 lines: chunked rendering keeps the pane cheap without virtualising. */
+export const ManyLines: Story = {
+  render: () => (
+    <AppLogsScreen
+      {...LOGS}
+      lines={Array.from({ length: 5000 }, (_, i) => ({
+        ...LOGS.lines[i % LOGS.lines.length],
+        message: `${LOGS.lines[i % LOGS.lines.length].message} #${i}`,
+      }))}
+    />
+  ),
+};
+
 export const LongStrings: Story = { render: () => <AppLogsScreen {...LOGS_LONG} /> };
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <AppLogsScreen {...LOGS_LONG} />
+    </div>
+  ),
+};

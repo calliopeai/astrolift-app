@@ -1,199 +1,169 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import type { DocumentNode } from "graphql";
+import * as React from "react";
 import { toast } from "sonner";
 
-import {
-  useCursorTable,
-  useRowSelection,
-  type CursorTableController,
-} from "@/components/data-table";
-import type { AppsListSortKey } from "@/graphql/__generated__/schema";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import {
   BULK_PUSH_SECRETS,
   BULK_RESYNC_MANIFEST,
   BULK_ROLLING_RESTART,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import type { BulkOperationResult } from "@/graphql/lifecycle/lifecycle.types";
-import { LIST_APPS_PAGE } from "@/graphql/registry/registry.queries";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
-  AppListStatusFilter,
-  AstroliftRegisteredApp,
-  AstroliftRegisteredAppPage,
-} from "@/graphql/registry/registry.types";
-import { useViewToggle } from "@/hooks/use-view-toggle";
+  AstroliftAppEnvironment,
+  BulkOperationResult,
+} from "@/graphql/lifecycle/lifecycle.types";
+import {
+  LIST_APPS_PAGE,
+  LIST_MY_APPS_PAGE,
+  LIST_WORKLOADS_PAGE,
+} from "@/graphql/registry/registry.queries";
+import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { classifyTopology } from "@/lib/topology";
 
-interface Resp {
-  astroliftAppsPage: AstroliftRegisteredAppPage;
-}
+import { APPS_LIST, type AppRow, selectApps } from "./apps-list";
 
-// Filter pill identifiers — the union is the user-facing axis (matches
-// the health pulse + a synthetic "in-flight" bucket). The pill-to-server
-// mapping lives in `PILL_TO_STATUS_FILTER`.
-export type Pill = "all" | "ok" | "degraded" | "stale" | "never_deployed";
+/** The walk's page size: the backend's page cap, so up to 200 apps is one request. */
+const WALK_LIMIT = 200;
 
-const PILL_TO_STATUS_FILTER: Record<Pill, AppListStatusFilter | null> = {
-  all: null,
-  ok: "OK",
-  degraded: "DEGRADED",
-  stale: "STALE",
-  never_deployed: "NEVER_DEPLOYED",
-};
+type Page<T> = Record<string, CursorPage<T> | undefined>;
 
-const STATUS_FILTER_TO_PILL: Record<AppListStatusFilter, Pill> = {
-  ALL: "all",
-  OK: "ok",
-  DEGRADED: "degraded",
-  STALE: "stale",
-  NEVER_DEPLOYED: "never_deployed",
-};
+/**
+ * Every row a cursor-paged field returns for `variables`: the first page
+ * through `useQuery`, the rest walked by cursor, so nothing past the first
+ * page is dropped (the Clusters list's walk, #1230).
+ */
+function useWalk<T>(
+  query: DocumentNode,
+  field: string,
+  cursorVariable: "cursor" | "after",
+  variables: Record<string, unknown>
+) {
+  const client = useApolloClient();
+  const head = useQuery<Page<T>>(query, {
+    variables: { ...variables, limit: WALK_LIMIT },
+    fetchPolicy: "cache-and-network",
+  });
+  const data = head.data ?? head.previousData;
+  const first = data?.[field];
+  const cursor = first?.nextCursor ?? null;
+  const key = JSON.stringify(variables);
 
-// #697 — pinned apps persist in localStorage so operators who work
-// with the same 2-3 apps daily can keep them at the top across
-// sessions. The pin set is per-browser, not synced server-side
-// (no privacy implications, just a personal sort preference).
-const PINNED_APPS_KEY = "astrolift.apps.pinned.v1";
+  const [tail, setTail] = React.useState<{ from: string; rows: T[] } | null>(null);
+  const [tailError, setTailError] = React.useState<Error | null>(null);
 
-function loadPinned(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(PINNED_APPS_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? new Set(parsed.filter((x) => typeof x === "string")) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function savePinned(pinned: Set<string>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(PINNED_APPS_KEY, JSON.stringify(Array.from(pinned)));
-  } catch {
-    // localStorage might be disabled (private mode, quota) — degrade silently
-  }
-}
-
-function usePinnedApps() {
-  const [pinned, setPinned] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    setPinned(loadPinned());
-  }, []);
-  const toggle = useCallback((slug: string) => {
-    setPinned((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      savePinned(next);
-      return next;
+  React.useEffect(() => {
+    if (!cursor) return;
+    let cancelled = false;
+    (async () => {
+      const rows: T[] = [];
+      let next: string | null = cursor;
+      while (next && !cancelled) {
+        const res: { data?: Page<T> } = await client.query<Page<T>>({
+          query,
+          variables: { ...JSON.parse(key), limit: WALK_LIMIT, [cursorVariable]: next },
+          fetchPolicy: "network-only",
+        });
+        const page = res.data?.[field];
+        rows.push(...(page?.items ?? []));
+        next = page?.nextCursor ?? null;
+      }
+      if (!cancelled) {
+        setTail({ from: `${key}|${cursor}`, rows });
+        setTailError(null);
+      }
+    })().catch((e: unknown) => {
+      if (!cancelled) setTailError(e instanceof Error ? e : new Error(String(e)));
     });
-  }, []);
-  return { pinned, toggle };
-}
+    return () => {
+      cancelled = true;
+    };
+  }, [client, query, field, cursorVariable, key, cursor]);
 
-function pillFromParam(value: string | null): Pill {
-  if (!value) return "all";
-  const upper = value.toUpperCase() as AppListStatusFilter;
-  return STATUS_FILTER_TO_PILL[upper] ?? "all";
+  const walking = Boolean(cursor) && tail?.from !== `${key}|${cursor}`;
+  const items = React.useMemo(
+    () => [...(first?.items ?? []), ...(cursor && !walking ? (tail?.rows ?? []) : [])],
+    [first?.items, cursor, walking, tail]
+  );
+
+  return {
+    items,
+    loading: head.loading && !data,
+    // Rows on screen answer an older search, or the tail is still walking.
+    stale: (head.loading && !head.data && Boolean(data)) || walking,
+    error: head.error ?? tailError,
+    refetch: head.refetch,
+  };
 }
 
 /**
- * The apps registry list: the paged server walk, the filter axes it does
- * not own (status pill, team, project, sort) mirrored into the URL, the
- * per-browser pin set, row selection, and the three bulk mutations.
- * The data half of AppsListScreen.
+ * The Apps list: URL list state, the registry walk joined with the org's
+ * environments (clusters) and workloads (topology), the per-browser pin set,
+ * and the three bulk mutations. The data half of AppsListScreen.
  */
 export function useAppsList() {
-  const [viewMode, setViewMode] = useViewToggle("astrolift_view_apps", "card");
-  const searchParams = useSearchParams();
+  const list = useListState(APPS_LIST);
+  const { state } = list;
   const { can } = useMyPermissions();
-  const canDeploy = can("app.deploy");
+  const mine = state.view === "mine";
 
-  // URL params seed the initial filter state so a shared link arrives
-  // pre-filtered. Read once, on mount: the effect below owns the query
-  // string from then on. The search term and page size are the
-  // controller's business (?apps-q=, ?apps-size=).
-  const [pill, setPill] = useState<Pill>(() => pillFromParam(searchParams.get("status")));
-  const [teamSlug, setTeamSlug] = useState(() => searchParams.get("team") ?? "");
-  const [projectSlug, setProjectSlug] = useState(() => searchParams.get("project") ?? "");
-  const [sortBy, setSortBy] = useState<AppsListSortKey>("CREATED_DESC");
-
-  const variables = useMemo(
-    () => ({
+  const walk = useWalk<AstroliftRegisteredApp>(
+    mine ? LIST_MY_APPS_PAGE : LIST_APPS_PAGE,
+    mine ? "astroliftMyAppsPage" : "astroliftAppsPage",
+    "cursor",
+    {
       includeFreshness: true,
-      status: PILL_TO_STATUS_FILTER[pill],
-      teamSlug: teamSlug || null,
-      projectSlug: projectSlug || null,
-      sortBy,
-    }),
-    [pill, teamSlug, projectSlug, sortBy]
+      search: state.q.trim() || null,
+      includeArchived: state.view === "archived",
+    }
   );
-
-  const table = useCursorTable<AstroliftRegisteredApp>({
-    query: LIST_APPS_PAGE,
-    variables,
-    extract: (d) => (d as Resp | undefined)?.astroliftAppsPage,
-    searchVariable: "search",
-    // This query spells its cursor argument `cursor`; the audit and
-    // events pages spell theirs `after`.
-    cursorVariable: "cursor",
-    urlKey: "apps",
+  const workloads = useWalk<AstroliftWorkload>(
+    LIST_WORKLOADS_PAGE,
+    "astroliftWorkloadsPage",
+    "after",
+    {}
+  );
+  const envs = useQuery<{ astroliftEnvironments: AstroliftAppEnvironment[] }>(LIST_ENVIRONMENTS, {
+    variables: { appSlug: null },
   });
 
-  const { clearFilters: clearSearch, isFiltered, rows } = table;
-
-  // Reflect the filter axes the controller does not own back into the
-  // URL, so the page state stays shareable. Mutates the existing query
-  // string rather than rebuilding it, because `useCursorTable` writes
-  // ?apps-q= / ?apps-size= into the same one — and uses replaceState for
-  // the same reason it does: a Next navigation would remount the tree
-  // and throw away the cursor stack.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const set = (key: string, value: string) => {
-      if (value) params.set(key, value);
-      else params.delete(key);
-    };
-    set("status", pill === "all" ? "" : (PILL_TO_STATUS_FILTER[pill] ?? ""));
-    set("team", teamSlug);
-    set("project", projectSlug);
-    const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [pill, teamSlug, projectSlug]);
-
-  // #697 — pinned apps sort to the top. This is the one client-side
-  // reorder left on the page and it is deliberately scoped to the page
-  // in hand: there is no server-side "pinned" axis (the set is a
-  // per-browser preference), so an app pinned on page three stays on
-  // page three until the operator walks to it.
-  const { pinned: pinnedSet, toggle: togglePin } = usePinnedApps();
-  const apps = useMemo(() => {
-    if (pinnedSet.size === 0) return rows;
-    const pins: AstroliftRegisteredApp[] = [];
-    const rest: AstroliftRegisteredApp[] = [];
-    for (const app of rows) {
-      if (pinnedSet.has(app.slug)) pins.push(app);
-      else rest.push(app);
+  // Kind and cluster are best effort: when either side query fails the list
+  // still renders, and those two columns read "unknown".
+  const apps: AppRow[] = React.useMemo(() => {
+    const byApp = new Map<string, AstroliftWorkload[]>();
+    for (const w of workloads.items) {
+      byApp.set(w.registeredAppSlug, [...(byApp.get(w.registeredAppSlug) ?? []), w]);
     }
-    return [...pins, ...rest];
-  }, [rows, pinnedSet]);
+    const clusters = new Map<string, string[]>();
+    for (const e of envs.data?.astroliftEnvironments ?? []) {
+      if (!e.clusterSlug) continue;
+      const seen = clusters.get(e.registeredAppSlug) ?? [];
+      if (!seen.includes(e.clusterSlug))
+        clusters.set(e.registeredAppSlug, [...seen, e.clusterSlug]);
+    }
+    return walk.items.map((a) => {
+      const ws = byApp.get(a.slug) ?? [];
+      return {
+        ...a,
+        topology: ws.length > 0 ? classifyTopology({ workloads: ws }) : null,
+        clusters: clusters.get(a.slug) ?? [],
+      };
+    });
+  }, [walk.items, workloads.items, envs.data]);
 
-  // Same controller, pinned rows first: paging, search, sort and state
-  // all still come from the server-side walk.
-  const pinnedController: CursorTableController<AstroliftRegisteredApp> = {
-    ...table,
-    rows: apps,
-  };
-
-  // #698 — bulk-action selection. Row ids are slugs (not guids) because
-  // the bulk mutations are keyed on slug.
-  const selection = useRowSelection();
-  const [pushSecretsOpen, setPushSecretsOpen] = useState(false);
+  const { pinned, toggle: togglePin } = usePinnedApps();
+  const { rows, totalCount } = selectApps(apps, {
+    filters: list.filters,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+    pinned,
+  });
 
   const [bulkRollingRestart, rollingRestartState] = useMutation<{
     bulkRollingRestart: BulkOperationResult;
@@ -205,89 +175,93 @@ export function useAppsList() {
     bulkResyncManifest: BulkOperationResult;
   }>(BULK_RESYNC_MANIFEST);
 
-  const bulkBusy =
-    rollingRestartState.loading || pushSecretsState.loading || resyncManifestState.loading;
-
-  function reportBulkResult(label: string, result: BulkOperationResult) {
+  // #698: each action fans out server-side; the toast reports the aggregate
+  // okCount/total plus a separate error toast listing the failed slugs.
+  function report(label: string, result: BulkOperationResult | undefined): boolean {
+    if (!result) return false;
     const total = result.okCount + result.failedCount;
     toast.success(`${label}: ${result.okCount}/${total} apps succeeded`);
     if (result.failedCount > 0) {
-      const failedSlugs = result.perApp
+      const failed = result.perApp
         .filter((p) => !p.ok)
         .map((p) => p.appSlug)
         .join(", ");
-      toast.error(`${label} failed for: ${failedSlugs}`);
+      toast.error(`${label} failed for: ${failed}`);
     }
+    return true;
   }
-
-  async function handleRollingRestart(appSlugs: string[]) {
-    const { data } = await bulkRollingRestart({
-      variables: { input: { appSlugs, environmentName: null } },
-    });
-    if (data?.bulkRollingRestart) {
-      reportBulkResult("Rolling restart", data.bulkRollingRestart);
-      selection.clear();
-    }
-  }
-
-  async function handlePushSecrets(bundleSlug: string, environmentName: string | null) {
-    const appSlugs = selection.selectedIds;
-    const { data } = await bulkPushSecrets({
-      variables: { input: { appSlugs, bundleSlug, environmentName } },
-    });
-    if (data?.bulkPushSecrets) {
-      reportBulkResult("Push secrets", data.bulkPushSecrets);
-      selection.clear();
-      setPushSecretsOpen(false);
-    }
-  }
-
-  async function handleResyncManifest(appSlugs: string[]) {
-    const { data } = await bulkResyncManifest({
-      variables: { input: { appSlugs } },
-    });
-    if (data?.bulkResyncManifest) {
-      reportBulkResult("Resync manifest", data.bulkResyncManifest);
-      selection.clear();
-    }
-  }
-
-  // Filters the controller doesn't own. A pill / team / project filter
-  // narrows the result set server-side but leaves `isFiltered` false —
-  // that flag tracks the search box — so the "you have no apps" empty
-  // state has to be swapped for the "nothing matched" one by hand.
-  const narrowed = pill !== "all" || teamSlug !== "" || projectSlug !== "";
-  const hasActiveFilters = narrowed || isFiltered;
-
-  const clearFilters = useCallback(() => {
-    setPill("all");
-    setTeamSlug("");
-    setProjectSlug("");
-    clearSearch();
-  }, [clearSearch]);
 
   return {
-    viewMode,
-    setViewMode,
-    canDeploy,
-    pill,
-    setPill,
-    sortBy,
-    setSortBy,
-    narrowed,
-    hasActiveFilters,
-    clearFilters,
-    table,
-    pinnedController,
-    apps,
-    pinnedSet: pinnedSet as ReadonlySet<string>,
+    list,
+    rows,
+    totalCount,
+    loading: walk.loading,
+    stale: walk.stale,
+    error: walk.error ? { message: walk.error.message } : null,
+    onRetry: () => void walk.refetch(),
+    canDeploy: can("app.deploy"),
+    pinned: pinned as ReadonlySet<string>,
     togglePin,
-    selection,
-    bulkBusy,
-    handleRollingRestart,
-    handlePushSecrets,
-    handleResyncManifest,
-    pushSecretsOpen,
-    setPushSecretsOpen,
+    bulkBusy:
+      rollingRestartState.loading || pushSecretsState.loading || resyncManifestState.loading,
+    onRollingRestart: async (appSlugs: string[]) => {
+      const { data } = await bulkRollingRestart({
+        variables: { input: { appSlugs, environmentName: null } },
+      });
+      return report("Rolling restart", data?.bulkRollingRestart);
+    },
+    onPushSecrets: async (
+      appSlugs: string[],
+      bundleSlug: string,
+      environmentName: string | null
+    ) => {
+      const { data } = await bulkPushSecrets({
+        variables: { input: { appSlugs, bundleSlug, environmentName } },
+      });
+      return report("Push secrets", data?.bulkPushSecrets);
+    },
+    onResyncManifest: async (appSlugs: string[]) => {
+      const { data } = await bulkResyncManifest({ variables: { input: { appSlugs } } });
+      return report("Resync manifest", data?.bulkResyncManifest);
+    },
   };
+}
+
+// #697: pinned apps persist in localStorage so operators who work with the
+// same two or three apps daily keep them at the top across sessions. The pin
+// set is per browser, not synced (a personal sort preference).
+const PINNED_APPS_KEY = "astrolift.apps.pinned.v1";
+
+function loadPinned(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(PINNED_APPS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function usePinnedApps() {
+  const [pinned, setPinned] = React.useState<Set<string>>(() => new Set());
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is the external system; reading it in render would break hydration
+    setPinned(loadPinned());
+  }, []);
+  const toggle = React.useCallback((slug: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      try {
+        window.localStorage.setItem(PINNED_APPS_KEY, JSON.stringify(Array.from(next)));
+      } catch {
+        // Storage blocked or full: the pin lasts for this visit only.
+      }
+      return next;
+    });
+  }, []);
+  return { pinned, toggle };
 }

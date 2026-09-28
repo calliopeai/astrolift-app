@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,7 +73,12 @@ function ResourceGroup({ group, labelKey }: { group: ResourceGroupSpec; labelKey
 }
 
 /**
- * Hard-deregister + full teardown surface (#392 + #436 A/B/C).
+ * Hard-deregister + full teardown (#392 + #436 A/B/C), a row of the
+ * Settings tab's Danger zone (spec 44 §5.3).
+ *
+ * The confirm stays an AlertDialog of its own rather than ConfirmDialog:
+ * it carries the blast-radius preview and a type-the-name guard, and
+ * ConfirmDialog has room for neither.
  *
  * The destructive button stays disabled until the operator types the
  * app's name verbatim (muscle-memory guard) — the backend enforces
@@ -290,60 +294,62 @@ export function DangerZoneView({
 
   return (
     <>
-      <Card className="border-destructive/40">
-        <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-          <div className="bg-destructive/10 text-destructive shrink-0 rounded-md p-2.5">
-            <Trash2Icon className="size-5" />
+      <div className="flex min-w-0 flex-col gap-3 py-3 first:pt-0 last:pb-0">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{t("button")}</p>
+            <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+              {t("description")}
+            </p>
           </div>
-          <div className="flex-1">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              {t("title")}
-            </CardTitle>
-            <CardDescription className="mt-1">{t("description")}</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
           <Can permission="app.delete">
-            <Button variant="destructive" onClick={() => setOpen(true)}>
-              <Trash2Icon className="size-4" />
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setOpen(true)}
+            >
+              <Trash2Icon className="size-3.5" />
               {t("button")}
               {preview && preview.totalResourceCount > 0 ? (
-                <Badge variant="secondary" className="text-2xs ml-1.5">
+                <Badge variant="secondary" className="text-2xs ml-1.5 font-mono">
                   {preview.totalResourceCount}
                 </Badge>
               ) : null}
             </Button>
           </Can>
-          {stillLive.length > 0 ? (
-            <div className="border-warning-border bg-warning/5 mt-3 rounded-md border p-3 text-xs">
-              <p className="text-warning-fg">{t("stillLive", { count: stillLive.length })}</p>
-              <ul className="text-foreground text-2xs mt-1 list-disc pl-5 font-mono">
-                {stillLive.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-              <Can permission="app.delete">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => void handleRetry()}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <RefreshCwIcon className="size-4" />
-                  )}
-                  {t("retry")}
-                </Button>
-              </Can>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-2xs mt-2">{t("softHint")}</p>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        {stillLive.length > 0 ? (
+          <div className="border-warning-border bg-warning/5 min-w-0 rounded-md border p-3 text-xs">
+            <p className="text-warning-fg">{t("stillLive", { count: stillLive.length })}</p>
+            <ul className="text-foreground text-2xs mt-1 list-disc pl-5 font-mono [overflow-wrap:anywhere]">
+              {stillLive.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+            <Can permission="app.delete">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => void handleRetry()}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCwIcon className="size-4" />
+                )}
+                {t("retry")}
+              </Button>
+            </Can>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-2xs">{t("softHint")}</p>
+        )}
+      </div>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="max-h-[90vh] overflow-y-auto">

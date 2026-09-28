@@ -1,13 +1,16 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { TEAR_DOWN_PREVIEW } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_PREVIEW_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { narrowPreviews, PREVIEWS_LIST, previewsVariables } from "./previews-list";
 
 interface MutationResultLite {
   ok: boolean;
@@ -18,22 +21,23 @@ interface PreviewsPageResp {
   astroliftPreviewEnvironmentsPage: CursorPage<AstroliftPreviewEnvironment>;
 }
 
-/** The data half of PreviewsScreen: the preview table walk and teardown. */
+/**
+ * Apps › Previews: URL list state, one cursor page of every app's previews,
+ * and teardown. The 30s poll is kept: a building preview settles while an
+ * operator watches. The data half of PreviewsScreen.
+ */
 export function usePreviews() {
   const { can } = useMyPermissions();
-
-  // `appSlug: null` is every app, which is what this page is. The field
-  // searches app, branch, hostname, commit and status, and takes no sort
-  // argument, so no column declares a `sortKey`. The 30s poll is kept:
-  // a building preview settles while an operator watches this page.
-  const table = useCursorTable<AstroliftPreviewEnvironment>({
-    query: LIST_PREVIEW_ENVIRONMENTS_PAGE,
-    variables: { appSlug: null },
-    extract: (d) => (d as PreviewsPageResp | undefined)?.astroliftPreviewEnvironmentsPage,
-    searchVariable: "search",
-    urlKey: "pv",
+  const list = useListState(PREVIEWS_LIST);
+  const { state } = list;
+  const query = useQuery<PreviewsPageResp>(LIST_PREVIEW_ENVIRONMENTS_PAGE, {
+    variables: previewsVariables(list.filters, state),
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
+  const data = query.data ?? query.previousData;
+  const page = data?.astroliftPreviewEnvironmentsPage;
+  const narrowing = Boolean(list.filters.status || list.filters.openedBy);
 
   const [tearDownMutation, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
@@ -53,7 +57,16 @@ export function usePreviews() {
   }
 
   return {
-    table,
+    list,
+    rows: narrowPreviews(page?.items ?? [], list.filters),
+    loading: query.loading && !data,
+    stale: query.loading && !query.data && Boolean(data),
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
+    nextCursor: page?.nextCursor ?? null,
+    totalCount: narrowing ? null : (page?.totalCount ?? null),
     canTearDown: can("app.deploy"),
     tearingDown: tearState.loading,
     tearDown,

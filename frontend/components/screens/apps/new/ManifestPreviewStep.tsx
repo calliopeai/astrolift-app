@@ -40,8 +40,8 @@ export interface ManifestPreviewStepProps<S extends ManifestPreviewFields> {
   fetchError: string;
   editing: boolean;
   setEditing: (editing: boolean) => void;
-  /** Re-fetch the manifest from the repo; `manual` surfaces a toast. */
-  refetch: (opts?: { manual?: boolean }) => Promise<void>;
+  /** Re-fetch the manifest from the repo; the banner shows the result. */
+  refetch: () => Promise<void>;
   /** The manifest holds server-masked env values this viewer can't reveal. */
   maskedEnvValues: boolean;
 }
@@ -125,7 +125,7 @@ export function ManifestPreviewStepView<S extends ManifestPreviewFields>({
               type="button"
               size="sm"
               variant="ghost"
-              onClick={() => void refetch({ manual: true })}
+              onClick={() => void refetch()}
               disabled={fetchState === "fetching"}
               title="Test connection & re-fetch the manifest from the picked repo"
             >

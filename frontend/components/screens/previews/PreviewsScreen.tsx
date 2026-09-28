@@ -6,98 +6,110 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable, type Column } from "@/components/data-table";
-import { PageShell } from "@/components/PageShell";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { appsListCrumbs } from "@/components/screens/deployments/apps-area";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type {
-  AstroliftPreviewEnvironment,
-  PreviewStatus,
-} from "@/graphql/lifecycle/lifecycle.types";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { PREVIEW_DOT } from "./previews-list";
 import type { usePreviews } from "./use-previews";
-
-const statusToDot: Record<PreviewStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
-  building: "pending",
-  running: "ok",
-  failed: "error",
-  torn_down: "muted",
-};
 
 export type PreviewsScreenProps = ReturnType<typeof usePreviews>;
 
-/** The /previews screen: every app's preview environments, with teardown. */
-export function PreviewsScreen({ table, canTearDown, tearingDown, tearDown }: PreviewsScreenProps) {
+// Cells holding their own link sit above the row's stretched link.
+const ABOVE_ROW_LINK = "relative z-10";
+
+/**
+ * Apps › Previews (spec 44 §4.4, §5.1): every app's per-PR preview on the
+ * shared list, views All · Mine, cursor paged; teardown in each row's ⋯.
+ * Pure view; the data half is usePreviews.
+ */
+export function PreviewsScreen({
+  list,
+  rows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
+  canTearDown,
+  tearingDown,
+  tearDown,
+}: PreviewsScreenProps) {
   const t = useTranslations("lists.previews");
   const fmt = useFormatters();
-  const formatTime = (iso: string | null | undefined): string =>
-    iso ? fmt.formatDateTime(iso) : "—";
-
   const [tearTarget, setTearTarget] = React.useState<AstroliftPreviewEnvironment | null>(null);
 
   const columns: Column<AstroliftPreviewEnvironment>[] = [
     {
-      id: "app",
+      id: "preview",
       header: t("columns.app"),
-      // The status dot lives in this cell rather than in a column of its
-      // own. `rowHref` builds the row's link out of the first column, so
-      // a lead column holding only a dot would give every row a link with
-      // no accessible name.
+      cellClassName: "max-w-80",
+      // The status dot folds into the linking cell: a link whose only
+      // content is a dot has no name.
       cell: (p) => (
-        <>
-          <span className="flex items-center gap-2 font-medium">
-            <StatusDot status={statusToDot[p.status]} />
-            {p.registeredAppSlug}
+        <span className="flex min-w-0 items-start gap-2">
+          <StatusDot status={PREVIEW_DOT[p.status]} className="mt-1.5 shrink-0" />
+          <span className="block min-w-0">
+            <span className="block truncate font-medium" title={p.registeredAppSlug}>
+              {p.registeredAppSlug} <span className="font-mono">#{p.prNumber}</span>
+            </span>
+            <span
+              className="text-muted-foreground block truncate font-mono text-xs"
+              title={p.namespace}
+            >
+              {p.namespace}
+            </span>
           </span>
-          <span className="text-muted-foreground block font-mono text-xs">ns {p.namespace}</span>
-        </>
+        </span>
       ),
-    },
-    {
-      id: "pr",
-      header: t("columns.pr"),
-      cellClassName: "font-mono text-xs",
-      cell: (p) => `#${p.prNumber}`,
     },
     {
       id: "branch",
       header: t("columns.branch"),
+      cellClassName: "max-w-64",
       cell: (p) => (
-        <>
-          <div className="text-sm">{p.branch}</div>
+        <span className="block min-w-0">
+          <span className="block truncate font-mono text-xs" title={p.branch}>
+            {p.branch}
+          </span>
           {p.commitSha && (
-            <div className="text-muted-foreground font-mono text-xs">{p.commitSha.slice(0, 7)}</div>
+            <span className="text-muted-foreground block font-mono text-xs">
+              {p.commitSha.slice(0, 8)}
+            </span>
           )}
-        </>
+        </span>
       ),
     },
     {
       id: "hostname",
       header: t("columns.hostname"),
-      // Above the row link, so the running preview stays reachable.
-      cellClassName: "relative z-10",
+      cellClassName: "max-w-72",
       cell: (p) =>
         p.status === "running" ? (
           <a
             href={`https://${p.hostname}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm hover:underline"
+            title={p.hostname}
+            className={`${ABOVE_ROW_LINK} flex min-w-0 items-center gap-1 font-mono text-xs hover:underline`}
           >
-            {p.hostname}
-            <ExternalLinkIcon className="size-3" />
+            <span className="min-w-0 truncate">{p.hostname}</span>
+            <ExternalLinkIcon className="size-3 shrink-0" />
           </a>
         ) : (
-          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
+          <span
+            className="text-muted-foreground block truncate font-mono text-xs"
+            title={p.hostname}
+          >
+            {p.hostname}
+          </span>
         ),
-    },
-    {
-      id: "lastDeploy",
-      header: t("columns.lastDeploy"),
-      cellClassName: "text-muted-foreground text-sm",
-      cell: (p) => formatTime(p.lastDeployedAt),
     },
     {
       id: "status",
@@ -109,38 +121,66 @@ export function PreviewsScreen({ table, canTearDown, tearingDown, tearDown }: Pr
       ),
     },
     {
-      id: "actions",
-      header: t("columns.actions"),
-      align: "right",
-      cellClassName: "relative z-10",
-      cell: (p) =>
-        p.status !== "torn_down" && canTearDown ? (
-          <Can permission="app.deploy">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={tearingDown}
-              onClick={() => setTearTarget(p)}
-            >
-              <TrashIcon className="size-3" /> {t("tearDown")}
-            </Button>
-          </Can>
-        ) : null,
+      id: "lastDeploy",
+      header: t("columns.lastDeploy"),
+      cell: (p) => (
+        <span className="text-muted-foreground font-mono text-xs">
+          {p.lastDeployedAt ? fmt.formatDateTime(p.lastDeployedAt) : "—"}
+        </span>
+      ),
     },
   ];
 
+  function rowActions(p: AstroliftPreviewEnvironment) {
+    return (
+      <>
+        {p.status === "running" && (
+          <DropdownMenuItem asChild>
+            <a href={`https://${p.hostname}`} target="_blank" rel="noreferrer">
+              <ExternalLinkIcon className="size-4" />
+              Open preview
+            </a>
+          </DropdownMenuItem>
+        )}
+        {p.prUrl && (
+          <DropdownMenuItem asChild>
+            <a href={p.prUrl} target="_blank" rel="noreferrer">
+              <GitPullRequestIcon className="size-4" />
+              Open pull request
+            </a>
+          </DropdownMenuItem>
+        )}
+        {p.status !== "torn_down" && canTearDown && (
+          <Can permission="app.deploy">
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={tearingDown}
+              onSelect={() => setTearTarget(p)}
+            >
+              <TrashIcon className="size-4" />
+              {t("tearDown")}
+            </DropdownMenuItem>
+          </Can>
+        )}
+      </>
+    );
+  }
+
   return (
-    <PageShell title={t("title")} description={t("description")}>
-      <DataTable
-        label="Preview environments"
-        controller={table}
+    <>
+      <ListPage<AstroliftPreviewEnvironment>
+        header={{ crumbs: appsListCrumbs("previews"), title: t("title") }}
+        list={list}
+        label="Previews"
         columns={columns}
+        rows={rows}
         getRowId={(p) => p.id}
-        // A real link, so a preview can be opened in a new tab. The
-        // hand-rolled row was `role="link"` on a <tr> driving
-        // `router.push`, which middle-click and copy-link could not reach.
         rowHref={(p) => `/previews/${p.id}`}
-        searchPlaceholder="Search by app, branch, host, commit, or status…"
+        rowActions={rowActions}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
         empty={{
           icon: <GitPullRequestIcon className="size-5" />,
           title: t("emptyTitle"),
@@ -148,11 +188,8 @@ export function PreviewsScreen({ table, canTearDown, tearingDown, tearDown }: Pr
           actionHref: "/apps",
           actionLabel: t("openApps"),
         }}
-        emptyFiltered={{
-          title: "No matching previews",
-          description:
-            "No preview matches that search. The server matches the app, branch, hostname, commit and status.",
-        }}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
       />
 
       <ConfirmDialog
@@ -173,10 +210,9 @@ export function PreviewsScreen({ table, canTearDown, tearingDown, tearDown }: Pr
         confirmLabel={t("tearDown")}
         destructive
         onConfirm={async () => {
-          if (!tearTarget) return;
-          await tearDown(tearTarget);
+          if (tearTarget) await tearDown(tearTarget);
         }}
       />
-    </PageShell>
+    </>
   );
 }

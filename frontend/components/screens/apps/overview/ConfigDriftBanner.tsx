@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ConfigDriftBannerView (#407 C) — amber callout above the URL card when
+ * ConfigDriftBannerView (#407 C): a notice in the overview's notices slot when
  * the latest applied deploy snapshot diverges from the live manifest,
  * or the source repo is ahead of the platform DB.
  *
@@ -20,11 +20,11 @@
 
 import { GitPullRequestArrowIcon, Loader2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import type { AstroliftAppConfigDrift } from "@/graphql/registry/registry.types";
 
+import { Notice } from "./OverviewNotices";
 import type { useConfigDriftResync } from "./use-config-drift-resync";
 
 export type ConfigDriftBannerViewProps = ReturnType<typeof useConfigDriftResync> & {
@@ -42,35 +42,23 @@ export function ConfigDriftBannerView({ drift, resyncing, onResync }: ConfigDrif
   if (!drift.hasDrift || drift.fields.length === 0) return null;
 
   return (
-    <section
-      className="border-warning-border bg-warning/10 rounded-md border p-4"
-      aria-live="polite"
-    >
-      <div className="flex items-start gap-3">
-        <GitPullRequestArrowIcon aria-hidden className="text-warning-fg size-5 shrink-0" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <p className="text-warning-fg text-sm font-semibold">{t("headline")}</p>
-            <p className="text-warning-fg text-xs leading-snug">
-              {drift.environmentName
-                ? t("description", { env: drift.environmentName })
-                : t("descriptionNoEnv")}
-            </p>
-          </div>
-          <ul className="text-warning-fg list-disc space-y-0.5 pl-5 text-xs">
-            {drift.fields.map((f) => (
-              <li key={f} className="font-mono">
-                {KNOWN_FIELDS.has(f) ? t(`field.${f}`) : t("field.unknown", { field: f })}
-              </li>
-            ))}
-          </ul>
-        </div>
+    <Notice
+      tone="warning"
+      icon={GitPullRequestArrowIcon}
+      title={t("headline")}
+      description={
+        drift.environmentName
+          ? t("description", { env: drift.environmentName })
+          : t("descriptionNoEnv")
+      }
+      actions={
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={onResync}
           disabled={resyncing}
-          className="shrink-0 gap-1"
+          className="gap-1"
         >
           {resyncing ? (
             <Loader2Icon className="size-4 animate-spin" />
@@ -79,7 +67,15 @@ export function ConfigDriftBannerView({ drift, resyncing, onResync }: ConfigDrif
           )}
           {t("cta")}
         </Button>
-      </div>
-    </section>
+      }
+    >
+      <ul className="space-y-0.5">
+        {drift.fields.map((f) => (
+          <li key={f} className="font-mono [overflow-wrap:anywhere]">
+            {KNOWN_FIELDS.has(f) ? t(`field.${f}`) : t("field.unknown", { field: f })}
+          </li>
+        ))}
+      </ul>
+    </Notice>
   );
 }

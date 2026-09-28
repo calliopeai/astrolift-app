@@ -1,22 +1,13 @@
 "use client";
 
 import { ArchiveIcon, Loader2Icon, PlayCircleIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useArchiveApp } from "./use-archive-app";
@@ -28,8 +19,10 @@ export type ArchiveAppViewProps = ReturnType<typeof useArchiveApp> & {
 };
 
 /**
- * Archive / restore: a reversible alternative to deregister that scales
- * every workload to zero and suppresses deploys.
+ * Archive / restore, a row of the Settings tab's Danger zone (spec 44
+ * §5.3): a reversible alternative to deregister that scales every workload
+ * to zero and suppresses deploys. Archive asks first, in a ConfirmDialog;
+ * restore puts things back, so it does not.
  */
 export function ArchiveAppView({
   archiving,
@@ -41,24 +34,14 @@ export function ArchiveAppView({
   archivedAt,
 }: ArchiveAppViewProps) {
   const fmt = useFormatters();
+  const t = useTranslations("apps.frame.archive");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
-  async function handleArchive() {
-    if (await onArchive()) setConfirmOpen(false);
-  }
-
   return (
-    <Section
-      title="App archive"
-      description={
-        isArchived
-          ? archivedAt
-            ? `Archived ${fmt.formatRelativeTime(archivedAt)}. Workloads are at zero replicas; deploys are suppressed.`
-            : "App is archived. Workloads are at zero replicas."
-          : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."
-      }
-      action={
-        <>
+    <div className="flex min-w-0 flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium">
+          App archive
           {isArchived ? (
             <Badge
               variant="outline"
@@ -67,77 +50,59 @@ export function ArchiveAppView({
               Archived
             </Badge>
           ) : null}
-          <Can permission="app.update">
-            {isArchived ? (
-              <Button
-                size="sm"
-                variant="default"
-                disabled={restoring}
-                onClick={() => void onRestore()}
-              >
-                {restoring ? (
-                  <Loader2Icon className="size-3.5 animate-spin" />
-                ) : (
-                  <PlayCircleIcon className="size-3.5" />
-                )}
-                Restore
-              </Button>
+        </p>
+        <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+          {isArchived
+            ? archivedAt
+              ? `Archived ${fmt.formatRelativeTime(archivedAt)}. Workloads are at zero replicas; deploys are suppressed.`
+              : "App is archived. Workloads are at zero replicas."
+            : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."}
+        </p>
+      </div>
+      <Can permission="app.update">
+        {isArchived ? (
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            disabled={restoring}
+            onClick={() => void onRestore()}
+          >
+            {restoring ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={archiving}
-                onClick={() => setConfirmOpen(true)}
-              >
-                {archiving ? (
-                  <Loader2Icon className="size-3.5 animate-spin" />
-                ) : (
-                  <ArchiveIcon className="size-3.5" />
-                )}
-                Archive
-              </Button>
+              <PlayCircleIcon className="size-3.5" />
             )}
-          </Can>
-        </>
-      }
-    >
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive {appName}?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="text-muted-foreground space-y-2 text-sm">
-                <p>
-                  Archive is a reversible alternative to deregister. It scales every workload to{" "}
-                  <span className="text-foreground font-mono">replicas=0</span>, suppresses webhook
-                  + scheduled deploys, and releases the load balancer capacity.
-                </p>
-                <p>
-                  Your manifest, secrets, deploy tokens, managed services, and domain bindings are
-                  preserved. Restoring returns each workload to its pre-archive replica count.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={archiving}
-              onClick={(e) => {
-                e.preventDefault();
-                void handleArchive();
-              }}
-            >
-              {archiving ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <ArchiveIcon className="size-4" />
-              )}
-              Archive {appName}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Section>
+            Restore
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="shrink-0"
+            disabled={archiving}
+            onClick={() => setConfirmOpen(true)}
+          >
+            {archiving ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <ArchiveIcon className="size-3.5" />
+            )}
+            Archive
+          </Button>
+        )}
+      </Can>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={<span className="[overflow-wrap:anywhere]">{t("title", { name: appName })}</span>}
+        description={t("description")}
+        confirmLabel={t("confirm")}
+        destructive
+        // The hook toasts its own failure, so the dialog just closes.
+        onConfirm={() => onArchive()}
+      />
+    </div>
   );
 }

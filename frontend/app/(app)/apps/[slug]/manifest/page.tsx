@@ -1,17 +1,18 @@
-import { ManifestPreviewClient } from "./manifest-preview-client";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Manifest preview · Astrolift" };
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export default async function ManifestPreviewPage({
+/**
+ * The manifest preview is Settings › Manifest now (spec 44 §5.2). The old
+ * URL keeps resolving, with whatever query it carried.
+ */
+export default async function AppManifestRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  // No PreloadQuery — the client component fetches both queries
-  // directly. This page already lives inside the (app) layout's two
-  // PreloadQuery wrappers (GET_ME + GET_MY_PERMISSIONS); adding more
-  // streams routinely hangs the dev-mode Suspense boundary in
-  // Next.js 16. Client-side fetch is fast enough on this surface.
   const { slug } = await params;
-  return <ManifestPreviewClient slug={slug} />;
+  redirect(redirectTarget(slug, "settings", "manifest", await searchParams));
 }

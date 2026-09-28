@@ -157,6 +157,33 @@ export const LongStrings: Story = {
   ),
 };
 
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ObservabilityScreen
+        {...OBSERVABILITY}
+        slug={LONG_APP.slug}
+        app={LONG_APP}
+        pods={LONG_PODS}
+        selectedPod={LONG_PODS[0].name}
+        podContainers={[LONG_PODS[0].containerStatuses[0].name]}
+        selectedContainer={LONG_PODS[0].containerStatuses[0].name}
+        allReplicas={false}
+        logBuffer={LONG_LOG_LINES}
+        panels={panels}
+        alertRules={
+          <AlertRulesPanelView
+            {...ALERT_RULES_PANEL}
+            appName={LONG_APP.name}
+            rules={LONG_ALERT_RULES}
+            renderEvents={() => null}
+          />
+        }
+      />
+    </div>
+  ),
+};
+
 export const AlertEvents: Story = {
   render: () => <AlertEventsListView {...ALERT_EVENTS_LIST} />,
 };

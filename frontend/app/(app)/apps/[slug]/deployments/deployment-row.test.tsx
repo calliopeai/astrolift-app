@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
-import { DeploymentRow } from "@/components/screens/apps/deployments/AppDeploymentsScreen";
+import { DeploymentStatusCell } from "@/components/screens/apps/deployments/AppDeploymentsScreen";
 
 // Why a deploy failed, or what a pending one waits on, on the row itself (#2123).
 
@@ -26,22 +26,10 @@ function row(overrides: Partial<AstroliftDeployment>) {
     statusReason: "",
     ...overrides,
   } as AstroliftDeployment;
-  render(
-    <table>
-      <tbody>
-        <DeploymentRow
-          deployment={d}
-          isOpen={false}
-          selected={false}
-          onToggleSelect={() => {}}
-          onToggleOpen={() => {}}
-        />
-      </tbody>
-    </table>
-  );
+  render(<DeploymentStatusCell deployment={d} />);
 }
 
-describe("DeploymentRow (#2123)", () => {
+describe("DeploymentStatusCell (#2123)", () => {
   it("says what a pending deploy is waiting on", () => {
     row({ statusReason: "Queued behind deploy main-9f8e7d6, still deploying." });
 

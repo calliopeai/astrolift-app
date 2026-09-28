@@ -4,9 +4,9 @@ import { ActivityIcon, GaugeIcon, ScalingIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { Panel } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -83,14 +83,13 @@ export function ScalingCardView({
 
   if (loading && !status) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{labels.title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
+      <Panel
+        title={labels.title}
+        icon={<ScalingIcon className="size-4" />}
+        span={6}
+        loading
+        skeleton={<Skeleton className="h-32 w-full" />}
+      />
     );
   }
   if (!status) {
@@ -114,11 +113,12 @@ export function ScalingCardView({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-          <ScalingIcon className="size-4" />
-          {labels.title}
+    <Panel
+      title={labels.title}
+      icon={<ScalingIcon className="size-4" />}
+      span={6}
+      actions={
+        <>
           {status.isScaling && (
             <Badge className="bg-warning/15 text-warning-fg gap-1">
               <ActivityIcon className="size-3 animate-pulse" />
@@ -131,9 +131,10 @@ export function ScalingCardView({
               {labels.hpaEnabledLabel}
             </Badge>
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
+        </>
+      }
+    >
+      <div className="min-w-0 space-y-5">
         <ManualScaleSection
           status={status}
           pending={pending}
@@ -147,8 +148,8 @@ export function ScalingCardView({
           labels={labels}
         />
         {status.hpaEnabled && <HpaGaugeSection status={status} labels={labels} />}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 

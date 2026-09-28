@@ -2,11 +2,19 @@
 
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
+import { toast } from "sonner";
 
 import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePodResourceUsage } from "@/components/observability/use-pod-resource-usage";
+import {
+  downloadTextFile,
+  formatLogFile,
+  logFilename,
+  toLogLines,
+} from "@/components/screens/apps/deployments/app-log-lines";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import { ON_APP_LOG, ON_APP_LOGS } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
@@ -401,6 +409,22 @@ export function useAppObservability(slug: string) {
     }
   }
 
+  const tViewer = useTranslations("apps.logViewer");
+  function downloadLogs() {
+    if (logBuffer.length === 0) {
+      toast.info(tViewer("downloadEmpty"));
+      return;
+    }
+    const many = allReplicas || isHistorical;
+    const filename = logFilename([
+      { value: a?.slug ?? slug, fallback: "app" },
+      { value: scopedEnv, fallback: "all" },
+      { value: many ? null : selectedPod, fallback: "pod" },
+    ]);
+    downloadTextFile(filename, formatLogFile(toLogLines(logBuffer, { withPodName: many })));
+    toast.success(tViewer("downloadStarted", { filename }));
+  }
+
   return {
     slug,
     app: a,
@@ -424,6 +448,8 @@ export function useAppObservability(slug: string) {
     // Logs
     logBuffer,
     onClearLogs: () => setLogBuffer([]),
+    /** Saves the whole buffer, whatever the screen's filters show. */
+    onDownloadLogs: downloadLogs,
     streaming,
     onToggleStreaming: () => setStreaming((s) => !s),
     allReplicas,

@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
@@ -322,35 +321,42 @@ function spendOf(list: AstroliftPreviewEnvironment[]) {
   };
 }
 
-export const PREVIEWS: AppPreviewsScreenProps = {
+/** Everything but the list state, which stories build with `useLocalListState`. */
+export type PreviewsFixture = Omit<AppPreviewsScreenProps, "list">;
+
+export const PREVIEWS: PreviewsFixture = {
   slug: "checkout",
   app: APP,
   loading: false,
-  list: PREVIEW_ROWS,
+  rows: PREVIEW_ROWS,
+  newRows: { count: 0, onReveal: setter },
+  pageLoading: false,
+  pageError: null,
+  onRetry: setter,
+  nextCursor: null,
+  totalCount: PREVIEW_ROWS.length,
+  previewCount: PREVIEW_ROWS.length,
   counts: { running: 2, failed: 1, tornDown: 1 },
   spend: spendOf(PREVIEW_ROWS),
-  stale: [PREVIEW_ROWS[1]!],
-  table: fakeController<AstroliftPreviewEnvironment>({
-    rows: PREVIEW_ROWS,
-    totalCount: PREVIEW_ROWS.length,
-    sortEnabled: false,
-  }),
+  stalePreviews: [PREVIEW_ROWS[1]!],
+  canDeploy: true,
   tearingDown: false,
   extending: false,
   creating: false,
   onExtend: noop,
   onTearDown: noop,
   onCreate: yes,
-  configHref: "/apps/checkout/config",
+  configHref: "/apps/checkout/settings?section=configuration",
 };
 
-export const PREVIEWS_EMPTY: AppPreviewsScreenProps = {
+export const PREVIEWS_EMPTY: PreviewsFixture = {
   ...PREVIEWS,
-  list: [],
+  rows: [],
+  totalCount: 0,
+  previewCount: 0,
   counts: { running: 0, failed: 0, tornDown: 0 },
   spend: spendOf([]),
-  stale: [],
-  table: fakeController<AstroliftPreviewEnvironment>({ state: "empty", sortEnabled: false }),
+  stalePreviews: [],
 };
 
 const LONG_ROW: AstroliftPreviewEnvironment = {
@@ -358,18 +364,16 @@ const LONG_ROW: AstroliftPreviewEnvironment = {
   branch: `feature/${LONG}`,
   namespace: `checkout-${LONG}`,
   hostname: `pr-412.${LONG}.astrolift.example.com`,
+  commitSha: "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
 };
 
-export const PREVIEWS_LONG: AppPreviewsScreenProps = {
+export const PREVIEWS_LONG: PreviewsFixture = {
   ...PREVIEWS,
   app: { ...APP, name: LONG, slug: LONG, subdomain: LONG } as AstroliftRegisteredApp,
-  list: [LONG_ROW],
+  rows: [LONG_ROW],
+  totalCount: 1,
+  previewCount: 1,
   counts: { running: 1, failed: 0, tornDown: 0 },
   spend: spendOf([LONG_ROW]),
-  stale: [],
-  table: fakeController<AstroliftPreviewEnvironment>({
-    rows: [LONG_ROW],
-    totalCount: 1,
-    sortEnabled: false,
-  }),
+  stalePreviews: [],
 };

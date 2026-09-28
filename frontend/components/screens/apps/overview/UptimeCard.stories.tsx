@@ -42,3 +42,15 @@ export const Down: Story = {
 export const LongStrings: Story = {
   args: { uptime: { ...UPTIME_DATA, uptimePct: 99.99999999999, windowHours: 87600 } },
 };
+
+export const QueryError: Story = {
+  args: { uptime: null, loading: false, error: "Network error: upstream timed out" },
+};
+
+export const At768: Story = {
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <UptimeCardView {...args} />
+    </div>
+  ),
+};

@@ -65,17 +65,8 @@ const NO_PAGE_FIELD = [
       "The pod table reads astroliftAppPods, unpaginated. The alert-rule and alert-event tables beside it are Page-capable and could move independently.",
   },
   {
-    file: "components/screens/apps/secrets/SecretsScreen.tsx",
-    reason:
-      "astroliftAppSecrets and astroliftAppSecretBundleAttachments are unpaginated list fields.",
-  },
-  {
     file: "components/screens/domains/ManagedDomainsScreen.tsx",
     reason: "astroliftManagedDomains is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/environments/EnvironmentsScreen.tsx",
-    reason: "astroliftEnvironments is an unpaginated list field.",
   },
   {
     file: "components/screens/metrics/MetricsScreen.tsx",
@@ -163,13 +154,7 @@ const NOT_A_SERVER_COLLECTION = [
 /**
  * Group 3 — a row shape DataTable does not model.
  */
-const UNSUPPORTED_ROW_SHAPE = [
-  {
-    file: "components/screens/apps/deployments/AppDeploymentsScreen.tsx",
-    reason:
-      "Rows expand into a full-width detail panel row. DataTable's column model has no row-expansion slot, so migrating means designing one first.",
-  },
-];
+const UNSUPPORTED_ROW_SHAPE = [];
 
 /**
  * Group 4 — no blocker. These were owed a migration, and are done.

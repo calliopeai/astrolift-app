@@ -75,7 +75,7 @@ const STATUS_ORDER: Record<string, number> = {
  * `loading` is true only for the first load; refetches render in place.
  */
 export function useManagedServicesSummary(appSlug: string) {
-  const { data, loading } = useQuery<Resp>(LIST_MANAGED_SERVICES, {
+  const { data, loading, error, refetch } = useQuery<Resp>(LIST_MANAGED_SERVICES, {
     variables: { appSlug, environmentName: null },
     fetchPolicy: "cache-and-network",
   });
@@ -89,7 +89,13 @@ export function useManagedServicesSummary(appSlug: string) {
     });
   }, [data]);
 
-  return { loading: loading && !data, services };
+  return {
+    loading: loading && !data,
+    services,
+    /** Only when there is nothing cached to show. */
+    error: data ? null : (error?.message ?? null),
+    onRetry: () => void refetch(),
+  };
 }
 
 /**

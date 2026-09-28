@@ -3,13 +3,11 @@
 import { ManagedServicesScreen } from "@/components/screens/apps/managed-services/ManagedServicesScreen";
 import { useManagedServices } from "@/components/screens/apps/managed-services/use-managed-services";
 
-import { AppTabs } from "../components/app-tabs";
-
 import { EmailDetailSheet } from "./email-detail-sheet";
 import { ServiceDetailSheet } from "./service-detail-sheet";
 
 /**
- * Managed-services tab. The screen owns the markup; the email sheet and
+ * The Managed services section of the Workloads tab. The screen owns the markup; the email sheet and
  * the service detail sheet get containers so their queries run only while
  * the service they describe is open.
  */
@@ -18,7 +16,6 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
     <ManagedServicesScreen
       {...useManagedServices(slug)}
       slug={slug}
-      tabs={<AppTabs slug={slug} active="settings" />}
       renderEmailDetail={(svc, onOpenChange) => (
         <EmailDetailSheet
           managedServiceId={svc.id}

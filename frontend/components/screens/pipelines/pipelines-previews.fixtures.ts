@@ -7,9 +7,6 @@ import type { CursorTableController } from "@/components/data-table/use-cursor-t
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
-import type { PreviewDetailScreenProps } from "../previews/PreviewDetail";
-import type { PreviewsScreenProps } from "../previews/PreviewsScreen";
-
 import type { PipelineDetailScreenProps, RunGraphViewProps } from "./PipelineDetail";
 import type { PipelineSecretsViewProps } from "./PipelineSecrets";
 import type { PipelineListViewProps, RunHistoryViewProps } from "./PipelinesScreen";
@@ -366,26 +363,3 @@ export const LONG_PREVIEW: AstroliftPreviewEnvironment = {
     "GCP variant: node pool cost is summed per pod rather than per node, so the total here is an over-count by construction and may be out by an order of magnitude on dense pools.",
   ],
 };
-
-export function previewsProps(
-  table: Partial<CursorTableController<AstroliftPreviewEnvironment>> = {},
-  extra: Partial<Omit<PreviewsScreenProps, "table">> = {}
-): PreviewsScreenProps {
-  return {
-    table: fakeController<AstroliftPreviewEnvironment>({
-      rows: PREVIEWS,
-      totalCount: PREVIEWS.length,
-      ...table,
-    }),
-    canTearDown: true,
-    tearingDown: false,
-    tearDown: resolveVoid,
-    ...extra,
-  };
-}
-
-export function previewDetailProps(
-  extra: Partial<PreviewDetailScreenProps> = {}
-): PreviewDetailScreenProps {
-  return { id: PREVIEWS[0].id, preview: PREVIEWS[0], loading: false, ...extra };
-}

@@ -1,76 +1,98 @@
 "use client";
 
 import {
+  ActivityIcon,
   CheckIcon,
-  ClockIcon,
-  GripVerticalIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  FileCodeIcon,
+  InfoIcon,
+  MoreHorizontalIcon,
+  NotebookTextIcon,
+  RadioIcon,
+  RocketIcon,
   RotateCcwIcon,
   StopCircleIcon,
   Trash2Icon,
   UndoIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  useDefaultLayout,
-} from "react-resizable-panels";
+import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
-import { PageShell } from "@/components/PageShell";
+import { Identifier } from "@/components/Identifier";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { RunPage } from "@/components/run/RunPage";
 import {
   formatDuration,
   formatTime,
 } from "@/components/screens/apps/deployments/app-deployments-format";
+import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StaleManifestNotice } from "@/components/StaleManifestNotice";
-import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PipelineDag, type PipelineDagStage } from "@/components/viz";
-import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { DefinitionList } from "@/components/ui/definition-list";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
-import { IN_FLIGHT, statusToDot } from "./deployments-format";
+import { appsDetailCrumbs } from "./apps-area";
+import { IN_FLIGHT } from "./deployments-format";
+import {
+  deploymentFailure,
+  deploymentLogLines,
+  deploymentSteps,
+  deploySha,
+} from "./deployments-list";
 import type { useDeploymentDetail } from "./use-deployment-detail";
 
 export type DeploymentDetailScreenProps = ReturnType<typeof useDeploymentDetail>;
 
-// useDefaultLayout's storage option defaults to bare `localStorage`, which
-// throws during SSR (client components still server-render). Guard both
-// sides like AstroliftNav's collapsed-state helpers — degrade silently
-// when localStorage is unavailable or disabled.
-const splitLayoutStorage = {
-  getItem(key: string): string | null {
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-  setItem(key: string, value: string) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(key, value);
-    } catch {
-      // localStorage might be disabled — degrade silently.
-    }
-  },
-};
+/** Deployments ▾ › storefront › deploy 4f2a9c1e (spec 44 §4.4). */
+function crumbs(d: AstroliftDeployment | null) {
+  if (!d) return appsDetailCrumbs("deployments", { label: "deploy …" });
+  return appsDetailCrumbs(
+    "deployments",
+    { label: d.registeredAppSlug, href: `/apps/${d.registeredAppSlug}/deployments` },
+    { label: `deploy ${deploySha(d)}` }
+  );
+}
 
-/** One deployment: status, fields, flow DAG, lifecycle, release notes, activity, events, manifests. */
+function elapsedMs(d: AstroliftDeployment, now: number): number | null {
+  if (IN_FLIGHT.has(d.status) && d.status !== "pending_approval") {
+    const from = Date.parse(d.startedAt ?? d.createdAt);
+    return Number.isFinite(from) ? Math.max(0, now - from) : null;
+  }
+  return d.durationSeconds != null ? d.durationSeconds * 1000 : null;
+}
+
+/**
+ * One deployment on the run archetype (spec 44 §5.5, #2123): the phases
+ * (build, push, approval, rollout, health) on the left, the lifecycle log on
+ * the right, status, duration and the next action in the header, and a
+ * failure's reason first. Below the run: the deploy's details, approvals,
+ * release notes, events and rendered manifest. Pure view; the data half is
+ * useDeploymentDetail.
+ */
 export function DeploymentDetailScreen({
   deployment: d,
   loading,
+  error,
+  onRetry,
+  now,
   log,
   logLoading,
+  logError,
+  onRetryLog,
+  onDownload,
   manifest,
   manifestLoading,
   events,
@@ -89,520 +111,489 @@ export function DeploymentDetailScreen({
   onDelete,
 }: DeploymentDetailScreenProps) {
   const t = useTranslations("lists.deploymentDetail");
-
-  // Split-pane plumbing (#1056b): stacked below md, resizable side-by-side
-  // at md+. All data hooks live in useDeploymentDetail, above this view,
-  // so switching layouts never remounts the lifecycle subscription or any
-  // query.
-  const isMobile = useIsMobile();
-  const splitLayout = useDefaultLayout({
-    id: "deployment-detail-split",
-    storage: splitLayoutStorage,
-  });
-
-  // #1055 — the lifecycle log rendered as a DAG: a linear chain of status
-  // transitions. Every entry before the newest reads as completed; the
-  // newest carries the live status (in-flight statuses map to "running"
-  // so the node pulses).
-  const dagStages = React.useMemo<PipelineDagStage[]>(
-    () =>
-      log.map((e, i) => {
-        const last = i === log.length - 1;
-        const active = IN_FLIGHT.has(e.status as DeploymentStatus) || e.status === "running";
-        return {
-          id: e.id,
-          name: e.status.replace(/_/g, " "),
-          status: !last ? "completed" : active ? "running" : e.status,
-          needs: i > 0 ? [log[i - 1].id] : [],
-          // Last node: show a live "running" duration while in flight;
-          // terminal nodes get no duration (an instant, not a span).
-          startedAt: last && !active ? null : e.occurredAt,
-          finishedAt: last ? null : log[i + 1].occurredAt,
-        };
-      }),
-    [log]
-  );
-
   const [confirmAbort, setConfirmAbort] = React.useState(false);
   const [confirmRollback, setConfirmRollback] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
-  if (loading && !d) {
+  const lines = React.useMemo(() => deploymentLogLines(log), [log]);
+
+  if (!d && loading) {
     return (
-      <PageShell title={t("loadingTitle")} description={t("loading")}>
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </PageShell>
+      <RunPage
+        crumbs={crumbs(null)}
+        title={t("loadingTitle")}
+        steps={[]}
+        stepsLoading
+        log={{ lines: [], loading: true, title: t("lifecycle") }}
+      />
     );
   }
 
   if (!d) {
     return (
-      <PageShell title={t("notFoundTitle")} description={t("notFoundDescription")}>
-        <Card>
-          <CardContent className="text-muted-foreground p-6 text-sm">
-            {t("returnLink")}{" "}
-            <Link href="/deployments" className="underline">
-              {t("deploymentsList")}
-            </Link>
-            .
-          </CardContent>
-        </Card>
-      </PageShell>
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <ShellHeader crumbs={crumbs(null)} title={error ? t("loadingTitle") : t("notFoundTitle")} />
+        <PanelGrid>
+          <Panel
+            title={t("loadingTitle")}
+            icon={<RocketIcon className="size-4" />}
+            error={error}
+            onRetry={onRetry}
+            empty={
+              error
+                ? null
+                : {
+                    icon: <RocketIcon className="size-5" />,
+                    title: t("notFoundTitle"),
+                    description: t("notFoundDescription"),
+                    actionHref: "/deployments",
+                    actionLabel: "Open deployments",
+                  }
+            }
+          />
+        </PanelGrid>
+      </div>
     );
   }
 
   const inFlight = IN_FLIGHT.has(d.status);
-  const showApprove =
+  const canApproveThis =
     d.status === "pending_approval" && d.approvalsReceived < d.approvalsRequired && canApprove;
-  const showAbort = inFlight && canDeploy;
-  const showRollback = d.status === "running" && canRollback;
-  const showRedeploy = (d.status === "running" || d.status === "failed") && canDeploy;
-  // Dismiss / delete: terminal rows (failed / superseded / rolled_back)
-  // soft-delete; a running row is superseded. Same app.deploy gate as
-  // abort. Hidden for in-flight rows — those abort first.
-  const showDelete =
+  const canAbortThis = inFlight && canDeploy;
+  const canRollbackThis = d.status === "running" && canRollback;
+  const canRedeployThis = (d.status === "running" || d.status === "failed") && canDeploy;
+  // Terminal rows soft-delete; a running row is retired (superseded).
+  // In-flight rows abort first.
+  const canDeleteThis =
     (d.status === "failed" ||
       d.status === "superseded" ||
       d.status === "rolled_back" ||
       d.status === "running") &&
     canDeploy;
 
-  // The dense middle of the page is split into two panes at md+ (#1056b):
-  // left = DAG + approval/release context, right = the logs + events
-  // stream. Below md the same cards stack. Each card is built once and
-  // referenced from whichever layout is live.
-  const dagCard = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Deployment flow</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {logLoading && log.length === 0 ? (
-          <Skeleton className="h-40 w-full" />
-        ) : dagStages.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noLog")}</p>
-        ) : (
-          <PipelineDag
-            key={`${log.length}:${log[log.length - 1]?.id ?? ""}`}
-            stages={dagStages}
-            height={240}
-            variant="telemetry"
-          />
+  // The one next action (spec 44 §4.4 rule 4); the rest sit in ⋯.
+  const primaryAction = canApproveThis ? (
+    <Can permission="app.approve_deploy">
+      <Button size="sm" disabled={busy} onClick={onApprove}>
+        <CheckIcon className="size-4" /> {t("approve")}
+      </Button>
+    </Can>
+  ) : canAbortThis ? (
+    <Can permission="app.deploy">
+      <Button size="sm" variant="destructive" disabled={busy} onClick={() => setConfirmAbort(true)}>
+        <StopCircleIcon className="size-4" /> {t("abort")}
+      </Button>
+    </Can>
+  ) : d.status === "failed" && canRedeployThis ? (
+    <Can permission="app.deploy">
+      <Button size="sm" disabled={busy} onClick={onRedeploy}>
+        <RotateCcwIcon className="size-4" /> {t("redeploy")}
+      </Button>
+    </Can>
+  ) : canRollbackThis ? (
+    <Can permission="app.rollback">
+      <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmRollback(true)}>
+        <UndoIcon className="size-4" /> {t("rollback")}
+      </Button>
+    </Can>
+  ) : null;
+
+  const commitHref =
+    d.repoUrl && d.commitSha ? `${d.repoUrl.replace(/\/$/, "")}/commit/${d.commitSha}` : null;
+
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        {d.status === "running" && canRedeployThis && (
+          <DropdownMenuItem disabled={busy} onSelect={() => void onRedeploy()}>
+            <RotateCcwIcon className="size-4" />
+            {t("redeploy")}
+          </DropdownMenuItem>
         )}
-      </CardContent>
-    </Card>
+        {commitHref && (
+          <DropdownMenuItem asChild>
+            <a href={commitHref} target="_blank" rel="noopener noreferrer">
+              <ExternalLinkIcon className="size-4" />
+              View commit
+            </a>
+          </DropdownMenuItem>
+        )}
+        {d.ciRunUrl && (
+          <DropdownMenuItem asChild>
+            <a href={d.ciRunUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLinkIcon className="size-4" />
+              Open CI run
+            </a>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onSelect={() => {
+            navigator.clipboard
+              .writeText(d.id)
+              .then(() => toast.success("Deployment ID copied."))
+              .catch(() => toast.error("Couldn't copy to clipboard."));
+          }}
+        >
+          <CopyIcon className="size-4" />
+          Copy deployment ID
+        </DropdownMenuItem>
+        {canDeleteThis && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={busy}
+              onSelect={() => setConfirmDelete(true)}
+            >
+              <Trash2Icon className="size-4" />
+              {d.status === "running" ? t("retire") : t("delete")}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
-  const lifecycleCard = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t("lifecycle")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {logLoading && log.length === 0 ? (
-          <Skeleton className="h-24 w-full" />
-        ) : log.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noLog")}</p>
-        ) : (
-          <ol className="border-muted relative ml-3 space-y-4 border-l pl-4">
-            {log.map((e) => (
-              <li key={e.id} className="relative">
-                <span className="bg-background border-muted-foreground absolute top-1 -left-[21px] size-3 rounded-full border" />
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-mono text-sm capitalize">
-                    {e.status.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-muted-foreground text-xs">{formatTime(e.occurredAt)}</span>
-                </div>
-                {e.message && <div className="text-sm">{e.message}</div>}
-                {e.detail && Object.keys(e.detail).length > 0 && (
-                  <pre className="bg-muted mt-1 max-h-40 overflow-auto rounded p-2 text-xs">
-                    {JSON.stringify(e.detail, null, 2)}
-                  </pre>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  // #657 / #738 — Release notes block. When the backend resolver
-  // returns content (PR descriptions + commit subjects between the
-  // previous successful deploy and this one), we render the full
-  // structured block; otherwise fall back to the raw commit message
-  // expander so the card is always non-empty when there's text.
-  const releaseNotesCard =
-    releaseNotes || d.commitMessage ? (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Release notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {releaseNotes ? (
-            <>
-              {releaseNotes.pullRequests.length > 0 && (
-                <ul className="space-y-2">
-                  {releaseNotes.pullRequests.map((pr) => (
-                    <li key={pr.number} className="border-muted border-l-2 pl-3">
-                      <span className="font-medium">{pr.title}</span>
-                      {pr.prUrl && (
-                        <a
-                          href={pr.prUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-muted-foreground ml-2 text-xs hover:underline"
-                        >
-                          #{pr.number}
-                        </a>
-                      )}
-                      {pr.body && (
-                        <p className="text-muted-foreground mt-1 text-xs whitespace-pre-wrap">
-                          {pr.body.slice(0, 400)}
-                          {pr.body.length > 400 && "…"}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {releaseNotes.commits.filter((c) => !c.isMerge).length > 0 && (
-                <details>
-                  <summary className="text-muted-foreground cursor-pointer text-xs">
-                    {releaseNotes.commits.filter((c) => !c.isMerge).length} commits
-                  </summary>
-                  <ul className="mt-2 space-y-1">
-                    {releaseNotes.commits
-                      .filter((c) => !c.isMerge)
-                      .map((c) => (
-                        <li key={c.sha} className="text-muted-foreground font-mono text-xs">
-                          <span className="text-foreground">{c.sha.slice(0, 7)}</span> {c.subject}
-                        </li>
-                      ))}
-                  </ul>
-                </details>
-              )}
-              {releaseNotes.compareUrl && (
-                <a
-                  href={releaseNotes.compareUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground text-xs hover:underline"
-                >
-                  View full diff →
-                </a>
-              )}
-            </>
-          ) : (
-            d.commitMessage && (
-              <details>
-                <summary className="text-muted-foreground cursor-pointer text-xs">
-                  {d.commitMessage.split("\n")[0].slice(0, 120)}
-                  {d.commitMessage.length > 120 && "…"}
-                </summary>
-                <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded p-3 font-mono text-xs whitespace-pre-wrap">
-                  {d.commitMessage}
-                </pre>
-              </details>
-            )
-          )}
-        </CardContent>
-      </Card>
-    ) : null;
-
-  // #653 — approval/review trail. Shows the full audit chain
-  // (proposed → reviewed → approved → deployed) when the deploy
-  // gated through quorum; collapses to a single triggered-by row
-  // when no approval was required. Lazy-loaded so an open detail
-  // page on an ungated deploy stays cheap.
-  const activityCard = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Activity</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {approvalHistoryLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : approvalHistory.length === 0 ? (
-          <div className="text-muted-foreground text-sm">
-            {d.triggeredByUserId
-              ? `Triggered by user ${d.triggeredByUserId} via ${d.triggerKind}.`
-              : `Triggered automatically via ${d.triggerKind}${d.ciProvider ? ` (${d.ciProvider})` : ""}.`}
-            {d.approvalsRequired === 0 && " No approvals required for this environment."}
-          </div>
-        ) : (
-          <ol className="border-muted relative ml-3 space-y-3 border-l pl-4 text-sm">
-            {approvalHistory.map((e) => (
-              <li key={e.id} className="relative">
-                <span className="bg-background border-muted-foreground absolute top-1.5 -left-[21px] size-3 rounded-full border" />
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-medium capitalize">{e.action}</span>
-                  {e.decision && e.decision !== "none" && (
-                    <Badge
-                      variant={
-                        e.decision === "approved"
-                          ? "default"
-                          : e.decision === "rejected"
-                            ? "destructive"
-                            : "outline"
-                      }
-                      className="text-2xs capitalize"
-                    >
-                      {e.decision}
-                    </Badge>
-                  )}
-                  <span className="text-muted-foreground font-mono text-xs">
-                    {e.actorDisplay} ({e.actorKind})
-                  </span>
-                  <span className="text-muted-foreground ml-auto text-xs">
-                    {formatTime(e.occurredAt)}
-                  </span>
-                </div>
-                {e.reason && <div className="text-muted-foreground mt-0.5 italic">{e.reason}</div>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const eventsCard = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t("events")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {eventsLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : (
-          (() => {
-            const filtered = events.filter(
-              (e) => e.registeredAppId && d.registeredAppSlug && e.registeredAppId.length > 0
-            );
-            if (filtered.length === 0) {
-              return <p className="text-muted-foreground text-sm">{t("noEvents")}</p>;
-            }
-            return (
-              <ul className="divide-y">
-                {filtered.slice(0, 12).map((e) => (
-                  <li key={e.id} className="py-2 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs">{e.eventType}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {formatTime(e.occurredAt)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            );
-          })()
-        )}
-      </CardContent>
-    </Card>
-  );
+  const nonMerge = releaseNotes?.commits.filter((c) => !c.isMerge) ?? [];
+  // Kept as it was: platform events that name an app.
+  const appEvents = events.filter((e) => e.registeredAppId && e.registeredAppId.length > 0);
 
   return (
-    <PageShell
-      title={t("title", { app: d.registeredAppSlug, env: d.environmentName })}
-      description={t("subtitle", { id: d.id })}
-      actions={
-        <div className="flex items-center gap-2">
-          {showApprove && (
-            <Can permission="app.approve_deploy">
-              <Button size="sm" disabled={busy} onClick={onApprove}>
-                <CheckIcon className="size-4" /> {t("approve")}
-              </Button>
-            </Can>
-          )}
-          {showAbort && (
-            <Can permission="app.deploy">
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={busy}
-                onClick={() => setConfirmAbort(true)}
-              >
-                <StopCircleIcon className="size-4" /> {t("abort")}
-              </Button>
-            </Can>
-          )}
-          {showRollback && (
-            <Can permission="app.rollback">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => setConfirmRollback(true)}
-              >
-                <UndoIcon className="size-4" /> {t("rollback")}
-              </Button>
-            </Can>
-          )}
-          {showRedeploy && (
-            <Can permission="app.deploy">
-              <Button size="sm" variant="outline" disabled={busy} onClick={onRedeploy}>
-                <RotateCcwIcon className="size-4" /> {t("redeploy")}
-              </Button>
-            </Can>
-          )}
-          {showDelete && (
-            <Can permission="app.deploy">
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={busy}
-                onClick={() => setConfirmDelete(true)}
-              >
-                <Trash2Icon className="size-4" />{" "}
-                {d.status === "running" ? t("retire") : t("delete")}
-              </Button>
-            </Can>
-          )}
-        </div>
-      }
-    >
-      {/* #1553: say so when this rollout rendered the stored manifest
-       * instead of the repo's. Above the status card because it changes
-       * what a green deploy means. */}
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <RunPage
+        crumbs={crumbs(d)}
+        title={`deploy ${deploySha(d)}`}
+        status={<DeploymentStatusPill status={d.status} />}
+        durationMs={elapsedMs(d, now)}
+        context={
+          <>
+            <span className="font-mono">{d.registeredAppSlug}</span>
+            {" · "}
+            <span className="font-mono">{d.environmentName}</span>
+            {" · "}
+            <span className="font-mono">{d.triggerKind}</span>
+          </>
+        }
+        primaryAction={primaryAction}
+        menu={menu}
+        steps={deploymentSteps(d, log, now)}
+        stepsLoading={logLoading && log.length === 0}
+        stepsError={logError}
+        onRetrySteps={onRetryLog}
+        failure={deploymentFailure(d, log)}
+        log={{
+          lines,
+          title: t("lifecycle"),
+          onDownload: log.length > 0 ? onDownload : undefined,
+          loading: logLoading && log.length === 0,
+          error: logError,
+          onRetry: onRetryLog,
+          emptyHint: t("noLog"),
+        }}
+      />
+
+      {/* #1553: this rollout rendered the stored manifest, not the repo's.
+          It changes what a green deploy means, so it leads the details. */}
       <StaleManifestNotice
         status={d.manifestResyncStatus}
         error={d.manifestResyncError}
         appSlug={d.registeredAppSlug}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <StatusDot status={statusToDot[d.status]} />
-            <DeploymentStatusPill status={d.status} />
-            {d.approvalsRequired > 0 && (
-              <Badge variant="secondary">
+
+      <PanelGrid className="items-start">
+        <Panel title="Details" icon={<InfoIcon className="size-4" />} span={6}>
+          <DefinitionList
+            items={[
+              {
+                term: t("fields.imageTag"),
+                description: d.imageTag ? <Identifier value={d.imageTag} form="full" /> : "—",
+              },
+              {
+                term: t("fields.imageDigest"),
+                description: d.imageDigest ? (
+                  <Identifier value={d.imageDigest} kind="digest" form="full" />
+                ) : (
+                  "—"
+                ),
+              },
+              {
+                term: t("fields.commit"),
+                description: d.commitSha ? (
+                  <Identifier value={d.commitSha} kind="sha" form="full" />
+                ) : (
+                  "—"
+                ),
+              },
+              {
+                term: t("fields.branch"),
+                description: <span className="font-mono text-xs">{d.branch || "—"}</span>,
+              },
+              {
+                term: t("fields.workload"),
+                description: <span className="font-mono text-xs">{d.workloadSlug || "—"}</span>,
+              },
+              {
+                term: t("fields.clusterRevision"),
+                description: <span className="font-mono text-xs">{d.clusterRevision || "—"}</span>,
+              },
+              {
+                term: "Strategy",
+                description: (
+                  <span className="font-mono text-xs">
+                    {d.strategy && d.strategy !== "unknown" ? d.strategy.replace(/_/g, " ") : "—"}
+                  </span>
+                ),
+              },
+              {
+                term: t("fields.ciProvider"),
+                description: (
+                  <span className="font-mono text-xs">
+                    {[d.ciProvider, d.ciActorKind].filter(Boolean).join(" · ") || "—"}
+                  </span>
+                ),
+              },
+              {
+                term: t("fields.ciRun"),
+                description: d.ciRunUrl ? (
+                  <a
+                    href={d.ciRunUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-xs [overflow-wrap:anywhere] hover:underline"
+                  >
+                    {d.ciRunUrl}
+                  </a>
+                ) : (
+                  "—"
+                ),
+              },
+              {
+                term: t("fields.created"),
+                description: <span className="font-mono text-xs">{formatTime(d.createdAt)}</span>,
+              },
+              {
+                term: t("fields.started"),
+                description: <span className="font-mono text-xs">{formatTime(d.startedAt)}</span>,
+              },
+              {
+                term: d.failedAt ? t("fields.failed") : t("fields.succeeded"),
+                description: (
+                  <span className="font-mono text-xs">
+                    {formatTime(d.failedAt ?? d.succeededAt)}
+                  </span>
+                ),
+              },
+              {
+                term: t("fields.duration"),
+                description: (
+                  <span className="font-mono text-xs">{formatDuration(d.durationSeconds)}</span>
+                ),
+              },
+            ]}
+          />
+        </Panel>
+
+        {/* #653: the approval trail when the deploy gated through quorum, else
+            who or what triggered it. */}
+        <Panel
+          title="Approvals"
+          icon={<ActivityIcon className="size-4" />}
+          span={6}
+          loading={approvalHistoryLoading}
+          actions={
+            d.approvalsRequired > 0 ? (
+              <Badge variant="secondary" className="font-mono">
                 {t("approvalsCount", {
                   received: d.approvalsReceived,
                   required: d.approvalsRequired,
                 })}
               </Badge>
-            )}
-            <Badge variant="outline" className="font-mono">
-              {d.triggerKind}
-            </Badge>
-            {d.strategy && d.strategy !== "unknown" && (
-              <Badge variant="outline" className="font-mono capitalize">
-                {d.strategy.replace(/_/g, " ")}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-          <Field label={t("fields.imageTag")} mono value={d.imageTag || "—"} />
-          <Field label={t("fields.imageDigest")} mono value={d.imageDigest || "—"} />
-          <Field label={t("fields.clusterRevision")} mono value={d.clusterRevision || "—"} />
-          <Field label={t("fields.workload")} mono value={d.workloadSlug || "—"} />
-          <Field label={t("fields.created")} value={formatTime(d.createdAt)} />
-          <Field label={t("fields.started")} value={formatTime(d.startedAt)} />
-          <Field label={t("fields.succeeded")} value={formatTime(d.succeededAt)} />
-          <Field label={t("fields.failed")} value={formatTime(d.failedAt)} />
-          <Field
-            label={t("fields.duration")}
-            value={
-              <span className="inline-flex items-center gap-1">
-                <ClockIcon className="size-3" />
-                {formatDuration(d.durationSeconds)}
-              </span>
-            }
-          />
-          {(d.commitSha || d.branch || d.ciRunUrl) && (
-            <>
-              {d.commitSha && (
-                <Field label={t("fields.commit")} mono value={d.commitSha.slice(0, 12)} />
-              )}
-              {d.branch && <Field label={t("fields.branch")} mono value={d.branch} />}
-              {d.ciActorKind && <Field label={t("fields.ciActor")} mono value={d.ciActorKind} />}
-              {d.ciProvider && <Field label={t("fields.ciProvider")} mono value={d.ciProvider} />}
-              {d.ciRunUrl && (
-                <Field
-                  label={t("fields.ciRun")}
-                  value={
-                    <a
-                      href={d.ciRunUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-sm hover:underline"
-                    >
-                      {d.ciRunUrl}
-                    </a>
-                  }
-                />
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {isMobile ? (
-        <>
-          {dagCard}
-          {lifecycleCard}
-          {releaseNotesCard}
-          {activityCard}
-          {eventsCard}
-        </>
-      ) : (
-        <PanelGroup
-          orientation="horizontal"
-          id="deployment-detail-split"
-          defaultLayout={splitLayout.defaultLayout}
-          onLayoutChanged={splitLayout.onLayoutChanged}
+            ) : undefined
+          }
         >
-          <Panel id="deployment-context" defaultSize="55%" minSize="30%">
-            <div className="flex h-full flex-col gap-6 overflow-y-auto">
-              {dagCard}
-              {releaseNotesCard}
-              {activityCard}
-            </div>
-          </Panel>
-          <PanelResizeHandle className="bg-border/50 hover:bg-border focus-visible:ring-ring mx-2 flex w-2 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none">
-            <GripVerticalIcon className="text-muted-foreground size-4" />
-          </PanelResizeHandle>
-          <Panel id="deployment-streams" defaultSize="45%" minSize="25%">
-            <div className="flex h-full flex-col gap-6 overflow-y-auto">
-              {lifecycleCard}
-              {eventsCard}
-            </div>
-          </Panel>
-        </PanelGroup>
-      )}
+          {approvalHistory.length === 0 ? (
+            <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+              {d.triggeredByUserId
+                ? `Triggered by user ${d.triggeredByUserId} via ${d.triggerKind}.`
+                : `Triggered automatically via ${d.triggerKind}${d.ciProvider ? ` (${d.ciProvider})` : ""}.`}
+              {d.approvalsRequired === 0 && " No approvals required for this environment."}
+            </p>
+          ) : (
+            <ol className="flex min-w-0 flex-col divide-y text-sm">
+              {approvalHistory.map((e) => (
+                <li key={e.id} className="min-w-0 py-2 first:pt-0 last:pb-0">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                    <span className="font-medium capitalize">{e.action}</span>
+                    {e.decision && e.decision !== "none" && (
+                      <Badge
+                        variant={
+                          e.decision === "approved"
+                            ? "default"
+                            : e.decision === "rejected"
+                              ? "destructive"
+                              : "outline"
+                        }
+                        className="text-2xs capitalize"
+                      >
+                        {e.decision}
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+                      {e.actorDisplay} ({e.actorKind})
+                    </span>
+                    <span className="text-muted-foreground ml-auto font-mono text-xs">
+                      {formatTime(e.occurredAt)}
+                    </span>
+                  </div>
+                  {e.reason && (
+                    <p className="text-muted-foreground mt-0.5 [overflow-wrap:anywhere] italic">
+                      {e.reason}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("manifests")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {manifestLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : manifest?.error ? (
-            <div className="text-destructive text-sm">
-              <p className="font-medium">{t("renderFailed")}</p>
-              <p className="mt-1">{manifest.error}</p>
-              {manifest.errorPath && (
-                <p className="text-muted-foreground mt-1 font-mono text-xs">
-                  {manifest.errorPath}
-                  {manifest.errorLine != null && ` :${manifest.errorLine}`}
-                </p>
-              )}
-            </div>
-          ) : manifest ? (
-            <pre className="bg-muted max-h-[480px] overflow-auto rounded p-3 font-mono text-xs leading-relaxed">
+        {/* #657, #738: the PRs and commits since the previous good deploy,
+            else the raw commit message. */}
+        {(releaseNotes || d.commitMessage) && (
+          <Panel title="Release notes" icon={<NotebookTextIcon className="size-4" />} span={6}>
+            {releaseNotes ? (
+              <div className="flex min-w-0 flex-col gap-3 text-sm">
+                {releaseNotes.pullRequests.length > 0 && (
+                  <ul className="flex min-w-0 flex-col gap-2">
+                    {releaseNotes.pullRequests.map((pr) => (
+                      <li key={pr.number} className="border-muted min-w-0 border-l-2 pl-3">
+                        <span className="font-medium [overflow-wrap:anywhere]">{pr.title}</span>
+                        {pr.prUrl && (
+                          <a
+                            href={pr.prUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground ml-2 font-mono text-xs hover:underline"
+                          >
+                            #{pr.number}
+                          </a>
+                        )}
+                        {pr.body && (
+                          <p className="text-muted-foreground mt-1 text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+                            {pr.body.slice(0, 400)}
+                            {pr.body.length > 400 && "…"}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {nonMerge.length > 0 && (
+                  <details>
+                    <summary className="text-muted-foreground cursor-pointer text-xs">
+                      <span className="font-mono">{nonMerge.length}</span> commits
+                    </summary>
+                    <ul className="mt-2 flex flex-col gap-1">
+                      {nonMerge.map((c) => (
+                        <li
+                          key={c.sha}
+                          className="text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]"
+                        >
+                          <span className="text-foreground">{c.sha.slice(0, 7)}</span> {c.subject}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {releaseNotes.compareUrl && (
+                  <a
+                    href={releaseNotes.compareUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground text-xs hover:underline"
+                  >
+                    View full diff
+                  </a>
+                )}
+              </div>
+            ) : (
+              <details>
+                <summary className="text-muted-foreground cursor-pointer text-xs [overflow-wrap:anywhere]">
+                  {d.commitMessage.split("\n")[0].slice(0, 120)}
+                  {d.commitMessage.length > 120 && "…"}
+                </summary>
+                <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded p-3 font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+                  {d.commitMessage}
+                </pre>
+              </details>
+            )}
+          </Panel>
+        )}
+
+        <Panel
+          title={t("events")}
+          icon={<RadioIcon className="size-4" />}
+          span={6}
+          loading={eventsLoading}
+          empty={
+            appEvents.length === 0
+              ? { icon: <RadioIcon className="size-5" />, title: t("noEvents") }
+              : null
+          }
+          flush
+        >
+          <ul className="divide-y">
+            {appEvents.slice(0, 12).map((e) => (
+              <li key={e.id} className="flex min-w-0 items-center justify-between gap-2 px-4 py-2">
+                <span className="min-w-0 truncate font-mono text-xs">{e.eventType}</span>
+                <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                  {formatTime(e.occurredAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+
+        <Panel
+          title={t("manifests")}
+          icon={<FileCodeIcon className="size-4" />}
+          span={12}
+          loading={manifestLoading}
+          failure={
+            manifest?.error
+              ? {
+                  title: t("renderFailed"),
+                  reason: (
+                    <>
+                      {manifest.error}
+                      {manifest.errorPath && (
+                        <span className="block">
+                          {manifest.errorPath}
+                          {manifest.errorLine != null && `:${manifest.errorLine}`}
+                        </span>
+                      )}
+                    </>
+                  ),
+                }
+              : null
+          }
+          empty={
+            !manifest
+              ? { icon: <FileCodeIcon className="size-5" />, title: t("noManifests") }
+              : null
+          }
+        >
+          {manifest && !manifest.error && (
+            <pre className="bg-muted max-h-96 overflow-auto rounded p-3 font-mono text-xs leading-relaxed">
               {JSON.stringify(manifest.resources, null, 2)}
             </pre>
-          ) : (
-            <p className="text-muted-foreground text-sm">{t("noManifests")}</p>
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelGrid>
 
       <ConfirmDialog
         reason={{
@@ -622,10 +613,7 @@ export function DeploymentDetailScreen({
       <ConfirmDialog
         open={confirmRollback}
         onOpenChange={setConfirmRollback}
-        title={t("confirmRollback.title", {
-          app: d.registeredAppSlug,
-          env: d.environmentName,
-        })}
+        title={t("confirmRollback.title", { app: d.registeredAppSlug, env: d.environmentName })}
         description={t("confirmRollback.description")}
         confirmLabel={t("confirmRollback.confirm")}
         onConfirm={onRollback}
@@ -650,15 +638,6 @@ export function DeploymentDetailScreen({
         destructive
         onConfirm={onDelete}
       />
-    </PageShell>
-  );
-}
-
-function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs tracking-wide uppercase">{label}</div>
-      <div className={mono ? "font-mono text-sm" : "text-sm"}>{value}</div>
     </div>
   );
 }

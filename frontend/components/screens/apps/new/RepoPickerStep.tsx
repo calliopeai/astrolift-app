@@ -344,8 +344,8 @@ function IntroCard() {
         <div className="flex flex-col">
           <span className="text-sm font-medium">How registration works</span>
           <span className="text-muted-foreground text-xs">
-            Three quick steps: connect a Git source, configure the manifest and app details, then
-            deploy.
+            Three steps: Source (the repo and its manifest), Run (the app and how it deploys), then
+            Review.
           </span>
         </div>
         <ChevronDownIcon
@@ -359,18 +359,18 @@ function IntroCard() {
         <div className="grid gap-3 px-4 pb-4 md:grid-cols-3">
           <IntroTile
             icon={PlugIcon}
-            title="Connect"
-            description="Pick a source connection and the repo that holds your app's code."
+            title="1 Source"
+            description="Pick a source connection and repo; we load or scaffold its astrolift.toml manifest."
           />
           <IntroTile
             icon={CogIcon}
-            title="Configure"
-            description="We load or scaffold an astrolift.toml manifest, then collect the app name, slug, and project."
+            title="2 Run"
+            description="Name the app, pick its project, and choose a trigger: auto on push, cron, or manual."
           />
           <IntroTile
             icon={RocketIcon}
-            title="Deploy"
-            description="Choose a trigger (auto on push, cron, or manual) and Astrolift onboards the app."
+            title="3 Review"
+            description="See what will be created and what will deploy, then create the app."
           />
         </div>
       </CollapsibleContent>

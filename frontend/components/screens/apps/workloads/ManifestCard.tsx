@@ -6,7 +6,7 @@ import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/panel/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -53,14 +53,12 @@ export function ManifestCardView({
 
   if (loading && !manifest) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{labels.title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-48 w-full" />
-        </CardContent>
-      </Card>
+      <Panel
+        title={labels.title}
+        icon={<FileCodeIcon className="size-4" />}
+        loading
+        skeleton={<Skeleton className="h-48 w-full" />}
+      />
     );
   }
   if (!manifest) return null;
@@ -68,57 +66,54 @@ export function ManifestCardView({
   const hasPrior = manifest.previousImageTag !== "";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileCodeIcon className="size-4" />
-            {labels.title}
-          </CardTitle>
-          <div className="flex items-center gap-1 rounded-md border p-0.5">
-            <Button
-              size="sm"
-              variant={mode === "manifest" ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs"
-              onClick={() => setMode("manifest")}
-            >
-              {labels.viewToggleManifest}
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === "diff" ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs"
-              onClick={() => setMode("diff")}
-              disabled={!hasPrior}
-              title={!hasPrior ? labels.diffNoHistory : undefined}
-            >
-              {labels.viewToggleDiff}
-            </Button>
-          </div>
+    <Panel
+      title={labels.title}
+      icon={<FileCodeIcon className="size-4" />}
+      description={labels.description}
+      actions={
+        <div className="flex items-center gap-1 rounded-md border p-0.5">
+          <Button
+            size="sm"
+            variant={mode === "manifest" ? "secondary" : "ghost"}
+            className="h-7 px-2 text-xs"
+            onClick={() => setMode("manifest")}
+          >
+            {labels.viewToggleManifest}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "diff" ? "secondary" : "ghost"}
+            className="h-7 px-2 text-xs"
+            onClick={() => setMode("diff")}
+            disabled={!hasPrior}
+            title={!hasPrior ? labels.diffNoHistory : undefined}
+          >
+            {labels.viewToggleDiff}
+          </Button>
         </div>
-        <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="secondary">
-            env <span className="ml-1 font-mono">{manifest.environmentName}</span>
+      }
+    >
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2 text-xs">
+        <Badge variant="secondary" className="max-w-full min-w-0">
+          env <span className="ml-1 truncate font-mono">{manifest.environmentName}</span>
+        </Badge>
+        <Badge variant="secondary" className="max-w-full min-w-0">
+          ns <span className="ml-1 truncate font-mono">{manifest.namespace}</span>
+        </Badge>
+        <Badge variant="secondary" className="max-w-full min-w-0">
+          image <span className="ml-1 truncate font-mono">{manifest.imageTag}</span>
+        </Badge>
+        {hasPrior && mode === "diff" && (
+          <Badge variant="outline" className="max-w-full min-w-0 font-mono">
+            <span className="truncate">prev: {manifest.previousImageTag}</span>
           </Badge>
-          <Badge variant="secondary">
-            ns <span className="ml-1 font-mono">{manifest.namespace}</span>
-          </Badge>
-          <Badge variant="secondary">
-            image <span className="ml-1 font-mono">{manifest.imageTag}</span>
-          </Badge>
-          {hasPrior && mode === "diff" && (
-            <Badge variant="outline" className="font-mono">
-              prev: {manifest.previousImageTag}
-            </Badge>
-          )}
-          <Badge variant="outline">
-            {manifest.resources.length} resource
-            {manifest.resources.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
+        )}
+        <Badge variant="outline" className="font-mono">
+          {manifest.resources.length} resource
+          {manifest.resources.length === 1 ? "" : "s"}
+        </Badge>
+      </div>
+      <div className="min-w-0">
         {manifest.error ? (
           <ManifestError
             error={manifest.error}
@@ -138,8 +133,8 @@ export function ManifestCardView({
             labels={labels}
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 

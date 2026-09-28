@@ -1,30 +1,17 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import * as React from "react";
 
-import { useCursorTable } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
-import { GET_APP, LIST_WORKLOADS, LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
-import type {
-  AstroliftRegisteredApp,
-  AstroliftWorkload,
-  WorkloadKind,
-} from "@/graphql/registry/registry.types";
+import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-interface AppResp {
-  astroliftApp: AstroliftRegisteredApp | null;
-}
+import { APP_WORKLOADS_LIST, selectWorkloads } from "./workloads-list";
+
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
-}
-interface WorkloadsPageResp {
-  astroliftWorkloadsPage: {
-    items: AstroliftWorkload[];
-    nextCursor?: string | null;
-    totalCount?: number | null;
-  };
 }
 interface AppPodsResp {
   astroliftAppPods: AstroliftAppPod[];
@@ -106,22 +93,20 @@ function aggregatePodStatus(
 }
 
 /**
- * The app, its workload table (server-paged), the whole-set summary behind
- * the stats strip, and live pod state for the readiness and restart cells.
- * The data half of WorkloadsListScreen.
+ * The app's workloads as the Workloads tab's list: list state in the URL
+ * (the kind chip is `?kind=`, where `/jobs` lands with `cronjob`), the whole
+ * workload set filtered, sorted and paged by `selectWorkloads`, and live pod
+ * state for the readiness and restart cells. The data half of
+ * WorkloadsListScreen.
  */
 export function useWorkloadsList(slug: string) {
-  const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
+  const list = useListState(APP_WORKLOADS_LIST);
+  const { state } = list;
 
-  /**
-   * The stats strip summarises the app's *whole* workload set, and
-   * `astroliftWorkloadsPage` exposes no aggregate — summing the page in
-   * hand would make "Total replicas" quietly mean "on this page". So the
-   * strip stays on the flat field while the table below pages on the
-   * server. Backend ask: a workload-summary field (or kind / public
-   * filters with `totalCount`) would retire this second round trip.
-   */
-  const summary = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+  // The whole set: an app's workloads are the few its manifest declares.
+  // `astroliftWorkloadsPage` has no kind filter and no sort (see
+  // workloads-list.ts), so the list is answered from this.
+  const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
     pollInterval: 60000,
   });
@@ -134,51 +119,26 @@ export function useWorkloadsList(slug: string) {
     fetchPolicy: "cache-and-network",
   });
 
-  // `astroliftWorkloadsPage` filters on `appSlug` and searches name,
-  // slug, kind and app slug. It takes no sort argument, so no column
-  // declares a `sortKey` — sorting the page in hand while the rest of
-  // the set sits on the server is wrong at every page boundary.
-  const table = useCursorTable<AstroliftWorkload>({
-    query: LIST_WORKLOADS_PAGE,
-    variables: { appSlug: slug },
-    extract: (d) => (d as WorkloadsPageResp | undefined)?.astroliftWorkloadsPage,
-    searchVariable: "search",
-    urlKey: "wl",
-    pollInterval: 60000,
-  });
-
-  const summaryList = React.useMemo(
-    () => summary.data?.astroliftWorkloads ?? [],
-    [summary.data?.astroliftWorkloads]
+  const all = workloads.data?.astroliftWorkloads;
+  const { rows, totalCount } = selectWorkloads(
+    all ?? [],
+    list.filters,
+    state.q,
+    state.sort,
+    state.page,
+    state.pageSize
   );
-  const podList = React.useMemo(
-    () => pods.data?.astroliftAppPods ?? [],
-    [pods.data?.astroliftAppPods]
-  );
-  const liveStatus = React.useMemo(
-    () => aggregatePodStatus(table.rows, podList),
-    [table.rows, podList]
-  );
-
-  // Surface stats up top so an operator immediately sees the shape of
-  // the app's workload set before diving into rows.
-  const totalReplicas = summaryList.reduce((acc, w) => acc + (w.replicas || 0), 0);
-  const publicCount = summaryList.filter((w) => w.isPublic).length;
-  const kindCounts = summaryList.reduce<Partial<Record<WorkloadKind, number>>>((acc, w) => {
-    acc[w.kind] = (acc[w.kind] ?? 0) + 1;
-    return acc;
-  }, {});
+  const liveStatus = aggregatePodStatus(rows, pods.data?.astroliftAppPods ?? []);
 
   return {
-    app: app.data?.astroliftApp ?? null,
-    appLoading: app.loading,
-    table,
-    liveStatus,
-    stats: {
-      workloads: table.totalCount ?? summaryList.length,
-      totalReplicas,
-      publicCount,
-      scheduled: kindCounts.cronjob ?? 0,
+    list,
+    rows,
+    totalCount,
+    loading: workloads.loading && !all,
+    error: workloads.error && !all ? { message: workloads.error.message } : null,
+    onRetry: () => {
+      void workloads.refetch();
     },
+    liveStatus,
   };
 }

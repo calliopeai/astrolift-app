@@ -67,3 +67,15 @@ export const NotFound: Story = { args: { workload: null, workloadLoading: false 
 export const Cronjob: Story = { args: DETAIL_CRONJOB };
 
 export const LongStrings: Story = { args: DETAIL_LONG };
+
+/** The narrowest the web console goes (spec 44 §6): panels stack, tables scroll in their frames. */
+export const Width768: Story = {
+  args: DETAIL_LONG,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 768 }} className="overflow-hidden border">
+        <Story />
+      </div>
+    ),
+  ],
+};

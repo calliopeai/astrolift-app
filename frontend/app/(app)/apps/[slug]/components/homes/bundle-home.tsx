@@ -4,7 +4,6 @@ import { BundleHomeScreen } from "@/components/screens/apps/homes/BundleHome";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
 import { appPath, useAppChrome } from "../app-chrome-context";
-import { AppTabs } from "../app-tabs";
 
 interface BundleHomeProps {
   slug: string;
@@ -24,7 +23,6 @@ export function BundleHome({ slug, name, status, workloads }: BundleHomeProps) {
       workloadHref={(workloadSlug) =>
         appPath(chrome, slug, "workloads", encodeURIComponent(workloadSlug))
       }
-      tabs={<AppTabs slug={slug} active="overview" />}
     />
   );
 }

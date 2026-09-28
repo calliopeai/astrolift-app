@@ -9,15 +9,23 @@ import {
   REDEPLOY_APP,
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { APP_DEPLOYMENTS_OPERATION } from "./app-deployments-query";
 
 interface MutationResultLite<T> {
   ok: boolean;
   errors: { code: string; message: string }[];
   data: T | null;
 }
+
+/**
+ * Refetch by operation name: the tab's page carries a view, chips, a search
+ * and a cursor, so no literal variables object names the page on screen.
+ * `ListDeployments` is the approval queue and the frame's latest deploy.
+ */
+const REFETCH = [APP_DEPLOYMENTS_OPERATION, "ListDeployments"];
 
 function reportResult(
   label: string,
@@ -32,67 +40,52 @@ function reportResult(
 }
 
 /**
- * One deployment row's lifecycle actions. The data half of
- * DeploymentRowActionsView. Abort, redeploy and rollback throw on failure
- * so ConfirmDialog holds open and reports the reason; approve reports its
- * own failure as a toast, since it fires without a dialog.
+ * The lifecycle actions on the Deployments tab's rows: one set of
+ * mutations for the whole list, each taking the deployment it acts on.
+ * Abort, redeploy and rollback throw on failure so ConfirmDialog holds open
+ * and reports the reason; approve fires without a dialog, so it reports its
+ * own failure as a toast.
  */
-export function useDeploymentActions(deployment: AstroliftDeployment, appSlug: string) {
+export function useDeploymentActions() {
   const { can } = useMyPermissions();
-  const d = deployment;
-
-  const refetch = [
-    {
-      query: LIST_DEPLOYMENTS,
-      variables: { appSlug, limit: 100 },
-    },
-  ];
 
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(APPROVE_DEPLOYMENT, { refetchQueries: refetch });
+  }>(APPROVE_DEPLOYMENT, { refetchQueries: REFETCH });
   const [abort, abortState] = useMutation<{
     abortDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ABORT_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ABORT_DEPLOYMENT, { refetchQueries: REFETCH });
   const [rollback, rollbackState] = useMutation<{
     rollbackDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: REFETCH });
   const [redeploy, redeployState] = useMutation<{
     redeployApp: MutationResultLite<AstroliftDeployment>;
-  }>(REDEPLOY_APP, { refetchQueries: refetch });
+  }>(REDEPLOY_APP, { refetchQueries: REFETCH });
 
   const busy =
     approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
 
-  async function onApprove() {
+  async function onApprove(d: AstroliftDeployment) {
     try {
-      const { data } = await approve({
-        variables: { input: { id: d.id } },
-      });
+      const { data } = await approve({ variables: { input: { id: d.id } } });
       reportResult("approveDeployment", data?.approveDeployment);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Approve failed");
     }
   }
 
-  async function onAbort(reason: string) {
-    const { data } = await abort({
-      variables: { input: { id: d.id, reason } },
-    });
+  async function onAbort(d: AstroliftDeployment, reason: string) {
+    const { data } = await abort({ variables: { input: { id: d.id, reason } } });
     reportResult("abortDeployment", data?.abortDeployment);
   }
 
-  async function onRedeploy() {
-    const { data } = await redeploy({
-      variables: { input: { id: d.id } },
-    });
+  async function onRedeploy(d: AstroliftDeployment) {
+    const { data } = await redeploy({ variables: { input: { id: d.id } } });
     reportResult("redeployApp", data?.redeployApp);
   }
 
-  async function onRollback() {
-    const { data } = await rollback({
-      variables: { input: { id: d.id } },
-    });
+  async function onRollback(d: AstroliftDeployment) {
+    const { data } = await rollback({ variables: { input: { id: d.id } } });
     reportResult("rollbackDeployment", data?.rollbackDeployment);
   }
 

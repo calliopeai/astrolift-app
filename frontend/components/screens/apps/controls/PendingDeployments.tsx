@@ -4,6 +4,7 @@ import { CheckIcon, GitCommitIcon, Loader2Icon, ShieldCheckIcon, XIcon } from "l
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Panel } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,12 +13,19 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import { shortDeploymentTag, type usePendingDeployments } from "./use-pending-deployments";
 
-export type PendingDeploymentsViewProps = ReturnType<typeof usePendingDeployments>;
+export type PendingDeploymentsViewProps = ReturnType<typeof usePendingDeployments> & {
+  /**
+   * Show the queue only when it waits on the viewer (the Deployments tab):
+   * someone who cannot approve finds these under the Waiting approval view.
+   */
+  onlyForApprovers?: boolean;
+};
 
 /**
  * Approval queue for deploys whose strategy requires sign-off before they
- * can roll out. Hidden entirely when nothing's waiting — operators see an
- * approval prompt or nothing at all, no "0 pending" busy-work card.
+ * can roll out, as a panel (spec 44 §5.2). Hidden entirely when nothing's
+ * waiting: operators see an approval prompt or nothing at all, no
+ * "0 pending" busy-work card.
  */
 export function PendingDeploymentsView({
   loading,
@@ -25,9 +33,12 @@ export function PendingDeploymentsView({
   canApprove,
   onApprove,
   onReject,
+  onlyForApprovers = false,
 }: PendingDeploymentsViewProps) {
+  if (onlyForApprovers && !canApprove) return null;
+
   if (loading) {
-    // Soft skeleton — most apps have none pending, so an aggressive
+    // Soft skeleton: most apps have none pending, so an aggressive
     // shimmer would be misleading. Tiny placeholder only.
     return <Skeleton className="h-12 w-full rounded-md" />;
   }
@@ -35,25 +46,29 @@ export function PendingDeploymentsView({
   if (pending.length === 0) return null;
 
   return (
-    <section className="border-info-border bg-info/5 flex flex-col gap-3 rounded-lg border p-4">
-      <div className="flex items-center gap-2">
-        <ShieldCheckIcon className="text-info-fg size-4" />
-        <h2 className="text-sm font-semibold">Pending approval</h2>
-        <span className="text-muted-foreground text-xs">({pending.length})</span>
-        {canApprove ? (
-          <Badge variant="secondary" className="text-2xs ml-auto">
-            You can approve
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground text-2xs ml-auto italic">Read-only</span>
-        )}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        {canApprove
+    <Panel
+      title={canApprove ? "Waiting on your approval" : "Pending approval"}
+      icon={<ShieldCheckIcon className="text-info-fg size-4" />}
+      description={
+        canApprove
           ? "Review each candidate before unlocking the rollout."
-          : "Waiting on a reviewer with the `app.approve_deploy` permission."}
-      </p>
-      <div className="flex flex-col gap-2">
+          : "Waiting on a reviewer with the `app.approve_deploy` permission."
+      }
+      actions={
+        <>
+          <span className="text-muted-foreground font-mono text-xs">{pending.length}</span>
+          {canApprove ? (
+            <Badge variant="secondary" className="text-2xs">
+              You can approve
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-2xs italic">Read-only</span>
+          )}
+        </>
+      }
+      className="border-info-border"
+    >
+      <div className="flex min-w-0 flex-col gap-2">
         {pending.map((d) => (
           <PendingRow
             key={d.id}
@@ -64,7 +79,7 @@ export function PendingDeploymentsView({
           />
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -109,10 +124,12 @@ function PendingRow({
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <GitCommitIcon className="text-muted-foreground size-4 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="font-mono text-sm">{shortTag}</span>
             {deployment.environmentName && (
-              <span className="text-muted-foreground text-xs">→ {deployment.environmentName}</span>
+              <span className="text-muted-foreground min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+                → {deployment.environmentName}
+              </span>
             )}
             <Badge variant="outline" className="text-2xs">
               {deployment.approvalsReceived}/{deployment.approvalsRequired || 1} approvals

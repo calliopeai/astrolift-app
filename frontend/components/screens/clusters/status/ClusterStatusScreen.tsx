@@ -30,6 +30,7 @@ import Link from "next/link";
 import type * as React from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
+import { Panel, PanelGrid, type PanelSpan, SkeletonRows } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,7 +62,6 @@ import type { useClusterLiveState } from "./use-cluster-live-state";
 import type { useClusterMetrics } from "./use-cluster-metrics";
 import type { useClusterWorkloadHealth } from "./use-cluster-workload-health";
 import type { useRecentClusterWorkflows } from "./use-recent-cluster-workflows";
-import { SkeletonRows, StatusPanel, StatusPanelGrid } from "./StatusPanel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function fmtTs(ts: number): string {
@@ -201,7 +201,7 @@ export function ClusterStatusBody({
   const live = isClusterLive(status);
 
   return (
-    <StatusPanelGrid>
+    <PanelGrid>
       <StatusLiveStateCard slug={slug} {...liveState} />
       {live ? (
         <>
@@ -213,7 +213,7 @@ export function ClusterStatusBody({
       ) : (
         <>
           <OfflineCard
-            span="full"
+            span={12}
             icon={<BarChart3Icon className="size-4" />}
             title="Cluster saturation"
             status={status}
@@ -244,7 +244,7 @@ export function ClusterStatusBody({
         </>
       )}
       {lifecycle}
-    </StatusPanelGrid>
+    </PanelGrid>
   );
 }
 
@@ -253,14 +253,14 @@ export function ClusterStatusBody({
 // section's live query is never mounted. Names the cluster's last-seen
 // cue and links to settings (where the agent is installed / rotated).
 function OfflineCard({
-  span = "half",
+  span = 6,
   icon,
   title,
   status,
   age,
   slug,
 }: {
-  span?: "full" | "half";
+  span?: PanelSpan;
   icon: React.ReactNode;
   title: string;
   status: HeartbeatStatus;
@@ -268,11 +268,11 @@ function OfflineCard({
   slug: string;
 }) {
   return (
-    <StatusPanel
+    <Panel
       span={span}
       icon={icon}
       title={title}
-      action={
+      actions={
         <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           {status === "never_seen" ? (
             <ServerOffIcon className="size-3.5" />
@@ -295,7 +295,7 @@ function OfflineCard({
           </Link>
         </div>
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -320,7 +320,7 @@ export function StatusLiveStateCard({
 
   if ((loading || error) && !state) {
     return (
-      <StatusPanel
+      <Panel
         icon={<ActivityIcon className="size-4" />}
         title="Cluster connection"
         description="Keep-alive heartbeat from the in-cluster agent."
@@ -333,11 +333,11 @@ export function StatusLiveStateCard({
   }
 
   return (
-    <StatusPanel
+    <Panel
       icon={<ActivityIcon className="size-4" />}
       title="Cluster connection"
       description="Keep-alive heartbeat from the in-cluster agent. Polls every 30s."
-      action={
+      actions={
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${p.pill}`}
         >
@@ -389,7 +389,7 @@ export function StatusLiveStateCard({
       ) : (
         <LiveSnapshotGrid state={state!} age={age} />
       )}
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -526,11 +526,11 @@ export function StatusMetricsCard({
   refetch,
 }: { slug: string } & ReturnType<typeof useClusterMetrics>) {
   return (
-    <StatusPanel
+    <Panel
       icon={<BarChart3Icon className="size-4" />}
       title="Cluster saturation"
       description="Prometheus-sourced golden signals — current snapshot and historical trend."
-      action={<WindowSelector value={selectedWindow} onChange={onWindowChange} />}
+      actions={<WindowSelector value={selectedWindow} onChange={onWindowChange} />}
       error={!instant && !range && !instantLoading && !rangeLoading ? error : null}
       onRetry={refetch}
     >
@@ -543,7 +543,7 @@ export function StatusMetricsCard({
           instantReason={instant?.reason ?? null}
         />
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -841,8 +841,8 @@ export function StatusWorkloadHealthCard({
   const namespaces = Array.from(grouped.keys()).sort();
 
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<ServerIcon className="size-4" />}
       title="Workload health"
       description="Per-Deployment readiness + 24h restart counts. Sorted most-broken first; polls every 30s."
@@ -874,7 +874,7 @@ export function StatusWorkloadHealthCard({
           </div>
         ))}
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -944,8 +944,8 @@ export function StatusLiveHealthCard({
   );
 
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<ActivityIcon className="size-4" />}
       title="Live health"
       description="Pod-phase rollup + recent warning events from the cluster driver. Polls every 30s."
@@ -995,7 +995,7 @@ export function StatusLiveHealthCard({
           )}
         </div>
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -1056,8 +1056,8 @@ export function StatusRecentWorkflowsCard({
   refetch,
 }: ReturnType<typeof useRecentClusterWorkflows>) {
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<GitBranchIcon className="size-4" />}
       title="Recent workflow runs"
       description="Temporal runs targeting this cluster — most recent first."
@@ -1076,7 +1076,7 @@ export function StatusRecentWorkflowsCard({
           <WorkflowRunRow key={r.workflowId + r.runId} run={r} />
         ))}
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 
@@ -1149,8 +1149,8 @@ export function StatusLifecycleCard({
   refetch,
 }: ReturnType<typeof useClusterLifecycleAudit>) {
   return (
-    <StatusPanel
-      span="half"
+    <Panel
+      span={6}
       icon={<ClockIcon className="size-4" />}
       title="Lifecycle events"
       description="Mutations targeting this cluster — registered → managing → managed transitions, refreshes, decommissions."
@@ -1169,7 +1169,7 @@ export function StatusLifecycleCard({
           <LifecycleRow key={`${e.timestamp}-${i}`} entry={e} />
         ))}
       </div>
-    </StatusPanel>
+    </Panel>
   );
 }
 

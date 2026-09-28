@@ -62,3 +62,12 @@ export const LongStrings: Story = {
     stillLive: [LONG, `${LONG}-2`],
   },
 };
+
+export const Width768: Story = {
+  args: { appName: LONG, stillLive: [LONG, `${LONG}-2`], preview: DEREGISTER_PREVIEW },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <DangerZoneView {...args} />
+    </div>
+  ),
+};

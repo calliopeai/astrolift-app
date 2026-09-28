@@ -1,57 +1,99 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { AppTabsView } from "@/components/screens/apps/detail/AppTabs";
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { LIST, LIST_EMPTY, LIST_LONG, SCALE } from "./app-workloads.fixtures";
+import {
+  LIST,
+  LIST_EMPTY,
+  LIST_LONG,
+  SCALE,
+  WORKLOADS,
+  type WorkloadsListFixture,
+} from "./app-workloads.fixtures";
 import { ScalePopoverView } from "./ScalePopover";
+import { WorkloadRowActions } from "./WorkloadRowActions";
+import { APP_WORKLOADS_LIST } from "./workloads-list";
 import { WorkloadsListScreen } from "./WorkloadsListScreen";
 
-const meta: Meta<typeof WorkloadsListScreen> = {
+/** An app's Workloads tab: the embedded list with a kind chip (spec 44 §5.1, §10.2). */
+const meta: Meta = {
   title: "Screens/Apps/Workloads/WorkloadsListScreen",
-  component: WorkloadsListScreen,
-  parameters: { layout: "fullscreen" },
-  args: {
-    ...LIST,
-    tabs: (
-      <AppTabsView
-        slug="billing"
-        basePath="/apps"
-        pathname="/apps/billing/workloads"
-        active="workloads"
-      />
-    ),
-    renderScale: (w, currentDesired) => (
-      <ScalePopoverView {...SCALE} workloadName={w.name} currentDesired={currentDesired} />
-    ),
-  },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
-type Story = StoryObj<typeof WorkloadsListScreen>;
+type Story = StoryObj;
+
+const ENVS = [
+  { id: "env-1", name: "production" },
+  { id: "env-2", name: "staging" },
+];
+
+function Workloads({
+  initial,
+  ...props
+}: Partial<WorkloadsListFixture> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(APP_WORKLOADS_LIST, initial);
+  return (
+    <WorkloadsListScreen
+      {...LIST}
+      list={list}
+      renderScale={(w, currentDesired) => (
+        <ScalePopoverView {...SCALE} workloadName={w.name} currentDesired={currentDesired} />
+      )}
+      renderRowActions={(w) => (
+        <WorkloadRowActions
+          workload={w}
+          logsHref={`#logs-${w.slug}`}
+          environments={ENVS}
+          pendingSlug={null}
+          canRun
+          onRun={() => {}}
+        />
+      )}
+      {...props}
+    />
+  );
+}
 
 /** Mixed kinds: a healthy public API, an HPA worker, a crash-looping StatefulSet, a CronJob. */
-export const Full: Story = {};
+export const Full: Story = { render: () => <Workloads /> };
 
-/** The app query has not answered yet. */
-export const Loading: Story = { args: { app: null, appLoading: true } };
-
-/** The app has no workloads in its manifest. */
-export const Empty: Story = { args: LIST_EMPTY };
-
-/** The workload page query failed; the table shows its error state. */
-export const LoadFailed: Story = {
-  args: {
-    table: fakeController<AstroliftWorkload>({
-      state: "error",
-      error: new Error("Network error: Failed to fetch"),
-      sortEnabled: false,
-    }),
-  },
+/** Scheduled jobs: the same list, filtered to the cronjob kind (`/jobs` lands here). */
+export const ScheduledJobs: Story = {
+  render: () => (
+    <Workloads
+      rows={WORKLOADS.filter((w) => w.kind === "cronjob")}
+      totalCount={1}
+      initial={{ filters: { kind: "cronjob" } }}
+    />
+  ),
 };
 
-/** No app with this slug, or no permission to read it. */
-export const NotFound: Story = { args: { app: null, appLoading: false, slug: "no-such-app" } };
+export const Loading: Story = { render: () => <Workloads rows={[]} loading /> };
 
-export const LongStrings: Story = { args: LIST_LONG };
+/** The app has no workloads in its manifest. */
+export const Empty: Story = { render: () => <Workloads {...LIST_EMPTY} /> };
+
+/** A kind with none of that kind. */
+export const EmptyFiltered: Story = {
+  render: () => (
+    <Workloads {...LIST_EMPTY} initial={{ filters: { kind: "statefulset", exposure: "public" } }} />
+  ),
+};
+
+/** The workloads query failed; the list shows its error in its own frame. */
+export const LoadFailed: Story = {
+  render: () => <Workloads {...LIST_EMPTY} error={{ message: "Network error: Failed to fetch" }} />,
+};
+
+export const LongStrings: Story = { render: () => <Workloads {...LIST_LONG} /> };
+
+/** The narrowest the web console goes (spec 44 §6): the table scrolls in its frame. */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Workloads {...LIST_LONG} />
+    </div>
+  ),
+};

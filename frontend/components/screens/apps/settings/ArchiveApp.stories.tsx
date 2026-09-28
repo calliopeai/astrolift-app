@@ -43,3 +43,12 @@ export const LongStrings: Story = {
     await expect(await within(document.body).findByRole("alertdialog")).toBeInTheDocument();
   },
 };
+
+export const Width768: Story = {
+  args: { appName: LONG, isArchived: true, archivedAt: "2026-09-27T18:00:00Z" },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <ArchiveAppView {...args} />
+    </div>
+  ),
+};

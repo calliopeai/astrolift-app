@@ -2,6 +2,9 @@
 
 import { GithubIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+
+import { Notice } from "./OverviewNotices";
 import type { useSourceConnections } from "./use-source-connections";
 
 export type GithubConnectCalloutViewProps = ReturnType<typeof useSourceConnections> & {
@@ -41,21 +44,16 @@ export function GithubConnectCalloutView({
     : `/settings/source-providers`;
 
   return (
-    <section className="border-warning-border bg-warning/5 flex flex-wrap items-start gap-3 rounded-lg border p-4">
-      <GithubIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">Connect your GitHub to manage this app</p>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-xs">
-          Astrolift uses your personal GitHub identity to browse the repo, sync the manifest, and
-          install webhooks. Org-level setup is already in place — this is just the per-user link.
-        </p>
-      </div>
-      <a
-        href={href}
-        className="bg-foreground text-background hover:bg-foreground/90 shrink-0 rounded-md px-3 py-1.5 text-xs font-medium"
-      >
-        Connect GitHub
-      </a>
-    </section>
+    <Notice
+      tone="info"
+      icon={GithubIcon}
+      title="Connect your GitHub to manage this app"
+      description="Astrolift uses your personal GitHub identity to browse the repo, sync the manifest, and install webhooks. Org-level setup is already in place; this is just the per-user link."
+      actions={
+        <Button asChild size="sm" variant="outline">
+          <a href={href}>Connect GitHub</a>
+        </Button>
+      }
+    />
   );
 }

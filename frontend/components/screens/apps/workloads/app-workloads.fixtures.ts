@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftAppPod,
   AstroliftContainerStatus,
@@ -113,45 +112,44 @@ const LIVE: Map<string, WorkloadLiveStatus> = new Map([
   ],
 ]);
 
-export const LIST: WorkloadsListScreenProps = {
-  app: APP,
-  appLoading: false,
-  table: fakeController<AstroliftWorkload>({
-    rows: WORKLOADS,
-    totalCount: WORKLOADS.length,
-    sort: undefined,
-    sortEnabled: false,
-  }),
+/** Everything but the list state, which stories build with `useLocalListState`. */
+export type WorkloadsListFixture = Omit<WorkloadsListScreenProps, "list">;
+
+export const LIST: WorkloadsListFixture = {
+  rows: WORKLOADS,
+  totalCount: WORKLOADS.length,
+  loading: false,
+  error: null,
+  onRetry: () => {},
   liveStatus: LIVE,
-  stats: { workloads: 4, totalReplicas: 7, publicCount: 1, scheduled: 1 },
   slug: "billing",
   basePath: "/apps",
 };
 
-export const LIST_EMPTY: WorkloadsListScreenProps = {
+export const LIST_EMPTY: WorkloadsListFixture = {
   ...LIST,
-  table: fakeController<AstroliftWorkload>({ rows: [], totalCount: 0, sortEnabled: false }),
+  rows: [],
+  totalCount: 0,
   liveStatus: new Map(),
-  stats: { workloads: 0, totalReplicas: 0, publicCount: 0, scheduled: 0 },
 };
 
-export const LIST_LONG: WorkloadsListScreenProps = {
+export const LIST_LONG: WorkloadsListFixture = {
   ...LIST,
-  app: { name: LONG, slug: LONG, manifestPath: `deploy/${LONG}/astrolift.yaml` },
-  table: fakeController<AstroliftWorkload>({
-    rows: [
-      workload({
-        id: "wl-long",
-        slug: LONG,
-        name: LONG,
-        cpuRequest: "1500m",
-        memoryRequest: "8Gi",
-      }),
-    ],
-    totalCount: 1,
-    sortEnabled: false,
-  }),
+  slug: LONG,
+  rows: [
+    workload({
+      id: "wl-long",
+      slug: LONG,
+      name: LONG,
+      cpuRequest: "1500m",
+      memoryRequest: "8Gi",
+      schedule: "*/5 * * * *",
+    }),
+    ...WORKLOADS,
+  ],
+  totalCount: WORKLOADS.length + 1,
   liveStatus: new Map([
+    ...LIVE,
     [
       LONG,
       {

@@ -3,6 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
+import { downloadTextFile, logFilename } from "@/components/screens/apps/deployments/app-log-lines";
 import { LIST_CONTAINERS, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
 
@@ -18,6 +19,8 @@ export type ConnState = "idle" | "connecting" | "open" | "closed";
 export interface OutputChunk {
   channel: "stdout" | "stderr" | "system";
   text: string;
+  /** Epoch ms the chunk arrived; the output pane shows it as the line time. */
+  ts: number;
 }
 
 const HISTORY_KEY_PREFIX = "astrolift:cmd-history:";
@@ -90,8 +93,21 @@ export function useCommandRunner(slug: string) {
     }
   }
 
-  function appendChunk(chunk: OutputChunk) {
-    setOutput((prev) => [...prev, chunk]);
+  function appendChunk(chunk: Omit<OutputChunk, "ts">) {
+    setOutput((prev) => [...prev, { ...chunk, ts: Date.now() }]);
+  }
+
+  /** The run's raw output as a file, byte for byte as it streamed. */
+  function downloadOutput() {
+    if (output.length === 0) return;
+    downloadTextFile(
+      logFilename([
+        { value: slug, fallback: "app" },
+        { value: workloadSlug, fallback: "workload" },
+        { value: containerName, fallback: "container" },
+      ]),
+      output.map((c) => c.text).join("")
+    );
   }
 
   function handleClose() {
@@ -205,5 +221,6 @@ export function useCommandRunner(slug: string) {
     onClearHistory: clearHistory,
     onRun: handleRun,
     onStop: handleClose,
+    onDownload: downloadOutput,
   };
 }

@@ -13,7 +13,7 @@ interface Props {
   setValid: (valid: boolean) => void;
 }
 
-/** Register-app step 3. The view owns the markup; the hook owns teams, projects, and validity. */
+/** New app step 2 (Run), the details part. The view owns the markup; the hook owns teams, projects, and validity. */
 export function AppDetailsStep({ state, setState, setValid }: Props) {
   const details = useAppDetailsStep(state, setState, setValid);
   return <AppDetailsStepView {...details} state={state} setState={setState} />;

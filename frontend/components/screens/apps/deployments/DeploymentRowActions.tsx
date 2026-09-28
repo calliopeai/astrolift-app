@@ -1,147 +1,171 @@
 "use client";
 
 import { CheckIcon, RotateCcwIcon, StopCircleIcon, Trash2Icon, UndoIcon } from "lucide-react";
-import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { IN_FLIGHT } from "./app-deployments-format";
 import type { useDeploymentActions } from "./use-deployment-actions";
 
-export type DeploymentRowActionsViewProps = ReturnType<typeof useDeploymentActions> & {
+export type DeploymentActions = ReturnType<typeof useDeploymentActions>;
+
+/** The actions that confirm first; approve fires straight from the menu. */
+export type ConfirmedAction = "redeploy" | "rollback" | "abort" | "discard";
+
+export interface ActionTarget {
+  kind: ConfirmedAction;
   deployment: AstroliftDeployment;
+}
+
+/** Which actions a deployment offers the viewer. Pure. */
+export function availableActions(
+  d: AstroliftDeployment,
+  {
+    canApprove,
+    canDeploy,
+    canRollback,
+  }: Pick<DeploymentActions, "canApprove" | "canDeploy" | "canRollback">
+) {
+  return {
+    approve:
+      d.status === "pending_approval" && d.approvalsReceived < d.approvalsRequired && canApprove,
+    redeploy: d.status === "running" && canDeploy,
+    rollback:
+      (d.status === "running" ||
+        d.status === "superseded" ||
+        d.status === "rolled_back" ||
+        d.status === "failed") &&
+      canRollback,
+    abort: IN_FLIGHT.has(d.status) && canDeploy,
+    discard: d.status === "failed" && canDeploy,
+  };
+}
+
+export interface DeploymentRowMenuItemsProps {
+  deployment: AstroliftDeployment;
+  actions: Pick<
+    DeploymentActions,
+    "canApprove" | "canDeploy" | "canRollback" | "busy" | "onApprove"
+  >;
+  /** Opens the confirm dialog for an action; the dialog lives outside the menu. */
+  onRequest: (target: ActionTarget) => void;
+}
+
+/**
+ * A deployment row's `⋯` items (spec 44 §5.1): approve, redeploy, roll back,
+ * abort, discard. Everything but approve asks first, through
+ * `DeploymentActionDialog`, which the screen renders outside the menu so it
+ * survives the menu closing.
+ */
+export function DeploymentRowMenuItems({
+  deployment: d,
+  actions,
+  onRequest,
+}: DeploymentRowMenuItemsProps) {
+  const show = availableActions(d, actions);
+  const { busy } = actions;
+  const ask = (kind: ConfirmedAction) => () => onRequest({ kind, deployment: d });
+
+  if (!Object.values(show).some(Boolean)) {
+    return <DropdownMenuItem disabled>No actions for this deployment</DropdownMenuItem>;
+  }
+  return (
+    <>
+      {show.approve && (
+        <DropdownMenuItem disabled={busy} onSelect={() => void actions.onApprove(d)}>
+          <CheckIcon className="size-4" />
+          Approve
+        </DropdownMenuItem>
+      )}
+      {show.redeploy && (
+        <DropdownMenuItem disabled={busy} onSelect={ask("redeploy")}>
+          <RotateCcwIcon className="size-4" />
+          Redeploy
+        </DropdownMenuItem>
+      )}
+      {show.rollback && (
+        <DropdownMenuItem disabled={busy} onSelect={ask("rollback")}>
+          <UndoIcon className="size-4" />
+          Roll back to this
+        </DropdownMenuItem>
+      )}
+      {show.abort && (
+        <DropdownMenuItem variant="destructive" disabled={busy} onSelect={ask("abort")}>
+          <StopCircleIcon className="size-4" />
+          Abort
+        </DropdownMenuItem>
+      )}
+      {show.discard && (
+        <DropdownMenuItem variant="destructive" disabled={busy} onSelect={ask("discard")}>
+          <Trash2Icon className="size-4" />
+          Discard failed deploy
+        </DropdownMenuItem>
+      )}
+    </>
+  );
+}
+
+export interface DeploymentActionDialogProps {
+  target: ActionTarget | null;
   appSlug: string;
-};
+  onClose: () => void;
+  actions: Pick<DeploymentActions, "onAbort" | "onRedeploy" | "onRollback">;
+}
 
-/** Approve / redeploy / rollback / abort / discard for one deployment row. */
-export function DeploymentRowActionsView({
-  deployment,
+/** The one confirm dialog behind the row menus. Copy matches the fleet list. */
+export function DeploymentActionDialog({
+  target,
   appSlug,
-  canApprove,
-  canDeploy,
-  canRollback,
-  busy,
-  onApprove,
-  onAbort,
-  onRedeploy,
-  onRollback,
-}: DeploymentRowActionsViewProps) {
-  const d = deployment;
-
-  const [confirmAbort, setConfirmAbort] = React.useState(false);
-  const [confirmRedeploy, setConfirmRedeploy] = React.useState(false);
-  const [confirmRollback, setConfirmRollback] = React.useState(false);
-  const [confirmTrash, setConfirmTrash] = React.useState(false);
-
-  const showApprove =
-    d.status === "pending_approval" && d.approvalsReceived < d.approvalsRequired && canApprove;
-  const inFlight = IN_FLIGHT.has(d.status);
-  const showAbort = inFlight && canDeploy;
-  const showRedeploy = d.status === "running" && canDeploy;
-  const showRollback =
-    (d.status === "running" || d.status === "superseded" || d.status === "rolled_back") &&
-    canRollback;
-  const showFailedRollback = d.status === "failed" && canRollback;
-  const showFailedTrash = d.status === "failed" && canDeploy;
+  onClose,
+  actions,
+}: DeploymentActionDialogProps) {
+  const d = target?.deployment;
+  const tag = d ? d.imageTag || d.id.slice(0, 8) : "";
+  const onOpenChange = (open: boolean) => {
+    if (!open) onClose();
+  };
 
   return (
-    <div className="inline-flex items-center justify-end gap-1">
-      {showApprove && (
-        <Button size="sm" variant="default" disabled={busy} onClick={onApprove}>
-          <CheckIcon className="size-3.5" />
-          Approve
-        </Button>
-      )}
-      {showRedeploy && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => setConfirmRedeploy(true)}
-        >
-          <RotateCcwIcon className="size-3.5" />
-          Redeploy
-        </Button>
-      )}
-      {(showRollback || showFailedRollback) && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => setConfirmRollback(true)}
-        >
-          <UndoIcon className="size-3.5" />
-          Rollback
-        </Button>
-      )}
-      {showAbort && (
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={busy}
-          onClick={() => setConfirmAbort(true)}
-        >
-          <StopCircleIcon className="size-3.5" />
-          Abort
-        </Button>
-      )}
-      {showFailedTrash && (
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={busy}
-          aria-label="Discard failed deployment"
-          onClick={() => setConfirmTrash(true)}
-        >
-          <Trash2Icon className="size-3.5" />
-        </Button>
-      )}
-
+    <>
       <ConfirmDialog
         reason={{ label: "Reason for abort", placeholder: "Why are you aborting this deploy?" }}
-        open={confirmAbort}
-        onOpenChange={setConfirmAbort}
-        title={`Abort deploy to ${d.environmentName}?`}
+        open={target?.kind === "abort"}
+        onOpenChange={onOpenChange}
+        title={`Abort deploy to ${d?.environmentName ?? ""}?`}
         description="The in-flight rollout will be marked failed. Tell the team what changed."
         confirmLabel="Abort deploy"
         destructive
-        onConfirm={onAbort}
+        onConfirm={(reason) => (d ? actions.onAbort(d, reason) : undefined)}
       />
-
-      {/* Redeploy spawns a real rollout — the same mutation /deployments
-          confirms before firing, and the sibling actions in this very row
-          already do. Wording matches the fleet surface so the two pages
-          describe the same action the same way. */}
+      {/* Redeploy spawns a real rollout, so it confirms, as on /deployments. */}
       <ConfirmDialog
-        open={confirmRedeploy}
-        onOpenChange={setConfirmRedeploy}
-        title={`Redeploy ${d.imageTag || d.id.slice(0, 8)} to ${appSlug}/${d.environmentName}?`}
+        open={target?.kind === "redeploy"}
+        onOpenChange={onOpenChange}
+        title={`Redeploy ${tag} to ${appSlug}/${d?.environmentName ?? ""}?`}
         description="Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config."
         confirmLabel="Redeploy"
-        onConfirm={onRedeploy}
+        onConfirm={() => (d ? actions.onRedeploy(d) : undefined)}
       />
-
       <ConfirmDialog
-        open={confirmRollback}
-        onOpenChange={setConfirmRollback}
-        title={`Rollback ${d.environmentName} to ${d.imageTag || d.id.slice(0, 8)}?`}
+        open={target?.kind === "rollback"}
+        onOpenChange={onOpenChange}
+        title={`Rollback ${d?.environmentName ?? ""} to ${tag}?`}
         description="The platform will redeploy this image as the live version. The current rollout will be marked superseded."
         confirmLabel="Roll back"
-        onConfirm={onRollback}
+        onConfirm={() => (d ? actions.onRollback(d) : undefined)}
       />
-
       <ConfirmDialog
         reason={{ label: "Reason for discard", placeholder: "Why are you discarding this deploy?" }}
-        open={confirmTrash}
-        onOpenChange={setConfirmTrash}
-        title={`Discard failed deploy ${(d.imageTag || d.id).slice(0, 8)}?`}
+        open={target?.kind === "discard"}
+        onOpenChange={onOpenChange}
+        title={`Discard failed deploy ${(d?.imageTag || d?.id || "").slice(0, 8)}?`}
         description="The row stays in history but the rollout is marked aborted. Tell the team what changed."
         confirmLabel="Discard"
         destructive
-        onConfirm={onAbort}
+        onConfirm={(reason) => (d ? actions.onAbort(d, reason) : undefined)}
       />
-    </div>
+    </>
   );
 }

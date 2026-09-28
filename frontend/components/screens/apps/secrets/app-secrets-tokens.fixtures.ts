@@ -181,6 +181,8 @@ export const SECRETS_SCREEN: Omit<SecretsScreenProps, "tabs" | "pushToGitHub" | 
   slug: "storefront",
   envName: ALL_ENVS,
   setEnvName: noop,
+  secretsError: null,
+  retrySecrets: noop,
   environments: ENVIRONMENTS,
   secrets: SECRETS,
   secretsLoading: false,

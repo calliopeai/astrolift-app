@@ -48,3 +48,32 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+/** The newest run failed: its log tail leads the first panel. */
+export const LastRunFailed: Story = {
+  render: () => (
+    <CronjobHomeScreen
+      {...CRONJOB}
+      table={{
+        ...CRONJOB.table,
+        rows: [
+          {
+            ...CRONJOB.table.rows[0],
+            status: "failed",
+            exitCode: 137,
+            logExcerpt: `pulling ${LONG}\nOOMKilled: container exceeded its 512Mi memory limit`,
+          },
+          ...CRONJOB.table.rows.slice(1),
+        ],
+      }}
+    />
+  ),
+};
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <CronjobHomeScreen {...CRONJOB} name={LONG} />
+    </div>
+  ),
+};

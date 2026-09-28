@@ -1,12 +1,16 @@
 "use client";
 
 import { useQuery, useSubscription } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { ON_APP_LOG } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+
+import { downloadTextFile, formatLogFile, logFilename, toLogLines } from "./app-log-lines";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -21,7 +25,8 @@ const DEFAULT_TAIL_LINES = 200;
 
 /**
  * The data half of AppLogsScreen: the app, and a live log tail of the
- * selected pod and container, capped at LOG_BUFFER_LIMIT lines.
+ * selected pod and container, capped at LOG_BUFFER_LIMIT lines, and the
+ * download of that buffer.
  */
 export function useAppLogs({
   slug,
@@ -32,6 +37,7 @@ export function useAppLogs({
   selectedPod: string | null;
   selectedContainer: string | null;
 }) {
+  const t = useTranslations("apps.logViewer");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const a = app.data?.astroliftApp ?? null;
 
@@ -56,7 +62,7 @@ export function useAppLogs({
     if (logBuffer.length !== 0) setLogBuffer([]);
   }
 
-  useSubscription<LogResp>(ON_APP_LOG, {
+  const sub = useSubscription<LogResp>(ON_APP_LOG, {
     variables: {
       appSlug: slug,
       podName: selectedPod ?? "",
@@ -83,5 +89,21 @@ export function useAppLogs({
     toggleStreaming: () => setStreaming((s) => !s),
     lines: logBuffer,
     clearLines: () => setLogBuffer([]),
+    /** The subscription failed; the buffer so far stays on screen. */
+    error: sub.error ?? null,
+    retry: sub.restart,
+    /** Saves the whole buffer, whatever the screen's filters show. */
+    downloadLines: () => {
+      if (logBuffer.length === 0) {
+        toast.info(t("downloadEmpty"));
+        return;
+      }
+      const filename = logFilename([
+        { value: a?.slug ?? slug, fallback: "app" },
+        { value: selectedPod, fallback: "pod" },
+      ]);
+      downloadTextFile(filename, formatLogFile(toLogLines(logBuffer)));
+      toast.success(t("downloadStarted", { filename }));
+    },
   };
 }

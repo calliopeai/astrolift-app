@@ -82,3 +82,22 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ShellScreen
+        {...SHELL}
+        slug={LONG_APP.slug}
+        app={LONG_APP}
+        podRows={LONG_PODS}
+        selectedPod={LONG_PODS[0].name}
+        podContainers={[LONG]}
+        selectedContainer={LONG}
+        uploadedFile={{ name: `${LONG}.py`, publicUrl: `https://uploads.example.com/${LONG}.py` }}
+        uploadedCommand={`python /tmp/${LONG}.py`}
+        fetchCommand={`curl -fsSL -o /tmp/${LONG}.py 'https://uploads.example.com/${LONG}.py'`}
+      />
+    </div>
+  ),
+};

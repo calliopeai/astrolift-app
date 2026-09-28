@@ -65,3 +65,11 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <AppDoctorPanelView {...DOCTOR_REPORT} />
+    </div>
+  ),
+};

@@ -1,8 +1,6 @@
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
-import type { EnvironmentDetailProps } from "../environments/EnvironmentDetail";
-import type { EnvironmentsScreenProps } from "../environments/EnvironmentsScreen";
 import type { ManagedDomainDetailProps } from "./ManagedDomainDetail";
 import type { ManagedDomainsScreenProps } from "./ManagedDomainsScreen";
 
@@ -172,20 +170,4 @@ export const ENV_LONG: AstroliftAppEnvironment = {
   settings: [
     { id: "s-l1", key: `${LONG.toUpperCase().replace(/-/g, "_")}_KEY`, value: `${LONG}-value` },
   ],
-};
-
-export const ENVIRONMENTS: EnvironmentsScreenProps = {
-  loading: false,
-  environments: [ENV_PROD, ENV_STAGING_PAUSED, ENV_UNPLACED],
-  busy: false,
-  canPause: true,
-  onPause: noopAsync,
-  onResume: noopAsync,
-  onOpen: noop,
-};
-
-export const ENVIRONMENT: EnvironmentDetailProps = {
-  id: ENV_PROD.id,
-  loading: false,
-  environment: ENV_PROD,
 };

@@ -15,6 +15,20 @@ export const ReadOnly: Story = {
   render: () => <PendingDeploymentsView {...PENDING} canApprove={false} />,
 };
 
+/** On the Deployments tab the queue shows only when it waits on the viewer: nothing here. */
+export const NotForThisViewer: Story = {
+  render: () => <PendingDeploymentsView {...PENDING} canApprove={false} onlyForApprovers />,
+};
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <PendingDeploymentsView {...PENDING} />
+    </div>
+  ),
+};
+
 export const Loading: Story = {
   render: () => <PendingDeploymentsView {...PENDING} loading pending={[]} />,
 };

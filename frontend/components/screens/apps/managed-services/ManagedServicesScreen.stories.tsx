@@ -113,6 +113,19 @@ export const LongStrings: Story = {
   ),
 };
 
+/** The narrowest the web console goes (spec 44 §6): the table scrolls in its frame. */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <ManagedServicesScreen
+        {...SCREEN}
+        {...slots}
+        table={fakeController<ManagedService>({ rows: LONG_SERVICES, totalCount: 1 })}
+      />
+    </div>
+  ),
+};
+
 export const Provision: Story = {
   render: () => (
     <ProvisionSheet

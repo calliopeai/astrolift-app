@@ -60,3 +60,11 @@ export const SignalsError: Story = {
 export const LongStrings: Story = {
   render: () => <FunctionHomeScreen {...FUNCTION} name={LONG} host={`${LONG}.apps.example.com`} />,
 };
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <FunctionHomeScreen {...FUNCTION} name={LONG} host={`${LONG}.apps.example.com`} />
+    </div>
+  ),
+};

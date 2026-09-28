@@ -7,7 +7,11 @@ import { AppTabs } from "../components/app-tabs";
 
 import { AccessCard } from "./access-card";
 
-export function AppSecurityClient({ slug }: { slug: string }) {
+/**
+ * Security scans for an app or agent. The Access tab passes `edge={false}`:
+ * it shows the edge access rule as a section of its own.
+ */
+export function AppSecurityClient({ slug, edge = true }: { slug: string; edge?: boolean }) {
   const security = useAppSecurity(slug);
   const a = security.app;
 
@@ -15,7 +19,7 @@ export function AppSecurityClient({ slug }: { slug: string }) {
     <AppSecurityScreen
       {...security}
       tabs={a ? <AppTabs slug={a.slug} active="security" /> : null}
-      access={a ? <AccessCard appSlug={a.slug} /> : null}
+      access={a && edge ? <AccessCard appSlug={a.slug} /> : null}
     />
   );
 }

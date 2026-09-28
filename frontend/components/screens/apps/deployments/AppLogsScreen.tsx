@@ -3,21 +3,23 @@
 import {
   AlertTriangleIcon,
   BoxIcon,
-  DownloadIcon,
+  FileDownIcon,
+  LayersIcon,
   PauseIcon,
   PlayIcon,
-  ScrollTextIcon,
   Trash2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { AppLogExportDialog, LogViewer } from "@/components/observability";
+import { AppLogExportDialog } from "@/components/observability";
 import type { useLogExport } from "@/components/observability/use-log-export";
 import { PageShell } from "@/components/PageShell";
+import { Panel } from "@/components/panel/Panel";
+import { LogView } from "@/components/run/LogView";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -29,6 +31,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
+import { countLevels, filterLogLines, type LogLevelFilter, toLogLines } from "./app-log-lines";
+import { LogFilters } from "./LogFilters";
 import { LOG_BUFFER_LIMIT, type useAppLogs } from "./use-app-logs";
 
 type AppLogs = ReturnType<typeof useAppLogs>;
@@ -52,12 +56,15 @@ export interface AppLogsScreenProps extends Omit<AppLogs, "app"> {
   tabs?: React.ReactNode;
 }
 
+const ALL_CONTAINERS = "__all__";
+
 /**
- * Observe › Logs — the read-only half of what used to be the Console tab.
+ * Logs & metrics › Logs (spec 44 §5.2, §5.5): one pod's live log in the
+ * shared LogView, which follows the end until the reader scrolls up. Pod,
+ * container, level and text narrow what is shown; Download saves the whole
+ * buffer and Export hands a longer window to the export dialog (#483).
  *
- * The shell and the script upload moved to Control › Shell (#1247): reading a
- * log and getting a root shell on a running pod are different acts with
- * different blast radius, and only one of them is observability.
+ * Reading only: the shell lives in the Console section (#1247).
  */
 export function AppLogsScreen({
   slug,
@@ -67,6 +74,9 @@ export function AppLogsScreen({
   toggleStreaming,
   lines,
   clearLines,
+  error,
+  retry,
+  downloadLines,
   podRows,
   selectedPod,
   setPickedPod,
@@ -82,8 +92,16 @@ export function AppLogsScreen({
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.logs");
   const tObs = useTranslations("apps.observability");
+  const tViewer = useTranslations("apps.logViewer");
 
   const [exportOpen, setExportOpen] = React.useState(false);
+  const [level, setLevel] = React.useState<LogLevelFilter>("all");
+  const [query, setQuery] = React.useState("");
+
+  const mapped = React.useMemo(() => toLogLines(lines), [lines]);
+  const shown = React.useMemo(() => filterLogLines(mapped, level, query), [mapped, level, query]);
+  const counts = React.useMemo(() => countLevels(mapped), [mapped]);
+  const filtered = shown.length !== mapped.length;
 
   if (loading && !a) {
     return (
@@ -111,119 +129,141 @@ export function AppLogsScreen({
     <PageShell
       title={t("title", { name: a.name })}
       description={
-        <span className="text-muted-foreground font-mono text-xs">
-          {t("description", { slug: a.slug })}
-        </span>
+        selectedPod ? (
+          <span className="font-mono text-xs [overflow-wrap:anywhere]">
+            {tObs("logs.streaming")} {selectedPod} {tObs("logs.fromCluster")}
+          </span>
+        ) : (
+          t("logs.selectPrompt")
+        )
+      }
+      actions={
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setExportOpen(true)}
+          disabled={!selectedPod}
+          title={tObs("logs.exportTitle")}
+        >
+          <FileDownIcon className="size-3.5" /> {tObs("logs.export")}
+        </Button>
       }
     >
       {tabs}
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ScrollTextIcon className="size-4" /> {t("logs.title")}
-            </CardTitle>
-            <CardDescription>
-              {selectedPod ? (
-                <>
-                  {tObs("logs.streaming")}{" "}
-                  <code className="bg-muted text-2xs rounded px-1 py-0.5 font-mono">
-                    {selectedPod}
-                  </code>{" "}
-                  {tObs("logs.fromCluster")}
-                </>
-              ) : (
-                t("logs.selectPrompt")
-              )}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
-              <Select
-                value={selectedPod ?? ""}
-                onValueChange={(v) => setPickedPod(v)}
-                disabled={podsLoading || noPods}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t("logs.podLabel")}
-                  className="font-mono text-xs"
-                >
-                  <SelectValue placeholder={t("logs.podPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {podRows.map((p) => (
-                    <SelectItem key={p.name} value={p.name} className="font-mono">
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button size="sm" variant="outline" onClick={clearLines} disabled={lines.length === 0}>
-              <Trash2Icon className="size-3" /> {tObs("logs.clear")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setExportOpen(true)}
-              disabled={!selectedPod}
-              title={tObs("logs.exportTitle")}
-            >
-              <DownloadIcon className="size-3" /> {tObs("logs.export")}
-            </Button>
-            <Button
-              size="sm"
-              variant={streaming ? "outline" : "default"}
-              onClick={toggleStreaming}
-              disabled={!selectedPod}
-            >
-              {streaming ? (
-                <>
-                  <PauseIcon className="size-3" /> {tObs("logs.pause")}
-                </>
-              ) : (
-                <>
-                  <PlayIcon className="size-3" /> {tObs("logs.stream")}
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {noPods ? (
-            <EmptyState
-              icon={<BoxIcon className="size-5" />}
-              title={tObs("pods.emptyTitle")}
-              description={tObs("pods.emptyDescription")}
-              actionHref={deploymentsHref}
-              actionLabel={tObs("pods.emptyAction")}
+      {noPods ? (
+        <Panel
+          title={t("logs.title")}
+          empty={{
+            icon: <BoxIcon className="size-5" />,
+            title: tObs("pods.emptyTitle"),
+            description: tObs("pods.emptyDescription"),
+            actionHref: deploymentsHref,
+            actionLabel: tObs("pods.emptyAction"),
+          }}
+        />
+      ) : (
+        <div className="flex min-w-0 flex-col gap-3">
+          <LogFilters
+            level={level}
+            onLevelChange={setLevel}
+            query={query}
+            onQueryChange={setQuery}
+            counts={counts}
+          >
+            <PodPicker
+              pods={podRows}
+              value={selectedPod}
+              onChange={setPickedPod}
+              disabled={podsLoading}
+              label={t("logs.podLabel")}
+              placeholder={t("logs.podPlaceholder")}
             />
-          ) : (
-            <LogViewer
-              lines={lines}
-              appSlug={a.slug}
-              podName={selectedPod}
-              containers={podContainers}
-              selectedContainer={selectedContainer}
-              onContainerChange={setPickedContainer}
-              loading={podsLoading}
-              bufferLimit={LOG_BUFFER_LIMIT}
-              emptyHint={
-                streaming
+            {podContainers.length > 1 && (
+              <div className="flex min-w-0 items-center gap-1.5">
+                <LayersIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+                <Select
+                  value={selectedContainer ?? ALL_CONTAINERS}
+                  onValueChange={(v) => setPickedContainer(v === ALL_CONTAINERS ? null : v)}
+                >
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={tViewer("containerLabel")}
+                    className="max-w-full min-w-0 font-mono text-xs"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_CONTAINERS}>{tViewer("containerAll")}</SelectItem>
+                    {podContainers.map((c) => (
+                      <SelectItem key={c} value={c} className="font-mono">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </LogFilters>
+
+          <LogView
+            title={t("logs.title")}
+            lines={shown}
+            loading={podsLoading}
+            error={error}
+            onRetry={retry}
+            onDownload={downloadLines}
+            emptyHint={
+              filtered
+                ? tViewer("filteredEmpty")
+                : streaming
                   ? tObs("logs.waiting")
                   : selectedPod
                     ? tObs("logs.pressStream")
                     : tObs("logs.pickPod")
-              }
-            />
-          )}
-        </CardContent>
-      </Card>
+            }
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearLines}
+                  disabled={lines.length === 0}
+                >
+                  <Trash2Icon className="size-3.5" /> {tObs("logs.clear")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={streaming ? "outline" : "default"}
+                  onClick={toggleStreaming}
+                  disabled={!selectedPod}
+                >
+                  {streaming ? (
+                    <>
+                      <PauseIcon className="size-3.5" /> {tObs("logs.pause")}
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon className="size-3.5" /> {tObs("logs.stream")}
+                    </>
+                  )}
+                </Button>
+              </>
+            }
+          />
 
-      {/* #483 app-log export modal — vendor handoff + compliance. */}
+          <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+            {tObs("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
+            <code className="font-mono">astro logs --app={a.slug} --follow</code>.{" "}
+            <Link href="/downloads" className="underline">
+              {tObs("logs.installCli")}
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+
+      {/* #483 app-log export modal: vendor handoff and compliance. */}
       <AppLogExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
@@ -231,5 +271,43 @@ export function AppLogsScreen({
         {...logExport}
       />
     </PageShell>
+  );
+}
+
+function PodPicker({
+  pods,
+  value,
+  onChange,
+  disabled,
+  label,
+  placeholder,
+}: {
+  pods: Pick<AstroliftAppPod, "name">[];
+  value: string | null;
+  onChange: (pod: string) => void;
+  disabled: boolean;
+  label: string;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <BoxIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+      <Select value={value ?? ""} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger
+          size="sm"
+          aria-label={label}
+          className="max-w-full min-w-0 font-mono text-xs"
+        >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {pods.map((p) => (
+            <SelectItem key={p.name} value={p.name} className="font-mono">
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

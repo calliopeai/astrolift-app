@@ -58,3 +58,11 @@ export const Busy: Story = { render: () => <DomainHandshakeCard {...HANDSHAKE_CA
 export const LongStrings: Story = {
   render: () => <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_LONG} />,
 };
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_LONG} />
+    </div>
+  ),
+};

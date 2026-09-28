@@ -194,6 +194,7 @@ export const OBSERVABILITY: ObservabilityScreenProps = {
   },
   logBuffer: LOG_LINES,
   onClearLogs: noop,
+  onDownloadLogs: noop,
   streaming: true,
   onToggleStreaming: noop,
   allReplicas: true,
@@ -473,12 +474,20 @@ export const COMMAND_RUNNER: CommandRunnerScreenProps = {
   onClearHistory: noop,
   onRun: noop,
   onStop: noop,
+  onDownload: noop,
 };
 
+/** A fixed instant, so the output pane's times are stable across renders. */
+export const T0 = Date.UTC(2026, 8, 28, 12, 0, 0);
+
 export const COMMAND_OUTPUT: CommandRunnerScreenProps["output"] = [
-  { channel: "stdout", text: "total 8\ndrwxrwxrwt 2 root root 4096 Sep 28 12:00 .\n" },
-  { channel: "stderr", text: "ls: cannot access '/tmp/missing': No such file or directory\n" },
-  { channel: "system", text: "\n[exit 2]\n" },
+  { channel: "stdout", text: "total 8\ndrwxrwxrwt 2 root root 4096 Sep 28 12:00 .\n", ts: T0 },
+  {
+    channel: "stderr",
+    text: "ls: cannot access '/tmp/missing': No such file or directory\n",
+    ts: T0 + 40,
+  },
+  { channel: "system", text: "\n[exit 2]\n", ts: T0 + 90 },
 ];
 
 export const COMMAND_HISTORY = [

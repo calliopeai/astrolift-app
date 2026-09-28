@@ -5,7 +5,7 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { DataTable, type Column } from "@/components/data-table";
-import { PageShell } from "@/components/PageShell";
+import { Panel } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import {
   AlertDialog,
@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -153,8 +152,6 @@ function ValidationBadges({ service }: { service: ManagedService }) {
 
 export type ManagedServicesScreenProps = ReturnType<typeof useManagedServices> & {
   slug: string;
-  /** The app detail tab row. */
-  tabs?: React.ReactNode;
   /**
    * The email deliverability sheet for one service, mounted only while
    * that service is open so its queries run only then.
@@ -173,10 +170,13 @@ export type ManagedServicesScreenProps = ReturnType<typeof useManagedServices> &
   ) => React.ReactNode;
 };
 
-/** /apps/[slug]/managed-services: the service table, provision sheet and deprovision dialog. */
+/**
+ * The Managed services section of an app's Workloads tab (spec 44 §5.2;
+ * `/managed-services` redirects to `?section=managed-services`): the
+ * service table in a panel, the provision sheet and the deprovision dialog.
+ */
 export function ManagedServicesScreen({
   slug,
-  tabs,
   table,
   envs,
   busy,
@@ -308,50 +308,50 @@ export function ManagedServicesScreen({
   ];
 
   return (
-    <PageShell
-      title="Managed services"
-      description={
-        <span className="text-muted-foreground font-mono text-xs">
-          Databases, caches, queues attached to {slug}. Provisioned via the platform&apos;s driver
-          registry; the workflow loop watches DB-side status and drives the upstream lifecycle.
-        </span>
-      }
-      actions={
-        <Can permission="app.deploy">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            Provision
-          </Button>
-        </Can>
-      }
-    >
-      {tabs}
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
-            label="Managed services"
-            controller={table}
-            columns={columns}
-            getRowId={(svc) => svc.id}
-            onRowActivate={openDetail}
-            rowLabel={(svc) =>
-              svc.status === "deleted" ? `${svc.name} (deleted)` : `Open ${svc.name} (${svc.kind})`
-            }
-            searchPlaceholder="Search by name, kind, variant, or environment…"
-            empty={{
-              icon: <DatabaseIcon className="size-5" />,
-              title: "No managed services",
-              description:
-                "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
-            }}
-            emptyFiltered={{
-              title: "No matching services",
-              description:
-                "No service on this app matches that search. The server matches the name, kind, variant and environment.",
-            }}
-          />
-        </CardContent>
-      </Card>
+    <>
+      <Panel
+        title="Managed services"
+        icon={<DatabaseIcon className="size-4" />}
+        description={
+          <>
+            Databases, caches, queues attached to <span className="font-mono">{slug}</span>.
+            Provisioned via the platform&apos;s driver registry; the workflow loop watches DB-side
+            status and drives the upstream lifecycle.
+          </>
+        }
+        actions={
+          <Can permission="app.deploy">
+            <Button size="sm" onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              Provision
+            </Button>
+          </Can>
+        }
+        flush
+      >
+        <DataTable
+          label="Managed services"
+          controller={table}
+          columns={columns}
+          getRowId={(svc) => svc.id}
+          onRowActivate={openDetail}
+          rowLabel={(svc) =>
+            svc.status === "deleted" ? `${svc.name} (deleted)` : `Open ${svc.name} (${svc.kind})`
+          }
+          searchPlaceholder="Search by name, kind, variant, or environment…"
+          empty={{
+            icon: <DatabaseIcon className="size-5" />,
+            title: "No managed services",
+            description:
+              "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
+          }}
+          emptyFiltered={{
+            title: "No matching services",
+            description:
+              "No service on this app matches that search. The server matches the name, kind, variant and environment.",
+          }}
+        />
+      </Panel>
 
       <ProvisionSheet
         open={open}
@@ -456,7 +456,7 @@ export function ManagedServicesScreen({
       {renderServiceDetail?.(serviceDetailTarget, (next) => {
         if (!next) setServiceDetailTarget(null);
       })}
-    </PageShell>
+    </>
   );
 }
 

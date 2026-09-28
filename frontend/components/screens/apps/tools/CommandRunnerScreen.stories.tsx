@@ -5,6 +5,7 @@ import {
   COMMAND_OUTPUT,
   COMMAND_RUNNER,
   LONG,
+  T0,
 } from "./app-observability-shell-topology-commands.fixtures";
 import { CommandRunnerScreen } from "./CommandRunnerScreen";
 
@@ -56,7 +57,7 @@ export const Running: Story = {
     <CommandRunnerScreen
       {...COMMAND_RUNNER}
       command="tail -f /var/log/app.log"
-      output={[{ channel: "stdout", text: "booting…\n" }]}
+      output={[{ channel: "stdout", text: "booting…\n", ts: T0 }]}
       connState="open"
       running
     />
@@ -70,8 +71,8 @@ export const ConnectionError: Story = {
       {...COMMAND_RUNNER}
       command="ls"
       output={[
-        { channel: "system", text: "\n[ws: connection error]\n" },
-        { channel: "system", text: "\n[ws closed: code 1006]\n" },
+        { channel: "system", text: "\n[ws: connection error]\n", ts: T0 },
+        { channel: "system", text: "\n[ws closed: code 1006]\n", ts: T0 + 20 },
       ]}
       connState="closed"
     />
@@ -88,10 +89,47 @@ export const LongStrings: Story = {
       containers={[{ id: "c-long", name: LONG, isPrimary: true }]}
       containerName={LONG}
       command={`echo ${LONG}`}
-      output={[{ channel: "stdout", text: `${LONG} ${LONG} ${LONG}\n` }]}
+      output={[{ channel: "stdout", text: `${LONG} ${LONG} ${LONG}\n`, ts: T0 }]}
       connState="closed"
       exitCode={0}
       history={COMMAND_HISTORY}
     />
+  ),
+};
+
+/** A chunk that ends mid-line joins the next one into a single log line. */
+export const SplitChunks: Story = {
+  render: () => (
+    <CommandRunnerScreen
+      {...COMMAND_RUNNER}
+      command="python manage.py showmigrations"
+      output={[
+        { channel: "stdout", text: "orders\n [X] 0001_init", ts: T0 },
+        { channel: "stdout", text: "ial\n [ ] 0002_add_sku\n", ts: T0 + 30 },
+        { channel: "system", text: "\n[exit 0]\n", ts: T0 + 60 },
+      ]}
+      connState="closed"
+      exitCode={0}
+    />
+  ),
+};
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <CommandRunnerScreen
+        {...COMMAND_RUNNER}
+        slug={LONG}
+        workloads={[{ id: "wl-long", slug: LONG, kind: "deployment" }]}
+        workloadSlug={LONG}
+        containers={[{ id: "c-long", name: LONG, isPrimary: true }]}
+        containerName={LONG}
+        command={`echo ${LONG}`}
+        output={COMMAND_OUTPUT}
+        connState="closed"
+        exitCode={2}
+        history={COMMAND_HISTORY}
+      />
+    </div>
   ),
 };

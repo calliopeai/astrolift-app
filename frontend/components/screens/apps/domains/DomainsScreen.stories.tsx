@@ -31,7 +31,18 @@ const base: DomainsScreenProps = {
   ),
 };
 
+/** The first domain still waiting on DNS is shown under the list with its records to add. */
 export const Full: Story = { render: () => <DomainsScreen {...base} /> };
+
+/** Every domain validated: the first one's panel shows its certificate and routing. */
+export const AllValidated: Story = {
+  render: () => (
+    <DomainsScreen
+      {...base}
+      domains={base.domains.map((d) => ({ ...d, certState: "validated" }))}
+    />
+  ),
+};
 
 /** First load: environments not back yet, domain list skeleton. */
 export const Loading: Story = {
@@ -42,11 +53,18 @@ export const Empty: Story = {
   render: () => <DomainsScreen {...base} domains={[]} environments={[ENV_PROD]} />,
 };
 
-/**
- * The tab has no page-level error state (query and mutation errors surface
- * as toasts); the closest real one is every domain failing validation or
- * issuance.
- */
+/** The domains query failed with nothing cached: the error and Retry sit in the table's frame. */
+export const LoadError: Story = {
+  render: () => (
+    <DomainsScreen
+      {...base}
+      domains={[]}
+      error={{ name: "ApolloError", message: "Network request failed: 502 Bad Gateway" }}
+    />
+  ),
+};
+
+/** Every domain failing validation or issuance; the first one's panel leads with the error. */
 export const FailingDomains: Story = {
   render: () => <DomainsScreen {...base} domains={[DOMAIN_CERT_FAILED, DOMAIN_PENDING]} />,
 };
@@ -66,5 +84,18 @@ export const LongStrings: Story = {
       domains={[DOMAIN_LONG]}
       environments={[{ ...ENV_PROD, name: LONG, url: `https://${LONG}.apps.example.com` }]}
     />
+  ),
+};
+
+export const W768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <DomainsScreen
+        {...base}
+        slug={LONG}
+        domains={[DOMAIN_LONG, DOMAIN_PENDING]}
+        environments={[{ ...ENV_PROD, name: LONG, url: `https://${LONG}.apps.example.com` }]}
+      />
+    </div>
   ),
 };

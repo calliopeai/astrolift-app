@@ -2,7 +2,6 @@
 
 import { useLazyQuery } from "@apollo/client/react";
 import * as React from "react";
-import { toast } from "sonner";
 
 import { GET_SOURCE_FILE } from "@/graphql/scm/scm.queries";
 import type { AstroliftSourceFile } from "@/graphql/scm/scm.types";
@@ -84,74 +83,63 @@ export function useManifestPreviewStep<S extends ManifestPreviewLogicFields>(
     fetchPolicy: "network-only",
   });
 
-  const auto = React.useCallback(
-    async (opts?: { manual?: boolean }) => {
-      if (!state.connectionId || !state.sourceRepo) return;
-      const manual = opts?.manual ?? false;
-      setFetchState("fetching");
-      setFetchError("");
-      const { data, error } = await fetchManifest({
-        variables: {
-          connectionId: state.connectionId,
-          repoFullName: state.sourceRepo,
-          path: state.manifestPath || "astrolift.toml",
-          ref: state.defaultBranch || "main",
-        },
-      });
-      if (error) {
-        setFetchState("error");
-        setFetchError(error.message);
-        if (manual) toast.error(`Manifest refetch failed: ${error.message}`);
-        return;
-      }
-      const f = data?.astroliftSourceFile;
-      if (!f) {
-        setFetchState("error");
-        setFetchError("no response from server");
-        if (manual) toast.error("Manifest refetch failed: no response from server.");
-        return;
-      }
-      if (f.errorCode) {
-        setFetchState("error");
-        setFetchError(f.errorMessage ?? f.errorCode);
-        if (manual) {
-          toast.error(`Manifest refetch failed: ${f.errorMessage ?? f.errorCode}`);
-        }
-        return;
-      }
-      if (f.content == null) {
-        // Not found — seed the editor with the template.
-        setFetchState("missing");
-        setEditing(true);
-        setState((s) => ({
-          ...s,
-          manifestRaw:
-            s.manifestRaw ||
-            TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || generateFriendlySlug()),
-          manifestFromRepo: false,
-        }));
-        if (manual) {
-          toast.message("No manifest at that path — seeded a template you can edit.");
-        }
-        return;
-      }
-      setFetchState("found");
+  // The outcome of a fetch, automatic or asked for, shows in the step's own
+  // banner beside the editor, never in a toast (spec 44 §5.4).
+  const auto = React.useCallback(async () => {
+    if (!state.connectionId || !state.sourceRepo) return;
+    setFetchState("fetching");
+    setFetchError("");
+    const { data, error } = await fetchManifest({
+      variables: {
+        connectionId: state.connectionId,
+        repoFullName: state.sourceRepo,
+        path: state.manifestPath || "astrolift.toml",
+        ref: state.defaultBranch || "main",
+      },
+    });
+    if (error) {
+      setFetchState("error");
+      setFetchError(error.message);
+      return;
+    }
+    const f = data?.astroliftSourceFile;
+    if (!f) {
+      setFetchState("error");
+      setFetchError("no response from server");
+      return;
+    }
+    if (f.errorCode) {
+      setFetchState("error");
+      setFetchError(f.errorMessage ?? f.errorCode);
+      return;
+    }
+    if (f.content == null) {
+      // Not found: seed the editor with the template.
+      setFetchState("missing");
+      setEditing(true);
       setState((s) => ({
         ...s,
-        manifestRaw: f.content ?? "",
-        manifestFromRepo: true,
+        manifestRaw:
+          s.manifestRaw ||
+          TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || generateFriendlySlug()),
+        manifestFromRepo: false,
       }));
-      if (manual) toast.success("Manifest re-fetched from repo.");
-    },
-    [
-      state.connectionId,
-      state.sourceRepo,
-      state.manifestPath,
-      state.defaultBranch,
-      fetchManifest,
-      setState,
-    ]
-  );
+      return;
+    }
+    setFetchState("found");
+    setState((s) => ({
+      ...s,
+      manifestRaw: f.content ?? "",
+      manifestFromRepo: true,
+    }));
+  }, [
+    state.connectionId,
+    state.sourceRepo,
+    state.manifestPath,
+    state.defaultBranch,
+    fetchManifest,
+    setState,
+  ]);
 
   // Auto-fetch when entering the step the first time (or whenever the
   // repo / manifest path / branch changes upstream).

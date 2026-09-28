@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/panel/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -43,42 +43,39 @@ export function ResourceUsageGaugesView({ usage, loading }: ResourceUsageGaugesV
 
   if (loading && !usage) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{labels.title}</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
+      <Panel
+        title={labels.title}
+        span={6}
+        loading
+        skeleton={
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        }
+      />
     );
   }
 
   if (!usage) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{labels.title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">{labels.empty}</p>
-        </CardContent>
-      </Card>
+      <Panel title={labels.title} span={6}>
+        <p className="text-muted-foreground text-sm">{labels.empty}</p>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-base">
-          <span>{labels.title}</span>
-          <span className="text-muted-foreground font-mono text-xs">
-            {labels.sourcedAt}: {formatSourcedAt(usage.sourcedAt)}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2">
+    <Panel
+      title={labels.title}
+      span={6}
+      actions={
+        <span className="text-muted-foreground font-mono text-xs">
+          {labels.sourcedAt}: {formatSourcedAt(usage.sourcedAt)}
+        </span>
+      }
+    >
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <GaugeCard
           title={labels.cpuTitle}
           icon={CpuIcon}
@@ -93,8 +90,8 @@ export function ResourceUsageGaugesView({ usage, loading }: ResourceUsageGaugesV
           formatValue={formatBytes}
           labels={labels}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 

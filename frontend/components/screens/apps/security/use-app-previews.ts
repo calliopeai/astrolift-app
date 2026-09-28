@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import { useHeldRows } from "@/components/list/use-held-rows";
+import { useListState } from "@/components/list/use-list-state";
 import {
   CREATE_PREVIEW_ENVIRONMENT,
   EXTEND_PREVIEW_TTL,
@@ -21,6 +22,9 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { APP_PREVIEWS_LIST } from "../deployments/app-deployments-list";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -34,6 +38,20 @@ interface PreviewsPageResp {
     nextCursor?: string | null;
     totalCount?: number | null;
   };
+}
+
+/**
+ * The page query's variables. The route preloads the first page with these
+ * exact values (`search: null`, the default page size, `after: null`), so
+ * keep the two in step or the preload is a cache miss.
+ */
+export function previewPageVariables(
+  appSlug: string,
+  q: string,
+  pageSize: number,
+  after: string | null
+) {
+  return { appSlug, search: q.trim() || null, limit: pageSize, after };
 }
 interface MutationResultLite {
   ok: boolean;
@@ -68,13 +86,18 @@ export function isStale(p: AstroliftPreviewEnvironment): boolean {
 }
 
 /**
- * The app behind the previews tab, its whole preview set (for the summary
- * chrome), the server-paged table, and the create / extend / tear-down
- * mutations. The data half of AppPreviewsScreen.
+ * The Previews view of the Deployments tab: the app, its whole preview set
+ * (for the summary chrome), the server-paged list with its state in the URL
+ * (the view picker it shares with the deployments list), and the create /
+ * extend / tear-down mutations. The data half of AppPreviewsScreen.
  */
 export function useAppPreviews(slug: string) {
   const t = useTranslations("apps.previews");
+  const { can } = useMyPermissions();
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
+  const list = useListState(APP_PREVIEWS_LIST);
+  const { state } = list;
+  const firstPage = state.after === null;
 
   /**
    * Summary chrome — the status counts, the stale sweep (#431) and the
@@ -92,17 +115,18 @@ export function useAppPreviews(slug: string) {
 
   // `astroliftPreviewEnvironmentsPage` filters on `appSlug` and searches
   // the app, branch, hostname, commit **and status**. It has no status
-  // filter and no sort argument, so this table declares neither — the
-  // status pills that used to filter one fetched page are gone (typing
+  // filter and no sort argument, so this list declares neither: typing
   // `running` / `failed` / `torn_down` in the box is the server-side
-  // equivalent).
-  const table = useCursorTable<AstroliftPreviewEnvironment>({
-    query: LIST_PREVIEW_ENVIRONMENTS_PAGE,
-    variables: { appSlug: slug },
-    extract: (d) => (d as PreviewsPageResp | undefined)?.astroliftPreviewEnvironmentsPage,
-    searchVariable: "search",
-    urlKey: "pv",
-    pollInterval: 30000,
+  // status filter.
+  const page = useQuery<PreviewsPageResp>(LIST_PREVIEW_ENVIRONMENTS_PAGE, {
+    variables: previewPageVariables(slug, state.q, state.pageSize, state.after),
+    fetchPolicy: "cache-and-network",
+    pollInterval: firstPage ? 30000 : 0,
+  });
+  const pageData = page.data?.astroliftPreviewEnvironmentsPage;
+  const held = useHeldRows(pageData?.items ?? [], (p) => p.id, {
+    live: firstPage,
+    resetKey: state.q + state.pageSize,
   });
 
   const [tearDown, tearState] = useMutation<{
@@ -122,18 +146,18 @@ export function useAppPreviews(slug: string) {
   }>(CREATE_PREVIEW_ENVIRONMENT, { refetchQueries: refetchFor(slug) });
 
   const a = app.data?.astroliftApp ?? null;
-  const list = React.useMemo(
+  const all = React.useMemo(
     () => summary.data?.astroliftPreviewEnvironments ?? [],
     [summary.data?.astroliftPreviewEnvironments]
   );
 
   const counts = React.useMemo(
     () => ({
-      running: list.filter((p) => p.status === "running").length,
-      failed: list.filter((p) => p.status === "failed").length,
-      tornDown: list.filter((p) => p.status === "torn_down").length,
+      running: all.filter((p) => p.status === "running").length,
+      failed: all.filter((p) => p.status === "failed").length,
+      tornDown: all.filter((p) => p.status === "torn_down").length,
     }),
-    [list]
+    [all]
   );
 
   // #660 — monthly preview-spend roll-up. estimatedDailyCostUsd is
@@ -141,7 +165,7 @@ export function useAppPreviews(slug: string) {
   // without a billing plugin), so we sum only what's available and
   // surface the count of unpriced rows next to the dollar figure.
   const spend = React.useMemo(() => {
-    const live = list.filter((p) => p.status !== "torn_down");
+    const live = all.filter((p) => p.status !== "torn_down");
     let dailySum = 0;
     let priced = 0;
     let unpriced = 0;
@@ -169,9 +193,9 @@ export function useAppPreviews(slug: string) {
       approximate,
       liveCount: live.length,
     };
-  }, [list]);
+  }, [all]);
 
-  const stale = list.filter((p) => p.status !== "torn_down").filter(isStale);
+  const stalePreviews = all.filter((p) => p.status !== "torn_down").filter(isStale);
 
   const onExtend = React.useCallback(
     async (p: AstroliftPreviewEnvironment, days: PreviewTtlExtendDays) => {
@@ -219,10 +243,20 @@ export function useAppPreviews(slug: string) {
     app: a,
     loading: app.loading,
     list,
+    rows: held.rows,
+    newRows: { count: held.newCount, onReveal: held.reveal },
+    pageLoading: page.loading && !pageData,
+    pageError: page.error && !pageData ? { message: page.error.message } : null,
+    onRetry: () => {
+      void page.refetch();
+    },
+    nextCursor: pageData?.nextCursor ?? null,
+    totalCount: pageData?.totalCount ?? null,
+    previewCount: all.length,
     counts,
     spend,
-    stale,
-    table,
+    stalePreviews,
+    canDeploy: can("app.deploy"),
     tearingDown: tearState.loading,
     extending: extendState.loading,
     creating: createState.loading,

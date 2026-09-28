@@ -22,9 +22,9 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -65,10 +65,10 @@ export interface ShellScreenProps {
 }
 
 /**
- * Control › Shell — the acting half of what used to be the Console tab
- * (#1247). An interactive root shell on a running pod, the script upload that
- * feeds it, and the paste-ready CLI equivalents. Observability sits next door
- * and stays read-only.
+ * Logs & metrics › Console (spec 44 §5.2): the acting half of what used to be
+ * the Console tab (#1247). An interactive root shell on a running pod, the
+ * script upload that feeds it, and the paste-ready CLI equivalents, each a
+ * Panel. The Logs section next door stays read-only.
  */
 export function ShellScreen({
   slug,
@@ -219,69 +219,24 @@ export function ShellScreen({
     >
       {tabs}
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TerminalIcon className="size-4" />
-              {t("terminal.title")}
-            </CardTitle>
-            <CardDescription>
-              {selectedPod && selectedContainer
-                ? t("terminal.targetDescription", {
-                    pod: selectedPod,
-                    container: selectedContainer,
-                  })
-                : t("terminal.pickTarget")}
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Pod + container pickers live here now: the Console tab hosted
-                them in the log card's header, and the shell borrowed the
-                selection. Split apart, each surface owns its own target. */}
-            <div className="flex items-center gap-1.5">
-              <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
-              <Select
-                value={selectedPod ?? ""}
-                onValueChange={(v) => setPickedPod(v)}
-                disabled={podsLoading || noPods}
-              >
-                <SelectTrigger size="sm" aria-label={t("podLabel")} className="font-mono text-xs">
-                  <SelectValue placeholder={t("podPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {podRows.map((p) => (
-                    <SelectItem key={p.name} value={p.name} className="font-mono">
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <LayersIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
-              <Select
-                value={selectedContainer ?? ""}
-                onValueChange={(v) => setPickedContainer(v)}
-                disabled={podContainers.length === 0}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t("containerLabel")}
-                  className="font-mono text-xs"
-                >
-                  <SelectValue placeholder={t("containerPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {podContainers.map((c) => (
-                    <SelectItem key={c} value={c} className="font-mono">
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {shellOpen ? (
+      <PanelGrid>
+        <Panel
+          title={t("terminal.title")}
+          icon={<TerminalIcon className="size-4" />}
+          description={
+            selectedPod && selectedContainer ? (
+              <span className="font-mono">
+                {t("terminal.targetDescription", {
+                  pod: selectedPod,
+                  container: selectedContainer,
+                })}
+              </span>
+            ) : (
+              t("terminal.pickTarget")
+            )
+          }
+          actions={
+            noPods ? null : shellOpen ? (
               <Button size="sm" variant="outline" onClick={() => setShellOpen(false)}>
                 {t("terminal.close")}
               </Button>
@@ -291,114 +246,167 @@ export function ShellScreen({
                 onClick={() => setShellOpen(true)}
                 disabled={!selectedPod || !selectedContainer}
               >
-                <TerminalIcon className="size-3" />
+                <TerminalIcon className="size-3.5" />
                 {t("terminal.open")}
               </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {noPods ? (
-            <EmptyState
-              icon={<BoxIcon className="size-5" />}
-              title={tObs("pods.emptyTitle")}
-              description={tObs("pods.emptyDescription")}
-              actionHref={deploymentsHref}
-              actionLabel={tObs("pods.emptyAction")}
-            />
-          ) : shellOpen && selectedPod && selectedContainer ? (
-            <TerminalEmulator
-              appSlug={a.slug}
-              podName={selectedPod}
-              container={selectedContainer}
-            />
-          ) : (
-            <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
-              <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 text-center">
-                <TerminalIcon className="size-8" />
-                <p className="text-sm">
-                  {selectedPod ? t("terminal.readyHint") : t("terminal.pickTarget")}
-                </p>
-                <p className="max-w-md text-xs">
-                  {t.rich("terminal.untilThen", {
-                    cli: () => (
-                      <code className="bg-background rounded px-1 py-0.5 font-mono">astro</code>
-                    ),
-                  })}
-                </p>
+            )
+          }
+          loading={podsLoading}
+          empty={
+            noPods
+              ? {
+                  icon: <BoxIcon className="size-5" />,
+                  title: tObs("pods.emptyTitle"),
+                  description: tObs("pods.emptyDescription"),
+                  actionHref: deploymentsHref,
+                  actionLabel: tObs("pods.emptyAction"),
+                }
+              : null
+          }
+        >
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* Each surface owns its target: the pod and container the shell opens on. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5 shrink-0" />
+                <Select value={selectedPod ?? ""} onValueChange={(v) => setPickedPod(v)}>
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={t("podLabel")}
+                    className="max-w-full min-w-0 font-mono text-xs"
+                  >
+                    <SelectValue placeholder={t("podPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {podRows.map((p) => (
+                      <SelectItem key={p.name} value={p.name} className="font-mono">
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <LayersIcon
+                  aria-hidden="true"
+                  className="text-muted-foreground size-3.5 shrink-0"
+                />
+                <Select
+                  value={selectedContainer ?? ""}
+                  onValueChange={(v) => setPickedContainer(v)}
+                  disabled={podContainers.length === 0}
+                >
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={t("containerLabel")}
+                    className="max-w-full min-w-0 font-mono text-xs"
+                  >
+                    <SelectValue placeholder={t("containerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {podContainers.map((c) => (
+                      <SelectItem key={c} value={c} className="font-mono">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href="/downloads">
-                <DownloadIcon className="size-4" />
-                {t("terminal.install")}
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={tokensHref}>
-                <ExternalLinkIcon className="size-4" />
-                {t("terminal.manageTokens")}
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileCode2Icon className="size-4" />
-              {t("upload.title")}
-            </CardTitle>
-            <CardDescription>{t("upload.description")}</CardDescription>
+            {shellOpen && selectedPod && selectedContainer ? (
+              <TerminalEmulator
+                appSlug={a.slug}
+                podName={selectedPod}
+                container={selectedContainer}
+              />
+            ) : (
+              <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
+                <div className="text-muted-foreground flex min-w-0 flex-col items-center gap-2 px-4 text-center">
+                  <TerminalIcon className="size-8" />
+                  <p className="text-sm">
+                    {selectedPod ? t("terminal.readyHint") : t("terminal.pickTarget")}
+                  </p>
+                  <p className="max-w-md text-xs">
+                    {t.rich("terminal.untilThen", {
+                      cli: () => (
+                        <code className="bg-background rounded px-1 py-0.5 font-mono">astro</code>
+                      ),
+                    })}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/downloads">
+                  <DownloadIcon className="size-4" />
+                  {t("terminal.install")}
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={tokensHref}>
+                  <ExternalLinkIcon className="size-4" />
+                  {t("terminal.manageTokens")}
+                </Link>
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept=".py,.sql,.sh,.ts,.js,.rb,.go,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onPickScript(f);
-                // Reset so re-uploading the same filename refires onChange.
-                e.target.value = "";
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => uploadInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? (
-                <Loader2Icon className="size-3 animate-spin" />
-              ) : (
-                <UploadIcon className="size-3" />
-              )}
-              {uploading ? t("upload.uploading") : t("upload.pick")}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {uploadedFile ? (
+        </Panel>
+
+        <Panel
+          span={6}
+          title={t("upload.title")}
+          icon={<FileCode2Icon className="size-4" />}
+          description={t("upload.description")}
+          actions={
             <>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="font-mono text-xs">
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept=".py,.sql,.sh,.ts,.js,.rb,.go,text/plain"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onPickScript(f);
+                  // Reset so re-uploading the same filename refires onChange.
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <UploadIcon className="size-3.5" />
+                )}
+                {uploading ? t("upload.uploading") : t("upload.pick")}
+              </Button>
+            </>
+          }
+        >
+          {uploadedFile ? (
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Badge
+                  variant="secondary"
+                  className="max-w-full min-w-0 font-mono text-xs [overflow-wrap:anywhere] whitespace-normal"
+                >
                   {uploadedFile.name}
                   <button
                     type="button"
                     aria-label={t("upload.clear")}
                     onClick={onClearUpload}
-                    className="hover:bg-background/60 ml-1 rounded-sm p-0.5"
+                    className="hover:bg-background/60 ml-1 shrink-0 rounded-sm p-0.5"
                   >
                     <XIcon className="size-3" />
                   </button>
                 </Badge>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
                   {t("upload.path", { path: `/tmp/${uploadedFile.name}` })}
                 </span>
               </div>
@@ -409,42 +417,38 @@ export function ShellScreen({
                 <CopyableCommand label={t("upload.fetchLabel")} command={fetchCommand} />
               )}
               <p className="text-muted-foreground text-xs">{t("upload.note")}</p>
-            </>
+            </div>
           ) : (
             <div className="text-muted-foreground bg-muted/40 rounded-md border border-dashed p-4 text-center text-xs">
               {t("upload.empty")}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("shortcuts.title")}</CardTitle>
-          <CardDescription>
-            {t.rich("shortcuts.description", {
-              login: () => (
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">astro login</code>
-              ),
-            })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {sampleCommands.map((s) => (
-            <CopyableCommand key={s.key} label={s.label} command={s.template(a.slug)} />
-          ))}
-        </CardContent>
-      </Card>
+        <Panel
+          span={6}
+          title={t("shortcuts.title")}
+          description={t.rich("shortcuts.description", {
+            login: () => <code className="font-mono">astro login</code>,
+          })}
+        >
+          <div className="flex min-w-0 flex-col gap-3">
+            {sampleCommands.map((s) => (
+              <CopyableCommand key={s.key} label={s.label} command={s.template(a.slug)} />
+            ))}
+          </div>
+        </Panel>
+      </PanelGrid>
     </PageShell>
   );
 }
 
 function CopyableCommand({ label, command }: { label: string; command: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">{label}</div>
-      <div className="bg-muted flex items-start gap-2 rounded-md p-2">
-        <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+      <div className="bg-muted flex min-w-0 items-start gap-2 rounded-md p-2">
+        <pre className="min-w-0 flex-1 font-mono text-xs leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
           {command}
         </pre>
         <CopyButton value={command} />

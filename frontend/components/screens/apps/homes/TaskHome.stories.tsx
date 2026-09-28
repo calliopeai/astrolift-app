@@ -27,3 +27,11 @@ export const Succeeded: Story = {
 };
 
 export const LongStrings: Story = { render: () => <TaskHomeScreen {...TASK} name={LONG} /> };
+
+export const At768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <TaskHomeScreen {...TASK} runs={TASK_RUNS.slice(2)} />
+    </div>
+  ),
+};

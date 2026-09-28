@@ -16,10 +16,16 @@ interface EventsResp {
  * serialised as a string). The data half of ActivityTimelineView.
  */
 export function useActivityTimeline(appSlug: string) {
-  const { data, loading } = useQuery<EventsResp>(LIST_EVENTS, {
+  const { data, loading, error, refetch } = useQuery<EventsResp>(LIST_EVENTS, {
     variables: { limit: 100, appSlug },
     fetchPolicy: "cache-and-network",
   });
 
-  return { events: data?.astroliftEvents ?? [], loading };
+  return {
+    events: data?.astroliftEvents ?? [],
+    loading,
+    /** Only when there is nothing cached to show. */
+    error: data ? null : (error?.message ?? null),
+    onRetry: () => void refetch(),
+  };
 }

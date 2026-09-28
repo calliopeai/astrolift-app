@@ -4,6 +4,7 @@ import * as React from "react";
 
 import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
+import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,7 +133,10 @@ const RUNS_EMPTY = {
   learnMoreHref: "#docs-runs",
 };
 
-type RunsProps = Partial<ListPageProps<RunRow>> & { initial?: Partial<ListState> };
+/** A routed list's props: the stories below own the page header. */
+type Routed<TRow> = Partial<Extract<ListPageProps<TRow>, { header: unknown }>>;
+
+type RunsProps = Routed<RunRow> & { initial?: Partial<ListState> };
 
 function Runs({ initial, rows = RUNS, ...props }: RunsProps) {
   const list = useLocalListState(RUNS_LIST, initial);
@@ -281,6 +285,123 @@ export const Width768: StoryObj = {
 };
 
 // ---------------------------------------------------------------------------
+// Embedded: a list on a detail page's tab (an agent's Runs tab)
+// ---------------------------------------------------------------------------
+
+const AGENT_TABS = [
+  "Overview",
+  "Runs",
+  "Configuration",
+  "Skills & tools",
+  "Logs & metrics",
+  "Secrets",
+  "Access",
+  "Settings",
+].map((label) => ({
+  key: label,
+  label,
+  href: `#${label.toLowerCase()}`,
+  active: label === "Runs",
+}));
+
+type EmbeddedProps = Partial<Extract<ListPageProps<RunRow>, { embedded: true }>> & {
+  initial?: Partial<ListState>;
+  title?: string;
+};
+
+/** The entity owns the header and the one row of tabs; the list draws none. */
+function EmbeddedRuns({ initial, title = "support-bot", rows = RUNS, ...props }: EmbeddedProps) {
+  const list = useLocalListState(RUNS_LIST, initial);
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <ShellHeader
+        crumbs={[{ label: "Agents", switcher: AGENT_FUNCTIONS }, { label: title }]}
+        title={title}
+        status={<StatusDot status="ok" />}
+        context="claude-sonnet"
+        primaryAction={<Button size="sm">Run now</Button>}
+        tabs={AGENT_TABS}
+        tabsAriaLabel="Agent"
+      />
+      <ListPage<RunRow>
+        embedded
+        list={list}
+        label="Runs"
+        columns={RUN_COLUMNS}
+        rows={rows}
+        getRowId={(r) => r.id}
+        rowHref={(r) => `#run-${r.id}`}
+        renderCard={RunCard}
+        empty={RUNS_EMPTY}
+        nextCursor="cursor-2"
+        {...props}
+      />
+    </div>
+  );
+}
+
+/** Views as a compact picker at the start of the filter bar, still `?view=`. */
+export const Embedded: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns />
+    </div>
+  ),
+};
+export const EmbeddedFilteredView: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns initial={{ view: "failed", filters: { trigger: "webhook" } }} />
+    </div>
+  ),
+};
+export const EmbeddedLoading: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns rows={[]} loading />
+    </div>
+  ),
+};
+export const EmbeddedEmpty: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns rows={[]} />
+    </div>
+  ),
+};
+export const EmbeddedError: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns
+        rows={[]}
+        error={{ message: "runs.list: upstream timed out after 30s" }}
+        onRetry={() => {}}
+      />
+    </div>
+  ),
+};
+export const EmbeddedLongStrings: StoryObj = {
+  render: () => (
+    <div className="p-6">
+      <EmbeddedRuns
+        rows={LONG_RUNS}
+        title={LONG_RUNS[0].agent}
+        initial={{ q: LONG_RUNS[0].project }}
+      />
+    </div>
+  ),
+};
+export const EmbeddedWidth768: StoryObj = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <div className="p-6">
+        <EmbeddedRuns rows={LONG_RUNS} initial={{ view: "scheduled" }} />
+      </div>
+    </div>
+  ),
+};
+
+// ---------------------------------------------------------------------------
 // Members: numbered paging, CSV export in the overflow menu
 // ---------------------------------------------------------------------------
 
@@ -307,7 +428,7 @@ const MEMBER_COLUMNS: Column<MemberRow>[] = [
   },
 ];
 
-function Members(props: Partial<ListPageProps<MemberRow>>) {
+function Members(props: Routed<MemberRow>) {
   const list = useLocalListState(MEMBERS_LIST, { page: 2 });
   return (
     <ListPage<MemberRow>

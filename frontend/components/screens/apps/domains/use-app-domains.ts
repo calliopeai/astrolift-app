@@ -409,6 +409,11 @@ export function useAppDomains(slug: string) {
 
   return {
     loading: domains.loading,
+    /** The domains query failed with nothing cached. */
+    error: domains.data ? null : (domains.error ?? null),
+    refetch: (): void => {
+      void domains.refetch();
+    },
     domains: domains.data?.astroliftAppDomains ?? [],
     environments: envs.data?.astroliftEnvironments ?? [],
     workloadOptions: workloads.data?.astroliftWorkloads ?? [],

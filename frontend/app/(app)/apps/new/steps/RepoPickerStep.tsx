@@ -14,7 +14,7 @@ interface Props {
   setValid: (valid: boolean) => void;
 }
 
-/** Wizard step 1. The view lives in components/screens/apps/new; this wires the hook. */
+/** New app step 1 (Source), the repository part. The view lives in components/screens/apps/new; this wires the hook. */
 export function RepoPickerStep({ state, setState, setValid }: Props) {
   return <RepoPickerStepView {...useRepoPicker({ state, setState, setValid, isCiPushableKind })} />;
 }

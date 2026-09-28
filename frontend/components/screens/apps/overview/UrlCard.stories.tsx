@@ -61,3 +61,12 @@ export const ReadOnly: Story = { globals: { permissions: "none" } };
 export const LongStrings: Story = {
   args: { subdomain: LONG, fullHost: `${LONG}.acme.astrolift.app` },
 };
+
+export const At768: Story = {
+  args: { subdomain: LONG, fullHost: `${LONG}.acme.astrolift.app` },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <UrlCardView {...args} />
+    </div>
+  ),
+};

@@ -1,260 +1,175 @@
 "use client";
 
 import { gql } from "@apollo/client";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import {
-  useCursorTable,
-  type CursorPage,
-  type CursorTableController,
-} from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import { RUN_JOB_ONCE } from "@/graphql/lifecycle/lifecycle.mutations";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+
 import {
-  LIST_COMMAND_RUNS_PAGE,
-  LIST_ENVIRONMENTS,
-  LIST_SCHEDULED_JOB_RUNS_PAGE,
-} from "@/graphql/lifecycle/lifecycle.queries";
-import type {
-  AstroliftAppEnvironment,
-  AstroliftCommandRun,
-  AstroliftScheduledJobRun,
-} from "@/graphql/lifecycle/lifecycle.types";
-import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
-
-// ── page envelopes ────────────────────────────────────────────────────────
-
-interface JobRunsPageResp {
-  astroliftScheduledJobRunsPage: CursorPage<AstroliftScheduledJobRun>;
-}
-
-interface CommandRunsPageResp {
-  astroliftCommandRunsPage: CursorPage<AstroliftCommandRun>;
-}
-
-export interface CronWorkload {
-  id: string;
-  slug: string;
-  name: string;
-  kind: string;
-  schedule: string;
-  concurrencyPolicy: string;
-}
-
-interface WorkloadsPageResp {
-  astroliftWorkloadsPage: CursorPage<CronWorkload>;
-}
+  type CronWorkload,
+  JOBS_LIST,
+  type JobRunPulse,
+  RECENT_RUNS,
+  selectJobs,
+  withLastRuns,
+} from "./jobs-list";
 
 /**
- * `astroliftScheduledJobRunsPage` has no `status:` argument and
- * `astroliftWorkloadsPage` has no `kind:` argument, so the two tabs that
- * are *defined* by one of those axes — Failures and Schedules — spend the
- * page field's `search` on it. `search` is an OR of `icontains` across the
- * run's app / workload / environment / status / Job name (and the
- * workload's name / slug / kind / app slug), so it narrows to a superset
- * server-side; the row guards below drop whatever matched on the wrong
- * column. Both tabs therefore render without a search box: `search` is
- * already carrying the filter.
+ * Every cron workload, fleet-wide or for one app. `kinds` narrows on the
+ * server (the old page spent `search` on "cronjob" and dropped the false
+ * positives), which leaves `search` free; the list searches client-side
+ * anyway, over the whole walked set.
  */
-const FAILED_TERM = "failed";
-const CRONJOB_TERM = "cronjob";
-
-/**
- * Run volume for the 14-day sparkline above the Runs table, sized to the
- * window the summary draws rather than to a page of the table. This is an
- * aggregate, not a list — the table below it walks the same field with a
- * cursor.
- */
-const SUMMARY_LIMIT = 100;
-
-/**
- * Tab badge counts + the Runs summary in one round trip.
- *
- * Each badge wants the size of its tab, not the rows in it, so the count
- * aliases ask for `limit: 1` and read `totalCount`. These numbers used to
- * be `.length` on the capped fetch that also drew the table, so they
- * stopped counting at the cap (100 runs, 200 workloads) and said so with
- * no hint that they had.
- */
-const JOBS_OVERVIEW = gql`
-  query JobsOverview(
-    $appSlug: String
-    $failedTerm: String
-    $cronjobTerm: String
-    $summaryLimit: Int
-  ) {
-    runs: astroliftScheduledJobRunsPage(appSlug: $appSlug, limit: $summaryLimit) {
-      totalCount
+const LIST_CRON_JOBS_PAGE = gql`
+  query ListCronJobsPage($appSlug: String, $kinds: [String!], $limit: Int, $after: String) {
+    astroliftWorkloadsPage(appSlug: $appSlug, kinds: $kinds, limit: $limit, after: $after) {
       items {
         id
-        status
-        startedAt
-        createdAt
+        slug
+        name
+        kind
+        schedule
+        concurrencyPolicy
+        registeredAppSlug
       }
-    }
-    failures: astroliftScheduledJobRunsPage(appSlug: $appSlug, search: $failedTerm, limit: 1) {
-      totalCount
-    }
-    commands: astroliftCommandRunsPage(appSlug: $appSlug, limit: 1) {
-      totalCount
-    }
-    schedules: astroliftWorkloadsPage(appSlug: $appSlug, search: $cronjobTerm, limit: 1) {
+      nextCursor
       totalCount
     }
   }
 `;
 
-export interface JobRunPulse {
-  id: string;
-  status: string;
-  startedAt: string | null;
-  createdAt: string;
+/** The recent runs each job's Last run and the Failing view read. */
+const RECENT_JOB_RUNS = gql`
+  query RecentJobRuns($appSlug: String, $limit: Int) {
+    astroliftScheduledJobRunsPage(appSlug: $appSlug, limit: $limit) {
+      items {
+        id
+        status
+        registeredAppSlug
+        workloadSlug
+        environmentName
+        startedAt
+        createdAt
+      }
+    }
+  }
+`;
+
+interface CronJobsResp {
+  astroliftWorkloadsPage: CursorPage<CronWorkload>;
 }
 
-interface JobsOverviewResp {
-  runs: { totalCount: number | null; items: JobRunPulse[] } | null;
-  failures: { totalCount: number | null } | null;
-  commands: { totalCount: number | null } | null;
-  schedules: { totalCount: number | null } | null;
+interface RecentRunsResp {
+  astroliftScheduledJobRunsPage: { items: JobRunPulse[] };
 }
 
-export type JobsTab = "schedules" | "runs" | "failures" | "commands" | "logs";
+/** The workloads page's own maximum: one request covers most fleets. */
+const WALK_LIMIT = 200;
+const KINDS = ["cronjob"];
+const NO_JOBS: CronWorkload[] = [];
 
 /**
- * Narrow a controller to the rows that survive a client-side guard.
- *
- * `CursorTableController<T>` mentions `T` only in `rows`, so the walk —
- * cursor, page size, search, error and retry — is untouched: this is not
- * client-side pagination, it is dropping the false positives a `search`-
- * shaped server filter cannot exclude. `state` has to be recomputed or a
- * page whose rows all fail the guard renders as nothing at all, which is
- * exactly the failure mode DataTable's required `empty` exists to kill.
+ * Every cron workload: the first page through `useQuery` (so its poll and
+ * cache apply), the rest, past one page, walked by cursor. Nothing past the
+ * first page is dropped.
  */
-function guardRows<TRow>(
-  controller: CursorTableController<TRow>,
-  rows: TRow[]
-): CursorTableController<TRow> {
+function useCronJobs(appSlug: string | null) {
+  const client = useApolloClient();
+  const head = useQuery<CronJobsResp>(LIST_CRON_JOBS_PAGE, {
+    variables: { appSlug, kinds: KINDS, limit: WALK_LIMIT },
+    fetchPolicy: "cache-and-network",
+  });
+  const first = (head.data ?? head.previousData)?.astroliftWorkloadsPage;
+  const cursor = first?.nextCursor ?? null;
+  const [tail, setTail] = React.useState<{ after: string; rows: CronWorkload[] } | null>(null);
+  const [tailError, setTailError] = React.useState<Error | null>(null);
+
+  React.useEffect(() => {
+    if (!cursor) return;
+    let cancelled = false;
+    (async () => {
+      const rows: CronWorkload[] = [];
+      let after: string | null = cursor;
+      while (after && !cancelled) {
+        const res: { data?: CronJobsResp } = await client.query<CronJobsResp>({
+          query: LIST_CRON_JOBS_PAGE,
+          variables: { appSlug, kinds: KINDS, limit: WALK_LIMIT, after },
+          fetchPolicy: "network-only",
+        });
+        const page = res.data?.astroliftWorkloadsPage;
+        rows.push(...(page?.items ?? []));
+        after = page?.nextCursor ?? null;
+      }
+      if (!cancelled) {
+        setTail({ after: cursor, rows });
+        setTailError(null);
+      }
+    })().catch((e: unknown) => {
+      if (!cancelled) setTailError(e instanceof Error ? e : new Error(String(e)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, cursor, appSlug]);
+
+  const tailRows = cursor && tail?.after === cursor ? tail.rows : NO_JOBS;
+  const jobs = React.useMemo(
+    () =>
+      // A workload with no schedule is not a scheduled job.
+      [...(first?.items ?? []), ...tailRows].filter((w) => w.kind === "cronjob" && w.schedule),
+    [first?.items, tailRows]
+  );
   return {
-    ...controller,
-    rows,
-    state:
-      controller.state === "ready" && rows.length === 0
-        ? controller.isFiltered
-          ? "emptyFiltered"
-          : "empty"
-        : controller.state,
+    jobs,
+    loading: head.loading && !first,
+    stale: Boolean(cursor && tail?.after !== cursor),
+    error: (!first && head.error) || tailError,
+    refetch: head.refetch,
   };
 }
 
 /**
- * The data half of JobsScreen: the active tab (it decides which table
- * walks), the overview query behind the tab badges and the runs summary,
- * and one cursor controller per tab.
+ * Scheduled jobs, fleet-wide at /jobs (URL list state) or one app's on its
+ * Workloads tab (`appSlug`, in-memory list state: the tab's own
+ * `?section=`/`?kind=` must survive a filter change). The data half of
+ * JobsScreen: the walk, each job's last run, the environments Run now
+ * offers, and the run-now mutation.
  */
 export function useJobs(appSlug?: string) {
-  const [tab, setTab] = React.useState<JobsTab>("schedules");
+  const routed = useListState(JOBS_LIST);
+  const local = useLocalListState(JOBS_LIST);
+  const list = appSlug ? local : routed;
+  const { state } = list;
+  const scope = appSlug ?? null;
 
-  const appVariables = React.useMemo(() => ({ appSlug: appSlug ?? null }), [appSlug]);
-
-  const overview = useQuery<JobsOverviewResp>(JOBS_OVERVIEW, {
-    variables: {
-      ...appVariables,
-      failedTerm: FAILED_TERM,
-      cronjobTerm: CRONJOB_TERM,
-      summaryLimit: SUMMARY_LIMIT,
-    },
+  const cron = useCronJobs(scope);
+  const recent = useQuery<RecentRunsResp>(RECENT_JOB_RUNS, {
+    variables: { appSlug: scope, limit: RECENT_RUNS },
     fetchPolicy: "cache-and-network",
     pollInterval: 15000,
   });
-
-  // One controller per tab. Each is skipped while its tab is hidden — the
-  // badges come from the overview above, so an unseen tab costs nothing
-  // and re-fetches on arrival (cache-and-network).
-  const runsTable = useCursorTable<AstroliftScheduledJobRun>({
-    query: LIST_SCHEDULED_JOB_RUNS_PAGE,
-    variables: appVariables,
-    extract: (d) => (d as JobRunsPageResp | undefined)?.astroliftScheduledJobRunsPage,
-    searchVariable: "search",
-    urlKey: "run",
-    pollInterval: 15000,
-    skip: tab !== "runs",
+  const runs = recent.data?.astroliftScheduledJobRunsPage.items;
+  const rows = React.useMemo(() => withLastRuns(cron.jobs, runs ?? []), [cron.jobs, runs]);
+  const { rows: pageRows, totalCount } = selectJobs(rows, {
+    filters: list.filters,
+    q: state.q,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
   });
 
-  const failuresTable = useCursorTable<AstroliftScheduledJobRun>({
-    query: LIST_SCHEDULED_JOB_RUNS_PAGE,
-    variables: { ...appVariables, search: FAILED_TERM },
-    extract: (d) => (d as JobRunsPageResp | undefined)?.astroliftScheduledJobRunsPage,
-    urlKey: "fail",
-    pollInterval: 15000,
-    skip: tab !== "failures",
-  });
-
-  const commandsTable = useCursorTable<AstroliftCommandRun>({
-    query: LIST_COMMAND_RUNS_PAGE,
-    variables: appVariables,
-    extract: (d) => (d as CommandRunsPageResp | undefined)?.astroliftCommandRunsPage,
-    searchVariable: "search",
-    urlKey: "cmd",
-    pollInterval: 15000,
-    skip: tab !== "commands",
-  });
-
-  // Fleet-wide /jobs has no single app to anchor a schedule list to, so
-  // the tab renders a pointer at the per-app view instead of a table.
-  const schedulesTable = useCursorTable<CronWorkload>({
-    query: LIST_WORKLOADS_PAGE,
-    variables: { ...appVariables, search: CRONJOB_TERM },
-    extract: (d) => (d as WorkloadsPageResp | undefined)?.astroliftWorkloadsPage,
-    urlKey: "sched",
-    skip: !appSlug || tab !== "schedules",
-  });
-
-  const cronRows = React.useMemo(
-    () => schedulesTable.rows.filter((w) => w.kind === "cronjob" && Boolean(w.schedule)),
-    [schedulesTable.rows]
-  );
-  const schedulesController = guardRows(schedulesTable, cronRows);
-
-  const failedRows = React.useMemo(
-    () => failuresTable.rows.filter((j) => j.status === "failed"),
-    [failuresTable.rows]
-  );
-  const failuresController = guardRows(failuresTable, failedRows);
-
-  function onRan() {
-    overview.refetch().catch(() => {
-      // Swallowed: the badge counts are re-polled every 15s.
-    });
-  }
-
-  return {
-    tab,
-    setTab,
-    summaryRuns: overview.data?.runs?.items ?? [],
-    scheduleCount: overview.data?.schedules?.totalCount ?? null,
-    runCount: overview.data?.runs?.totalCount ?? null,
-    failureCount: overview.data?.failures?.totalCount ?? null,
-    commandCount: overview.data?.commands?.totalCount ?? null,
-    runsTable,
-    failuresController,
-    commandsTable,
-    schedulesController,
-    onRan,
-  };
-}
-
-/**
- * Environments + the run-now mutation behind the cron workloads table
- * (#670). Mounted only while the per-app Schedules tab is shown.
- */
-export function useCronWorkloadRun(appSlug: string, onRan: () => void) {
   const envs = useQuery<{ astroliftEnvironments: AstroliftAppEnvironment[] }>(LIST_ENVIRONMENTS, {
-    variables: { appSlug },
+    variables: { appSlug: scope },
     fetchPolicy: "cache-and-network",
   });
-  const envList = envs.data?.astroliftEnvironments ?? [];
-  const [pendingSlug, setPendingSlug] = React.useState<string | null>(null);
+  const environments = envs.data?.astroliftEnvironments ?? [];
+  const [pendingJob, setPendingJob] = React.useState<string | null>(null);
 
   const [runOnce] = useMutation<{
     runAstroliftJobOnce: {
@@ -263,35 +178,48 @@ export function useCronWorkloadRun(appSlug: string, onRan: () => void) {
       data: { runName: string; namespace: string; logsUrl: string } | null;
     };
   }>(RUN_JOB_ONCE, {
-    // Refetch by operation name: the runs walk carries a cursor, a page
-    // size and a search term, so no literal variables object names the
-    // page an operator is actually looking at. "JobsOverview" is the
-    // query that is always mounted here — the runs table lives on
-    // another tab and re-fetches when the operator switches to it.
-    refetchQueries: ["JobsOverview"],
+    // By operation name: the run lists carry cursors and filters, so no
+    // literal variables object names the page an operator returns to.
+    refetchQueries: ["RecentJobRuns", "ListScheduledJobRunsPage"],
   });
 
-  async function onRun(jobSlug: string, envName: string) {
-    if (!envName) {
-      toast.error("Pick an environment first.");
-      return;
-    }
-    setPendingSlug(jobSlug);
+  async function onRun(job: CronWorkload, environmentName: string) {
+    const key = `${job.registeredAppSlug}/${job.slug}`;
+    setPendingJob(key);
     try {
       const { data } = await runOnce({
-        variables: { input: { appSlug, environmentName: envName, jobSlug } },
+        variables: {
+          input: { appSlug: job.registeredAppSlug, environmentName, jobSlug: job.slug },
+        },
       });
       const res = data?.runAstroliftJobOnce;
       if (res?.ok) {
-        toast.success(`${jobSlug} dispatched as ${res.data?.runName ?? "manual run"} (${envName})`);
-        onRan();
+        toast.success(
+          `${job.slug} dispatched as ${res.data?.runName ?? "manual run"} (${environmentName})`
+        );
       } else {
         toast.error(res?.errors?.[0]?.message ?? "Run failed");
       }
     } finally {
-      setPendingSlug(null);
+      setPendingJob(null);
     }
   }
 
-  return { envList, pendingSlug, onRun };
+  return {
+    list,
+    embedded: Boolean(appSlug),
+    appSlug: appSlug ?? null,
+    rows: pageRows,
+    totalCount,
+    loading: cron.loading,
+    stale: cron.stale || (recent.loading && !recent.data),
+    error: cron.error ? { message: cron.error.message } : null,
+    onRetry: () => {
+      void cron.refetch();
+      void recent.refetch();
+    },
+    environments,
+    pendingJob,
+    onRun,
+  };
 }

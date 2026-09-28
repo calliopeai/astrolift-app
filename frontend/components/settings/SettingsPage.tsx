@@ -23,8 +23,18 @@
  *
  * where each section's content is a `SettingsSection` with its own form
  * state and `onSave`. Pure: permission checks and mutations are the hook's.
+ *
+ * Single-section mode, for tabs whose sections are heavy (a config editor,
+ * a shell console): only the active section is mounted, chosen by
+ * `?section=` in the URL. The nav still lists every section (a select below
+ * `md`); an absent or unknown id shows the first. Without `single` every
+ * section is mounted and the nav scrolls to it, as before.
+ *
+ *   const section = useSettingsSection();       // use-settings-section.ts
+ *   <SettingsPage single={section} sections={[…]} dangerZone={…} />
  */
 
+import Link from "next/link";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -41,6 +51,7 @@ import { type RestrictedSettings } from "@/lib/display-prefs";
 import { cn } from "@/lib/utils";
 
 import { useRestrictedMode } from "./Restricted";
+import type { SectionSelection } from "./use-settings-section";
 
 const DANGER_ID = "danger-zone";
 
@@ -66,6 +77,8 @@ export interface SettingsPageProps {
   readOnly?: ReadOnlyReason;
   /** Overrides the person's "settings you can't change" preference (stories). */
   restrictedMode?: RestrictedSettings;
+  /** Mount only the active section, chosen by `?section=` (useSettingsSection). */
+  single?: SectionSelection;
   className?: string;
 }
 
@@ -74,6 +87,7 @@ export function SettingsPage({
   dangerZone: danger,
   readOnly,
   restrictedMode,
+  single,
   className,
 }: SettingsPageProps) {
   // A person who hides what they can't change sees only the notice on a
@@ -85,10 +99,16 @@ export function SettingsPage({
     ...sections.map((s) => ({ id: s.id, title: s.title })),
     ...(dangerZone ? [{ id: DANGER_ID, title: "Danger zone" }] : []),
   ];
-  const [active, setActive] = React.useState(nav[0]?.id);
+  const [scrolledTo, setScrolledTo] = React.useState(nav[0]?.id);
+  const active = single ? (nav.find((n) => n.id === single.active) ?? nav[0])?.id : scrolledTo;
+  const shown = (id: string) => !single || id === active;
 
   const go = (id: string) => {
-    setActive(id);
+    if (single) {
+      single.select(id);
+      return;
+    }
+    setScrolledTo(id);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -116,20 +136,32 @@ export function SettingsPage({
           <ul className="hidden flex-col gap-0.5 md:flex">
             {nav.map((n) => (
               <li key={n.id}>
-                <a
-                  href={`#${n.id}`}
-                  onClick={() => setActive(n.id)}
-                  aria-current={active === n.id ? "location" : undefined}
-                  className={cn(
-                    "block min-w-0 truncate rounded-sm px-2 py-1.5 text-sm transition-colors",
-                    active === n.id
-                      ? "bg-muted text-foreground font-medium"
-                      : "text-muted-foreground hover:text-foreground",
-                    n.id === DANGER_ID && "text-danger hover:text-danger"
-                  )}
-                >
-                  {n.title}
-                </a>
+                {single ? (
+                  <Link
+                    href={single.href(n.id)}
+                    scroll={false}
+                    onClick={(e) => {
+                      // A plain click selects in place; a modified one opens the link.
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                        return;
+                      e.preventDefault();
+                      single.select(n.id);
+                    }}
+                    aria-current={active === n.id ? "page" : undefined}
+                    className={navItemClass(active === n.id, n.id)}
+                  >
+                    {n.title}
+                  </Link>
+                ) : (
+                  <a
+                    href={`#${n.id}`}
+                    onClick={() => setScrolledTo(n.id)}
+                    aria-current={active === n.id ? "location" : undefined}
+                    className={navItemClass(active === n.id, n.id)}
+                  >
+                    {n.title}
+                  </a>
+                )}
               </li>
             ))}
           </ul>
@@ -137,12 +169,14 @@ export function SettingsPage({
 
         <div className="flex min-w-0 flex-1 flex-col gap-10">
           {readOnly && <ReadOnlyNotice permission={readOnly.permission} />}
-          {sections.map((s) => (
-            <div key={s.id} id={s.id} className="min-w-0 scroll-mt-6">
-              {s.content}
-            </div>
-          ))}
-          {dangerZone && (
+          {sections
+            .filter((s) => shown(s.id))
+            .map((s) => (
+              <div key={s.id} id={s.id} className="min-w-0 scroll-mt-6">
+                {s.content}
+              </div>
+            ))}
+          {dangerZone && shown(DANGER_ID) && (
             <div id={DANGER_ID} className="min-w-0 scroll-mt-6">
               <Section
                 title="Danger zone"
@@ -158,6 +192,16 @@ export function SettingsPage({
         </div>
       </div>
     </ReadOnlyContext.Provider>
+  );
+}
+
+function navItemClass(isActive: boolean, id: string) {
+  return cn(
+    "block min-w-0 truncate rounded-sm px-2 py-1.5 text-sm transition-colors",
+    isActive
+      ? "bg-muted text-foreground font-medium"
+      : "text-muted-foreground hover:text-foreground",
+    id === DANGER_ID && "text-danger hover:text-danger"
   );
 }
 

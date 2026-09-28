@@ -158,6 +158,7 @@ export const LIST_APPS_PAGE = gql`
     $sortBy: AppsListSortKey = CREATED_DESC
     $cursor: String
     $limit: Int = 50
+    $includeArchived: Boolean = false
   ) {
     astroliftAppsPage(
       includeFreshness: $includeFreshness
@@ -169,6 +170,38 @@ export const LIST_APPS_PAGE = gql`
       sortBy: $sortBy
       cursor: $cursor
       limit: $limit
+      includeArchived: $includeArchived
+    ) {
+      items {
+        ...AppFields
+        ...AppFreshnessFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+/**
+ * ``LIST_APPS_PAGE`` narrowed to the apps the viewer's own RoleBindings
+ * reach (app, project, team or org scope). The Apps list's Mine view.
+ */
+export const LIST_MY_APPS_PAGE = gql`
+  ${APP_FIELDS}
+  ${APP_FRESHNESS_FIELDS}
+  query ListMyAppsPage(
+    $includeFreshness: Boolean = false
+    $search: String
+    $cursor: String
+    $limit: Int = 50
+    $includeArchived: Boolean = false
+  ) {
+    astroliftMyAppsPage(
+      includeFreshness: $includeFreshness
+      search: $search
+      cursor: $cursor
+      limit: $limit
+      includeArchived: $includeArchived
     ) {
       items {
         ...AppFields

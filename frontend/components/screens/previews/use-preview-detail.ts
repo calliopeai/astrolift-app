@@ -16,7 +16,7 @@ interface Resp {
  * when navigated from /previews.
  */
 export function usePreviewDetail(id: string) {
-  const { data, loading } = useQuery<Resp>(LIST_PREVIEW_ENVIRONMENTS, {
+  const { data, loading, error, refetch } = useQuery<Resp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: null },
     fetchPolicy: "cache-and-network",
   });
@@ -26,5 +26,13 @@ export function usePreviewDetail(id: string) {
     [data, id]
   );
 
-  return { id, preview, loading };
+  return {
+    id,
+    preview,
+    loading: loading && !data,
+    error: error && !data ? { message: error.message } : null,
+    onRetry: () => {
+      void refetch();
+    },
+  };
 }

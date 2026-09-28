@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { FRESHNESS } from "../new/apps-list-wizard-shell.fixtures";
+import { FRESHNESS } from "./fixtures";
 
 import { AppFreshnessRow } from "./AppFreshnessRow";
 

@@ -4,6 +4,7 @@ import {
   ActivityIcon,
   AlertTriangleIcon,
   BoxIcon,
+  CalendarClockIcon,
   ChevronRightIcon,
   CopyIcon,
   DatabaseIcon,
@@ -21,11 +22,10 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { PageShell } from "@/components/PageShell";
+import { Panel, PanelGrid, SkeletonRows } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -159,50 +159,40 @@ export function WorkloadDetailScreen({
 
   if (wlLoading && !w) {
     return (
-      <PageShell title="Workload" description="Loading…">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </PageShell>
+      <PanelGrid>
+        <Panel title="Workload" icon={<BoxIcon className="size-4" />} loading />
+        <Panel title="Pod status" span={6} loading />
+        <Panel title="Pods" span={6} loading />
+      </PanelGrid>
     );
   }
 
   if (!w) {
     return (
-      <PageShell
-        title="Workload not found"
-        description="The workload doesn't exist or you don't have permission to view it."
-      >
-        <Card>
-          <CardContent className="text-muted-foreground p-6 text-sm">
-            Return to the{" "}
-            <a href={appHref(basePath, appSlug)} className="underline">
-              app overview
-            </a>
-            .
-          </CardContent>
-        </Card>
-      </PageShell>
+      <PanelGrid>
+        <Panel
+          title="Workload"
+          icon={<BoxIcon className="size-4" />}
+          empty={{
+            icon: <AlertTriangleIcon className="size-5" />,
+            title: "Workload not found",
+            description: "The workload doesn't exist or you don't have permission to view it.",
+            actionHref: appHref(basePath, appSlug, "workloads"),
+            actionLabel: "Back to workloads",
+          }}
+        />
+      </PanelGrid>
     );
   }
 
   return (
-    <PageShell
-      title={`${appSlug} · ${w.slug}`}
-      description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
-      actions={
-        <Button variant="outline" asChild>
-          <a href={appHref(basePath, appSlug, "manifest")}>
-            <GitBranchIcon className="size-4" />
-            Manifest preview
-          </a>
-        </Button>
-      }
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <BoxIcon className="size-4" />
-            <span className="font-mono">{w.slug}</span>
+    <PanelGrid>
+      <Panel
+        title={w.slug}
+        icon={<BoxIcon className="size-4" />}
+        description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
+        actions={
+          <>
             <Badge variant="secondary" className="capitalize">
               {w.kind}
             </Badge>
@@ -216,9 +206,16 @@ export function WorkloadDetailScreen({
                 cron {w.schedule}
               </Badge>
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+            <Button variant="outline" size="sm" asChild>
+              <a href={appHref(basePath, appSlug, "manifest")}>
+                <GitBranchIcon className="size-4" />
+                Manifest preview
+              </a>
+            </Button>
+          </>
+        }
+      >
+        <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Replicas" mono value={w.replicas} />
           <Field
             label="HPA"
@@ -258,8 +255,8 @@ export function WorkloadDetailScreen({
               unavailable: t("fqdn.unavailable"),
             }}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {resourceUsage}
 
@@ -353,69 +350,61 @@ export function WorkloadDetailScreen({
       {manifest}
 
       {isCronjob && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Recent runs
-              <Badge variant="outline" className="ml-2">
-                {runs.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {rLoading && runs.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : runs.length === 0 ? (
-              <div className="text-muted-foreground p-6 text-sm">
-                No scheduled runs recorded yet.
-              </div>
-            ) : (
-              <ul className="divide-y">
-                {runs.map((r) => (
-                  <li
-                    key={r.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="capitalize">
-                          {r.status}
-                        </Badge>
-                        <span className="font-mono text-xs">
-                          {r.k8sJobName || r.id.slice(0, 12)}
-                        </span>
-                      </div>
-                      <div className="text-muted-foreground mt-0.5 text-xs">
-                        env <span className="font-mono">{r.environmentName}</span>
-                        {r.startedAt && (
-                          <>
-                            {" · "}started {new Date(r.startedAt).toLocaleString()}
-                          </>
-                        )}
-                        {r.durationSeconds != null && (
-                          <>
-                            {" · "}
-                            {r.durationSeconds < 60
-                              ? `${r.durationSeconds}s`
-                              : `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s`}
-                          </>
-                        )}
-                      </div>
+        <Panel
+          title="Recent runs"
+          icon={<CalendarClockIcon className="size-4" />}
+          actions={
+            <Badge variant="outline" className="font-mono">
+              {runs.length}
+            </Badge>
+          }
+          loading={rLoading && runs.length === 0}
+          skeleton={<SkeletonRows count={2} />}
+          flush={runs.length > 0}
+        >
+          {runs.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No scheduled runs recorded yet.</p>
+          ) : (
+            <ul className="divide-y">
+              {runs.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="capitalize">
+                        {r.status}
+                      </Badge>
+                      <span className="font-mono text-xs">{r.k8sJobName || r.id.slice(0, 12)}</span>
                     </div>
-                    <code className="text-muted-foreground font-mono text-xs">
-                      exit {r.exitCode ?? "—"}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+                    <div className="text-muted-foreground mt-0.5 text-xs">
+                      env <span className="font-mono">{r.environmentName}</span>
+                      {r.startedAt && (
+                        <>
+                          {" · "}started {new Date(r.startedAt).toLocaleString()}
+                        </>
+                      )}
+                      {r.durationSeconds != null && (
+                        <>
+                          {" · "}
+                          {r.durationSeconds < 60
+                            ? `${r.durationSeconds}s`
+                            : `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s`}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <code className="text-muted-foreground font-mono text-xs">
+                    exit {r.exitCode ?? "—"}
+                  </code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       )}
-    </PageShell>
+    </PanelGrid>
   );
 }
 
@@ -448,50 +437,46 @@ function PodStatusGridCard({
   labels: PodStatusGridLabels;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <LayersIcon className="size-4" />
-          {labels.title}
-          <Badge variant="outline" className="ml-2">
-            {labels.podsCount}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {loading ? (
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : buckets.length === 0 ? (
-          <div className="text-muted-foreground p-6 text-sm">{labels.empty}</div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8" />
-                <TableHead>{labels.headerStatus}</TableHead>
-                <TableHead className="text-right">{labels.headerCount}</TableHead>
-                <TableHead className="text-right">{labels.headerPercent}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {buckets.map((b) => (
-                <PodStatusGridRow
-                  key={b.status}
-                  appSlug={appSlug}
-                  basePath={basePath}
-                  bucket={b}
-                  bucketEmptyLabel={labels.bucketEmpty}
-                  notReadyLabel={labels.notReady}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+    <Panel
+      title={labels.title}
+      icon={<LayersIcon className="size-4" />}
+      span={6}
+      actions={
+        <Badge variant="outline" className="font-mono">
+          {labels.podsCount}
+        </Badge>
+      }
+      loading={loading}
+      skeleton={<SkeletonRows count={2} />}
+      flush={buckets.length > 0}
+    >
+      {buckets.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{labels.empty}</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8" />
+              <TableHead>{labels.headerStatus}</TableHead>
+              <TableHead className="text-right">{labels.headerCount}</TableHead>
+              <TableHead className="text-right">{labels.headerPercent}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {buckets.map((b) => (
+              <PodStatusGridRow
+                key={b.status}
+                appSlug={appSlug}
+                basePath={basePath}
+                bucket={b}
+                bucketEmptyLabel={labels.bucketEmpty}
+                notReadyLabel={labels.notReady}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Panel>
   );
 }
 
@@ -595,84 +580,80 @@ function PodHealthTableCard({
   labels: PodHealthLabels;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ActivityIcon className="size-4" />
-          {labels.title}
-          <Badge variant="outline" className="ml-2">
-            {pods.length}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {loading ? (
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : pods.length === 0 ? (
-          <div className="text-muted-foreground p-6 text-sm">{labels.empty}</div>
-        ) : (
-          <TooltipProvider delayDuration={200}>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{labels.columnName}</TableHead>
-                  <TableHead>{labels.columnStatus}</TableHead>
-                  <TableHead className="text-right">{labels.columnRestarts}</TableHead>
-                  <TableHead>{labels.columnNode}</TableHead>
-                  <TableHead className="text-right">{labels.columnAge}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pods.map((p) => {
-                  const flapping = podIsFlapping(p);
-                  const reasons = p.containerStatuses
-                    .flatMap((c) => c.lastRestartReasons)
-                    .slice(0, 3);
-                  return (
-                    <TableRow key={p.name}>
-                      <TableCell>
-                        <Link
-                          href={`${appHref(basePath, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
-                          className="font-mono text-xs hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn(statusClass(p.status))}>{p.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        <div className="flex items-center justify-end gap-2">
-                          <RestartCell
-                            restarts={p.restarts}
-                            reasons={reasons}
-                            heading={labels.restartReasonsHeading}
-                          />
-                          {flapping && (
-                            <Badge className="bg-danger/15 text-danger-fg">
-                              <RotateCwIcon className="size-3" /> {labels.flapping}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {p.node || "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatAge(p.age)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TooltipProvider>
-        )}
-      </CardContent>
-    </Card>
+    <Panel
+      title={labels.title}
+      icon={<ActivityIcon className="size-4" />}
+      span={6}
+      actions={
+        <Badge variant="outline" className="font-mono">
+          {pods.length}
+        </Badge>
+      }
+      loading={loading}
+      skeleton={<SkeletonRows count={2} />}
+      flush={pods.length > 0}
+    >
+      {pods.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{labels.empty}</p>
+      ) : (
+        <TooltipProvider delayDuration={200}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{labels.columnName}</TableHead>
+                <TableHead>{labels.columnStatus}</TableHead>
+                <TableHead className="text-right">{labels.columnRestarts}</TableHead>
+                <TableHead>{labels.columnNode}</TableHead>
+                <TableHead className="text-right">{labels.columnAge}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pods.map((p) => {
+                const flapping = podIsFlapping(p);
+                const reasons = p.containerStatuses
+                  .flatMap((c) => c.lastRestartReasons)
+                  .slice(0, 3);
+                return (
+                  <TableRow key={p.name}>
+                    <TableCell>
+                      <Link
+                        href={`${appHref(basePath, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
+                        className="font-mono text-xs hover:underline"
+                      >
+                        {p.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn(statusClass(p.status))}>{p.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      <div className="flex items-center justify-end gap-2">
+                        <RestartCell
+                          restarts={p.restarts}
+                          reasons={reasons}
+                          heading={labels.restartReasonsHeading}
+                        />
+                        {flapping && (
+                          <Badge className="bg-danger/15 text-danger-fg">
+                            <RotateCwIcon className="size-3" /> {labels.flapping}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-xs">
+                      {p.node || "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatAge(p.age)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TooltipProvider>
+      )}
+    </Panel>
   );
 }
 
@@ -773,34 +754,21 @@ function ContainerSplitCard({
     else sidecars.push(entry);
   }
 
-  if (loading && byName.size === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Containers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (byName.size === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Containers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">{labels.empty}</p>
-        </CardContent>
-      </Card>
+      <Panel
+        title="Containers"
+        icon={<BoxIcon className="size-4" />}
+        loading={loading}
+        skeleton={<Skeleton className="h-24 w-full" />}
+      >
+        <p className="text-muted-foreground text-sm">{labels.empty}</p>
+      </Panel>
     );
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
+    <>
       <ContainerGroupCard
         title={labels.initTitle}
         description={labels.initDescription}
@@ -825,7 +793,7 @@ function ContainerSplitCard({
         emptyHint={labels.sidecarsEmpty}
         fieldLabels={labels}
       />
-    </div>
+    </>
   );
 }
 
@@ -849,18 +817,18 @@ function ContainerGroupCard({
   fieldLabels: ContainerSplitLabels;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Icon className="size-4" />
-          {title}
-          <Badge variant="outline" className="ml-auto">
-            {entries.length}
-          </Badge>
-        </CardTitle>
-        <p className="text-muted-foreground mt-1 text-xs">{description}</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Panel
+      title={title}
+      icon={<Icon className="size-4" />}
+      description={description}
+      span={4}
+      actions={
+        <Badge variant="outline" className="font-mono">
+          {entries.length}
+        </Badge>
+      }
+    >
+      <div className="min-w-0 space-y-3">
         {entries.length === 0 ? (
           <p className="text-muted-foreground text-xs">{emptyHint}</p>
         ) : (
@@ -874,8 +842,8 @@ function ContainerGroupCard({
             />
           ))
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -1105,50 +1073,49 @@ function VolumesCard({ volumes, labels }: { volumes: unknown; labels: VolumesLab
     : [];
   if (rows.length === 0) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <HardDriveIcon className="size-4" />
-          {labels.title}
-          <Badge variant="outline" className="ml-2">
-            {rows.length}
-          </Badge>
-        </CardTitle>
-        <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{labels.columnName}</TableHead>
-              <TableHead>{labels.columnKind}</TableHead>
-              <TableHead>{labels.columnMount}</TableHead>
-              <TableHead>{labels.columnDetail}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((v, i) => {
-              const kindKey = (v.kind || "").toLowerCase();
-              return (
-                <TableRow key={`${v.name || "vol"}-${i}`}>
-                  <TableCell className="font-mono text-xs">{emptyOrValue(v.name)}</TableCell>
-                  <TableCell>
-                    <Badge className={cn("font-mono text-xs", VOLUME_KIND_VARIANT[kindKey] ?? "")}>
-                      <DatabaseIcon className="size-3" />
-                      {VOLUME_KIND_LABEL[kindKey] ?? (kindKey || "—")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{emptyOrValue(v.mount_path)}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">
-                    {volumeDetail(v)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <Panel
+      title={labels.title}
+      icon={<HardDriveIcon className="size-4" />}
+      description={labels.description}
+      span={6}
+      actions={
+        <Badge variant="outline" className="font-mono">
+          {rows.length}
+        </Badge>
+      }
+      flush
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{labels.columnName}</TableHead>
+            <TableHead>{labels.columnKind}</TableHead>
+            <TableHead>{labels.columnMount}</TableHead>
+            <TableHead>{labels.columnDetail}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((v, i) => {
+            const kindKey = (v.kind || "").toLowerCase();
+            return (
+              <TableRow key={`${v.name || "vol"}-${i}`}>
+                <TableCell className="font-mono text-xs">{emptyOrValue(v.name)}</TableCell>
+                <TableCell>
+                  <Badge className={cn("font-mono text-xs", VOLUME_KIND_VARIANT[kindKey] ?? "")}>
+                    <DatabaseIcon className="size-3" />
+                    {VOLUME_KIND_LABEL[kindKey] ?? (kindKey || "—")}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{emptyOrValue(v.mount_path)}</TableCell>
+                <TableCell className="text-muted-foreground font-mono text-xs">
+                  {volumeDetail(v)}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Panel>
   );
 }
 
@@ -1259,33 +1226,29 @@ function ProbesCard({
   const rows = containers.filter((c) => c.startupProbe || c.readinessProbe || c.livenessProbe);
   if (rows.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheckIcon className="size-4" />
-            {labels.title}
-          </CardTitle>
-          <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-xs">{labels.empty}</p>
-        </CardContent>
-      </Card>
+      <Panel
+        title={labels.title}
+        icon={<ShieldCheckIcon className="size-4" />}
+        description={labels.description}
+        span={6}
+      >
+        <p className="text-muted-foreground text-xs">{labels.empty}</p>
+      </Panel>
     );
   }
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheckIcon className="size-4" />
-          {labels.title}
-          <Badge variant="outline" className="ml-2">
-            {rows.length}
-          </Badge>
-        </CardTitle>
-        <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
-      </CardHeader>
-      <CardContent className="space-y-4 p-4">
+    <Panel
+      title={labels.title}
+      icon={<ShieldCheckIcon className="size-4" />}
+      description={labels.description}
+      span={6}
+      actions={
+        <Badge variant="outline" className="font-mono">
+          {rows.length}
+        </Badge>
+      }
+    >
+      <div className="min-w-0 space-y-4">
         {rows.map((c) => (
           <div key={c.id} className="space-y-2">
             <div className="flex items-center gap-2 text-xs">
@@ -1320,7 +1283,7 @@ function ProbesCard({
             </Table>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

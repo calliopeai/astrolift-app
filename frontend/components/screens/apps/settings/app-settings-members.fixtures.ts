@@ -8,6 +8,7 @@ import type {
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import type { AstroliftManagedService } from "@/graphql/services/services.types";
 
+import type { AppIdentityViewProps } from "./AppIdentity";
 import type { AppMembersScreenProps } from "./AppMembersScreen";
 import type { AppSettingsScreenProps } from "./AppSettingsScreen";
 import type { ArchiveAppViewProps } from "./ArchiveApp";
@@ -65,6 +66,29 @@ export const SETTINGS: AppSettingsScreenProps = {
   loading: false,
   slug: "checkout",
   basePath: "/apps",
+};
+
+// ─── identity ─────────────────────────────────────────────────────────────────
+
+export const IDENTITY: AppIdentityViewProps = {
+  name: "Checkout",
+  description: "Takes payment and writes the order.",
+  slug: "checkout",
+  sourceRepo: "acme/checkout",
+  sourceUrl: "https://github.com/acme/checkout",
+  defaultBranch: "main",
+  saving: false,
+  onSave: noop,
+};
+
+export const IDENTITY_LONG: AppIdentityViewProps = {
+  ...IDENTITY,
+  name: LONG,
+  description: `${LONG} ${LONG}`,
+  slug: LONG,
+  sourceRepo: `acme/${LONG}`,
+  sourceUrl: `https://github.com/acme/${LONG}/tree/main/services/checkout/${LONG}`,
+  defaultBranch: `release/${LONG}`,
 };
 
 // ─── resync ───────────────────────────────────────────────────────────────────

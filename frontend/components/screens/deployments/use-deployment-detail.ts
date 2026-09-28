@@ -29,6 +29,10 @@ import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { IN_FLIGHT } from "./deployments-format";
+import { deploymentLogLines, deploySha } from "./deployments-list";
+import { downloadText, logText, useNow } from "./run-support";
+
 interface MutationResultLite<T> {
   ok: boolean;
   errors: { code: string; message: string }[];
@@ -109,11 +113,13 @@ export function useDeploymentDetail(id: string) {
   const {
     data: dData,
     loading: dLoading,
+    error: dError,
     refetch: refetchDeployment,
   } = useQuery<DeploymentResp>(GET_DEPLOYMENT, { variables: { id } });
   const {
     data: lData,
     loading: lLoading,
+    error: lError,
     refetch: refetchLog,
   } = useQuery<LogResp>(GET_DEPLOYMENT_LOG, {
     variables: { deploymentId: id },
@@ -203,6 +209,18 @@ export function useDeploymentDetail(id: string) {
 
   const log = React.useMemo(() => lData?.astroliftDeploymentLog ?? [], [lData]);
 
+  // The run page's clock ticks while the rollout is in flight (spec 44 §5.5).
+  const live = Boolean(deployment && IN_FLIGHT.has(deployment.status));
+  const now = useNow(live);
+
+  function onDownload() {
+    if (!deployment) return;
+    downloadText(
+      `deploy-${deployment.registeredAppSlug}-${deploySha(deployment)}.log`,
+      logText(deploymentLogLines(log))
+    );
+  }
+
   async function onApprove() {
     if (!deployment) return;
     const { data } = await approve({
@@ -257,8 +275,18 @@ export function useDeploymentDetail(id: string) {
   return {
     deployment,
     loading: dLoading,
+    error: dError && !dData ? { message: dError.message } : null,
+    onRetry: () => {
+      void refetchDeployment();
+    },
+    now,
     log,
     logLoading: lLoading,
+    logError: lError && !lData ? { message: lError.message } : null,
+    onRetryLog: () => {
+      void refetchLog();
+    },
+    onDownload,
     manifest: manifest.data?.astroliftRenderedManifest ?? null,
     manifestLoading: manifest.loading,
     events: events.data?.astroliftEvents ?? [],

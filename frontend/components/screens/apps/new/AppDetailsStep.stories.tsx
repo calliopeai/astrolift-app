@@ -32,7 +32,7 @@ export const Loading: Story = {
   render: () => (
     <Stateful
       initial={{ ...DETAILS_STATE, projectId: "" }}
-      details={{ ...DETAILS, allTeams: [], allProjects: [] }}
+      details={{ ...DETAILS, allTeams: [], allProjects: [], projectsLoading: true }}
     />
   ),
 };

@@ -3,7 +3,6 @@
 import { RocketIcon } from "lucide-react";
 import Link from "next/link";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
@@ -49,7 +48,8 @@ export type DeployActivityStripProps = ReturnType<typeof useDeployActivity> & {
 };
 
 /**
- * Horizontal heatmap of the last N deploys for an app. Tile color encodes
+ * Horizontal heatmap of the last N deploys for an app, drawn inside the
+ * overview's Activity panel. Tile color encodes
  * status; hovering surfaces the time + image tag + status. Click jumps to
  * the deployment detail page so an operator can drill into a red square
  * without navigating to the full deployments list first.
@@ -61,7 +61,7 @@ export function DeployActivityStrip({
   limit,
 }: DeployActivityStripProps) {
   const fmt = useFormatters();
-  const environmentsHref = `${appHref}/environments`;
+  const deploymentsHref = `${appHref}/deployments`;
   const inFlight = deployments.filter((d) => IN_FLIGHT.has(d.status));
 
   // Render the strip newest-on-the-right so the timeline reads naturally
@@ -69,59 +69,56 @@ export function DeployActivityStrip({
   const ordered = [...deployments].reverse();
 
   return (
-    <Card size="sm">
-      <CardContent>
-        <div className="mb-2 flex items-baseline justify-between gap-3">
-          <div className="flex items-baseline gap-2">
-            <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-              Deploy activity
-            </p>
-            <p className="text-muted-foreground text-2xs">
-              Last {limit}
-              {inFlight.length > 0 && (
-                <span className="text-warning-fg ml-2">· {inFlight.length} in flight</span>
-              )}
-            </p>
-          </div>
-          <Link
-            href={environmentsHref}
-            className="text-xs text-[var(--brand-primary)] hover:underline"
-          >
-            View all
-          </Link>
+    <div className="min-w-0">
+      <div className="mb-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+            Deploy activity
+          </p>
+          <p className="text-muted-foreground text-2xs">
+            Last <span className="font-mono">{limit}</span>
+            {inFlight.length > 0 && (
+              <span className="text-warning-fg ml-2">
+                · <span className="font-mono">{inFlight.length}</span> in flight
+              </span>
+            )}
+          </p>
         </div>
+        <Link href={deploymentsHref} className="text-primary text-xs hover:underline">
+          View all
+        </Link>
+      </div>
 
-        {loading && deployments.length === 0 ? (
-          <Skeleton className="h-7 w-full" />
-        ) : deployments.length === 0 ? (
-          <div className="text-muted-foreground flex items-center gap-2 py-1 text-xs italic">
-            <RocketIcon className="size-3.5" />
-            No deploys yet — trigger one from the CLI or push to the deploy branch.
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1">
-            {ordered.map((d) => (
-              <DeployTile
-                key={d.id}
-                dep={d}
-                environmentsHref={environmentsHref}
-                relativeTime={fmt.formatRelativeTime(d.createdAt)}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {loading && deployments.length === 0 ? (
+        <Skeleton className="h-7 w-full" />
+      ) : deployments.length === 0 ? (
+        <div className="text-muted-foreground flex items-center gap-2 py-1 text-xs">
+          <RocketIcon className="size-3.5" />
+          No deploys yet. Trigger one from the CLI or push to the deploy branch.
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {ordered.map((d) => (
+            <DeployTile
+              key={d.id}
+              dep={d}
+              deploymentsHref={deploymentsHref}
+              relativeTime={fmt.formatRelativeTime(d.createdAt)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
 function DeployTile({
   dep,
-  environmentsHref,
+  deploymentsHref,
   relativeTime,
 }: {
   dep: AstroliftDeployment;
-  environmentsHref: string;
+  deploymentsHref: string;
   relativeTime: string;
 }) {
   const tone = TILE_TONE[dep.status] ?? TILE_TONE.superseded;
@@ -133,7 +130,7 @@ function DeployTile({
 
   return (
     <Link
-      href={`${environmentsHref}?deployment=${dep.id}`}
+      href={`${deploymentsHref}?deployment=${dep.id}`}
       title={tooltip}
       aria-label={tooltip}
       className={cn("size-6 shrink-0 rounded-sm border transition-all hover:scale-110", tone)}

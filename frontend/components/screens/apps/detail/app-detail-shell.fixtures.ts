@@ -4,7 +4,6 @@ import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/regist
 import type { AppDetailScreenProps } from "./AppDetail";
 import type { AppTabsViewProps } from "./AppTabs";
 import type { DeployActivityStripProps } from "./DeployActivityStrip";
-import type { LatestDeploymentRowProps } from "./LatestDeploymentRow";
 import type { QuickLinksGridProps } from "./QuickLinksGrid";
 import type { RepoBadgeProps } from "./RepoBadge";
 
@@ -13,8 +12,6 @@ import type { RepoBadgeProps } from "./RepoBadge";
  * bar, and the header/overview pieces this group owns. The app and deployment
  * records carry only the fields these views read.
  */
-
-const noop = async () => {};
 
 export const LONG =
   "platform-team-shared-production-checkout-service-with-a-deliberately-long-name-that-keeps-going";
@@ -106,14 +103,6 @@ export const ACTIVITY: DeployActivityStripProps = {
   limit: 20,
 };
 
-// ─── LatestDeploymentRow ──────────────────────────────────────────────────────
-
-export const LATEST: LatestDeploymentRowProps = {
-  appHref: APP_HREF,
-  loading: false,
-  latest: DEPLOYMENTS[2],
-};
-
 // ─── QuickLinksGrid ───────────────────────────────────────────────────────────
 
 export const QUICK_LINKS: QuickLinksGridProps = {
@@ -126,15 +115,9 @@ export const QUICK_LINKS: QuickLinksGridProps = {
 
 export const DETAIL: AppDetailScreenProps = {
   slug: "checkout",
-  appHref: APP_HREF,
   loading: false,
   app: APP,
   workloads: WORKLOADS,
-  latestDeploy: DEPLOYMENTS[2],
-  headerDeploying: false,
-  onHeaderDeploy: noop,
-  deleting: false,
-  onDelete: noop,
 };
 
 export const LONG_APP = {

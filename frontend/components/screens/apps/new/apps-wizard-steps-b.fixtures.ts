@@ -3,7 +3,7 @@ import type { AstroliftRemoteRepo, AstroliftSourceConnection } from "@/graphql/s
 import type { RepoPickerStepViewProps } from "./RepoPickerStep";
 import type { ReviewSubmitStepViewProps } from "./ReviewSubmitStep";
 
-/** Hand-typed fixtures for wizard steps 1 (repo picker) and 5 (review + submit). */
+/** Hand-typed fixtures for the repo picker (Source) and the Review step. */
 
 const noop = () => {};
 
@@ -195,13 +195,22 @@ export const REPO_PICKER_LONG: RepoPickerStepViewProps = {
 
 // ----- Step 5: review + submit --------------------------------------------
 
-export const STEPS = [
-  { label: "Repository" },
-  { label: "Manifest" },
-  { label: "App details" },
-  { label: "Deploy strategy" },
-  { label: "Review" },
-];
+const REVIEW_MANIFEST = `name = "api-gateway"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+replicas = 2
+
+[[workloads]]
+name = "queue-worker"
+kind = "deployment"
+replicas = 1
+
+[[managed_services]]
+kind = "postgres"
+name = "db"
+`;
 
 const REVIEW_STATE: ReviewSubmitStepViewProps["state"] = {
   sourceRepo: "conflict-hq/api-gateway",
@@ -221,6 +230,8 @@ const REVIEW_STATE: ReviewSubmitStepViewProps["state"] = {
   approverUserIds: ["u1", "u2", "u3"],
   approverTeamId: "",
   minimumApprovals: 2,
+  manifestRaw: REVIEW_MANIFEST,
+  manifestLater: false,
   connectionIsAppInstall: true,
   pushCiWorkflow: true,
   triggerFirstDeploy: true,
@@ -229,7 +240,6 @@ const REVIEW_STATE: ReviewSubmitStepViewProps["state"] = {
 /** Before submit: every side effect pending. */
 export const REVIEW: ReviewSubmitStepViewProps = {
   state: REVIEW_STATE,
-  steps: STEPS,
   onJumpToStep: noop,
   canPushCiWorkflow: true,
   onPushCiWorkflowChange: noop,
@@ -281,6 +291,8 @@ export const REVIEW_MINIMAL: ReviewSubmitStepViewProps = {
     defaultBranch: "",
     manifestFromRepo: false,
     manifestValid: false,
+    manifestRaw: "",
+    manifestLater: true,
     description: "",
     deployTiming: "skip",
     connectionIsAppInstall: false,
@@ -296,6 +308,7 @@ export const REVIEW_LONG: ReviewSubmitStepViewProps = {
     sourceRepo: `conflict-hq/${LONG_NAME}`,
     defaultBranch: `release/${LONG_NAME}`,
     manifestPath: `services/${LONG_NAME}/astrolift.toml`,
+    manifestRaw: `name = "${LONG_NAME}"\n\n[[workloads]]\nname = "${LONG_NAME}"\nkind = "statefulset"\n`,
     name: LONG_NAME,
     slug: LONG_NAME.slice(0, 40),
     description: `An app whose description goes on and on: ${LONG_NAME} ${LONG_NAME}`,

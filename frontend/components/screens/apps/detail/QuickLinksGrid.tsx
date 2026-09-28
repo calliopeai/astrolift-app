@@ -1,100 +1,75 @@
 "use client";
 
 import {
+  BoxesIcon,
   ChartLineIcon,
   ChevronRightIcon,
+  GlobeIcon,
   RocketIcon,
   SettingsIcon,
+  ShieldIcon,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 
 import type { useQuickLinks } from "./use-quick-links";
 
 export type QuickLinksGridProps = ReturnType<typeof useQuickLinks> & {
   /** The app's own base path, e.g. `/apps/acme` (or `/agents/acme`). */
   appHref: string;
+  span?: PanelSpan;
 };
 
-interface QuickLinkCardProps {
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  chip?: React.ReactNode;
-}
-
-function QuickLinkCard({ href, icon: Icon, title, description, chip }: QuickLinkCardProps) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "group hover:border-primary/40 hover:bg-accent/30 focus-visible:ring-ring/50",
-        "rounded-xl transition-colors outline-none focus-visible:ring-3"
-      )}
-    >
-      <Card className="hover:border-primary/40 h-full transition-colors">
-        <CardContent className="flex items-start gap-3 p-4">
-          <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
-            <Icon className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <p className="text-foreground text-sm font-semibold">{title}</p>
-              {chip}
-            </div>
-            <p className="text-muted-foreground text-xs leading-snug">{description}</p>
-          </div>
-          <ChevronRightIcon
-            aria-hidden
-            className="text-muted-foreground mt-1 size-4 shrink-0 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
-          />
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
+const LINKS: { key: string; segment: string; icon: LucideIcon }[] = [
+  { key: "deployments", segment: "deployments", icon: RocketIcon },
+  { key: "workloads", segment: "workloads", icon: BoxesIcon },
+  { key: "logs", segment: "logs", icon: ChartLineIcon },
+  { key: "domains", segment: "domains", icon: GlobeIcon },
+  { key: "access", segment: "access", icon: ShieldIcon },
+  { key: "settings", segment: "settings", icon: SettingsIcon },
+];
 
 /**
- * Bottom-of-page quick-link grid for the app overview (#408). Three
- * cards point to the highest-traffic sub-tabs (observability,
- * deployments, settings) and cut a navigation click. Deployments
- * card shows a live count chip from the existing
- * `LIST_DEPLOYMENTS` query.
+ * The overview's quick links (#408): six places, a name and a sentence each.
+ * Six links with a sentence are a list, not cards (astrolift-design §11), so
+ * this is one panel of hairline rows. Deployments carries the live count.
  */
-export function QuickLinksGrid({ appHref, count, loading }: QuickLinksGridProps) {
-  const chip =
-    loading && count === 0 ? null : (
-      <Badge variant="secondary" className="text-2xs font-mono">
-        {count} {count === 1 ? "deployment" : "deployments"}
-      </Badge>
-    );
-
+export function QuickLinksGrid({ appHref, count, loading, span = 4 }: QuickLinksGridProps) {
+  const t = useTranslations("apps.overview.links");
   return (
-    <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-3">
-      <QuickLinkCard
-        href={`${appHref}/observability`}
-        icon={ChartLineIcon}
-        title="Observability"
-        description="Metrics, logs, and traces for this app's workloads."
-      />
-      <QuickLinkCard
-        href={`${appHref}/deployments`}
-        icon={RocketIcon}
-        title="Deployments"
-        description="Recent deploys, in-flight rollouts, and rollback history."
-        chip={chip ?? undefined}
-      />
-      <QuickLinkCard
-        href={`${appHref}/settings`}
-        icon={SettingsIcon}
-        title="Settings"
-        description="Project assignment, deploy strategy, manifest, and teams."
-      />
-    </div>
+    <Panel title={t("title")} span={span} flush>
+      <ul className="divide-y">
+        {LINKS.map(({ key, segment, icon: Icon }) => (
+          <li key={key}>
+            <Link
+              href={`${appHref}/${segment}`}
+              className="group hover:bg-muted/40 focus-visible:ring-ring/50 flex min-w-0 items-start gap-3 px-4 py-2.5 outline-none focus-visible:ring-3"
+            >
+              <Icon aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="text-sm font-medium">{t(`${key}.title`)}</span>
+                  {key === "deployments" && !(loading && count === 0) && (
+                    <span className="text-muted-foreground text-2xs font-mono">
+                      {t("count", { count })}
+                    </span>
+                  )}
+                </span>
+                <span className="text-muted-foreground block text-xs">
+                  {t(`${key}.description`)}
+                </span>
+              </span>
+              <ChevronRightIcon
+                aria-hidden
+                className="text-muted-foreground mt-0.5 size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }

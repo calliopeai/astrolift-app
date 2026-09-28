@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftAppEnvironment,
   AstroliftCommandRun,
@@ -9,9 +8,11 @@ import type {
 import type { TaskWorkload } from "../tasks/use-tasks";
 
 import type { CommandRunDetailProps } from "./CommandRunDetail";
+import type { CommandRunsScreenProps } from "./CommandRunsScreen";
 import type { JobRunDetailProps } from "./JobRunDetail";
-import type { CronWorkloadsTableProps, JobsScreenProps } from "./JobsScreen";
-import type { CronWorkload, JobRunPulse } from "./use-jobs";
+import type { JobRunsScreenProps } from "./JobRunsScreen";
+import type { CronWorkload, JobRunPulse } from "./jobs-list";
+import type { JobsScreenProps } from "./JobsScreen";
 
 /** Hand-typed fixtures for the jobs and tasks screens. */
 
@@ -111,6 +112,7 @@ export function cronWorkload(slug: string, patch: Partial<CronWorkload> = {}): C
     kind: "cronjob",
     schedule: "0 2 * * *",
     concurrencyPolicy: "Forbid",
+    registeredAppSlug: "billing",
     ...patch,
   };
 }
@@ -121,11 +123,11 @@ export const CRON_WORKLOADS: CronWorkload[] = [
   cronWorkload("weekly-digest", { schedule: "0 9 * * 1", concurrencyPolicy: "Replace" }),
 ];
 
-function environment(name: string): AstroliftAppEnvironment {
+function environment(name: string, app = "billing"): AstroliftAppEnvironment {
   return {
-    id: `env-${name}`,
+    id: `env-${app}-${name}`,
     name,
-    registeredAppSlug: "billing",
+    registeredAppSlug: app,
     createdAt: "2026-09-01T12:00:00Z",
     deploysPaused: false,
     ingressPaused: false,
@@ -144,39 +146,53 @@ export const ENVIRONMENTS: AstroliftAppEnvironment[] = [
   environment("staging"),
 ];
 
-/** Pulse rows for the 14-day summary, spread back from the render time. */
-function pulses(): JobRunPulse[] {
-  const now = Date.now();
-  const statuses = ["succeeded", "succeeded", "failed", "succeeded", "running"];
-  return Array.from({ length: 30 }, (_, i) => {
-    const at = new Date(now - (i % 14) * 86_400_000 - i * 60_000).toISOString();
-    return { id: `p-${i}`, status: statuses[i % statuses.length], startedAt: at, createdAt: at };
-  });
+/** Recent runs, newest first: nightly-report last succeeded, sync-invoices last failed. */
+export const RECENT: JobRunPulse[] = JOB_RUNS.map((r) => ({
+  id: r.id,
+  status: r.status,
+  registeredAppSlug: r.registeredAppSlug,
+  workloadSlug: r.workloadSlug,
+  environmentName: r.environmentName,
+  startedAt: r.startedAt ?? null,
+  createdAt: r.createdAt,
+}));
+
+/** Everything JobsScreen takes except the list state, which a story makes. */
+export function jobsProps(
+  overrides: Partial<Omit<JobsScreenProps, "list">> = {}
+): Omit<JobsScreenProps, "list"> {
+  return {
+    embedded: false,
+    appSlug: null,
+    rows: [],
+    totalCount: 0,
+    loading: false,
+    stale: false,
+    error: null,
+    onRetry: noop,
+    environments: ENVIRONMENTS,
+    pendingJob: null,
+    onRun: async () => {},
+    ...overrides,
+  };
 }
 
-export const JOBS: JobsScreenProps = {
-  appSlug: "billing",
-  tab: "schedules",
-  setTab: noop,
-  summaryRuns: pulses(),
-  scheduleCount: CRON_WORKLOADS.length,
-  runCount: 128,
-  failureCount: 3,
-  commandCount: 17,
-  runsTable: fakeController({ rows: JOB_RUNS, totalCount: 128, hasNext: true }),
-  failuresController: fakeController({ rows: FAILED_RUNS, totalCount: 3, searchEnabled: false }),
-  commandsTable: fakeController({ rows: COMMAND_RUNS, totalCount: 17 }),
-  schedulesController: fakeController({ rows: CRON_WORKLOADS, searchEnabled: false }),
-  onRan: noop,
-};
+/** Everything a run list screen takes except the list state. */
+export function runListProps<TRow>(rows: TRow[]) {
+  return {
+    rows,
+    newRows: { count: 0, onReveal: noop },
+    loading: false,
+    stale: false,
+    error: null,
+    onRetry: noop,
+    nextCursor: "c:25" as string | null,
+    totalCount: 128 as number | null,
+  };
+}
 
-export const CRON_TABLE: CronWorkloadsTableProps = {
-  appSlug: "billing",
-  controller: JOBS.schedulesController,
-  envList: ENVIRONMENTS,
-  pendingSlug: null,
-  onRun: async () => {},
-};
+export type JobRunsFixture = Omit<JobRunsScreenProps, "list">;
+export type CommandRunsFixture = Omit<CommandRunsScreenProps, "list">;
 
 export const LONG_JOB_RUNS: AstroliftScheduledJobRun[] = [
   jobRun("1b8e7a5c-4f0a-4736-8600-4c3af92adb05", {
@@ -212,12 +228,20 @@ export const JOB_RUN_DETAIL: JobRunDetailProps = {
   id: JOB_RUNS[1].id,
   loading: false,
   run: JOB_RUNS[1],
+  error: null,
+  onRetry: noop,
+  now: Date.parse("2026-09-28T02:05:00Z"),
+  onDownload: noop,
 };
 
 export const COMMAND_RUN_DETAIL: CommandRunDetailProps = {
   id: COMMAND_RUNS[1].id,
   loading: false,
   run: COMMAND_RUNS[1],
+  error: null,
+  onRetry: noop,
+  now: Date.parse("2026-09-28T09:13:00Z"),
+  onDownload: noop,
 };
 
 // ── tasks ─────────────────────────────────────────────────────────────────
@@ -308,3 +332,22 @@ export const LONG_TASK_RUNS: AstroliftTaskRun[] = [
     durationSeconds: 7384,
   }),
 ];
+
+// ── long strings for the jobs lists ───────────────────────────────────────
+
+export const LONG_CRON_WORKLOADS: CronWorkload[] = [
+  cronWorkload(LONG_WORKLOAD, { registeredAppSlug: LONG_APP, schedule: "*/5 * * * *" }),
+];
+
+/** A failed run whose last line is a 200-character ARN and an unbroken URL. */
+export const LONG_FAILED_RUN: AstroliftScheduledJobRun = jobRun(
+  "0a7d6c4b-3e9f-4625-8500-5d4bfa4bec06",
+  {
+    status: "failed",
+    exitCode: 1,
+    registeredAppSlug: LONG_APP,
+    workloadSlug: LONG_WORKLOAD,
+    output: `Uploading to https://storage.example.com/${"partition-".repeat(20)}end\nAccessDenied: ${`arn:aws:iam::123456789012:role/${"ledger-export-".repeat(14)}`.slice(0, 200)}`,
+    logExcerpt: "",
+  }
+);
