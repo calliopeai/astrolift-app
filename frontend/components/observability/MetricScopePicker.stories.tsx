@@ -11,7 +11,6 @@ function Demo({ loading = false }: { loading?: boolean }) {
   const [workload, setWorkload] = React.useState<string | null>(null);
   return (
     <MetricScopePicker
-      appSlug="checkout"
       environmentName={env}
       workloadSlug={workload}
       onEnvironmentChange={setEnv}

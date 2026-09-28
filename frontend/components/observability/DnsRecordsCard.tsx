@@ -61,13 +61,11 @@ const PROPAGATION_LABEL: Record<DnsPropagationStatus, string> = {
 export interface DnsRecordsCardProps {
   appSlug: string;
   /** Optional — names a specific environment's cluster to query. */
-  environmentName?: string;
 }
 
 /** Pure (Storybook first): the data comes from useDnsRecords. */
 export function DnsRecordsCard({
   appSlug,
-  environmentName,
   data,
   loading,
   onRefresh,

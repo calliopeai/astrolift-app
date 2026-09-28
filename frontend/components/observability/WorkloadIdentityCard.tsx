@@ -53,13 +53,11 @@ function formatLastUsed(iso: string | null | undefined): string {
 
 export interface WorkloadIdentityCardProps {
   appSlug: string;
-  environmentName?: string;
 }
 
 /** Pure (Storybook first): the data comes from useWorkloadIdentity. */
 export function WorkloadIdentityCard({
   appSlug,
-  environmentName,
   data,
   loading,
   onRefresh,

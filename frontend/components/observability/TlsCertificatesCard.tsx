@@ -85,13 +85,11 @@ function formatNotAfter(iso: string): string {
 
 export interface TlsCertificatesCardProps {
   appSlug: string;
-  environmentName?: string;
 }
 
 /** Pure (Storybook first): the data comes from useTlsCertificates. */
 export function TlsCertificatesCard({
   appSlug,
-  environmentName,
   data,
   loading,
   onRefresh,

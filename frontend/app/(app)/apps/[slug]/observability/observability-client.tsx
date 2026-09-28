@@ -3,6 +3,7 @@
 import { useDnsRecords } from "@/components/observability/use-dns-records";
 import { useEndpointMetrics } from "@/components/observability/use-endpoint-metrics";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
+import { usePromql } from "@/components/observability/use-promql";
 import { useTraceExplorer } from "@/components/observability/use-trace-explorer";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
 import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
@@ -462,6 +463,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   const scopedWorkload = workloadParam;
   const scopeOptions = useMetricScopeOptions(slug);
   const traces = useTraceExplorer(slug, scopedEnv);
+  const promql = usePromql(slug, scopedEnv);
   const endpointMetrics = useEndpointMetrics({
     appSlug: slug,
     environmentName: scopedEnv,
@@ -817,7 +819,6 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-medium">{t("scope.title")}</h3>
         <MetricScopePicker
-          appSlug={a.slug}
           environmentName={scopedEnv}
           workloadSlug={scopedWorkload}
           onEnvironmentChange={handleEnvChange}
@@ -845,7 +846,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       <TraceExplorerPanel {...traces} />
 
       {/* ─── #647 ad-hoc PromQL panel ──────────────────────────────── */}
-      <PromqlQueryPanel appSlug={a.slug} environmentName={scopedEnv} />
+      <PromqlQueryPanel {...promql} />
 
       {/* ─── #645 / #646 managed-service metric tiles ─────────────── */}
       <ManagedServiceMetricsList

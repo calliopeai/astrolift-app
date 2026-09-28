@@ -53,7 +53,6 @@ export interface MetricScopeOptions {
 }
 
 export interface MetricScopePickerProps {
-  appSlug: string;
   /** Current env selection — ``null`` means "let the backend pick the
    *  alphabetically-first env" (pre-#422 default). */
   environmentName: string | null;
@@ -87,7 +86,6 @@ const DEFAULT_LABELS = {
 } as const;
 
 export function MetricScopePicker({
-  appSlug,
   environmentName,
   workloadSlug,
   onEnvironmentChange,
