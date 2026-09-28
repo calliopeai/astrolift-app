@@ -13,6 +13,22 @@ import * as preview from "../.storybook/preview";
  */
 setProjectAnnotations(preview);
 
+// jsdom has no matchMedia; components that read the viewport (the sidebar's
+// mobile check) get a desktop answer, as in a browser at a wide window.
+if (!window.matchMedia) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 const modules = import.meta.glob<Record<string, unknown>>("./**/*.stories.tsx", {
   eager: true,
 });
