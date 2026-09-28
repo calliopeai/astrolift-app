@@ -18,7 +18,6 @@
  * *would* have asked Prometheus.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { AlertTriangleIcon, ChartSplineIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -43,20 +42,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  GET_APP_GOLDEN_SIGNALS,
-  GET_APP_STATUS_CODE_BREAKDOWN,
-} from "@/graphql/observability/observability.queries";
 import type {
   AstroliftAppGoldenSignal,
-  AstroliftStatusCodeBreakdown,
   AstroliftStatusCodeSeries,
   AstroliftTimeSeriesPoint,
   GoldenSignalKind,
 } from "@/graphql/__generated__/schema";
 
+import type { StatusBreakdownWithReason, useGoldenSignals } from "./use-golden-signals";
 import {
-  DEFAULT_TIME_RANGE,
   PROMETHEUS_DOC_LINK,
   STATUS_CLASS_COLORS,
   STATUS_CLASS_ORDER,
@@ -65,74 +59,30 @@ import {
   formatSignalValue,
 } from "./golden-signals-types";
 
-interface GoldenSignalsResp {
-  astroliftAppGoldenSignals: {
-    reason: ObservabilityPanelReason;
-    signals: AstroliftAppGoldenSignal[];
-  };
-}
-
-type StatusBreakdownWithReason = AstroliftStatusCodeBreakdown & {
-  reason: ObservabilityPanelReason;
-};
-
-interface StatusBreakdownResp {
-  astroliftAppStatusCodeBreakdown: StatusBreakdownWithReason | null;
-}
-
-export interface GoldenSignalsPanelProps {
-  appSlug: string;
-  /** Optional — when set, scopes the queries to one environment's
-   *  cluster. When omitted, the backend picks the alphabetically-first
-   *  environment for the app. */
-  environmentName?: string | null;
-  /** Optional — when set, narrows the PromQL to one workload via the
-   *  ``workload="<slug>"`` label. Omit to roll every workload up
-   *  (pre-#422 default). */
-  workloadSlug?: string | null;
-}
+export type GoldenSignalsPanelProps = ReturnType<typeof useGoldenSignals>;
 
 export function GoldenSignalsPanel({
-  appSlug,
-  environmentName,
-  workloadSlug,
+  range,
+  onRangeChange: setRange,
+  signals,
+  reason: signalsReason,
+  loading: isLoading,
+  onRetry,
+  statusBreakdown,
+  statusLoading,
+  onStatusRetry,
 }: GoldenSignalsPanelProps) {
-  const [range, setRange] = React.useState<TimeRangeKey>(DEFAULT_TIME_RANGE);
-  const rangeSeconds =
-    TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ?? TIME_RANGE_OPTIONS[1].seconds;
-
-  const signals = useQuery<GoldenSignalsResp>(GET_APP_GOLDEN_SIGNALS, {
-    variables: {
-      appSlug,
-      environmentName: environmentName ?? null,
-      workloadSlug: workloadSlug ?? null,
-      rangeSeconds,
-    },
-    fetchPolicy: "cache-and-network",
-  });
-  const statusBreakdown = useQuery<StatusBreakdownResp>(GET_APP_STATUS_CODE_BREAKDOWN, {
-    variables: {
-      appSlug,
-      environmentName: environmentName ?? null,
-      workloadSlug: workloadSlug ?? null,
-      rangeSeconds,
-    },
-    fetchPolicy: "cache-and-network",
-  });
-
   // Pick out the individual signals from the backend's flat list so
   // the rest of the render is a simple grid of cards. Latency rolls up
   // p50 + p90 + p99 into one card with a stacked line.
   const signalsByKind = React.useMemo(() => {
     const out: Partial<Record<GoldenSignalKind, AstroliftAppGoldenSignal>> = {};
-    for (const s of signals.data?.astroliftAppGoldenSignals?.signals ?? []) {
+    for (const s of signals ?? []) {
       out[s.name] = s;
     }
     return out;
-  }, [signals.data]);
+  }, [signals]);
 
-  const isLoading = signals.loading && !signals.data;
-  const signalsReason = signals.data?.astroliftAppGoldenSignals?.reason;
   // When the panel can't produce metrics for a structural reason (no
   // Prometheus endpoint, or a load error), render ONE honest message
   // instead of a wall of empty cards. OK / NO_DATA_YET fall through to
@@ -166,7 +116,7 @@ export function GoldenSignalsPanel({
         <NoMetricsCallout
           title={panelEmpty.title}
           description={panelEmpty.description}
-          onRetry={signalsReason === "ERROR" ? () => void signals.refetch() : undefined}
+          onRetry={signalsReason === "ERROR" ? onRetry : undefined}
         />
       ) : (
         <>
@@ -215,9 +165,9 @@ export function GoldenSignalsPanel({
             {/* Sixth grid cell — fills the slot beside Saturation (memory)
                 instead of a lonely full-width row below. */}
             <StatusCodeCard
-              breakdown={statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null}
-              loading={statusBreakdown.loading && !statusBreakdown.data}
-              onRetry={() => void statusBreakdown.refetch()}
+              breakdown={statusBreakdown}
+              loading={statusLoading}
+              onRetry={onStatusRetry}
             />
           </div>
         </>

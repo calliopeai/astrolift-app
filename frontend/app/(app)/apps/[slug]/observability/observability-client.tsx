@@ -4,6 +4,7 @@ import { useDnsRecords } from "@/components/observability/use-dns-records";
 import { useEndpointMetrics } from "@/components/observability/use-endpoint-metrics";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePromql } from "@/components/observability/use-promql";
+import { useGoldenSignals } from "@/components/observability/use-golden-signals";
 import { useTraceExplorer } from "@/components/observability/use-trace-explorer";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
 import { useWorkloadIdentity } from "@/components/observability/use-workload-identity";
@@ -464,6 +465,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   const scopeOptions = useMetricScopeOptions(slug);
   const traces = useTraceExplorer(slug, scopedEnv);
   const promql = usePromql(slug, scopedEnv);
+  const goldenSignals = useGoldenSignals(slug, scopedEnv, scopedWorkload);
   const endpointMetrics = useEndpointMetrics({
     appSlug: slug,
     environmentName: scopedEnv,
@@ -833,11 +835,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           {...scopeOptions}
         />
       </div>
-      <GoldenSignalsPanel
-        appSlug={a.slug}
-        environmentName={scopedEnv}
-        workloadSlug={scopedWorkload}
-      />
+      <GoldenSignalsPanel {...goldenSignals} />
 
       {/* ─── #641 per-endpoint HTTP metrics ────────────────────────── */}
       <EndpointMetricsPanel {...endpointMetrics} />

@@ -4,6 +4,7 @@ import { BoltIcon, GlobeIcon, ZapIcon } from "lucide-react";
 import * as React from "react";
 
 import { GoldenSignalsPanel } from "@/components/observability/GoldenSignalsPanel";
+import { useGoldenSignals } from "@/components/observability/use-golden-signals";
 import { PageShell } from "@/components/PageShell";
 import { AppTabs } from "../app-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ interface FunctionHomeProps {
  */
 export function FunctionHome({ slug, name, workload, host, environmentName }: FunctionHomeProps) {
   const url = workload.isPublic && host ? `https://${host}` : null;
+  const goldenSignals = useGoldenSignals(slug, environmentName, workload.slug);
 
   return (
     <PageShell
@@ -85,11 +87,7 @@ export function FunctionHome({ slug, name, workload, host, environmentName }: Fu
         {/* Invocations / latency / errors — the golden signals scoped to this
             function's workload (traffic == invocation rate). Live from
             Prometheus; each panel renders its own empty/NOT_CONFIGURED state. */}
-        <GoldenSignalsPanel
-          appSlug={slug}
-          workloadSlug={workload.slug}
-          environmentName={environmentName ?? null}
-        />
+        <GoldenSignalsPanel {...goldenSignals} />
       </div>
     </PageShell>
   );
