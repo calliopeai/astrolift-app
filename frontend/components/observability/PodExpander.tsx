@@ -20,7 +20,6 @@
  * affordances rendering — those don't depend on Prometheus.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { ChartSplineIcon, RotateCcwIcon, TerminalIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -34,30 +33,17 @@ import {
   YAxis,
 } from "recharts";
 
-import {
-  type ObservabilityPanelReason,
-  panelEmptyState,
-} from "@/components/observability/panel-reason";
+import { panelEmptyState } from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GET_POD_RESOURCE_USAGE } from "@/graphql/observability/observability.queries";
-import type {
-  AstroliftPodResourceUsage,
-  AstroliftPodResourceUsagePoint,
-} from "@/graphql/__generated__/schema";
+import type { AstroliftPodResourceUsagePoint } from "@/graphql/__generated__/schema";
 
-interface UsageResp {
-  astroliftPodResourceUsage:
-    | (AstroliftPodResourceUsage & { reason: ObservabilityPanelReason })
-    | null;
-}
+import type { PodResourceUsage } from "./use-pod-resource-usage";
 
 export interface PodExpanderProps {
   appSlug: string;
   /** Pod name to scope the queries to. */
   podName: string;
-  /** Environment to scope the queries to. Null rolls up across envs. */
-  environmentName: string | null;
   /** Container to deep-link the Open shell action at. Falls back to
    *  the resolver's heuristic default when null. */
   defaultContainer: string | null;
@@ -65,32 +51,21 @@ export interface PodExpanderProps {
    *  has something to render before / instead of the per-pod query.
    *  When the per-pod resolver returns its own count it wins. */
   fallbackRestartCount: number;
+  /** The pod's usage over the last hour; null before the first answer. */
+  usage: PodResourceUsage | null;
+  loading: boolean;
+  onRetry: () => void;
 }
-
-const DEFAULT_RANGE_SECONDS = 60 * 60;
 
 export function PodExpander({
   appSlug,
   podName,
-  environmentName,
   defaultContainer,
   fallbackRestartCount,
+  usage: data,
+  loading: isLoading,
+  onRetry,
 }: PodExpanderProps) {
-  const q = useQuery<UsageResp>(GET_POD_RESOURCE_USAGE, {
-    variables: {
-      appSlug,
-      podName,
-      environmentName,
-      rangeSeconds: DEFAULT_RANGE_SECONDS,
-    },
-    // Poll every 30s so an operator watching the panel sees the
-    // sparkline tick along without manual refresh. 30s matches the
-    // cadence kube-state-metrics scrapes by default.
-    pollInterval: 30000,
-    fetchPolicy: "cache-and-network",
-  });
-
-  const data = q.data?.astroliftPodResourceUsage ?? null;
   const samples = data?.samples ?? [];
   const restartCount = data?.restartCount ?? fallbackRestartCount;
   const podEmpty = panelEmptyState(data?.reason ?? "NOT_CONFIGURED", {
@@ -99,7 +74,6 @@ export function PodExpander({
     provider: "this cloud",
   });
   const lastRestartAt = data?.lastRestartAt ?? null;
-  const isLoading = q.loading && !q.data;
   const hasSamples = samples.length > 0;
 
   const cpuRows = React.useMemo(() => samplesToCpuRows(samples), [samples]);
@@ -146,7 +120,7 @@ export function PodExpander({
           <p className="font-medium">{podEmpty.title}</p>
           <p className="mt-1">{podEmpty.description}</p>
           {data?.reason === "ERROR" && (
-            <Button size="sm" variant="outline" className="mt-3" onClick={() => void q.refetch()}>
+            <Button size="sm" variant="outline" className="mt-3" onClick={onRetry}>
               Try again
             </Button>
           )}

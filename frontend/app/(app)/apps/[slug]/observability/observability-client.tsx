@@ -5,6 +5,7 @@ import { useEndpointMetrics } from "@/components/observability/use-endpoint-metr
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePromql } from "@/components/observability/use-promql";
 import { useGoldenSignals } from "@/components/observability/use-golden-signals";
+import { usePodResourceUsage } from "@/components/observability/use-pod-resource-usage";
 import { ManagedServiceMetrics } from "../components/managed-service-metrics";
 import { useTraceExplorer } from "@/components/observability/use-trace-explorer";
 import { useTlsCertificates } from "@/components/observability/use-tls-certificates";
@@ -523,6 +524,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
     }
     return pickDefaultContainer(podContainers, selectedPodWorkload);
   }, [pickedContainer, podContainers, selectedPodWorkload]);
+  const podUsage = usePodResourceUsage(slug, selectedPod, scopedEnv);
 
   // Clearing the buffer when the operator switches pods or containers
   // uses the official React pattern for "reset state on a different
@@ -801,9 +803,9 @@ export function ObservabilityClient({ slug }: { slug: string }) {
                             <PodExpander
                               appSlug={a.slug}
                               podName={pod.name}
-                              environmentName={scopedEnv}
                               defaultContainer={selectedContainer}
                               fallbackRestartCount={pod.restarts}
+                              {...podUsage}
                             />
                           </TableCell>
                         </TableRow>
