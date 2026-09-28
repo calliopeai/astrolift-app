@@ -15,6 +15,7 @@ import Link from "next/link";
 import * as React from "react";
 
 import { ScmEmptyConnectAction, ScmReauthAction } from "@/components/ScmConnectPrompt";
+import { useScmConnect } from "@/components/use-scm-connect";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -83,6 +84,7 @@ interface Props {
 }
 
 export function RepoPickerStep({ state, setState, setValid }: Props) {
+  const scm = useScmConnect();
   // Reactive org id (#1022): the synchronous cookie read races the
   // post-render effect that sets it, leaving orgId "" on cold load.
   const { org } = useActiveOrg();
@@ -193,7 +195,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           Connect a Git host (GitHub App, GitLab OAuth, or a personal-access token) so the platform
           can list your repositories and scan them for agent manifests.
         </p>
-        <ScmEmptyConnectAction />
+        <ScmEmptyConnectAction scm={scm} />
       </div>
     );
   }
@@ -266,7 +268,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
             <div className="text-destructive flex flex-col items-start gap-1 text-xs">
               <span>{repoList.errorMessage ?? repoList.errorCode}</span>
               {repoList.recoverable && (
-                <ScmReauthAction connectionKind={pickedConnection?.kind ?? ""} />
+                <ScmReauthAction connectionKind={pickedConnection?.kind ?? ""} scm={scm} />
               )}
             </div>
           ) : repoList && repoList.repos.length > 0 ? (
@@ -314,7 +316,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
                               {existingCount > 0 && (
                                 <Badge
                                   variant="secondary"
-                                  className="shrink-0 gap-1 px-1 py-0 text-2xs"
+                                  className="text-2xs shrink-0 gap-1 px-1 py-0"
                                   title={`This repo already hosts ${existingCount} registered agent${existingCount === 1 ? "" : "s"}. Re-scanning adds only newly-added agents.`}
                                 >
                                   {existingCount === 1
@@ -323,7 +325,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-muted-foreground flex items-center gap-2 text-2xs">
+                            <div className="text-muted-foreground text-2xs flex items-center gap-2">
                               <VisibilityBadge visibility={r.visibility} />
                               {r.defaultBranch && (
                                 <span className="inline-flex items-center gap-1">
@@ -424,13 +426,13 @@ function connectionKindLabel(kind: ScmConnectionKind): string {
 function VisibilityBadge({ visibility }: { visibility: string }) {
   if (visibility === "private" || visibility === "internal") {
     return (
-      <Badge variant="secondary" className="gap-1 px-1 py-0 text-2xs">
+      <Badge variant="secondary" className="text-2xs gap-1 px-1 py-0">
         <LockIcon className="size-2.5" /> {visibility}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="gap-1 px-1 py-0 text-2xs">
+    <Badge variant="outline" className="text-2xs gap-1 px-1 py-0">
       <UnlockIcon className="size-2.5" /> {visibility}
     </Badge>
   );
