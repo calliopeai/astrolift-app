@@ -180,7 +180,7 @@ const deploymentRun = (i: number, status: string, mine = false) =>
     durationSeconds: 84 + i * 9,
     commitAuthor: mine ? "" : "grace@example.com",
     ciProvider: i % 3 === 2 ? "github" : "",
-    triggeredByUserId: mine ? "leo@calliope.ai" : null,
+    triggeredByUserId: mine ? "ops@example.com" : null,
     triggeredByMe: mine,
   });
 

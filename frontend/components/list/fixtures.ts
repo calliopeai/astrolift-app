@@ -69,7 +69,7 @@ export const RUNS: RunRow[] = Array.from({ length: 25 }, (_, i) => ({
   took: `${Math.floor((i * 37) / 60)}:${String((i * 37) % 60).padStart(2, "0")}`,
   trigger: TRIGGERS[i % TRIGGERS.length],
   started: `${2 + i * 7}m ago`,
-  startedBy: i % 3 === 0 ? "leo@calliope.ai" : "scheduler",
+  startedBy: i % 3 === 0 ? "ops@example.com" : "scheduler",
   project: i % 2 === 0 ? "storefront" : "internal-tools",
 }));
 

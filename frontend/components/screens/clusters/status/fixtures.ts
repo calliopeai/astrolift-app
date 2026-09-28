@@ -448,7 +448,7 @@ export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
       success: true,
       errors: [],
       timestamp: iso(90_000),
-      actor: "leo@calliope.ai",
+      actor: "ops@example.com",
     },
     {
       operation: "installClusterPrereqs",
@@ -456,7 +456,7 @@ export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
       success: false,
       errors: ["Helm release astrolift-ingress failed: timed out waiting for the condition"],
       timestamp: iso(3 * HOUR),
-      actor: "leo@calliope.ai",
+      actor: "ops@example.com",
     },
     {
       operation: "registerCluster",
