@@ -630,6 +630,31 @@ const API_TOKEN_FIELDS = gql`
     lastUsedAgent
     isRevoked
     createdAt
+    effectivePermissions
+  }
+`;
+
+// The token picker's only source of scopes (#2120): what each one unlocks,
+// derived from enforcement, and whether the caller's roles let them use it.
+export const GET_API_TOKEN_SCOPE_CATALOG = gql`
+  query GetApiTokenScopeCatalog {
+    astroliftApiTokenScopeCatalog {
+      scopes {
+        value
+        label
+        surface
+        description
+        sensitive
+        permissions
+        available
+        unavailableReason
+      }
+      presets {
+        key
+        label
+        scopes
+      }
+    }
   }
 `;
 

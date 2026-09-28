@@ -698,6 +698,7 @@ type AstroliftApiToken {
   lastUsedAgent: String
   isRevoked: Boolean!
   createdAt: DateTime!
+  effectivePermissions: [String!]!
 }
 
 """One page of a cursor-paginated list."""
@@ -720,6 +721,28 @@ type AstroliftApiTokenPlaintextMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftApiTokenPlaintext
+}
+
+type AstroliftApiTokenScope {
+  value: String!
+  label: String!
+  surface: String!
+  description: String!
+  sensitive: Boolean!
+  permissions: [String!]!
+  available: Boolean!
+  unavailableReason: String!
+}
+
+type AstroliftApiTokenScopeCatalog {
+  scopes: [AstroliftApiTokenScope!]!
+  presets: [AstroliftApiTokenScopePreset!]!
+}
+
+type AstroliftApiTokenScopePreset {
+  key: String!
+  label: String!
+  scopes: [String!]!
 }
 
 type AstroliftAppAutowireStatus {
@@ -6185,6 +6208,7 @@ type Query {
   astroliftRoleBindings: [AstroliftRoleBinding!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage.")
   astroliftRoleBindingsPage(search: String = null, appSlug: String = null, limit: Int! = 50, after: String = null): AstroliftRoleBindingPage!
   astroliftApiTokens: [AstroliftApiToken!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage.")
+  astroliftApiTokenScopeCatalog: AstroliftApiTokenScopeCatalog!
   astroliftApiTokensPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftApiTokenPage!
   astroliftPolicies: [AstroliftPolicy!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage.")
   astroliftPoliciesPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftPolicyPage!

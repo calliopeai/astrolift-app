@@ -701,6 +701,7 @@ export type AstroliftAnonymizeUserPayloadMutationResult = {
 
 export type AstroliftApiToken = {
   createdAt: Scalars['DateTime']['output'];
+  effectivePermissions: Array<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
@@ -732,6 +733,28 @@ export type AstroliftApiTokenPlaintextMutationResult = {
   data?: Maybe<AstroliftApiTokenPlaintext>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftApiTokenScope = {
+  available: Scalars['Boolean']['output'];
+  description: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  sensitive: Scalars['Boolean']['output'];
+  surface: Scalars['String']['output'];
+  unavailableReason: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftApiTokenScopeCatalog = {
+  presets: Array<AstroliftApiTokenScopePreset>;
+  scopes: Array<AstroliftApiTokenScope>;
+};
+
+export type AstroliftApiTokenScopePreset = {
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  scopes: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftAppAutowireStatus = {
@@ -7832,6 +7855,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage. */
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftAlertRulesPage: AstroliftAlertRulePage;
+  astroliftApiTokenScopeCatalog: AstroliftApiTokenScopeCatalog;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage. */
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApiTokensPage: AstroliftApiTokenPage;
