@@ -172,6 +172,33 @@ files importing `@/components/ui/table`. Migrating a surface therefore
 includes deleting its entry, or the test fails; adding a raw table fails
 lint until an entry is added in review. The list may only shrink.
 
+## Storybook first (the rule)
+
+**No component reaches the app unless it is in Storybook.** Every piece of UI,
+from a button to a whole screen, is built and reviewed in Storybook first; the
+app imports those components and only wires data into them (spec 44, Leo,
+2026-09-28).
+
+```
+components/ui/        primitives (Button, Dialog, Field, …)          each with stories
+components/patterns/  shared compositions (DataTable, PageShell, …)  each with stories
+components/screens/   whole pages, fed typed fixtures in every state each with stories
+app/**/page.tsx       fetch data → map it to the screen's props → <Screen {...props} />
+```
+
+- **Screens are pure**: props and callbacks in, no data fetching, no GraphQL.
+- **One props type per screen**, the shape of what the page shows. The route
+  maps the GraphQL result into it; the story fixtures are typed by hand
+  against the same type, one per state: loading, empty, error, full, long
+  strings, 768px wide.
+- **Order of work**: story and fixtures first, reviewed in Storybook
+  (`npm run storybook`); then the route wires the real data.
+- **Enforced**:
+  - every `.tsx` under `components/` (not tests or hooks) has a sibling
+    `.stories.tsx`, and every story renders (`components/stories.test.tsx`);
+  - files under `app/` render screens only: no raw HTML elements and no
+    `components/ui` imports (the `no-markup-in-app` lint rule, at `error`).
+
 ## Design system
 
 The theme lives in `app/globals.css`. Brand seeds (`--brand-*`, the teal +
