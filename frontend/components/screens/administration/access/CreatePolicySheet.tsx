@@ -1,8 +1,6 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
 import * as React from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,18 +21,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { CREATE_POLICY } from "@/graphql/identity/identity.mutations";
-import { LIST_POLICIES } from "@/graphql/identity/identity.queries";
-import type {
-  AstroliftPolicy,
-  MutationResult,
-  PolicyEffect,
-  ScopeKind,
-} from "@/graphql/identity/identity.types";
+import type { PolicyEffect, ScopeKind } from "@/graphql/identity/identity.types";
 
-interface Props {
+import type { CreatePolicyInput } from "./use-policies";
+
+export interface CreatePolicySheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Resolves true when the policy was created; the sheet then closes. */
+  onCreate: (input: CreatePolicyInput) => Promise<boolean>;
+  creating: boolean;
 }
 
 const slugify = (s: string) =>
@@ -54,7 +50,12 @@ const CONDITION_TEMPLATE = `[
   }
 ]`;
 
-export function CreatePolicyDialog({ open, onOpenChange }: Props) {
+export function CreatePolicySheet({
+  open,
+  onOpenChange,
+  onCreate,
+  creating: loading,
+}: CreatePolicySheetProps) {
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -77,13 +78,6 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
     }
   }, [open]);
 
-  const [createPolicy, { loading }] = useMutation<{
-    createPolicy: MutationResult<AstroliftPolicy>;
-  }>(CREATE_POLICY, {
-    refetchQueries: [{ query: LIST_POLICIES }],
-    awaitRefetchQueries: true,
-  });
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setConditionsError(null);
@@ -98,25 +92,15 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
       return;
     }
 
-    const finalSlug = slug || slugify(name);
-    const { data } = await createPolicy({
-      variables: {
-        input: {
-          name: name.trim(),
-          slug: finalSlug,
-          scopeLevel,
-          effect,
-          actionPattern: actionPattern.trim() || "*",
-          conditions: parsedConditions,
-        },
-      },
+    const created = await onCreate({
+      name: name.trim(),
+      slug: slug || slugify(name),
+      scopeLevel,
+      effect,
+      actionPattern: actionPattern.trim() || "*",
+      conditions: parsedConditions,
     });
-    if (data?.createPolicy.ok) {
-      toast.success(`Policy ${finalSlug} created`);
-      onOpenChange(false);
-    } else {
-      toast.error(data?.createPolicy.errors?.[0]?.message ?? "Create failed");
-    }
+    if (created) onOpenChange(false);
   }
 
   return (
@@ -125,9 +109,8 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
         <SheetHeader>
           <SheetTitle>New policy</SheetTitle>
           <SheetDescription>
-            ABAC policies can only deny. The conditions array describes the
-            runtime predicates: time windows, IP allowlists, MFA freshness,
-            env match, etc.
+            ABAC policies can only deny. The conditions array describes the runtime predicates: time
+            windows, IP allowlists, MFA freshness, env match, etc.
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
@@ -199,10 +182,9 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
           </div>
           <p className="text-muted-foreground text-xs">
             Scope sets how widely the rule applies. Effect is normally{" "}
-            <span className="font-mono">DENY</span> — ABAC narrows access, it
-            doesn&apos;t grant it. Action pattern is a permission glob like{" "}
-            <span className="font-mono">app.deploy</span> or{" "}
-            <span className="font-mono">*</span> for every action.
+            <span className="font-mono">DENY</span> — ABAC narrows access, it doesn&apos;t grant it.
+            Action pattern is a permission glob like <span className="font-mono">app.deploy</span>{" "}
+            or <span className="font-mono">*</span> for every action.
           </p>
 
           <div className="space-y-2">
@@ -214,12 +196,10 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
               rows={10}
               className="font-mono text-xs"
             />
-            {conditionsError && (
-              <p className="text-destructive text-xs">{conditionsError}</p>
-            )}
+            {conditionsError && <p className="text-destructive text-xs">{conditionsError}</p>}
             <p className="text-muted-foreground text-xs">
-              Predicate kinds per spec/03 §5: time_window, ip_allowlist,
-              approval_required, env_match, device_assertion, freshness.
+              Predicate kinds per spec/03 §5: time_window, ip_allowlist, approval_required,
+              env_match, device_assertion, freshness.
             </p>
           </div>
 

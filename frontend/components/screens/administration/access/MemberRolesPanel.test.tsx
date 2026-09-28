@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { MemberRolesPanel } from "./member-roles-panel";
+import { MemberRolesPanel } from "./MemberRolesPanel";
 
 const binding = (
   id: string,

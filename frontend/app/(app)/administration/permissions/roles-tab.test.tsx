@@ -38,7 +38,12 @@ function role(id: string, name: string, permissions: string[], isSystem = false)
 // `org_owner` carries the full Permission enum and is the reason the union
 // over the whole list is the complete catalogue. It is kept off the page
 // on purpose.
-const OWNER = role("r-owner", "Org Owner", ["app.create", "app.delete", "org.manage_members"], true);
+const OWNER = role(
+  "r-owner",
+  "Org Owner",
+  ["app.create", "app.delete", "org.manage_members"],
+  true
+);
 const VIEWER = role("r-viewer", "Viewer", ["app.read"]);
 
 vi.mock("@apollo/client/react", () => ({

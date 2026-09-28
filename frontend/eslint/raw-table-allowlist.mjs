@@ -36,7 +36,7 @@
  */
 const NO_PAGE_FIELD = [
   {
-    file: "app/(app)/administration/organization/trusted-domains-card.tsx",
+    file: "components/screens/administration/organization/TrustedDomainsCard.tsx",
     reason: "astroliftOrganizationAllowlistDomains is an unpaginated list field.",
   },
   {
@@ -134,7 +134,7 @@ const NOT_A_SERVER_COLLECTION = [
     reason: "Pod-status buckets, containers and probes all render off the single workload payload.",
   },
   {
-    file: "app/(app)/clusters/[slug]/settings/cluster-settings-client.tsx",
+    file: "components/screens/clusters/settings/ClusterSettings.tsx",
     reason:
       "One table iterates the static CAPABILITY_KEYS constant; another iterates installedReleases nested in a bootstrap run.",
   },
