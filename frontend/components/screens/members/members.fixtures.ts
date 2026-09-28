@@ -3,8 +3,7 @@
  * against each view's props so a story cannot drift from what the hooks
  * return.
  */
-import type { RowSelection } from "@/components/data-table";
-import { fakeController } from "@/components/data-table/fixtures";
+import { pageData } from "@/components/screens/administration/access/fixtures";
 import type {
   AstroliftInvitation,
   AstroliftMember,
@@ -275,37 +274,15 @@ export const LONG_INVITATIONS: AstroliftInvitation[] = [
 
 /* ---- props ------------------------------------------------------------- */
 
-export function fakeSelection(ids: string[] = []): RowSelection {
-  const set = new Set(ids);
-  return {
-    selectedIds: ids,
-    selectedCount: ids.length,
-    isSelected: (id) => set.has(id),
-    toggle: noop,
-    togglePage: noop,
-    pageSelectionState: (pageIds) => {
-      const on = pageIds.filter((id) => set.has(id)).length;
-      return on === 0 ? false : on === pageIds.length ? true : "indeterminate";
-    },
-    clear: noop,
-  };
-}
-
-export const table = <TRow>(patch: Parameters<typeof fakeController<TRow>>[0] = {}) =>
-  fakeController<TRow>({ sort: undefined, sortEnabled: false, ...patch });
-
-export function membersProps(overrides: Partial<MembersScreenProps> = {}): MembersScreenProps {
+/** Everything but the list controller, which a story makes with useLocalListState. */
+export function membersProps(
+  overrides: Partial<Omit<MembersScreenProps, "list">> = {}
+): Omit<MembersScreenProps, "list"> {
   return {
     canManageMembers: true,
-    membersTable: table<AstroliftMember>({ rows: MEMBERS, totalCount: MEMBERS.length }),
-    bindingsTable: table<AstroliftRoleBinding>({ rows: BINDINGS, totalCount: BINDINGS.length }),
-    bindingSelection: fakeSelection(),
-    invitationsTable: table<AstroliftInvitation>({
-      rows: INVITATIONS,
-      totalCount: INVITATIONS.length,
-    }),
-    inviteStatus: "pending",
-    setInviteStatus: noop,
+    people: pageData(MEMBERS, { totalCount: 140, nextCursor: "c2" }),
+    invitations: pageData(INVITATIONS),
+    bindings: pageData(BINDINGS),
     bindingIndexRows: BINDINGS,
     teams: TEAMS,
     projects: PROJECTS,
@@ -320,7 +297,7 @@ export function membersProps(overrides: Partial<MembersScreenProps> = {}): Membe
     onResendInvite: resolved(undefined),
     onDeleteInvite: resolved(undefined),
     onRevokeBinding: resolved(undefined),
-    onBulkRevoke: resolved(undefined),
+    onBulkRevoke: resolved(true),
     onAnonymize: resolved(true),
     ...overrides,
   };

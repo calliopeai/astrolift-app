@@ -5,7 +5,21 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ACCENTS, GROUNDS, THEMES, type Corners, type Density, modeFor } from "@/lib/appearance";
+import { Input } from "@/components/ui/input";
+import {
+  ACCENTS,
+  GROUNDS,
+  MIN_ACCENT_CONTRAST,
+  THEMES,
+  type Corners,
+  type CustomAccent,
+  type Density,
+  type Ground,
+  accentContrast,
+  isCustomAccent,
+  modeFor,
+  parseCustomAccent,
+} from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 import type { useAppearanceSettings } from "./use-appearance-settings";
@@ -45,6 +59,97 @@ function ThemePreview({ ground, accent }: { ground: string; accent: string }) {
         <span style={{ background: accent, height: 4, width: "58%", borderRadius: 1 }} />
       </span>
     </span>
+  );
+}
+
+/**
+ * Palette option A: any colour as the accent. It applies only once it stands
+ * 3:1 off the current ground; the status colours stay as they are.
+ */
+function CustomAccentPicker({
+  value,
+  ground,
+  disabled,
+  onChange,
+}: {
+  value: CustomAccent | null;
+  ground: Ground;
+  disabled: boolean;
+  onChange: (accent: CustomAccent) => void;
+}) {
+  const [draft, setDraft] = React.useState(value ?? "");
+  React.useEffect(() => {
+    if (value) setDraft(value);
+  }, [value]);
+
+  const parsed = parseCustomAccent(draft);
+  const check = parsed ? accentContrast(parsed, ground) : null;
+  const groundLabel = GROUNDS[ground].label;
+
+  function update(next: string) {
+    setDraft(next);
+    const hex = parseCustomAccent(next);
+    if (hex && accentContrast(hex, ground).ok) onChange(hex);
+  }
+
+  return (
+    <div className="mt-3 flex min-w-0 flex-col gap-1.5">
+      <label htmlFor="custom-accent" className="text-sm font-medium">
+        Custom accent
+      </label>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <input
+          type="color"
+          aria-label="Pick a custom accent"
+          disabled={disabled}
+          value={parsed ?? "#2f9e52"}
+          onChange={(e) => update(e.target.value)}
+          className="border-border size-8 shrink-0 cursor-pointer rounded-sm border bg-transparent disabled:cursor-not-allowed"
+        />
+        <Input
+          id="custom-accent"
+          disabled={disabled}
+          value={draft}
+          placeholder="#2f9e52"
+          onChange={(e) => update(e.target.value)}
+          aria-invalid={Boolean(draft) && !check?.ok}
+          aria-describedby="custom-accent-help"
+          className="w-32 font-mono"
+        />
+        {value && (
+          <span className="text-muted-foreground text-xs" aria-live="polite">
+            In use
+          </span>
+        )}
+      </div>
+      <p
+        id="custom-accent-help"
+        className={cn(
+          "min-w-0 text-xs [overflow-wrap:anywhere]",
+          draft && !check?.ok ? "text-danger" : "text-muted-foreground"
+        )}
+      >
+        {!draft ? (
+          <>Any colour, as long as it reads against the ground. Status colours never change.</>
+        ) : !parsed ? (
+          <>
+            Use a hex colour, like <span className="font-mono">#2f9e52</span>.
+          </>
+        ) : check?.ok ? (
+          <>
+            <span className="font-mono">{check.ratio.toFixed(1)}:1</span> on {groundLabel}. Status
+            colours never change.
+          </>
+        ) : (
+          <>
+            Too faint on {groundLabel}:{" "}
+            <span className="font-mono">{check?.ratio.toFixed(1)}:1</span>, it needs{" "}
+            <span className="font-mono">{MIN_ACCENT_CONTRAST}:1</span>. Pick a{" "}
+            {modeFor(ground) === "dark" ? "lighter" : "darker"} colour.
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -128,6 +233,12 @@ export function AppearanceSettings({
               </button>
             ))}
           </div>
+          <CustomAccentPicker
+            value={isCustomAccent(appearance.accent) ? appearance.accent : null}
+            ground={appearance.ground}
+            disabled={locked}
+            onChange={(accent) => setAppearance({ accent })}
+          />
 
           <p className="text-muted-foreground text-2xs mt-4 mb-2 font-semibold tracking-[0.08em] uppercase">
             Ground

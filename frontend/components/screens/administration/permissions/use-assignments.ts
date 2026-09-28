@@ -3,7 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { useCursorTable, useRowSelection, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import {
   BULK_REVOKE_ROLE_BINDINGS,
   REVOKE_ROLE_BINDING,
@@ -20,6 +21,9 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { useListPageQuery } from "../access/use-list-page-query";
+import { ASSIGNMENTS_LIST } from "./permissions-lists";
 
 interface BindingsPageResp {
   astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
@@ -44,14 +48,12 @@ export function useAssignments() {
   // `astroliftRoleBindingsPage` searches username, email, first / last
   // name, group external id and role slug / name. It takes no sort
   // argument, so no column declares a `sortKey`.
-  const table = useCursorTable<AstroliftRoleBinding>({
-    query: LIST_ROLE_BINDINGS_PAGE,
-    extract: (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
-    searchVariable: "search",
-    urlKey: "rb",
-    fetchPolicy: "cache-and-network",
-  });
-  const selection = useRowSelection();
+  const list = useListState(ASSIGNMENTS_LIST);
+  const page = useListPageQuery<AstroliftRoleBinding>(
+    LIST_ROLE_BINDINGS_PAGE,
+    list,
+    (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage
+  );
 
   const roles = useQuery<RolesResp>(LIST_ROLES);
 
@@ -78,15 +80,17 @@ export function useAssignments() {
     }
   }
 
-  /** Revokes the selected bindings; the view closes its confirm when this settles. */
-  async function onBulkRevoke(): Promise<void> {
-    const ids = selection.selectedIds;
-    if (ids.length === 0) return;
+  /**
+   * Revokes the selected bindings. Resolves true when any were revoked, so the
+   * view clears its selection; the view closes its confirm when this settles.
+   */
+  async function onBulkRevoke(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return false;
     const { data } = await bulkRevoke({ variables: { input: { bindingIds: ids } } });
     const env = data?.bulkRevokeAstroliftRoleBindings;
     if (!env?.ok || !env.data) {
       toast.error(env?.errors?.[0]?.message ?? "Bulk revoke failed");
-      return;
+      return false;
     }
     const { revokedCount, failedCount } = env.data;
     if (failedCount === 0) {
@@ -94,12 +98,12 @@ export function useAssignments() {
     } else {
       toast.warning(`Revoked ${revokedCount}, ${failedCount} failed`);
     }
-    selection.clear();
+    return true;
   }
 
   return {
-    table,
-    selection,
+    list,
+    page,
     canManage,
     roles: roles.data?.astroliftRoles ?? [],
     rolesLoading: roles.loading,

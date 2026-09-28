@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -71,8 +71,10 @@ function ModuleRow({
   return (
     <div className="border-border/60 flex items-center gap-4 border-b py-3 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <p className="font-medium">{item.label}</p>
-        <p className="text-muted-foreground mt-0.5 text-sm">{item.description}</p>
+        <p className="font-medium [overflow-wrap:anywhere]">{item.label}</p>
+        <p className="text-muted-foreground mt-0.5 text-sm [overflow-wrap:anywhere]">
+          {item.description}
+        </p>
         {!installAllowed && (
           <p className="text-muted-foreground mt-1 text-xs">Turned off on this install</p>
         )}
@@ -96,22 +98,19 @@ export function ModulesCard({
   onToggle,
 }: ModulesCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Modules</CardTitle>
-        <CardDescription>
-          Optional integrations for this organization. An install admin can still force one off for
-          every organization.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col">
+    <Section
+      title="Modules"
+      description="Optional integrations for this organization. An install admin can still force one off for every organization."
+      divided
+    >
+      <div className="flex min-w-0 flex-col">
         {loading ? (
           <div className="flex flex-col gap-3 py-2">
             {items.map((m) => (
-              <div key={m.key} className="flex items-center gap-4">
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-72" />
+              <div key={m.key} className="flex min-w-0 items-center gap-4">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48 max-w-full" />
+                  <Skeleton className="h-3 w-72 max-w-full" />
                 </div>
                 <Skeleton className="h-5 w-9 rounded-full" />
               </div>
@@ -129,7 +128,7 @@ export function ModulesCard({
             />
           ))
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

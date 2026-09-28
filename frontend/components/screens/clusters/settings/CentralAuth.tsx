@@ -1,15 +1,16 @@
 "use client";
 
-import { KeyRoundIcon, RouteIcon } from "lucide-react";
+import { KeyRoundIcon } from "lucide-react";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SettingsSection } from "@/components/settings/SettingsPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import {
   Select,
   SelectContent,
@@ -57,118 +58,114 @@ export function CentralAuthView({ view, saving, onSave }: CentralAuthViewProps) 
     setClientSecret("");
   }
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function save() {
     if (await onSave({ discoveryUrl, clientId, authHost, jwksUri, clientSecret })) {
       setClientSecret("");
       setEditing(false);
     }
   }
 
+  const description = (
+    <>
+      One sign-in for every app on this cluster. The identity provider needs exactly one callback,{" "}
+      <code className="font-mono text-xs [overflow-wrap:anywhere]">
+        https://&lt;auth host&gt;/oauth2/callback
+      </code>
+      , and the session covers every host under the auth host&apos;s parent zone. Read by the Envoy
+      and nginx edges; on the ALB class the per-app Cognito gate applies instead.
+    </>
+  );
+
+  if (editing) {
+    return (
+      // An open edit counts as unsaved: Save and Cancel are live from the
+      // start, and `required` holds back a save with a blank field.
+      <SettingsSection
+        title="Central auth"
+        description={description}
+        dirty
+        saving={saving}
+        onSave={save}
+        onCancel={() => setEditing(false)}
+      >
+        <TextField
+          id="oidc-auth-host"
+          label="Auth host"
+          value={authHost}
+          onChange={setAuthHost}
+          placeholder="auth.apps.example.com"
+          required
+        />
+        <TextField
+          id="oidc-discovery"
+          label="Discovery URL"
+          value={discoveryUrl}
+          onChange={setDiscoveryUrl}
+          placeholder="https://cognito-idp.us-west-2.amazonaws.com/us-west-2_abc/.well-known/openid-configuration"
+          required
+        />
+        <TextField
+          id="oidc-client-id"
+          label="Client ID"
+          value={clientId}
+          onChange={setClientId}
+          required
+        />
+        <TextField
+          id="oidc-client-secret"
+          label="Client secret"
+          value={clientSecret}
+          onChange={setClientSecret}
+          type="password"
+          autoComplete="new-password"
+          placeholder={view?.client_secret_set ? "Set. Leave empty to keep it." : "Not set"}
+          hint="Write-only. Never shown again once saved."
+        />
+        <TextField
+          id="oidc-jwks"
+          label="JWKS URI (optional)"
+          value={jwksUri}
+          onChange={setJwksUri}
+          hint="Only for a provider that does not serve its keys at <issuer>/.well-known/jwks.json."
+        />
+      </SettingsSection>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <KeyRoundIcon className="size-4" />
-          Central auth
-        </CardTitle>
-        <CardDescription>
-          One sign-in for every app on this cluster. The identity provider needs exactly one
-          callback,{" "}
-          <code className="font-mono text-xs">https://&lt;auth host&gt;/oauth2/callback</code>, and
-          the session covers every host under the auth host&apos;s parent zone. Read by the Envoy
-          and nginx edges; on the ALB class the per-app Cognito gate applies instead.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!editing ? (
-          <>
-            {view ? (
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-                <ViewField label="Auth host" value={view.auth_proxy_host} />
-                <ViewField label="Client ID" value={view.client_id} />
-                <ViewField label="Discovery URL" value={view.discovery_url} />
-                {view.jwks_uri && <ViewField label="JWKS URI" value={view.jwks_uri} />}
-              </dl>
-            ) : (
-              <p className="text-muted-foreground text-sm">Not configured.</p>
-            )}
-            {view && (
-              <div className="flex flex-wrap gap-1.5">
-                <SecretBadge label="Client secret" set={view.client_secret_set} />
-                <SecretBadge label="Cookie secret" set={view.cookie_secret_set} />
-                <SecretBadge label="Gateway secret" set={view.gateway_secret_set} />
-              </div>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                reset();
-                setEditing(true);
-              }}
-            >
-              {view ? "Edit" : "Set up central auth"}
-            </Button>
-          </>
+    <Section title="Central auth" description={description} divided>
+      <div className="flex min-w-0 flex-col gap-4">
+        {view ? (
+          <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+            <ViewField label="Auth host" value={view.auth_proxy_host} />
+            <ViewField label="Client ID" value={view.client_id} />
+            <ViewField label="Discovery URL" value={view.discovery_url} />
+            {view.jwks_uri && <ViewField label="JWKS URI" value={view.jwks_uri} />}
+          </dl>
         ) : (
-          <form onSubmit={save} className="space-y-3">
-            <TextField
-              id="oidc-auth-host"
-              label="Auth host"
-              value={authHost}
-              onChange={setAuthHost}
-              placeholder="auth.apps.example.com"
-              required
-            />
-            <TextField
-              id="oidc-discovery"
-              label="Discovery URL"
-              value={discoveryUrl}
-              onChange={setDiscoveryUrl}
-              placeholder="https://cognito-idp.us-west-2.amazonaws.com/us-west-2_abc/.well-known/openid-configuration"
-              required
-            />
-            <TextField
-              id="oidc-client-id"
-              label="Client ID"
-              value={clientId}
-              onChange={setClientId}
-              required
-            />
-            <TextField
-              id="oidc-client-secret"
-              label="Client secret"
-              value={clientSecret}
-              onChange={setClientSecret}
-              type="password"
-              autoComplete="new-password"
-              placeholder={view?.client_secret_set ? "Set. Leave empty to keep it." : "Not set"}
-              hint="Write-only. Never shown again once saved."
-            />
-            <TextField
-              id="oidc-jwks"
-              label="JWKS URI (optional)"
-              value={jwksUri}
-              onChange={setJwksUri}
-              hint="Only for a provider that does not serve its keys at <issuer>/.well-known/jwks.json."
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={saving || !discoveryUrl.trim() || !clientId.trim() || !authHost.trim()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          </form>
+          <p className="text-muted-foreground text-sm">Not configured.</p>
         )}
-      </CardContent>
-    </Card>
+        {view && (
+          <div className="flex flex-wrap gap-1.5">
+            <SecretBadge label="Client secret" set={view.client_secret_set} />
+            <SecretBadge label="Cookie secret" set={view.cookie_secret_set} />
+            <SecretBadge label="Gateway secret" set={view.gateway_secret_set} />
+          </div>
+        )}
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              reset();
+              setEditing(true);
+            }}
+          >
+            {view ? "Edit" : "Set up central auth"}
+          </Button>
+        </div>
+      </div>
+    </Section>
   );
 }
 
@@ -207,38 +204,35 @@ export function IngressClassView({
   const chosen = CLASSES.find((c) => c.value === target);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <RouteIcon className="size-4" />
-          Ingress class
-        </CardTitle>
-        <CardDescription>
-          Which edge serves this cluster&apos;s apps. Each app moves on its next deploy; running
-          apps are not touched by the change itself.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={target} onValueChange={setTarget}>
-            <SelectTrigger className="w-72" aria-label="Ingress class">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CLASSES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-              {!CLASSES.some((c) => c.value === ingressClass) && (
-                <SelectItem value={ingressClass}>{ingressClass}</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-          <Button size="sm" disabled={!changing} onClick={() => setConfirming(true)}>
-            Change class
-          </Button>
-        </div>
+    <>
+      <SettingsSection
+        title="Ingress class"
+        description="Which edge serves this cluster's apps. Each app moves on its next deploy; running apps are not touched by the change itself."
+        dirty={changing}
+        saveLabel="Change class"
+        onSave={() => setConfirming(true)}
+        onCancel={() => {
+          setTarget(ingressClass);
+          setSyncManifests(false);
+        }}
+      >
+        <Select value={target} onValueChange={setTarget}>
+          <SelectTrigger className="w-full max-w-72" aria-label="Ingress class">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CLASSES.map((c) => (
+              <SelectItem key={c.value} value={c.value}>
+                {c.label}
+              </SelectItem>
+            ))}
+            {!CLASSES.some((c) => c.value === ingressClass) && (
+              <SelectItem value={ingressClass}>
+                <span className="font-mono">{ingressClass}</span>
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
         {changing && chosen && (
           <p className="text-muted-foreground text-xs">Apps will be gated by {chosen.gate}.</p>
         )}
@@ -251,24 +245,28 @@ export function IngressClassView({
           </p>
         )}
         {changing && (
-          <label className="flex items-start gap-2 text-xs">
+          <label className="flex min-w-0 items-start gap-2 text-xs">
             <Checkbox
               checked={syncManifests}
               onCheckedChange={(v) => setSyncManifests(v === true)}
               className="mt-0.5"
             />
-            <span>
-              Also write the new gate into every app&apos;s <code>astrolift.toml</code>. This
-              commits to each app&apos;s repo, and each commit starts that app&apos;s deploy, so
-              every app redeploys at once.
+            <span className="min-w-0">
+              Also write the new gate into every app&apos;s{" "}
+              <code className="font-mono">astrolift.toml</code>. This commits to each app&apos;s
+              repo, and each commit starts that app&apos;s deploy, so every app redeploys at once.
             </span>
           </label>
         )}
-      </CardContent>
+      </SettingsSection>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={`Change the ingress class to ${target}?`}
+        title={
+          <>
+            Change the ingress class to <span className="font-mono">{target}</span>?
+          </>
+        }
         description={
           syncManifests
             ? "Every app on this cluster gets a commit to its astrolift.toml and redeploys now."
@@ -277,7 +275,7 @@ export function IngressClassView({
         confirmLabel="Change class"
         onConfirm={() => onApply(target, syncManifests)}
       />
-    </Card>
+    </>
   );
 }
 
@@ -305,9 +303,15 @@ function TextField({
   hint?: string;
 } & Omit<React.ComponentProps<typeof Input>, "id" | "value" | "onChange">) {
   return (
-    <div className="space-y-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="font-mono"
+        {...rest}
+      />
       {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   );

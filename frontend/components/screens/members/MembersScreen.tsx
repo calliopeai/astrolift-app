@@ -2,10 +2,11 @@
 
 import {
   AlertTriangleIcon,
+  DownloadIcon,
   InfoIcon,
   MailIcon,
+  MoreHorizontalIcon,
   SendIcon,
-  ShieldIcon,
   Trash2Icon,
   UserMinusIcon,
   UserPlusIcon,
@@ -16,8 +17,11 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column, type CursorTableController } from "@/components/data-table";
+import type { Column, RowSelection } from "@/components/data-table";
+import { type CsvColumn, exportCsv } from "@/components/list/exportCsv";
+import { ListPage, type ListPageProps } from "@/components/list/ListPage";
+import { adminCrumb } from "@/components/screens/administration/access/admin-crumbs";
+import type { ListPageData } from "@/components/screens/administration/access/use-list-page-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +35,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   AstroliftInvitation,
@@ -42,6 +51,7 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { InvitationExpiryBadge } from "./InvitationExpiryBadge";
+import { MEMBERS_SEARCH_PLACEHOLDER, type MembersView } from "./members-list";
 import type { useMembers } from "./use-members";
 
 export type MembersScreenProps = ReturnType<typeof useMembers> & {
@@ -84,21 +94,23 @@ type MemberGroup = { rows: AstroliftMember[]; primary: AstroliftMember };
 const STALE_THRESHOLD_DAYS = 90;
 
 /**
- * Cells that own their own pointer affordances (hover tooltips, action
- * buttons) have to sit above ``rowHref``'s stretched row link, which is
- * an absolutely-positioned overlay across the whole row.
+ * Cells that own their own pointer affordances (hover tooltips) have to sit
+ * above ``rowHref``'s stretched row link, which is an absolutely-positioned
+ * overlay across the whole row.
  */
 const ABOVE_ROW_LINK = "relative z-10";
 
-/** Org members: People, Role bindings and Invitations. Pure view; data comes from useMembers. */
+/**
+ * Admin › Members (spec 44 §5.1): one list whose views are the people, the
+ * pending invitations, the invitation history and the role bindings. Pure
+ * view; data comes from useMembers.
+ */
 export function MembersScreen({
   canManageMembers,
-  membersTable,
-  bindingsTable,
-  bindingSelection,
-  invitationsTable,
-  inviteStatus,
-  setInviteStatus,
+  list,
+  people,
+  invitations,
+  bindings,
   bindingIndexRows: bindingIndexData,
   teams,
   projects,
@@ -121,6 +133,7 @@ export function MembersScreen({
   const t = useTranslations("orgMembers");
   const tBulk = useTranslations("lists.membersBulk");
   const fmt = useFormatters();
+  const view = list.state.view as MembersView;
 
   const [open, setOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
@@ -136,13 +149,15 @@ export function MembersScreen({
   // Re-sending rotates the invitation token, which kills any link the
   // operator already handed out — confirmed rather than fired on click.
   const [resendTarget, setResendTarget] = React.useState<AstroliftInvitation | null>(null);
-  const [confirmBulkRevoke, setConfirmBulkRevoke] = React.useState(false);
+  const [bulkTarget, setBulkTarget] = React.useState<RowSelection | null>(null);
+  const bulkCount = bulkTarget?.selectedCount ?? 0;
 
   async function handleBulkRevoke() {
+    if (!bulkTarget) return;
     try {
-      await onBulkRevoke();
+      if (await onBulkRevoke(bulkTarget.selectedIds)) bulkTarget.clear();
     } finally {
-      setConfirmBulkRevoke(false);
+      setBulkTarget(null);
     }
   }
 
@@ -205,7 +220,7 @@ export function MembersScreen({
   // a page boundary and show up once on each.
   const memberGroups = React.useMemo<MemberGroup[]>(() => {
     const byUser = new Map<string, AstroliftMember[]>();
-    for (const m of membersTable.rows) {
+    for (const m of people.rows) {
       const arr = byUser.get(m.user.id) ?? [];
       arr.push(m);
       byUser.set(m.user.id, arr);
@@ -214,38 +229,42 @@ export function MembersScreen({
       rows,
       primary: rows.find((r) => r.scopeKind === "ORG") ?? rows[0],
     }));
-  }, [membersTable.rows]);
-
-  // Same controller, grouped rows: paging, search and state all still
-  // come from the server-side walk.
-  const peopleController: CursorTableController<MemberGroup> = {
-    ...membersTable,
-    rows: memberGroups,
-  };
+  }, [people.rows]);
 
   const peopleColumns: Column<MemberGroup>[] = [
     {
       id: "user",
       header: "User",
+      cellClassName: "max-w-72",
       cell: ({ primary }) => (
         // The id is the anchor InviterCell deep-links to (`#u-<userId>`).
-        <div id={`u-${primary.user.id}`}>
-          <div className="font-medium">{primary.user.username}</div>
-          <div className="text-muted-foreground text-xs">{primary.user.email}</div>
+        <div id={`u-${primary.user.id}`} className="min-w-0">
+          <div className="truncate font-medium" title={primary.user.username}>
+            {primary.user.username}
+          </div>
+          <div
+            className="text-muted-foreground truncate font-mono text-xs"
+            title={primary.user.email}
+          >
+            {primary.user.email}
+          </div>
         </div>
       ),
     },
     {
       id: "scope",
       header: "Scope",
+      cellClassName: "max-w-64",
       cell: ({ rows }) => (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex min-w-0 flex-col items-start gap-1">
           {rows.map((r) => (
-            <div key={r.id} className="flex items-center gap-1.5">
-              <Badge className={scopeBadge[r.scopeKind]} variant="secondary">
+            <div key={r.id} className="flex max-w-full min-w-0 items-center gap-1.5">
+              <Badge className={`${scopeBadge[r.scopeKind] ?? ""} font-mono`} variant="secondary">
                 {r.scopeKind}
               </Badge>
-              <span className="text-muted-foreground text-xs">{scopeLabel(r)}</span>
+              <span className="text-muted-foreground min-w-0 truncate font-mono text-xs">
+                {scopeLabel(r)}
+              </span>
             </div>
           ))}
         </div>
@@ -254,14 +273,14 @@ export function MembersScreen({
     {
       id: "roles",
       header: "Roles",
-      cellClassName: ABOVE_ROW_LINK,
+      cellClassName: `${ABOVE_ROW_LINK} max-w-80`,
       cell: ({ primary }) => {
         const userBindings = bindingsByUser.get(primary.user.id) ?? [];
         if (userBindings.length === 0) {
           return <span className="text-muted-foreground text-xs">—</span>;
         }
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-w-0 flex-wrap gap-1">
             {userBindings.map((b) => (
               <RoleSourcePill key={b.id} binding={b} />
             ))}
@@ -278,56 +297,9 @@ export function MembersScreen({
     {
       id: "joined",
       header: "Joined",
-      cellClassName: "text-muted-foreground text-sm",
+      cellClassName: "text-muted-foreground font-mono text-xs",
       cell: ({ primary }) =>
         primary.joinedAt ? fmt.formatDate(primary.joinedAt) : fmt.formatDate(primary.createdAt),
-    },
-    {
-      id: "actions",
-      header: t("actionsColumn"),
-      align: "right",
-      width: "w-24",
-      cellClassName: ABOVE_ROW_LINK,
-      cell: ({ rows, primary }) => {
-        const alreadyAnonymized = rows.some((r) => r.lifecycle === "anonymized");
-        return (
-          <div className="flex items-center justify-end gap-1">
-            <Can permission="org.manage_members">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setGrantForMember(primary)}
-                    aria-label={t("grantRoleRowLabel", { name: primary.user.username })}
-                  >
-                    <UserPlusIcon className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {t("grantRoleRowTooltip", { name: primary.user.username })}
-                </TooltipContent>
-              </Tooltip>
-            </Can>
-            <Can permission="org.manage_members">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={alreadyAnonymized}
-                onClick={() => openAnonymizeDialog(primary)}
-                aria-label={`Anonymize ${primary.user.username}`}
-                title={
-                  alreadyAnonymized
-                    ? "Already anonymized"
-                    : "Anonymize user data (GDPR right-to-delete)"
-                }
-              >
-                <UserMinusIcon className="size-4" />
-              </Button>
-            </Can>
-          </div>
-        );
-      },
     },
   ];
 
@@ -335,24 +307,36 @@ export function MembersScreen({
     {
       id: "subject",
       header: "Subject",
+      cellClassName: "max-w-72",
       cell: (b) =>
         b.user ? (
-          <>
-            <div className="font-medium">{b.user.username}</div>
-            <div className="text-muted-foreground text-xs">{b.user.email}</div>
-          </>
+          <div className="min-w-0">
+            <div className="truncate font-medium" title={b.user.username}>
+              {b.user.username}
+            </div>
+            <div className="text-muted-foreground truncate font-mono text-xs" title={b.user.email}>
+              {b.user.email}
+            </div>
+          </div>
         ) : (
-          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+          <div className="truncate font-mono text-xs" title={`group:${b.groupExternalId}`}>
+            group:{b.groupExternalId}
+          </div>
         ),
     },
     {
       id: "role",
       header: "Role",
+      cellClassName: "max-w-72",
       cell: (b) => (
-        <>
-          <div className="font-medium">{b.role.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-        </>
+        <div className="min-w-0">
+          <div className="truncate font-medium" title={b.role.name}>
+            {b.role.name}
+          </div>
+          <div className="text-muted-foreground truncate font-mono text-xs" title={b.role.slug}>
+            {b.role.slug}
+          </div>
+        </div>
       ),
     },
     {
@@ -360,7 +344,7 @@ export function MembersScreen({
       header: t("sourceColumn"),
       cell: (b) => (
         <div className="flex items-center gap-1.5">
-          <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
+          <Badge className={`${scopeBadge[b.scopeKind] ?? ""} font-mono`} variant="secondary">
             {b.scopeKind}
           </Badge>
           {b.sourceScopeLabel && (
@@ -385,27 +369,8 @@ export function MembersScreen({
     {
       id: "granted",
       header: "Granted",
-      cellClassName: "text-muted-foreground text-sm",
+      cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (b) => fmt.formatDate(b.grantedAt),
-    },
-    {
-      id: "actions",
-      header: t("actionsColumn"),
-      align: "right",
-      width: "w-16",
-      cell: (b) => (
-        <Can permission="org.manage_members">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-            disabled={revoking || bulkRevoking}
-          >
-            <Trash2Icon className="size-4" />
-            <span className="sr-only">Revoke</span>
-          </Button>
-        </Can>
-      ),
     },
   ];
 
@@ -413,16 +378,21 @@ export function MembersScreen({
     {
       id: "email",
       header: "Email",
-      cellClassName: "font-medium",
-      cell: (inv) => inv.email,
+      cellClassName: "max-w-80",
+      cell: (inv) => (
+        <span className="block min-w-0 truncate font-mono text-sm" title={inv.email}>
+          {inv.email}
+        </span>
+      ),
     },
     {
       id: "role",
       header: "Role",
+      cellClassName: "max-w-64",
       cell: (inv) =>
         inv.roleSlug ? (
-          <Badge variant="outline" className="font-mono text-xs">
-            {inv.roleSlug}
+          <Badge variant="outline" className="max-w-full font-mono text-xs" title={inv.roleSlug}>
+            <span className="truncate">{inv.roleSlug}</span>
           </Badge>
         ) : (
           <span className="text-muted-foreground text-xs">—</span>
@@ -432,7 +402,10 @@ export function MembersScreen({
       id: "status",
       header: "Status",
       cell: (inv) => (
-        <Badge variant={inv.status === "pending" ? "default" : "secondary"} className="capitalize">
+        <Badge
+          variant={inv.status === "pending" ? "default" : "secondary"}
+          className="font-mono capitalize"
+        >
           {inv.status}
         </Badge>
       ),
@@ -444,183 +417,261 @@ export function MembersScreen({
         inv.status === "pending" ? (
           <InvitationExpiryBadge expiresAt={inv.expiresAt} />
         ) : (
-          <span className="text-muted-foreground text-sm">{fmt.formatDate(inv.expiresAt)}</span>
+          <span className="text-muted-foreground font-mono text-xs">
+            {fmt.formatDate(inv.expiresAt)}
+          </span>
         ),
     },
     {
       id: "invitedBy",
       header: "Invited by",
+      cellClassName: "max-w-72",
       cell: (inv) => <InviterCell invitation={inv} />,
-    },
-    {
-      id: "actions",
-      header: <span className="sr-only">{t("actionsColumn")}</span>,
-      align: "right",
-      width: "w-24",
-      cell: (inv) =>
-        inv.status === "pending" ? (
-          <Can permission="org.manage_members">
-            <div className="flex items-center justify-end gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setResendTarget(inv)}
-                    disabled={resendingInvite || revokingInvite}
-                    aria-label={`Resend invitation to ${inv.email}`}
-                  >
-                    <SendIcon className="size-4" />
-                    <span className="sr-only">Resend</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Resend invitation</TooltipContent>
-              </Tooltip>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setRevokeTarget({ kind: "invitation", invitation: inv })}
-                disabled={revokingInvite}
-              >
-                <Trash2Icon className="size-4" />
-                <span className="sr-only">Revoke</span>
-              </Button>
-            </div>
-          </Can>
-        ) : (
-          <Can permission="org.manage_members">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setDeleteInviteTarget(inv)}
-                  disabled={deletingInvite}
-                  aria-label={`Delete resolved invitation for ${inv.email}`}
-                >
-                  <Trash2Icon className="size-4" />
-                  <span className="sr-only">Delete</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete this resolved invitation</TooltipContent>
-            </Tooltip>
-          </Can>
-        ),
     },
   ];
 
-  const showingPendingOnly = inviteStatus === "pending";
+  // The page's header, shared by every view: the views are its tabs.
+  const header: ListPageProps<unknown>["header"] = {
+    crumbs: [adminCrumb("members"), { label: "Members" }],
+    title: "Members",
+    context: "Users with access to this organization, and the role bindings behind them.",
+    primaryAction: (
+      <Can permission="org.manage_members">
+        <Button size="sm" onClick={() => setInviteOpen(true)}>
+          <MailIcon className="size-4" />
+          Invite
+        </Button>
+      </Can>
+    ),
+    menu: canManageMembers ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8" aria-label="More member actions">
+            <MoreHorizontalIcon className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled={rolesLoading} onSelect={() => setOpen(true)}>
+            <UserPlusIcon className="size-4" />
+            Grant role
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : undefined,
+  };
+
+  // Each view searches different fields; the box says which.
+  const viewList = {
+    ...list,
+    definition: { ...list.definition, searchPlaceholder: MEMBERS_SEARCH_PLACEHOLDER[view] },
+  };
+
+  const shared = { header, list: viewList };
+
+  function listProps<TRow>(page: ListPageData<TRow>) {
+    return {
+      loading: page.loading,
+      stale: page.stale,
+      error: page.error,
+      onRetry: page.refetch,
+      totalCount: page.totalCount,
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  const pageEl =
+    view === "bindings" ? (
+      <ListPage<AstroliftRoleBinding>
+        {...shared}
+        {...listProps(bindings)}
+        label="Role bindings"
+        columns={bindingColumns}
+        rows={bindings.rows}
+        getRowId={(b) => b.id}
+        menu={
+          <ExportMenu
+            filename="role-bindings"
+            rows={bindings.rows}
+            columns={[
+              { header: "Subject", value: (b) => b.user?.username ?? `group:${b.groupExternalId}` },
+              { header: "Email", value: (b) => b.user?.email ?? "" },
+              { header: "Role", value: (b) => b.role.slug },
+              { header: "Scope", value: (b) => b.scopeKind },
+              { header: "Source", value: (b) => b.sourceScopeLabel },
+              { header: "Granted", value: (b) => b.grantedAt },
+            ]}
+          />
+        }
+        rowActions={
+          canManageMembers
+            ? (b) => (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={revoking || bulkRevoking}
+                  onSelect={() => setRevokeTarget({ kind: "binding", binding: b })}
+                >
+                  <Trash2Icon className="size-4" />
+                  Revoke
+                </DropdownMenuItem>
+              )
+            : undefined
+        }
+        bulkActions={
+          canManageMembers
+            ? (selection) => (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkTarget(selection)}
+                  disabled={bulkRevoking}
+                >
+                  <Trash2Icon className="size-4" />
+                  {tBulk("revokeButton", { count: selection.selectedCount })}
+                </Button>
+              )
+            : undefined
+        }
+        empty={{
+          icon: <UsersIcon className="size-5" />,
+          title: "No role bindings",
+          description: "Grant a system role to a user to give them access to the platform.",
+        }}
+      />
+    ) : view === "invited" || view === "invitations" ? (
+      <ListPage<AstroliftInvitation>
+        {...shared}
+        {...listProps(invitations)}
+        label="Invitations"
+        columns={invitationColumns}
+        rows={invitations.rows}
+        getRowId={(inv) => inv.id}
+        menu={
+          <ExportMenu
+            filename={view === "invited" ? "invitations-pending" : "invitations"}
+            rows={invitations.rows}
+            columns={[
+              { header: "Email", value: (inv) => inv.email },
+              { header: "Role", value: (inv) => inv.roleSlug },
+              { header: "Status", value: (inv) => inv.status },
+              { header: "Expires", value: (inv) => inv.expiresAt },
+              {
+                header: "Invited by",
+                value: (inv) => inv.invitedByDisplayName ?? inv.invitedByUsername,
+              },
+            ]}
+          />
+        }
+        rowActions={
+          canManageMembers
+            ? (inv) =>
+                inv.status === "pending" ? (
+                  <>
+                    <DropdownMenuItem
+                      disabled={resendingInvite || revokingInvite}
+                      onSelect={() => setResendTarget(inv)}
+                    >
+                      <SendIcon className="size-4" />
+                      Resend invitation
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={revokingInvite}
+                      onSelect={() => setRevokeTarget({ kind: "invitation", invitation: inv })}
+                    >
+                      <Trash2Icon className="size-4" />
+                      Revoke
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={deletingInvite}
+                    onSelect={() => setDeleteInviteTarget(inv)}
+                  >
+                    <Trash2Icon className="size-4" />
+                    Delete this resolved invitation
+                  </DropdownMenuItem>
+                )
+            : undefined
+        }
+        empty={{
+          icon: <MailIcon className="size-5" />,
+          title: "No invitations",
+          description:
+            "Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation.",
+        }}
+      />
+    ) : (
+      <ListPage<MemberGroup>
+        {...shared}
+        {...listProps(people)}
+        label="People"
+        columns={peopleColumns}
+        rows={memberGroups}
+        getRowId={(g) => g.primary.user.id}
+        rowHref={(g) => `/administration/members/${g.primary.id}`}
+        menu={
+          <ExportMenu
+            filename="members"
+            rows={memberGroups}
+            columns={[
+              { header: "Username", value: (g) => g.primary.user.username },
+              { header: "Email", value: (g) => g.primary.user.email },
+              { header: "Scopes", value: (g) => g.rows.map((r) => r.scopeKind).join(" ") },
+              {
+                header: "Roles",
+                value: (g) =>
+                  (bindingsByUser.get(g.primary.user.id) ?? []).map((b) => b.role.slug).join(" "),
+              },
+              { header: "Last active", value: (g) => g.primary.lastActiveAt },
+              { header: "Joined", value: (g) => g.primary.joinedAt ?? g.primary.createdAt },
+            ]}
+          />
+        }
+        rowActions={
+          canManageMembers
+            ? ({ rows, primary }) => {
+                const alreadyAnonymized = rows.some((r) => r.lifecycle === "anonymized");
+                return (
+                  <>
+                    <DropdownMenuItem onSelect={() => setGrantForMember(primary)}>
+                      <UserPlusIcon className="size-4" />
+                      {t("grantRoleRowLabel", { name: primary.user.username })}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={alreadyAnonymized}
+                      onSelect={() => openAnonymizeDialog(primary)}
+                    >
+                      <UserMinusIcon className="size-4" />
+                      {alreadyAnonymized ? "Already anonymized" : "Anonymize user data"}
+                    </DropdownMenuItem>
+                  </>
+                );
+              }
+            : undefined
+        }
+        empty={{
+          icon: <UsersIcon className="size-5" />,
+          title: "No members",
+          description: "Members appear here once role bindings are granted to users.",
+        }}
+      />
+    );
 
   return (
     <TooltipProvider>
-      <PageShell
-        title="Members"
-        description="Users with access to this organization, plus the role bindings that grant their permissions."
-        actions={
-          <div className="flex items-center gap-2">
-            <Can permission="org.manage_members">
-              <Button variant="outline" onClick={() => setInviteOpen(true)}>
-                <MailIcon className="size-4" />
-                Invite
-              </Button>
-            </Can>
-            <Can permission="org.manage_members">
-              <Button onClick={() => setOpen(true)} disabled={rolesLoading}>
-                <UserPlusIcon className="size-4" />
-                Grant role
-              </Button>
-            </Can>
-          </div>
-        }
-      >
-        <Section title="People">
-          <DataTable
-            label="People"
-            controller={peopleController}
-            columns={peopleColumns}
-            getRowId={(g) => g.primary.user.id}
-            rowHref={(g) => `/administration/members/${g.primary.id}`}
-            searchPlaceholder={t("searchPlaceholder")}
-            empty={{
-              icon: <UsersIcon className="size-5" />,
-              title: "No members",
-              description: "Members appear here once role bindings are granted to users.",
-            }}
-            emptyFiltered={{
-              title: t("noMatchTitle"),
-              description: t("noMatchDescription", { term: membersTable.search.trim() }),
-            }}
-          />
-        </Section>
-
-        <Section title="Role bindings">
-          <DataTable
-            label="Role bindings"
-            controller={bindingsTable}
-            columns={bindingColumns}
-            getRowId={(b) => b.id}
-            selection={canManageMembers ? bindingSelection : undefined}
-            bulkActions={(selection) => (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setConfirmBulkRevoke(true)}
-                disabled={bulkRevoking}
-              >
-                <Trash2Icon className="size-4" />
-                {tBulk("revokeButton", { count: selection.selectedCount })}
-              </Button>
-            )}
-            searchPlaceholder="Search by user, group, or role…"
-            empty={{
-              icon: <ShieldIcon className="size-5" />,
-              title: "No role bindings",
-              description: "Grant a system role to a user to give them access to the platform.",
-            }}
-            emptyFiltered={{
-              title: "No matching role bindings",
-              description:
-                "No binding matches this search. Try a username, an SSO group, or a role slug.",
-            }}
-          />
-        </Section>
-
-        <Section title="Invitations">
-          <DataTable
-            label="Invitations"
-            controller={invitationsTable}
-            columns={invitationColumns}
-            getRowId={(inv) => inv.id}
-            toolbar={
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setInviteStatus(showingPendingOnly ? null : "pending")}
-              >
-                {showingPendingOnly ? "Show resolved" : "Hide resolved"}
-              </Button>
-            }
-            searchPlaceholder="Search by email, role, or inviter…"
-            empty={{
-              icon: <MailIcon className="size-5" />,
-              title: showingPendingOnly ? "No pending invitations" : "No invitations",
-              description: showingPendingOnly
-                ? "Resolved invitations are hidden — use Show resolved to review or delete them."
-                : "Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation.",
-            }}
-            emptyFiltered={{
-              title: "No matching invitations",
-              description: "No invitation matches this search under the current status filter.",
-            }}
-          />
-        </Section>
+      <div className="flex min-w-0 flex-1 flex-col p-6">
+        {pageEl}
 
         <ConfirmDialog
-          open={confirmBulkRevoke}
-          onOpenChange={setConfirmBulkRevoke}
-          title={tBulk("confirm.title", { count: bindingSelection.selectedCount })}
+          open={bulkTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setBulkTarget(null);
+          }}
+          title={tBulk("confirm.title", { count: bulkCount })}
           description={tBulk("confirm.description")}
-          confirmLabel={tBulk("confirm.confirmLabel", { count: bindingSelection.selectedCount })}
+          confirmLabel={tBulk("confirm.confirmLabel", { count: bulkCount })}
           destructive
           onConfirm={handleBulkRevoke}
         />
@@ -708,8 +759,42 @@ export function MembersScreen({
             anonymizeTarget ? onAnonymize(anonymizeTarget) : Promise.resolve(false)
           }
         />
-      </PageShell>
+      </div>
     </TooltipProvider>
+  );
+}
+
+/**
+ * CSV export from the filter bar's `⋯` (spec 44 §5.1, Admin lists). It
+ * writes the rows on screen: the page queries have no export or unpaged
+ * read, so the label says "this page" rather than promising the whole list.
+ */
+function ExportMenu<TRow>({
+  filename,
+  rows,
+  columns,
+}: {
+  filename: string;
+  rows: TRow[];
+  columns: CsvColumn<TRow>[];
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8" aria-label="More list actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          disabled={rows.length === 0}
+          onSelect={() => exportCsv(filename, rows, columns)}
+        >
+          <DownloadIcon className="size-4" />
+          Export this page as CSV
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 /* ---- helper components ---------------------------------------------- */

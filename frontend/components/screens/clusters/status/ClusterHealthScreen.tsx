@@ -7,13 +7,13 @@
  * surface as copy rather than errors.
  */
 
-import { RocketIcon } from "lucide-react";
+import { ActivityIcon, RocketIcon, ServerIcon, ServerOffIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { StatusPanel, StatusPanelGrid } from "./StatusPanel";
 import type { useClusterHealth } from "./use-cluster-health";
 import type { useClusterWorkloadHealth } from "./use-cluster-workload-health";
 
@@ -22,13 +22,13 @@ export interface ClusterHealthBodyProps {
   workloads: ReturnType<typeof useClusterWorkloadHealth>;
 }
 
-/** The Health tab body: the live health card over the workload health card. */
+/** The Health tab body: the live health panel over the workload health panel. */
 export function ClusterHealthBody({ health, workloads }: ClusterHealthBodyProps) {
   return (
-    <>
+    <StatusPanelGrid>
       <HealthLiveCard {...health} />
       <HealthWorkloadCard {...workloads} />
-    </>
+    </StatusPanelGrid>
   );
 }
 
@@ -46,85 +46,108 @@ const PHASE_VARIANT: Record<string, "default" | "secondary" | "destructive" | "o
   Unknown: "outline",
 };
 
-function HealthLiveCard({ pods, events, loading }: ReturnType<typeof useClusterHealth>) {
+function HealthLiveCard({
+  pods,
+  events,
+  loading,
+  error,
+  refetch,
+}: ReturnType<typeof useClusterHealth>) {
   const fmt = useFormatters();
+  const nothing = pods.length === 0 && events.length === 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Live health</CardTitle>
-        <CardDescription>
+    <StatusPanel
+      icon={<ActivityIcon className="size-4" />}
+      title="Live health"
+      description={
+        <>
           Pod-phase rollup + recent Warning events across the platform&apos;s managed namespaces.
           Sourced directly from the cluster driver; polls every 30s.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {loading && pods.length === 0 && events.length === 0 ? (
-          <Skeleton className="h-24 w-full" />
-        ) : (
-          <>
-            <div>
-              <h3 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">Pods</h3>
-              {pods.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No pod data available — the driver couldn&apos;t reach the apiserver, or no
-                  astrolift-managed pods are running.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {pods.map((p) => (
-                    <Badge
-                      key={`${p.namespace}-${p.phase}`}
-                      variant={PHASE_VARIANT[p.phase] ?? "outline"}
-                      className="gap-1.5"
-                    >
-                      <span className="text-2xs font-mono">{p.namespace}</span>
-                      <span className="opacity-60">·</span>
-                      <span>{p.phase}</span>
-                      <span className="opacity-60">·</span>
-                      <span>{p.count}</span>
-                    </Badge>
-                  ))}
-                </div>
-              )}
+        </>
+      }
+      loading={loading && nothing}
+      skeleton={<Skeleton className="h-24 w-full" />}
+      error={nothing ? error : null}
+      onRetry={refetch}
+      empty={
+        nothing
+          ? {
+              icon: <ServerOffIcon className="size-5" />,
+              title: "No pod data available",
+              description:
+                "The driver couldn't reach the apiserver, or no astrolift-managed pods are running.",
+            }
+          : null
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">Pods</h3>
+          {pods.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No pod data available — the driver couldn&apos;t reach the apiserver, or no
+              astrolift-managed pods are running.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {pods.map((p) => (
+                <Badge
+                  key={`${p.namespace}-${p.phase}`}
+                  variant={PHASE_VARIANT[p.phase] ?? "outline"}
+                  className="gap-1.5"
+                >
+                  <span className="text-2xs font-mono">{p.namespace}</span>
+                  <span className="opacity-60">·</span>
+                  <span>{p.phase}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="font-mono tabular-nums">{p.count}</span>
+                </Badge>
+              ))}
             </div>
-            <div>
-              <h3 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
-                Recent warnings
-              </h3>
-              {events.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No recent warning events. (A green Live health state is the expected baseline.)
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {events.map((e, i) => (
-                    <li
-                      key={`${e.namespace}-${e.name}-${i}`}
-                      className="border-border rounded-md border p-2 text-sm"
-                    >
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <code className="font-mono text-xs">{e.reason}</code>
-                        <span className="text-muted-foreground text-xs">{e.involvedObject}</span>
-                        {e.count > 1 && (
-                          <Badge variant="outline" className="text-2xs">
-                            ×{e.count}
-                          </Badge>
-                        )}
-                        <span className="text-muted-foreground ml-auto text-xs">
-                          {e.lastSeen ? fmt.formatDateTime(e.lastSeen) : "—"}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{e.message}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </div>
+        <div>
+          <h3 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
+            Recent warnings
+          </h3>
+          {events.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No recent warning events. (A green Live health state is the expected baseline.)
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {events.map((e, i) => (
+                <li
+                  key={`${e.namespace}-${e.name}-${i}`}
+                  className="border-border min-w-0 rounded-md border p-2 text-sm"
+                >
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                    <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+                      {e.reason}
+                    </code>
+                    <span className="text-muted-foreground min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+                      {e.involvedObject}
+                    </span>
+                    {e.count > 1 && (
+                      <Badge variant="outline" className="text-2xs font-mono">
+                        ×{e.count}
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground ml-auto font-mono text-xs">
+                      {e.lastSeen ? fmt.formatDateTime(e.lastSeen) : "—"}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground mt-1 line-clamp-2 text-xs [overflow-wrap:anywhere]">
+                    {e.message}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </StatusPanel>
   );
 }
 
@@ -135,7 +158,12 @@ function HealthLiveCard({ pods, events, loading }: ReturnType<typeof useClusterH
 // "which workload is red" and lets the operator triage without
 // clicking through to ``kubectl`` / a dashboard.
 
-function HealthWorkloadCard({ rows, loading }: ReturnType<typeof useClusterWorkloadHealth>) {
+function HealthWorkloadCard({
+  rows,
+  loading,
+  error,
+  refetch,
+}: ReturnType<typeof useClusterWorkloadHealth>) {
   const fmt = useFormatters();
 
   // Sort by readiness deficit, descending — most-broken first. The
@@ -152,84 +180,95 @@ function HealthWorkloadCard({ rows, loading }: ReturnType<typeof useClusterWorkl
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Workload health</CardTitle>
-        <CardDescription>
+    <StatusPanel
+      icon={<ServerIcon className="size-4" />}
+      title="Workload health"
+      description={
+        <>
           Per-Deployment readiness + 24h restart counts across the platform&apos;s managed
           namespaces. Sorted most-broken first; polls every 30s.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading && rows.length === 0 ? (
-          <Skeleton className="h-24 w-full" />
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No workload data available — the driver couldn&apos;t reach the apiserver, or no
-            Deployments are running in the platform&apos;s managed namespaces yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground text-xs tracking-wide uppercase">
-                <tr className="border-border border-b">
-                  <th className="py-2 pr-3 text-left font-medium">Workload</th>
-                  <th className="py-2 pr-3 text-left font-medium">Namespace</th>
-                  <th className="py-2 pr-3 text-right font-medium">Ready / desired</th>
-                  <th className="py-2 pr-3 text-right font-medium">Restarts 24h</th>
-                  <th className="py-2 pr-0 text-right font-medium">Last deploy</th>
+        </>
+      }
+      loading={loading && rows.length === 0}
+      skeleton={<Skeleton className="h-24 w-full" />}
+      error={rows.length === 0 ? error : null}
+      onRetry={refetch}
+      empty={
+        rows.length === 0
+          ? {
+              icon: <ServerOffIcon className="size-5" />,
+              title: "No workload data available",
+              description:
+                "The driver couldn't reach the apiserver, or no Deployments are running in the platform's managed namespaces yet.",
+            }
+          : null
+      }
+    >
+      <div className="min-w-0 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-muted-foreground text-xs tracking-wide uppercase">
+            <tr className="border-border border-b">
+              <th className="py-2 pr-3 text-left font-medium">Workload</th>
+              <th className="py-2 pr-3 text-left font-medium">Namespace</th>
+              <th className="py-2 pr-3 text-right font-medium">Ready / desired</th>
+              <th className="py-2 pr-3 text-right font-medium">Restarts 24h</th>
+              <th className="py-2 pr-0 text-right font-medium">Last deploy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => {
+              const deficit = row.desiredReplicas - row.readyReplicas;
+              const readyTone =
+                deficit === 0
+                  ? "text-success-fg"
+                  : deficit === row.desiredReplicas
+                    ? "text-destructive"
+                    : "text-warning-fg";
+              const restartsTone =
+                row.restartCount24h === 0
+                  ? "text-muted-foreground"
+                  : row.restartCount24h < 5
+                    ? "text-warning-fg"
+                    : "text-destructive";
+              return (
+                <tr
+                  key={`${row.namespace}-${row.workloadName}`}
+                  className="border-border/50 border-b last:border-b-0"
+                >
+                  <td className="max-w-80 py-2 pr-3">
+                    <code className="font-mono text-xs [overflow-wrap:anywhere]">
+                      {row.workloadName}
+                    </code>
+                  </td>
+                  <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                    {row.namespace}
+                  </td>
+                  <td
+                    className={
+                      "py-2 pr-3 text-right font-mono whitespace-nowrap tabular-nums " + readyTone
+                    }
+                  >
+                    {row.readyReplicas} / {row.desiredReplicas}
+                  </td>
+                  <td className={"py-2 pr-3 text-right font-mono tabular-nums " + restartsTone}>
+                    {row.restartCount24h}
+                  </td>
+                  <td className="text-muted-foreground py-2 pr-0 text-right font-mono text-xs whitespace-nowrap">
+                    {row.lastImageDeployedAt ? (
+                      <span className="inline-flex items-center gap-1">
+                        <RocketIcon className="size-3" />
+                        {fmt.formatDateTime(row.lastImageDeployedAt)}
+                      </span>
+                    ) : (
+                      <span className="opacity-60">never</span>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {sorted.map((row) => {
-                  const deficit = row.desiredReplicas - row.readyReplicas;
-                  const readyTone =
-                    deficit === 0
-                      ? "text-success-fg"
-                      : deficit === row.desiredReplicas
-                        ? "text-destructive"
-                        : "text-warning-fg";
-                  const restartsTone =
-                    row.restartCount24h === 0
-                      ? "text-muted-foreground"
-                      : row.restartCount24h < 5
-                        ? "text-warning-fg"
-                        : "text-destructive";
-                  return (
-                    <tr
-                      key={`${row.namespace}-${row.workloadName}`}
-                      className="border-border/50 border-b last:border-b-0"
-                    >
-                      <td className="py-2 pr-3">
-                        <code className="font-mono text-xs">{row.workloadName}</code>
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
-                        {row.namespace}
-                      </td>
-                      <td className={"py-2 pr-3 text-right tabular-nums " + readyTone}>
-                        {row.readyReplicas} / {row.desiredReplicas}
-                      </td>
-                      <td className={"py-2 pr-3 text-right tabular-nums " + restartsTone}>
-                        {row.restartCount24h}
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-0 text-right text-xs">
-                        {row.lastImageDeployedAt ? (
-                          <span className="inline-flex items-center gap-1">
-                            <RocketIcon className="size-3" />
-                            {fmt.formatDateTime(row.lastImageDeployedAt)}
-                          </span>
-                        ) : (
-                          <span className="opacity-60">never</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </StatusPanel>
   );
 }

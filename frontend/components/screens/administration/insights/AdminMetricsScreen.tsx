@@ -1,14 +1,21 @@
 "use client";
 
-import { ActivityIcon, ServerIcon, ServerOffIcon, WifiOffIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  ServerIcon,
+  ServerOffIcon,
+  WifiOffIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { AdministrationShell } from "@/components/screens/administration/organization/AdministrationShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   clusterOfflineMessage,
@@ -43,15 +50,29 @@ export function AdminMetricsScreen({
   win,
   clusters,
   loading,
+  error,
+  onRetry,
   renderLivePanels,
 }: AdminMetricsScreenProps) {
   return (
-    <PageShell
+    <AdministrationShell
+      fnKey="metrics"
       title="Platform metrics"
       description="Fleet health, in-cluster Prometheus saturation, and cloud-provider system metrics across your organization's clusters."
-      actions={<WindowSelector value={windowLabel} onChange={onWindowChange} />}
+      primaryAction={<WindowSelector value={windowLabel} onChange={onWindowChange} />}
     >
-      {loading && clusters.length === 0 ? (
+      {error && clusters.length === 0 ? (
+        <EmptyState
+          icon={<AlertTriangleIcon className="text-danger size-5" />}
+          title="Could not load clusters"
+          description={error.message}
+          secondary={
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        />
+      ) : loading && clusters.length === 0 ? (
         <div className="space-y-4">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -65,14 +86,23 @@ export function AdminMetricsScreen({
           actionLabel="Open clusters"
         />
       ) : (
-        <div className="space-y-6">
-          <FleetSummary clusters={clusters} />
-          {clusters.map((c) => (
-            <ClusterSection key={c.id} cluster={c} win={win} renderLivePanels={renderLivePanels} />
-          ))}
+        <div className="flex min-w-0 flex-col gap-8">
+          <Section title="Fleet">
+            <FleetSummary clusters={clusters} />
+          </Section>
+          <Section title="Clusters">
+            {clusters.map((c) => (
+              <ClusterSection
+                key={c.id}
+                cluster={c}
+                win={win}
+                renderLivePanels={renderLivePanels}
+              />
+            ))}
+          </Section>
         </div>
       )}
-    </PageShell>
+    </AdministrationShell>
   );
 }
 
@@ -93,14 +123,16 @@ function FleetSummary({ clusters }: { clusters: MetricsCluster[] }) {
   ];
 
   return (
-    <Card className="!rounded-none shadow-md">
+    <Card>
       <CardContent className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
         {tiles.map((t) => (
-          <div key={t.label} className="space-y-1">
+          <div key={t.label} className="min-w-0 space-y-1">
             <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
               {t.label}
             </p>
-            <p className={`text-2xl font-semibold tabular-nums ${TONE_COLORS[t.tone].text}`}>
+            <p
+              className={`font-mono text-2xl font-semibold tabular-nums ${TONE_COLORS[t.tone].text}`}
+            >
               {t.value}
             </p>
           </div>
@@ -130,18 +162,24 @@ function ClusterSection({
   const p = heartbeatPresentation(cluster.heartbeatStatus);
 
   return (
-    <Card className="!rounded-none shadow-md">
+    <Card className="min-w-0">
       <CardHeader className="px-4 pt-4 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <ServerIcon className="text-muted-foreground size-4" />
-          <CardTitle className="text-sm font-semibold">{cluster.name}</CardTitle>
-          <span className="text-muted-foreground font-mono text-xs">{cluster.slug}</span>
-          <Badge variant="secondary">{cluster.providerPluginSlug}</Badge>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <ServerIcon className="text-muted-foreground size-4 shrink-0" />
+          <CardTitle className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
+            {cluster.name}
+          </CardTitle>
+          <span className="text-muted-foreground min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
+            {cluster.slug}
+          </span>
+          <Badge variant="secondary" className="max-w-full font-mono whitespace-normal">
+            {cluster.providerPluginSlug}
+          </Badge>
           {cluster.region && (
-            <span className="text-muted-foreground text-xs">{cluster.region}</span>
+            <span className="text-muted-foreground font-mono text-xs">{cluster.region}</span>
           )}
           <span
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${p.pill}`}
+            className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${p.pill}`}
           >
             {live ? (
               <ActivityIcon className="size-3" />
@@ -154,14 +192,16 @@ function ClusterSection({
           </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6 px-4 pb-4">
+      <CardContent className="min-w-0 space-y-6 px-4 pb-4">
         {live ? (
           renderLivePanels(cluster, win)
         ) : (
           <div className="border-border/70 text-muted-foreground flex items-start gap-3 rounded-md border border-dashed px-3 py-4 text-sm">
             <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
-            <div className="space-y-1">
-              <p>{clusterOfflineMessage(cluster.heartbeatStatus, cluster.heartbeatAgeSeconds)}</p>
+            <div className="min-w-0 space-y-1">
+              <p className="[overflow-wrap:anywhere]">
+                {clusterOfflineMessage(cluster.heartbeatStatus, cluster.heartbeatAgeSeconds)}
+              </p>
               <Link
                 href={`/clusters/${cluster.slug}/status`}
                 className="text-primary inline-block text-xs underline-offset-4 hover:underline"
@@ -191,7 +231,7 @@ function WindowSelector({
           key={w.label}
           variant={value === w.label ? "default" : "ghost"}
           size="sm"
-          className="h-7 px-3 text-xs"
+          className="h-7 px-3 font-mono text-xs"
           onClick={() => onChange(w.label)}
         >
           {w.label}

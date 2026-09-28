@@ -5,41 +5,25 @@ import {
   CheckCircleIcon,
   LayersIcon,
   Loader2Icon,
-  MoreHorizontalIcon,
   PlayIcon,
   PlusIcon,
   RefreshCcwIcon,
-  SearchXIcon,
   Trash2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import {
-  DataTable,
-  DataTablePagination,
-  DataTableToolbar,
-  type Column,
-  type EmptyStateSpec,
-} from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import type { Column, EmptyStateSpec } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { StatusDot } from "@/components/StatusDot";
-import { ViewToggle } from "@/components/ViewToggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
-import { useViewToggle } from "@/hooks/use-view-toggle";
 import {
   formatHeartbeatAge,
   heartbeatPresentation,
@@ -48,23 +32,24 @@ import {
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
-import type { ClusterRow, useClustersList } from "./use-clusters-list";
+import { clusterCrumbs, LIFECYCLE_LABEL, type Lifecycle, providerLabel } from "./clusters-list";
+import type { ClusterActions } from "./use-cluster-actions";
+import type { ClusterRow } from "./use-clusters-list";
 
-/** The localStorage key the card/list preference persists under. */
-export const CLUSTERS_VIEW_KEY = "astrolift_view_clusters";
-
-/** The register sheet, rendered by the caller so its queries stay out of this view. */
-export interface RegisterDialogSlotProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export type ClustersListProps = ReturnType<typeof useClustersList> & {
-  renderRegisterDialog: (props: RegisterDialogSlotProps) => React.ReactNode;
+export type ClustersListProps = ClusterActions & {
+  list: ListStateController;
+  /** The page on screen, already filtered, sorted and sliced. */
+  rows: ClusterRow[];
+  /** Clusters matching the view, filters and search, across all pages. */
+  totalCount: number;
+  loading: boolean;
+  stale: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+  /** The register flow: a page, since it asks for more than three fields (spec 44 §5.4). */
+  registerHref: string;
 };
 
-// Both views render the same two empty states, so the copy lives in one
-// place: switching card ↔ list must not change what the operator is told.
 const EMPTY: EmptyStateSpec = {
   icon: <LayersIcon className="size-5" />,
   title: "No clusters registered",
@@ -74,59 +59,28 @@ const EMPTY: EmptyStateSpec = {
   learnMoreLabel: "Cluster prerequisites",
 };
 
-const EMPTY_FILTERED = {
-  title: "No matching clusters",
-  description:
-    "No cluster matches that search. The server matches the cluster name, slug, endpoint, region and provider — try another term, or clear the search to see the whole fleet.",
-};
-
 // The row's link is an ::after overlay stretched across the whole row, and
 // it paints above any cell that isn't lifted out of its way — a tooltip
-// trigger or a button underneath it never receives the pointer. Anything
-// interactive in a later cell carries this.
+// trigger underneath it never receives the pointer.
 const ABOVE_ROW_LINK = "relative z-10";
 
-type Lifecycle = "registered" | "managing" | "managed" | "error";
+const LIFECYCLE_BADGE: Record<
+  Lifecycle,
+  { variant: "default" | "secondary" | "outline" | "destructive"; icon: React.ReactNode }
+> = {
+  registered: { variant: "outline", icon: <LayersIcon className="size-3" /> },
+  managing: { variant: "secondary", icon: <Loader2Icon className="size-3 animate-spin" /> },
+  managed: { variant: "default", icon: <CheckCircleIcon className="size-3" /> },
+  error: { variant: "destructive", icon: <AlertTriangleIcon className="size-3" /> },
+};
 
-function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: string }) {
-  // The lifecycle badge is the single most informative cell in the row
-  // — semantic color and icon convey state without forcing the operator
-  // to read the slug. Tooltip carries the error message on the error
-  // state so the operator can fix without leaving the list.
-  const presentation: Record<
-    Lifecycle,
-    {
-      label: string;
-      variant: "default" | "secondary" | "outline" | "destructive";
-      icon: React.ReactNode;
-    }
-  > = {
-    registered: {
-      label: "Registered",
-      variant: "outline",
-      icon: <LayersIcon className="size-3" />,
-    },
-    managing: {
-      label: "Managing…",
-      variant: "secondary",
-      icon: <Loader2Icon className="size-3 animate-spin" />,
-    },
-    managed: {
-      label: "Managed",
-      variant: "default",
-      icon: <CheckCircleIcon className="size-3" />,
-    },
-    error: {
-      label: "Error",
-      variant: "destructive",
-      icon: <AlertTriangleIcon className="size-3" />,
-    },
-  };
-  const p = presentation[lifecycle];
+/** The lifecycle badge; on error its tooltip carries the failure, so it can be fixed from the list. */
+export function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: string }) {
+  const p = LIFECYCLE_BADGE[lifecycle] ?? LIFECYCLE_BADGE.registered;
   const badge = (
     <Badge variant={p.variant} className="gap-1">
       {p.icon}
-      {p.label}
+      {LIFECYCLE_LABEL[lifecycle] ?? lifecycle}
     </Badge>
   );
   if (lifecycle === "error" && error) {
@@ -135,19 +89,18 @@ function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: st
         <TooltipTrigger asChild>
           <span>{badge}</span>
         </TooltipTrigger>
-        <TooltipContent className="max-w-sm text-xs whitespace-pre-wrap">{error}</TooltipContent>
+        <TooltipContent className="max-w-sm text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+          {error}
+        </TooltipContent>
       </Tooltip>
     );
   }
   return badge;
 }
 
-// Live keep-alive status pill (#808). Driven by the heartbeat-derived
-// status the backend computes; the tooltip carries the last-seen cue
-// so an operator sees "Offline · last seen 12m ago" without leaving the
-// list. Renders nothing meaningful for a cluster with no agent yet —
-// "No agent" is the honest state, distinct from "Offline".
-function HeartbeatBadge({
+// Live keep-alive status pill (#808). "No agent" is the honest state for a
+// cluster whose agent never reported, distinct from "Offline".
+export function HeartbeatBadge({
   status,
   ageSeconds,
 }: {
@@ -157,14 +110,6 @@ function HeartbeatBadge({
   const s = status ?? "never_seen";
   const p = heartbeatPresentation(s);
   const age = formatHeartbeatAge(ageSeconds ?? null);
-  const badge = (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${p.pill}`}
-    >
-      <StatusDot status={p.dot} />
-      {p.label}
-    </span>
-  );
   const tip =
     s === "never_seen"
       ? "No keep-alive agent has reported yet"
@@ -174,189 +119,151 @@ function HeartbeatBadge({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span>{badge}</span>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs",
+            p.pill
+          )}
+        >
+          <StatusDot status={p.dot} />
+          {p.label}
+        </span>
       </TooltipTrigger>
-      <TooltipContent className="text-xs">{tip}</TooltipContent>
+      <TooltipContent className="font-mono text-xs">{tip}</TooltipContent>
     </Tooltip>
   );
 }
 
-/**
- * /clusters: the fleet as a card grid or a table, both reading one cursor
- * walk. Pure view; the data half is useClustersList.
- */
-export function ClustersList({
-  table,
-  deleting,
-  bringing,
-  refreshing,
-  onUnregister,
-  onBring,
-  onRefresh,
-  renderRegisterDialog,
-}: ClustersListProps) {
-  const fmt = useFormatters();
-  const [viewMode, setViewMode] = useViewToggle(CLUSTERS_VIEW_KEY, "card");
-  const [open, setOpen] = React.useState(false);
-  const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
-    null
-  );
+interface LifecycleAction {
+  label: string;
+  icon: React.ReactNode;
+  run: () => void;
+  disabled: boolean;
+  variant: "default" | "outline";
+}
 
-  // The register dialog refetches LIST_CLUSTERS, which is a different root
-  // field from the page this surface walks, so a newly registered cluster
-  // would not appear until a navigation. Refetch the walk when it closes.
-  function handleRegisterOpenChange(next: boolean) {
-    setOpen(next);
-    if (!next) table.refetch();
-  }
-
-  // Action descriptors. Each lifecycle resolves to one primary action
-  // (managing has none — workflow is in flight). Reused by both the
-  // md:+ inline button and the <md dropdown so the operator gets the
-  // same affordances regardless of viewport.
-  interface PrimaryAction {
-    label: string;
-    icon: React.ReactNode;
-    onSelect: () => void;
-    disabled?: boolean;
-    variant?: "default" | "outline";
-  }
-
-  function primaryAction(c: AstroliftTenantCluster): PrimaryAction | null {
-    const lifecycle = c.lifecycle as Lifecycle;
-    if (lifecycle === "managing") return null;
-    if (lifecycle === "managed") {
+/** The one lifecycle action a cluster offers; none while a workflow is in flight. */
+export function lifecycleAction(
+  c: AstroliftTenantCluster,
+  { bringing, refreshing, onBring, onRefresh }: ClusterActions
+): LifecycleAction | null {
+  switch (c.lifecycle as Lifecycle) {
+    case "managing":
+      return null;
+    case "managed":
       return {
         label: "Refresh setup",
         icon: <RefreshCcwIcon className="size-4" />,
-        onSelect: () => onRefresh(c, false),
+        run: () => void onRefresh(c, false),
         disabled: refreshing,
         variant: "outline",
       };
-    }
-    if (lifecycle === "error") {
+    case "error":
       return {
         label: "Retry",
         icon: <PlayIcon className="size-4" />,
-        onSelect: () => onBring(c),
+        run: () => void onBring(c),
         disabled: bringing,
         variant: "outline",
       };
-    }
-    return {
-      label: "Bring into management",
-      icon: <PlayIcon className="size-4" />,
-      onSelect: () => onBring(c),
-      disabled: bringing,
-      variant: "default",
-    };
+    default:
+      return {
+        label: "Bring into management",
+        icon: <PlayIcon className="size-4" />,
+        run: () => void onBring(c),
+        disabled: bringing,
+        variant: "default",
+      };
   }
+}
 
-  // Compact mobile-only action menu — below md: the desktop button
-  // row would wrap awkwardly. The dropdown stacks the lifecycle-
-  // appropriate primary action above Unregister and reuses the same
-  // handler closures so behavior is identical. The trigger is a single
-  // 3-dot icon button (44px tap target via size="icon" + size-9) so it
-  // doesn't compete with the lifecycle badge for row real estate.
-  function renderRowMenu(c: AstroliftTenantCluster) {
-    const lifecycle = c.lifecycle as Lifecycle;
-    const action = primaryAction(c);
-    const busy = bringing || refreshing || deleting;
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            disabled={lifecycle === "managing" && !action}
-          >
-            <MoreHorizontalIcon className="size-4" />
-            <span className="sr-only">Cluster actions</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {lifecycle === "managing" && (
-            <DropdownMenuItem disabled>
-              <Loader2Icon className="size-4 animate-spin" />
-              Setup in progress…
-            </DropdownMenuItem>
-          )}
-          {action && (
-            <Can permission="cluster.manage">
-              <DropdownMenuItem onSelect={action.onSelect} disabled={action.disabled || busy}>
-                {action.icon}
-                {action.label}
-              </DropdownMenuItem>
-            </Can>
-          )}
-          <Can permission="cluster.unregister">
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => setUnregisterTarget(c)}
-              disabled={busy}
-            >
-              <Trash2Icon className="size-4" />
-              Unregister
-            </DropdownMenuItem>
-          </Can>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
+function ClusterCard(c: ClusterRow) {
+  return (
+    <div className="bg-card hover:bg-accent/30 flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-semibold" title={c.name}>
+            {c.name}
+          </div>
+          <div className="text-muted-foreground truncate font-mono text-xs" title={c.slug}>
+            {c.slug}
+          </div>
+        </div>
+        <StatusDot status={c.isActive ? "ok" : "muted"} className="mt-1.5" />
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+        <HeartbeatBadge status={c.heartbeatStatus} ageSeconds={c.heartbeatAgeSeconds} />
+        <Badge variant="outline" className="max-w-full min-w-0 truncate font-mono">
+          {c.providerPluginSlug}
+        </Badge>
+        <Badge variant="secondary" className="max-w-full min-w-0 truncate font-mono">
+          {c.region || "—"}
+        </Badge>
+        <Badge variant="outline" className="max-w-full min-w-0 truncate font-mono">
+          {c.ingressClass}
+        </Badge>
+      </div>
+    </div>
+  );
+}
 
-  function renderActionButton(c: AstroliftTenantCluster) {
-    const lifecycle = c.lifecycle as Lifecycle;
-    if (lifecycle === "managing") {
-      return (
-        <Button size="sm" variant="ghost" disabled>
-          <Loader2Icon className="size-4 animate-spin" />
-          Setup in progress…
-        </Button>
-      );
-    }
-    const action = primaryAction(c);
-    if (!action) return null;
-    return (
-      <Can permission="cluster.manage">
-        <Button
-          size="sm"
-          variant={action.variant === "outline" ? "outline" : undefined}
-          onClick={action.onSelect}
-          disabled={action.disabled}
-        >
-          {action.icon}
-          {action.label}
-        </Button>
-      </Can>
-    );
-  }
+/**
+ * Admin › Clusters (spec 44 §5.1): the fleet on the shared list, views All ·
+ * Mine · Offline, provider and status filters, numbered pages, list or
+ * cards. Pure view; the data half is useClustersList.
+ */
+export function ClustersList(props: ClustersListProps) {
+  const {
+    list,
+    rows,
+    totalCount,
+    loading,
+    stale,
+    error,
+    onRetry,
+    registerHref,
+    deleting,
+    bringing,
+    refreshing,
+    onUnregister,
+  } = props;
+  const fmt = useFormatters();
+  const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
+    null
+  );
+  const busy = bringing || refreshing || deleting;
 
   const columns: Column<ClusterRow>[] = [
     {
       id: "cluster",
       header: "Cluster",
-      // The active dot folds into this cell rather than sitting in a
-      // column of its own: the first column carries the row link, and a
-      // link whose only content is a coloured dot has no accessible name.
+      sortKey: "name",
+      cellClassName: "max-w-80",
+      // The active dot folds into this cell: the first column carries the
+      // row link, and a link whose only content is a dot has no name.
       cell: (c) => (
-        <span className="flex items-start gap-2">
-          <StatusDot status={c.isActive ? "ok" : "muted"} className="mt-1.5 shrink-0" />
-          <span className="block">
-            <span className="block font-medium">{c.name}</span>
-            <span className="text-muted-foreground block font-mono text-xs">{c.slug}</span>
+        <span className="flex min-w-0 items-start gap-2">
+          <StatusDot status={c.isActive ? "ok" : "muted"} className="mt-1.5" />
+          <span className="block min-w-0">
+            <span className="block truncate font-medium" title={c.name}>
+              {c.name}
+            </span>
+            <span className="text-muted-foreground block truncate font-mono text-xs" title={c.slug}>
+              {c.slug}
+            </span>
           </span>
         </span>
       ),
     },
     {
-      id: "lifecycle",
-      header: "Lifecycle",
+      id: "status",
+      header: "Status",
+      sortKey: "status",
       cell: (c) => (
         <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
           <LifecycleBadge
             lifecycle={(c.lifecycle as Lifecycle) ?? "registered"}
-            error={c.lastManagementError ?? undefined}
+            error={c.lastManagementError || undefined}
           />
         </span>
       ),
@@ -364,23 +271,38 @@ export function ClustersList({
     {
       id: "provider",
       header: "Provider",
-      cell: (c) => <Badge variant="outline">{c.providerPluginSlug}</Badge>,
+      sortKey: "provider",
+      cell: (c) => (
+        <Badge variant="outline" className="font-mono" title={providerLabel(c.providerPluginSlug)}>
+          {c.providerPluginSlug}
+        </Badge>
+      ),
     },
     {
       id: "region",
       header: "Region",
-      cellClassName: "font-mono text-xs",
-      cell: (c) => c.region || "—",
+      sortKey: "region",
+      cellClassName: "max-w-48",
+      cell: (c) => (
+        <span className="block min-w-0 truncate font-mono text-xs" title={c.region}>
+          {c.region || "—"}
+        </span>
+      ),
     },
     {
       id: "ingress",
       header: "Ingress",
-      cellClassName: "font-mono text-xs",
-      cell: (c) => c.ingressClass,
+      cellClassName: "max-w-48",
+      cell: (c) => (
+        <span className="block min-w-0 truncate font-mono text-xs" title={c.ingressClass}>
+          {c.ingressClass}
+        </span>
+      ),
     },
     {
       id: "live",
       header: "Live",
+      sortKey: "live",
       cell: (c) => (
         <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
           <HeartbeatBadge status={c.heartbeatStatus} ageSeconds={c.heartbeatAgeSeconds} />
@@ -390,175 +312,80 @@ export function ClustersList({
     {
       id: "lastProbe",
       header: "Last probe",
-      cellClassName: "text-muted-foreground text-sm",
-      cell: (c) => (c.capabilitiesProbedAt ? fmt.formatDateTime(c.capabilitiesProbedAt) : "never"),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
+      sortKey: "lastProbe",
       cell: (c) => (
-        <div className={cn(ABOVE_ROW_LINK, "flex items-center justify-end")}>
-          <div className="hidden items-center justify-end gap-2 md:flex">
-            {renderActionButton(c)}
-            <Can permission="cluster.unregister">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setUnregisterTarget(c)}
-                disabled={deleting}
-              >
-                <Trash2Icon className="size-4" />
-                <span className="sr-only">Unregister</span>
-              </Button>
-            </Can>
-          </div>
-          <div className="flex items-center justify-end md:hidden">{renderRowMenu(c)}</div>
-        </div>
+        <span className="text-muted-foreground font-mono text-xs">
+          {c.capabilitiesProbedAt ? fmt.formatDateTime(c.capabilitiesProbedAt) : "never"}
+        </span>
       ),
     },
   ];
 
-  // The card grid is a real view, not decoration, so it reads its rows
-  // from the same controller the table does: search, page size and the
-  // cursor walk apply identically in both modes. DataTable owns the four
-  // states for the list view; the grid renders them itself, with the same
-  // copy, so switching modes never changes what the operator is told.
-  const cardBody = (() => {
-    switch (table.state) {
-      case "loading":
-        // Skeleton cards, not a floating skeleton block: the placeholders
-        // stand in the grid the cards will occupy, so nothing reflows when
-        // the rows land.
-        return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={`skeleton-${i}`}>
-                <CardContent className="flex flex-col gap-3 p-5">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-3 w-24" />
-                  <div className="flex flex-wrap gap-2">
-                    <Skeleton className="h-5 w-24 rounded-full" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                    <Skeleton className="h-5 w-20 rounded-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        );
-
-      case "error":
-        return (
-          <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
-            <AlertTriangleIcon className="text-danger size-5" />
-            <div>
-              <p className="font-medium">Could not load clusters</p>
-              <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                {table.error?.message ?? "The request failed."}
-              </p>
-            </div>
-            <Button size="sm" variant="outline" onClick={table.retry}>
-              Retry
-            </Button>
-          </div>
-        );
-
-      case "emptyFiltered":
-        return (
-          <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
-            <SearchXIcon className="text-muted-foreground size-5" />
-            <div>
-              <p className="font-medium">{EMPTY_FILTERED.title}</p>
-              <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                {EMPTY_FILTERED.description}
-              </p>
-            </div>
-            <Button size="sm" variant="outline" onClick={table.clearFilters}>
-              Clear search
-            </Button>
-          </div>
-        );
-
-      case "empty":
-        return <EmptyState {...EMPTY} />;
-
-      case "ready":
-        return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {table.rows.map((c) => (
-              <a key={c.id} href={`/clusters/${c.slug}`} className="block">
-                <Card className="hover:bg-accent/30 transition-colors">
-                  <CardContent className="flex flex-col gap-3 p-5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold">{c.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">{c.slug}</div>
-                      </div>
-                      <StatusDot status={c.isActive ? "ok" : "muted"} />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <HeartbeatBadge
-                        status={c.heartbeatStatus}
-                        ageSeconds={c.heartbeatAgeSeconds}
-                      />
-                      <Badge variant="outline">{c.providerPluginSlug}</Badge>
-                      <Badge variant="secondary">{c.region || "—"}</Badge>
-                      <Badge variant="outline">{c.ingressClass}</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </a>
-            ))}
-          </div>
-        );
-    }
-  })();
+  function rowActions(c: ClusterRow) {
+    const action = lifecycleAction(c, props);
+    return (
+      <>
+        {c.lifecycle === "managing" && (
+          <DropdownMenuItem disabled>
+            <Loader2Icon className="size-4 animate-spin" />
+            Setup in progress…
+          </DropdownMenuItem>
+        )}
+        {action && (
+          <Can permission="cluster.manage">
+            <DropdownMenuItem onSelect={action.run} disabled={action.disabled || busy}>
+              {action.icon}
+              {action.label}
+            </DropdownMenuItem>
+          </Can>
+        )}
+        <Can permission="cluster.unregister">
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setUnregisterTarget(c)}
+            disabled={busy}
+          >
+            <Trash2Icon className="size-4" />
+            Unregister
+          </DropdownMenuItem>
+        </Can>
+      </>
+    );
+  }
 
   return (
-    <PageShell
-      title="Clusters"
-      description="Tenant Kubernetes clusters registered with the platform. Register a cluster to record its metadata, then click Bring into management when its prereqs (cert-manager, ingress controller) are installed."
-      actions={
-        <div className="flex items-center gap-2">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-          <Can permission="cluster.register">
-            <Button onClick={() => setOpen(true)}>
-              <PlusIcon className="size-4" />
-              Register cluster
-            </Button>
-          </Can>
-        </div>
-      }
-    >
-      {viewMode === "card" ? (
-        <div className="flex flex-col gap-3">
-          <DataTableToolbar controller={table} searchPlaceholder="Search clusters..." />
-          {/* Rows persist across a refetch rather than blanking, so fade
-              them while they answer the previous question — the same cue
-              DataTable gives the list view. */}
-          <div
-            className={cn("transition-opacity", table.isStale && "opacity-60")}
-            aria-busy={table.isStale || undefined}
-          >
-            {cardBody}
-          </div>
-          <DataTablePagination controller={table} />
-        </div>
-      ) : (
-        <DataTable
-          label="Clusters"
-          controller={table}
-          columns={columns}
-          getRowId={(c) => c.id}
-          rowHref={(c) => `/clusters/${c.slug}`}
-          searchPlaceholder="Search clusters..."
-          empty={EMPTY}
-          emptyFiltered={EMPTY_FILTERED}
-        />
-      )}
-
-      {renderRegisterDialog({ open, onOpenChange: handleRegisterOpenChange })}
+    <>
+      <ListPage<ClusterRow>
+        header={{
+          crumbs: clusterCrumbs(),
+          title: "Clusters",
+          primaryAction: (
+            <Can permission="cluster.register">
+              <Button size="sm" asChild>
+                <Link href={registerHref}>
+                  <PlusIcon className="size-4" />
+                  Register cluster
+                </Link>
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
+        label="Clusters"
+        columns={columns}
+        rows={rows}
+        getRowId={(c) => c.id}
+        rowHref={(c) => `/clusters/${c.slug}`}
+        rowActions={rowActions}
+        renderCard={ClusterCard}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        // No create action here: it would show to viewers without cluster.register.
+        empty={EMPTY}
+        totalCount={totalCount}
+      />
 
       <ConfirmDialog
         open={unregisterTarget !== null}
@@ -575,6 +402,6 @@ export function ClustersList({
           if (unregisterTarget) await onUnregister(unregisterTarget);
         }}
       />
-    </PageShell>
+    </>
   );
 }

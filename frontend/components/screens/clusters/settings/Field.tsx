@@ -11,9 +11,11 @@ export function Field({
   mono?: boolean;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
-      <dd className={mono ? "font-mono text-sm break-all" : "text-sm"}>{value}</dd>
+      <dd className={mono ? "font-mono text-sm break-all" : "text-sm [overflow-wrap:anywhere]"}>
+        {value}
+      </dd>
     </div>
   );
 }

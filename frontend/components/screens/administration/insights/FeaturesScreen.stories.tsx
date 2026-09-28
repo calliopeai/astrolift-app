@@ -50,3 +50,24 @@ export const Error: Story = {
 };
 
 export const LongStrings: Story = { render: () => <FeaturesScreen {...FEATURES_LONG} /> };
+
+/** The inventory query failed: the error sits in the page with a Retry. */
+export const QueryError: Story = {
+  render: () => (
+    <FeaturesScreen
+      {...FEATURES}
+      runtimeFlags={[]}
+      buildTimeFeatures={[]}
+      error={new globalThis.Error("Network error: the Astrolift API did not answer.")}
+    />
+  ),
+};
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <FeaturesScreen {...FEATURES_LONG} />
+    </div>
+  ),
+};

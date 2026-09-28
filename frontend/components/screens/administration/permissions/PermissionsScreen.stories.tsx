@@ -1,18 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+import { useLocalListState } from "@/components/list/use-list-state";
 
+import { assignmentsProps, diagnosticsProps, rolesProps } from "./fixtures";
 import { AssignmentsView } from "./AssignmentsView";
-import {
-  LONG_BINDINGS,
-  LONG_PERMISSIONS,
-  LONG_ROLE,
-  ROLES,
-  assignmentsProps,
-  diagnosticsProps,
-  rolesProps,
-} from "./fixtures";
+import { ASSIGNMENTS_LIST, ROLES_LIST } from "./permissions-lists";
 import { PermissionsDiagnosticsView } from "./PermissionsDiagnosticsView";
 import { PermissionsScreen } from "./PermissionsScreen";
 import { RolesView } from "./RolesView";
@@ -25,98 +17,53 @@ export default meta;
 
 type Story = StoryObj;
 
-const rolesTable = (patch: Parameters<typeof fakeController<AstroliftRole>>[0]) =>
-  fakeController<AstroliftRole>({ sort: undefined, sortEnabled: false, ...patch });
-const bindingsTable = (patch: Parameters<typeof fakeController<AstroliftRoleBinding>>[0]) =>
-  fakeController<AstroliftRoleBinding>({ sort: undefined, sortEnabled: false, ...patch });
+function Roles() {
+  return <RolesView list={useLocalListState(ROLES_LIST)} {...rolesProps()} />;
+}
+function Assignments() {
+  return <AssignmentsView list={useLocalListState(ASSIGNMENTS_LIST)} {...assignmentsProps()} />;
+}
 
-const full = {
-  roles: <RolesView {...rolesProps()} />,
-  assignments: <AssignmentsView {...assignmentsProps()} />,
-  diagnostics: <PermissionsDiagnosticsView {...diagnosticsProps()} />,
+/** The gate open: the page passes through with its own header. */
+export const RolesPage: Story = {
+  render: () => (
+    <PermissionsScreen enabled page="roles">
+      <Roles />
+    </PermissionsScreen>
+  ),
 };
 
-export const Full: Story = { render: () => <PermissionsScreen enabled {...full} /> };
-
-export const AssignmentsTab: Story = {
-  render: () => <PermissionsScreen enabled initialTab="assignments" {...full} />,
+export const AssignmentsPage: Story = {
+  render: () => (
+    <PermissionsScreen enabled page="assignments">
+      <Assignments />
+    </PermissionsScreen>
+  ),
 };
 
-export const DiagnosticsTab: Story = {
-  render: () => <PermissionsScreen enabled initialTab="diagnostics" {...full} />,
+export const DiagnosticsPage: Story = {
+  render: () => (
+    <PermissionsScreen enabled page="diagnostics">
+      <PermissionsDiagnosticsView {...diagnosticsProps()} />
+    </PermissionsScreen>
+  ),
 };
 
-/** `admin.permissions_enabled` is off: the screen says so and mounts no tab. */
+/** `admin.permissions_enabled` is off: the screen says so and mounts nothing. */
 export const TurnedOff: Story = {
-  render: () => <PermissionsScreen enabled={false} {...full} />,
-};
-
-export const Loading: Story = {
   render: () => (
-    <PermissionsScreen
-      enabled
-      roles={<RolesView {...rolesProps({ table: rolesTable({ state: "loading" }) })} />}
-      assignments={full.assignments}
-      diagnostics={full.diagnostics}
-    />
+    <PermissionsScreen enabled={false} page="roles">
+      <Roles />
+    </PermissionsScreen>
   ),
 };
 
-export const Empty: Story = {
+export const TurnedOffWidth768: Story = {
   render: () => (
-    <PermissionsScreen
-      enabled
-      roles={<RolesView {...rolesProps({ table: rolesTable({ state: "empty" }) })} />}
-      assignments={
-        <AssignmentsView {...assignmentsProps({ table: bindingsTable({ state: "empty" }) })} />
-      }
-      diagnostics={
-        <PermissionsDiagnosticsView {...diagnosticsProps({ permissions: [], myBindings: [] })} />
-      }
-    />
-  ),
-};
-
-export const Error: Story = {
-  render: () => (
-    <PermissionsScreen
-      enabled
-      roles={
-        <RolesView
-          {...rolesProps({
-            table: rolesTable({
-              state: "error",
-              error: new globalThis.Error("upstream timed out"),
-            }),
-          })}
-        />
-      }
-      assignments={full.assignments}
-      diagnostics={full.diagnostics}
-    />
-  ),
-};
-
-export const LongStrings: Story = {
-  render: () => (
-    <PermissionsScreen
-      enabled
-      roles={
-        <RolesView
-          {...rolesProps({
-            table: rolesTable({ rows: [LONG_ROLE, ...ROLES], totalCount: 214, hasNext: true }),
-            allPermissions: LONG_PERMISSIONS,
-          })}
-        />
-      }
-      assignments={
-        <AssignmentsView {...assignmentsProps({ table: bindingsTable({ rows: LONG_BINDINGS }) })} />
-      }
-      diagnostics={
-        <PermissionsDiagnosticsView
-          {...diagnosticsProps({ permissions: LONG_PERMISSIONS, myBindings: LONG_BINDINGS })}
-        />
-      }
-    />
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <PermissionsScreen enabled={false} page="assignments">
+        <Assignments />
+      </PermissionsScreen>
+    </div>
   ),
 };

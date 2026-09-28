@@ -45,7 +45,7 @@ import { cn } from "@/lib/utils";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableToolbar } from "./data-table-toolbar";
 import { SortableColumnHeader } from "./sortable-column-header";
-import type { Column, EmptyStateSpec } from "./types";
+import type { Column, EmptyStateSpec, SortState } from "./types";
 import type { CursorTableController } from "./use-cursor-table";
 import type { RowSelection } from "./use-row-selection";
 
@@ -90,6 +90,18 @@ type DataTableBaseProps<TRow> = {
   toolbar?: React.ReactNode;
   /** Extra classes on the row, e.g. to tint a failed one. */
   rowClassName?: (row: TRow) => string | undefined;
+  /**
+   * `"table"` renders the table alone, without the toolbar and pagination:
+   * for `ListPage`, which draws the shared FilterBar and ListPagination
+   * around it (spec 44 §5.1). Default `"full"`.
+   */
+  chrome?: "full" | "table";
+  /**
+   * A multi-key sort, overriding the controller's single key: the ordered
+   * keys, and a toggle that is told whether the click was a shift-click.
+   */
+  sorts?: SortState[];
+  onSortToggle?: (key: string, additive: boolean) => void;
   className?: string;
 };
 
@@ -116,6 +128,9 @@ export function DataTable<TRow>({
   onRowActivate,
   rowLabel,
   rowClassName,
+  chrome = "full",
+  sorts,
+  onSortToggle,
   className,
 }: DataTableProps<TRow>) {
   const { rows, state, error, retry, pageSize, isFiltered, clearFilters } = controller;
@@ -214,7 +229,9 @@ export function DataTable<TRow>({
               )}
             >
               {selection && (
-                <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                // relative z-10: above the row's stretched link, so the box
+                // selects the row instead of opening it.
+                <TableCell className="relative z-10 w-10" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selected}
                     onCheckedChange={() => selection.toggle(id)}
@@ -265,9 +282,11 @@ export function DataTable<TRow>({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <DataTableToolbar controller={controller} searchPlaceholder={searchPlaceholder}>
-        {toolbar}
-      </DataTableToolbar>
+      {chrome === "full" && (
+        <DataTableToolbar controller={controller} searchPlaceholder={searchPlaceholder}>
+          {toolbar}
+        </DataTableToolbar>
+      )}
 
       {selection && selection.selectedCount > 0 && bulkActions && (
         <div className="bg-muted/50 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
@@ -306,24 +325,18 @@ export function DataTable<TRow>({
                   key={column.id}
                   // aria-sort belongs on the column header cell, not on the
                   // control inside it.
-                  aria-sort={
-                    column.sortKey && controller.sort?.key === column.sortKey
-                      ? controller.sort.dir === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : undefined
-                  }
+                  aria-sort={ariaSort(column.sortKey, sorts ?? controller.sort)}
                   className={cn(
                     column.width,
                     column.align && ALIGN[column.align],
                     column.headClassName
                   )}
                 >
-                  {column.sortKey && controller.sortEnabled ? (
+                  {column.sortKey && (onSortToggle || controller.sortEnabled) ? (
                     <SortableColumnHeader
                       sortKey={column.sortKey}
-                      sort={controller.sort}
-                      onToggle={controller.toggleSort}
+                      sort={sorts ?? controller.sort}
+                      onToggle={onSortToggle ?? ((key) => controller.toggleSort(key))}
                     >
                       {column.header}
                     </SortableColumnHeader>
@@ -338,7 +351,7 @@ export function DataTable<TRow>({
         </Table>
       </div>
 
-      <DataTablePagination controller={controller} />
+      {chrome === "full" && <DataTablePagination controller={controller} />}
 
       {isFiltered && state === "ready" && (
         <p className="text-muted-foreground sr-only" aria-live="polite">
@@ -347,4 +360,14 @@ export function DataTable<TRow>({
       )}
     </div>
   );
+}
+
+/** aria-sort for a header: only the primary key is announced as sorted. */
+function ariaSort(
+  sortKey: string | undefined,
+  sort: SortState | SortState[] | undefined
+): "ascending" | "descending" | undefined {
+  const primary = Array.isArray(sort) ? sort[0] : sort;
+  if (!sortKey || primary?.key !== sortKey) return undefined;
+  return primary.dir === "asc" ? "ascending" : "descending";
 }

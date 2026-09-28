@@ -147,6 +147,12 @@ export const PAGES: PaletteEntry[] = [
     module: "admin",
     permission: "audit_log.read",
   },
+  {
+    label: "Run audit",
+    href: "/administration/runs",
+    group: "Pages",
+    module: "admin",
+  },
   { label: "Policies", href: "/administration/policies", group: "Pages", module: "admin" },
   {
     label: "Permissions diagnostics",

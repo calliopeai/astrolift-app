@@ -1,12 +1,11 @@
 "use client";
 
-import { KeyRoundIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -18,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftClusterAuthUser } from "@/graphql/__generated__/schema";
 
@@ -48,45 +48,41 @@ export function AuthUsersView({
 
   if (loading && !view) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Sign-in users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
+      <Section title="Sign-in users" divided>
+        <Skeleton className="h-24 w-full" />
+      </Section>
     );
   }
   if (!view) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <UsersIcon className="size-4" />
+    <Section
+      title={
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
           Sign-in users
           {view.provider && (
             <Badge variant="outline" className="text-2xs font-normal">
               {view.provider}
             </Badge>
           )}
-        </CardTitle>
-        <CardDescription>
-          The logins of this cluster&apos;s central auth. {view.reachNote}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        </span>
+      }
+      description={<>The logins of this cluster&apos;s central auth. {view.reachNote}</>}
+      action={
+        view.supported && (
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <PlusIcon className="size-4" />
+            Add user
+          </Button>
+        )
+      }
+      divided
+    >
+      <div className="min-w-0">
         {!view.supported ? (
           <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">{view.reason}</p>
         ) : (
           <>
-            <div className="flex justify-end">
-              <Button size="sm" onClick={() => setCreating(true)}>
-                <PlusIcon className="size-4" />
-                Add user
-              </Button>
-            </div>
             {view.users.length === 0 ? (
               <p className="text-muted-foreground text-sm">No users yet.</p>
             ) : (
@@ -98,7 +94,7 @@ export function AuthUsersView({
                     key={u.username}
                     className="grid min-w-0 gap-2 p-3 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,2fr)_auto] sm:items-center"
                   >
-                    <span className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                    <span className="min-w-0 font-mono text-sm [overflow-wrap:anywhere]">
                       {u.email || u.username}
                     </span>
                     <span>
@@ -106,7 +102,7 @@ export function AuthUsersView({
                         <Badge variant={u.enabled ? "secondary" : "outline"}>
                           {u.enabled ? "enabled" : "disabled"}
                         </Badge>
-                        <span className="text-muted-foreground text-2xs">
+                        <span className="text-muted-foreground text-2xs font-mono">
                           {u.status.toLowerCase().replace(/_/g, " ")}
                         </span>
                       </div>
@@ -144,7 +140,7 @@ export function AuthUsersView({
             )}
           </>
         )}
-      </CardContent>
+      </div>
 
       <CreateUserDialog
         open={creating}
@@ -176,7 +172,7 @@ export function AuthUsersView({
           await onDelete(deleting.username);
         }}
       />
-    </Card>
+    </Section>
   );
 }
 

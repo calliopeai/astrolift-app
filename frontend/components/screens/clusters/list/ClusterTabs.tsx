@@ -2,12 +2,12 @@
 
 import { usePathname } from "next/navigation";
 
-import { DetailTabRow } from "@/components/DetailPageTabs";
+import { type DetailTab, DetailTabRow } from "@/components/DetailPageTabs";
 
-type TabKey = "overview" | "status" | "health" | "activity" | "settings";
+export type ClusterTabKey = "overview" | "status" | "health" | "activity" | "settings";
 
 interface TabSpec {
-  key: TabKey;
+  key: ClusterTabKey;
   label: string;
   href: (slug: string) => string;
   match: (pathname: string, slug: string) => boolean;
@@ -46,33 +46,35 @@ const TABS: TabSpec[] = [
   },
 ];
 
+/**
+ * The cluster's own tabs (spec 44 §5.2: Overview · Status · Health ·
+ * Activity · Settings), each its own route. `active` wins; otherwise the
+ * pathname picks it.
+ */
+export function clusterTabs(slug: string, pathname: string, active?: ClusterTabKey): DetailTab[] {
+  const activeKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
+  return TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    href: tab.href(slug),
+    active: tab.key === activeKey,
+  }));
+}
+
 interface ClusterTabsProps {
   slug: string;
-  active?: TabKey;
+  active?: ClusterTabKey;
 }
 
 /**
- * Link-based tab nav for ``/clusters/[slug]`` (#68). Mirrors the
- * AppTabs pattern at ``apps/[slug]/components/app-tabs.tsx``. Each
- * tab is a real route; the existing overview detail page keeps its
- * URL and gains a sibling status route under
- * ``/clusters/[slug]/status``.
+ * Link-based tab nav for ``/clusters/[slug]`` (#68), for a page that draws
+ * its own header. ClusterHeader carries the same tabs as its one row.
  */
 export function ClusterTabs({ slug, active }: ClusterTabsProps) {
   const pathname = usePathname() ?? "";
-  const activeKey: TabKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
-
   return (
     <div className="-mx-6 min-w-0">
-      <DetailTabRow
-        ariaLabel="Cluster tabs"
-        tabs={TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          href: tab.href(slug),
-          active: tab.key === activeKey,
-        }))}
-      />
+      <DetailTabRow ariaLabel="Cluster tabs" tabs={clusterTabs(slug, pathname, active)} />
     </div>
   );
 }

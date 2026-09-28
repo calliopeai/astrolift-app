@@ -23,25 +23,29 @@ export function useClusterMetrics(clusterId: string) {
   const [selectedWindow, setSelectedWindow] = useState<WindowLabel>("1h");
   const win = WINDOWS.find((w) => w.label === selectedWindow)!;
 
-  const { data: rangeData, loading: rangeLoading } = useQuery<PrometheusRangeResp>(
-    CLUSTER_PROMETHEUS_RANGE_METRICS,
-    {
-      variables: {
-        clusterId,
-        rangeSeconds: win.rangeSeconds,
-        stepSeconds: win.stepSeconds,
-      },
-      pollInterval: 60000,
-    }
-  );
+  const {
+    data: rangeData,
+    loading: rangeLoading,
+    error: rangeError,
+    refetch: refetchRange,
+  } = useQuery<PrometheusRangeResp>(CLUSTER_PROMETHEUS_RANGE_METRICS, {
+    variables: {
+      clusterId,
+      rangeSeconds: win.rangeSeconds,
+      stepSeconds: win.stepSeconds,
+    },
+    pollInterval: 60000,
+  });
 
-  const { data: instantData, loading: instantLoading } = useQuery<PrometheusInstantResp>(
-    CLUSTER_PROMETHEUS_METRICS,
-    {
-      variables: { clusterId },
-      pollInterval: 60000,
-    }
-  );
+  const {
+    data: instantData,
+    loading: instantLoading,
+    error: instantError,
+    refetch: refetchInstant,
+  } = useQuery<PrometheusInstantResp>(CLUSTER_PROMETHEUS_METRICS, {
+    variables: { clusterId },
+    pollInterval: 60000,
+  });
 
   const range = rangeData?.astroliftClusterPrometheusRangeMetrics ?? null;
   const instant = instantData?.astroliftClusterPrometheusMetrics ?? null;
@@ -53,5 +57,10 @@ export function useClusterMetrics(clusterId: string) {
     rangeLoading: rangeLoading && !range,
     instant,
     instantLoading: instantLoading && !instant,
+    error: (rangeError ?? instantError)?.message ?? null,
+    refetch: () => {
+      void refetchRange();
+      void refetchInstant();
+    },
   };
 }

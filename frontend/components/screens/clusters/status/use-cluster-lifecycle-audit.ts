@@ -15,9 +15,16 @@ export function useClusterLifecycleAudit(
   clusterId: string,
   { limit, pollInterval }: { limit: number; pollInterval?: number }
 ) {
-  const { data, loading } = useQuery<LifecycleResp>(CLUSTER_LIFECYCLE_AUDIT, {
+  const { data, loading, error, refetch } = useQuery<LifecycleResp>(CLUSTER_LIFECYCLE_AUDIT, {
     variables: { clusterId, limit },
     pollInterval,
   });
-  return { entries: data?.astroliftClusterLifecycleAudit ?? [], loading };
+  return {
+    entries: data?.astroliftClusterLifecycleAudit ?? [],
+    loading,
+    error: error?.message ?? null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 }

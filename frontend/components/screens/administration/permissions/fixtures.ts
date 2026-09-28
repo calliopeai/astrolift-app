@@ -3,15 +3,14 @@
  * against each view's props so a story cannot drift from what the hooks
  * return.
  */
-import { fakeController } from "@/components/data-table/fixtures";
-import type { RowSelection } from "@/components/data-table";
 import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+
+import { pageData } from "../access/fixtures";
 
 import type { AssignmentsViewProps } from "./AssignmentsView";
 import type { PermissionsDiagnosticsViewProps } from "./PermissionsDiagnosticsView";
 import type { RolesViewProps } from "./RolesView";
 
-const noop = () => {};
 const resolved =
   <T>(value: T) =>
   () =>
@@ -95,14 +94,12 @@ export const LONG_ROLE = role(
 
 export const LONG_PERMISSIONS = [...LONG_ROLE.permissions].sort((a, b) => a.localeCompare(b));
 
-export function rolesProps(overrides: Partial<RolesViewProps> = {}): RolesViewProps {
+/** Everything but the list controller, which a story makes with useLocalListState. */
+export function rolesProps(
+  overrides: Partial<Omit<RolesViewProps, "list">> = {}
+): Omit<RolesViewProps, "list"> {
   return {
-    table: fakeController<AstroliftRole>({
-      rows: ROLES,
-      totalCount: ROLES.length,
-      sort: undefined,
-      sortEnabled: false,
-    }),
+    page: pageData(ROLES),
     allPermissions: ALL_PERMISSIONS,
     canManage: true,
     createRole: resolved(true),
@@ -173,39 +170,18 @@ export const LONG_BINDINGS: AstroliftRoleBinding[] = [
   }),
 ];
 
-export function fakeSelection(ids: string[] = []): RowSelection {
-  const set = new Set(ids);
-  return {
-    selectedIds: ids,
-    selectedCount: ids.length,
-    isSelected: (id) => set.has(id),
-    toggle: noop,
-    togglePage: noop,
-    pageSelectionState: (pageIds) => {
-      const on = pageIds.filter((id) => set.has(id)).length;
-      return on === 0 ? false : on === pageIds.length ? true : "indeterminate";
-    },
-    clear: noop,
-  };
-}
-
+/** Everything but the list controller, which a story makes with useLocalListState. */
 export function assignmentsProps(
-  overrides: Partial<AssignmentsViewProps> = {}
-): AssignmentsViewProps {
+  overrides: Partial<Omit<AssignmentsViewProps, "list">> = {}
+): Omit<AssignmentsViewProps, "list"> {
   return {
-    table: fakeController<AstroliftRoleBinding>({
-      rows: BINDINGS,
-      totalCount: BINDINGS.length,
-      sort: undefined,
-      sortEnabled: false,
-    }),
-    selection: fakeSelection(),
+    page: pageData(BINDINGS),
     canManage: true,
     rolesLoading: false,
     revoking: false,
     bulkRevoking: false,
     onRevoke: resolved(undefined),
-    onBulkRevoke: resolved(undefined),
+    onBulkRevoke: resolved(true),
     ...overrides,
   };
 }

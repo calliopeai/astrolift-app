@@ -5,7 +5,7 @@ import { useAssignments } from "@/components/screens/administration/permissions/
 
 import { GrantRoleDialog } from "@/components/screens/members/GrantRoleDialog";
 
-/** Mounted only while the Assignments tab is shown, so its queries run only then. */
+/** Admin › Permissions › Assignments, mounted only while the permissions console is on. */
 export function AssignmentsTab() {
   const { roles, ...assignments } = useAssignments();
   return (

@@ -12,6 +12,18 @@ export type ClusterWithHeartbeat = AstroliftTenantCluster & Partial<ClusterHeart
 
 export type Lifecycle = "registered" | "managing" | "managed" | "error";
 
+/** What the viewer may change on the settings tab, one flag per permission. */
+export interface ClusterSettingsAccess {
+  /** `cluster.manage`: lifecycle actions, the keep-alive agent, the bootstrap recipe. */
+  manage: boolean;
+  /** `cluster.update`: ingress class, central auth, ingress auth. */
+  update: boolean;
+  /** `cluster.users`: the central auth's sign-in users. */
+  users: boolean;
+  /** `cluster.unregister`: decommission. */
+  unregister: boolean;
+}
+
 // ─── Bootstrap plan (#67 + #66) ─────────────────────────────────────────
 
 export interface BootstrapOptionChoice {

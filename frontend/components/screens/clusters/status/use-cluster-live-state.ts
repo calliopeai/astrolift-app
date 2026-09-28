@@ -15,9 +15,16 @@ interface LiveStateResp {
  * while the cluster is offline.
  */
 export function useClusterLiveState(clusterId: string) {
-  const { data, loading } = useQuery<LiveStateResp>(CLUSTER_LIVE_STATE, {
+  const { data, loading, error, refetch } = useQuery<LiveStateResp>(CLUSTER_LIVE_STATE, {
     variables: { clusterId },
     pollInterval: 30000,
   });
-  return { state: data?.astroliftClusterLiveState ?? null, loading };
+  return {
+    state: data?.astroliftClusterLiveState ?? null,
+    loading,
+    error: error?.message ?? null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 }

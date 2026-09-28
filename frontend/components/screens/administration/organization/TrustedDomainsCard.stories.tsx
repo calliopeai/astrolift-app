@@ -30,3 +30,12 @@ export const Error: Story = { args: trustedDomainsRemoveFails };
 export const Busy: Story = { args: { ...trustedDomains, adding: true, removing: true } };
 
 export const LongStrings: Story = { args: trustedDomainsLong };
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <TrustedDomainsCard {...trustedDomainsLong} />
+    </div>
+  ),
+};

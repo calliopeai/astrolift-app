@@ -3,9 +3,15 @@
 import { LockIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ACCENTS, GROUNDS, normalizePartial, type Accent, type Ground } from "@/lib/appearance";
+import { SettingsSection } from "@/components/settings/SettingsPage";
+import {
+  ACCENTS,
+  GROUNDS,
+  isAccent,
+  normalizePartial,
+  type Accent,
+  type Ground,
+} from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 import type { useHouseTheme } from "./use-house-theme";
@@ -23,6 +29,9 @@ export type HouseThemeCardProps = ReturnType<typeof useHouseTheme>;
  * Axes left unset stay personal. Pinning only the accent leaves ground,
  * density and corners to each person, which is why the payload is a partial
  * and "Not set" is a real choice rather than a placeholder.
+ *
+ * The accent here is a preset only. A custom accent colour is personal
+ * (Settings › Appearance) until the org's appearance validation accepts one.
  */
 export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
   const current = React.useMemo(
@@ -30,14 +39,15 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
     [org.appearanceDefault]
   );
   const [ground, setGround] = React.useState<Ground | "">(current.ground ?? "");
-  const [accent, setAccent] = React.useState<Accent | "">(current.accent ?? "");
+  const currentAccent = isAccent(current.accent) ? current.accent : "";
+  const [accent, setAccent] = React.useState<Accent | "">(currentAccent);
   const [locked, setLocked] = React.useState(Boolean(org.appearanceLocked));
 
   React.useEffect(() => {
     setGround(current.ground ?? "");
-    setAccent(current.accent ?? "");
+    setAccent(currentAccent);
     setLocked(Boolean(org.appearanceLocked));
-  }, [current, org.appearanceLocked]);
+  }, [current, currentAccent, org.appearanceLocked]);
 
   async function save() {
     const appearanceDefault: Record<string, string> = {};
@@ -48,67 +58,69 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
 
   const dirty =
     ground !== (current.ground ?? "") ||
-    accent !== (current.accent ?? "") ||
+    accent !== currentAccent ||
     locked !== Boolean(org.appearanceLocked);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>House theme</CardTitle>
-        <CardDescription>
+    <SettingsSection
+      title="House theme"
+      description={
+        <>
           Applies to anyone who hasn&apos;t picked their own under Settings › Appearance. Leave an
           option on <span className="font-medium">Not set</span> to let people choose it for
-          themselves.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <Choice
-          label="Ground"
-          value={ground}
-          onChange={(v) => setGround(v as Ground | "")}
-          options={(Object.keys(GROUNDS) as Ground[]).map((k) => ({
-            value: k,
-            label: GROUNDS[k].label,
-            hint: GROUNDS[k].mode,
-          }))}
-        />
-        <Choice
-          label="Accent"
-          value={accent}
-          onChange={(v) => setAccent(v as Accent | "")}
-          options={(Object.keys(ACCENTS) as Accent[]).map((k) => ({
-            value: k,
-            label: ACCENTS[k].label,
-            swatch: ACCENTS[k].swatch,
-          }))}
-        />
+          themselves. A custom accent colour is set per person there.
+        </>
+      }
+      dirty={dirty}
+      saving={saving}
+      saveLabel="Save house theme"
+      onCancel={() => {
+        setGround(current.ground ?? "");
+        setAccent(currentAccent);
+        setLocked(Boolean(org.appearanceLocked));
+      }}
+      onSave={save}
+    >
+      <Choice
+        label="Ground"
+        value={ground}
+        onChange={(v) => setGround(v as Ground | "")}
+        options={(Object.keys(GROUNDS) as Ground[]).map((k) => ({
+          value: k,
+          label: GROUNDS[k].label,
+          hint: GROUNDS[k].mode,
+        }))}
+      />
+      <Choice
+        label="Accent"
+        value={accent}
+        onChange={(v) => setAccent(v as Accent | "")}
+        options={(Object.keys(ACCENTS) as Accent[]).map((k) => ({
+          value: k,
+          label: ACCENTS[k].label,
+          swatch: ACCENTS[k].swatch,
+        }))}
+      />
 
-        <label className="border-border flex cursor-pointer items-start gap-2.5 rounded-lg border p-3">
-          <input
-            type="checkbox"
-            checked={locked}
-            onChange={(e) => setLocked(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="flex items-center gap-1.5 text-sm font-semibold">
-              <LockIcon aria-hidden className="size-3.5" />
-              Lock this theme
-            </span>
-            <span className="text-muted-foreground block text-xs">
-              Everyone gets the house theme and their personal picker becomes read-only. Off by
-              default — publishing a default and forcing it are different decisions.
-            </span>
+      <label className="border-border flex min-w-0 cursor-pointer items-start gap-2.5 rounded-lg border p-3">
+        <input
+          type="checkbox"
+          checked={locked}
+          onChange={(e) => setLocked(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            <LockIcon aria-hidden className="size-3.5" />
+            Lock this theme
           </span>
-        </label>
-
-        <div>
-          <Button type="button" size="sm" disabled={saving || !dirty} onClick={save}>
-            {saving ? "Saving…" : "Save house theme"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <span className="text-muted-foreground block text-xs">
+            Everyone gets the house theme and their personal picker becomes read-only. Off by
+            default — publishing a default and forcing it are different decisions.
+          </span>
+        </span>
+      </label>
+    </SettingsSection>
   );
 }
 

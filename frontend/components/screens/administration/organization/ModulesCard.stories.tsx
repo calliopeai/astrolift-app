@@ -25,3 +25,12 @@ export const Error: Story = { args: modulesReadOnly };
 export const Pending: Story = { args: { ...modules, pendingKey: "chat_studio_integration" } };
 
 export const LongStrings: Story = { args: modulesLong };
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ModulesCard {...modulesLong} />
+    </div>
+  ),
+};

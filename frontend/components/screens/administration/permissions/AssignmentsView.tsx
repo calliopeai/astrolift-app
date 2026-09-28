@@ -5,13 +5,15 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column, RowSelection } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { permissionsCrumbs } from "../access/admin-crumbs";
 import { SCOPE_TONE } from "./scope-tone";
 import type { useAssignments } from "./use-assignments";
 
@@ -19,7 +21,7 @@ export type AssignmentsViewProps = Omit<ReturnType<typeof useAssignments>, "role
   /**
    * The grant-role dialog, rendered by the caller (it runs its own
    * queries). The view owns whether it is open; closing it also refetches
-   * this table's page.
+   * this list's page.
    */
   renderGrantDialog?: (props: {
     open: boolean;
@@ -31,10 +33,10 @@ function subjectLabel(b: AstroliftRoleBinding): string {
   return b.user?.username ?? `group:${b.groupExternalId}`;
 }
 
-/** The Assignments tab of the Permissions screen: role bindings, grant and revoke. */
+/** Admin › Permissions › Assignments: role bindings (spec 44 §5.1), grant and revoke. */
 export function AssignmentsView({
-  table,
-  selection,
+  list,
+  page,
   canManage,
   rolesLoading,
   revoking,
@@ -47,13 +49,15 @@ export function AssignmentsView({
 
   const [grantOpen, setGrantOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
-  const [confirmBulk, setConfirmBulk] = React.useState(false);
+  const [bulkTarget, setBulkTarget] = React.useState<RowSelection | null>(null);
+  const bulkCount = bulkTarget?.selectedCount ?? 0;
 
   async function handleBulkRevoke() {
+    if (!bulkTarget) return;
     try {
-      await onBulkRevoke();
+      if (await onBulkRevoke(bulkTarget.selectedIds)) bulkTarget.clear();
     } finally {
-      setConfirmBulk(false);
+      setBulkTarget(null);
     }
   }
 
@@ -61,36 +65,54 @@ export function AssignmentsView({
     {
       id: "user",
       header: "User",
+      cellClassName: "max-w-72",
       cell: (b) =>
         b.user ? (
-          <>
-            <div className="font-medium">{b.user.username}</div>
-            <div className="text-muted-foreground text-xs">{b.user.email}</div>
-          </>
+          <div className="min-w-0">
+            <div className="truncate font-medium" title={b.user.username}>
+              {b.user.username}
+            </div>
+            <div className="text-muted-foreground truncate font-mono text-xs" title={b.user.email}>
+              {b.user.email}
+            </div>
+          </div>
         ) : (
-          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+          <div className="truncate font-mono text-xs" title={`group:${b.groupExternalId}`}>
+            group:{b.groupExternalId}
+          </div>
         ),
     },
     {
       id: "role",
       header: "Role",
+      cellClassName: "max-w-72",
       cell: (b) => (
-        <>
-          <div className="font-medium">{b.role.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-        </>
+        <div className="min-w-0">
+          <div className="truncate font-medium" title={b.role.name}>
+            {b.role.name}
+          </div>
+          <div className="text-muted-foreground truncate font-mono text-xs" title={b.role.slug}>
+            {b.role.slug}
+          </div>
+        </div>
       ),
     },
     {
       id: "scope",
       header: "Scope",
+      cellClassName: "max-w-64",
       cell: (b) => (
-        <div className="flex flex-col items-start gap-1">
-          <Badge className={SCOPE_TONE[b.scopeKind]} variant="secondary">
+        <div className="flex min-w-0 flex-col items-start gap-1">
+          <Badge className={`${SCOPE_TONE[b.scopeKind] ?? ""} font-mono`} variant="secondary">
             {b.scopeKind}
           </Badge>
           {b.sourceScopeLabel && (
-            <span className="text-muted-foreground text-xs">{b.sourceScopeLabel}</span>
+            <span
+              className="text-muted-foreground block max-w-full truncate text-xs"
+              title={b.sourceScopeLabel}
+            >
+              {b.sourceScopeLabel}
+            </span>
           )}
         </div>
       ),
@@ -98,86 +120,82 @@ export function AssignmentsView({
     {
       id: "granted",
       header: "Granted",
-      cellClassName: "text-muted-foreground text-sm",
+      cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (b) => fmt.formatDate(b.grantedAt),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      width: "w-24",
-      cell: (b) => (
-        <Can permission="org.manage_members">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setRevokeTarget(b)}
-            disabled={revoking || bulkRevoking}
-          >
-            <Trash2Icon className="size-4" />
-            <span className="sr-only">
-              Revoke {b.role.slug} from {subjectLabel(b)}
-            </span>
-          </Button>
-        </Can>
-      ),
     },
   ];
 
   return (
-    <>
-      <Section
-        title="Role bindings"
-        description="Every role granted to a user (or IdP group) and the scope it applies to. Grant, revoke, or bulk-revoke access here."
-        action={
-          <Can permission="org.manage_members">
-            <Button size="sm" onClick={() => setGrantOpen(true)} disabled={rolesLoading}>
-              <UserPlusIcon className="size-4" />
-              Grant role
-            </Button>
-          </Can>
+    <div className="flex min-w-0 flex-1 flex-col p-6">
+      <ListPage<AstroliftRoleBinding>
+        header={{
+          crumbs: permissionsCrumbs("assignments"),
+          title: "Assignments",
+          context: "Every role granted to a user or IdP group, and the scope it applies to.",
+          primaryAction: (
+            <Can permission="org.manage_members">
+              <Button size="sm" onClick={() => setGrantOpen(true)} disabled={rolesLoading}>
+                <UserPlusIcon className="size-4" />
+                Grant role
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
+        label="Role bindings"
+        columns={columns}
+        rows={page.rows}
+        getRowId={(b) => b.id}
+        loading={page.loading}
+        stale={page.stale}
+        error={page.error}
+        onRetry={page.refetch}
+        totalCount={page.totalCount}
+        nextCursor={page.nextCursor}
+        rowActions={
+          canManage
+            ? (b) => (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={revoking || bulkRevoking}
+                  onSelect={() => setRevokeTarget(b)}
+                >
+                  <Trash2Icon className="size-4" />
+                  Revoke
+                </DropdownMenuItem>
+              )
+            : undefined
         }
-      >
-        <DataTable
-          label="Role bindings"
-          controller={table}
-          columns={columns}
-          getRowId={(b) => b.id}
-          selection={canManage ? selection : undefined}
-          bulkActions={
-            canManage
-              ? (sel) => (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setConfirmBulk(true)}
-                    disabled={bulkRevoking}
-                  >
-                    <Trash2Icon className="size-4" />
-                    Revoke {sel.selectedCount}
-                  </Button>
-                )
-              : undefined
-          }
-          searchPlaceholder="Search by user, group, or role…"
-          empty={{
-            icon: <ShieldIcon className="size-5" />,
-            title: "No role bindings",
-            description: "Grant a role to a user to give them access to the platform.",
-          }}
-          emptyFiltered={{
-            title: "No matching bindings",
-            description: "No binding matches this search. Try another user, group, or role.",
-          }}
-        />
-      </Section>
+        bulkActions={
+          canManage
+            ? (sel) => (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkTarget(sel)}
+                  disabled={bulkRevoking}
+                >
+                  <Trash2Icon className="size-4" />
+                  Revoke {sel.selectedCount}
+                </Button>
+              )
+            : undefined
+        }
+        empty={{
+          icon: <ShieldIcon className="size-5" />,
+          title: "No role bindings",
+          description: "Grant a role to a user to give them access to the platform.",
+        }}
+      />
 
       <ConfirmDialog
-        open={confirmBulk}
-        onOpenChange={setConfirmBulk}
-        title={`Revoke ${selection.selectedCount} role binding${selection.selectedCount === 1 ? "" : "s"}?`}
+        open={bulkTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setBulkTarget(null);
+        }}
+        title={`Revoke ${bulkCount} role binding${bulkCount === 1 ? "" : "s"}?`}
         description="The selected users lose the permissions these roles granted. Any other bindings they hold stay in effect."
-        confirmLabel={`Revoke ${selection.selectedCount}`}
+        confirmLabel={`Revoke ${bulkCount}`}
         destructive
         onConfirm={handleBulkRevoke}
       />
@@ -205,12 +223,12 @@ export function AssignmentsView({
         onOpenChange: (next) => {
           setGrantOpen(next);
           // GrantRoleDialog refetches the deprecated flat list and exposes
-          // no onGranted hook, so pull this table's page again when it
+          // no onGranted hook, so pull this list's page again when it
           // closes; otherwise a new binding would not appear until the
           // next fetch.
-          if (!next) table.refetch();
+          if (!next) page.refetch();
         },
       })}
-    </>
+    </div>
   );
 }

@@ -2,10 +2,20 @@
  * Hand-typed fixtures for the administration insights screens (audit,
  * platform metrics, features), typed against each screen's props.
  */
-import { fakeController } from "@/components/data-table/fixtures";
+import { LONG_ARN, LONG_SHA, LONG_URL } from "@/components/list/fixtures";
+import type { DeploymentStatus, ScheduledJobRunStatus } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
 
 import type { AuditLogScreenProps } from "./AuditLogScreen";
+import {
+  type CombinedRun,
+  fromAgentTask,
+  fromDeployment,
+  fromJobRun,
+  fromWorkflowRun,
+  mergeRuns,
+} from "./combined-runs";
+import type { CombinedRunsScreenProps } from "./CombinedRunsScreen";
 import type { AdminMetricsScreenProps } from "./AdminMetricsScreen";
 import type { PrometheusPanelProps, SystemMetricsPanelProps } from "./ClusterMetricsPanels";
 import type { FeaturesScreenProps } from "./FeaturesScreen";
@@ -84,28 +94,152 @@ export const AUDIT_EVENTS_LONG: AstroliftAuditEvent[] = [
     before: { prompt: LONG.repeat(4) },
     after: { prompt: LONG.repeat(6) },
   }),
+  // The three the list archetype must hold: a 64-char SHA, a 200-char ARN
+  // and an unbroken URL.
+  event("ev-long-2", {
+    action: "deployment.approve",
+    actorKind: "token",
+    actorDisplay: "",
+    actorId: LONG_URL,
+    targetKind: "iam_role",
+    targetSlug: LONG_ARN,
+    targetId: LONG_SHA,
+    requestId: LONG_SHA,
+    decision: "DENY",
+  }),
 ];
 
-export const AUDIT: AuditLogScreenProps = {
-  table: fakeController<AstroliftAuditEvent>({
-    rows: AUDIT_EVENTS,
-    totalCount: AUDIT_EVENTS.length,
-    pageSize: 100,
-    sort: undefined,
-    sortEnabled: false,
-  }),
-  decisionFilter: "",
-  onDecisionFilterChange: noop,
-  fromDate: "",
-  onFromDateChange: noop,
-  toDate: "",
-  onToDateChange: noop,
+/** Everything but the list state, which each story makes with useLocalListState. */
+export const AUDIT: Omit<AuditLogScreenProps, "list"> = {
+  rows: AUDIT_EVENTS,
+  loading: false,
+  stale: false,
+  error: null,
+  onRetry: noop,
+  nextCursor: "cursor-2",
+  totalCount: 1284,
+  targetFilteredLocally: false,
   retentionDays: 365,
   exporting: false,
   onExport: async () => {},
   canEditRetention: true,
   savingRetention: false,
   saveRetention: async () => true,
+};
+
+// ─── Run audit ────────────────────────────────────────────────────────
+
+// Built through the real mappers, so the fixtures carry what each source
+// actually says (and does not say) about who started a run.
+const at = (minutesAgo: number) =>
+  new Date(Date.UTC(2026, 8, 27, 14, 0, 0) - minutesAgo * 60_000).toISOString();
+
+const agentRun = (i: number, status: string) =>
+  fromAgentTask({
+    id: `task-${(0x7f3c2a91 - i * 0x1b3d).toString(16)}`,
+    agentSlug: ["support-bot", "triage-agent", "billing-reconciler"][i % 3],
+    agentName: "Support bot",
+    projectSlug: i % 2 ? "storefront" : "internal-tools",
+    status,
+    createdAt: at(i * 11 + 1),
+    startedAt: at(i * 11),
+    finishedAt: status === "running" ? null : at(i * 11 - 2),
+  });
+
+const workflowRun = (i: number, status: string, child = false) =>
+  fromWorkflowRun({
+    guid: `wfr-${(0x51e0a7 + i * 0x2f1).toString(16)}`,
+    definitionGuid: "wfd-1",
+    definitionSlug: "nightly-sync",
+    definitionName: "Nightly sync",
+    projectGuid: "prj-1",
+    projectSlug: "internal-tools",
+    status,
+    temporalWorkflowId: "tw-1",
+    temporalRunId: null,
+    currentStageOrder: null,
+    currentStageRole: "",
+    parentRunGuid: child ? "wfr-parent" : null,
+    parentStageExecutionGuid: null,
+    nestingDepth: child ? 1 : 0,
+    childRunCount: 0,
+    startedAt: at(i * 13 + 4),
+    endedAt: status === "running" ? null : at(i * 13 + 1),
+  });
+
+const deploymentRun = (i: number, status: string, mine = false) =>
+  fromDeployment({
+    id: `dep-${(0x1112015d + i * 0x3b).toString(16)}`,
+    registeredAppSlug: ["checkout", "storefront-web"][i % 2],
+    environmentName: i % 3 ? "production" : "staging",
+    workloadSlug: "web",
+    triggerKind: (["push", "manual", "ci"] as const)[i % 3],
+    status: status as DeploymentStatus,
+    startedAt: at(i * 17 + 6),
+    createdAt: at(i * 17 + 7),
+    durationSeconds: 84 + i * 9,
+    commitAuthor: mine ? "" : "grace@example.com",
+    ciProvider: i % 3 === 2 ? "github" : "",
+    triggeredByUserId: mine ? "leo@calliope.ai" : null,
+    triggeredByMe: mine,
+  });
+
+const jobRun = (i: number, status: ScheduledJobRunStatus) =>
+  fromJobRun({
+    id: `job-${(0x9a01 + i * 0x77).toString(16)}`,
+    registeredAppSlug: "checkout",
+    environmentName: "production",
+    workloadSlug: "nightly-invoices",
+    status,
+    startedAt: at(i * 29 + 9),
+    createdAt: at(i * 29 + 9),
+    durationSeconds: status === "running" ? null : 312 + i,
+  });
+
+export const COMBINED_RUNS: CombinedRun[] = mergeRuns(
+  [
+    agentRun(0, "running"),
+    agentRun(1, "completed"),
+    agentRun(2, "failed"),
+    agentRun(3, "timed_out"),
+  ],
+  [workflowRun(0, "running"), workflowRun(1, "completed", true), workflowRun(2, "failed")],
+  [
+    deploymentRun(0, "deploying", true),
+    deploymentRun(1, "running"),
+    deploymentRun(2, "pending_approval"),
+    deploymentRun(3, "rolled_back"),
+    deploymentRun(4, "superseded", true),
+  ],
+  [jobRun(0, "succeeded"), jobRun(1, "failed"), jobRun(2, "running")]
+);
+
+/** A 64-char SHA, a 200-char ARN and an unbroken URL in the cells that hold them. */
+export const COMBINED_RUNS_LONG: CombinedRun[] = [
+  { ...COMBINED_RUNS[0], key: "long-1", id: LONG_SHA, subject: LONG_ARN, scope: LONG_URL },
+  {
+    ...COMBINED_RUNS[1],
+    key: "long-2",
+    startedBy: `${LONG}@example.com`,
+    trigger: LONG_URL,
+    status: `ImagePullBackOff:${LONG}`,
+  },
+  ...COMBINED_RUNS.slice(2, 5),
+];
+
+/** Everything but the list state, which each story makes with useLocalListState. */
+export const RUN_AUDIT: Omit<CombinedRunsScreenProps, "list"> = {
+  rows: COMBINED_RUNS,
+  loading: false,
+  stale: false,
+  error: null,
+  onRetry: noop,
+  nextCursor: "o:25",
+  totalCount: 318,
+  approximateCount: true,
+  unavailable: [],
+  coverage: "Merged from the newest 100 of each kind; older runs are on each kind's own list.",
+  onExportCsv: noop,
 };
 
 // ─── Platform metrics ────────────────────────────────────────────────
@@ -308,6 +442,8 @@ export const METRICS: Omit<AdminMetricsScreenProps, "renderLivePanels"> = {
   win: WINDOWS[0],
   clusters: CLUSTERS,
   loading: false,
+  error: null,
+  onRetry: noop,
 };
 
 // ─── Features ────────────────────────────────────────────────────────
@@ -341,6 +477,8 @@ export const FEATURES: FeaturesScreenProps = {
     },
   ],
   loading: false,
+  error: null,
+  onRetry: noop,
   pendingKey: null,
   toggleFlag: async () => {},
 };

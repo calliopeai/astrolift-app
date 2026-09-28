@@ -4,7 +4,6 @@ import type {
   AstroliftRole,
 } from "@/graphql/identity/identity.types";
 
-import type { AdministrationSubnavProps } from "./AdministrationSubnav";
 import type { HouseThemeCardProps } from "./HouseThemeCard";
 import type { ModulesCardProps } from "./ModulesCard";
 import type { OrganizationSettingsProps } from "./OrganizationSettings";
@@ -13,6 +12,15 @@ import type { ModuleItem } from "./use-modules-card";
 
 const LONG =
   "Intergalactic Heavy Industries Consolidated Holdings and Subsidiary Launch Operations Worldwide";
+
+/** The long-string fixtures every screen is checked against (spec 44 §8). */
+export const LONG_SHA = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+export const LONG_ARN =
+  "arn:aws:iam::123456789012:role/astrolift/organizations/intergalactic-heavy-industries/" +
+  "identity/trusted-domains/sso-auto-join/permission-boundaries/astrolift-organization-admin-boundary-v2-us-east-2a-1";
+export const LONG_URL =
+  "https://launch-operations.intergalactic-heavy-industries-consolidated-holdings.example/" +
+  "organizations/intergalactic-heavy-industries/settings?ref=9f86d081884c7d659a2feaa0c55ad015";
 
 export const ORG: AstroliftOrganization = {
   id: "org-1",
@@ -53,7 +61,7 @@ export const ORG_LONG: AstroliftOrganization = {
   ...ORG,
   slug: "intergalactic-heavy-industries-consolidated-holdings-launch-ops",
   name: LONG,
-  website: "https://launch-operations.intergalactic-heavy-industries-consolidated.example",
+  website: LONG_URL,
 };
 
 const ok = async () => true;
@@ -217,19 +225,4 @@ export const modulesLong: ModulesCardProps = {
     label: `${m.label} for ${LONG}`,
     description: `${m.description} ${LONG}, including every subsidiary launch site.`,
   })),
-};
-
-export const subnav: AdministrationSubnavProps = {
-  pathname: "/administration/organization",
-  permissionsEnabled: true,
-};
-
-export const subnavFlagOff: AdministrationSubnavProps = {
-  pathname: "/administration/members/42",
-  permissionsEnabled: false,
-};
-
-export const subnavNoMatch: AdministrationSubnavProps = {
-  pathname: "/administration/unknown-section-that-matches-no-link-in-the-subnav",
-  permissionsEnabled: false,
 };

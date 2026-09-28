@@ -92,3 +92,33 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+/** The cluster list itself failed: the error sits in the page with a Retry. */
+export const ClustersError: Story = {
+  render: () => (
+    <AdminMetricsScreen
+      {...METRICS}
+      clusters={[]}
+      error={new globalThis.Error("Network error: the Astrolift API did not answer.")}
+      renderLivePanels={() => null}
+    />
+  ),
+};
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <AdminMetricsScreen
+        {...METRICS}
+        clusters={CLUSTERS_LONG}
+        renderLivePanels={() => (
+          <>
+            <PrometheusPanel {...PROMETHEUS_LONG} />
+            <SystemMetricsPanel {...SYSTEM} />
+          </>
+        )}
+      />
+    </div>
+  ),
+};

@@ -20,9 +20,12 @@ export type BuildTimeFeature =
 
 /** The install's runtime flags and install-time features, and the flag toggle. */
 export function useFeatureFlags() {
-  const { data, loading } = useQuery<AdminFeatureInventoryQuery>(ADMIN_FEATURE_INVENTORY, {
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, loading, error, refetch } = useQuery<AdminFeatureInventoryQuery>(
+    ADMIN_FEATURE_INVENTORY,
+    {
+      fetchPolicy: "cache-and-network",
+    }
+  );
   const [setFlag] = useMutation<SetFeatureFlagMutation, SetFeatureFlagMutationVariables>(
     SET_FEATURE_FLAG
   );
@@ -56,6 +59,10 @@ export function useFeatureFlags() {
     runtimeFlags: data?.astroliftServerInfo?.featureFlags ?? [],
     buildTimeFeatures: data?.astroliftServerInfo?.buildTimeFeatures ?? [],
     loading,
+    error: error ?? null,
+    onRetry: (): void => {
+      void refetch();
+    },
     pendingKey,
     toggleFlag,
   };

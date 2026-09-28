@@ -41,12 +41,22 @@ export function useAdminMetrics() {
   const [windowLabel, setWindowLabel] = useState<WindowLabel>("1h");
   const win = WINDOWS.find((w) => w.label === windowLabel)!;
 
-  const { data, loading } = useQuery<ClustersResp>(LIST_CLUSTERS, {
+  const { data, loading, error, refetch } = useQuery<ClustersResp>(LIST_CLUSTERS, {
     pollInterval: 60_000,
   });
   const clusters = (data?.astroliftClusters ?? []).filter((c) => c.isActive);
 
-  return { windowLabel, onWindowChange: setWindowLabel, win, clusters, loading };
+  return {
+    windowLabel,
+    onWindowChange: setWindowLabel,
+    win,
+    clusters,
+    loading,
+    error: error ?? null,
+    onRetry: (): void => {
+      void refetch();
+    },
+  };
 }
 
 /**

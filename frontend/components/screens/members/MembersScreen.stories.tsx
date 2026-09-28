@@ -1,14 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
-import type {
-  AstroliftInvitation,
-  AstroliftMember,
-  AstroliftRoleBinding,
-} from "@/graphql/identity/identity.types";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+import { pageData } from "@/components/screens/administration/access/fixtures";
 
 import { GrantRoleSheet } from "./GrantRoleDialog";
 import { InviteSheet } from "./InviteDialog";
-import { MembersScreen } from "./MembersScreen";
+import { MEMBERS_LIST } from "./members-list";
 import {
   BINDINGS,
   INVITATIONS,
@@ -17,12 +15,11 @@ import {
   LONG_MEMBERS,
   MEMBERS,
   RESOLVED_INVITATIONS,
-  fakeSelection,
   grantRoleProps,
   inviteProps,
   membersProps,
-  table,
 } from "./members.fixtures";
+import { MembersScreen, type MembersScreenProps } from "./MembersScreen";
 
 const meta: Meta = {
   title: "Screens/Members/MembersScreen",
@@ -32,10 +29,18 @@ export default meta;
 
 type Story = StoryObj;
 
-/** Every table populated, with the grant and invite sheets wired to fixtures (closed until clicked). */
+function Members({
+  initial,
+  ...props
+}: Omit<MembersScreenProps, "list"> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(MEMBERS_LIST, initial);
+  return <MembersScreen list={list} {...props} />;
+}
+
+/** People, with the grant and invite sheets wired to fixtures (closed until clicked). */
 export const Full: Story = {
   render: () => (
-    <MembersScreen
+    <Members
       {...membersProps()}
       renderGrantDialog={(p) => <GrantRoleSheet {...grantRoleProps()} {...p} />}
       renderInviteDialog={(p) => <InviteSheet {...inviteProps()} {...p} />}
@@ -45,11 +50,9 @@ export const Full: Story = {
 
 export const Loading: Story = {
   render: () => (
-    <MembersScreen
+    <Members
       {...membersProps({
-        membersTable: table<AstroliftMember>({ state: "loading" }),
-        bindingsTable: table<AstroliftRoleBinding>({ state: "loading" }),
-        invitationsTable: table<AstroliftInvitation>({ state: "loading" }),
+        people: pageData([], { loading: true }),
         bindingIndexRows: undefined,
         teams: undefined,
         projects: undefined,
@@ -61,127 +64,95 @@ export const Loading: Story = {
 };
 
 export const Empty: Story = {
-  render: () => (
-    <MembersScreen
-      {...membersProps({
-        membersTable: table<AstroliftMember>({ state: "empty" }),
-        bindingsTable: table<AstroliftRoleBinding>({ state: "empty" }),
-        invitationsTable: table<AstroliftInvitation>({ state: "empty" }),
-        bindingIndexRows: [],
-      })}
-    />
-  ),
-};
-
-/** Resolved invitations shown and none exist: the "No invitations" empty copy. */
-export const EmptyAllStatuses: Story = {
-  render: () => (
-    <MembersScreen
-      {...membersProps({
-        inviteStatus: null,
-        invitationsTable: table<AstroliftInvitation>({ state: "empty" }),
-      })}
-    />
-  ),
+  render: () => <Members {...membersProps({ people: pageData([]), bindingIndexRows: [] })} />,
 };
 
 export const NoMatches: Story = {
-  render: () => (
-    <MembersScreen
-      {...membersProps({
-        membersTable: table<AstroliftMember>({
-          state: "emptyFiltered",
-          search: "nobody",
-          isFiltered: true,
-        }),
-        bindingsTable: table<AstroliftRoleBinding>({
-          state: "emptyFiltered",
-          search: "nobody",
-          isFiltered: true,
-        }),
-        invitationsTable: table<AstroliftInvitation>({
-          state: "emptyFiltered",
-          search: "nobody",
-          isFiltered: true,
-        }),
-      })}
-    />
-  ),
+  render: () => <Members {...membersProps({ people: pageData([]) })} initial={{ q: "nobody" }} />,
 };
 
 export const LoadFailed: Story = {
   render: () => (
-    <MembersScreen
+    <Members
       {...membersProps({
-        membersTable: table<AstroliftMember>({
-          state: "error",
-          error: new globalThis.Error("upstream timed out"),
-        }),
-        bindingsTable: table<AstroliftRoleBinding>({
-          state: "error",
-          error: new globalThis.Error("upstream timed out"),
-        }),
-        invitationsTable: table<AstroliftInvitation>({
-          state: "error",
-          error: new globalThis.Error("upstream timed out"),
-        }),
+        people: pageData([], { error: { message: "upstream timed out after 30s" } }),
       })}
     />
   ),
 };
 
-/** "Show resolved" flipped: accepted / revoked / expired rows with their delete action. */
-export const ShowingResolved: Story = {
+/** The Invited view: pending invitations with resend and revoke. */
+export const Invited: Story = {
+  render: () => <Members {...membersProps()} initial={{ view: "invited" }} />,
+};
+
+export const InvitedEmpty: Story = {
   render: () => (
-    <MembersScreen
-      {...membersProps({
-        inviteStatus: null,
-        invitationsTable: table<AstroliftInvitation>({
-          rows: [...INVITATIONS, ...RESOLVED_INVITATIONS],
-          totalCount: INVITATIONS.length + RESOLVED_INVITATIONS.length,
-        }),
-      })}
+    <Members {...membersProps({ invitations: pageData([]) })} initial={{ view: "invited" }} />
+  ),
+};
+
+/** Invitation history: accepted, revoked and expired rows with their delete action. */
+export const InvitationHistory: Story = {
+  render: () => (
+    <Members
+      {...membersProps({ invitations: pageData([...INVITATIONS, ...RESOLVED_INVITATIONS]) })}
+      initial={{ view: "invitations" }}
     />
   ),
+};
+
+export const RoleBindings: Story = {
+  render: () => <Members {...membersProps()} initial={{ view: "bindings" }} />,
 };
 
 /** Two bindings selected: the bulk revoke action shows. */
 export const WithSelection: Story = {
+  render: () => <Members {...membersProps()} initial={{ view: "bindings" }} />,
+  play: async ({ canvasElement }) => {
+    const boxes = within(canvasElement).getAllByRole("checkbox");
+    await userEvent.click(boxes[2]);
+    await userEvent.click(boxes[4]);
+    await expect(within(canvasElement).getByRole("button", { name: /Revoke 2/ })).toBeVisible();
+  },
+};
+
+/** A viewer without org.manage_members: no row menus, no selection column. */
+export const NoManageAccess: Story = {
   render: () => (
-    <MembersScreen
+    <Members {...membersProps({ canManageMembers: false })} initial={{ view: "bindings" }} />
+  ),
+};
+
+export const LongStrings: Story = {
+  render: () => (
+    <Members
       {...membersProps({
-        bindingSelection: fakeSelection(["b-2", "b-4"]),
+        people: pageData([...LONG_MEMBERS, ...MEMBERS], { totalCount: 1_284, nextCursor: "c2" }),
+        bindingIndexRows: [...LONG_BINDINGS, ...BINDINGS],
       })}
     />
   ),
 };
 
-/** A viewer without org.manage_members: no selection column. */
-export const NoManageAccess: Story = {
-  render: () => <MembersScreen {...membersProps({ canManageMembers: false })} />,
+export const LongInvitations: Story = {
+  render: () => (
+    <Members
+      {...membersProps({ invitations: pageData([...LONG_INVITATIONS, ...INVITATIONS]) })}
+      initial={{ view: "invited" }}
+    />
+  ),
 };
 
-export const LongStrings: Story = {
+export const Width768: Story = {
   render: () => (
-    <MembersScreen
-      {...membersProps({
-        membersTable: table<AstroliftMember>({
-          rows: [...LONG_MEMBERS, ...MEMBERS],
-          totalCount: 1_284,
-          hasNext: true,
-        }),
-        bindingsTable: table<AstroliftRoleBinding>({
-          rows: [...LONG_BINDINGS, ...BINDINGS],
-          totalCount: 3_907,
-          hasNext: true,
-        }),
-        bindingIndexRows: [...LONG_BINDINGS, ...BINDINGS],
-        invitationsTable: table<AstroliftInvitation>({
-          rows: [...LONG_INVITATIONS, ...INVITATIONS],
-          totalCount: 212,
-          hasNext: true,
-        }),
-      })}
-    />
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Members
+        {...membersProps({
+          people: pageData([...LONG_MEMBERS, ...MEMBERS]),
+          bindingIndexRows: [...LONG_BINDINGS, ...BINDINGS],
+        })}
+      />
+    </div>
   ),
 };

@@ -2,17 +2,16 @@
  * Hand-typed story fixtures for the administration access screens, typed
  * against each screen's props so a story cannot drift from its hook.
  */
-import { fakeController } from "@/components/data-table/fixtures";
-import type { CursorTableController } from "@/components/data-table/use-cursor-table";
 import type {
   AstroliftMember,
   AstroliftPolicy,
   AstroliftRoleBinding,
 } from "@/graphql/identity/identity.types";
 
-import type { CreatePolicySheetProps } from "./CreatePolicySheet";
+import type { CreatePolicyScreenProps } from "./CreatePolicyScreen";
 import type { MemberDetailProps } from "./MemberDetail";
 import type { PoliciesScreenProps } from "./PoliciesScreen";
+import type { ListPageData } from "./use-list-page-query";
 
 const USER = {
   id: "u-2f81",
@@ -83,6 +82,8 @@ export const MEMBER_DETAIL: MemberDetailProps = {
   id: MEMBER.id,
   member: MEMBER,
   loading: false,
+  error: null,
+  onRetry: () => {},
   roleBindings: ROLE_BINDINGS,
   rolesLoading: false,
 };
@@ -180,31 +181,42 @@ export const LONG_POLICIES: AstroliftPolicy[] = [
   },
 ];
 
+const noop = () => {};
 const noopAsync = async () => {};
 
-export function policiesProps(
-  table: Partial<CursorTableController<AstroliftPolicy>> = {},
-  overrides: Partial<PoliciesScreenProps> = {}
-): PoliciesScreenProps {
+/** One page of a cursor-paged list, as useListPageQuery returns it. */
+export function pageData<TRow>(
+  rows: TRow[],
+  patch: Partial<ListPageData<TRow>> = {}
+): ListPageData<TRow> {
   return {
-    table: fakeController<AstroliftPolicy>({
-      rows: POLICIES,
-      totalCount: POLICIES.length,
-      searchEnabled: true,
-      sortEnabled: false,
-      ...table,
-    }),
+    rows,
+    totalCount: rows.length,
+    nextCursor: null,
+    loading: false,
+    stale: false,
+    error: null,
+    refetch: noop,
+    ...patch,
+  };
+}
+
+/** Everything but the list controller, which a story makes with useLocalListState. */
+export function policiesProps(
+  page: Partial<ListPageData<AstroliftPolicy>> = {},
+  overrides: Partial<Omit<PoliciesScreenProps, "list">> = {}
+): Omit<PoliciesScreenProps, "list"> {
+  return {
+    page: pageData(POLICIES, page),
+    canManage: true,
     deleting: false,
     deletePolicy: noopAsync,
-    creating: false,
-    createPolicy: async () => true,
     ...overrides,
   };
 }
 
-export const CREATE_SHEET: CreatePolicySheetProps = {
-  open: true,
-  onOpenChange: () => {},
-  onCreate: async () => true,
+export const CREATE_POLICY: CreatePolicyScreenProps = {
   creating: false,
+  createPolicy: async () => null,
+  onCancel: noop,
 };

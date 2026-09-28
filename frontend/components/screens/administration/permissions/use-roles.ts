@@ -4,11 +4,15 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { CREATE_ROLE, UPDATE_ROLE } from "@/graphql/identity/identity.mutations";
 import { LIST_ROLES, LIST_ROLES_PAGE } from "@/graphql/identity/identity.queries";
 import type { AstroliftRole, MutationResult, ScopeKind } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { useListPageQuery } from "../access/use-list-page-query";
+import { ROLES_LIST } from "./permissions-lists";
 
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
@@ -35,20 +39,19 @@ export interface RoleDraft {
  */
 const ROLE_REFETCH = ["ListRolesPage", { query: LIST_ROLES }];
 
-/** The data half of RolesView: the roles page, the catalogue, and the editor's mutations. */
+/** The data half of RolesView: the roles list, the catalogue, and the editor's mutations. */
 export function useRoles() {
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
 
-  // `astroliftRolesPage` searches slug, name and description. It takes no
-  // sort argument, so no column declares a `sortKey`.
-  const table = useCursorTable<AstroliftRole>({
-    query: LIST_ROLES_PAGE,
-    extract: (d) => (d as RolesPageResp | undefined)?.astroliftRolesPage,
-    searchVariable: "search",
-    urlKey: "role",
-    fetchPolicy: "cache-and-network",
-  });
+  // `astroliftRolesPage` searches slug, name and description. The document
+  // sends no sort argument, so no column declares a `sortKey`.
+  const list = useListState(ROLES_LIST);
+  const page = useListPageQuery<AstroliftRole>(
+    LIST_ROLES_PAGE,
+    list,
+    (d) => (d as RolesPageResp | undefined)?.astroliftRolesPage
+  );
 
   // The flat list stays, and it is not the table's data source: the
   // permission checklist below is the union of *every* role's permission
@@ -120,7 +123,8 @@ export function useRoles() {
   }
 
   return {
-    table,
+    list,
+    page,
     allPermissions,
     canManage,
     createRole,

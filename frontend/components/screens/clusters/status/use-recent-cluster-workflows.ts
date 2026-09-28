@@ -15,9 +15,16 @@ export function useRecentClusterWorkflows(
   clusterId: string,
   { limit, pollInterval }: { limit: number; pollInterval?: number }
 ) {
-  const { data, loading } = useQuery<WorkflowsResp>(RECENT_CLUSTER_WORKFLOWS, {
+  const { data, loading, error, refetch } = useQuery<WorkflowsResp>(RECENT_CLUSTER_WORKFLOWS, {
     variables: { clusterId, limit },
     pollInterval,
   });
-  return { runs: data?.astroliftRecentClusterWorkflows ?? [], loading };
+  return {
+    runs: data?.astroliftRecentClusterWorkflows ?? [],
+    loading,
+    error: error?.message ?? null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 }

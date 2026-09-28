@@ -7,7 +7,7 @@ import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, detailProps } from "./fixtures";
 const meta: Meta = {
   title: "Screens/Clusters/List/ClusterDetail",
   parameters: {
-    layout: "fullscreen",
+    layout: "padded",
     nextjs: { navigation: { pathname: "/clusters/prd-us-west-2" } },
   },
 };
@@ -59,5 +59,19 @@ export const LongStrings: Story = {
         renderLiveStats: liveStats,
       })}
     />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ClusterDetail
+        {...detailProps({
+          slug: LONG_CLUSTER.slug,
+          cluster: LONG_CLUSTER,
+          renderLiveStats: liveStats,
+        })}
+      />
+    </div>
   ),
 };

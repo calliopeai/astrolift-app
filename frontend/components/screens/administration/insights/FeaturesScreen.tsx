@@ -1,12 +1,15 @@
 "use client";
 
-import { FlagIcon, Loader2Icon, LockIcon } from "lucide-react";
+import { AlertTriangleIcon, FlagIcon, Loader2Icon, LockIcon } from "lucide-react";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
+import { EmptyState } from "@/components/EmptyState";
+import { AdministrationShell } from "@/components/screens/administration/organization/AdministrationShell";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -71,16 +74,22 @@ function FeatureRow({
   control: React.ReactNode;
 }) {
   return (
-    <div className="border-border/60 flex items-center gap-4 border-b py-3 last:border-b-0">
+    <div className="border-border/60 flex min-w-0 items-center gap-4 border-b py-3 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{humanizeKey(featureKey)}</span>
-          <code className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-xs">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="min-w-0 font-medium [overflow-wrap:anywhere]">
+            {humanizeKey(featureKey)}
+          </span>
+          <code className="text-muted-foreground bg-muted max-w-full rounded px-1.5 py-0.5 font-mono text-xs [overflow-wrap:anywhere]">
             {featureKey}
           </code>
           {meta}
         </div>
-        {description && <p className="text-muted-foreground mt-0.5 text-sm">{description}</p>}
+        {description && (
+          <p className="text-muted-foreground mt-0.5 text-sm [overflow-wrap:anywhere]">
+            {description}
+          </p>
+        )}
       </div>
       <Badge variant={enabled ? "secondary" : "outline"} className="shrink-0">
         {enabled ? "On" : "Off"}
@@ -94,10 +103,10 @@ function RowSkeletons() {
   return (
     <div className="flex flex-col gap-3 py-2">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="flex items-center gap-4">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-72" />
+        <div key={i} className="flex min-w-0 items-center gap-4">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-4 w-48 max-w-full" />
+            <Skeleton className="h-3 w-72 max-w-full" />
           </div>
           <Skeleton className="h-6 w-11 rounded-full" />
         </div>
@@ -111,6 +120,8 @@ export function FeaturesScreen({
   runtimeFlags,
   buildTimeFeatures,
   loading,
+  error,
+  onRetry,
   pendingKey,
   toggleFlag,
 }: FeaturesScreenProps) {
@@ -119,101 +130,123 @@ export function FeaturesScreen({
   const [confirmFlag, setConfirmFlag] = React.useState<RuntimeFlag | null>(null);
 
   return (
-    <PageShell
+    <AdministrationShell
+      fnKey="features"
       title="Features"
       description="Toggle runtime feature flags for this install, and review the install-time features that require a redeploy to change."
     >
-      <TooltipProvider>
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FlagIcon className="size-4" /> Runtime flags
-              </CardTitle>
-              <CardDescription>
-                Flip these live — the change takes effect immediately across the install. Backed by
-                Constance; platform-admin only.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
-              {loading && runtimeFlags.length === 0 ? (
-                <RowSkeletons />
-              ) : runtimeFlags.length === 0 ? (
-                <p className="text-muted-foreground py-6 text-center text-sm">
-                  No runtime feature flags are published on this install.
-                </p>
-              ) : (
-                runtimeFlags.map((flag) => (
-                  <FeatureRow
-                    key={flag.key}
-                    featureKey={flag.key}
-                    description={flag.description}
-                    enabled={flag.enabled}
-                    control={
-                      <FlagSwitch
-                        checked={flag.enabled}
-                        pending={pendingKey === flag.key}
-                        disabled={pendingKey !== null && pendingKey !== flag.key}
-                        onToggle={() => setConfirmFlag(flag)}
-                        label={`Toggle ${flag.key}`}
+      {error && runtimeFlags.length === 0 && buildTimeFeatures.length === 0 ? (
+        <EmptyState
+          icon={<AlertTriangleIcon className="text-danger size-5" />}
+          title="Could not load features"
+          description={error.message}
+          secondary={
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        />
+      ) : (
+        <TooltipProvider>
+          <div className="flex min-w-0 flex-col gap-8">
+            <Section
+              title={
+                <span className="flex items-center gap-2">
+                  <FlagIcon className="size-4" /> Runtime flags
+                </span>
+              }
+              description="Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only."
+            >
+              <Card>
+                <CardContent className="flex min-w-0 flex-col">
+                  {loading && runtimeFlags.length === 0 ? (
+                    <RowSkeletons />
+                  ) : runtimeFlags.length === 0 ? (
+                    <p className="text-muted-foreground py-6 text-center text-sm">
+                      No runtime feature flags are published on this install.
+                    </p>
+                  ) : (
+                    runtimeFlags.map((flag) => (
+                      <FeatureRow
+                        key={flag.key}
+                        featureKey={flag.key}
+                        description={flag.description}
+                        enabled={flag.enabled}
+                        control={
+                          <FlagSwitch
+                            checked={flag.enabled}
+                            pending={pendingKey === flag.key}
+                            disabled={pendingKey !== null && pendingKey !== flag.key}
+                            onToggle={() => setConfirmFlag(flag)}
+                            label={`Toggle ${flag.key}`}
+                          />
+                        }
                       />
-                    }
-                  />
-                ))
-              )}
-            </CardContent>
-          </Card>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </Section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LockIcon className="size-4" /> Install-time features
-              </CardTitle>
-              <CardDescription>
-                These gate app loading at boot and cannot be flipped at runtime — change the
-                environment variable and redeploy. Shown for visibility.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
-              {loading && buildTimeFeatures.length === 0 ? (
-                <RowSkeletons />
-              ) : (
-                buildTimeFeatures.map((feat) => (
-                  <FeatureRow
-                    key={feat.key}
-                    featureKey={feat.key}
-                    description={feat.description}
-                    enabled={feat.enabled}
-                    meta={
-                      <Badge variant="outline" className="font-mono">
-                        {feat.envVar}
-                      </Badge>
-                    }
-                    control={
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          {/* span wrapper: a disabled button won't emit the
-                              hover events radix Tooltip listens for. */}
-                          <span className="inline-flex">
-                            <FlagSwitch
-                              checked={feat.enabled}
-                              disabled
-                              label={`${feat.key} (requires redeploy)`}
-                            />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Requires a redeploy — set {feat.envVar} and restart.
-                        </TooltipContent>
-                      </Tooltip>
-                    }
-                  />
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </TooltipProvider>
+            <Section
+              title={
+                <span className="flex items-center gap-2">
+                  <LockIcon className="size-4" /> Install-time features
+                </span>
+              }
+              description="These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility."
+            >
+              <Card>
+                <CardContent className="flex min-w-0 flex-col">
+                  {loading && buildTimeFeatures.length === 0 ? (
+                    <RowSkeletons />
+                  ) : buildTimeFeatures.length === 0 ? (
+                    <p className="text-muted-foreground py-6 text-center text-sm">
+                      No install-time features are reported by this install.
+                    </p>
+                  ) : (
+                    buildTimeFeatures.map((feat) => (
+                      <FeatureRow
+                        key={feat.key}
+                        featureKey={feat.key}
+                        description={feat.description}
+                        enabled={feat.enabled}
+                        meta={
+                          <Badge
+                            variant="outline"
+                            className="max-w-full font-mono [overflow-wrap:anywhere] whitespace-normal"
+                          >
+                            {feat.envVar}
+                          </Badge>
+                        }
+                        control={
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {/* span wrapper: a disabled button won't emit the
+                                  hover events radix Tooltip listens for. */}
+                              <span className="inline-flex">
+                                <FlagSwitch
+                                  checked={feat.enabled}
+                                  disabled
+                                  label={`${feat.key} (requires redeploy)`}
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Requires a redeploy — set{" "}
+                              <span className="font-mono">{feat.envVar}</span> and restart.
+                            </TooltipContent>
+                          </Tooltip>
+                        }
+                      />
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </Section>
+          </div>
+        </TooltipProvider>
+      )}
 
       <ConfirmDialog
         open={confirmFlag !== null}
@@ -236,6 +269,6 @@ export function FeaturesScreen({
           if (confirmFlag) await toggleFlag(confirmFlag);
         }}
       />
-    </PageShell>
+    </AdministrationShell>
   );
 }

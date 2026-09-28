@@ -12,10 +12,18 @@ interface HealthResp {
 
 /** Pod-phase rollup + recent Warning events from the driver, polled every 30s. */
 export function useClusterHealth(clusterId: string, eventLimit: number) {
-  const { data, loading } = useQuery<HealthResp>(CLUSTER_HEALTH, {
+  const { data, loading, error, refetch } = useQuery<HealthResp>(CLUSTER_HEALTH, {
     variables: { clusterId, eventLimit },
     pollInterval: 30000,
   });
   const payload = data?.astroliftClusterHealth;
-  return { pods: payload?.pods ?? [], events: payload?.events ?? [], loading };
+  return {
+    pods: payload?.pods ?? [],
+    events: payload?.events ?? [],
+    loading,
+    error: error?.message ?? null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 }

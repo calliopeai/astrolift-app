@@ -5,6 +5,7 @@ import { PermissionsDiagnosticsView } from "./PermissionsDiagnosticsView";
 
 const meta: Meta = {
   title: "Screens/Administration/Permissions/PermissionsDiagnosticsView",
+  parameters: { layout: "fullscreen" },
 };
 export default meta;
 
@@ -60,5 +61,15 @@ export const LongStrings: Story = {
         myBindings: LONG_BINDINGS,
       })}
     />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <PermissionsDiagnosticsView
+        {...diagnosticsProps({ permissions: LONG_PERMISSIONS, myBindings: LONG_BINDINGS })}
+      />
+    </div>
   ),
 };

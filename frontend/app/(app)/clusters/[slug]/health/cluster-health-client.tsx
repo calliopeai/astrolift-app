@@ -4,7 +4,6 @@ import { ClusterTabFrame } from "@/components/screens/clusters/status/ClusterTab
 import { useClusterBySlug } from "@/components/screens/clusters/status/use-cluster-by-slug";
 
 import { ClusterHealthContainer } from "../../_components/cluster-status-tabs";
-import { ClusterTabs } from "@/components/screens/clusters/list/ClusterTabs";
 
 /**
  * Cluster health tab — pod-phase rollup + recent warning events +
@@ -12,15 +11,15 @@ import { ClusterTabs } from "@/components/screens/clusters/list/ClusterTabs";
  * client; polls every 30s.
  */
 export function ClusterHealthClient({ slug }: { slug: string }) {
-  const { cluster, loading } = useClusterBySlug(slug);
+  const { cluster, loading, error, refetch } = useClusterBySlug(slug);
   return (
     <ClusterTabFrame
       slug={slug}
       cluster={cluster}
       loading={loading}
-      loadingTitle="Cluster health"
-      tabLabel="Health"
-      tabs={<ClusterTabs slug={slug} active="health" />}
+      error={error}
+      onRetry={refetch}
+      active="health"
     >
       {cluster ? <ClusterHealthContainer clusterId={cluster.id} /> : null}
     </ClusterTabFrame>

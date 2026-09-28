@@ -18,13 +18,16 @@ import {
   BotIcon,
   BoltIcon,
   BrainCircuitIcon,
+  BuildingIcon,
   CalendarClockIcon,
   ClipboardListIcon,
   CloudIcon,
   EyeIcon,
+  FlagIcon,
   FolderIcon,
   GaugeIcon,
   GlobeIcon,
+  HistoryIcon,
   HomeIcon,
   KeyRoundIcon,
   LayersIcon,
@@ -178,6 +181,13 @@ export const NAV: NavArea[] = [
         label: "Organization",
         functions: [
           {
+            key: "organization",
+            label: "Organization",
+            href: "/administration/organization",
+            icon: BuildingIcon,
+            module: "admin",
+          },
+          {
             key: "members",
             label: "Members",
             href: "/administration/members",
@@ -264,6 +274,23 @@ export const NAV: NavArea[] = [
             label: "Audit",
             href: "/administration/audit",
             icon: ScrollTextIcon,
+            module: "admin",
+          },
+          {
+            // The combined run audit (spec 44 §4.4, decision 14): agent and
+            // workflow runs, deployments and job runs in one list. Keyed apart
+            // from the Agents area's own Runs.
+            key: "run-audit",
+            label: "Runs",
+            href: "/administration/runs",
+            icon: HistoryIcon,
+            module: "admin",
+          },
+          {
+            key: "features",
+            label: "Features",
+            href: "/administration/features",
+            icon: FlagIcon,
             module: "admin",
           },
         ],

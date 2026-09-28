@@ -6,9 +6,9 @@ import * as React from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import {
   Select,
   SelectContent,
@@ -66,22 +66,20 @@ export function TrustedDomainsCard({
     React.useState<AstroliftOrganizationAllowlistedDomain | null>(null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Trusted email domains</CardTitle>
-        <CardDescription>
+    <Section
+      title="Trusted email domains"
+      description={
+        <>
           SSO users whose email belongs to one of these domains can join this organization without
           an explicit invitation. Set <em>Require admin review</em> to land them as pending members
           for approval before they get active access.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="grid gap-6">
-        <form
-          onSubmit={handleAdd}
-          className="grid gap-3 sm:grid-cols-[1fr_180px_180px_auto] sm:items-end"
-        >
-          <div className="space-y-2">
+        </>
+      }
+      divided
+    >
+      <div className="grid min-w-0 gap-6">
+        <form onSubmit={handleAdd} className="grid min-w-0 gap-3 sm:grid-cols-2 sm:items-end">
+          <div className="min-w-0 space-y-2 sm:col-span-2">
             <Label htmlFor="allowlist-domain">Domain</Label>
             <Input
               id="allowlist-domain"
@@ -89,10 +87,11 @@ export function TrustedDomainsCard({
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               autoComplete="off"
+              className="font-mono"
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="allowlist-role">Default role</Label>
             <Select value={roleSlug} onValueChange={setRoleSlug}>
               <SelectTrigger id="allowlist-role">
@@ -108,7 +107,7 @@ export function TrustedDomainsCard({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="allowlist-review">On sign-in</Label>
             <Select value={reviewMode} onValueChange={setReviewMode}>
               <SelectTrigger id="allowlist-review">
@@ -120,10 +119,12 @@ export function TrustedDomainsCard({
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={adding || !domain.trim()}>
-            <PlusIcon className="size-4" />
-            Add domain
-          </Button>
+          <div className="flex justify-end sm:col-span-2">
+            <Button type="submit" disabled={adding || !domain.trim()}>
+              <PlusIcon className="size-4" />
+              Add domain
+            </Button>
+          </div>
         </form>
 
         {loading ? (
@@ -149,10 +150,17 @@ export function TrustedDomainsCard({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="font-mono">{row.domain}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-mono [overflow-wrap:anywhere] whitespace-normal">
+                    {row.domain}
+                  </TableCell>
+                  <TableCell className="whitespace-normal">
                     {row.defaultRoleSlug ? (
-                      <Badge variant="secondary">{row.defaultRoleSlug}</Badge>
+                      <Badge
+                        variant="secondary"
+                        className="max-w-full font-mono [overflow-wrap:anywhere] whitespace-normal"
+                      >
+                        {row.defaultRoleSlug}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">none</span>
                     )}
@@ -181,7 +189,7 @@ export function TrustedDomainsCard({
             </TableBody>
           </Table>
         )}
-      </CardContent>
+      </div>
 
       <ConfirmDialog
         open={removeTarget !== null}
@@ -196,6 +204,6 @@ export function TrustedDomainsCard({
           if (removeTarget) await onRemove(removeTarget);
         }}
       />
-    </Card>
+    </Section>
   );
 }

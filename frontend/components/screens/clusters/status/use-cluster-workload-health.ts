@@ -12,9 +12,16 @@ interface WorkloadHealthResp {
 
 /** Per-Deployment readiness + 24h restarts (#362), polled every 30s. */
 export function useClusterWorkloadHealth(clusterId: string) {
-  const { data, loading } = useQuery<WorkloadHealthResp>(CLUSTER_WORKLOAD_HEALTH, {
+  const { data, loading, error, refetch } = useQuery<WorkloadHealthResp>(CLUSTER_WORKLOAD_HEALTH, {
     variables: { clusterId },
     pollInterval: 30000,
   });
-  return { rows: data?.astroliftClusterWorkloadHealth ?? [], loading };
+  return {
+    rows: data?.astroliftClusterWorkloadHealth ?? [],
+    loading,
+    error: error?.message ?? null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 }

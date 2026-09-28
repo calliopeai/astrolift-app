@@ -33,3 +33,12 @@ export const Error: Story = { args: houseThemeSaveFails };
 export const Locked: Story = { args: houseThemeLocked };
 
 export const LongStrings: Story = { args: { ...houseTheme, org: ORG_LONG } };
+
+/** The narrowest the web console goes (spec 44 §6). */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <HouseThemeCard {...{ ...houseTheme, org: ORG_LONG }} />
+    </div>
+  ),
+};

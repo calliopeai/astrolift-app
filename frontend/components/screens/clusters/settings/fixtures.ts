@@ -16,6 +16,15 @@ const yes = async () => true;
 export const LONG =
   "platform-team-shared-production-workloads-us-west-2-with-a-deliberately-long-name-that-keeps-going";
 
+/** A 64-character SHA, a 200-character ARN and an unbroken URL, for overflow stories. */
+export const SHA64 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+export const ARN200 = (
+  "arn:aws:cognito-idp:us-west-2:123456789012:userpool/us-west-2_AbCdEf123/" +
+  "platform-team-shared-production-workloads-with-a-deliberately-long-pool-path-" +
+  "that-keeps-going-and-going-until-it-is-two-hundreds"
+).slice(0, 200);
+export const UNBROKEN_URL = `https://${"a".repeat(40)}.gr7.us-west-2.eks.amazonaws.com/${"b".repeat(120)}`;
+
 export const BOOTSTRAP_RUN: BootstrapRun = {
   id: "run-3",
   status: "succeeded",
@@ -92,7 +101,16 @@ export const SETTINGS: ClusterSettingsScreenProps = {
   decommissioning: false,
   onBring: noop,
   onRefresh: noop,
-  onDecommission: yes,
+  onDecommission: noop,
+  access: { manage: true, update: true, users: true, unregister: true },
+};
+
+/** A viewer with none of the cluster permissions. */
+export const NO_ACCESS: ClusterSettingsScreenProps["access"] = {
+  manage: false,
+  update: false,
+  users: false,
+  unregister: false,
 };
 
 export const HISTORY: BootstrapHistoryViewProps = {

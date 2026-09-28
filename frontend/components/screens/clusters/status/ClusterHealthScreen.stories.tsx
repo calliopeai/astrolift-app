@@ -1,44 +1,32 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { DetailTabRow } from "@/components/DetailPageTabs";
-
 import { ClusterHealthBody, type ClusterHealthBodyProps } from "./ClusterHealthScreen";
 import { ClusterTabFrame } from "./ClusterTabFrame";
-import { CLUSTER, HEALTH, HEALTH_LONG, LONG_CLUSTER, WORKLOADS, WORKLOADS_LONG } from "./fixtures";
+import {
+  CLUSTER,
+  HEALTH,
+  HEALTH_LONG,
+  LONG_CLUSTER,
+  QUERY_FAILED,
+  QUERY_OK,
+  WORKLOADS,
+  WORKLOADS_LONG,
+} from "./fixtures";
 
 const meta: Meta = {
   title: "Screens/Clusters/Status/ClusterHealth",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
-
-const tabs = (
-  <DetailTabRow
-    ariaLabel="Cluster tabs"
-    tabs={["Overview", "Status", "Health", "Activity", "Settings"].map((label) => ({
-      key: label.toLowerCase(),
-      label,
-      href: "#",
-      active: label === "Health",
-    }))}
-  />
-);
 
 function Screen({
   cluster = CLUSTER,
   ...body
 }: ClusterHealthBodyProps & { cluster?: typeof CLUSTER }) {
   return (
-    <ClusterTabFrame
-      slug={cluster.slug}
-      cluster={cluster}
-      loading={false}
-      loadingTitle="Cluster health"
-      tabLabel="Health"
-      tabs={tabs}
-    >
+    <ClusterTabFrame slug={cluster.slug} cluster={cluster} loading={false} active="health">
       <ClusterHealthBody {...body} />
     </ClusterTabFrame>
   );
@@ -49,8 +37,8 @@ export const Full: Story = { render: () => <Screen health={HEALTH} workloads={WO
 export const Loading: Story = {
   render: () => (
     <Screen
-      health={{ pods: [], events: [], loading: true }}
-      workloads={{ rows: [], loading: true }}
+      health={{ pods: [], events: [], loading: true, ...QUERY_OK }}
+      workloads={{ rows: [], loading: true, ...QUERY_OK }}
     />
   ),
 };
@@ -59,8 +47,18 @@ export const Loading: Story = {
 export const Empty: Story = {
   render: () => (
     <Screen
-      health={{ pods: [], events: [], loading: false }}
-      workloads={{ rows: [], loading: false }}
+      health={{ pods: [], events: [], loading: false, ...QUERY_OK }}
+      workloads={{ rows: [], loading: false, ...QUERY_OK }}
+    />
+  ),
+};
+
+/** Both queries failed: each panel keeps its frame and offers a retry. */
+export const LoadError: Story = {
+  render: () => (
+    <Screen
+      health={{ pods: [], events: [], loading: false, ...QUERY_FAILED }}
+      workloads={{ rows: [], loading: false, ...QUERY_FAILED }}
     />
   ),
 };
@@ -74,7 +72,7 @@ export const ErrorState: Story = {
         pods: [{ namespace: "astrolift-apps", phase: "Failed", count: 9 }],
       }}
       workloads={{
-        loading: false,
+        ...WORKLOADS,
         rows: WORKLOADS.rows.map((r) => ({ ...r, readyReplicas: 0, restartCount24h: 12 })),
       }}
     />
@@ -83,4 +81,13 @@ export const ErrorState: Story = {
 
 export const LongStrings: Story = {
   render: () => <Screen cluster={LONG_CLUSTER} health={HEALTH_LONG} workloads={WORKLOADS_LONG} />,
+};
+
+/** At 768px the workload table scrolls inside its panel; the page never widens. */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Screen cluster={LONG_CLUSTER} health={HEALTH_LONG} workloads={WORKLOADS_LONG} />
+    </div>
+  ),
 };

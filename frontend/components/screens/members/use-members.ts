@@ -2,10 +2,11 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
-import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable, useRowSelection, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
+import { useListPageQuery } from "@/components/screens/administration/access/use-list-page-query";
 import {
   ANONYMIZE_USER,
   BULK_REVOKE_ROLE_BINDINGS,
@@ -30,10 +31,11 @@ import type {
   AstroliftRole,
   AstroliftRoleBinding,
   AstroliftTeam,
-  InvitationStatus,
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { MEMBERS_LIST, type MembersView } from "./members-list";
 
 interface MembersPageResp {
   astroliftMembersPage: CursorPage<AstroliftMember>;
@@ -60,9 +62,10 @@ interface InvitationsPageResp {
 const BINDING_INDEX_LIMIT = 200;
 
 /**
- * The data half of MembersScreen: the People, Role bindings and
- * Invitations tables, the lookups their cells resolve against, and every
- * revoke / resend / delete / anonymize mutation.
+ * The data half of MembersScreen: the list state (URL), the one query its
+ * view needs (people, invitations or role bindings), the lookups their
+ * cells resolve against, and every revoke / resend / delete / anonymize
+ * mutation.
  */
 export function useMembers() {
   // Bulk-revoke (#416) lives in its own i18n namespace so the team-
@@ -72,34 +75,31 @@ export function useMembers() {
   const perms = useMyPermissions();
   const canManageMembers = perms.can("org.manage_members");
 
-  // Resolved (revoked/accepted/expired) invitations are hidden by
-  // default and deletable — pending ones keep the resend/revoke pair.
-  // `null` means "every status"; the filter is a query variable, so the
-  // server does the narrowing and the cursor walk resets when it flips.
-  const [inviteStatus, setInviteStatus] = React.useState<InvitationStatus | null>("pending");
+  const list = useListState(MEMBERS_LIST);
+  const view = list.state.view as MembersView;
+  const invitationView = view === "invited" || view === "invitations";
 
-  const membersTable = useCursorTable<AstroliftMember>({
-    query: LIST_MEMBERS_PAGE,
-    extract: (d) => (d as MembersPageResp | undefined)?.astroliftMembersPage,
-    searchVariable: "search",
-    urlKey: "ppl",
-  });
-
-  const bindingsTable = useCursorTable<AstroliftRoleBinding>({
-    query: LIST_ROLE_BINDINGS_PAGE,
-    extract: (d) => (d as RoleBindingsPageResp | undefined)?.astroliftRoleBindingsPage,
-    searchVariable: "search",
-    urlKey: "rb",
-  });
-  const bindingSelection = useRowSelection();
-
-  const invitationsTable = useCursorTable<AstroliftInvitation>({
-    query: LIST_INVITATIONS_PAGE,
-    variables: { status: inviteStatus },
-    extract: (d) => (d as InvitationsPageResp | undefined)?.astroliftInvitationsPage,
-    searchVariable: "search",
-    urlKey: "inv",
-  });
+  // Only the active view's query runs. The Invited view is the `status:
+  // pending` filter; Invitation history is every status (`null`), where
+  // resolved invitations can be deleted.
+  const people = useListPageQuery<AstroliftMember>(
+    LIST_MEMBERS_PAGE,
+    list,
+    (d) => (d as MembersPageResp | undefined)?.astroliftMembersPage,
+    { skip: view !== "all" }
+  );
+  const invitations = useListPageQuery<AstroliftInvitation>(
+    LIST_INVITATIONS_PAGE,
+    list,
+    (d) => (d as InvitationsPageResp | undefined)?.astroliftInvitationsPage,
+    { variables: { status: list.filters.status ?? null }, skip: !invitationView }
+  );
+  const bindings = useListPageQuery<AstroliftRoleBinding>(
+    LIST_ROLE_BINDINGS_PAGE,
+    list,
+    (d) => (d as RoleBindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    { skip: view !== "bindings" }
+  );
 
   const bindingIndex = useQuery<RoleBindingsPageResp>(LIST_ROLE_BINDINGS_PAGE, {
     variables: { limit: BINDING_INDEX_LIMIT },
@@ -227,10 +227,12 @@ export function useMembers() {
     }
   }
 
-  /** Revokes the selected bindings; the view closes its confirm when this settles. */
-  async function onBulkRevoke(): Promise<void> {
-    const ids = bindingSelection.selectedIds;
-    if (ids.length === 0) return;
+  /**
+   * Revokes the selected bindings. Resolves true when any were revoked, so the
+   * view clears its selection; the view closes its confirm when this settles.
+   */
+  async function onBulkRevoke(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return false;
     const { data } = await bulkRevoke({
       variables: { input: { bindingIds: ids } },
     });
@@ -241,7 +243,7 @@ export function useMembers() {
           message: env?.errors?.[0]?.message ?? "unknown error",
         })
       );
-      return;
+      return false;
     }
     const { revokedCount, failedCount } = env.data;
     if (failedCount === 0) {
@@ -254,7 +256,7 @@ export function useMembers() {
         })
       );
     }
-    bindingSelection.clear();
+    return true;
   }
 
   // Right-to-delete (GDPR) — anonymize a user's PII while preserving
@@ -279,12 +281,10 @@ export function useMembers() {
 
   return {
     canManageMembers,
-    membersTable,
-    bindingsTable,
-    bindingSelection,
-    invitationsTable,
-    inviteStatus,
-    setInviteStatus,
+    list,
+    people,
+    invitations,
+    bindings,
     bindingIndexRows: bindingIndex.data?.astroliftRoleBindingsPage.items,
     teams: teams.data?.astroliftTeams,
     projects: projects.data?.astroliftProjects,

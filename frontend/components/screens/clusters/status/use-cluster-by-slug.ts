@@ -11,7 +11,7 @@ interface Resp {
 
 /** One cluster out of the (preloaded) cluster list, by slug. */
 export function useClusterBySlug(slug: string) {
-  const { data, loading } = useQuery<Resp>(LIST_CLUSTERS);
+  const { data, loading, error, refetch } = useQuery<Resp>(LIST_CLUSTERS);
   const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug) ?? null;
-  return { cluster, loading };
+  return { cluster, loading, error: error?.message ?? null, refetch: () => void refetch() };
 }

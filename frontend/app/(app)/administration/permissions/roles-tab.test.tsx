@@ -77,6 +77,13 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// The roles list keeps its search and page in the URL (spec 44 §5.1); this
+// run has no app router to hold it.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => true, loading: false }),
 }));

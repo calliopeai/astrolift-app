@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { DetailTabRow } from "@/components/DetailPageTabs";
-
 import {
   ClusterStatusBody,
   type ClusterStatusBodyProps,
@@ -29,6 +27,8 @@ import {
   METRICS_LONG,
   METRICS_NO_ENDPOINT,
   METRICS_UNREACHABLE,
+  QUERY_FAILED,
+  QUERY_OK,
   WORKFLOWS,
   WORKFLOWS_LONG,
   WORKLOADS,
@@ -37,23 +37,11 @@ import {
 
 const meta: Meta = {
   title: "Screens/Clusters/Status/ClusterStatus",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
-
-const tabs = (
-  <DetailTabRow
-    ariaLabel="Cluster tabs"
-    tabs={["Overview", "Status", "Health", "Activity", "Settings"].map((label) => ({
-      key: label.toLowerCase(),
-      label,
-      href: "#",
-      active: label === "Status",
-    }))}
-  />
-);
 
 const FULL: ClusterStatusBodyProps = {
   slug: CLUSTER.slug,
@@ -68,14 +56,7 @@ const FULL: ClusterStatusBodyProps = {
 function Screen(props: Partial<ClusterStatusBodyProps> & { cluster?: typeof CLUSTER }) {
   const { cluster = CLUSTER, ...body } = props;
   return (
-    <ClusterTabFrame
-      slug={cluster.slug}
-      cluster={cluster}
-      loading={false}
-      loadingTitle="Cluster status"
-      tabLabel="Status"
-      tabs={tabs}
-    >
+    <ClusterTabFrame slug={cluster.slug} cluster={cluster} loading={false} active="status">
       <ClusterStatusBody {...FULL} slug={cluster.slug} {...body} />
     </ClusterTabFrame>
   );
@@ -87,7 +68,10 @@ export const Full: Story = { render: () => <Screen /> };
 /** Heartbeat still loading: offline stand-ins until the live state lands. */
 export const Loading: Story = {
   render: () => (
-    <Screen liveState={LIVE_LOADING} lifecycle={<StatusLifecycleCard entries={[]} loading />} />
+    <Screen
+      liveState={LIVE_LOADING}
+      lifecycle={<StatusLifecycleCard entries={[]} loading {...QUERY_OK} />}
+    />
   ),
 };
 
@@ -96,10 +80,10 @@ export const CardsLoading: Story = {
   render: () => (
     <Screen
       metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS_LOADING} />}
-      workloads={<StatusWorkloadHealthCard rows={[]} loading />}
-      liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading />}
-      workflows={<StatusRecentWorkflowsCard runs={[]} loading />}
-      lifecycle={<StatusLifecycleCard entries={[]} loading />}
+      workloads={<StatusWorkloadHealthCard rows={[]} loading {...QUERY_OK} />}
+      liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading {...QUERY_OK} />}
+      workflows={<StatusRecentWorkflowsCard runs={[]} loading {...QUERY_OK} />}
+      lifecycle={<StatusLifecycleCard entries={[]} loading {...QUERY_OK} />}
     />
   ),
 };
@@ -109,10 +93,10 @@ export const Empty: Story = {
   render: () => (
     <Screen
       metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS_NO_ENDPOINT} />}
-      workloads={<StatusWorkloadHealthCard rows={[]} loading={false} />}
-      liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading={false} />}
-      workflows={<StatusRecentWorkflowsCard runs={[]} loading={false} />}
-      lifecycle={<StatusLifecycleCard entries={[]} loading={false} />}
+      workloads={<StatusWorkloadHealthCard rows={[]} loading={false} {...QUERY_OK} />}
+      liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading={false} {...QUERY_OK} />}
+      workflows={<StatusRecentWorkflowsCard runs={[]} loading={false} {...QUERY_OK} />}
+      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_OK} />}
     />
   ),
 };
@@ -141,5 +125,52 @@ export const LongStrings: Story = {
       workflows={<StatusRecentWorkflowsCard {...WORKFLOWS_LONG} />}
       lifecycle={<StatusLifecycleCard {...AUDIT_LONG} />}
     />
+  ),
+};
+
+/** Every query failed: each panel keeps its frame and offers a retry. */
+export const LoadError: Story = {
+  render: () => (
+    <Screen
+      liveState={{ state: null, loading: false, ...QUERY_FAILED }}
+      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_FAILED} />}
+    />
+  ),
+};
+
+/** Connected, but the driver-backed queries failed. */
+export const CardsError: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <StatusMetricsCard
+          slug={CLUSTER.slug}
+          {...METRICS}
+          range={null}
+          instant={null}
+          {...QUERY_FAILED}
+        />
+      }
+      workloads={<StatusWorkloadHealthCard rows={[]} loading={false} {...QUERY_FAILED} />}
+      liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading={false} {...QUERY_FAILED} />}
+      workflows={<StatusRecentWorkflowsCard runs={[]} loading={false} {...QUERY_FAILED} />}
+      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_FAILED} />}
+    />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Screen
+        cluster={LONG_CLUSTER}
+        liveState={LIVE_LONG}
+        metrics={<StatusMetricsCard slug={LONG_CLUSTER.slug} {...METRICS_LONG} />}
+        workloads={<StatusWorkloadHealthCard {...WORKLOADS_LONG} />}
+        liveHealth={<StatusLiveHealthCard {...HEALTH_LONG} />}
+        workflows={<StatusRecentWorkflowsCard {...WORKFLOWS_LONG} />}
+        lifecycle={<StatusLifecycleCard {...AUDIT_LONG} />}
+      />
+    </div>
   ),
 };

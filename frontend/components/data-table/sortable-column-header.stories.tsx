@@ -25,3 +25,24 @@ function Demo() {
   );
 }
 export const Default: StoryObj = { render: () => <Demo /> };
+
+/** Shift-click adds a key; each sorted column shows its rank. */
+export const MultiKey: StoryObj = {
+  render: () => (
+    <div className="flex gap-6">
+      {["status", "agent", "started"].map((key) => (
+        <SortableColumnHeader
+          key={key}
+          sortKey={key}
+          sort={[
+            { key: "status", dir: "asc" },
+            { key: "started", dir: "desc" },
+          ]}
+          onToggle={() => {}}
+        >
+          {key[0].toUpperCase() + key.slice(1)}
+        </SortableColumnHeader>
+      ))}
+    </div>
+  ),
+};

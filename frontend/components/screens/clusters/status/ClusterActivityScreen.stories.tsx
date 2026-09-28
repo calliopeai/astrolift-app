@@ -1,44 +1,32 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { DetailTabRow } from "@/components/DetailPageTabs";
-
 import { ClusterActivityBody, type ClusterActivityBodyProps } from "./ClusterActivityScreen";
 import { ClusterTabFrame } from "./ClusterTabFrame";
-import { AUDIT, AUDIT_LONG, CLUSTER, LONG_CLUSTER, WORKFLOWS, WORKFLOWS_LONG } from "./fixtures";
+import {
+  AUDIT,
+  AUDIT_LONG,
+  CLUSTER,
+  LONG_CLUSTER,
+  QUERY_FAILED,
+  QUERY_OK,
+  WORKFLOWS,
+  WORKFLOWS_LONG,
+} from "./fixtures";
 
 const meta: Meta = {
   title: "Screens/Clusters/Status/ClusterActivity",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
-
-const tabs = (
-  <DetailTabRow
-    ariaLabel="Cluster tabs"
-    tabs={["Overview", "Status", "Health", "Activity", "Settings"].map((label) => ({
-      key: label.toLowerCase(),
-      label,
-      href: "#",
-      active: label === "Activity",
-    }))}
-  />
-);
 
 function Screen({
   cluster = CLUSTER,
   ...body
 }: ClusterActivityBodyProps & { cluster?: typeof CLUSTER }) {
   return (
-    <ClusterTabFrame
-      slug={cluster.slug}
-      cluster={cluster}
-      loading={false}
-      loadingTitle="Cluster activity"
-      tabLabel="Activity"
-      tabs={tabs}
-    >
+    <ClusterTabFrame slug={cluster.slug} cluster={cluster} loading={false} active="activity">
       <ClusterActivityBody {...body} />
     </ClusterTabFrame>
   );
@@ -48,13 +36,29 @@ export const Full: Story = { render: () => <Screen workflows={WORKFLOWS} lifecyc
 
 export const Loading: Story = {
   render: () => (
-    <Screen workflows={{ runs: [], loading: true }} lifecycle={{ entries: [], loading: true }} />
+    <Screen
+      workflows={{ runs: [], loading: true, ...QUERY_OK }}
+      lifecycle={{ entries: [], loading: true, ...QUERY_OK }}
+    />
   ),
 };
 
 export const Empty: Story = {
   render: () => (
-    <Screen workflows={{ runs: [], loading: false }} lifecycle={{ entries: [], loading: false }} />
+    <Screen
+      workflows={{ runs: [], loading: false, ...QUERY_OK }}
+      lifecycle={{ entries: [], loading: false, ...QUERY_OK }}
+    />
+  ),
+};
+
+/** Temporal and the audit log both failed: errors with a retry in each panel. */
+export const LoadError: Story = {
+  render: () => (
+    <Screen
+      workflows={{ runs: [], loading: false, ...QUERY_FAILED }}
+      lifecycle={{ entries: [], loading: false, ...QUERY_FAILED }}
+    />
   ),
 };
 
@@ -63,11 +67,11 @@ export const ErrorState: Story = {
   render: () => (
     <Screen
       workflows={{
-        loading: false,
+        ...WORKFLOWS,
         runs: WORKFLOWS.runs.map((r) => ({ ...r, status: "FAILED" })),
       }}
       lifecycle={{
-        loading: false,
+        ...AUDIT,
         entries: AUDIT.entries.map((e) => ({
           ...e,
           success: false,
@@ -80,4 +84,12 @@ export const ErrorState: Story = {
 
 export const LongStrings: Story = {
   render: () => <Screen cluster={LONG_CLUSTER} workflows={WORKFLOWS_LONG} lifecycle={AUDIT_LONG} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Screen cluster={LONG_CLUSTER} workflows={WORKFLOWS_LONG} lifecycle={AUDIT_LONG} />
+    </div>
+  ),
 };

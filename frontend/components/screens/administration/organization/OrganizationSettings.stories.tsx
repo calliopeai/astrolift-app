@@ -65,3 +65,13 @@ export const LongStrings: Story = {
     modules: <ModulesCard {...modulesLong} />,
   },
 };
+
+/** The narrowest the web console goes (spec 44 §6): the section nav becomes a select. */
+export const Width768: Story = {
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <OrganizationSettings {...args} />
+    </div>
+  ),
+  args: LongStrings.args,
+};

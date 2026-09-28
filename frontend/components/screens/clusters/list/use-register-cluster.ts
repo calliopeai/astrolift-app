@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -30,11 +31,30 @@ export interface RegisterClusterInput {
   authConfig: unknown;
 }
 
+/** Keys of RegisterClusterInput, which are also the mutation's error `field`s. */
+export type RegisterField = keyof RegisterClusterInput;
+
+/** A refused register: errors by field, shown in place, and any the form owns. */
+export type RegisterResult =
+  | { ok: true }
+  | { ok: false; fieldErrors: Partial<Record<RegisterField, string>>; formError: string | null };
+
+const FIELDS: RegisterField[] = [
+  "name",
+  "slug",
+  "providerPluginSlug",
+  "authMethod",
+  "region",
+  "endpoint",
+  "ingressClass",
+  "authConfig",
+];
+
 /**
  * The provider catalog, the selected provider's regions and the register
- * mutation behind the register sheet. The data half of
- * RegisterClusterSheet. The selected plugin lives here, not in the view,
- * because it keys the regions query.
+ * mutation behind the register page. The data half of RegisterClusterPage.
+ * The selected plugin lives here, not in the view, because it keys the
+ * regions query.
  */
 export function useRegisterCluster() {
   const plugins = useQuery<{
@@ -68,15 +88,30 @@ export function useRegisterCluster() {
     awaitRefetchQueries: true,
   });
 
-  /** Resolves true when the cluster registered, so the view can close. */
-  async function onRegister(input: RegisterClusterInput): Promise<boolean> {
+  const router = useRouter();
+
+  /**
+   * On success, a toast (the outcome) and the new cluster's page, where
+   * Bring into management is the next step. On refusal, the errors go back
+   * to the form to show beside their fields (spec 44 §5.4).
+   */
+  async function onRegister(input: RegisterClusterInput): Promise<RegisterResult> {
     const { data } = await register({ variables: { input } });
     if (data?.registerTenantCluster.ok) {
       toast.success(`Registered ${input.slug}`);
-      return true;
+      router.push(`/clusters/${data.registerTenantCluster.data?.slug ?? input.slug}`);
+      return { ok: true };
     }
-    toast.error(data?.registerTenantCluster.errors?.[0]?.message ?? "Failed");
-    return false;
+    const fieldErrors: Partial<Record<RegisterField, string>> = {};
+    const rest: string[] = [];
+    for (const e of data?.registerTenantCluster.errors ?? []) {
+      const field = FIELDS.find((f) => f === e.field);
+      if (field && !fieldErrors[field]) fieldErrors[field] = e.message;
+      else rest.push(e.message);
+    }
+    const formError =
+      rest.join(" ") || (Object.keys(fieldErrors).length === 0 ? "Registration failed." : null);
+    return { ok: false, fieldErrors, formError };
   }
 
   return {

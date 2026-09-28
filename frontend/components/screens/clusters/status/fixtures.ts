@@ -14,11 +14,23 @@ const HOUR = 3_600_000;
 const BASE = Date.UTC(2026, 8, 28, 12, 0, 0);
 const iso = (offsetMs: number) => new Date(BASE - offsetMs).toISOString();
 
+/** The query half every hook returns: no error, and a retry that does nothing here. */
+export const QUERY_OK = { error: null as string | null, refetch: () => {} };
+
+/** A query that failed, as the hooks surface it. */
+export const QUERY_FAILED = {
+  error: "Network error: upstream driver call timed out after 30000ms",
+  refetch: () => {},
+};
+
 export const CLUSTER: ClusterSummary = {
   id: "cl_01",
   name: "Production east",
   slug: "prod-east",
   providerPluginSlug: "aws-eks",
+  region: "us-east-1",
+  lifecycle: "managed",
+  isActive: true,
 };
 
 export const LONG_CLUSTER: ClusterSummary = {
@@ -26,6 +38,9 @@ export const LONG_CLUSTER: ClusterSummary = {
   name: "Production east shared multi-tenant platform cluster for regulated workloads",
   slug: "prod-east-shared-multi-tenant-platform-cluster-for-regulated-workloads",
   providerPluginSlug: "azure-aks-private-endpoint-with-customer-managed-keys",
+  region: "eastus2-availability-zone-3-with-customer-managed-private-link-endpoint",
+  lifecycle: "error",
+  isActive: false,
 };
 
 // ─── Live state ───────────────────────────────────────────────────────
@@ -54,11 +69,13 @@ const CONNECTED_STATE: ClusterLiveState = {
 export const LIVE_CONNECTED: ReturnType<typeof useClusterLiveState> = {
   state: CONNECTED_STATE,
   loading: false,
+  ...QUERY_OK,
 };
 
 export const LIVE_LOADING: ReturnType<typeof useClusterLiveState> = {
   state: null,
   loading: true,
+  ...QUERY_OK,
 };
 
 export const LIVE_OFFLINE: ReturnType<typeof useClusterLiveState> = {
@@ -69,6 +86,7 @@ export const LIVE_OFFLINE: ReturnType<typeof useClusterLiveState> = {
     heartbeatAgeSeconds: 18_000,
   },
   loading: false,
+  ...QUERY_OK,
 };
 
 export const LIVE_NEVER_SEEN: ReturnType<typeof useClusterLiveState> = {
@@ -89,6 +107,7 @@ export const LIVE_NEVER_SEEN: ReturnType<typeof useClusterLiveState> = {
     agentVersion: "",
   },
   loading: false,
+  ...QUERY_OK,
 };
 
 export const LIVE_LONG: ReturnType<typeof useClusterLiveState> = {
@@ -106,10 +125,10 @@ export const LIVE_LONG: ReturnType<typeof useClusterLiveState> = {
     agentVersion: "v0.1.38-rc.2+build.20260928.f1f9f11a0c2e4b7d",
   },
   loading: false,
+  ...QUERY_OK,
 };
 
 // ─── Prometheus ───────────────────────────────────────────────────────
-const noop = () => {};
 
 function series(start: number, amplitude: number, count = 24): RangePoint[] {
   const t0 = Math.floor(BASE / 1000) - count * 60;
@@ -182,11 +201,12 @@ const RANGE: PrometheusRange = {
 
 export const METRICS: ReturnType<typeof useClusterMetrics> = {
   selectedWindow: "1h",
-  onWindowChange: noop,
+  onWindowChange: () => {},
   range: RANGE,
   rangeLoading: false,
   instant: INSTANT,
   instantLoading: false,
+  ...QUERY_OK,
 };
 
 export const METRICS_LOADING: ReturnType<typeof useClusterMetrics> = {
@@ -236,6 +256,7 @@ export const METRICS_LONG: ReturnType<typeof useClusterMetrics> = {
 // ─── Driver health ────────────────────────────────────────────────────
 export const WORKLOADS: ReturnType<typeof useClusterWorkloadHealth> = {
   loading: false,
+  ...QUERY_OK,
   rows: [
     {
       namespace: "astrolift-apps",
@@ -274,6 +295,7 @@ export const WORKLOADS: ReturnType<typeof useClusterWorkloadHealth> = {
 
 export const WORKLOADS_LONG: ReturnType<typeof useClusterWorkloadHealth> = {
   loading: false,
+  ...QUERY_OK,
   rows: [
     {
       namespace: "customer-facing-payments-reconciliation-namespace",
@@ -289,6 +311,7 @@ export const WORKLOADS_LONG: ReturnType<typeof useClusterWorkloadHealth> = {
 
 export const HEALTH: ReturnType<typeof useClusterHealth> = {
   loading: false,
+  ...QUERY_OK,
   pods: [
     { namespace: "astrolift-apps", phase: "Running", count: 112 },
     { namespace: "astrolift-apps", phase: "Pending", count: 3 },
@@ -335,6 +358,7 @@ export const HEALTH: ReturnType<typeof useClusterHealth> = {
 
 export const HEALTH_LONG: ReturnType<typeof useClusterHealth> = {
   loading: false,
+  ...QUERY_OK,
   pods: [
     {
       namespace: "customer-facing-payments-reconciliation-namespace",
@@ -362,6 +386,7 @@ export const HEALTH_LONG: ReturnType<typeof useClusterHealth> = {
 // ─── Temporal + audit ─────────────────────────────────────────────────
 export const WORKFLOWS: ReturnType<typeof useRecentClusterWorkflows> = {
   loading: false,
+  ...QUERY_OK,
   runs: [
     {
       workflowId: "refresh-cl_01-1",
@@ -400,6 +425,7 @@ export const WORKFLOWS: ReturnType<typeof useRecentClusterWorkflows> = {
 
 export const WORKFLOWS_LONG: ReturnType<typeof useRecentClusterWorkflows> = {
   loading: false,
+  ...QUERY_OK,
   runs: [
     {
       workflowId: "long-1",
@@ -414,6 +440,7 @@ export const WORKFLOWS_LONG: ReturnType<typeof useRecentClusterWorkflows> = {
 
 export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
   loading: false,
+  ...QUERY_OK,
   entries: [
     {
       operation: "refreshClusterManagement",
@@ -444,6 +471,7 @@ export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
 
 export const AUDIT_LONG: ReturnType<typeof useClusterLifecycleAudit> = {
   loading: false,
+  ...QUERY_OK,
   entries: [
     {
       operation: "decommissionClusterAndReleaseAllProviderResourcesImmediately",

@@ -4,43 +4,84 @@ import { LockIcon, PlusIcon, ShieldIcon } from "lucide-react";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
 import type { AstroliftRole } from "@/graphql/identity/identity.types";
 
+import { permissionsCrumbs } from "../access/admin-crumbs";
 import { RoleEditorSheet, type EditorMode } from "./RoleEditorSheet";
 import { SCOPE_TONE } from "./scope-tone";
 import type { useRoles } from "./use-roles";
 
 export type RolesViewProps = ReturnType<typeof useRoles>;
 
-/** The Roles tab of the Permissions screen: the roles table and its editor sheet. */
+/** Admin › Permissions › Roles: the roles list (spec 44 §5.1) and its editor sheet. */
 export function RolesView({
-  table,
+  list,
+  page,
   allPermissions,
   canManage,
   createRole,
   updateRole,
   saving,
 }: RolesViewProps) {
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [sheetMode, setSheetMode] = React.useState<EditorMode>("create");
+  // In edit mode this is the role being edited; in create mode it is an
+  // optional seed to clone from (null = blank new role).
+  const [sheetRole, setSheetRole] = React.useState<AstroliftRole | null>(null);
+
+  function openCreate() {
+    setSheetMode("create");
+    setSheetRole(null);
+    setSheetOpen(true);
+  }
+  function openRole(role: AstroliftRole) {
+    setSheetMode("edit");
+    setSheetRole(role);
+    setSheetOpen(true);
+  }
+  function cloneRole(role: AstroliftRole) {
+    // Switch the open sheet from a read-only system role into a fresh
+    // create form seeded with that role's permissions — the "clone and
+    // prune" path the backend documents for system roles.
+    setSheetMode("create");
+    setSheetRole(role);
+  }
+
   const columns: Column<AstroliftRole>[] = [
     {
       id: "role",
       header: "Role",
+      cellClassName: "max-w-96",
+      // A role has no page of its own: its name opens the editor sheet,
+      // read-only for a system role or a viewer without manage.
       cell: (role) => (
-        <>
-          <div className="font-medium">{role.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">{role.slug}</div>
-        </>
+        <button
+          type="button"
+          onClick={() => openRole(role)}
+          aria-label={`${role.isSystem || !canManage ? "View" : "Edit"} role ${role.name}`}
+          className="focus-visible:ring-ring block w-full min-w-0 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <span className="block truncate font-medium hover:underline" title={role.name}>
+            {role.name}
+          </span>
+          <span
+            className="text-muted-foreground block truncate font-mono text-xs"
+            title={role.slug}
+          >
+            {role.slug}
+          </span>
+        </button>
       ),
     },
     {
       id: "scope",
       header: "Scope",
       cell: (role) => (
-        <Badge className={SCOPE_TONE[role.scopeLevel]} variant="secondary">
+        <Badge className={`${SCOPE_TONE[role.scopeLevel] ?? ""} font-mono`} variant="secondary">
           {role.scopeLevel}
         </Badge>
       ),
@@ -67,66 +108,40 @@ export function RolesView({
     },
   ];
 
-  const [sheetOpen, setSheetOpen] = React.useState(false);
-  const [sheetMode, setSheetMode] = React.useState<EditorMode>("create");
-  // In edit mode this is the role being edited; in create mode it is an
-  // optional seed to clone from (null = blank new role).
-  const [sheetRole, setSheetRole] = React.useState<AstroliftRole | null>(null);
-
-  function openCreate() {
-    setSheetMode("create");
-    setSheetRole(null);
-    setSheetOpen(true);
-  }
-  function openRole(role: AstroliftRole) {
-    setSheetMode("edit");
-    setSheetRole(role);
-    setSheetOpen(true);
-  }
-  function cloneRole(role: AstroliftRole) {
-    // Switch the open sheet from a read-only system role into a fresh
-    // create form seeded with that role's permissions — the "clone and
-    // prune" path the backend documents for system roles.
-    setSheetMode("create");
-    setSheetRole(role);
-  }
-
   return (
-    <>
-      <Section
-        title="Roles"
-        description="A role is a named permission set. System roles ship with the platform and are read-only; create custom roles to tailor access."
-        action={
-          <Can permission="org.manage_members">
-            <Button size="sm" onClick={openCreate}>
-              <PlusIcon className="size-4" />
-              New role
-            </Button>
-          </Can>
-        }
-      >
-        <DataTable
-          label="Roles"
-          controller={table}
-          columns={columns}
-          getRowId={(role) => role.id}
-          // A role has no page of its own; activating one opens the editor
-          // sheet, read-only for a system role or a viewer without manage.
-          onRowActivate={openRole}
-          rowLabel={(role) => `${role.isSystem || !canManage ? "View" : "Edit"} role ${role.name}`}
-          searchPlaceholder="Search roles by name or slug…"
-          empty={{
-            icon: <ShieldIcon className="size-5" />,
-            title: "No roles",
-            description:
-              "System roles are seeded on deploy; if none appear, the org context may not be resolved yet.",
-          }}
-          emptyFiltered={{
-            title: "No matching roles",
-            description: "No role matches this search. Try another name or slug.",
-          }}
-        />
-      </Section>
+    <div className="flex min-w-0 flex-1 flex-col p-6">
+      <ListPage<AstroliftRole>
+        header={{
+          crumbs: permissionsCrumbs("roles"),
+          title: "Roles",
+          context: "Named permission sets. System roles are read-only; custom roles tailor access.",
+          primaryAction: (
+            <Can permission="org.manage_members">
+              <Button size="sm" onClick={openCreate}>
+                <PlusIcon className="size-4" />
+                New role
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
+        label="Roles"
+        columns={columns}
+        rows={page.rows}
+        getRowId={(role) => role.id}
+        loading={page.loading}
+        stale={page.stale}
+        error={page.error}
+        onRetry={page.refetch}
+        totalCount={page.totalCount}
+        nextCursor={page.nextCursor}
+        empty={{
+          icon: <ShieldIcon className="size-5" />,
+          title: "No roles",
+          description:
+            "System roles are seeded on deploy; if none appear, the org context may not be resolved yet.",
+        }}
+      />
 
       <RoleEditorSheet
         open={sheetOpen}
@@ -140,6 +155,6 @@ export function RolesView({
         onCreate={createRole}
         onUpdate={updateRole}
       />
-    </>
+    </div>
   );
 }

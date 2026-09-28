@@ -1,17 +1,10 @@
 "use client";
 
-import {
-  ActivityIcon,
-  CheckCircleIcon,
-  CopyIcon,
-  KeyRoundIcon,
-  Loader2Icon,
-  RocketIcon,
-} from "lucide-react";
+import { CheckCircleIcon, CopyIcon, KeyRoundIcon, Loader2Icon, RocketIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 import type { useClusterAgent } from "./use-cluster-agent";
@@ -54,38 +47,36 @@ export function ClusterAgentView({
     : null;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ActivityIcon className="size-4" />
-              Keep-alive agent
-            </CardTitle>
-            <CardDescription className="mt-1">
-              A lightweight agent in the cluster&apos;s{" "}
-              <code className="font-mono text-xs">astrolift-system</code> namespace POSTs a signed
-              heartbeat so the platform can show live pod, node, and resource state — and flag the
-              cluster offline when it stops. Pulses every {heartbeatIntervalSeconds}s.
-            </CardDescription>
-          </div>
-          {provisioned && (
-            <Badge variant="outline" className="shrink-0 gap-1">
-              <CheckCircleIcon className="size-3" />
-              Key issued
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Section
+      title="Keep-alive agent"
+      description={
+        <>
+          A lightweight agent in the cluster&apos;s{" "}
+          <code className="font-mono text-xs">astrolift-system</code> namespace POSTs a signed
+          heartbeat so the platform can show live pod, node, and resource state, and flag the
+          cluster offline when it stops. Pulses every{" "}
+          <span className="font-mono">{heartbeatIntervalSeconds}s</span>.
+        </>
+      }
+      action={
+        provisioned && (
+          <Badge variant="outline" className="shrink-0 gap-1">
+            <CheckCircleIcon className="size-3" />
+            Key issued
+          </Badge>
+        )
+      }
+      divided
+    >
+      <div className="flex min-w-0 flex-col gap-3">
         {issued ? (
           <>
             <div className="border-warning-border bg-warning/10 rounded-md border p-3">
               <p className="text-warning-fg text-xs font-medium">
                 Copy this key now — it won&apos;t be shown again.
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="bg-background/60 flex-1 truncate rounded px-2 py-1 font-mono text-xs">
+              <div className="mt-2 flex min-w-0 items-center gap-2">
+                <code className="bg-background/60 min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs">
                   {issued.agentKey}
                 </code>
                 <Button
@@ -100,7 +91,7 @@ export function ClusterAgentView({
               </div>
             </div>
             {snippet && (
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium">Install the agent secret</p>
                   <Button
@@ -179,7 +170,7 @@ export function ClusterAgentView({
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }

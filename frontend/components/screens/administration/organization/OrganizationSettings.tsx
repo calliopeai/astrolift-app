@@ -1,34 +1,34 @@
 "use client";
 
-import { ClockIcon, InfoIcon, SaveIcon } from "lucide-react";
+import { ClockIcon, InfoIcon } from "lucide-react";
 import * as React from "react";
 
-import { PageShell } from "@/components/PageShell";
+import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPage";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import type { useOrganizationSettings } from "./use-organization-settings";
+import { AdministrationShell } from "./AdministrationShell";
+import type {
+  OrganizationSettingsDraft,
+  useOrganizationSettings,
+} from "./use-organization-settings";
 
 export type OrganizationSettingsProps = ReturnType<typeof useOrganizationSettings> & {
-  /** The house-theme card; rendered only once the org has loaded. */
+  /** The house-theme section; rendered only once the org has loaded. */
   houseTheme: React.ReactNode;
   trustedDomains: React.ReactNode;
   modules: React.ReactNode;
 };
 
-/** Administration › Organization: identity, retention and user-policy defaults. */
+/**
+ * Administration › Organization, on the settings archetype (spec 44 §5.3):
+ * one section per concern, each saving on its own. There is no Danger zone:
+ * the organization has no destructive setting in the app.
+ */
 export function OrganizationSettings({
   org,
   loading: orgsLoading,
@@ -38,64 +38,67 @@ export function OrganizationSettings({
   trustedDomains,
   modules,
 }: OrganizationSettingsProps) {
-  const [name, setName] = React.useState("");
-  const [website, setWebsite] = React.useState("");
-  const [auditDays, setAuditDays] = React.useState("365");
-  const [previewMax, setPreviewMax] = React.useState("5");
-  const [logDays, setLogDays] = React.useState("30");
-  const [allowProfileEdit, setAllowProfileEdit] = React.useState(true);
+  const saved = React.useMemo(
+    () => ({
+      name: org?.name ?? "",
+      website: org?.website ?? "",
+      auditDays: String(org?.auditLogRetentionDays ?? 365),
+      allowProfileEdit: org?.allowUserProfileEdit ?? true,
+    }),
+    [org]
+  );
+  const [name, setName] = React.useState(saved.name);
+  const [website, setWebsite] = React.useState(saved.website);
+  const [auditDays, setAuditDays] = React.useState(saved.auditDays);
+  const [allowProfileEdit, setAllowProfileEdit] = React.useState(saved.allowProfileEdit);
 
   React.useEffect(() => {
-    if (org) {
-      setName(org.name);
-      setWebsite(org.website);
-      setAuditDays(String(org.auditLogRetentionDays));
-      setPreviewMax(String(org.previewMaxActiveDefault));
-      setLogDays(String(org.logRetentionDaysDefault));
-      setAllowProfileEdit(org.allowUserProfileEdit);
-    }
-  }, [org]);
+    setName(saved.name);
+    setWebsite(saved.website);
+    setAuditDays(saved.auditDays);
+    setAllowProfileEdit(saved.allowProfileEdit);
+  }, [saved]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    await onSave({ name, website, auditDays, allowProfileEdit });
-  }
+  // Each section sends its own edits over the saved values, so saving one
+  // never carries another section's unsaved changes along with it.
+  const save = (patch: Partial<OrganizationSettingsDraft>) => onSave({ ...saved, ...patch });
 
-  return (
-    <PageShell
-      title="Organization"
-      description="Edit the platform's organization-level identity and retention defaults."
-    >
-      {orgsLoading ? (
-        <Card>
-          <CardContent className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full max-w-md" />
-            <Skeleton className="h-10 w-full max-w-md" />
-            <Skeleton className="h-10 w-full max-w-md" />
-          </CardContent>
-        </Card>
-      ) : (
-        <form onSubmit={submit} className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>General</CardTitle>
-              <CardDescription>
-                Display name and homepage URL surfaced in the sidebar and emails.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:max-w-lg">
-              <div className="space-y-2">
+  const generalDirty = Boolean(org) && (name !== saved.name || website !== saved.website);
+  const retentionDirty = Boolean(org) && auditDays !== saved.auditDays;
+  const policiesDirty = Boolean(org) && allowProfileEdit !== saved.allowProfileEdit;
+
+  const sections = [
+    {
+      id: "general",
+      title: "General",
+      content: (
+        <SettingsSection
+          title="General"
+          description="Display name and homepage URL surfaced in the sidebar and emails."
+          dirty={generalDirty}
+          saving={saving}
+          onCancel={() => {
+            setName(saved.name);
+            setWebsite(saved.website);
+          }}
+          onSave={() => save({ name, website })}
+        >
+          {orgsLoading ? (
+            <FieldSkeletons count={3} />
+          ) : (
+            <div className="grid min-w-0 gap-4 sm:max-w-lg">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="slug">Slug</Label>
                 <Input id="slug" value={org?.slug ?? ""} disabled className="font-mono" />
                 <p className="text-muted-foreground text-xs">
                   Slug is immutable — used in URLs and namespace prefixes.
                 </p>
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="name">Display name</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <Input
                   id="website"
@@ -103,21 +106,31 @@ export function OrganizationSettings({
                   onChange={(e) => setWebsite(e.target.value)}
                   type="url"
                   placeholder="https://acme.example"
+                  className="font-mono"
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Retention defaults</CardTitle>
-              <CardDescription>
-                Defaults inherited by new apps. Existing apps retain their own values until edited
-                explicitly.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
+            </div>
+          )}
+        </SettingsSection>
+      ),
+    },
+    {
+      id: "retention",
+      title: "Retention defaults",
+      content: (
+        <SettingsSection
+          title="Retention defaults"
+          description="Defaults inherited by new apps. Existing apps retain their own values until edited explicitly."
+          dirty={retentionDirty}
+          saving={saving}
+          onCancel={() => setAuditDays(saved.auditDays)}
+          onSave={() => save({ auditDays })}
+        >
+          {orgsLoading ? (
+            <FieldSkeletons count={3} />
+          ) : (
+            <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="audit-days">Audit log days</Label>
                 <Input
                   id="audit-days"
@@ -126,117 +139,146 @@ export function OrganizationSettings({
                   max={2555}
                   value={auditDays}
                   onChange={(e) => setAuditDays(e.target.value)}
+                  className="font-mono"
                 />
-                <p className="text-muted-foreground text-xs">Default 365.</p>
+                <p className="text-muted-foreground text-xs">
+                  Default <span className="font-mono">365</span>.
+                </p>
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="preview-max">Preview env cap</Label>
                 <Input
                   id="preview-max"
                   type="number"
-                  min={0}
-                  value={previewMax}
-                  onChange={(e) => setPreviewMax(e.target.value)}
+                  value={String(org?.previewMaxActiveDefault ?? 5)}
+                  readOnly
                   disabled
+                  className="font-mono"
                 />
                 <p className="text-muted-foreground text-xs">
                   Editable once the App registry surface lands.
                 </p>
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="log-days">App log days</Label>
                 <Input
                   id="log-days"
                   type="number"
-                  min={1}
-                  value={logDays}
-                  onChange={(e) => setLogDays(e.target.value)}
+                  value={String(org?.logRetentionDaysDefault ?? 30)}
+                  readOnly
                   disabled
+                  className="font-mono"
                 />
                 <p className="text-muted-foreground text-xs">
                   Editable once the App registry surface lands.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>User policies</CardTitle>
-              <CardDescription>
-                Org-wide rules that apply to every member, including the self-service profile
-                editor.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:max-w-xl">
-              <label className="flex items-start gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={allowProfileEdit}
-                  onChange={(e) => setAllowProfileEdit(e.target.checked)}
-                />
-                <span>
-                  <span className="font-medium">Allow users to edit their own profile</span>
-                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                    Lets users update their first name, last name, and email on{" "}
-                    <code>/settings/profile</code>. Fields managed by the identity provider stay
-                    locked even when this is on — local edits to IdP-claimed fields would be
-                    overwritten on next sign-in. Turn this off for SSO-only deployments where the
-                    IdP is the source of truth.
-                  </span>
+            </div>
+          )}
+        </SettingsSection>
+      ),
+    },
+    {
+      id: "user-policies",
+      title: "User policies",
+      content: (
+        <SettingsSection
+          title="User policies"
+          description="Org-wide rules that apply to every member, including the self-service profile editor."
+          dirty={policiesDirty}
+          saving={saving}
+          onCancel={() => setAllowProfileEdit(saved.allowProfileEdit)}
+          onSave={() => save({ allowProfileEdit })}
+        >
+          {orgsLoading ? (
+            <FieldSkeletons count={1} />
+          ) : (
+            <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={allowProfileEdit}
+                onChange={(e) => setAllowProfileEdit(e.target.checked)}
+              />
+              <span className="min-w-0">
+                <span className="font-medium">Allow users to edit their own profile</span>
+                <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                  Lets users update their first name, last name, and email on{" "}
+                  <code className="font-mono">/settings/profile</code>. Fields managed by the
+                  identity provider stay locked even when this is on — local edits to IdP-claimed
+                  fields would be overwritten on next sign-in. Turn this off for SSO-only
+                  deployments where the IdP is the source of truth.
                 </span>
-              </label>
-            </CardContent>
-          </Card>
+              </span>
+            </label>
+          )}
+        </SettingsSection>
+      ),
+    },
+    ...(org && houseTheme
+      ? [{ id: "house-theme", title: "House theme", content: houseTheme }]
+      : []),
+    { id: "trusted-domains", title: "Trusted domains", content: trustedDomains },
+    { id: "modules", title: "Modules", content: modules },
+    {
+      id: "identity-provider",
+      title: "Identity provider",
+      content: <IdentityProviderSection />,
+    },
+  ];
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={saving || !org}>
-              <SaveIcon className="size-4" />
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
-        </form>
-      )}
+  return (
+    <AdministrationShell
+      fnKey="organization"
+      title="Organization"
+      description="Edit the platform's organization-level identity and retention defaults."
+    >
+      <SettingsPage sections={sections} />
+    </AdministrationShell>
+  );
+}
 
-      {org && houseTheme}
+function FieldSkeletons({ count }: { count: number }) {
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <Skeleton key={i} className="h-10 w-full max-w-md" />
+      ))}
+    </div>
+  );
+}
 
-      {trustedDomains}
-
-      {modules}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Identity provider</CardTitle>
-          <CardDescription>
-            OIDC, SAML, and SCIM sign-in configuration for this organization.
-          </CardDescription>
-          <CardAction>
-            <Badge variant="outline" className="gap-1">
-              <ClockIcon className="size-3" />
-              In-app setup coming soon
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="space-y-2">
-            <p className="text-muted-foreground text-xs">Currently active, by environment:</p>
-            <DefinitionList
-              items={[
-                { term: "Development", description: "auth1 dev-login bypass" },
-                { term: "Staging & production", description: "Auth0" },
-              ]}
-            />
-          </div>
-          <div className="border-info-border bg-info/5 flex items-start gap-2 rounded-md border p-3">
-            <InfoIcon className="text-info-fg mt-0.5 size-3.5 shrink-0" />
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              A dedicated setup sub-route will add OIDC discovery, SAML metadata, and SCIM token
-              rotation once the in-app provider picker is wired.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </PageShell>
+function IdentityProviderSection() {
+  return (
+    <Section
+      title="Identity provider"
+      description="OIDC, SAML, and SCIM sign-in configuration for this organization."
+      divided
+      action={
+        <Badge variant="outline" className="gap-1">
+          <ClockIcon className="size-3" />
+          In-app setup coming soon
+        </Badge>
+      }
+    >
+      <div className="grid min-w-0 gap-4">
+        <div className="min-w-0 space-y-2">
+          <p className="text-muted-foreground text-xs">Currently active, by environment:</p>
+          <DefinitionList
+            items={[
+              { term: "Development", description: "auth1 dev-login bypass" },
+              { term: "Staging & production", description: "Auth0" },
+            ]}
+          />
+        </div>
+        <div className="border-info-border bg-info/5 flex min-w-0 items-start gap-2 rounded-md border p-3">
+          <InfoIcon className="text-info-fg mt-0.5 size-3.5 shrink-0" />
+          <p className="text-muted-foreground min-w-0 text-xs leading-relaxed">
+            A dedicated setup sub-route will add OIDC discovery, SAML metadata, and SCIM token
+            rotation once the in-app provider picker is wired.
+          </p>
+        </div>
+      </div>
+    </Section>
   );
 }

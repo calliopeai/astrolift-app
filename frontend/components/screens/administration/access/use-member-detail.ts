@@ -19,7 +19,7 @@ interface RoleBindingsResp {
  * member's granted roles.
  */
 export function useMemberDetail(id: string) {
-  const { data, loading } = useQuery<MembersResp>(LIST_MEMBERS, {
+  const { data, loading, error, refetch } = useQuery<MembersResp>(LIST_MEMBERS, {
     variables: {},
     fetchPolicy: "cache-and-network",
   });
@@ -40,5 +40,15 @@ export function useMemberDetail(id: string) {
     [bindingsQuery.data, member]
   );
 
-  return { id, member, loading, roleBindings, rolesLoading: bindingsQuery.loading };
+  return {
+    id,
+    member,
+    loading,
+    error: error && !data ? { message: error.message } : null,
+    onRetry: () => {
+      void refetch();
+    },
+    roleBindings,
+    rolesLoading: bindingsQuery.loading,
+  };
 }

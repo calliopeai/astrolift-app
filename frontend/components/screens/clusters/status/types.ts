@@ -1,9 +1,9 @@
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
-/** The slice of a cluster the tab frame shows. */
+/** The slice of a cluster the tab frame shows (the id, plus ClusterHeader's fields). */
 export type ClusterSummary = Pick<
   AstroliftTenantCluster,
-  "id" | "name" | "slug" | "providerPluginSlug"
+  "id" | "name" | "slug" | "providerPluginSlug" | "region" | "lifecycle" | "isActive"
 >;
 
 // ─── Prometheus windows ───────────────────────────────────────────────

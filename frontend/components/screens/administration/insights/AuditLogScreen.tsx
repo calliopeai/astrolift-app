@@ -4,6 +4,7 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   Loader2Icon,
+  MoreHorizontalIcon,
   SaveIcon,
   ScrollTextIcon,
   Settings2Icon,
@@ -12,8 +13,9 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { DataTable, type Column } from "@/components/data-table";
-import { PageShell } from "@/components/PageShell";
+import { type Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,25 +37,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
+import type { AstroliftAuditEvent, AuditExportFormat } from "@/graphql/operations/operations.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import type { useAuditLog } from "./use-audit-log";
+import { adminCrumbs } from "./header";
 
-export type AuditLogScreenProps = ReturnType<typeof useAuditLog>;
+export interface AuditLogScreenProps {
+  /** List state: views, search, filter chips, cursor (see audit-list.ts). */
+  list: ListStateController;
+  rows: AstroliftAuditEvent[];
+  /** Events that arrived after the page was read, behind the "new" pill. */
+  newRows?: { count: number; onReveal: () => void };
+  loading: boolean;
+  stale: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+  nextCursor: string | null;
+  totalCount: number | null;
+  /** A target-kind chip narrows the page in hand, not the query (no argument yet). */
+  targetFilteredLocally: boolean;
+  retentionDays: number | null;
+  exporting: boolean;
+  onExport: (format: AuditExportFormat) => void | Promise<void>;
+  canEditRetention: boolean;
+  savingRetention: boolean;
+  saveRetention: (days: number) => Promise<boolean>;
+}
 
 // Server-side bound on Organization.audit_log_retention_days (spec
 // ceiling ~7 years); mirrors the guard in updateOrganization.
@@ -75,23 +90,29 @@ const decisionStyles: Record<string, { icon: React.ReactNode; cls: string }> = {
   },
 };
 
-function todayIso(): string {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(now.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function targetText(row: AstroliftAuditEvent): string {
+  return `${row.targetKind}${row.targetSlug ? `:${row.targetSlug}` : ""}${
+    row.targetId ? ` (${row.targetId})` : ""
+  }`;
 }
 
-/** The audit trail: filterable event table, detail sheet, export and retention editor. */
+/**
+ * Admin › Usage & governance › Audit (spec 44 §5.1): the audit trail on the
+ * list archetype. Views All · Mine · Denied; chips for actor, action, target
+ * kind, decision and since; cursor paged, newest first, live on the first
+ * page. A row opens the detail sheet; export and retention stay as they were.
+ */
 export function AuditLogScreen({
-  table,
-  decisionFilter,
-  onDecisionFilterChange: setDecisionFilter,
-  fromDate,
-  onFromDateChange: setFromDate,
-  toDate,
-  onToDateChange: setToDate,
+  list,
+  rows,
+  newRows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
+  targetFilteredLocally,
   retentionDays,
   exporting,
   onExport: handleExport,
@@ -104,37 +125,54 @@ export function AuditLogScreen({
 
   const [activeRow, setActiveRow] = React.useState<AstroliftAuditEvent | null>(null);
 
-  const description = retentionDays
-    ? t("retentionDescription", { days: retentionDays })
-    : t("description");
-
-  const maxDate = todayIso();
-
   const columns: Column<AstroliftAuditEvent>[] = [
     {
       id: "when",
       header: t("columns.when"),
       cellClassName: "font-mono text-xs whitespace-nowrap",
-      cell: (row) => fmt.formatDateTime(row.occurredAt),
+      // Rows open the detail sheet; they are not links. One button per
+      // row, stretched over it, named by action and time: what tells one
+      // audit row from the next.
+      cell: (row) => (
+        <button
+          type="button"
+          aria-label={`${row.action} ${fmt.formatDateTime(row.occurredAt)}`}
+          onClick={() => setActiveRow(row)}
+          className="focus-visible:ring-ring rounded-sm text-left after:absolute after:inset-0 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {fmt.formatDateTime(row.occurredAt)}
+        </button>
+      ),
     },
     {
       id: "actor",
       header: t("columns.actor"),
+      cellClassName: "max-w-64",
       cell: (row) => (
-        <>
-          <div className="text-sm">{row.actorDisplay || row.actorKind}</div>
-          <div className="text-muted-foreground text-xs">
+        <div className="min-w-0">
+          <div className="truncate text-sm" title={row.actorDisplay || row.actorKind}>
+            {row.actorDisplay || row.actorKind}
+          </div>
+          <div
+            className="text-muted-foreground truncate font-mono text-xs"
+            title={row.actorId || undefined}
+          >
             {row.actorKind}
             {row.actorId ? ` · ${row.actorId}` : ""}
           </div>
-        </>
+        </div>
       ),
     },
     {
       id: "action",
       header: t("columns.action"),
+      cellClassName: "max-w-72",
       cell: (row) => (
-        <Badge variant="outline" className="font-mono text-xs">
+        <Badge
+          variant="outline"
+          className="block max-w-full truncate font-mono text-xs"
+          title={row.action}
+        >
           {row.action}
         </Badge>
       ),
@@ -142,13 +180,11 @@ export function AuditLogScreen({
     {
       id: "target",
       header: t("columns.target"),
-      cellClassName: "text-sm",
+      cellClassName: "max-w-72 text-sm",
       cell: (row) =>
         row.targetKind ? (
-          <div className="font-mono text-xs">
-            {row.targetKind}
-            {row.targetSlug ? `:${row.targetSlug}` : ""}
-            {row.targetId ? ` (${row.targetId})` : ""}
+          <div className="truncate font-mono text-xs" title={targetText(row)}>
+            {targetText(row)}
           </div>
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -160,7 +196,7 @@ export function AuditLogScreen({
       cell: (row) => {
         const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
         return (
-          <Badge className={style.cls + " gap-1 px-2 py-0.5 text-xs"} variant="secondary">
+          <Badge className={style.cls + " gap-1 px-2 py-0.5 font-mono text-xs"} variant="secondary">
             {style.icon}
             {row.decision}
           </Badge>
@@ -170,117 +206,80 @@ export function AuditLogScreen({
   ];
 
   return (
-    <PageShell
-      title={t("title")}
-      description={description}
-      actions={
-        <div className="flex items-center gap-2">
-          <RetentionDialog
-            currentDays={retentionDays}
-            canSave={canEditRetention}
-            saving={savingRetention}
-            onSave={saveRetention}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={exporting}>
-                {exporting ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <DownloadIcon className="size-4" />
-                )}
-                {t("export.button")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => handleExport("csv")}>
-                {t("export.formatCsv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
-                {t("export.formatNdjson")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      }
-    >
-      <DataTable
+    <div className="flex min-w-0 flex-1 flex-col gap-3 p-6">
+      <ListPage<AstroliftAuditEvent>
+        header={{
+          crumbs: adminCrumbs("audit", "Audit"),
+          title: t("title"),
+          context:
+            retentionDays != null ? (
+              <span className="font-mono">retained {retentionDays} days</span>
+            ) : undefined,
+          primaryAction: (
+            <RetentionDialog
+              currentDays={retentionDays}
+              canSave={canEditRetention}
+              saving={savingRetention}
+              onSave={saveRetention}
+            />
+          ),
+        }}
+        list={list}
         label="Audit events"
-        controller={table}
         columns={columns}
+        rows={rows}
         getRowId={(row) => row.id}
-        // Rows open the detail sheet; they are not links, so they must
-        // not pretend to be.
-        onRowActivate={setActiveRow}
-        // Action and timestamp: what distinguishes one audit row from the
-        // next, and it carries the first cell's visible text.
-        rowLabel={(row) => `${row.action} ${fmt.formatDateTime(row.occurredAt)}`}
-        // DataTable owns the search box, so the field names itself in
-        // its own placeholder: it is the action filter, not a free-text
-        // search across the row.
-        searchPlaceholder={`${t("filters.actionLabel")}: ${t("filters.actionPlaceholder")}`}
-        toolbar={
-          <>
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="audit-decision-filter" className="text-muted-foreground text-xs">
-                {t("filters.decisionLabel")}
-              </Label>
-              <Select
-                value={decisionFilter || "ALL"}
-                onValueChange={(v) => setDecisionFilter(v === "ALL" ? "" : v)}
-              >
-                <SelectTrigger id="audit-decision-filter" className="w-40">
-                  <SelectValue placeholder={t("filters.decisionLabel")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">{t("filters.anyDecision")}</SelectItem>
-                  <SelectItem value="ALLOW">ALLOW</SelectItem>
-                  <SelectItem value="DENY">DENY</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="audit-from-date" className="text-muted-foreground text-xs">
-                {t("filters.fromLabel")}
-              </Label>
-              <Input
-                id="audit-from-date"
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                max={maxDate}
-                className="w-40"
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="audit-to-date" className="text-muted-foreground text-xs">
-                {t("filters.toLabel")}
-              </Label>
-              <Input
-                id="audit-to-date"
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                max={maxDate}
-                className="w-40"
-              />
-            </div>
-          </>
-        }
+        rowClassName={() => "relative cursor-pointer"}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
         empty={{
           icon: <ScrollTextIcon className="size-5" />,
           title: t("emptyTitle"),
           description: t("emptyDescription"),
         }}
-        emptyFiltered={{
-          title: "No events for that action",
-          description:
-            "The action filter matches exactly: “team.create”, not “team”. Check the full action name on a row you can see, or clear the filter to get the whole range back.",
-        }}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        newRows={newRows}
+        menu={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("export.button")}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <MoreHorizontalIcon className="size-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => handleExport("csv")}>
+                <DownloadIcon className="size-4" />
+                {t("export.formatCsv")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
+                <DownloadIcon className="size-4" />
+                {t("export.formatNdjson")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
       />
 
+      {targetFilteredLocally && (
+        <p className="text-muted-foreground text-xs">
+          The target kind filter narrows this page only; the export covers every target.
+        </p>
+      )}
+
       <AuditDetailsSheet row={activeRow} onOpenChange={(open) => !open && setActiveRow(null)} />
-    </PageShell>
+    </div>
   );
 }
 

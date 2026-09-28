@@ -17,7 +17,7 @@ export const Loading: Story = {
   render: () => <MemberDetail {...MEMBER_DETAIL} member={null} roleBindings={[]} loading />,
 };
 
-/** No such member. A failed LIST_MEMBERS also lands here: the query has no error view. */
+/** No such member, or one past the list query's window. */
 export const NotFound: Story = {
   render: () => <MemberDetail {...MEMBER_DETAIL} member={null} roleBindings={[]} />,
 };
@@ -33,5 +33,24 @@ export const NoRoles: Story = {
 export const LongStrings: Story = {
   render: () => (
     <MemberDetail {...MEMBER_DETAIL} member={LONG_MEMBER} roleBindings={LONG_ROLE_BINDINGS} />
+  ),
+};
+
+export const Error: Story = {
+  render: () => (
+    <MemberDetail
+      {...MEMBER_DETAIL}
+      member={null}
+      roleBindings={[]}
+      error={{ message: "upstream timed out after 30s (identity.members)" }}
+    />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <MemberDetail {...MEMBER_DETAIL} member={LONG_MEMBER} roleBindings={LONG_ROLE_BINDINGS} />
+    </div>
   ),
 };

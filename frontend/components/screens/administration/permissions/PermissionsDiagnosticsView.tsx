@@ -3,6 +3,7 @@
 import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
 import * as React from "react";
 
+import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { permissionsCrumbs } from "../access/admin-crumbs";
 import type { usePermissionsDiagnostics } from "./use-permissions-diagnostics";
 
 export type PermissionsDiagnosticsViewProps = ReturnType<typeof usePermissionsDiagnostics>;
@@ -30,9 +32,9 @@ const RESOURCE_TONE: Record<string, string> = {
 };
 
 /**
- * Read-only "why do I have this access" body. Rendered as the
- * Diagnostics tab of the Permissions screen (#1206), so it omits its
- * own PageShell — the tabbed screen owns the page chrome.
+ * Admin › Permissions › Diagnostics (#1206): the read-only "why do I have
+ * this access" page. Detail-like (spec 44 §5.2): the shared header, then
+ * panels; it has no tab row and no list controls of its own.
  */
 export function PermissionsDiagnosticsView({
   me,
@@ -65,13 +67,22 @@ export function PermissionsDiagnosticsView({
   }, [filtered]);
 
   return (
-    <>
+    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
+      <ShellHeader
+        crumbs={permissionsCrumbs("diagnostics")}
+        title="Diagnostics"
+        context={
+          me?.profile?.username ? (
+            <span className="font-mono">{me.profile.username}</span>
+          ) : undefined
+        }
+      />
       <p className="text-muted-foreground max-w-2xl text-sm">
         Your effective permissions in this organization, grouped by resource. Use this to figure out
         why a button is hidden or a mutation rejects.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-3">
         <StatTile label="Total permissions" value={allPerms.length} loading={permissionsLoading} />
         <StatTile
           label="Role bindings on you"
@@ -89,12 +100,18 @@ export function PermissionsDiagnosticsView({
                 {
                   term: "Username",
                   description: (
-                    <span className="font-mono text-sm">{me?.profile?.username ?? "—"}</span>
+                    <span className="font-mono text-sm [overflow-wrap:anywhere]">
+                      {me?.profile?.username ?? "—"}
+                    </span>
                   ),
                 },
                 {
                   term: "ID",
-                  description: <span className="font-mono text-xs">{me?.id ?? "—"}</span>,
+                  description: (
+                    <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                      {me?.id ?? "—"}
+                    </span>
+                  ),
                 },
               ]}
             />
@@ -125,16 +142,16 @@ export function PermissionsDiagnosticsView({
                   <Badge variant="secondary" className={RESOURCE_TONE[resource] ?? ""}>
                     {resource}
                   </Badge>
-                  <span className="text-muted-foreground text-xs">{perms.length}</span>
+                  <span className="text-muted-foreground font-mono text-xs">{perms.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
                   {perms.map((p) => (
                     <div
                       key={p}
-                      className="bg-muted/40 inline-flex items-center gap-2 rounded px-2 py-1 font-mono text-xs"
+                      className="bg-muted/40 inline-flex min-w-0 items-center gap-2 rounded px-2 py-1 font-mono text-xs"
                     >
                       <CheckCircle2Icon className="text-success-fg size-3 shrink-0" />
-                      {p}
+                      <span className="min-w-0 [overflow-wrap:anywhere]">{p}</span>
                     </div>
                   ))}
                 </div>
@@ -162,8 +179,8 @@ export function PermissionsDiagnosticsView({
           <div className="divide-y">
             {myBindings.map((b) => (
               <div key={b.id} className="py-3 text-sm first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-mono">{b.role.slug}</span>
+                <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                  <span className="min-w-0 font-mono [overflow-wrap:anywhere]">{b.role.slug}</span>
                   <Badge variant="outline" className="text-xs">
                     {b.role.name}
                   </Badge>
@@ -171,12 +188,12 @@ export function PermissionsDiagnosticsView({
                     {b.scopeKind}
                   </Badge>
                   {b.expiresAt && (
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground font-mono text-xs">
                       expires {fmt.formatDateTime(b.expiresAt)}
                     </span>
                   )}
                 </div>
-                <div className="text-muted-foreground mt-1 text-xs">
+                <div className="text-muted-foreground mt-1 font-mono text-xs">
                   granted {fmt.formatDateTime(b.grantedAt)}
                 </div>
               </div>
@@ -184,6 +201,6 @@ export function PermissionsDiagnosticsView({
           </div>
         )}
       </Section>
-    </>
+    </div>
   );
 }

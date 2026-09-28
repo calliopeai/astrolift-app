@@ -11,7 +11,6 @@ import {
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Combobox,
   ComboboxContent,
@@ -21,6 +20,7 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 
 import { Field } from "./Field";
@@ -202,55 +202,48 @@ export function IngressAuthView({
 
   if (!authMeta.supported) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <KeyRoundIcon className="size-4" />
-            {authMeta.label}
-          </CardTitle>
-          <CardDescription className="mt-1">{authMeta.description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">{authMeta.comingSoon}</p>
-        </CardContent>
-      </Card>
+      <Section title={authMeta.label} description={authMeta.description} divided>
+        <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+          {authMeta.comingSoon}
+        </p>
+      </Section>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              {enabled ? (
-                <ShieldIcon className="text-success-fg size-4" />
-              ) : (
-                <KeyRoundIcon className="size-4" />
-              )}
-              {authMeta.label}
-            </CardTitle>
-            <CardDescription className="mt-1">{authMeta.description}</CardDescription>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <AuthGateToggle
-              checked={enabled}
-              onChange={handleToggle}
-              disabled={busy}
-              label={enabled ? "Disable auth gate" : "Enable auth gate"}
-            />
-            <span
-              className={cn(
-                "text-xs font-medium",
-                enabled ? "text-success-fg" : "text-muted-foreground"
-              )}
-            >
-              {enabled ? "Enabled" : "Disabled"}
-            </span>
-          </div>
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          {enabled ? (
+            <ShieldIcon className="text-success-fg size-4 shrink-0" />
+          ) : (
+            <KeyRoundIcon className="size-4 shrink-0" />
+          )}
+          {authMeta.label}
+        </span>
+      }
+      description={authMeta.description}
+      action={
+        <div className="flex shrink-0 items-center gap-2">
+          <AuthGateToggle
+            checked={enabled}
+            onChange={handleToggle}
+            disabled={busy}
+            label={enabled ? "Disable auth gate" : "Enable auth gate"}
+          />
+          <span
+            className={cn(
+              "text-xs font-medium",
+              enabled ? "text-success-fg" : "text-muted-foreground"
+            )}
+          >
+            {enabled ? "Enabled" : "Disabled"}
+          </span>
         </div>
-      </CardHeader>
-      <CardContent>
+      }
+      divided
+    >
+      <div className="min-w-0">
         {editing ? (
           <div className="space-y-3">
             {isAws && !useAdvanced ? (
@@ -346,11 +339,11 @@ export function IngressAuthView({
           </div>
         ) : enabled ? (
           <div className="space-y-3">
-            <div className="space-y-2 text-sm">
+            <dl className="min-w-0 space-y-2 text-sm">
               <Field label="User pool ARN" mono value={existing.user_pool_arn} />
               <Field label="App client ID" mono value={existing.user_pool_client_id} />
               <Field label="Domain" mono value={existing.user_pool_domain} />
-            </div>
+            </dl>
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleApply} disabled={busy} className="gap-1.5">
                 {reconciling && <Loader2Icon className="size-3.5 animate-spin" />}
@@ -384,8 +377,8 @@ export function IngressAuthView({
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 }
 

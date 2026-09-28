@@ -32,7 +32,6 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   clusterOfflineMessage,
@@ -62,6 +61,7 @@ import type { useClusterLiveState } from "./use-cluster-live-state";
 import type { useClusterMetrics } from "./use-cluster-metrics";
 import type { useClusterWorkloadHealth } from "./use-cluster-workload-health";
 import type { useRecentClusterWorkflows } from "./use-recent-cluster-workflows";
+import { SkeletonRows, StatusPanel, StatusPanelGrid } from "./StatusPanel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function fmtTs(ts: number): string {
@@ -201,7 +201,7 @@ export function ClusterStatusBody({
   const live = isClusterLive(status);
 
   return (
-    <div className="space-y-4">
+    <StatusPanelGrid>
       <StatusLiveStateCard slug={slug} {...liveState} />
       {live ? (
         <>
@@ -213,6 +213,7 @@ export function ClusterStatusBody({
       ) : (
         <>
           <OfflineCard
+            span="full"
             icon={<BarChart3Icon className="size-4" />}
             title="Cluster saturation"
             status={status}
@@ -243,7 +244,7 @@ export function ClusterStatusBody({
         </>
       )}
       {lifecycle}
-    </div>
+    </StatusPanelGrid>
   );
 }
 
@@ -252,12 +253,14 @@ export function ClusterStatusBody({
 // section's live query is never mounted. Names the cluster's last-seen
 // cue and links to settings (where the agent is installed / rotated).
 function OfflineCard({
+  span = "half",
   icon,
   title,
   status,
   age,
   slug,
 }: {
+  span?: "full" | "half";
   icon: React.ReactNode;
   title: string;
   status: HeartbeatStatus;
@@ -265,7 +268,8 @@ function OfflineCard({
   slug: string;
 }) {
   return (
-    <SectionCard
+    <StatusPanel
+      span={span}
       icon={icon}
       title={title}
       action={
@@ -281,7 +285,7 @@ function OfflineCard({
     >
       <div className="border-border/70 text-muted-foreground flex items-start gap-3 rounded-md border border-dashed px-3 py-4 text-sm">
         <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <p>{clusterOfflineMessage(status, age)}</p>
           <Link
             href={`/clusters/${slug}/settings`}
@@ -291,7 +295,7 @@ function OfflineCard({
           </Link>
         </div>
       </div>
-    </SectionCard>
+    </StatusPanel>
   );
 }
 
@@ -306,29 +310,33 @@ export function StatusLiveStateCard({
   slug,
   state,
   loading,
+  error,
+  refetch,
 }: { slug: string } & ReturnType<typeof useClusterLiveState>) {
   const status: HeartbeatStatus = state?.status ?? "never_seen";
   const p = heartbeatPresentation(status);
   const age = formatHeartbeatAge(state?.heartbeatAgeSeconds ?? null);
   const live = isClusterLive(status);
 
-  if (loading && !state) {
+  if ((loading || error) && !state) {
     return (
-      <SectionCard
+      <StatusPanel
         icon={<ActivityIcon className="size-4" />}
         title="Cluster connection"
-        subtitle="Keep-alive heartbeat from the in-cluster agent."
-      >
-        <Skeleton className="h-16 w-full" />
-      </SectionCard>
+        description="Keep-alive heartbeat from the in-cluster agent."
+        loading={loading}
+        skeleton={<Skeleton className="h-16 w-full" />}
+        error={error}
+        onRetry={refetch}
+      />
     );
   }
 
   return (
-    <SectionCard
+    <StatusPanel
       icon={<ActivityIcon className="size-4" />}
       title="Cluster connection"
-      subtitle="Keep-alive heartbeat from the in-cluster agent. Polls every 30s."
+      description="Keep-alive heartbeat from the in-cluster agent. Polls every 30s."
       action={
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${p.pill}`}
@@ -347,7 +355,7 @@ export function StatusLiveStateCard({
       {status === "never_seen" ? (
         <div className="border-border/70 flex items-start gap-3 rounded-md border border-dashed p-3">
           <ServerOffIcon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
-          <div className="space-y-1 text-sm">
+          <div className="min-w-0 space-y-1 text-sm">
             <p className="font-medium">No keep-alive agent</p>
             <p className="text-muted-foreground">
               No agent has reported from this cluster yet. Install the keep-alive agent to surface
@@ -364,7 +372,7 @@ export function StatusLiveStateCard({
       ) : !live ? (
         <div className="border-destructive/30 bg-destructive/5 flex items-start gap-3 rounded-md border p-3">
           <WifiOffIcon className="text-destructive mt-0.5 size-5 shrink-0" />
-          <div className="space-y-1 text-sm">
+          <div className="min-w-0 space-y-1 text-sm">
             <p className="font-medium">Cluster disconnected</p>
             <p className="text-muted-foreground">
               {clusterOfflineMessage(status, state?.heartbeatAgeSeconds ?? null)} The live cards
@@ -381,7 +389,7 @@ export function StatusLiveStateCard({
       ) : (
         <LiveSnapshotGrid state={state!} age={age} />
       )}
-    </SectionCard>
+    </StatusPanel>
   );
 }
 
@@ -430,11 +438,11 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {tiles.map((t) => (
-          <div key={t.label} className="space-y-1">
+          <div key={t.label} className="min-w-0 space-y-1">
             <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
               {t.label}
             </p>
-            <p className="text-xl font-semibold tabular-nums">{t.value}</p>
+            <p className="font-mono text-xl font-semibold tabular-nums">{t.value}</p>
           </div>
         ))}
       </div>
@@ -454,14 +462,19 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">Ingress:</span>
           {state.ingressIps.map((ip) => (
-            <code key={ip} className="bg-muted text-2xs rounded px-1.5 py-0.5 font-mono">
+            <code
+              key={ip}
+              className="bg-muted text-2xs max-w-full rounded px-1.5 py-0.5 font-mono [overflow-wrap:anywhere]"
+            >
               {ip}
             </code>
           ))}
         </div>
       )}
       {state.agentVersion && (
-        <p className="text-muted-foreground text-2xs">Agent {state.agentVersion}</p>
+        <p className="text-muted-foreground text-2xs [overflow-wrap:anywhere]">
+          Agent <span className="font-mono">{state.agentVersion}</span>
+        </p>
       )}
     </div>
   );
@@ -488,44 +501,15 @@ function AppReadinessPill({
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
     >
-      <code className="font-mono font-medium">{appSlug}</code>
-      <span className="tabular-nums opacity-80">
+      <code className="min-w-0 truncate font-mono font-medium" title={appSlug}>
+        {appSlug}
+      </code>
+      <span className="shrink-0 font-mono tabular-nums opacity-80">
         {ready}/{total} ready
       </span>
     </span>
-  );
-}
-
-// ─── Section card template ───────────────────────────────────────────
-function SectionCard({
-  icon,
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card className="!rounded-none shadow-md">
-      <CardHeader className="px-4 pt-4 pb-3">
-        <div className="flex items-start gap-2">
-          <span className="text-muted-foreground mt-0.5">{icon}</span>
-          <div className="flex-1">
-            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-            {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
-          </div>
-          {action && <div className="shrink-0">{action}</div>}
-        </div>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">{children}</CardContent>
-    </Card>
   );
 }
 
@@ -538,13 +522,17 @@ export function StatusMetricsCard({
   rangeLoading,
   instant,
   instantLoading,
+  error,
+  refetch,
 }: { slug: string } & ReturnType<typeof useClusterMetrics>) {
   return (
-    <SectionCard
+    <StatusPanel
       icon={<BarChart3Icon className="size-4" />}
       title="Cluster saturation"
-      subtitle="Prometheus-sourced golden signals — current snapshot and historical trend."
+      description="Prometheus-sourced golden signals — current snapshot and historical trend."
       action={<WindowSelector value={selectedWindow} onChange={onWindowChange} />}
+      error={!instant && !range && !instantLoading && !rangeLoading ? error : null}
+      onRetry={refetch}
     >
       <SaturationKPIBar instant={instant} loading={instantLoading} slug={slug} />
       <div className="mt-5">
@@ -555,7 +543,7 @@ export function StatusMetricsCard({
           instantReason={instant?.reason ?? null}
         />
       </div>
-    </SectionCard>
+    </StatusPanel>
   );
 }
 
@@ -618,11 +606,13 @@ function SaturationKPIBar({
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {kpis.map((k) => (
-        <div key={k.label} className="space-y-1">
+        <div key={k.label} className="min-w-0 space-y-1">
           <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
             {k.label}
           </p>
-          <p className={`text-2xl font-semibold tabular-nums ${TONE_COLORS[k.tone].text}`}>
+          <p
+            className={`font-mono text-2xl font-semibold tabular-nums ${TONE_COLORS[k.tone].text}`}
+          >
             {fmtValue(k.value, k.unit)}
           </p>
         </div>
@@ -719,7 +709,7 @@ function PrometheusUnavailableCard({
   return (
     <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3">
       <Icon className="text-warning mt-0.5 size-5 shrink-0" />
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-muted-foreground text-sm">{body}</p>
         <p className="text-muted-foreground text-xs">{hint}</p>
@@ -745,7 +735,7 @@ function WindowSelector({
   onChange: (w: WindowLabel) => void;
 }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {WINDOWS.map((w) => (
         <Button
           key={w.label}
@@ -768,16 +758,16 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
   const chartData = series.points.map((p) => ({ ts: p.ts, value: p.value }));
 
   return (
-    <Card className="overflow-hidden !rounded-none shadow-md">
-      <CardHeader className="px-4 pt-4 pb-2">
-        <span className="text-muted-foreground text-xs tracking-wide uppercase">
+    <div className="min-w-0 overflow-hidden rounded-md border">
+      <div className="min-w-0 px-4 pt-4 pb-2">
+        <span className="text-muted-foreground text-xs tracking-wide [overflow-wrap:anywhere] uppercase">
           {series.label}
         </span>
-        <CardTitle className={`text-2xl font-semibold tabular-nums ${colors.text}`}>
+        <p className={`font-mono text-2xl font-semibold tabular-nums ${colors.text}`}>
           {fmtValue(series.current, series.unit)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-0 pb-0">
+        </p>
+      </div>
+      <div>
         {chartData.length > 1 ? (
           <ResponsiveContainer width="100%" height={80}>
             <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -814,14 +804,14 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-[80px] items-center justify-center">
+          <div className="flex h-20 items-center justify-center">
             <span className="text-muted-foreground text-xs">
               {series.points.length === 0 ? "No data in window" : "Collecting data…"}
             </span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -829,6 +819,8 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
 export function StatusWorkloadHealthCard({
   rows,
   loading,
+  error,
+  refetch,
 }: ReturnType<typeof useClusterWorkloadHealth>) {
   // Sort most-broken first within each namespace; namespaces are
   // grouped alphabetically.
@@ -849,37 +841,40 @@ export function StatusWorkloadHealthCard({
   const namespaces = Array.from(grouped.keys()).sort();
 
   return (
-    <SectionCard
+    <StatusPanel
+      span="half"
       icon={<ServerIcon className="size-4" />}
       title="Workload health"
-      subtitle="Per-Deployment readiness + 24h restart counts. Sorted most-broken first; polls every 30s."
+      description="Per-Deployment readiness + 24h restart counts. Sorted most-broken first; polls every 30s."
+      loading={loading && rows.length === 0}
+      skeleton={<SkeletonRows />}
+      error={rows.length === 0 ? error : null}
+      onRetry={refetch}
+      empty={
+        rows.length === 0
+          ? {
+              icon: <ServerOffIcon className="size-5" />,
+              title: "No deployment data",
+              description: "Apiserver unreachable or no workloads running yet.",
+            }
+          : null
+      }
     >
-      {loading && rows.length === 0 ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <EmptyHint
-          icon={<ServerOffIcon className="size-4" />}
-          text="No deployment data — apiserver unreachable or no workloads running yet."
-        />
-      ) : (
-        <div className="space-y-4">
-          {namespaces.map((ns) => (
-            <div key={ns}>
-              <p className="text-muted-foreground text-2xs mb-1.5 font-mono">{ns}/</p>
-              <div>
-                {grouped.get(ns)!.map((row) => (
-                  <WorkloadRowItem key={row.workloadName} row={row} />
-                ))}
-              </div>
+      <div className="space-y-4">
+        {namespaces.map((ns) => (
+          <div key={ns}>
+            <p className="text-muted-foreground text-2xs mb-1.5 font-mono [overflow-wrap:anywhere]">
+              {ns}/
+            </p>
+            <div>
+              {grouped.get(ns)!.map((row) => (
+                <WorkloadRowItem key={row.workloadName} row={row} />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-    </SectionCard>
+          </div>
+        ))}
+      </div>
+    </StatusPanel>
   );
 }
 
@@ -896,18 +891,23 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
 
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
-      <code className="flex-1 truncate font-mono text-xs">{row.workloadName}</code>
-      <span className={`text-xs tabular-nums ${readyTone}`}>
+      <code className="min-w-0 flex-1 truncate font-mono text-xs" title={row.workloadName}>
+        {row.workloadName}
+      </code>
+      <span className={`shrink-0 font-mono text-xs tabular-nums ${readyTone}`}>
         {row.readyReplicas} / {row.desiredReplicas}
       </span>
       {row.restartCount24h > 0 ? (
-        <Badge variant="outline" className="border-warning-border text-warning-fg">
+        <Badge
+          variant="outline"
+          className="border-warning-border text-warning-fg shrink-0 font-mono"
+        >
           {row.restartCount24h} restart{row.restartCount24h === 1 ? "" : "s"}
         </Badge>
       ) : (
-        <span className="text-muted-foreground/60 text-2xs">no restarts</span>
+        <span className="text-muted-foreground/60 text-2xs shrink-0">no restarts</span>
       )}
-      <span className="text-muted-foreground text-2xs w-20 text-right font-mono">
+      <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
         {deployedAge ?? "—"}
       </span>
     </div>
@@ -928,6 +928,8 @@ export function StatusLiveHealthCard({
   pods,
   events,
   loading,
+  error,
+  refetch,
 }: ReturnType<typeof useClusterHealth>) {
   // Aggregate pod counts by phase across all namespaces — the live
   // view answers "is the cluster green?" before "where is it red?".
@@ -935,59 +937,65 @@ export function StatusLiveHealthCard({
   for (const p of pods) {
     phaseTotals.set(p.phase, (phaseTotals.get(p.phase) ?? 0) + p.count);
   }
+  const nothing = pods.length === 0 && events.length === 0;
   const phaseOrder = ["Running", "Pending", "Failed", "CrashLoopBackOff", "Succeeded", "Unknown"];
   const phasesSorted = Array.from(phaseTotals.entries()).sort(
     ([a], [b]) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b)
   );
 
   return (
-    <SectionCard
+    <StatusPanel
+      span="half"
       icon={<ActivityIcon className="size-4" />}
       title="Live health"
-      subtitle="Pod-phase rollup + recent warning events from the cluster driver. Polls every 30s."
+      description="Pod-phase rollup + recent warning events from the cluster driver. Polls every 30s."
+      loading={loading && nothing}
+      skeleton={<Skeleton className="h-24 w-full" />}
+      error={nothing ? error : null}
+      onRetry={refetch}
+      empty={
+        nothing
+          ? {
+              icon: <ServerOffIcon className="size-5" />,
+              title: "No health data",
+              description: "The driver couldn't reach the apiserver.",
+            }
+          : null
+      }
     >
-      {loading && pods.length === 0 && events.length === 0 ? (
-        <Skeleton className="h-24 w-full" />
-      ) : pods.length === 0 && events.length === 0 ? (
-        <EmptyHint
-          icon={<ServerOffIcon className="size-4" />}
-          text="No health data — driver couldn't reach the apiserver."
-        />
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
-              Pod phases
-            </p>
-            {phasesSorted.length === 0 ? (
-              <p className="text-muted-foreground text-xs">No pods in managed namespaces.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {phasesSorted.map(([phase, count]) => (
-                  <PodPhasePill key={phase} phase={phase} count={count} />
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
-              Recent events
-            </p>
-            {events.length === 0 ? (
-              <p className="text-muted-foreground text-xs">
-                No recent warning events. (A quiet event feed is the expected baseline.)
-              </p>
-            ) : (
-              <div>
-                {events.map((e, i) => (
-                  <EventRow key={`${e.namespace}-${e.name}-${i}`} event={e} />
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="space-y-4">
+        <div>
+          <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
+            Pod phases
+          </p>
+          {phasesSorted.length === 0 ? (
+            <p className="text-muted-foreground text-xs">No pods in managed namespaces.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {phasesSorted.map(([phase, count]) => (
+                <PodPhasePill key={phase} phase={phase} count={count} />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </SectionCard>
+        <div>
+          <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
+            Recent events
+          </p>
+          {events.length === 0 ? (
+            <p className="text-muted-foreground text-xs">
+              No recent warning events. (A quiet event feed is the expected baseline.)
+            </p>
+          ) : (
+            <div>
+              {events.map((e, i) => (
+                <EventRow key={`${e.namespace}-${e.name}-${i}`} event={e} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </StatusPanel>
   );
 }
 
@@ -1004,7 +1012,7 @@ function PodPhasePill({ phase, count }: { phase: string; count: number }) {
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
     >
       <span className="font-medium">{phase}</span>
-      <span className="tabular-nums opacity-80">{count}</span>
+      <span className="font-mono tabular-nums opacity-80">{count}</span>
     </span>
   );
 }
@@ -1019,8 +1027,8 @@ function EventRow({ event }: { event: ClusterEvent }) {
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <Icon className={`size-3.5 shrink-0 ${iconClass}`} />
       <code className="text-2xs shrink-0 font-mono">{event.reason}</code>
-      <span className="text-muted-foreground flex-1 truncate text-xs">
-        {event.involvedObject}
+      <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+        <span className="font-mono">{event.involvedObject}</span>
         {event.message && (
           <>
             <span className="opacity-60"> · </span>
@@ -1029,7 +1037,7 @@ function EventRow({ event }: { event: ClusterEvent }) {
         )}
       </span>
       {event.count > 1 && (
-        <Badge variant="outline" className="text-2xs">
+        <Badge variant="outline" className="text-2xs shrink-0 font-mono">
           ×{event.count}
         </Badge>
       )}
@@ -1044,32 +1052,31 @@ function EventRow({ event }: { event: ClusterEvent }) {
 export function StatusRecentWorkflowsCard({
   runs,
   loading,
+  error,
+  refetch,
 }: ReturnType<typeof useRecentClusterWorkflows>) {
   return (
-    <SectionCard
+    <StatusPanel
+      span="half"
       icon={<GitBranchIcon className="size-4" />}
       title="Recent workflow runs"
-      subtitle="Temporal runs targeting this cluster — most recent first."
+      description="Temporal runs targeting this cluster — most recent first."
+      loading={loading && runs.length === 0}
+      skeleton={<SkeletonRows />}
+      error={runs.length === 0 ? error : null}
+      onRetry={refetch}
+      empty={
+        runs.length === 0
+          ? { icon: <GitBranchIcon className="size-5" />, title: "No workflow runs recorded yet" }
+          : null
+      }
     >
-      {loading && runs.length === 0 ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
-          ))}
-        </div>
-      ) : runs.length === 0 ? (
-        <EmptyHint
-          icon={<GitBranchIcon className="size-4" />}
-          text="No workflow runs recorded yet."
-        />
-      ) : (
-        <div>
-          {runs.map((r) => (
-            <WorkflowRunRow key={r.workflowId + r.runId} run={r} />
-          ))}
-        </div>
-      )}
-    </SectionCard>
+      <div>
+        {runs.map((r) => (
+          <WorkflowRunRow key={r.workflowId + r.runId} run={r} />
+        ))}
+      </div>
+    </StatusPanel>
   );
 }
 
@@ -1081,12 +1088,14 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <Icon className={`size-4 shrink-0 ${iconClass}`} />
-      <span className="flex-1 truncate font-medium">{prettyWorkflowType(run.workflowType)}</span>
-      <Badge variant="outline" className="text-2xs">
+      <span className="min-w-0 flex-1 truncate font-medium" title={run.workflowType}>
+        {prettyWorkflowType(run.workflowType)}
+      </span>
+      <Badge variant="outline" className="text-2xs shrink-0">
         {label}
       </Badge>
       {duration && (
-        <span className="text-muted-foreground text-2xs inline-flex items-center gap-1 font-mono">
+        <span className="text-muted-foreground text-2xs inline-flex shrink-0 items-center gap-1 font-mono">
           <ClockIcon className="size-3" />
           {duration}
         </span>
@@ -1136,32 +1145,31 @@ function workflowStatusIcon(status: string): {
 export function StatusLifecycleCard({
   entries,
   loading,
+  error,
+  refetch,
 }: ReturnType<typeof useClusterLifecycleAudit>) {
   return (
-    <SectionCard
+    <StatusPanel
+      span="half"
       icon={<ClockIcon className="size-4" />}
       title="Lifecycle events"
-      subtitle="Mutations targeting this cluster — registered → managing → managed transitions, refreshes, decommissions."
+      description="Mutations targeting this cluster — registered → managing → managed transitions, refreshes, decommissions."
+      loading={loading && entries.length === 0}
+      skeleton={<SkeletonRows />}
+      error={entries.length === 0 ? error : null}
+      onRetry={refetch}
+      empty={
+        entries.length === 0
+          ? { icon: <ClockIcon className="size-5" />, title: "No lifecycle events recorded yet" }
+          : null
+      }
     >
-      {loading && entries.length === 0 ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
-          ))}
-        </div>
-      ) : entries.length === 0 ? (
-        <EmptyHint
-          icon={<ClockIcon className="size-4" />}
-          text="No lifecycle events recorded yet."
-        />
-      ) : (
-        <div>
-          {entries.map((e, i) => (
-            <LifecycleRow key={`${e.timestamp}-${i}`} entry={e} />
-          ))}
-        </div>
-      )}
-    </SectionCard>
+      <div>
+        {entries.map((e, i) => (
+          <LifecycleRow key={`${e.timestamp}-${i}`} entry={e} />
+        ))}
+      </div>
+    </StatusPanel>
   );
 }
 
@@ -1172,9 +1180,11 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <span className={`shrink-0 text-base leading-none ${dotClass}`}>●</span>
-      <span className="flex-1 truncate font-medium">{prettyOperation(entry.operation)}</span>
+      <span className="min-w-0 flex-1 truncate font-medium" title={entry.operation}>
+        {prettyOperation(entry.operation)}
+      </span>
       {entry.actor && (
-        <span className="text-muted-foreground text-2xs">
+        <span className="text-muted-foreground text-2xs min-w-0 truncate">
           by <span className="font-mono">{entry.actor}</span>
         </span>
       )}
@@ -1186,16 +1196,6 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
       <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
         {ts || "—"}
       </span>
-    </div>
-  );
-}
-
-// ─── Shared empty hint ───────────────────────────────────────────────
-function EmptyHint({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="border-border/70 text-muted-foreground flex items-center gap-2 rounded-md border border-dashed px-3 py-4 text-sm">
-      <span className="text-muted-foreground/70">{icon}</span>
-      <span>{text}</span>
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import { useHeldRows } from "@/components/list/use-held-rows";
+import { useListState } from "@/components/list/use-list-state";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
 import type { AstroliftOrganization, MutationResult } from "@/graphql/identity/identity.types";
@@ -21,17 +22,14 @@ import type {
   AstroliftAuditRetention,
   AuditExportFormat,
 } from "@/graphql/operations/operations.types";
+import { useMe } from "@/graphql/user/user.hooks";
+
+import type { AuditLogScreenProps } from "./AuditLogScreen";
+import { AUDIT_LIST, auditVariables, matchesTargetKind } from "./audit-list";
 
 interface PageResp {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
 }
-
-/**
- * The audit trail is the densest list on the platform and operators
- * read it a screen at a time, so this surface keeps the 100-row page
- * the hand-rolled version defaulted to rather than DataTable's 25.
- */
-const AUDIT_PAGE_SIZE = 100;
 
 interface RetentionResp {
   astroliftAuditRetention: AstroliftAuditRetention;
@@ -45,62 +43,56 @@ interface ExportResp {
   };
 }
 
-/**
- * Convert a yyyy-mm-dd input value to an ISO 8601 timestamp at UTC
- * midnight. Returns null for empty strings so the variable is dropped
- * from the query. The DateTime scalar on the server accepts ISO 8601.
- */
-function dateInputToIso(value: string, endOfDay = false): string | null {
-  if (!value) return null;
-  const [y, m, d] = value.split("-").map((s) => Number.parseInt(s, 10));
-  if (!y || !m || !d) return null;
-  const ts = endOfDay ? Date.UTC(y, m - 1, d, 23, 59, 59, 999) : Date.UTC(y, m - 1, d, 0, 0, 0, 0);
-  return new Date(ts).toISOString();
-}
+const EMPTY: AstroliftAuditEvent[] = [];
 
 /**
- * The audit trail's data half: the cursor-paged event table and its
- * filters, the retention window, the export, and the retention editor's
- * write (through `updateOrganization`, the same field the
- * /administration/organization settings page edits).
+ * The audit trail's data half: the cursor-paged event list (state in the
+ * URL, spec 44 §5.1), the retention window, the server-side export of the
+ * filter set in view, and the retention editor's write (through
+ * `updateOrganization`, the same field the /administration/organization
+ * settings page edits).
  */
-export function useAuditLog() {
+export function useAuditLog(): AuditLogScreenProps {
   const t = useTranslations("lists.audit");
   const { org } = useActiveOrg();
-
-  const [decisionFilter, setDecisionFilter] = React.useState<string>("");
-  const [fromDate, setFromDate] = React.useState<string>("");
-  const [toDate, setToDate] = React.useState<string>("");
+  const { user } = useMe();
+  const list = useListState(AUDIT_LIST);
   const [exporting, setExporting] = React.useState(false);
+  // `since:24h` is anchored when the page opens, so the variables stay
+  // stable across renders; the 5s poll still brings in newer events.
+  const [now] = React.useState(() => Date.now());
 
-  // Filters the controller doesn't own. Changing any of them resets the
-  // cursor walk to page one, which is what a different result set needs.
-  const variables = React.useMemo(
-    () => ({
-      decision: decisionFilter || null,
-      createdAtGte: dateInputToIso(fromDate, false),
-      createdAtLte: dateInputToIso(toDate, true),
-      // `totalCount` on this page is opt-in — a full-range count is
-      // expensive, so the caller asks for it.
-      includeTotal: true,
-    }),
-    [decisionFilter, fromDate, toDate]
+  const { variables, ready } = auditVariables(list.filters, list.state.q, {
+    pageSize: list.state.pageSize,
+    after: list.state.after,
+    viewerId: user?.id ?? null,
+    now,
+  });
+
+  const firstPage = list.state.after === null;
+  const { data, previousData, loading, error, refetch } = useQuery<PageResp>(
+    LIST_AUDIT_EVENTS_PAGE,
+    {
+      variables,
+      skip: !ready,
+      fetchPolicy: "cache-and-network",
+      // Live on the newest page only; an older page is a fixed window.
+      pollInterval: firstPage ? 5000 : 0,
+    }
   );
 
-  const table = useCursorTable<AstroliftAuditEvent>({
-    query: LIST_AUDIT_EVENTS_PAGE,
-    variables,
-    extract: (d) => (d as PageResp | undefined)?.astroliftAuditEventsPage,
-    // The action box is the query's `action` argument, debounced by the
-    // controller. It used to be an ordinary <Input> wired straight into
-    // the query variables, which cost one network round trip per
-    // keystroke. Note the server matches it *exactly*, hence the
-    // placeholder and the filtered-empty copy on the screen.
-    searchVariable: "action",
-    pageSize: AUDIT_PAGE_SIZE,
-    urlKey: "audit",
-    fetchPolicy: "cache-and-network",
-    pollInterval: 5000,
+  const page = (data ?? previousData)?.astroliftAuditEventsPage;
+  const targetKind = list.filters.target;
+  const rows = React.useMemo(
+    () => (page?.items ?? EMPTY).filter((r) => matchesTargetKind(r, targetKind)),
+    [page, targetKind]
+  );
+  const stale = loading && !data && Boolean(previousData);
+  const held = useHeldRows(rows, (r) => r.id, {
+    // Not while the rows on screen answer the previous question: those
+    // must not become the held set of the new one.
+    live: firstPage && !stale,
+    resetKey: JSON.stringify(list.filters) + list.state.q + list.state.pageSize,
   });
 
   const { data: retentionData } = useQuery<RetentionResp>(GET_AUDIT_RETENTION, {
@@ -109,10 +101,7 @@ export function useAuditLog() {
 
   const [exportMutation] = useMutation<ExportResp>(EXPORT_AUDIT_EVENTS);
 
-  // The export takes the filter set the operator is looking at, not the
-  // page: `action` comes from the search box, the rest from `variables`.
-  const actionFilter = table.search.trim();
-
+  // The export takes the filter set the operator is looking at, not the page.
   const onExport = React.useCallback(
     async (format: AuditExportFormat) => {
       setExporting(true);
@@ -122,9 +111,9 @@ export function useAuditLog() {
           variables: {
             input: {
               format: format.toUpperCase(),
-              action: actionFilter || null,
+              action: variables.action,
               decision: variables.decision,
-              actorId: null,
+              actorId: variables.actorId,
               createdAtGte: variables.createdAtGte,
               createdAtLte: variables.createdAtLte,
             },
@@ -154,7 +143,15 @@ export function useAuditLog() {
         setExporting(false);
       }
     },
-    [exportMutation, t, actionFilter, variables]
+    [
+      exportMutation,
+      t,
+      variables.action,
+      variables.decision,
+      variables.actorId,
+      variables.createdAtGte,
+      variables.createdAtLte,
+    ]
   );
 
   const [updateOrg, { loading: savingRetention }] = useMutation<{
@@ -166,17 +163,17 @@ export function useAuditLog() {
 
   /**
    * Writes the retention window. The server enforces ORG_UPDATE and the
-   * 1..2557 range; the retention query is refetched so the subtitle
-   * updates in place. Resolves true when saved, so the dialog can close.
+   * 1..2557 range; the retention query is refetched so the header updates
+   * in place. Resolves true when saved, so the dialog can close.
    */
   const saveRetention = React.useCallback(
     async (days: number): Promise<boolean> => {
       if (!org) return false;
       try {
-        const { data } = await updateOrg({
+        const { data: saved } = await updateOrg({
           variables: { input: { id: org.id, auditLogRetentionDays: days } },
         });
-        const payload = data?.updateOrganization;
+        const payload = saved?.updateOrganization;
         if (payload?.ok) {
           toast.success(t("retention.toastSuccess", { days }));
           return true;
@@ -191,13 +188,17 @@ export function useAuditLog() {
   );
 
   return {
-    table,
-    decisionFilter,
-    onDecisionFilterChange: setDecisionFilter,
-    fromDate,
-    onFromDateChange: setFromDate,
-    toDate,
-    onToDateChange: setToDate,
+    list,
+    rows: held.rows,
+    newRows: { count: held.newCount, onReveal: held.reveal },
+    loading: (!ready || loading) && !page,
+    stale,
+    error: error && !page ? error : null,
+    onRetry: () => void refetch(),
+    nextCursor: page?.nextCursor ?? null,
+    // A client-side target filter makes the server's count wrong for the rows shown.
+    totalCount: targetKind ? null : (page?.totalCount ?? null),
+    targetFilteredLocally: Boolean(targetKind),
     retentionDays: retentionData?.astroliftAuditRetention?.days ?? null,
     exporting,
     onExport,

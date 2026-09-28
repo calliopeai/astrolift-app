@@ -8,7 +8,9 @@ import { ClusterAgentView } from "./ClusterAgent";
 import { BootstrapHistoryView, ClusterSettingsScreen } from "./ClusterSettings";
 import {
   AGENT,
+  ARN200,
   AUTH_USERS,
+  BOOTSTRAP_RUN,
   CENTRAL_AUTH,
   CLUSTER,
   FAILED_RUN,
@@ -16,15 +18,19 @@ import {
   INGRESS_AUTH,
   INGRESS_CLASS,
   LONG,
+  NO_ACCESS,
   PLAN,
   SETTINGS,
+  SHA64,
+  UNBROKEN_URL,
 } from "./fixtures";
 import { IngressAuthView } from "./IngressAuth";
 import type { ClusterWithHeartbeat } from "./types";
 
+/** Cluster settings on the settings archetype (spec 44 §5.3). */
 const meta: Meta = {
   title: "Screens/Clusters/Settings/ClusterSettings",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
@@ -120,22 +126,98 @@ export const MissingPrereqs: Story = {
   ),
 };
 
+const longCluster = {
+  ...CLUSTER,
+  slug: LONG,
+  name: `Cluster ${LONG}`,
+  endpoint: UNBROKEN_URL,
+  authMethod: `irsa-${SHA64}`,
+  ingressClass: `custom-${LONG}`,
+  lastBootstrapRun: {
+    ...BOOTSTRAP_RUN,
+    chartVersion: `astrolift-system-${SHA64}`,
+    triggeredByUsername: `${LONG}@example.com`,
+    installedReleases: [{ name: `release-${LONG}`, version: SHA64, status: "deployed" }],
+  },
+} as unknown as ClusterWithHeartbeat;
+
+const longCards = {
+  ...cards,
+  ingressAuth: (
+    <IngressAuthView
+      {...INGRESS_AUTH}
+      existing={{
+        user_pool_arn: ARN200,
+        user_pool_client_id: SHA64,
+        user_pool_domain: UNBROKEN_URL,
+      }}
+    />
+  ),
+};
+
+/** A 64-character SHA, a 200-character ARN and an unbroken URL: nothing widens the page. */
 export const LongStrings: Story = {
   render: () => (
     <ClusterSettingsScreen
       {...SETTINGS}
       slug={LONG}
-      cluster={{
-        ...CLUSTER,
-        slug: LONG,
-        name: `Cluster ${LONG}`,
-        endpoint: `https://${LONG}.gr7.us-west-2.eks.amazonaws.com:443/${LONG}`,
-        ingressClass: `custom-${LONG}`,
-      }}
+      cluster={longCluster}
+      cards={longCards}
+      bootstrapHistory={history}
+    />
+  ),
+};
+
+/** The narrowest the console goes (spec 44 §6): the section nav is a select. */
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="border p-4">
+      <ClusterSettingsScreen
+        {...SETTINGS}
+        slug={LONG}
+        cluster={longCluster}
+        cards={longCards}
+        bootstrapHistory={history}
+      />
+    </div>
+  ),
+};
+
+/**
+ * A viewer with none of the cluster permissions: the same fields, disabled,
+ * each naming the permission that would allow it; no lifecycle actions; the
+ * sign-in users are not listed at all.
+ */
+export const ReadOnly: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      access={NO_ACCESS}
       cards={cards}
       bootstrapHistory={history}
     />
   ),
+};
+
+/** May run the lifecycle, may not change the edge or decommission. */
+export const PartialAccess: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      access={{ manage: true, update: false, users: true, unregister: false }}
+      cards={cards}
+      bootstrapHistory={history}
+    />
+  ),
+};
+
+/** The decommission confirm: what goes and what stays. */
+export const Decommission: Story = {
+  render: () => <ClusterSettingsScreen {...SETTINGS} cards={cards} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Decommission" }));
+  },
 };
 
 export const HistoryOpen: Story = {

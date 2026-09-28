@@ -8,22 +8,34 @@ import {
   HardDriveIcon,
   LayersIcon,
   Loader2Icon,
+  MoreHorizontalIcon,
   NetworkIcon,
-  ServerIcon,
+  SettingsIcon,
   ShieldCheckIcon,
+  Trash2Icon,
   TrendingUpIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import { ClusterTabs } from "./ClusterTabs";
+import { ClusterHeader } from "./ClusterHeader";
+import { lifecycleAction } from "./ClustersList";
+import { type Lifecycle, providerLabel } from "./clusters-list";
 import type { useClusterDetail } from "./use-cluster-detail";
 
 export type ClusterDetailProps = ReturnType<typeof useClusterDetail> & {
@@ -31,18 +43,7 @@ export type ClusterDetailProps = ReturnType<typeof useClusterDetail> & {
   renderLiveStats: (clusterId: string) => React.ReactNode;
 };
 
-type Lifecycle = "registered" | "managing" | "managed" | "error";
-
 // ─── Static maps ─────────────────────────────────────────────────────
-const PROVIDER_LABEL: Record<string, string> = {
-  k8s_native: "Kubernetes",
-  eks: "AWS EKS",
-  gke: "Google GKE",
-  aks: "Azure AKS",
-  k3s: "k3s",
-  kind: "kind",
-};
-
 const LIFECYCLE_CONFIG: Record<
   Lifecycle,
   {
@@ -118,72 +119,126 @@ function isCapInstalled(key: CapKey, value: unknown): boolean {
 }
 
 /**
- * The cluster overview tab. Pure view; the data half is useClusterDetail.
+ * The cluster overview tab, under the shared cluster header. Pure view; the
+ * data half is useClusterDetail.
  */
-export function ClusterDetail({ slug, cluster, loading, renderLiveStats }: ClusterDetailProps) {
+export function ClusterDetail(props: ClusterDetailProps) {
+  const { slug, cluster, loading, renderLiveStats, deleting, onUnregister } = props;
   const fmt = useFormatters();
+  const [confirming, setConfirming] = React.useState(false);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
-
-  if (loading && !cluster) {
-    return (
-      <PageShell title="Cluster" description="Loading…">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </PageShell>
-    );
-  }
 
   if (!cluster) {
     return (
-      <PageShell
-        title="Cluster not found"
-        description="The cluster doesn't exist or you don't have permission to view it."
-      >
-        <EmptyState
-          icon={<AlertTriangleIcon className="size-5" />}
-          title={`No cluster with slug ${slug}`}
-          actionHref="/clusters"
-          actionLabel="Back to clusters"
-        />
-      </PageShell>
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <ClusterHeader slug={slug} cluster={null} loading={loading} active="overview" />
+        {loading ? (
+          <>
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </>
+        ) : (
+          <EmptyState
+            icon={<AlertTriangleIcon className="size-5" />}
+            title={`No cluster with slug ${slug}`}
+            description="The cluster doesn't exist or you don't have permission to view it."
+            actionHref="/clusters"
+            actionLabel="Back to clusters"
+          />
+        )}
+      </div>
     );
   }
 
-  const provider = PROVIDER_LABEL[cluster.providerPluginSlug] ?? cluster.providerPluginSlug;
+  const provider = providerLabel(cluster.providerPluginSlug);
   const lc = LIFECYCLE_CONFIG[lifecycle];
   const caps = (cluster.capabilities ?? {}) as Record<string, unknown>;
   const hasCaps = Object.keys(caps).length > 0;
+  const action = lifecycleAction(cluster, props);
+
+  const primaryAction =
+    lifecycle === "managing" ? (
+      <Button size="sm" variant="ghost" disabled>
+        <Loader2Icon className="size-4 animate-spin" />
+        Setup in progress…
+      </Button>
+    ) : action ? (
+      <Can permission="cluster.manage">
+        <Button
+          size="sm"
+          variant={action.variant === "outline" ? "outline" : undefined}
+          onClick={action.run}
+          disabled={action.disabled}
+        >
+          {action.icon}
+          {action.label}
+        </Button>
+      </Can>
+    ) : null;
+
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="size-8" aria-label="Cluster actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuItem asChild>
+          <Link href={`/clusters/${cluster.slug}/settings`}>
+            <SettingsIcon className="size-4" />
+            Settings
+          </Link>
+        </DropdownMenuItem>
+        <Can permission="cluster.unregister">
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setConfirming(true)}
+            disabled={deleting}
+          >
+            <Trash2Icon className="size-4" />
+            Unregister
+          </DropdownMenuItem>
+        </Can>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <PageShell
-      title={
-        <span className="flex items-center gap-3">
-          <span className="bg-muted text-muted-foreground rounded-md p-1.5">
-            <ServerIcon className="size-4" />
-          </span>
-          {cluster.name}
-        </span>
-      }
-      description={
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm">{cluster.slug}</span>
-          <Badge variant="secondary">{provider}</Badge>
-          {cluster.region && <Badge variant="outline">{cluster.region}</Badge>}
-          {!cluster.isActive && <Badge variant="destructive">inactive</Badge>}
-          <Badge variant={lc.variant} className="gap-1">
-            {lc.icon}
-            {lc.label}
-          </Badge>
-        </span>
-      }
-    >
-      <ClusterTabs slug={slug} active="overview" />
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <ClusterHeader
+        slug={slug}
+        cluster={cluster}
+        active="overview"
+        primaryAction={primaryAction}
+        menu={menu}
+      />
+
+      {/* ── Error card: a failure's reason leads the page (spec 44 §5.2) ── */}
+      {lifecycle === "error" && cluster.lastManagementError && (
+        <Card className="border-l-destructive border-destructive/40 bg-destructive/5 !rounded-none border-l-4 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2 text-base">
+              <AlertTriangleIcon className="size-4" />
+              Last management failure
+            </CardTitle>
+            <CardDescription>
+              Fix the underlying issue and click Retry from Settings to re-run.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-destructive font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+              {cluster.lastManagementError}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Management status card ──────────────────────────────────── */}
-      <Card className="!rounded-none border-l-4 border-l-neutral-600 shadow-md dark:border-l-neutral-500">
+      <Card className="border-l-muted-foreground !rounded-none border-l-4 shadow-md">
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex min-w-0 items-start justify-between gap-4">
+            <div className="min-w-0">
               <CardTitle className="text-base">Management</CardTitle>
               <CardDescription className="mt-0.5">
                 {lifecycle === "managed" && cluster.managedAt
@@ -201,17 +256,19 @@ export function ClusterDetail({ slug, cluster, loading, renderLiveStats }: Clust
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-            <div>
+            <div className="min-w-0">
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">Provider</dt>
               <dd className="mt-0.5 font-medium">{provider}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">Region</dt>
-              <dd className="mt-0.5 font-mono">{cluster.region || "—"}</dd>
+              <dd className="mt-0.5 font-mono [overflow-wrap:anywhere]">{cluster.region || "—"}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">Auth</dt>
-              <dd className="mt-0.5 font-mono">{cluster.authMethod || "—"}</dd>
+              <dd className="mt-0.5 font-mono [overflow-wrap:anywhere]">
+                {cluster.authMethod || "—"}
+              </dd>
             </div>
           </dl>
         </CardContent>
@@ -262,26 +319,6 @@ export function ClusterDetail({ slug, cluster, loading, renderLiveStats }: Clust
         </Card>
       )}
 
-      {/* ── Error card ──────────────────────────────────────────────── */}
-      {lifecycle === "error" && cluster.lastManagementError && (
-        <Card className="border-l-destructive border-destructive/40 bg-destructive/5 !rounded-none border-l-4 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2 text-base">
-              <AlertTriangleIcon className="size-4" />
-              Last management failure
-            </CardTitle>
-            <CardDescription>
-              Fix the underlying issue and click Retry from Settings to re-run.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="text-destructive text-xs whitespace-pre-wrap">
-              {cluster.lastManagementError}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── Action required ─────────────────────────────────────────── */}
       {lifecycle !== "managed" && lifecycle !== "managing" && (
         <div className="border-border bg-muted/40 border p-4 text-sm">
@@ -298,6 +335,16 @@ export function ClusterDetail({ slug, cluster, loading, renderLiveStats }: Clust
           </p>
         </div>
       )}
-    </PageShell>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Unregister cluster ${cluster.slug}?`}
+        description="Refused if any active app still targets this cluster. The cluster's kubeconfig and probed capabilities are removed from the control plane."
+        confirmLabel="Unregister"
+        destructive
+        onConfirm={() => onUnregister(cluster)}
+      />
+    </div>
   );
 }

@@ -32,3 +32,11 @@ export const LongSlug: Story = {
     />
   ),
 };
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ClusterTabs slug="prd-us-west-2" active="health" />
+    </div>
+  ),
+};
