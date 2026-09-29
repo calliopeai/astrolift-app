@@ -12,7 +12,10 @@
  * step with the tree: migrate a surface and the test fails until its entry
  * is deleted.
  *
- * The list may only shrink.
+ * The baseline is empty (#2126, spec 44 section 9): every group below is
+ * an empty array, and the exact-match test keeps it that way. Adding an
+ * entry is a design decision, made in review with its blocker written
+ * down, not a way to land a surface that skips the list primitives.
  */
 
 /**
@@ -20,13 +23,7 @@
  * controller and the spec 44 §5.1 variables (`filter`, `search`, `sort`,
  * `first` / `after`), so the hook moves first, then the screen.
  */
-const ON_CURSOR_TABLE = [
-  {
-    file: "components/screens/agents/list/BoxesTabView.tsx",
-    reason:
-      "Walks agent boxes with useCursorTable in use-agent-boxes.ts; the hook moves to useListState first.",
-  },
-];
+const ON_CURSOR_TABLE = [];
 
 /**
  * Group 2: two tables on one screen (rule 3). One stays the screen's list;
@@ -46,18 +43,7 @@ const FEED_OR_SUMMARY = [];
  * client-side paging and a ListView note until the field pages
  * (needsBackend), or, for the viz list styles, stay a decision to make.
  */
-const CLIENT_ROWS = [
-  {
-    file: "components/viz/fleet/FleetList.tsx",
-    reason:
-      "FleetView's 'list' style over one snapshot's agents; whether a viz style is a ListPage is not decided.",
-  },
-  {
-    file: "components/viz/workflow/WorkflowList.tsx",
-    reason:
-      "WorkflowView's 'list' style over one snapshot's stages and runs; whether a viz style is a ListPage is not decided.",
-  },
-];
+const CLIENT_ROWS = [];
 
 export const LIST_ARCHETYPE_ALLOWLIST = [
   ...ON_CURSOR_TABLE,

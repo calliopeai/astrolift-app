@@ -13,20 +13,20 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
+import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
+import { ListPage } from "@/components/list/ListPage";
+import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
+import {
+  type ListDefinition,
+  standardViews,
+  useLocalListState,
+} from "@/components/list/use-list-state";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { AstroliftSecurityPolicy } from "@/graphql/__generated__/operations";
 
 import {
@@ -52,6 +52,35 @@ const SEVERITY_TONE: Record<ScanFinding["severity"], string> = {
   high: "bg-danger/10 text-danger-fg",
   medium: "bg-warning/15 text-warning-fg",
   low: "bg-foreground/5 text-muted-foreground",
+};
+
+const SEVERITY_RANK: Record<ScanFinding["severity"], number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+const findingKey = (f: ScanFinding) => `${f.cve_id}-${f.package_name}`;
+
+/**
+ * The latest scan's findings as an embedded list: arrays inside one event
+ * payload, so search, filters, sort and pages run in the client. Findings
+ * are the image's, not a person's, so Mine is empty.
+ */
+const FINDINGS_SELECT: SelectRowsSpec<ScanFinding> = {
+  filter: {
+    owner: () => false,
+    severity: (f, value) => f.severity === value,
+    fix: (f, value) => (value === "available" ? Boolean(f.fixed_in_version) : !f.fixed_in_version),
+  },
+  text: (f) => [f.cve_id, f.package_name, f.package_version, f.fixed_in_version],
+  sort: {
+    severity: (f) => SEVERITY_RANK[f.severity] ?? 9,
+    cve: (f) => f.cve_id,
+    package: (f) => f.package_name.toLowerCase(),
+  },
+  id: findingKey,
 };
 
 function formatTime(iso: string | null | undefined): string {
@@ -273,15 +302,65 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
   const counts = payload?.counts ?? { critical: 0, high: 0, medium: 0, low: 0 };
   const findings = payload?.findings ?? [];
 
-  const sortedFindings = React.useMemo(() => {
-    const order: Record<ScanFinding["severity"], number> = {
-      critical: 0,
-      high: 1,
-      medium: 2,
-      low: 3,
-    };
-    return [...findings].sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
-  }, [findings]);
+  const list = useLocalListState(useFindingsList());
+  const page = selectRows(
+    findings,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    FINDINGS_SELECT
+  );
+
+  const columns: Column<ScanFinding>[] = [
+    {
+      id: "cve",
+      header: t("columns.cve"),
+      sortKey: "cve",
+      cell: (f) => (
+        <a
+          href={`https://nvd.nist.gov/vuln/detail/${f.cve_id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-xs hover:underline"
+        >
+          {f.cve_id}
+        </a>
+      ),
+    },
+    {
+      id: "severity",
+      header: t("columns.severity"),
+      sortKey: "severity",
+      cell: (f) => <Badge className={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>,
+    },
+    {
+      id: "package",
+      header: t("columns.package"),
+      sortKey: "package",
+      cellClassName: "font-mono text-xs",
+      cell: (f) => (
+        <>
+          {f.package_name}
+          <span className="text-muted-foreground"> @ {f.package_version}</span>
+        </>
+      ),
+    },
+    {
+      id: "fix",
+      header: t("columns.fix"),
+      cellClassName: "font-mono text-xs",
+      cell: (f) =>
+        f.fixed_in_version ? (
+          <span className="text-success-fg">{t("upgrade", { version: f.fixed_in_version })}</span>
+        ) : (
+          <span className="text-muted-foreground">{t("noFix")}</span>
+        ),
+    },
+  ];
 
   return (
     <Card>
@@ -312,7 +391,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
           </div>
         ) : !hasEvent ? (
           <p className="text-muted-foreground p-6 text-sm">{t("noEvent")}</p>
-        ) : sortedFindings.length === 0 ? (
+        ) : findings.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm">
             <CheckCircle2Icon className="text-success-fg size-4" />
             <span className="text-muted-foreground">
@@ -320,52 +399,56 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
             </span>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("columns.cve")}</TableHead>
-                <TableHead>{t("columns.severity")}</TableHead>
-                <TableHead>{t("columns.package")}</TableHead>
-                <TableHead>{t("columns.fix")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedFindings.map((f) => (
-                <TableRow key={`${f.cve_id}-${f.package_name}`}>
-                  <TableCell>
-                    <a
-                      href={`https://nvd.nist.gov/vuln/detail/${f.cve_id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-xs hover:underline"
-                    >
-                      {f.cve_id}
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {f.package_name}
-                    <span className="text-muted-foreground"> @ {f.package_version}</span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {f.fixed_in_version ? (
-                      <span className="text-success-fg">
-                        {t("upgrade", { version: f.fixed_in_version })}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">{t("noFix")}</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="px-6 pb-6">
+            <ListPage<ScanFinding>
+              embedded
+              list={list}
+              label="Findings"
+              columns={columns}
+              rows={page.rows}
+              getRowId={findingKey}
+              totalCount={page.totalCount}
+              empty={{ icon: <ScanLineIcon className="size-5" />, title: t("title") }}
+            />
+          </div>
         )}
       </CardContent>
     </Card>
   );
+}
+
+/** The findings list's declaration; its labels are the scan card's own copy. */
+function useFindingsList(): ListDefinition {
+  const t = useTranslations("apps.security.scan");
+  const [def] = React.useState<ListDefinition>(() => ({
+    id: "apps.security.findings",
+    fields: [
+      {
+        key: "severity",
+        label: t("columns.severity"),
+        options: (["critical", "high", "medium", "low"] as const).map((v) => ({
+          value: v,
+          label: t(v),
+        })),
+      },
+      {
+        key: "fix",
+        label: t("columns.fix"),
+        options: [
+          { value: "available", label: t("columns.fix") },
+          { value: "none", label: t("noFix") },
+        ],
+      },
+    ],
+    searchPlaceholder: "Search CVEs, packages…",
+    defaultSort: [{ key: "severity", dir: "asc" }],
+    views: standardViews({ owner: "me" }, [], {
+      mineNote: "Findings are the image's, not a person's, so Mine is empty.",
+    }),
+    paging: "numbered",
+    pageSizes: [25, 50, 100],
+  }));
+  return def;
 }
 
 function SeverityCount({

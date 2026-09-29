@@ -1,5 +1,4 @@
 import type { SortState } from "@/components/data-table";
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftAgentBox,
   AstroliftAgentEnvironmentSpec,
@@ -324,18 +323,18 @@ export const SPECS: AstroliftAgentEnvironmentSpec[] = [
   },
 ];
 
+/** Everything but the list state, which a story makes with useLocalListState. */
 export function boxesProps(
   rows: AstroliftAgentBox[] = BOXES,
-  patch: Partial<BoxesTabViewProps> = {}
-): BoxesTabViewProps {
+  patch: Partial<Omit<BoxesTabViewProps, "list">> = {}
+): Omit<BoxesTabViewProps, "list"> {
   return {
-    controller: fakeController<AstroliftAgentBox>({
-      rows,
-      totalCount: rows.length,
-      state: rows.length ? "ready" : "empty",
-      searchEnabled: false,
-      sortEnabled: false,
-    }),
+    rows,
+    totalCount: rows.length,
+    loading: false,
+    stale: false,
+    error: null,
+    onRetry: noop,
     specs: SPECS,
     starting: false,
     includeEnded: false,

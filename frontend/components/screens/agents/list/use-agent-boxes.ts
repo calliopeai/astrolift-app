@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import { selectRows } from "@/components/list/select-rows";
+import { useListState } from "@/components/list/use-list-state";
 import type {
   DestroyAgentBoxMutation,
   EnsureAgentBoxMutation,
@@ -13,9 +14,12 @@ import { DESTROY_AGENT_BOX, ENSURE_AGENT_BOX } from "@/graphql/agents/agents.mut
 import { LIST_AGENT_BOXES, LIST_AGENT_ENVIRONMENT_SPECS } from "@/graphql/agents/agents.queries";
 import type {
   AgentBoxesData,
+  AgentBoxesVars,
   AstroliftAgentBox,
   AstroliftAgentEnvironmentSpec,
 } from "@/graphql/agents/agents.types";
+
+import { AGENT_BOXES_LIST, AGENT_BOXES_SELECT } from "./agent-boxes-list";
 
 export interface StartBoxInput {
   specSlug: string;
@@ -25,30 +29,37 @@ export interface StartBoxInput {
 }
 
 /**
- * The org's agent boxes (polled while one provisions), the environment specs
- * the new-box dialog offers, and the ensure / destroy mutations. The data half
- * of BoxesTabView.
+ * The org's agent boxes (URL list state, filtered, sorted and paged in the
+ * client: see agent-boxes-list.ts; polled while one provisions), the
+ * environment specs the new-box dialog offers, and the ensure / destroy
+ * mutations. The data half of BoxesTabView.
  */
 export function useAgentBoxes(orgId: string) {
   const [includeEnded, setIncludeEnded] = React.useState(false);
+  const list = useListState(AGENT_BOXES_LIST);
 
-  // `agentBoxes` is a capped list rather than a cursor page — an org has a
-  // handful of boxes, not a fleet — so the envelope is synthesized here. The
-  // items array is Apollo's, so row identity stays stable across renders.
-  const extract = React.useCallback((d: unknown) => {
-    const rows = (d as AgentBoxesData | undefined)?.agentBoxes;
-    return rows ? { items: rows, nextCursor: null, totalCount: rows.length } : null;
-  }, []);
-
-  const controller = useCursorTable<AstroliftAgentBox, { orgId: string }>({
-    query: LIST_AGENT_BOXES,
-    variables: { orgId, includeEnded } as Partial<{ orgId: string }>,
-    extract,
+  const query = useQuery<AgentBoxesData, AgentBoxesVars>(LIST_AGENT_BOXES, {
+    variables: { orgId, includeEnded },
     // A box takes a moment to go provisioning -> running, so the button press
     // visibly resolves instead of leaving the operator to reload.
     pollInterval: 5000,
     skip: !orgId,
   });
+  const data = query.data ?? query.previousData;
+  const page = selectRows<AstroliftAgentBox>(
+    data?.agentBoxes ?? [],
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    AGENT_BOXES_SELECT
+  );
+  const refetch = (): void => {
+    void query.refetch();
+  };
 
   const { data: specData } = useQuery<{
     agentEnvironmentSpecs: AstroliftAgentEnvironmentSpec[];
@@ -77,7 +88,7 @@ export function useAgentBoxes(orgId: string) {
         throw new Error(result?.errors?.[0]?.message ?? "Could not start the box");
       }
       toast.success(`Box ${result.data?.slug ?? ""} is starting`);
-      controller.refetch();
+      refetch();
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -94,7 +105,7 @@ export function useAgentBoxes(orgId: string) {
         throw new Error(result?.errors?.[0]?.message ?? "Could not destroy the box");
       }
       toast.success(`Destroyed ${box.slug}`);
-      controller.refetch();
+      refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toast.error("Couldn't destroy the box", { description: message });
@@ -107,7 +118,14 @@ export function useAgentBoxes(orgId: string) {
   }
 
   return {
-    controller,
+    list,
+    rows: page.rows,
+    totalCount: page.totalCount,
+    loading: query.loading && !data,
+    // Showing ended boxes asks a new question; the old answer fades until it lands.
+    stale: !query.data && Boolean(query.previousData),
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: refetch,
     specs,
     starting,
     includeEnded,

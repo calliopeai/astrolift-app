@@ -21,7 +21,10 @@
  *      test fails until its entry is deleted; add a raw table and lint
  *      fails until an entry is added, in review, with a reason.
  *
- * The list may only shrink. Adding to it is a design decision, not a
+ * The baseline is empty (#2126, spec 44 section 9): every group below is
+ * an empty array, and the exact-match test keeps it that way. The groups
+ * stay as the vocabulary for a reason. Adding an entry is a design
+ * decision, made in review with its blocker written down, not a
  * formality.
  */
 
@@ -34,12 +37,7 @@
  * schema first. That is backend work, and it is what actually gates
  * these — not the frontend rewrite.
  */
-const NO_PAGE_FIELD = [
-  {
-    file: "components/observability/TraceExplorerPanel.tsx",
-    reason: "astroliftAppTraces returns a bounded trace window, unpaginated.",
-  },
-];
+const NO_PAGE_FIELD = [];
 
 /**
  * Group 2 — the rows are not a server-side collection at all.
@@ -52,34 +50,7 @@ const NO_PAGE_FIELD = [
  * locally. These stay on the primitives unless their data moves to the
  * server as its own collection.
  */
-const NOT_A_SERVER_COLLECTION = [
-  {
-    file: "components/screens/apps/managed-services/EmailDetailSheet.tsx",
-    reason:
-      "Four tables over arrays nested in the astroliftEmailServiceDetail payload (suppressions, messages, templates) — no collection of their own.",
-  },
-  {
-    file: "components/screens/apps/security/AppSecurityScreen.tsx",
-    reason: "Findings are derived and sorted in the client from the app's event stream.",
-  },
-  {
-    file: "components/screens/apps/workloads/WorkloadDetailScreen.tsx",
-    reason: "Pod-status buckets, containers and probes all render off the single workload payload.",
-  },
-  {
-    file: "components/screens/clusters/settings/ClusterSettings.tsx",
-    reason:
-      "One table iterates the static CAPABILITY_KEYS constant; another iterates installedReleases nested in a bootstrap run.",
-  },
-  {
-    file: "components/screens/documentation/ConfigurationScreen.tsx",
-    reason: "A static environment-variable reference. The page issues no query.",
-  },
-  {
-    file: "components/screens/documentation/DriversScreen.tsx",
-    reason: "A capability matrix computed by crossing provider plugins with registered clusters.",
-  },
-];
+const NOT_A_SERVER_COLLECTION = [];
 
 /**
  * Group 3 — a row shape DataTable does not model.
@@ -93,8 +64,7 @@ const UNSUPPORTED_ROW_SHAPE = [];
  * goes when someone adds a raw table with no reason not to use DataTable,
  * and an empty array makes that entry obvious in review. Naming the group
  * "nobody got to it" rather than inventing a blocker is what let it be
- * emptied — every other group here is still populated because its entries
- * have real ones.
+ * emptied first; the other groups followed in #2126.
  *
  * Two of the eight turned out to have blockers after all once read:
  * cronjob-home moved to group 1 (its field filters on the app, not the

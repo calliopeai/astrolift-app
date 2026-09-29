@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   DOCS_E_DRIVERS,
@@ -31,3 +32,17 @@ export const Empty: Story = { args: DOCS_E_DRIVERS_FALLBACK };
 export const QueryFailed: Story = { args: DOCS_E_DRIVERS_FALLBACK };
 
 export const LongStrings: Story = { args: DOCS_E_DRIVERS_LONG };
+
+/** The same providers read as the managed-services matrix. */
+export const ManagedServices: Story = {
+  args: DOCS_E_DRIVERS,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("tab", { name: "Managed services per provider" }));
+    await expect(c.getByRole("tab", { name: "Managed services per provider" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await expect(c.getByRole("columnheader", { name: "postgres" })).toBeInTheDocument();
+  },
+};

@@ -17,9 +17,10 @@ import { describe, expect, it } from "vitest";
  * render together are not added up: `a ? <ListPage embedded/> : <ListPage/>`
  * is one list, and so is an early `if (…) return <ListPage/>`.
  *
- * Report-only for the files below, today's violators, each with a reason,
- * so the apply agents can shrink it: a listed file that now has one list
- * fails until its entry is deleted, and a new violator fails outright.
+ * The allowlist is empty (#2126): no screen renders two lists. A new
+ * violator fails outright. Adding an entry, with its reason, is a design
+ * decision; a listed file that drops to one list fails until its entry is
+ * deleted.
  */
 const ALLOWLIST: { file: string; reason: string }[] = [];
 

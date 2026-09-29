@@ -249,6 +249,18 @@ export const HistoryOpen: Story = {
   },
 };
 
+/** The last run's installed releases; opening them closes the history, so one list shows. */
+export const ReleasesOpen: Story = {
+  render: () => <ClusterSettingsScreen {...SETTINGS} cards={cards} bootstrapHistory={history} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: /View history/ }));
+    await userEvent.click(c.getByRole("button", { name: /View installed releases/ }));
+    await expect(c.getByRole("cell", { name: "ingress-nginx" })).toBeInTheDocument();
+    await expect(c.getByRole("button", { name: /View history/ })).toBeInTheDocument();
+  },
+};
+
 export const HistoryLoading: Story = {
   render: () => <BootstrapHistoryView runs={[]} loading />,
 };

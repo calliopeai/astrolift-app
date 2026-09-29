@@ -4,7 +4,9 @@ import {
   AlertTriangleIcon,
   CheckCircleIcon,
   ChevronDownIcon,
+  HistoryIcon,
   MoreHorizontalIcon,
+  PackageIcon,
   PlayIcon,
   RefreshCcwIcon,
   ShieldIcon,
@@ -14,7 +16,16 @@ import {
 import Link from "next/link";
 import * as React from "react";
 
+import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
+import { ListPage } from "@/components/list/ListPage";
+import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
+import {
+  type ListDefinition,
+  type ListStateController,
+  standardViews,
+  useLocalListState,
+} from "@/components/list/use-list-state";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
 import { PermissionNote, Restricted, useRestrictedMode } from "@/components/settings/Restricted";
 import { DangerAction, SettingsPage } from "@/components/settings/SettingsPage";
@@ -29,14 +40,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
@@ -419,22 +422,11 @@ function CapabilitiesSection({
           </p>
         )
       ) : (
-        <div className="min-w-0 overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Capability</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Detail</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {CAPABILITY_KEYS.map((key) => (
-                <CapabilityRow key={key} keyName={key} value={caps[key]} />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+          {CAPABILITY_KEYS.map((key) => (
+            <CapabilityItem key={key} keyName={key} value={caps[key]} />
+          ))}
+        </dl>
       )}
     </Section>
   );
@@ -479,16 +471,15 @@ function MissingPrereqs({ slug }: { slug: string }) {
   );
 }
 
-// Per-row capability renderer. Each key in the JSONField shape has
-// a small adapter that pulls out the user-facing status string +
-// detail line — keeping the table readable without forcing the
-// operator to decode the JSON.
-function CapabilityRow({ keyName, value }: { keyName: string; value: unknown }) {
+// Per-capability renderer. Each key in the JSONField shape has a small
+// adapter that pulls out the user-facing status string + detail line,
+// so the operator reads a fixed set of facts without decoding the JSON.
+function CapabilityItem({ keyName, value }: { keyName: string; value: unknown }) {
   const presentation = formatCapability(keyName, value);
   return (
-    <TableRow>
-      <TableCell className="font-mono text-xs">{presentation.label}</TableCell>
-      <TableCell>
+    <div className="min-w-0">
+      <dt className="font-mono text-xs">{presentation.label}</dt>
+      <dd className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
         {presentation.installed ? (
           <Badge variant="default" className="gap-1">
             <CheckCircleIcon className="size-3" />
@@ -499,9 +490,11 @@ function CapabilityRow({ keyName, value }: { keyName: string; value: unknown }) 
             Not detected
           </Badge>
         )}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-xs">{presentation.detail}</TableCell>
-    </TableRow>
+        <span className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+          {presentation.detail}
+        </span>
+      </dd>
+    </div>
   );
 }
 
@@ -592,7 +585,10 @@ function LastBootstrapSection({
   run: BootstrapRun | null;
   history?: React.ReactNode;
 }) {
-  const [historyOpen, setHistoryOpen] = React.useState(false);
+  // One disclosure open at a time, so the section shows one list.
+  const [open, setOpen] = React.useState<"releases" | "history" | null>(null);
+  const historyOpen = open === "history";
+  const releasesOpen = open === "releases";
   const fmt = useFormatters();
 
   const cliHint = `astro cluster bootstrap --cluster-slug ${slug}`;
@@ -692,38 +688,27 @@ function LastBootstrapSection({
         )}
 
         {releaseCount > 0 && Array.isArray(run.installedReleases) && (
-          <details className="min-w-0 overflow-x-auto rounded-md border">
-            <summary className="text-muted-foreground cursor-pointer px-3 py-2 text-xs">
-              View installed releases
-            </summary>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Release</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(run.installedReleases as Array<Record<string, unknown>>).map((r, i) => (
-                  <TableRow key={`${r.name ?? "release"}-${i}`}>
-                    <TableCell className="font-mono text-xs">{String(r.name ?? "—")}</TableCell>
-                    <TableCell className="font-mono text-xs">{String(r.version ?? "—")}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {String(r.status ?? "")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </details>
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen(releasesOpen ? null : "releases")}
+              aria-expanded={releasesOpen}
+              className="text-primary hover:text-primary inline-flex w-fit items-center gap-1 text-xs underline-offset-4 hover:underline"
+            >
+              <ChevronDownIcon
+                className={cn("size-3 transition-transform", releasesOpen && "rotate-180")}
+              />
+              {releasesOpen ? "Hide installed releases" : "View installed releases"}
+            </button>
+            {releasesOpen && <InstalledReleases releases={run.installedReleases} />}
+          </>
         )}
 
         <button
           type="button"
-          onClick={() => setHistoryOpen((v) => !v)}
+          onClick={() => setOpen(historyOpen ? null : "history")}
           aria-expanded={historyOpen}
-          className="text-primary hover:text-primary inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+          className="text-primary hover:text-primary inline-flex w-fit items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           <ChevronDownIcon
             className={cn("size-3 transition-transform", historyOpen && "rotate-180")}
@@ -737,58 +722,208 @@ function LastBootstrapSection({
   );
 }
 
+/** One release the bootstrap run installed, as the CLI reported it. */
+interface ReleaseRow {
+  key: string;
+  name: string;
+  version: string;
+  status: string;
+}
+
+const NOT_PERSONAL = "Bootstrap runs are the cluster's, not a person's, so Mine is empty.";
+
+const releaseKey = (r: ReleaseRow) => r.key;
+
+const RELEASES_SELECT: SelectRowsSpec<ReleaseRow> = {
+  filter: { owner: () => false, status: (r, value) => r.status === value },
+  text: (r) => [r.name, r.version, r.status],
+  sort: {
+    name: (r) => r.name.toLowerCase(),
+    version: (r) => r.version,
+    status: (r) => r.status,
+  },
+  id: releaseKey,
+};
+
+function releasesList(rows: ReleaseRow[]): ListDefinition {
+  const statuses = [...new Set(rows.map((r) => r.status).filter(Boolean))].sort();
+  return {
+    id: "clusters.settings.bootstrap-releases",
+    fields: [
+      { key: "status", label: "Status", options: statuses.map((v) => ({ value: v, label: v })) },
+    ],
+    searchPlaceholder: "Search releases, versions…",
+    defaultSort: [{ key: "name", dir: "asc" }],
+    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    paging: "numbered",
+    pageSizes: [25, 50, 100],
+  };
+}
+
+/** The last run's installed releases (nested in its payload), as an embedded list. */
+function InstalledReleases({ releases }: { releases: unknown[] }) {
+  const rows: ReleaseRow[] = (releases as Array<Record<string, unknown>>).map((r, i) => ({
+    key: `${String(r.name ?? "release")}-${i}`,
+    name: String(r.name ?? "unknown"),
+    version: String(r.version ?? "unknown"),
+    status: String(r.status ?? ""),
+  }));
+  const [def] = React.useState(() => releasesList(rows));
+  const list = useLocalListState(def);
+  const page = selectRows(rows, pageState(list), RELEASES_SELECT);
+  const columns: Column<ReleaseRow>[] = [
+    {
+      id: "name",
+      header: "Release",
+      sortKey: "name",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (r) => r.name,
+    },
+    {
+      id: "version",
+      header: "Version",
+      sortKey: "version",
+      cellClassName: "font-mono text-xs break-all",
+      cell: (r) => r.version,
+    },
+    {
+      id: "status",
+      header: "Status",
+      sortKey: "status",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (r) => r.status,
+    },
+  ];
+  return (
+    <ListPage<ReleaseRow>
+      embedded
+      list={list}
+      label="Installed releases"
+      columns={columns}
+      rows={page.rows}
+      getRowId={releaseKey}
+      totalCount={page.totalCount}
+      empty={{ icon: <PackageIcon className="size-5" />, title: "No installed releases" }}
+    />
+  );
+}
+
+function pageState(list: ListStateController) {
+  return {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  };
+}
+
+const HISTORY_LIST: ListDefinition = {
+  id: "clusters.settings.bootstrap-history",
+  fields: [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "succeeded", label: "Succeeded" },
+        { value: "failed", label: "Failed" },
+      ],
+    },
+  ],
+  searchPlaceholder: "Search charts, operators…",
+  defaultSort: [{ key: "when", dir: "desc" }],
+  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+  paging: "numbered",
+  pageSizes: [25, 50, 100],
+};
+
+const HISTORY_SELECT: SelectRowsSpec<BootstrapRun> = {
+  filter: {
+    owner: () => false,
+    status: (r, value) =>
+      value === "succeeded" ? r.status === "succeeded" : r.status !== "succeeded",
+  },
+  text: (r) => [r.chartVersion, r.triggeredByUsername, r.cliVersion],
+  sort: {
+    when: (r) => r.endedAt ?? "",
+    chart: (r) => r.chartVersion,
+    releases: (r) => bootstrapReleaseCount(r.installedReleases),
+    operator: (r) => (r.triggeredByUsername ?? "").toLowerCase(),
+  },
+  id: (r) => r.id,
+};
+
 export type BootstrapHistoryViewProps = ReturnType<typeof useBootstrapHistory>;
 
-/** The per-cluster bootstrap history (#319), inside the Last bootstrap card. */
+/**
+ * The per-cluster bootstrap history (#319), inside the Last bootstrap card:
+ * the recent runs the query returns, as an embedded list.
+ */
 export function BootstrapHistoryView({ runs, loading }: BootstrapHistoryViewProps) {
   const fmt = useFormatters();
+  const list = useLocalListState(HISTORY_LIST);
+  const page = selectRows(runs, pageState(list), HISTORY_SELECT);
 
-  if (loading) {
-    return <Skeleton className="h-16 w-full" />;
-  }
-  if (runs.length === 0) {
-    return <p className="text-muted-foreground text-xs">No prior bootstrap runs.</p>;
-  }
+  const columns: Column<BootstrapRun>[] = [
+    {
+      id: "status",
+      header: "Status",
+      cell: (r) =>
+        r.status === "succeeded" ? (
+          <Badge variant="default" className="gap-1">
+            <CheckCircleIcon className="size-3" />
+            Succeeded
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="gap-1">
+            <XCircleIcon className="size-3" />
+            Failed
+          </Badge>
+        ),
+    },
+    {
+      id: "when",
+      header: "When",
+      sortKey: "when",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => (
+        <span title={fmt.formatDateTime(r.endedAt)}>{fmt.formatRelativeTime(r.endedAt)}</span>
+      ),
+    },
+    {
+      id: "chart",
+      header: "Chart",
+      sortKey: "chart",
+      cellClassName: "font-mono text-xs break-all",
+      cell: (r) => r.chartVersion || "unknown",
+    },
+    {
+      id: "releases",
+      header: "Releases",
+      sortKey: "releases",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => bootstrapReleaseCount(r.installedReleases),
+    },
+    {
+      id: "operator",
+      header: "Operator",
+      sortKey: "operator",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (r) => r.triggeredByUsername || "unknown",
+    },
+  ];
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Status</TableHead>
-          <TableHead>When</TableHead>
-          <TableHead>Chart</TableHead>
-          <TableHead>Releases</TableHead>
-          <TableHead>Operator</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {runs.map((r) => (
-          <TableRow key={r.id}>
-            <TableCell>
-              {r.status === "succeeded" ? (
-                <Badge variant="default" className="gap-1">
-                  <CheckCircleIcon className="size-3" />
-                  Succeeded
-                </Badge>
-              ) : (
-                <Badge variant="destructive" className="gap-1">
-                  <XCircleIcon className="size-3" />
-                  Failed
-                </Badge>
-              )}
-            </TableCell>
-            <TableCell className="font-mono text-xs" title={fmt.formatDateTime(r.endedAt)}>
-              {fmt.formatRelativeTime(r.endedAt)}
-            </TableCell>
-            <TableCell className="font-mono text-xs">{r.chartVersion || "—"}</TableCell>
-            <TableCell className="font-mono text-xs">
-              {bootstrapReleaseCount(r.installedReleases)}
-            </TableCell>
-            <TableCell className="font-mono text-xs">
-              {r.triggeredByUsername || "unknown"}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <ListPage<BootstrapRun>
+      embedded
+      list={list}
+      label="Bootstrap runs"
+      columns={columns}
+      rows={page.rows}
+      getRowId={(r) => r.id}
+      totalCount={page.totalCount}
+      loading={loading}
+      empty={{ icon: <HistoryIcon className="size-5" />, title: "No prior bootstrap runs." }}
+    />
   );
 }
