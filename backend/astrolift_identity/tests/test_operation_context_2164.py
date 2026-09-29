@@ -290,3 +290,37 @@ def test_exact_execution_does_not_borrow_latest_executions_approvals(operation_w
         assert execution_operation({"execution_id": str(runs[0].guid)})[0].approvals == 1
         assert execution_operation({"execution_id": str(runs[1].guid)})[0].approvals == 0
         assert workflow_operation("shared-id", "older").approvals == 1
+
+
+def test_visibility_backed_scope_uses_the_operation_region_before_resolving(operation_world):
+    from astrolift_agents.scopes import agent_workload_app_scope
+    from astrolift_identity.operation_context import OperationContext
+    from astrolift_registry.models import Workload
+    from core.permissions import ScopeKind, require_permission
+
+    w = operation_world
+    workload = Workload.objects.create(
+        registered_app=w.world.platform_app, name="Agent", slug=f"agent-{uuid4().hex}", kind="agent"
+    )
+    policy(w, action="agent.dispatch", resource={"region": ["us-east-1"]})
+    seen = []
+
+    def region(args):
+        return (OperationContext(region=args["region"], approvals=0),)
+
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_workload_app_scope("slug", Permission.AGENT_DISPATCH),
+        operation=region,
+    )
+    def act(slug, region):
+        # No app environment exists on this agent. The bound dispatcher
+        # region must be visible to the scope factory and handler alike.
+        scope = agent_workload_app_scope("slug", Permission.AGENT_DISPATCH)({"slug": slug})
+        seen.append(scope.kind)
+
+    with as_tenant(w.world, w.user):
+        act(workload.slug, "us-west-2")
+        with pytest.raises(PermissionDenied):
+            act(workload.slug, "us-east-1")
+    assert seen == [ScopeKind.APP]

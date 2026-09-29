@@ -553,6 +553,8 @@ def _policy_scope_permissions(tenant: TenantContext, slugs: set[str]) -> dict[st
     shares = _share_grants(tenant, app_ids)
     allowed = {kind: {} for kind in ("ORG", "TEAM", "PROJECT", "APP")}
     for (kind, ident), chain, contexts in points:
+        if attrs.environment is not None or attrs.region is not None or attrs.approvals is not None:
+            contexts = (OperationContext(attrs.environment, attrs.region, attrs.approvals),)
         covering = [grant for grant in grants if grant.covers(chain)]
         candidates = {slug for grant in covering for slug in slugs if grant.carries(slug)}
         # Team shares have a permission ceiling and must be evaluated with
