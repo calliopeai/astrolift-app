@@ -170,14 +170,21 @@ export const APP_EVENTS: ObservabilityScreenProps["appEvents"] = [
 
 // ─── Observability screen ────────────────────────────────────────────────
 
-export const OBSERVABILITY: ObservabilityScreenProps = {
+/**
+ * The screen's props less its list state: the stories answer `podsList`,
+ * `podRows` and `podTotal` in memory. Pods is the panel shown by default
+ * here, since it is the one this screen draws itself.
+ */
+export const OBSERVABILITY: Omit<ObservabilityScreenProps, "podsList" | "podRows" | "podTotal"> = {
   slug: APP.slug,
   app: APP,
   loading: false,
+  panel: "pods",
+  panelHref: (p) => `/apps/${APP.slug}/logs?section=metrics&panel=${p}`,
   pods: PODS,
   podsLoading: false,
+  podHref: (pod) => `/apps/${APP.slug}/logs?section=metrics&panel=pods&pod=${pod.name}`,
   selectedPod: PODS[0].name,
-  onPickPod: noop,
   podContainers: ["web", "istio-proxy"],
   selectedContainer: "web",
   onPickContainer: noop,
@@ -312,10 +319,16 @@ export const LONG_ALERT_RULES: AlertRule[] = [
   }),
 ];
 
-export const ALERT_RULES_PANEL: Omit<AlertRulesPanelViewProps, "renderEvents"> = {
+/** The panel's props less its slot and list state (the stories keep that in memory). */
+export const ALERT_RULES_PANEL: Omit<
+  AlertRulesPanelViewProps,
+  "renderEvents" | "list" | "rows" | "totalCount"
+> = {
   appId: APP.id,
   appName: APP.name,
   rules: ALERT_RULES,
+  pickedRuleId: "rule-1",
+  ruleHref: (r) => `/apps/${APP.slug}/logs?section=metrics&panel=alerts&rule=${r.id}`,
   loading: false,
   busy: false,
   creating: false,
@@ -352,6 +365,7 @@ export const ALERT_EVENTS: AlertEvent[] = [
 export const ALERT_EVENTS_LIST: AlertEventsListViewProps = {
   events: ALERT_EVENTS,
   loading: false,
+  hasMore: false,
   acking: false,
   onAck: noopAsync,
 };

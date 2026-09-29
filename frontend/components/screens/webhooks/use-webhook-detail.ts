@@ -3,31 +3,24 @@
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
-import {
-  LIST_WEBHOOK_DELIVERIES,
-  LIST_WEBHOOK_DELIVERIES_PAGE,
-  LIST_WEBHOOKS,
-} from "@/graphql/operations/operations.queries";
+import { LIST_WEBHOOK_DELIVERIES, LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
 import type {
   AstroliftWebhookDelivery,
   AstroliftWebhookSubscription,
 } from "@/graphql/operations/operations.types";
 
+import { useSubscriptionDeliveries } from "./use-webhooks";
+
 interface SubscriptionsResp {
   astroliftWebhookSubscriptions: AstroliftWebhookSubscription[];
-}
-interface DeliveriesPageResp {
-  astroliftWebhookDeliveriesPage: CursorPage<AstroliftWebhookDelivery>;
 }
 interface DeliveriesResp {
   astroliftWebhookDeliveries: AstroliftWebhookDelivery[];
 }
-
 /**
  * Webhook subscription detail (#1106). Reuses the global LIST_WEBHOOKS
- * window (no singular query exists) plus LIST_WEBHOOK_DELIVERIES_PAGE for
- * the recent deliveries table. The data half of WebhookDetailScreen.
+ * window (no singular query exists) plus the delivery log as a Feed on
+ * LIST_WEBHOOK_DELIVERIES_PAGE. The data half of WebhookDetailScreen.
  */
 export function useWebhookDetail(id: string) {
   const { data, loading } = useQuery<SubscriptionsResp>(LIST_WEBHOOKS, {
@@ -42,17 +35,8 @@ export function useWebhookDetail(id: string) {
 
   // Skipped until the subscription resolves: `subscriptionId` is
   // non-null on the field, and this page reaches it through the global
-  // LIST_WEBHOOKS window rather than a singular query. No `urlKey` —
-  // the search and page size belong to this panel, not to the URL an
-  // operator shares for the subscription.
-  const deliveries = useCursorTable<AstroliftWebhookDelivery>({
-    query: LIST_WEBHOOK_DELIVERIES_PAGE,
-    variables: { subscriptionId: id },
-    extract: (d) => (d as DeliveriesPageResp | undefined)?.astroliftWebhookDeliveriesPage,
-    searchVariable: "search",
-    fetchPolicy: "cache-and-network",
-    skip: !subscription,
-  });
+  // LIST_WEBHOOKS window rather than a singular query.
+  const { deliveries } = useSubscriptionDeliveries(id, { skip: !subscription });
 
   return { id, loading, subscription, deliveries };
 }

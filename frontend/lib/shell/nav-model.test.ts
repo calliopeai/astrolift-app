@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activeFor, NAV, visibleNav } from "./nav-model";
+import { activeFor, areaSwitcher, NAV, visibleNav } from "./nav-model";
 
 const only =
   (...keys: string[]) =>
@@ -21,6 +21,20 @@ describe("visibleNav", () => {
     ]);
   });
 
+  it("lists the Agents functions of spec 44 §4.1, Workloads last", () => {
+    const agents = NAV.find((a) => a.key === "agents");
+    expect(agents?.groups.flatMap((g) => g.functions.map((f) => f.label))).toEqual([
+      "Agents",
+      "Workflows",
+      "Runs",
+      "Functions",
+      "Skills",
+      "Tools",
+      "Models",
+      "Workloads",
+    ]);
+  });
+
   it("drops Admin's empty groups with the module", () => {
     expect(visibleNav(NAV, only("apps", "agents")).some((a) => a.key === "admin")).toBe(false);
   });
@@ -38,5 +52,13 @@ describe("activeFor", () => {
 
   it("does not match a prefix that is not a path segment", () => {
     expect(activeFor(NAV, "/appsx")).toBeNull();
+  });
+});
+
+describe("areaSwitcher", () => {
+  it("is the area's name over its functions, the active one checked", () => {
+    const crumb = areaSwitcher(NAV, "agents", "workloads");
+    expect(crumb.label).toBe("Agents");
+    expect(crumb.switcher.filter((o) => o.active).map((o) => o.href)).toEqual(["/workloads"]);
   });
 });

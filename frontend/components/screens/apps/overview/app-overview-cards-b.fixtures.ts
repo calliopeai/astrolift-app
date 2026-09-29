@@ -74,7 +74,18 @@ export const EVENTS: AstroliftEvent[] = [
 export const ACTIVITY: ActivityTimelineViewProps = {
   events: EVENTS,
   loading: false,
-  limit: 20,
+};
+
+/** A long history: older pages still on the cursor. */
+export const ACTIVITY_PAGED: ActivityTimelineViewProps = {
+  ...ACTIVITY,
+  events: Array.from({ length: 40 }, (_, i) =>
+    event(`ev-p${i}`, i % 3 === 0 ? "deployment.succeeded" : "manifest.updated", i * 90, {
+      summary: `Event ${i + 1}`,
+    })
+  ),
+  hasMore: true,
+  onLoadMore: () => {},
 };
 
 export const ACTIVITY_LONG: ActivityTimelineViewProps = {

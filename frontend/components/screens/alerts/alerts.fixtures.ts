@@ -2,10 +2,8 @@
  * Hand-typed story fixtures for the alerts screens, typed against each
  * screen's props so a story cannot drift from its hook.
  */
-import { fakeController } from "@/components/data-table/fixtures";
-import type { CursorTableController } from "@/components/data-table/use-cursor-table";
-
 import type { AlertEventDetailProps } from "./AlertEventDetail";
+import type { AlertEventsScreenProps } from "./AlertEventsScreen";
 import type { AlertRuleDetailProps } from "./AlertRuleDetail";
 import type { AlertsScreenProps } from "./AlertsScreen";
 import type { AlertEvent, AlertRule } from "./use-alerts";
@@ -125,40 +123,51 @@ export const LONG_EVENT: AlertEvent = {
 
 const noopAsync = async () => {};
 
+/** The rules screen's props less the list controller, which the story builds. */
 export function alertsProps(
-  rules: Partial<CursorTableController<AlertRule>> = {},
-  events: Partial<CursorTableController<AlertEvent>> = {},
-  overrides: Partial<AlertsScreenProps> = {}
-): AlertsScreenProps {
-  const rulesTable = fakeController<AlertRule>({
+  overrides: Partial<Omit<AlertsScreenProps, "list">> = {}
+): Omit<AlertsScreenProps, "list"> {
+  return {
     rows: RULES,
     totalCount: RULES.length,
-    searchEnabled: true,
-    sortEnabled: false,
-    ...rules,
-  });
-  const eventsTable = fakeController<AlertEvent>({
-    rows: EVENTS,
-    totalCount: EVENTS.length,
-    searchEnabled: true,
-    sortEnabled: false,
-    ...events,
-  });
-  return {
-    rulesTable,
-    eventsTable,
-    ruleCount: rulesTable.totalCount ?? 0,
+    nextCursor: null,
+    loading: false,
+    error: null,
+    onRetry: () => {},
     activeRuleCount: 2,
     unresolvedCount: 2,
-    eventCount: eventsTable.totalCount ?? 0,
     busy: false,
     createRule: async () => true,
     deleteRule: noopAsync,
-    acknowledge: noopAsync,
     mutePreset: noopAsync,
     muteCustom: async () => true,
     unmute: noopAsync,
     ...overrides,
+  };
+}
+
+/** The events feed screen's props. */
+export function alertEventsProps(
+  overrides: Partial<AlertEventsScreenProps> = {},
+  feed: Partial<AlertEventsScreenProps["events"]> = {}
+): AlertEventsScreenProps {
+  return {
+    view: "all",
+    busy: false,
+    acknowledge: noopAsync,
+    ...overrides,
+    events: {
+      items: EVENTS,
+      loading: false,
+      error: null,
+      onRetry: () => {},
+      hasMore: false,
+      loadingMore: false,
+      onLoadMore: () => undefined,
+      newCount: 0,
+      onShowNew: () => {},
+      ...feed,
+    },
   };
 }
 

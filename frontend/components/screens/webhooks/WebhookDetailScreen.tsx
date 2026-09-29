@@ -1,20 +1,16 @@
 "use client";
 
-import { SendIcon } from "lucide-react";
-import * as React from "react";
-
-import { DataTable, type Column } from "@/components/data-table";
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { AstroliftWebhookDelivery } from "@/graphql/operations/operations.types";
 
+import { DeliveriesFeed } from "./DeliveriesFeed";
 import type { WebhookDetailData } from "./use-webhook-detail";
 
 /**
  * Webhook subscription detail (#1106): the subscription's overview plus
- * the recent deliveries table, whose rows drill into the per-delivery
- * detail.
+ * its delivery log as a Feed (list rule 5: deliveries keep arriving), whose
+ * lines drill into the per-delivery detail.
  */
 export function WebhookDetailScreen({
   id,
@@ -22,56 +18,6 @@ export function WebhookDetailScreen({
   subscription: s,
   deliveries,
 }: WebhookDetailData) {
-  const columns: Column<AstroliftWebhookDelivery>[] = [
-    {
-      id: "attempt",
-      header: "#",
-      width: "w-12",
-      cellClassName: "font-mono text-xs",
-      cell: (d) => d.retryAttempt,
-    },
-    {
-      id: "when",
-      header: "When",
-      cellClassName: "text-xs",
-      cell: (d) => <DetailTimestamp iso={d.deliveredAt} />,
-    },
-    {
-      id: "event",
-      header: "Event",
-      cellClassName: "font-mono text-xs",
-      cell: (d) => d.eventType,
-    },
-    {
-      id: "status",
-      header: "Status",
-      width: "w-16",
-      cell: (d) => (
-        <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
-          {d.statusCode ?? "ERR"}
-        </Badge>
-      ),
-    },
-    {
-      id: "latency",
-      header: "Latency",
-      width: "w-20",
-      cellClassName: "font-mono text-xs",
-      cell: (d) => `${d.latencyMs}ms`,
-    },
-    {
-      id: "test",
-      header: "Test?",
-      width: "w-16",
-      cell: (d) =>
-        d.isTest ? (
-          <Badge variant="outline" className="text-2xs">
-            test
-          </Badge>
-        ) : null,
-    },
-  ];
-
   return (
     <EntityDetailShell
       loading={loading}
@@ -144,27 +90,10 @@ export function WebhookDetailScreen({
             <CardTitle className="text-base">Recent deliveries</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              label="Deliveries"
-              controller={deliveries}
-              columns={columns}
-              getRowId={(d) => d.id}
-              // A real link, so a delivery can be opened in a new tab. The
-              // hand-rolled row was `role="link"` on a <tr> with a
-              // `router.push`, which middle-click and copy-link could not
-              // reach.
-              rowHref={(d) => `/webhooks/${id}/deliveries/${d.id}`}
-              searchPlaceholder="Search deliveries…"
-              empty={{
-                icon: <SendIcon className="size-5" />,
-                title: "No deliveries yet",
-                description: "Use the Send test event action on the webhooks list to fire one.",
-              }}
-              emptyFiltered={{
-                title: "No matching deliveries",
-                description:
-                  "No attempt matches that search. The server matches the event type, the delivery id, and the error text.",
-              }}
+            <DeliveriesFeed
+              deliveries={deliveries}
+              hrefOf={(d) => `/webhooks/${id}/deliveries/${d.id}`}
+              emptyHint="Use the Send test event action on the webhooks list to fire one."
             />
           </CardContent>
         </Card>

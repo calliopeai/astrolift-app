@@ -3,7 +3,6 @@
  * detail, delivery detail), typed against each screen's props so a story
  * cannot drift from its hook.
  */
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftWebhookDelivery,
   AstroliftWebhookSubscription,
@@ -11,6 +10,7 @@ import type {
 } from "@/graphql/operations/operations.types";
 
 import type { SubscriptionDetailViewProps } from "./SubscriptionDetail";
+import type { SubscriptionDeliveriesData } from "./use-webhooks";
 import type { WebhookDeliveryData, WebhookDetailData } from "./use-webhook-detail";
 import type { WebhooksScreenProps } from "./WebhooksScreen";
 
@@ -165,13 +165,14 @@ export const TEST_RESULT_FAILED: AstroliftWebhookTestResult = {
   error: "dial tcp 10.0.0.12:443: i/o timeout",
 };
 
-/** The list screen, loaded, with nothing revealed or expanded. */
-export const WEBHOOKS: Omit<WebhooksScreenProps, "renderDetail"> = {
-  table: fakeController<AstroliftWebhookSubscription>({
-    rows: SUBSCRIPTIONS,
-    totalCount: SUBSCRIPTIONS.length,
-    sortEnabled: false,
-  }),
+/** The list screen, loaded, with nothing revealed or open; the story adds the list state. */
+export const WEBHOOKS: Omit<WebhooksScreenProps, "renderDetail" | "list"> = {
+  rows: SUBSCRIPTIONS,
+  totalCount: SUBSCRIPTIONS.length,
+  nextCursor: null,
+  loading: false,
+  error: null,
+  onRetry: noop,
   creating: false,
   rotating: false,
   firing: false,
@@ -194,26 +195,29 @@ export const REVEAL = {
   subscription: SUBSCRIPTIONS[0],
 };
 
+/** A delivery log's Feed props: the newest page, nothing older. */
+export const DELIVERIES_FEED: SubscriptionDeliveriesData["deliveries"] = {
+  items: DELIVERIES,
+  loading: false,
+  error: null,
+  onRetry: noop,
+  hasMore: false,
+  loadingMore: false,
+  onLoadMore: () => undefined,
+  newCount: 0,
+  onShowNew: noop,
+};
+
 export const SUBSCRIPTION_DETAIL: SubscriptionDetailViewProps = {
   subscription: SUBSCRIPTIONS[1],
-  onClose: noop,
-  deliveries: fakeController<AstroliftWebhookDelivery>({
-    rows: DELIVERIES,
-    totalCount: DELIVERIES.length,
-    pageSize: 10,
-    sortEnabled: false,
-  }),
+  deliveries: DELIVERIES_FEED,
 };
 
 export const WEBHOOK_DETAIL: WebhookDetailData = {
   id: SUBSCRIPTIONS[1].id,
   loading: false,
   subscription: SUBSCRIPTIONS[1],
-  deliveries: fakeController<AstroliftWebhookDelivery>({
-    rows: DELIVERIES,
-    totalCount: DELIVERIES.length,
-    sortEnabled: false,
-  }),
+  deliveries: DELIVERIES_FEED,
 };
 
 export const DELIVERY_DETAIL: WebhookDeliveryData = {

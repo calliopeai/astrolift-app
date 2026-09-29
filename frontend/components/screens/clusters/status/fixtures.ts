@@ -309,7 +309,7 @@ export const WORKLOADS_LONG: ReturnType<typeof useClusterWorkloadHealth> = {
   ],
 };
 
-export const HEALTH: ReturnType<typeof useClusterHealth> = {
+export const HEALTH: Omit<ReturnType<typeof useClusterHealth>, "moreEvents"> = {
   loading: false,
   ...QUERY_OK,
   pods: [
@@ -356,7 +356,7 @@ export const HEALTH: ReturnType<typeof useClusterHealth> = {
   ],
 };
 
-export const HEALTH_LONG: ReturnType<typeof useClusterHealth> = {
+export const HEALTH_LONG: Omit<ReturnType<typeof useClusterHealth>, "moreEvents"> = {
   loading: false,
   ...QUERY_OK,
   pods: [
@@ -384,7 +384,7 @@ export const HEALTH_LONG: ReturnType<typeof useClusterHealth> = {
 };
 
 // ─── Temporal + audit ─────────────────────────────────────────────────
-export const WORKFLOWS: ReturnType<typeof useRecentClusterWorkflows> = {
+export const WORKFLOWS: Omit<ReturnType<typeof useRecentClusterWorkflows>, "more"> = {
   loading: false,
   ...QUERY_OK,
   runs: [
@@ -423,7 +423,7 @@ export const WORKFLOWS: ReturnType<typeof useRecentClusterWorkflows> = {
   ],
 };
 
-export const WORKFLOWS_LONG: ReturnType<typeof useRecentClusterWorkflows> = {
+export const WORKFLOWS_LONG: Omit<ReturnType<typeof useRecentClusterWorkflows>, "more"> = {
   loading: false,
   ...QUERY_OK,
   runs: [
@@ -438,7 +438,7 @@ export const WORKFLOWS_LONG: ReturnType<typeof useRecentClusterWorkflows> = {
   ],
 };
 
-export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
+export const AUDIT: Omit<ReturnType<typeof useClusterLifecycleAudit>, "more"> = {
   loading: false,
   ...QUERY_OK,
   entries: [
@@ -469,7 +469,7 @@ export const AUDIT: ReturnType<typeof useClusterLifecycleAudit> = {
   ],
 };
 
-export const AUDIT_LONG: ReturnType<typeof useClusterLifecycleAudit> = {
+export const AUDIT_LONG: Omit<ReturnType<typeof useClusterLifecycleAudit>, "more"> = {
   loading: false,
   ...QUERY_OK,
   entries: [

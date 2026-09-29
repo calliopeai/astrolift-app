@@ -1,17 +1,14 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
 
 import { ABORT_DEPLOYMENT, APPROVE_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-interface DeploymentsResp {
-  astroliftDeployments: AstroliftDeployment[];
-}
+import { useAppDeploys } from "../detail/use-app-deploys";
 
 interface MutResp {
   approveDeployment?: MutationResult<AstroliftDeployment>;
@@ -29,17 +26,16 @@ export function shortDeploymentTag(deployment: AstroliftDeployment): string {
  * reject throw on failure so ConfirmDialog holds open and reports the
  * reason; either way the queue refetches afterwards.
  */
-export function usePendingDeployments(appSlug: string) {
+export function usePendingDeployments(appSlug: string, { live = false }: { live?: boolean } = {}) {
   const { can } = useMyPermissions();
   const canApprove = can("app.approve_deploy");
 
-  const { data, loading, refetch } = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { appSlug, limit: 25 },
-    fetchPolicy: "cache-and-network",
-    pollInterval: 30_000,
-  });
+  // The frame's deploys read (use-app-deploys). On the Overview the
+  // latest-deploy panel keeps it live; on the Deployments tab the queue is
+  // the only reader, so it passes `live`.
+  const { deployments, loading, refetch } = useAppDeploys(appSlug, { live });
 
-  const pending = (data?.astroliftDeployments ?? []).filter((d) => d.status === "pending_approval");
+  const pending = deployments.filter((d) => d.status === "pending_approval");
 
   const [approve] = useMutation<MutResp>(APPROVE_DEPLOYMENT);
   const [abort] = useMutation<MutResp>(ABORT_DEPLOYMENT);
@@ -74,5 +70,5 @@ export function usePendingDeployments(appSlug: string) {
     }
   }
 
-  return { loading: loading && !data, pending, canApprove, onApprove, onReject };
+  return { loading, pending, canApprove, onApprove, onReject };
 }

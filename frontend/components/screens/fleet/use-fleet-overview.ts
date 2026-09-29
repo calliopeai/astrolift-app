@@ -3,13 +3,10 @@
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
-import { useCursorTable } from "@/components/data-table";
 import {
   LIST_AGENT_ENVIRONMENT_SPECS,
   LIST_AGENT_FLEET,
-  LIST_AGENT_FLEET_PAGE,
   LIST_AGENT_TASKS,
-  LIST_AGENT_TASKS_PAGE,
 } from "@/graphql/agents/agents.queries";
 import type {
   AstroliftAgentEnvironmentSpec,
@@ -21,27 +18,15 @@ import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 type FleetData = { agentFleet: AstroliftAgentListItem[] };
 type TaskData = { agentTasks: AstroliftAgentTask[] };
 type RuntimeData = { agentEnvironmentSpecs: AstroliftAgentEnvironmentSpec[] };
-type FleetPageData = {
-  agentFleetPage: {
-    items: AstroliftAgentListItem[];
-    nextCursor: string | null;
-    totalCount: number | null;
-  };
-};
-type TaskPageData = {
-  agentTasksPage: {
-    items: AstroliftAgentTask[];
-    nextCursor: string | null;
-    totalCount: number | null;
-  };
-};
 
 export const ACTIVE_TASK_STATUSES = new Set(["queued", "provisioning", "running"]);
 export const FAILING_TASK_STATUSES = new Set(["failed", "timed_out"]);
 
 /**
- * The data half of FleetOverviewScreen: fleet, task and runtime polls, the
- * two paginated tables, and the counts the stat tiles show.
+ * The data half of FleetOverviewScreen: one fleet poll, one task poll and
+ * the runtimes. The stat tiles and the three summaries all read these same
+ * three queries (list rule 2: two panels never fetch the same thing twice);
+ * the full lists live on their own routes and fetch there.
  */
 export function useFleetOverview() {
   const { org } = useActiveOrg();
@@ -63,24 +48,6 @@ export function useFleetOverview() {
     skip: !orgId,
     fetchPolicy: "cache-and-network",
   });
-  const agentTable = useCursorTable<AstroliftAgentListItem>({
-    query: LIST_AGENT_FLEET_PAGE,
-    variables: { orgId },
-    extract: (data) => (data as FleetPageData | undefined)?.agentFleetPage,
-    searchVariable: "search",
-    urlKey: "fleet-agent",
-    skip: !orgId,
-  });
-  const taskTable = useCursorTable<AstroliftAgentTask>({
-    query: LIST_AGENT_TASKS_PAGE,
-    variables: { orgId, status: null, workloadId: null },
-    extract: (data) => (data as TaskPageData | undefined)?.agentTasksPage,
-    searchVariable: "search",
-    urlKey: "fleet-task",
-    skip: !orgId,
-    pollInterval: 10000,
-  });
-
   const agents = fleet.data?.agentFleet ?? [];
   const rows = React.useMemo(
     () =>
@@ -102,7 +69,13 @@ export function useFleetOverview() {
     refresh: () => {
       void Promise.all([fleet.refetch(), tasks.refetch(), runtimes.refetch()]);
     },
-    agentTable,
-    taskTable,
+    /** Newest first; the summary shows the top rows. */
+    recentTasks: rows,
+    tasksLoading: tasks.loading && !tasks.data,
+    tasksError: tasks.error && !tasks.data ? tasks.error.message : null,
+    agents,
+    agentsLoading: fleet.loading && !fleet.data,
+    agentsError: fleet.error && !fleet.data ? fleet.error.message : null,
+    runtimesError: runtimes.error && !runtimes.data ? runtimes.error.message : null,
   };
 }

@@ -6,11 +6,9 @@ import { DOCTOR_REPORT, TASK } from "@/components/screens/apps/homes/app-homes.f
 import { TaskHomeScreen } from "@/components/screens/apps/homes/TaskHome";
 import { ActivityTimelineView } from "@/components/screens/apps/overview/ActivityTimeline";
 import { AutowireStatusBannerView } from "@/components/screens/apps/overview/AutowireStatusBanner";
-import { CiSetupPanel } from "@/components/screens/apps/overview/CiSetupPanel";
 import { ConfigDriftBannerView } from "@/components/screens/apps/overview/ConfigDriftBanner";
 import { LatestDeployPanel } from "@/components/screens/apps/overview/LatestDeployPanel";
 import { ManagedServicesPanel } from "@/components/screens/apps/overview/ManagedServicesPanel";
-import { ObservabilitySectionView } from "@/components/screens/apps/overview/ObservabilitySection";
 import { OwnershipPanel } from "@/components/screens/apps/overview/OwnershipPanel";
 import { UptimeCardView } from "@/components/screens/apps/overview/UptimeCard";
 import { UrlCardView } from "@/components/screens/apps/overview/UrlCard";
@@ -29,10 +27,7 @@ import {
   MANAGED_SERVICES_HREF,
   SERVICES,
 } from "@/components/screens/apps/overview/app-overview-cards-b.fixtures";
-import { OBSERVABILITY } from "@/components/screens/apps/overview/app-ci-observability-section.fixtures";
 import {
-  CI,
-  CI_LONG,
   DEPLOY_LONG,
   LATEST_DEPLOY,
   LATEST_DEPLOY_FAILED,
@@ -43,18 +38,10 @@ import { TopologyScreen } from "@/components/screens/apps/tools/TopologyScreen";
 import { TOPOLOGY } from "@/components/screens/apps/tools/app-observability-shell-topology-commands.fixtures";
 
 import { AppDetailScreen, type AppDetailSlots } from "./AppDetail";
-import {
-  ACTIVITY,
-  DETAIL,
-  FAILED_APP,
-  LONG,
-  LONG_APP,
-  QUICK_LINKS,
-} from "./app-detail-shell.fixtures";
+import { ACTIVITY, DETAIL, FAILED_APP, LONG, LONG_APP } from "./app-detail-shell.fixtures";
 import { AppFrame } from "./AppFrame";
 import { FAILING_APP, FRAME, LONG_FRAME_APP } from "./app-frame.fixtures";
 import { DeployActivityStrip } from "./DeployActivityStrip";
-import { QuickLinksGrid } from "./QuickLinksGrid";
 
 /**
  * The Overview tab inside the app frame (spec 44 §5.2). The route fills each
@@ -67,10 +54,8 @@ const SLOTS: AppDetailSlots = {
   latestDeploy: <LatestDeployPanel {...LATEST_DEPLOY} />,
   health: <UptimeCardView {...UPTIME} />,
   url: <UrlCardView {...URL_CARD} healthBadge={<UrlHealthBadgeView {...URL_HEALTH} />} />,
-  observability: <ObservabilitySectionView {...OBSERVABILITY} />,
   topology: <TopologyScreen {...TOPOLOGY} />,
   activity: <ActivityTimelineView {...EVENTS} strip={<DeployActivityStrip {...ACTIVITY} />} />,
-  links: <QuickLinksGrid {...QUICK_LINKS} />,
   managedServices: (
     <ManagedServicesPanel
       loading={false}
@@ -79,7 +64,6 @@ const SLOTS: AppDetailSlots = {
     />
   ),
   ownership: <OwnershipPanel {...OWNERSHIP} />,
-  ci: <CiSetupPanel {...CI} />,
   doctor: <AppDoctorPanelView {...DOCTOR_REPORT} />,
 };
 
@@ -189,7 +173,6 @@ export const LongStrings: Story = {
       ...SLOTS,
       latestDeploy: <LatestDeployPanel {...LATEST_DEPLOY} current={DEPLOY_LONG} />,
       ownership: <OwnershipPanel {...OWNERSHIP_LONG} />,
-      ci: <CiSetupPanel {...CI_LONG} />,
     },
   },
   parameters: { frame: { app: LONG_FRAME_APP, slug: LONG, pathname: `/apps/${LONG}` } },

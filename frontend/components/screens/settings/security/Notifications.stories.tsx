@@ -1,12 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { AlertSubscriptionsView } from "./AlertSubscriptions";
+import type * as React from "react";
+
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+
+import { ALERT_SUBSCRIPTIONS_LIST } from "./alert-subscriptions-list";
+import { AlertSubscriptionsView, type AlertSubscriptionsViewProps } from "./AlertSubscriptions";
 import { NotificationsScreen } from "./Notifications";
+import { NotificationsInbox } from "./NotificationsInbox";
 import {
   LONG_NOTIFICATIONS,
-  NOTIFICATIONS,
   alertProps,
-  notificationsProps,
+  inboxProps,
 } from "./settings-security-notifications.fixtures";
 
 const meta: Meta = {
@@ -17,73 +23,70 @@ export default meta;
 
 type Story = StoryObj;
 
-const alerts = <AlertSubscriptionsView {...alertProps()} />;
+function AlertSubscriptionsStory({
+  initial,
+  ...over
+}: Partial<Omit<AlertSubscriptionsViewProps, "list">> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(ALERT_SUBSCRIPTIONS_LIST, initial);
+  return <AlertSubscriptionsView {...alertProps(over)} list={list} />;
+}
 
-export const Full: Story = {
-  render: () => <NotificationsScreen {...notificationsProps({ alertSubscriptions: alerts })} />,
-};
+function Screen({
+  initial = null,
+  inbox = <NotificationsInbox {...inboxProps()} />,
+  alerts = <AlertSubscriptionsStory />,
+}: {
+  initial?: string | null;
+  inbox?: React.ReactNode;
+  alerts?: React.ReactNode;
+}) {
+  const section = useLocalSettingsSection(initial);
+  return <NotificationsScreen section={section} inbox={inbox} alertSubscriptions={alerts} />;
+}
+
+/** The inbox section, the default. */
+export const Full: Story = { render: () => <Screen /> };
+
+/** The alert subscriptions section: only it is mounted. */
+export const AlertsSection: Story = { render: () => <Screen initial="alerts" /> };
 
 export const Loading: Story = {
   render: () => (
-    <NotificationsScreen
-      {...notificationsProps({
-        notifications: [],
-        loading: true,
-        alertSubscriptions: (
-          <AlertSubscriptionsView {...alertProps({ rows: [], state: "loading" })} />
-        ),
-      })}
-    />
+    <Screen inbox={<NotificationsInbox {...inboxProps({ notifications: [], loading: true })} />} />
   ),
 };
 
 export const Empty: Story = {
-  render: () => (
-    <NotificationsScreen
-      {...notificationsProps({ notifications: [], alertSubscriptions: alerts })}
-    />
-  ),
+  render: () => <Screen inbox={<NotificationsInbox {...inboxProps({ notifications: [] })} />} />,
 };
 
-/** Everything read: no "Mark all as read", no per-row button. */
-export const AllRead: Story = {
-  render: () => (
-    <NotificationsScreen
-      {...notificationsProps({
-        notifications: NOTIFICATIONS.filter((n) => n.readAt),
-        alertSubscriptions: alerts,
-      })}
-    />
-  ),
-};
-
-/**
- * The inbox has no error state of its own (a failed query renders as empty);
- * this is the closest real one: the alert matrix failing above an empty inbox.
- */
+/** The alert list failed; the inbox is not affected, it is not mounted. */
 export const AlertsLoadFailed: Story = {
   render: () => (
-    <NotificationsScreen
-      {...notificationsProps({
-        notifications: [],
-        alertSubscriptions: (
-          <AlertSubscriptionsView
-            {...alertProps({
-              rows: [],
-              state: "error",
-              error: new Error("Response not successful: Received status code 503"),
-            })}
-          />
-        ),
-      })}
+    <Screen
+      initial="alerts"
+      alerts={
+        <AlertSubscriptionsStory
+          rows={[]}
+          error={{ message: "Response not successful: Received status code 503" }}
+        />
+      }
     />
   ),
 };
 
 export const LongStrings: Story = {
   render: () => (
-    <NotificationsScreen
-      {...notificationsProps({ notifications: LONG_NOTIFICATIONS, alertSubscriptions: alerts })}
-    />
+    <Screen inbox={<NotificationsInbox {...inboxProps({ notifications: LONG_NOTIFICATIONS })} />} />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Screen
+        inbox={<NotificationsInbox {...inboxProps({ notifications: LONG_NOTIFICATIONS })} />}
+      />
+    </div>
   ),
 };

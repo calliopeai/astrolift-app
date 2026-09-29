@@ -3,12 +3,16 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import {
   DELETE_PIPELINE_SECRET,
   SET_PIPELINE_SECRET,
 } from "@/graphql/pipelines/pipelines.mutations";
 import { LIST_PIPELINE_SECRETS } from "@/graphql/pipelines/pipelines.queries";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
+
+import { PIPELINE_SECRETS_LIST } from "./pipelines-list";
 
 interface SecretsResp {
   astroliftPipelineSecrets: PipelineSecret[];
@@ -20,8 +24,12 @@ interface MutationResult<T> {
   data: T | null;
 }
 
-/** The data half of PipelineSecretsView (#100): the secret list, set, and delete. */
+/**
+ * The data half of PipelineSecretsView (#100): the secret list (with its
+ * list state in memory; the view pages it in the client), set, and delete.
+ */
 export function usePipelineSecrets(pipelineId: string) {
+  const list = useLocalListState(PIPELINE_SECRETS_LIST);
   const { data, loading } = useQuery<SecretsResp>(LIST_PIPELINE_SECRETS, {
     variables: { pipelineId },
     fetchPolicy: "cache-and-network",
@@ -66,6 +74,7 @@ export function usePipelineSecrets(pipelineId: string) {
   }
 
   return {
+    list,
     secrets,
     loading,
     deleting: deleteState.loading,

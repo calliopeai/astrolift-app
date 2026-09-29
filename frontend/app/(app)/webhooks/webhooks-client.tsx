@@ -9,8 +9,8 @@ import type { AstroliftWebhookSubscription } from "@/graphql/operations/operatio
 
 /**
  * Webhooks, platform-wide or scoped to one app/agent (`appSlug`). The
- * screen owns the markup; the expanded subscription's panel gets a
- * container here so its deliveries walk runs only while it is shown.
+ * screen owns the markup; the deliveries sheet's body gets a container
+ * here so its delivery feed runs only while the sheet is open.
  */
 export function WebhooksClient({
   appSlug,
@@ -21,25 +21,16 @@ export function WebhooksClient({
       {...useWebhooks(appSlug)}
       appSlug={appSlug}
       tabs={tabs}
-      renderDetail={(subscription, onClose) => (
-        <SubscriptionDetail subscription={subscription} onClose={onClose} />
-      )}
+      renderDetail={(subscription) => <SubscriptionDetail subscription={subscription} />}
     />
   );
 }
 
-function SubscriptionDetail({
-  subscription,
-  onClose,
-}: {
-  subscription: AstroliftWebhookSubscription;
-  onClose: () => void;
-}) {
+function SubscriptionDetail({ subscription }: { subscription: AstroliftWebhookSubscription }) {
   return (
     <SubscriptionDetailView
       {...useSubscriptionDeliveries(subscription.id)}
       subscription={subscription}
-      onClose={onClose}
     />
   );
 }

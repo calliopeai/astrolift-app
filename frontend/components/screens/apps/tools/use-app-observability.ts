@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useLocalListState } from "@/components/list/use-list-state";
 import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePodResourceUsage } from "@/components/observability/use-pod-resource-usage";
@@ -23,6 +24,8 @@ import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
+
+import { APP_PODS_LIST, type MetricsPanel, metricsPanelQuery, selectPods } from "./metrics-panels";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -126,22 +129,35 @@ function pickDefaultContainer(
   return nonSidecar ?? containers[0];
 }
 
+/** The platform events the Pods panel reads: this app's, filtered on the server. */
+export function podEventsVariables(appSlug: string) {
+  return { limit: 100, appSlug };
+}
+
 /**
- * App › Observability data: the app, its pods (polled), platform events,
- * the env/workload scope (URL-backed), the pod/container pick, and the log
- * pane in its three modes (per-pod live tail, all-replicas live tail,
- * historical window). The metric panels beside it have their own hooks.
+ * Logs & metrics › Metrics data: the app, its pods (polled) as a list, this
+ * app's platform events, the env/workload scope (URL-backed), the pod pick
+ * (`?pod=`), the container pick, and the log pane in its three modes
+ * (per-pod live tail, all-replicas live tail, historical window). `panel`
+ * is the one on screen: the pods, events and managed-service reads run only
+ * on the panel that shows them (Leo's page rule 2). The metric panels have
+ * their own hooks.
  */
-export function useAppObservability(slug: string) {
+export function useAppObservability(slug: string, panel: MetricsPanel = "signals") {
+  const onPods = panel === "pods";
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
+  // Server-filtered to this app: it used to read the org's 200 newest
+  // events and keep this app's in the browser.
   const events = useQuery<EventsResp>(LIST_EVENTS, {
-    variables: { limit: 200 },
+    variables: podEventsVariables(slug),
     pollInterval: 15000,
+    skip: !onPods,
   });
 
   const pods = useQuery<PodsResp>(LIST_APP_PODS, {
     variables: { appSlug: slug },
     pollInterval: POD_POLL_MS,
+    skip: !onPods,
   });
 
   // #645 / #646 — fetch the app's managed-service list so we can fan
@@ -152,6 +168,7 @@ export function useAppObservability(slug: string) {
     astroliftManagedServices: Array<{ id: string; kind: string }>;
   }>(LIST_MANAGED_SERVICES, {
     variables: { appSlug: slug, environmentName: null },
+    skip: panel !== "signals",
   });
 
   const a = app.data?.astroliftApp ?? null;
@@ -183,16 +200,8 @@ export function useAppObservability(slug: string) {
   const podParam = searchParams?.get("pod") ?? null;
   const envParam = searchParams?.get("env") ?? null;
   const workloadParam = searchParams?.get("workload") ?? null;
-  const [pickedPod, setPickedPod] = React.useState<string | null>(podParam);
-  React.useEffect(() => {
-    if (podParam && pickedPod == null) {
-      setPickedPod(podParam);
-    }
-    // We intentionally only react to the URL on mount-equivalent
-    // transitions — once the operator picks a row, their pick is
-    // sticky for the rest of the session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [podParam]);
+  // The pick is the URL's: a pod row links to `?pod=<name>`.
+  const pickedPod = podParam;
 
   // Env + workload pickers (#422) — URL is the single source of
   // truth so deep-links survive refresh. ``null`` means "use the
@@ -226,6 +235,18 @@ export function useAppObservability(slug: string) {
     (workload: string | null) => updateScopeParam("workload", workload),
     [updateScopeParam]
   );
+  // The Pods panel's list: in memory, since the panel's own `?section=` and
+  // `?panel=` must survive a filter change.
+  const podsList = useLocalListState(APP_PODS_LIST);
+  const podPage = selectPods(podRows, podsList.filters, podsList.state);
+  const qs = searchParams?.toString() ?? "";
+  const podHref = (pod: AstroliftAppPod) => {
+    const next = new URLSearchParams(qs);
+    next.set("pod", pod.name);
+    return `${pathname ?? ""}?${next.toString()}`;
+  };
+  const panelHref = (p: MetricsPanel) => `${pathname ?? ""}?${metricsPanelQuery(qs, p)}`;
+
   const selectedPod: string | null = React.useMemo(() => {
     if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
     const running = podRows.find((p) => p.status === "Running");
@@ -430,10 +451,15 @@ export function useAppObservability(slug: string) {
     app: a,
     loading: app.loading && !a,
     // Pods
+    panel,
+    panelHref,
     pods: podRows,
     podsLoading: pods.loading && podRows.length === 0,
+    podsList,
+    podRows: podPage.rows,
+    podTotal: podPage.totalCount,
+    podHref,
     selectedPod,
-    onPickPod: setPickedPod,
     podContainers,
     selectedContainer,
     onPickContainer: setPickedContainer,

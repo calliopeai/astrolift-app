@@ -7,7 +7,10 @@
  *
  * Every card here is a pure view over its hook in this folder. The
  * driver-dependent cards arrive as slots so the container can leave them
- * unmounted (their queries never fire) while the cluster is offline.
+ * unmounted (their queries never fire) while the cluster is offline. The
+ * tab is an overview (list rule 3): workloads, workflow runs and lifecycle
+ * events are summaries of their top rows, each with "View all" to the
+ * Health or Activity tab, which hold the full list or feed.
  */
 
 import {
@@ -30,7 +33,8 @@ import Link from "next/link";
 import type * as React from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
-import { Panel, PanelGrid, type PanelSpan, SkeletonRows } from "@/components/panel/Panel";
+import { ListSummary } from "@/components/list/ListSummary";
+import { Panel, PanelGrid, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -817,64 +821,41 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
 
 // ─── Workload health section ─────────────────────────────────────────
 export function StatusWorkloadHealthCard({
+  slug,
   rows,
   loading,
   error,
   refetch,
-}: ReturnType<typeof useClusterWorkloadHealth>) {
-  // Sort most-broken first within each namespace; namespaces are
-  // grouped alphabetically.
-  const grouped = new Map<string, WorkloadRow[]>();
-  for (const r of rows) {
-    const list = grouped.get(r.namespace) ?? [];
-    list.push(r);
-    grouped.set(r.namespace, list);
-  }
-  for (const list of grouped.values()) {
-    list.sort((a, b) => {
-      const deficitA = a.desiredReplicas - a.readyReplicas;
-      const deficitB = b.desiredReplicas - b.readyReplicas;
-      if (deficitA !== deficitB) return deficitB - deficitA;
-      return a.workloadName.localeCompare(b.workloadName);
-    });
-  }
-  const namespaces = Array.from(grouped.keys()).sort();
+}: ReturnType<typeof useClusterWorkloadHealth> & { slug: string }) {
+  // Most broken first; the full list is the Health tab's.
+  const sorted = [...rows].sort((a, b) => {
+    const deficitA = a.desiredReplicas - a.readyReplicas;
+    const deficitB = b.desiredReplicas - b.readyReplicas;
+    if (deficitA !== deficitB) return deficitB - deficitA;
+    if (a.restartCount24h !== b.restartCount24h) return b.restartCount24h - a.restartCount24h;
+    return a.workloadName.localeCompare(b.workloadName);
+  });
 
   return (
-    <Panel
+    <ListSummary<WorkloadRow>
       span={6}
       icon={<ServerIcon className="size-4" />}
       title="Workload health"
-      description="Per-Deployment readiness + 24h restart counts. Sorted most-broken first; polls every 30s."
-      loading={loading && rows.length === 0}
-      skeleton={<SkeletonRows />}
-      error={rows.length === 0 ? error : null}
+      description="Per-Deployment readiness + 24h restart counts, most broken first. Polls every 30s."
+      count={rows.length}
+      rows={sorted}
+      keyOf={(r) => `${r.namespace}/${r.workloadName}`}
+      renderRow={(r) => <WorkloadRowItem row={r} />}
+      viewAllHref={`/clusters/${slug}/health`}
+      loading={loading}
+      error={error}
       onRetry={refetch}
-      empty={
-        rows.length === 0
-          ? {
-              icon: <ServerOffIcon className="size-5" />,
-              title: "No deployment data",
-              description: "Apiserver unreachable or no workloads running yet.",
-            }
-          : null
-      }
-    >
-      <div className="space-y-4">
-        {namespaces.map((ns) => (
-          <div key={ns}>
-            <p className="text-muted-foreground text-2xs mb-1.5 font-mono [overflow-wrap:anywhere]">
-              {ns}/
-            </p>
-            <div>
-              {grouped.get(ns)!.map((row) => (
-                <WorkloadRowItem key={row.workloadName} row={row} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Panel>
+      empty={{
+        icon: <ServerOffIcon className="size-5" />,
+        title: "No deployment data",
+        description: "Apiserver unreachable or no workloads running yet.",
+      }}
+    />
   );
 }
 
@@ -890,8 +871,11 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
   const deployedAge = row.lastImageDeployedAt ? formatRelativeAge(row.lastImageDeployedAt) : null;
 
   return (
-    <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
-      <code className="min-w-0 flex-1 truncate font-mono text-xs" title={row.workloadName}>
+    <div className="flex min-w-0 items-center gap-3 text-sm">
+      <code
+        className="min-w-0 flex-1 truncate font-mono text-xs"
+        title={`${row.namespace}/${row.workloadName}`}
+      >
         {row.workloadName}
       </code>
       <span className={`shrink-0 font-mono text-xs tabular-nums ${readyTone}`}>
@@ -930,7 +914,7 @@ export function StatusLiveHealthCard({
   loading,
   error,
   refetch,
-}: ReturnType<typeof useClusterHealth>) {
+}: Omit<ReturnType<typeof useClusterHealth>, "moreEvents">) {
   // Aggregate pod counts by phase across all namespaces — the live
   // view answers "is the cluster green?" before "where is it red?".
   const phaseTotals = new Map<string, number>();
@@ -1050,33 +1034,27 @@ function EventRow({ event }: { event: ClusterEvent }) {
 
 // ─── Recent workflows section ────────────────────────────────────────
 export function StatusRecentWorkflowsCard({
+  slug,
   runs,
   loading,
   error,
   refetch,
-}: ReturnType<typeof useRecentClusterWorkflows>) {
+}: Omit<ReturnType<typeof useRecentClusterWorkflows>, "more"> & { slug: string }) {
   return (
-    <Panel
+    <ListSummary<WorkflowRun>
       span={6}
       icon={<GitBranchIcon className="size-4" />}
       title="Recent workflow runs"
       description="Temporal runs targeting this cluster — most recent first."
-      loading={loading && runs.length === 0}
-      skeleton={<SkeletonRows />}
-      error={runs.length === 0 ? error : null}
+      rows={runs}
+      keyOf={(r) => r.workflowId + r.runId}
+      renderRow={(r) => <WorkflowRunRow run={r} />}
+      viewAllHref={`/clusters/${slug}/activity`}
+      loading={loading}
+      error={error}
       onRetry={refetch}
-      empty={
-        runs.length === 0
-          ? { icon: <GitBranchIcon className="size-5" />, title: "No workflow runs recorded yet" }
-          : null
-      }
-    >
-      <div>
-        {runs.map((r) => (
-          <WorkflowRunRow key={r.workflowId + r.runId} run={r} />
-        ))}
-      </div>
-    </Panel>
+      empty={{ icon: <GitBranchIcon className="size-5" />, title: "No workflow runs recorded yet" }}
+    />
   );
 }
 
@@ -1086,7 +1064,7 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
   const duration = fmtDuration(run.startedAt, run.closedAt);
 
   return (
-    <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 text-sm">
       <Icon className={`size-4 shrink-0 ${iconClass}`} />
       <span className="min-w-0 flex-1 truncate font-medium" title={run.workflowType}>
         {prettyWorkflowType(run.workflowType)}
@@ -1143,33 +1121,27 @@ function workflowStatusIcon(status: string): {
 
 // ─── Lifecycle timeline section ──────────────────────────────────────
 export function StatusLifecycleCard({
+  slug,
   entries,
   loading,
   error,
   refetch,
-}: ReturnType<typeof useClusterLifecycleAudit>) {
+}: Omit<ReturnType<typeof useClusterLifecycleAudit>, "more"> & { slug: string }) {
   return (
-    <Panel
+    <ListSummary<AuditRow>
       span={6}
       icon={<ClockIcon className="size-4" />}
       title="Lifecycle events"
       description="Mutations targeting this cluster — registered → managing → managed transitions, refreshes, decommissions."
-      loading={loading && entries.length === 0}
-      skeleton={<SkeletonRows />}
-      error={entries.length === 0 ? error : null}
+      rows={entries}
+      keyOf={(e) => `${e.timestamp}-${e.operation}`}
+      renderRow={(e) => <LifecycleRow entry={e} />}
+      viewAllHref={`/clusters/${slug}/activity`}
+      loading={loading}
+      error={error}
       onRetry={refetch}
-      empty={
-        entries.length === 0
-          ? { icon: <ClockIcon className="size-5" />, title: "No lifecycle events recorded yet" }
-          : null
-      }
-    >
-      <div>
-        {entries.map((e, i) => (
-          <LifecycleRow key={`${e.timestamp}-${i}`} entry={e} />
-        ))}
-      </div>
-    </Panel>
+      empty={{ icon: <ClockIcon className="size-5" />, title: "No lifecycle events recorded yet" }}
+    />
   );
 }
 
@@ -1178,7 +1150,7 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
   const dotClass = entry.success ? "text-success" : "text-destructive";
 
   return (
-    <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 text-sm">
       <span className={`shrink-0 text-base leading-none ${dotClass}`}>●</span>
       <span className="min-w-0 flex-1 truncate font-medium" title={entry.operation}>
         {prettyOperation(entry.operation)}
@@ -1189,7 +1161,7 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
         </span>
       )}
       {!entry.success && entry.errors.length > 0 && (
-        <span className="text-destructive text-2xs max-w-[40%] truncate" title={entry.errors[0]}>
+        <span className="text-destructive text-2xs max-w-2/5 truncate" title={entry.errors[0]}>
           {entry.errors[0]}
         </span>
       )}

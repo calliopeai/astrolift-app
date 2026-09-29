@@ -2,9 +2,12 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
 import { CreateProjectSheet } from "./CreateProjectSheet";
 import { EditProjectSheet } from "./EditProjectSheet";
-import { ProjectsScreen } from "./ProjectsScreen";
+import { PROJECTS_LIST } from "./projects-list";
+import { ProjectsScreen as Base, type ProjectsScreenProps } from "./ProjectsScreen";
 import {
   LONG_PROJECT,
   PROJECTS,
@@ -21,49 +24,46 @@ export default meta;
 
 type Story = StoryObj;
 
+/** The screen over fixture rows, with its list state in memory. */
+function ProjectsScreen({
+  initial,
+  ...props
+}: Omit<ProjectsScreenProps, "list"> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(PROJECTS_LIST, initial);
+  return <Base {...props} list={list} />;
+}
+
 export const Full: Story = { render: () => <ProjectsScreen {...projectsProps()} /> };
 
 export const Loading: Story = {
   render: () => (
-    <ProjectsScreen {...projectsProps({ state: "loading", rows: [] }, { teamsLoading: true })} />
+    <ProjectsScreen {...projectsProps({ loading: true, rows: [], teamsLoading: true })} />
   ),
 };
 
 export const Empty: Story = {
-  render: () => <ProjectsScreen {...projectsProps({ state: "empty", rows: [], totalCount: 0 })} />,
+  render: () => <ProjectsScreen {...projectsProps({ rows: [], totalCount: 0 })} />,
 };
 
 /** No teams yet: the empty state points at team management instead. */
 export const EmptyNoTeams: Story = {
   render: () => (
-    <ProjectsScreen
-      {...projectsProps({ state: "empty", rows: [], totalCount: 0 }, { teams: [], noTeams: true })}
-    />
+    <ProjectsScreen {...projectsProps({ rows: [], totalCount: 0, teams: [], noTeams: true })} />
   ),
 };
 
 export const EmptyFiltered: Story = {
-  render: () => (
-    <ProjectsScreen
-      {...projectsProps({ state: "emptyFiltered", rows: [], isFiltered: true, search: "zzz" })}
-    />
-  ),
+  render: () => <ProjectsScreen {...projectsProps({ rows: [] })} initial={{ q: "zzz" }} />,
 };
 
 export const LoadError: Story = {
   render: () => (
-    <ProjectsScreen
-      {...projectsProps({
-        state: "error",
-        rows: [],
-        error: new globalThis.Error("upstream timed out"),
-      })}
-    />
+    <ProjectsScreen {...projectsProps({ rows: [], error: { message: "upstream timed out" } })} />
   ),
 };
 
 export const Deleting: Story = {
-  render: () => <ProjectsScreen {...projectsProps({}, { deleting: true })} />,
+  render: () => <ProjectsScreen {...projectsProps({ deleting: true })} />,
 };
 
 export const LongStrings: Story = {
@@ -94,13 +94,13 @@ export const OpensCreateSheet: Story = {
 export const AutoOpenCreate: Story = {
   render: () => (
     <ProjectsScreen
-      {...projectsProps({}, { autoOpenCreate: true })}
+      {...projectsProps({ autoOpenCreate: true })}
       renderCreateDialog={(p) => <CreateProjectSheet {...createProjectProps()} {...p} />}
     />
   ),
 };
 
-/** A row's edit button opens the edit sheet for that project. */
+/** A row's `⋯` › Edit opens the edit sheet for that project. */
 export const OpensEditSheet: Story = {
   render: () => (
     <ProjectsScreen
@@ -116,9 +116,30 @@ export const OpensEditSheet: Story = {
     />
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Edit" })[0]);
+    await userEvent.click(
+      within(canvasElement).getAllByRole("button", { name: /row actions/i })[0]!
+    );
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Edit" }));
     await expect(
       await within(document.body).findByRole("heading", { name: "Edit project" })
     ).toBeInTheDocument();
   },
+};
+
+/** Filtered to one team, as the nav tree's "Add project" link arrives. */
+export const TeamFilter: Story = {
+  render: () => (
+    <ProjectsScreen
+      {...projectsProps({ rows: PROJECTS.slice(0, 1), totalCount: null })}
+      initial={{ filters: { team: PROJECTS[0]!.team.slug } }}
+    />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <ProjectsScreen {...projectsProps({ rows: [LONG_PROJECT, ...PROJECTS] })} />
+    </div>
+  ),
 };

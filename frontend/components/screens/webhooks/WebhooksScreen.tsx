@@ -4,9 +4,9 @@ import {
   AlertTriangleIcon,
   BookOpenIcon,
   CheckCircle2Icon,
-  ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  HistoryIcon,
   KeyRoundIcon,
   PauseIcon,
   PlayIcon,
@@ -22,13 +22,15 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DefinitionList } from "@/components/ui/definition-list";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -89,19 +91,30 @@ export type WebhooksScreenProps = WebhooksData & {
   /** Set on the app/agent-scoped tab; unset on the platform-wide surface. */
   appSlug?: string;
   tabs?: React.ReactNode;
-  /** The expanded subscription's detail panel. The route fills it with a
-   *  container so its deliveries walk runs only while it is shown. */
-  renderDetail: (
-    subscription: AstroliftWebhookSubscription,
-    onClose: () => void
-  ) => React.ReactNode;
+  /** The deliveries sheet's body. The route fills it with a container so
+   *  its delivery feed runs only while the sheet is open. */
+  renderDetail: (subscription: AstroliftWebhookSubscription) => React.ReactNode;
 };
 
+/**
+ * Admin › Webhooks (spec 44 §5.1), or an app's Settings › Webhooks section
+ * (embedded, `appSlug`): the subscriptions on the shared list, views All ·
+ * Mine · Failing · Paused, cursor paged, row actions in `⋯`. A
+ * subscription's delivery log opens in a sheet (platform-wide, the row also
+ * links to its detail page), so the page holds one list. Pure; the data half
+ * is useWebhooks.
+ */
 export function WebhooksScreen({
   appSlug,
   tabs,
   renderDetail,
-  table,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   creating,
   rotating,
   firing,
@@ -138,49 +151,21 @@ export function WebhooksScreen({
     }
   }
 
-  // The expanded subscription is resolved against the page in hand, so
-  // paging away (or searching past it) closes the panel rather than
+  // The sheet's subscription is resolved against the page in hand, so
+  // paging away (or searching past it) closes the sheet rather than
   // leaving it describing a row that is no longer on screen.
-  const expanded = table.rows.find((s) => s.id === expandedId) ?? null;
+  const expanded = rows.find((s) => s.id === expandedId) ?? null;
 
   const columns: Column<AstroliftWebhookSubscription>[] = [
     {
-      id: "expand",
-      header: <span className="sr-only">Details</span>,
-      width: "w-8",
-      cellClassName: "p-2",
-      cell: (s) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          onClick={() => setExpandedId((prev) => (prev === s.id ? null : s.id))}
-          aria-label={expandedId === s.id ? "Collapse" : "Expand"}
-          aria-expanded={expandedId === s.id}
-        >
-          {expandedId === s.id ? (
-            <ChevronDownIcon className="size-4" />
-          ) : (
-            <ChevronRightIcon className="size-4" />
-          )}
-        </Button>
-      ),
-    },
-    {
       id: "url",
       header: "URL",
-      cellClassName: "max-w-xs truncate font-mono text-xs",
-      cell: (s) =>
-        appSlug ? (
-          s.url
-        ) : (
-          <Link
-            href={`/webhooks/${s.id}`}
-            className="hover:text-[var(--brand-primary)] hover:underline"
-          >
-            {s.url}
-          </Link>
-        ),
+      cellClassName: "max-w-xs",
+      cell: (s) => (
+        <span className="block truncate font-mono text-xs" title={s.url}>
+          {s.url}
+        </span>
+      ),
     },
     {
       id: "events",
@@ -213,7 +198,8 @@ export function WebhooksScreen({
           }
         >
           <Select value={s.format} onValueChange={(v) => onFormatChange(s, v as WebhookFormat)}>
-            <SelectTrigger size="sm" className="h-7 w-32 text-xs">
+            {/* Above the row's stretched link, so the select opens instead of the row. */}
+            <SelectTrigger size="sm" className="relative z-10 h-7 w-32 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -259,152 +245,176 @@ export function WebhooksScreen({
         </Badge>
       ),
     },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (s) => (
-        <div className="flex justify-end gap-1">
-          <Can permission="webhook.update">
-            <Button
-              size="sm"
-              variant="ghost"
-              title={s.isActive ? "Pause" : "Resume"}
-              onClick={() => onToggleActive(s)}
-            >
-              {s.isActive ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
-              <span className="sr-only">{s.isActive ? "Pause" : "Resume"}</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              title="Send test event"
-              disabled={firing || !s.isActive}
-              onClick={() => setTestTarget(s)}
-            >
-              <SendIcon className="size-4" />
-              <span className="sr-only">Send test</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              title="Rotate secret"
-              disabled={rotating}
-              onClick={() => setRotateTarget(s)}
-            >
-              <KeyRoundIcon className="size-4" />
-              <span className="sr-only">Rotate secret</span>
-            </Button>
-          </Can>
-          <Can permission="webhook.delete">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDeleteTarget(s)}
-              disabled={deleting}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Delete</span>
-            </Button>
-          </Can>
-        </div>
-      ),
-    },
   ];
 
-  return (
-    <PageShell
-      title="Webhooks"
-      description={
-        appSlug ? (
-          <span className="text-muted-foreground font-mono text-xs">
-            Outbound HTTP delivery for {appSlug}&apos;s event stream. Each subscription&apos;s
-            secret is used to HMAC-sign every payload.
-          </span>
-        ) : (
-          "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
-        )
-      }
-      actions={
-        <>
-          <Button asChild size="sm" variant="outline">
-            <Link href={DOC_LINKS.webhooks}>
-              <BookOpenIcon className="size-4" />
-              Learn more
-            </Link>
-          </Button>
-          <Can permission="webhook.create">
-            <Button onClick={() => setOpen(true)}>
-              <PlusIcon className="size-4" />
-              New webhook
-            </Button>
-          </Can>
-        </>
-      }
-    >
-      {tabs}
-      {reveal && (
-        <Card className="border-success-border bg-success/5">
-          <CardContent className="flex flex-col gap-3 p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle2Icon className="text-success-fg size-4" />
-              <p className="text-sm font-medium">
-                Secret for <span className="font-mono">{reveal.subscription.url}</span> ready
+  function rowActions(s: AstroliftWebhookSubscription) {
+    return (
+      <>
+        <DropdownMenuItem onSelect={() => setExpandedId(s.id)}>
+          <HistoryIcon className="size-4" />
+          Deliveries
+        </DropdownMenuItem>
+        <Can permission="webhook.update">
+          <DropdownMenuItem onSelect={() => void onToggleActive(s)}>
+            {s.isActive ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
+            {s.isActive ? "Pause" : "Resume"}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={firing || !s.isActive} onSelect={() => setTestTarget(s)}>
+            <SendIcon className="size-4" />
+            Send test event
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={rotating} onSelect={() => setRotateTarget(s)}>
+            <KeyRoundIcon className="size-4" />
+            Rotate secret
+          </DropdownMenuItem>
+        </Can>
+        <Can permission="webhook.delete">
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={deleting}
+            onSelect={() => setDeleteTarget(s)}
+          >
+            <Trash2Icon className="size-4" />
+            Delete
+          </DropdownMenuItem>
+        </Can>
+      </>
+    );
+  }
+
+  const description = appSlug ? (
+    <>
+      Outbound HTTP delivery for <span className="font-mono">{appSlug}</span>&apos;s event stream.
+      Each subscription&apos;s secret is used to HMAC-sign every payload.
+    </>
+  ) : (
+    "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
+  );
+
+  const actions = (
+    <>
+      <Button asChild size="sm" variant="outline">
+        <Link href={DOC_LINKS.webhooks}>
+          <BookOpenIcon className="size-4" />
+          Learn more
+        </Link>
+      </Button>
+      <Can permission="webhook.create">
+        <Button onClick={() => setOpen(true)}>
+          <PlusIcon className="size-4" />
+          New webhook
+        </Button>
+      </Can>
+    </>
+  );
+
+  const notice =
+    reveal || testResult ? (
+      <>
+        {reveal && (
+          <Card className="border-success-border bg-success/5">
+            <CardContent className="flex flex-col gap-3 p-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
+                <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+                  Secret for <span className="font-mono">{reveal.subscription.url}</span> ready
+                </p>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Save the HMAC secret below — it&apos;s never shown again. We store only its SHA-256.
+                The previous secret stays valid for the rotation grace window.
               </p>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Save the HMAC secret below — it&apos;s never shown again. We store only its SHA-256.
-              The previous secret stays valid for the rotation grace window.
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
-                {reveal.plaintextSecret}
-              </code>
-              <Button size="sm" variant="outline" onClick={copySecret}>
-                <CopyIcon className="size-4" />
-                Copy
-              </Button>
-            </div>
-            <div className="flex justify-end">
-              <Button size="sm" variant="ghost" onClick={dismissReveal}>
-                Dismiss
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex min-w-0 items-center gap-2">
+                <code className="bg-background min-w-0 flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
+                  {reveal.plaintextSecret}
+                </code>
+                <Button size="sm" variant="outline" onClick={copySecret}>
+                  <CopyIcon className="size-4" />
+                  Copy
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="ghost" onClick={dismissReveal}>
+                  Dismiss
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {testResult && <TestResultCard result={testResult} onDismiss={dismissTestResult} />}
+      </>
+    ) : undefined;
+
+  const body = {
+    list,
+    label: "Webhook subscriptions",
+    columns,
+    rows,
+    getRowId: (s: AstroliftWebhookSubscription) => s.id,
+    rowActions,
+    rowClassName: (s: AstroliftWebhookSubscription) =>
+      s.isActive ? undefined : "text-muted-foreground line-through opacity-60",
+    loading,
+    error,
+    onRetry,
+    totalCount,
+    nextCursor,
+    notice,
+    empty: {
+      icon: <WebhookIcon className="size-5" />,
+      title: "No webhook subscriptions",
+      description:
+        "Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events.",
+    },
+  };
+
+  return (
+    <>
+      {appSlug ? (
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {tabs}
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+            <p className="text-muted-foreground max-w-3xl min-w-0 text-sm">{description}</p>
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          </div>
+          <ListPage<AstroliftWebhookSubscription> embedded {...body} />
+        </div>
+      ) : (
+        <ListPage<AstroliftWebhookSubscription>
+          header={{
+            crumbs: adminCrumbs("webhooks", "Webhooks"),
+            title: "Webhooks",
+            context: description,
+            primaryAction: <div className="flex items-center gap-2">{actions}</div>,
+          }}
+          rowHref={(s) => `/webhooks/${s.id}`}
+          {...body}
+        />
       )}
 
-      {testResult && <TestResultCard result={testResult} onDismiss={dismissTestResult} />}
-
-      <DataTable
-        label="Webhook subscriptions"
-        controller={table}
-        columns={columns}
-        getRowId={(s) => s.id}
-        rowClassName={(s) =>
-          s.isActive ? undefined : "text-muted-foreground line-through opacity-60"
-        }
-        searchPlaceholder="Search webhooks…"
-        empty={{
-          icon: <WebhookIcon className="size-5" />,
-          title: "No webhook subscriptions",
-          description:
-            "Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events.",
+      <Sheet
+        open={expanded !== null}
+        onOpenChange={(next) => {
+          if (!next) setExpandedId(null);
         }}
-        emptyFiltered={{
-          title: "No matching webhooks",
-          description:
-            "No subscription matches that search. The server matches the delivery URL, not the event list.",
-        }}
-      />
-
-      {expanded && (
-        // Keyed by id so expanding a different subscription starts its own
-        // delivery walk rather than inheriting the previous one's search.
-        <React.Fragment key={expanded.id}>
-          {renderDetail(expanded, () => setExpandedId(null))}
-        </React.Fragment>
-      )}
+      >
+        <SheetContent className="flex w-full flex-col sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Deliveries</SheetTitle>
+            <SheetDescription>
+              Every attempt to this subscription, newest first. Older attempts load as you scroll.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-4">
+            {expanded && (
+              // Keyed by id so opening a different subscription starts its
+              // own delivery feed rather than inheriting the previous one's.
+              <React.Fragment key={expanded.id}>{renderDetail(expanded)}</React.Fragment>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="flex flex-col">
@@ -523,7 +533,7 @@ export function WebhooksScreen({
           if (testTarget) await onTestFire(testTarget);
         }}
       />
-    </PageShell>
+    </>
   );
 }
 

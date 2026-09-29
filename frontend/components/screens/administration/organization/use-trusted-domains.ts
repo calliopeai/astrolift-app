@@ -3,6 +3,9 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { selectRows } from "@/components/list/select-rows";
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import {
   ADD_ORGANIZATION_ALLOWLIST_DOMAIN,
   REMOVE_ORGANIZATION_ALLOWLIST_DOMAIN,
@@ -16,6 +19,8 @@ import type {
   AstroliftRole,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+
+import { TRUSTED_DOMAINS_LIST, TRUSTED_DOMAINS_SELECT } from "./trusted-domains-list";
 
 interface ListResp {
   astroliftOrganizationAllowlistDomains: AstroliftOrganizationAllowlistedDomain[];
@@ -31,8 +36,13 @@ export interface TrustedDomainInput {
   requiresReview: boolean;
 }
 
-/** The server half of TrustedDomainsCard: the allowlist and its mutations. */
+/**
+ * The server half of TrustedDomainsCard: the allowlist (filtered, sorted and
+ * paged in the client over in-memory list state, since the settings page
+ * owns `?section=`) and its mutations.
+ */
 export function useTrustedDomains() {
+  const listState = useLocalListState(TRUSTED_DOMAINS_LIST);
   const list = useQuery<ListResp>(LIST_ORGANIZATION_ALLOWLIST_DOMAINS);
   const rolesQ = useQuery<RolesResp>(LIST_ROLES);
 
@@ -96,9 +106,29 @@ export function useTrustedDomains() {
     }
   }
 
+  const { state } = listState;
+  const all = list.data?.astroliftOrganizationAllowlistDomains ?? [];
+  const page = selectRows(
+    all,
+    {
+      filters: listState.filters,
+      q: state.q,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    },
+    TRUSTED_DOMAINS_SELECT
+  );
+
   return {
-    rows: list.data?.astroliftOrganizationAllowlistDomains ?? [],
-    loading: list.loading,
+    list: listState,
+    rows: page.rows,
+    totalCount: page.totalCount,
+    loading: list.loading && all.length === 0,
+    error: list.error && all.length === 0 ? { message: list.error.message } : null,
+    onRetry: () => {
+      void list.refetch();
+    },
     roleOptions,
     adding,
     removing,

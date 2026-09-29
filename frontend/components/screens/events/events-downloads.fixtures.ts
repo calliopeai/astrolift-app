@@ -2,8 +2,6 @@
  * Hand-typed fixtures for the events, downloads and platform-activity
  * screens (group "events-downloads").
  */
-import { fakeController } from "@/components/data-table/fixtures";
-import type { CursorTableController } from "@/components/data-table";
 import { PLATFORMS, type PlatformAsset } from "@/components/screens/downloads/platforms";
 import type { AstroliftEvent } from "@/graphql/operations/operations.types";
 
@@ -132,28 +130,48 @@ export const BUCKET_MEMBERS: AstroliftEvent[] = [
   }),
 ];
 
-export function eventsTable(
-  overrides: Partial<CursorTableController<AstroliftEvent>> = {}
-): CursorTableController<AstroliftEvent> {
-  return fakeController<AstroliftEvent>({ rows: EVENTS, sort: undefined, ...overrides });
+type Feed<T> = {
+  items: T[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => undefined;
+  newCount: number;
+  onShowNew: () => void;
+};
+
+function feedOf<T>(items: T[], overrides: Partial<Feed<T>>): Feed<T> {
+  return {
+    items,
+    loading: false,
+    error: null,
+    onRetry: () => {},
+    hasMore: false,
+    loadingMore: false,
+    onLoadMore: () => undefined,
+    newCount: 0,
+    onShowNew: () => {},
+    ...overrides,
+  };
 }
 
-export function bucketsTable(
-  overrides: Partial<CursorTableController<AggregatedEvent>> = {}
-): CursorTableController<AggregatedEvent> {
-  return fakeController<AggregatedEvent>({
-    rows: BUCKETS,
-    totalCount: BUCKETS.length,
-    sort: undefined,
-    ...overrides,
-  });
+/** The raw stream's Feed props. */
+export function eventsFeed(overrides: Partial<Feed<AstroliftEvent>> = {}): Feed<AstroliftEvent> {
+  return feedOf(EVENTS, overrides);
+}
+
+/** The grouped stream's Feed props. */
+export function bucketsFeed(overrides: Partial<Feed<AggregatedEvent>> = {}): Feed<AggregatedEvent> {
+  return feedOf(BUCKETS, overrides);
 }
 
 /** Fourteen days, oldest first. */
 export const RATE_DAYS = [3, 5, 2, 0, 8, 12, 7, 4, 9, 15, 11, 6, 10, 14];
 export const RATE_TOTAL = RATE_DAYS.reduce((a, b) => a + b, 0);
 
-export const TABLE_ERROR = new globalThis.Error("upstream timed out");
+export const FEED_ERROR = "upstream timed out";
 
 // ─── downloads ─────────────────────────────────────────────────────────
 

@@ -1,4 +1,16 @@
 import type { DetailTab } from "@/components/DetailPageTabs";
+import {
+  activeTabSection,
+  type DetailTabSection,
+  type DetailTabSpec,
+  detailRedirectTarget,
+  detailTabHref,
+  detailTabs,
+  resolveDetailTab,
+  type SearchParams,
+  sectionsBy,
+  tabSectionHref,
+} from "@/components/detail/detail-tabs-model";
 
 /**
  * The app detail's one row of tabs, named by function (spec 44 §5.2, §10.1,
@@ -17,15 +29,8 @@ export type AppTabKey =
   | "access"
   | "settings";
 
-export interface AppTabSpec {
-  key: AppTabKey;
-  /** i18n key under `apps.tabs.*`. */
-  label: string;
-  /** The route segment under `<base>/[slug]`; empty for Overview. */
-  segment: string;
-  /** Former routes this tab absorbed (each now redirects here). */
-  owns: string[];
-}
+/** `label` is an i18n key under `apps.tabs.*`; an empty `segment` is Overview. */
+export type AppTabSpec = DetailTabSpec<AppTabKey>;
 
 export const APP_TABS: readonly AppTabSpec[] = [
   { key: "overview", label: "overview", segment: "", owns: ["topology"] },
@@ -55,12 +60,7 @@ export const APP_TABS: readonly AppTabSpec[] = [
 
 /** `<base>/<slug>` or `<base>/<slug>/<segment>`. */
 export function appTabHref(basePath: string, slug: string, tab: AppTabKey): string {
-  const segment = APP_TABS.find((t) => t.key === tab)?.segment ?? "";
-  return segment ? `${basePath}/${slug}/${segment}` : `${basePath}/${slug}`;
-}
-
-function tabFor(name: string): AppTabKey | undefined {
-  return APP_TABS.find((t) => t.key === name || t.segment === name || t.owns.includes(name))?.key;
+  return detailTabHref(APP_TABS, basePath, slug, tab);
 }
 
 /**
@@ -75,14 +75,7 @@ export function resolveAppTab(
   slug: string,
   active?: string
 ): AppTabKey {
-  const root = `${basePath}/${slug}`;
-  if (pathname === root || pathname === `${root}/`) return "overview";
-  if (pathname.startsWith(`${root}/`)) {
-    const segment = pathname.slice(root.length + 1).split(/[/?#]/)[0];
-    const owner = tabFor(segment);
-    if (owner) return owner;
-  }
-  return (active && tabFor(active)) || "overview";
+  return resolveDetailTab(APP_TABS, basePath, pathname, slug, active);
 }
 
 /** The row as `DetailTab`s, labels resolved by the caller. */
@@ -93,32 +86,11 @@ export function appTabs(
   label: (key: string) => string,
   active?: string
 ): DetailTab[] {
-  const current = resolveAppTab(basePath, pathname, slug, active);
-  return APP_TABS.map((tab) => ({
-    key: tab.key,
-    label: label(tab.label),
-    href: appTabHref(basePath, slug, tab.key),
-    active: tab.key === current,
-  }));
+  return detailTabs(APP_TABS, basePath, slug, pathname, label, active);
 }
 
-/** One section inside a tab: `?<param>=<value>` picks it; the first is the default. */
-export interface AppTabSection {
-  id: string;
-  /** i18n key under `apps.frame.sections.*`. */
-  label: string;
-  /** The query that selects it; empty for the tab's default section. */
-  query: Record<string, string>;
-}
-
-const bySection = (...ids: [string, string][]): AppTabSection[] =>
-  ids.map(
-    ([id, label], i): AppTabSection => ({
-      id,
-      label,
-      query: i === 0 ? {} : { section: id },
-    })
-  );
+/** One section inside a tab; `label` is an i18n key under `apps.frame.sections.*`. */
+export type AppTabSection = DetailTabSection;
 
 /**
  * The sections the consolidated tabs hold (spec 44 §5.2): what each former
@@ -136,19 +108,19 @@ export const APP_TAB_SECTIONS: Partial<Record<AppTabKey, AppTabSection[]>> = {
     { id: "jobs", label: "jobs", query: { kind: "cronjob" } },
     { id: "managed-services", label: "managedServices", query: { section: "managed-services" } },
   ],
-  logs: bySection(
+  logs: sectionsBy(
     ["logs", "logs"],
     ["metrics", "metrics"],
     ["console", "console"],
     ["commands", "commands"]
   ),
-  access: bySection(
+  access: sectionsBy(
     ["members", "members"],
     ["tokens", "tokens"],
     ["security", "security"],
     ["edge", "edge"]
   ),
-  settings: bySection(
+  settings: sectionsBy(
     ["general", "general"],
     ["configuration", "configuration"],
     ["manifest", "manifest"],
@@ -158,21 +130,11 @@ export const APP_TAB_SECTIONS: Partial<Record<AppTabKey, AppTabSection[]>> = {
   ),
 };
 
-export type SearchParams = Record<string, string | string[] | undefined>;
-
-function first(v: string | string[] | undefined): string | undefined {
-  return Array.isArray(v) ? v[0] : v;
-}
+export type { SearchParams };
 
 /** The section a tab's query selects, or its default. */
 export function activeSection(tab: AppTabKey, params: SearchParams): string {
-  const sections = APP_TAB_SECTIONS[tab] ?? [];
-  const hit = sections.find(
-    (s) =>
-      Object.keys(s.query).length > 0 &&
-      Object.entries(s.query).every(([k, v]) => first(params[k]) === v)
-  );
-  return (hit ?? sections[0])?.id ?? "";
+  return activeTabSection(APP_TAB_SECTIONS[tab], params);
 }
 
 /** A section's href: the tab's route plus the section's query. */
@@ -182,9 +144,7 @@ export function sectionHref(
   tab: AppTabKey,
   section: AppTabSection
 ): string {
-  const qs = new URLSearchParams(section.query).toString();
-  const href = appTabHref(basePath, slug, tab);
-  return qs ? `${href}?${qs}` : href;
+  return tabSectionHref(APP_TABS, basePath, slug, tab, section);
 }
 
 /**
@@ -197,14 +157,5 @@ export function redirectTarget(
   sectionId: string | null,
   params: SearchParams
 ): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (Array.isArray(value)) value.forEach((v) => query.append(key, v));
-    else if (value !== undefined) query.set(key, value);
-  }
-  const section = sectionId ? APP_TAB_SECTIONS[tab]?.find((s) => s.id === sectionId) : undefined;
-  for (const [key, value] of Object.entries(section?.query ?? {})) query.set(key, value);
-  const qs = query.toString();
-  const href = appTabHref("/apps", slug, tab);
-  return qs ? `${href}?${qs}` : href;
+  return detailRedirectTarget(APP_TABS, APP_TAB_SECTIONS, "/apps", slug, tab, sectionId, params);
 }

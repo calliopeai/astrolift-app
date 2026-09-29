@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import { useMutation, useSubscription } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -10,9 +10,7 @@ import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subsc
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
-interface DeploymentsResp {
-  astroliftDeployments: AstroliftDeployment[];
-}
+import { appDeploysVariables, useAppDeploys } from "../detail/use-app-deploys";
 
 interface RollbackResp {
   rollbackDeployment: MutationResult<AstroliftDeployment>;
@@ -21,13 +19,11 @@ interface RollbackResp {
 /**
  * The most-recent deployment, kept live by the lifecycle stream, and the
  * last-known-good it would roll back to. The data half of
- * DeploymentPanelView.
+ * DeploymentPanelView. It reads the deploys the app frame already holds
+ * (use-app-deploys) and is the reader that keeps them live.
  */
 export function useDeploymentPanel(appSlug: string) {
-  const { data, loading, refetch } = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { appSlug, limit: 10 },
-    fetchPolicy: "cache-and-network",
-  });
+  const { deployments, loading, refetch } = useAppDeploys(appSlug, { live: true });
 
   // Refetch on any lifecycle event for this app — the row deltas come
   // through the same query so the rollback button stays accurate.
@@ -38,7 +34,6 @@ export function useDeploymentPanel(appSlug: string) {
     },
   });
 
-  const deployments = React.useMemo(() => data?.astroliftDeployments ?? [], [data]);
   const current = deployments.at(0) ?? null;
   // For rollback, target the last `running` deploy that isn't the current
   // one — that's the version we'd actually flip traffic back to.
@@ -48,7 +43,7 @@ export function useDeploymentPanel(appSlug: string) {
   );
 
   const [rollback, { loading: rolling }] = useMutation<RollbackResp>(ROLLBACK_DEPLOYMENT, {
-    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { appSlug, limit: 10 } }],
+    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: appDeploysVariables(appSlug) }],
     awaitRefetchQueries: true,
   });
 

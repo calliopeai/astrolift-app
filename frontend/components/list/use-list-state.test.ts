@@ -6,6 +6,7 @@ import {
   defaultListState,
   effectiveFilters,
   extractFilterTokens,
+  mergeListQuery,
   parseListState,
   parseSort,
   serializeListState,
@@ -169,5 +170,17 @@ describe("paging", () => {
     expect(countLabel(2_300_000, true)).toBe("about 2.3m");
     expect(countLabel(800, true)).toBe("about 800");
     expect(countLabel(1240, false)).toBe("1,240");
+  });
+});
+
+describe("mergeListQuery", () => {
+  it("keeps the host page's params and replaces the list's own", () => {
+    expect(
+      mergeListQuery(RUNS_LIST, "section=tools&status=failed&after=abc&q=old", "view=running&q=bot")
+    ).toBe("section=tools&view=running&q=bot");
+  });
+
+  it("drops a cleared list param but not a host param", () => {
+    expect(mergeListQuery(RUNS_LIST, "section=tools&agent=support-bot", "")).toBe("section=tools");
   });
 });

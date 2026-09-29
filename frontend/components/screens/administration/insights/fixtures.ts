@@ -6,7 +6,7 @@ import { LONG_ARN, LONG_SHA, LONG_URL } from "@/components/list/fixtures";
 import type { DeploymentStatus, ScheduledJobRunStatus } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
 
-import type { AuditLogScreenProps } from "./AuditLogScreen";
+import type { AuditEventsFeed, AuditLogScreenProps } from "./AuditLogScreen";
 import {
   type CombinedRun,
   fromAgentTask,
@@ -110,13 +110,21 @@ export const AUDIT_EVENTS_LONG: AstroliftAuditEvent[] = [
 ];
 
 /** Everything but the list state, which each story makes with useLocalListState. */
-export const AUDIT: Omit<AuditLogScreenProps, "list"> = {
-  rows: AUDIT_EVENTS,
+/** The audit feed: the newest page, more behind the cursor. */
+export const AUDIT_FEED: AuditEventsFeed = {
+  items: AUDIT_EVENTS,
   loading: false,
-  stale: false,
   error: null,
   onRetry: noop,
-  nextCursor: "cursor-2",
+  hasMore: true,
+  loadingMore: false,
+  onLoadMore: noop,
+  newCount: 0,
+  onShowNew: noop,
+};
+
+export const AUDIT: Omit<AuditLogScreenProps, "list"> = {
+  events: AUDIT_FEED,
   totalCount: 1284,
   targetFilteredLocally: false,
   retentionDays: 365,

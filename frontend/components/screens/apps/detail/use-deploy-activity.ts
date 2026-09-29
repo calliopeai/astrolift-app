@@ -1,25 +1,13 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
-
-interface DeploymentsResp {
-  astroliftDeployments: AstroliftDeployment[];
-}
+import { useAppDeploys } from "./use-app-deploys";
 
 /**
- * The last `limit` deploys behind the deploy activity strip, polled every
- * 15s. The data half of DeployActivityStrip.
+ * The last `limit` deploys behind the deploy activity strip. The data half
+ * of DeployActivityStrip. It reads the app frame's deploys (use-app-deploys),
+ * which the latest-deploy panel keeps live, so the strip adds no query.
  */
 export function useDeployActivity(appSlug: string, limit = 20) {
-  const { data, loading } = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { appSlug, limit },
-    fetchPolicy: "cache-and-network",
-    pollInterval: 15_000,
-  });
-
-  const deployments = (data?.astroliftDeployments ?? []) as AstroliftDeployment[];
-  return { deployments, loading, limit };
+  const { deployments, loading } = useAppDeploys(appSlug);
+  return { deployments: deployments.slice(0, limit), loading, limit };
 }

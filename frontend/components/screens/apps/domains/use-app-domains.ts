@@ -1,9 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { usePathname, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useListState } from "@/components/list/use-list-state";
 import { CLUSTER_CERTIFICATES } from "@/graphql/clusters/clusters.queries";
 import type { ClusterCertificatesQuery } from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -21,6 +23,8 @@ import {
 import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+
+import { APP_DOMAINS_LIST, selectDomains } from "./domains-list";
 
 export interface RequiredDnsRecord {
   kind: string;
@@ -407,6 +411,21 @@ export function useAppDomains(slug: string) {
     }
   }
 
+  // The tab's list: URL state, answered in the browser (domains-list.ts).
+  const list = useListState(APP_DOMAINS_LIST);
+  const all = domains.data?.astroliftAppDomains ?? [];
+  const { rows, totalCount } = selectDomains(all, list.filters, list.state);
+  // The picked domain is `?domain=<id>`; a row links there, keeping the
+  // list's own params, so the handshake panel under the list follows it.
+  const params = useSearchParams();
+  const pathname = usePathname() ?? "";
+  const qs = params?.toString() ?? "";
+  const domainHref = (d: AppDomain) => {
+    const p = new URLSearchParams(qs);
+    p.set("domain", d.id);
+    return `${pathname}?${p.toString()}`;
+  };
+
   return {
     loading: domains.loading,
     /** The domains query failed with nothing cached. */
@@ -414,7 +433,12 @@ export function useAppDomains(slug: string) {
     refetch: (): void => {
       void domains.refetch();
     },
-    domains: domains.data?.astroliftAppDomains ?? [],
+    domains: all,
+    list,
+    rows,
+    totalCount,
+    pickedId: params?.get("domain") ?? null,
+    domainHref,
     environments: envs.data?.astroliftEnvironments ?? [],
     workloadOptions: workloads.data?.astroliftWorkloads ?? [],
     busy,

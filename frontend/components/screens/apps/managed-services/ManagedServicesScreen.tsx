@@ -4,8 +4,8 @@ import { DatabaseIcon, InfoIcon, MailIcon, PlusIcon, Trash2Icon } from "lucide-r
 import * as React from "react";
 
 import { Can } from "@/components/Can";
-import { DataTable, type Column } from "@/components/data-table";
-import { Panel } from "@/components/panel/Panel";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { StatusDot } from "@/components/StatusDot";
 import {
   AlertDialog,
@@ -173,11 +173,20 @@ export type ManagedServicesScreenProps = ReturnType<typeof useManagedServices> &
 /**
  * The Managed services section of an app's Workloads tab (spec 44 §5.2;
  * `/managed-services` redirects to `?section=managed-services`): the
- * service table in a panel, the provision sheet and the deprovision dialog.
+ * services on the embedded list (cursor pages, search over name, kind,
+ * variant and environment), the provision sheet and the deprovision dialog.
+ * A service's details open from its row's detail button.
  */
 export function ManagedServicesScreen({
   slug,
-  table,
+  list,
+  rows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
   envs,
   busy,
   deprovisioning,
@@ -199,26 +208,17 @@ export function ManagedServicesScreen({
     }
   }, [deprovisionTarget]);
 
-  // A deleted service is inert: no sheet, no actions. `onRowActivate` is
-  // per-table rather than per-row, so the guard lives in the handler.
-  const openDetail = (svc: ManagedService) => {
-    if (svc.status === "deleted") return;
-    if (svc.kind === "email") setEmailDetailTarget(svc);
-    else setServiceDetailTarget(svc);
-  };
-
   const columns: Column<ManagedService>[] = [
-    {
-      id: "health",
-      header: <span className="sr-only">Status</span>,
-      width: "w-8",
-      cell: (svc) => <StatusDot status={STATUS_DOT[svc.status] ?? "muted"} />,
-    },
     {
       id: "name",
       header: "Name",
-      cellClassName: "font-mono text-xs",
-      cell: (svc) => svc.name,
+      cellClassName: "font-mono text-xs whitespace-normal",
+      cell: (svc) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <StatusDot status={STATUS_DOT[svc.status] ?? "muted"} />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{svc.name}</span>
+        </span>
+      ),
     },
     {
       id: "kind",
@@ -308,50 +308,40 @@ export function ManagedServicesScreen({
   ];
 
   return (
-    <>
-      <Panel
-        title="Managed services"
-        icon={<DatabaseIcon className="size-4" />}
-        description={
-          <>
-            Databases, caches, queues attached to <span className="font-mono">{slug}</span>.
-            Provisioned via the platform&apos;s driver registry; the workflow loop watches DB-side
-            status and drives the upstream lifecycle.
-          </>
-        }
-        actions={
-          <Can permission="app.deploy">
-            <Button size="sm" onClick={() => setOpen(true)}>
-              <PlusIcon className="size-4" />
-              Provision
-            </Button>
-          </Can>
-        }
-        flush
-      >
-        <DataTable
-          label="Managed services"
-          controller={table}
-          columns={columns}
-          getRowId={(svc) => svc.id}
-          onRowActivate={openDetail}
-          rowLabel={(svc) =>
-            svc.status === "deleted" ? `${svc.name} (deleted)` : `Open ${svc.name} (${svc.kind})`
-          }
-          searchPlaceholder="Search by name, kind, variant, or environment…"
-          empty={{
-            icon: <DatabaseIcon className="size-5" />,
-            title: "No managed services",
-            description:
-              "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
-          }}
-          emptyFiltered={{
-            title: "No matching services",
-            description:
-              "No service on this app matches that search. The server matches the name, kind, variant and environment.",
-          }}
-        />
-      </Panel>
+    <div className="min-w-0 space-y-3">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <p className="text-muted-foreground min-w-0 flex-1 text-sm">
+          Databases, caches, queues attached to <span className="font-mono">{slug}</span>.
+          Provisioned via the platform&apos;s driver registry; the workflow loop watches DB-side
+          status and drives the upstream lifecycle.
+        </p>
+        <Can permission="app.deploy">
+          <Button size="sm" onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            Provision
+          </Button>
+        </Can>
+      </div>
+      <ListPage<ManagedService>
+        embedded
+        list={list}
+        label="Managed services"
+        columns={columns}
+        rows={rows}
+        getRowId={(svc) => svc.id}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        nextCursor={nextCursor}
+        totalCount={totalCount}
+        empty={{
+          icon: <DatabaseIcon className="size-5" />,
+          title: "No managed services",
+          description:
+            "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
+        }}
+      />
 
       <ProvisionSheet
         open={open}
@@ -456,7 +446,7 @@ export function ManagedServicesScreen({
       {renderServiceDetail?.(serviceDetailTarget, (next) => {
         if (!next) setServiceDetailTarget(null);
       })}
-    </>
+    </div>
   );
 }
 

@@ -208,3 +208,27 @@ export const Width768: Story = {
     </At768>
   ),
 };
+
+/**
+ * An agent's Settings tab: General, Environments, Domains, Managed services
+ * and the one Danger zone (an agent has no Domains or Workloads tab of its
+ * own, so they are sections here).
+ */
+const AGENT_SLOTS: AppSettingsTabSlots = {
+  resync: <ResyncSourceView {...RESYNC} />,
+  environments: <p>The environments list renders here.</p>,
+  domains: <p>The domains list renders here.</p>,
+  managedServices: <p>The managed services list renders here.</p>,
+  archive: <ArchiveAppView {...ARCHIVE} />,
+  deregister: <DangerZoneView {...DANGER_ZONE} preview={DEREGISTER_PREVIEW} />,
+};
+
+export const AgentSections: Story = {
+  render: () => <Tab slots={AGENT_SLOTS} initial="domains" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("The domains list renders here.")).toBeInTheDocument();
+    await expect(canvas.getAllByText("Managed services").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByText("Danger zone")).toHaveLength(1);
+  },
+};

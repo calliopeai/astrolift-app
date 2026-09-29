@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftAppTeamAccess } from "@/graphql/registry/registry.types";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import {
   ACCESSES,
@@ -11,52 +10,59 @@ import {
   TEAMS_CARD,
 } from "./app-overview-cards-a.fixtures";
 import { AddTeamSheetView, MoveTeamSheetView, TeamsCardView } from "./TeamsCard";
+import { APP_TEAM_ACCESS_LIST } from "./use-teams-card";
 
-const meta: Meta<typeof TeamsCardView> = {
+/** The card with in-memory list state, as the hook would pass it. */
+function TeamsCard({ initial, ...props }: typeof TEAMS_CARD & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(APP_TEAM_ACCESS_LIST, initial);
+  return <TeamsCardView {...props} list={list} />;
+}
+
+const meta: Meta<typeof TeamsCard> = {
   title: "Screens/Apps/Overview/TeamsCard",
-  component: TeamsCardView,
+  component: TeamsCard,
   args: TEAMS_CARD,
 };
 export default meta;
 
-type Story = StoryObj<typeof TeamsCardView>;
+type Story = StoryObj<typeof TeamsCard>;
 
 export const Full: Story = {};
 
 export const Loading: Story = {
   args: {
-    table: fakeController<AstroliftAppTeamAccess>({ state: "loading", sort: undefined }),
+    rows: [],
+    loading: true,
+    totalCount: null,
     teamsLoading: true,
   },
 };
 
 export const Empty: Story = {
   args: {
-    table: fakeController<AstroliftAppTeamAccess>({ state: "empty", sort: undefined }),
+    rows: [],
+    totalCount: 0,
   },
 };
 
 /** A search that matches no grant. */
 export const EmptyFiltered: Story = {
   args: {
-    table: fakeController<AstroliftAppTeamAccess>({
-      state: "emptyFiltered",
-      search: "nope",
-      isFiltered: true,
-      sort: undefined,
-    }),
+    rows: [],
+    totalCount: 0,
+    initial: { q: "nope" },
   },
 };
 
 export const LoadFailed: Story = {
   args: {
-    table: fakeController<AstroliftAppTeamAccess>({
-      state: "error",
-      error: new globalThis.Error("upstream timed out"),
-      sort: undefined,
-    }),
+    rows: [],
+    error: { message: "upstream timed out" },
   },
 };
+
+/** More grants than one page: Older is live on the cursor. */
+export const MorePages: Story = { args: { nextCursor: "cursor-2", totalCount: 60 } };
 
 /** Every team already holds a grant: Add team is disabled. */
 export const AllTeamsGranted: Story = { args: { candidateTeams: [] } };
@@ -66,11 +72,8 @@ export const ReadOnly: Story = { globals: { permissions: "none" } };
 
 export const LongStrings: Story = {
   args: {
-    table: fakeController<AstroliftAppTeamAccess>({
-      rows: [...ACCESSES, LONG_ACCESS],
-      totalCount: ACCESSES.length + 1,
-      sort: undefined,
-    }),
+    rows: [...ACCESSES, LONG_ACCESS],
+    totalCount: ACCESSES.length + 1,
     candidateTeams: [LONG_TEAM],
   },
 };
@@ -104,6 +107,15 @@ export const MoveTeamSheet: Story = {
         moveLoading={false}
         onMove={async () => {}}
       />
+    </div>
+  ),
+};
+
+export const At768: Story = {
+  args: LongStrings.args,
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <TeamsCard {...args} />
     </div>
   ),
 };

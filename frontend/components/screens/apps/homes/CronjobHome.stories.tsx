@@ -6,6 +6,7 @@ import {
   CRONJOB_EMPTY,
   CRONJOB_ERROR,
   CRONJOB_LOADING,
+  CRONJOB_LONG_HISTORY,
   LONG,
 } from "./app-homes.fixtures";
 import { CronjobHomeScreen } from "./CronjobHome";
@@ -54,19 +55,28 @@ export const LastRunFailed: Story = {
   render: () => (
     <CronjobHomeScreen
       {...CRONJOB}
-      table={{
-        ...CRONJOB.table,
-        rows: [
-          {
-            ...CRONJOB.table.rows[0],
-            status: "failed",
-            exitCode: 137,
-            logExcerpt: `pulling ${LONG}\nOOMKilled: container exceeded its 512Mi memory limit`,
-          },
-          ...CRONJOB.table.rows.slice(1),
-        ],
-      }}
+      runs={[
+        {
+          ...CRONJOB.runs[0]!,
+          status: "failed",
+          exitCode: 137,
+          logExcerpt: `pulling ${LONG}\nOOMKilled: container exceeded its 512Mi memory limit`,
+        },
+        ...CRONJOB.runs.slice(1),
+      ]}
     />
+  ),
+};
+
+/** Forty runs with older pages on the cursor: the feed scrolls in its own frame. */
+export const LongHistory: Story = {
+  render: () => <CronjobHomeScreen {...CRONJOB_LONG_HISTORY} />,
+};
+
+/** Older runs failed to load: the loaded ones stay, the error sits at the end. */
+export const OlderPageError: Story = {
+  render: () => (
+    <CronjobHomeScreen {...CRONJOB_LONG_HISTORY} error="Network error: upstream timed out" />
   ),
 };
 

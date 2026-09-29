@@ -1,10 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftWebhookDelivery } from "@/graphql/operations/operations.types";
-
 import { SubscriptionDetailView } from "./SubscriptionDetail";
 import {
+  DELIVERIES_FEED,
   LONG_DELIVERY,
   LONG_SUBSCRIPTIONS,
   SUBSCRIPTION_DETAIL,
@@ -26,7 +24,7 @@ export const Loading: Story = {
   render: () => (
     <SubscriptionDetailView
       {...SUBSCRIPTION_DETAIL}
-      deliveries={fakeController<AstroliftWebhookDelivery>({ state: "loading", pageSize: 10 })}
+      deliveries={{ ...DELIVERIES_FEED, items: [], loading: true }}
     />
   ),
 };
@@ -35,11 +33,7 @@ export const Empty: Story = {
   render: () => (
     <SubscriptionDetailView
       {...SUBSCRIPTION_DETAIL}
-      deliveries={fakeController<AstroliftWebhookDelivery>({
-        state: "empty",
-        totalCount: 0,
-        pageSize: 10,
-      })}
+      deliveries={{ ...DELIVERIES_FEED, items: [] }}
     />
   ),
 };
@@ -48,11 +42,7 @@ export const LoadFailed: Story = {
   render: () => (
     <SubscriptionDetailView
       {...SUBSCRIPTION_DETAIL}
-      deliveries={fakeController<AstroliftWebhookDelivery>({
-        state: "error",
-        error: new Error("Network error: failed to fetch"),
-        pageSize: 10,
-      })}
+      deliveries={{ ...DELIVERIES_FEED, items: [], error: "Network error: failed to fetch" }}
     />
   ),
 };
@@ -60,14 +50,8 @@ export const LoadFailed: Story = {
 export const LongStrings: Story = {
   render: () => (
     <SubscriptionDetailView
-      {...SUBSCRIPTION_DETAIL}
       subscription={LONG_SUBSCRIPTIONS[0]}
-      deliveries={fakeController<AstroliftWebhookDelivery>({
-        rows: [LONG_DELIVERY],
-        totalCount: 1,
-        pageSize: 10,
-        sortEnabled: false,
-      })}
+      deliveries={{ ...DELIVERIES_FEED, items: [LONG_DELIVERY], hasMore: true }}
     />
   ),
 };

@@ -42,6 +42,12 @@ export interface AppSettingsTabSlots {
   webhooks?: React.ReactNode;
   environments?: React.ReactNode;
   environmentSettings?: React.ReactNode;
+  /**
+   * Sections of their own, for a resource whose Settings holds them: an
+   * agent's domains and managed services (an app's are their own tabs).
+   */
+  domains?: React.ReactNode;
+  managedServices?: React.ReactNode;
   /** Danger zone rows. */
   archive?: React.ReactNode;
   deregister?: React.ReactNode;
@@ -233,6 +239,10 @@ export function AppSettingsTab({
       )
     );
   }
+
+  if (present(slots.domains)) sections.push(titled("domains", tSection("domains"), slots.domains));
+  if (present(slots.managedServices))
+    sections.push(titled("managed-services", tSection("managedServices"), slots.managedServices));
 
   const archive = gate(access.update, "app.update", slots.archive);
   const deregister = gate(access.delete, "app.delete", slots.deregister);

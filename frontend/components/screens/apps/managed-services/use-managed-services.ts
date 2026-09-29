@@ -3,7 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -15,6 +16,9 @@ import {
   LIST_MANAGED_SERVICES,
   LIST_MANAGED_SERVICES_PAGE,
 } from "@/graphql/services/services.queries";
+
+import { useCursorList } from "../use-cursor-list";
+import { APP_MANAGED_SERVICES_LIST } from "./managed-services-list";
 
 export interface ManagedService {
   id: string;
@@ -67,13 +71,13 @@ export function useManagedServices(slug: string) {
   // returned — so paging also makes the list stable between polls. The
   // 15s poll stays: a provisioning service settles while an operator
   // watches this page.
-  const table = useCursorTable<ManagedService>({
+  // The list state is in memory: the section lives under
+  // `?section=managed-services`, which a URL list state would drop.
+  const services = useCursorList<ManagedService>({
     query: LIST_MANAGED_SERVICES_PAGE,
     variables: { appSlug: slug, environmentName: null },
     extract: (d) => (d as PageResp | undefined)?.astroliftManagedServicesPage,
-    searchVariable: "search",
-    urlKey: "svc",
-    fetchPolicy: "cache-and-network",
+    list: useLocalListState(APP_MANAGED_SERVICES_LIST),
     pollInterval: 15000,
   });
 
@@ -144,7 +148,7 @@ export function useManagedServices(slug: string) {
   }
 
   return {
-    table,
+    ...services,
     envs: envs.data?.astroliftEnvironments ?? [],
     busy: provisionState.loading || deprovisionState.loading,
     deprovisioning: deprovisionState.loading,

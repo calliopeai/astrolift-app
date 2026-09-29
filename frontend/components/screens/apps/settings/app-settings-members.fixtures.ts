@@ -1,5 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import type {
   AstroliftAppEnvironment,
   AstroliftDeregisterPreview,
@@ -9,7 +7,6 @@ import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/regist
 import type { AstroliftManagedService } from "@/graphql/services/services.types";
 
 import type { AppIdentityViewProps } from "./AppIdentity";
-import type { AppMembersScreenProps } from "./AppMembersScreen";
 import type { AppSettingsScreenProps } from "./AppSettingsScreen";
 import type { ArchiveAppViewProps } from "./ArchiveApp";
 import type { DangerZoneViewProps } from "./DangerZone";
@@ -23,8 +20,9 @@ import type { RunScheduledJobViewProps } from "./RunScheduledJob";
 import type { WebhookDeploysPauseViewProps } from "./WebhookDeploysPause";
 
 /**
- * Hand-typed fixtures for the app settings landing, its sections, and the
- * app members tab. Records carry only the fields these views read.
+ * Hand-typed fixtures for the app settings landing and its sections (People
+ * with access has its own, app-access-members.fixtures.ts). Records carry
+ * only the fields these views read.
  */
 
 const noop = async () => {};
@@ -345,48 +343,4 @@ export const RUN_JOB: RunScheduledJobViewProps = {
   running: false,
   onRun: noop,
   basePath: "/apps",
-};
-
-// ─── members ──────────────────────────────────────────────────────────────────
-
-export const ROLES = [
-  { id: "role-1", slug: "app-admin", scopeLevel: "APP" },
-  { id: "role-2", slug: "app-deployer", scopeLevel: "APP" },
-  { id: "role-3", slug: "app-viewer", scopeLevel: "APP" },
-] as AstroliftRole[];
-
-function binding(id: string, patch: Partial<AstroliftRoleBinding> = {}): AstroliftRoleBinding {
-  return {
-    id,
-    user: { id: `u-${id}`, username: "leo", email: "leo@example.com" },
-    groupExternalId: "",
-    role: ROLES[0],
-    grantedAt: "2026-09-01T12:00:00Z",
-    expiresAt: null,
-    ...patch,
-  } as AstroliftRoleBinding;
-}
-
-export const BINDINGS: AstroliftRoleBinding[] = [
-  binding("rb-1"),
-  binding("rb-2", {
-    user: { id: "u-2", username: "eric", email: "eric@example.com" },
-    role: ROLES[1],
-    expiresAt: "2026-12-31T00:00:00Z",
-  } as Partial<AstroliftRoleBinding>),
-  binding("rb-3", {
-    user: null,
-    groupExternalId: "okta:platform-oncall",
-    role: ROLES[2],
-  } as Partial<AstroliftRoleBinding>),
-];
-
-export const MEMBERS: AppMembersScreenProps = {
-  app: APP,
-  loading: false,
-  appRoles: ROLES,
-  table: fakeController<AstroliftRoleBinding>({ rows: BINDINGS, totalCount: BINDINGS.length }),
-  revoking: false,
-  onRevoke: noop,
-  slug: "checkout",
 };

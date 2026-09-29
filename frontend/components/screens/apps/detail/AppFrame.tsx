@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
-import { NAV } from "@/lib/shell/nav-model";
+import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 import { appTabHref, appTabs, sectionHref, APP_TAB_SECTIONS } from "./app-tabs-model";
 
@@ -108,13 +108,7 @@ const DOT: Record<ProvisioningStatus, Dot> = {
 
 /** `Apps ▾`: the Apps area's functions, read from the rail's own model (§4.4 rule 7). */
 function appsCrumb(): Crumb {
-  const area = NAV.find((a) => a.key === "apps");
-  return {
-    label: area?.label ?? "Apps",
-    switcher: (area?.groups ?? []).flatMap((g) =>
-      g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === "apps" }))
-    ),
-  };
+  return areaSwitcher(NAV, "apps", "apps");
 }
 
 /** A detail nested under a tab (`/workloads/<slug>`) adds its own last crumb. */

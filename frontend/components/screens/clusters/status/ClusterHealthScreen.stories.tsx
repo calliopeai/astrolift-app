@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { selectRows } from "@/components/list/select-rows";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
+import { CLUSTER_WORKLOADS_LIST, CLUSTER_WORKLOADS_SELECT } from "./cluster-workloads-list";
 import { ClusterHealthBody, type ClusterHealthBodyProps } from "./ClusterHealthScreen";
 import { ClusterTabFrame } from "./ClusterTabFrame";
 import {
@@ -12,6 +16,7 @@ import {
   WORKLOADS,
   WORKLOADS_LONG,
 } from "./fixtures";
+import type { WorkloadRow } from "./types";
 
 const meta: Meta = {
   title: "Screens/Clusters/Status/ClusterHealth",
@@ -21,24 +26,78 @@ export default meta;
 
 type Story = StoryObj;
 
+interface WorkloadsFixture {
+  rows: WorkloadRow[];
+  loading: boolean;
+  error: string | null;
+}
+
+/** The body over fixture workloads, filtered, sorted and paged the way the hook does it. */
 function Screen({
   cluster = CLUSTER,
-  ...body
-}: ClusterHealthBodyProps & { cluster?: typeof CLUSTER }) {
+  health,
+  workloads,
+  initial,
+}: {
+  cluster?: typeof CLUSTER;
+  health: ClusterHealthBodyProps["health"];
+  workloads: WorkloadsFixture;
+  initial?: Partial<ListState>;
+}) {
+  const list = useLocalListState(CLUSTER_WORKLOADS_LIST, initial);
+  const { rows, totalCount } = selectRows(
+    workloads.rows,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    CLUSTER_WORKLOADS_SELECT
+  );
   return (
     <ClusterTabFrame slug={cluster.slug} cluster={cluster} loading={false} active="health">
-      <ClusterHealthBody {...body} />
+      <ClusterHealthBody
+        health={health}
+        workloads={{
+          list,
+          rows,
+          totalCount,
+          loading: workloads.loading,
+          error: workloads.error ? { message: workloads.error } : null,
+          onRetry: () => {},
+        }}
+      />
     </ClusterTabFrame>
   );
 }
 
 export const Full: Story = { render: () => <Screen health={HEALTH} workloads={WORKLOADS} /> };
 
+/** More warnings behind the window: Load older at the end of the frame. */
+export const MoreWarnings: Story = {
+  render: () => (
+    <Screen
+      health={{
+        ...HEALTH,
+        moreEvents: { hasMore: true, loadingMore: false, onLoadMore: () => {} },
+      }}
+      workloads={WORKLOADS}
+    />
+  ),
+};
+
+/** The Unhealthy view: the workloads short of desired replicas. */
+export const Unhealthy: Story = {
+  render: () => <Screen health={HEALTH} workloads={WORKLOADS} initial={{ view: "unhealthy" }} />,
+};
+
 export const Loading: Story = {
   render: () => (
     <Screen
       health={{ pods: [], events: [], loading: true, ...QUERY_OK }}
-      workloads={{ rows: [], loading: true, ...QUERY_OK }}
+      workloads={{ rows: [], loading: true, error: null }}
     />
   ),
 };
@@ -48,7 +107,7 @@ export const Empty: Story = {
   render: () => (
     <Screen
       health={{ pods: [], events: [], loading: false, ...QUERY_OK }}
-      workloads={{ rows: [], loading: false, ...QUERY_OK }}
+      workloads={{ rows: [], loading: false, error: null }}
     />
   ),
 };
@@ -58,7 +117,7 @@ export const LoadError: Story = {
   render: () => (
     <Screen
       health={{ pods: [], events: [], loading: false, ...QUERY_FAILED }}
-      workloads={{ rows: [], loading: false, ...QUERY_FAILED }}
+      workloads={{ rows: [], loading: false, error: QUERY_FAILED.error }}
     />
   ),
 };

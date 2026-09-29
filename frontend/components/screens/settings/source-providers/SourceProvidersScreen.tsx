@@ -11,6 +11,7 @@ import {
   InfoIcon,
   KeyRoundIcon,
   PlusIcon,
+  RotateCwIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -19,9 +20,13 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { SettingsPage } from "@/components/settings/SettingsPage";
+import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
 import type {
   AstroliftSourceConnection,
@@ -31,7 +36,7 @@ import type {
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
-import type { SourceProvidersData } from "./use-source-providers";
+import type { DeployKeysData, SourceHostsData } from "./use-source-providers";
 
 // localStorage key for the Advanced (paste-credentials) toggle.
 // Persisting it removes a chore from re-opening the page after a
@@ -64,41 +69,83 @@ const SCOPE_LABEL: Record<string, string> = {
 
 type DialogSlot = (open: boolean, onOpenChange: (next: boolean) => void) => React.ReactNode;
 
-export type SourceProvidersScreenProps = SourceProvidersData & {
-  /** The connect / generate sheets. The route fills them with containers
-   *  so each sheet's hook runs only while it is mounted. */
+export interface SourceProvidersScreenProps {
+  /** Which section is shown (`?section=`); only that one is mounted and fetches. */
+  section: SectionSelection;
+  /** The Hosts section (SourceHostsView), filled by the route. */
+  hosts: React.ReactNode;
+  /** The SSH deploy keys section (DeployKeysView), filled by the route. */
+  keys: React.ReactNode;
+}
+
+/**
+ * Providers › Source: hosts and SSH deploy keys, one section at a time
+ * (list rules 1 to 3), so the tab holds one list and fetches only the
+ * section on screen. Pure.
+ */
+export function SourceProvidersScreen({ section, hosts, keys }: SourceProvidersScreenProps) {
+  return (
+    <Section
+      title="Source providers"
+      description={
+        <span className="block max-w-2xl">
+          Connect Astrolift to a code-hosting service so it can clone your repos and watch for
+          pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or
+          Gitea, and SSH deploy keys for direct git access to any host.
+        </span>
+      }
+      className="gap-6"
+    >
+      <SettingsPage
+        single={section}
+        sections={[
+          { id: "hosts", title: "Hosts", content: hosts },
+          { id: "keys", title: "SSH deploy keys", content: keys },
+        ]}
+      />
+    </Section>
+  );
+}
+
+export type SourceHostsViewProps = SourceHostsData & {
+  /** The connect sheets. The route fills them with containers so each
+   *  sheet's hook runs only while it is mounted. */
   renderConnectGithub: DialogSlot;
   renderConnectGitlab: DialogSlot;
   renderConnectSource: DialogSlot;
-  renderGenerateKey: DialogSlot;
   renderAddClientId: (
     connection: AstroliftSourceConnection | null,
     onClose: () => void
   ) => React.ReactNode;
 };
 
-export function SourceProvidersScreen({
-  connTable,
-  keyTable,
+/**
+ * The Hosts section: the org's SCM connections on an embedded list (views
+ * All · Mine, host and status filters, cursor pages), each row's actions in
+ * its `⋯`. Pure; the data half is useSourceHosts.
+ */
+export function SourceHostsView({
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   incompleteClientIdConnections,
   disconnecting,
-  deletingKey,
   rotatingSecret,
   disconnect,
-  deleteKey,
   rotateSecret,
   refreshConnections,
-  refreshKeys,
   renderConnectGithub,
   renderConnectGitlab,
   renderConnectSource,
-  renderGenerateKey,
   renderAddClientId,
-}: SourceProvidersScreenProps) {
+}: SourceHostsViewProps) {
   const [openConnect, setOpenConnect] = React.useState(false);
   const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
   const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
-  const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
   const [showAdvanced, setShowAdvanced] = useLocalStorage<boolean>(
     ADVANCED_OPEN_STORAGE_KEY,
     false
@@ -106,62 +153,72 @@ export function SourceProvidersScreen({
   const [disconnectTarget, setDisconnectTarget] = React.useState<AstroliftSourceConnection | null>(
     null
   );
-  const [deleteKeyTarget, setDeleteKeyTarget] = React.useState<AstroliftSshDeployKey | null>(null);
-
   const [revealedSecret, setRevealedSecret] = React.useState<AstroliftWebhookSecretReveal | null>(
     null
   );
-
   const [rotateSecretTarget, setRotateSecretTarget] =
     React.useState<AstroliftSourceConnection | null>(null);
-
   // Connection currently being edited to add a missing Client ID (#525
   // recovery flow). NULL when the dialog is closed.
   const [clientIdTarget, setClientIdTarget] = React.useState<AstroliftSourceConnection | null>(
     null
   );
 
-  // No sort controls on either table: neither page field takes a sort
-  // argument (both seek on `-created_at, -guid`), and reordering the page
-  // in hand while the rest of the list sits on the server is wrong at
-  // every page boundary.
+  // No sortable headers: the page field takes no sort argument, and
+  // reordering the page in hand while the rest sits on the server is wrong
+  // at every page boundary.
   const connectionColumns: Column<AstroliftSourceConnection>[] = [
     {
       id: "connection",
       header: "Connection",
+      cellClassName: "max-w-72",
       cell: (c) => (
-        <>
-          <div className="font-medium">{c.name}</div>
+        <span className="block min-w-0">
+          <span className="block truncate font-medium" title={c.name}>
+            {c.name}
+          </span>
           {c.apiBaseUrl && (
-            <div className="text-muted-foreground font-mono text-xs">{c.apiBaseUrl}</div>
+            <span
+              className="text-muted-foreground block truncate font-mono text-xs"
+              title={c.apiBaseUrl}
+            >
+              {c.apiBaseUrl}
+            </span>
           )}
-        </>
+        </span>
       ),
     },
     {
       id: "kind",
       header: "Kind",
       cell: (c) => (
-        <>
+        <span className="flex min-w-0 flex-wrap gap-1">
           <Badge variant="outline">{KIND_LABEL[c.kind] ?? c.kind}</Badge>
           {c.isOauthAppConfig && (
-            <Badge variant="secondary" className="text-2xs ml-2 gap-1">
+            <Badge variant="secondary" className="text-2xs gap-1">
               OAuth-app config
             </Badge>
           )}
           {c.isPersonal && (
-            <Badge variant="secondary" className="bg-info/15 text-info-fg text-2xs ml-2 gap-1">
+            <Badge
+              variant="secondary"
+              className="bg-info/15 text-info-fg text-2xs max-w-full gap-1 truncate"
+            >
               personal {c.userUsername ? `· ${c.userUsername}` : ""}
             </Badge>
           )}
-        </>
+        </span>
       ),
     },
     {
       id: "account",
       header: "Account",
-      cellClassName: "font-mono text-xs",
-      cell: (c) => c.accountLogin || "—",
+      cellClassName: "max-w-48",
+      cell: (c) => (
+        <span className="block truncate font-mono text-xs" title={c.accountLogin || undefined}>
+          {c.accountLogin || "—"}
+        </span>
+      ),
     },
     {
       id: "scopes",
@@ -192,192 +249,126 @@ export function SourceProvidersScreen({
           <Badge variant="outline">disabled</Badge>
         ),
     },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (c) => (
-        <div className="flex justify-end gap-1">
-          {/* GitHub user-to-server OAuth works against both a classic
-              OAuth App config (kind=github_oauth_app + isOauthAppConfig)
-              and a manifest-registered GitHub App install
-              (kind=github_app_install) — both have a client_id sitting
-              in oauth_client_id and GitHub's /login/oauth/authorize
-              endpoint accepts either. */}
-          {((c.kind === "github_oauth_app" && c.isOauthAppConfig) ||
-            c.kind === "github_app_install") &&
-            (c.needsClientId ? (
-              <Can permission="scm.connect">
-                <Button size="sm" variant="ghost" onClick={() => setClientIdTarget(c)}>
-                  <PlusIcon className="size-3.5" />
-                  Add Client ID
-                </Button>
-              </Can>
-            ) : (
-              <Button asChild size="sm" variant="outline">
-                <a
-                  href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
-                >
-                  Connect my GitHub
-                </a>
-              </Button>
-            ))}
-          {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
-            <Button asChild size="sm" variant="outline">
-              <a
-                href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
-              >
-                Connect my GitLab
-              </a>
-            </Button>
-          )}
-          {!c.isPersonal && (c.kind.startsWith("github_") || c.kind.startsWith("gitlab_")) && (
-            <Can permission="scm.connect">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setRotateSecretTarget(c)}
-                disabled={rotatingSecret}
-              >
-                Webhook secret
-              </Button>
-            </Can>
-          )}
-          <Can permission="scm.disconnect">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDisconnectTarget(c)}
-              disabled={disconnecting}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Disconnect</span>
-            </Button>
-          </Can>
-        </div>
-      ),
-    },
   ];
 
-  const keyColumns: Column<AstroliftSshDeployKey>[] = [
-    {
-      id: "name",
-      header: "Name",
-      cellClassName: "font-medium",
-      cell: (k) => k.name,
-    },
-    {
-      id: "scope",
-      header: "Scope",
-      cell: (k) =>
-        k.registeredAppSlug ? (
-          <Badge variant="secondary">app: {k.registeredAppSlug}</Badge>
-        ) : (
-          <Badge variant="outline">org-scoped</Badge>
-        ),
-    },
-    {
-      id: "fingerprint",
-      header: "Fingerprint",
-      cellClassName: "font-mono text-2xs",
-      cell: (k) => k.fingerprintSha256,
-    },
-    {
-      id: "publicKey",
-      header: "Public key",
-      cell: (k) => <PublicKeyCell value={k.publicKey} />,
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (k) => (
-        <div className="flex justify-end">
-          <Can permission="scm.key_delete">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDeleteKeyTarget(k)}
-              disabled={deletingKey}
+  function rowActions(c: AstroliftSourceConnection) {
+    // GitHub user-to-server OAuth works against both a classic OAuth App
+    // config (kind=github_oauth_app + isOauthAppConfig) and a
+    // manifest-registered GitHub App install (kind=github_app_install):
+    // both have a client_id in oauth_client_id and GitHub's
+    // /login/oauth/authorize endpoint accepts either.
+    const githubUserOauth =
+      (c.kind === "github_oauth_app" && c.isOauthAppConfig) || c.kind === "github_app_install";
+    return (
+      <>
+        {githubUserOauth &&
+          (c.needsClientId ? (
+            <Can permission="scm.connect">
+              <DropdownMenuItem onSelect={() => setClientIdTarget(c)}>
+                <PlusIcon className="size-4" />
+                Add Client ID
+              </DropdownMenuItem>
+            </Can>
+          ) : (
+            <DropdownMenuItem asChild>
+              <a
+                href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
+              >
+                <GithubIcon className="size-4" />
+                Connect my GitHub
+              </a>
+            </DropdownMenuItem>
+          ))}
+        {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
+          <DropdownMenuItem asChild>
+            <a
+              href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
             >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Delete</span>
-            </Button>
+              <GitlabIcon className="size-4" />
+              Connect my GitLab
+            </a>
+          </DropdownMenuItem>
+        )}
+        {!c.isPersonal && (c.kind.startsWith("github_") || c.kind.startsWith("gitlab_")) && (
+          <Can permission="scm.connect">
+            <DropdownMenuItem disabled={rotatingSecret} onSelect={() => setRotateSecretTarget(c)}>
+              <RotateCwIcon className="size-4" />
+              Webhook secret
+            </DropdownMenuItem>
           </Can>
-        </div>
-      ),
-    },
-  ];
+        )}
+        <Can permission="scm.disconnect">
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={disconnecting}
+            onSelect={() => setDisconnectTarget(c)}
+          >
+            <Trash2Icon className="size-4" />
+            Disconnect
+          </DropdownMenuItem>
+        </Can>
+      </>
+    );
+  }
 
   return (
     <Section
-      title="Source providers"
-      description={
-        <span className="block max-w-2xl">
-          Connect Astrolift to a code-hosting service so it can clone your repos and watch for
-          pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or
-          Gitea, and SSH deploy keys for direct git access to any host.
+      headingLevel="h3"
+      title={
+        <span className="flex items-center gap-2">
+          <GitBranchIcon className="size-4" />
+          Hosts
         </span>
       }
-      className="gap-6"
-    >
-      {/* Connections */}
-      <Section
-        headingLevel="h3"
-        title={
-          <span className="flex items-center gap-2">
-            <GitBranchIcon className="size-4" />
-            Hosts
-          </span>
-        }
-        description={
-          <span className="block max-w-2xl">
-            One-click GitHub App registration via the manifest flow, or a guided GitLab Group OAuth
-            wizard. Personal Access Tokens and pre-registered OAuth apps remain available under{" "}
-            <em>Advanced</em>.
-          </span>
-        }
-        action={
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href={DOC_LINKS.sourceProviders}>
-                  <BookOpenIcon className="size-4" />
-                  Setup guide
-                </Link>
+      description={
+        <span className="block max-w-2xl">
+          One-click GitHub App registration via the manifest flow, or a guided GitLab Group OAuth
+          wizard. Personal Access Tokens and pre-registered OAuth apps remain available under{" "}
+          <em>Advanced</em>.
+        </span>
+      }
+      action={
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href={DOC_LINKS.sourceProviders}>
+                <BookOpenIcon className="size-4" />
+                Setup guide
+              </Link>
+            </Button>
+            <Can permission="scm.connect">
+              <Button size="sm" onClick={() => setOpenConnectGithub(true)}>
+                <GithubIcon className="size-4" />
+                Connect to GitHub
               </Button>
-              <Can permission="scm.connect">
-                <Button size="sm" onClick={() => setOpenConnectGithub(true)}>
-                  <GithubIcon className="size-4" />
-                  Connect to GitHub
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setOpenConnectGitlab(true)}>
-                  <GitlabIcon className="size-4" />
-                  Connect to GitLab
-                </Button>
-              </Can>
-            </div>
-            <Link
-              href={DOC_LINKS.sourceProviders}
-              className="text-muted-foreground text-2xs underline"
-            >
-              one-click GitHub flow + GitLab wizard — full walkthrough
-            </Link>
-            {/* #760 — GitHub's manifest API can't set the App's logo, so
-                the App lands with a placeholder. Surface the platform's
-                logo asset here so operators can grab it once + upload
-                manually under App settings → Display information. */}
-            <a
-              href="/static/img/astrolift-app-icon.png"
-              download="astrolift-app-icon.png"
-              className="text-muted-foreground text-2xs underline"
-            >
-              download Astrolift logo for your new App
-            </a>
+              <Button size="sm" variant="secondary" onClick={() => setOpenConnectGitlab(true)}>
+                <GitlabIcon className="size-4" />
+                Connect to GitLab
+              </Button>
+            </Can>
           </div>
-        }
-      >
-        {/*
+          <Link
+            href={DOC_LINKS.sourceProviders}
+            className="text-muted-foreground text-2xs underline"
+          >
+            one-click GitHub flow + GitLab wizard — full walkthrough
+          </Link>
+          {/* #760 — GitHub's manifest API can't set the App's logo, so
+              the App lands with a placeholder. Surface the platform's
+              logo asset here so operators can grab it once + upload
+              manually under App settings → Display information. */}
+          <a
+            href="/static/img/astrolift-app-icon.png"
+            download="astrolift-app-icon.png"
+            className="text-muted-foreground text-2xs underline"
+          >
+            download Astrolift logo for your new App
+          </a>
+        </div>
+      }
+    >
+      {/*
           Optional-enhancement note — surfaces GitHub App connections
           that don't yet carry an OAuth Client ID (post-#525 schema
           split). These connections already work: cloning, autowiring
@@ -387,101 +378,52 @@ export function SourceProvidersScreen({
           action (focused dialog → UpdateSourceConnection in place),
           not a failure state.
         */}
-        {incompleteClientIdConnections.length > 0 && (
-          <div className="text-muted-foreground bg-muted/40 flex items-start gap-3 rounded-md border p-3 text-xs">
-            <InfoIcon className="mt-0.5 size-4 shrink-0" />
-            <div className="flex-1 space-y-2">
-              <p className="text-foreground font-medium">
-                Optional: enable &quot;Connect my GitHub&quot; repo browsing
-              </p>
-              <p>
-                {incompleteClientIdConnections.length === 1
-                  ? "This GitHub App connection is"
-                  : `These ${incompleteClientIdConnections.length} GitHub App connections are`}{" "}
-                ready to use — cloning, autowiring and deploys run on the App installation token.
-                Adding an OAuth Client ID is optional; it turns on the user-to-server &quot;Connect
-                my GitHub&quot; flow so people can browse their own repositories. The Client ID
-                looks like <code className="font-mono">Iv23l…</code> for new GitHub Apps.
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {incompleteClientIdConnections.map((c) => (
-                  <Button
-                    key={c.id}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setClientIdTarget(c)}
-                  >
-                    Add Client ID for {c.name}
-                  </Button>
-                ))}
-              </div>
+      {incompleteClientIdConnections.length > 0 && (
+        <div className="text-muted-foreground bg-muted/40 flex items-start gap-3 rounded-md border p-3 text-xs">
+          <InfoIcon className="mt-0.5 size-4 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <p className="text-foreground font-medium">
+              Optional: enable &quot;Connect my GitHub&quot; repo browsing
+            </p>
+            <p>
+              {incompleteClientIdConnections.length === 1
+                ? "This GitHub App connection is"
+                : `These ${incompleteClientIdConnections.length} GitHub App connections are`}{" "}
+              ready to use — cloning, autowiring and deploys run on the App installation token.
+              Adding an OAuth Client ID is optional; it turns on the user-to-server &quot;Connect my
+              GitHub&quot; flow so people can browse their own repositories. The Client ID looks
+              like <code className="font-mono">Iv23l…</code> for new GitHub Apps.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {incompleteClientIdConnections.map((c) => (
+                <Button key={c.id} size="sm" variant="outline" onClick={() => setClientIdTarget(c)}>
+                  Add Client ID for {c.name}
+                </Button>
+              ))}
             </div>
           </div>
-        )}
-        <DataTable
-          label="Connections"
-          controller={connTable}
-          columns={connectionColumns}
-          getRowId={(c) => c.id}
-          searchPlaceholder="Search connections…"
-          empty={{
-            icon: <GitBranchIcon className="size-5" />,
-            title: "No hosts connected yet",
-            description:
-              "Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs.",
-          }}
-          emptyFiltered={{
-            title: "No matching connections",
-            description:
-              "No connection matches that search. It looks at the kind, API base URL, account login, and display name — try another term, or clear the search to see every host.",
-          }}
-        />
-      </Section>
-
-      {/* SSH keys */}
-      <Section
-        headingLevel="h3"
-        title={
-          <span className="flex items-center gap-2">
-            <KeyRoundIcon className="size-4" />
-            SSH deploy keys
-          </span>
-        }
-        description={
-          <span className="block max-w-2xl">
-            ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to
-            paste into the repo&apos;s deploy-key settings; the private key stays encrypted in the
-            platform secrets backend.
-          </span>
-        }
-        action={
-          <Can permission="scm.key_create">
-            <Button size="sm" onClick={() => setOpenGenerateKey(true)}>
-              <PlusIcon className="size-4" />
-              Generate key
-            </Button>
-          </Can>
-        }
-      >
-        <DataTable
-          label="SSH deploy keys"
-          controller={keyTable}
-          columns={keyColumns}
-          getRowId={(k) => k.id}
-          searchPlaceholder="Search deploy keys…"
-          empty={{
-            icon: <KeyRoundIcon className="size-5" />,
-            title: "No SSH deploy keys yet",
-            description:
-              "Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius.",
-          }}
-          emptyFiltered={{
-            title: "No matching deploy keys",
-            description:
-              "No key matches that search. It looks at the name, the SHA-256 fingerprint, and the app slug a key is scoped to — clear the search to see every key.",
-          }}
-        />
-      </Section>
+        </div>
+      )}
+      <ListPage<AstroliftSourceConnection>
+        embedded
+        list={list}
+        label="Connections"
+        columns={connectionColumns}
+        rows={rows}
+        getRowId={(c) => c.id}
+        rowActions={rowActions}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={{
+          icon: <GitBranchIcon className="size-5" />,
+          title: "No hosts connected yet",
+          description:
+            "Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs.",
+        }}
+      />
 
       {/* Advanced: pre-registered OAuth apps / PATs / GitHub-App-from-paste */}
       <Can permission="scm.connect">
@@ -524,9 +466,17 @@ export function SourceProvidersScreen({
         setOpenConnect(next);
         if (!next) refreshConnections();
       })}
-      {renderGenerateKey(openGenerateKey, (next) => {
-        setOpenGenerateKey(next);
-        if (!next) refreshKeys();
+      {renderConnectGithub(openConnectGithub, (next) => {
+        setOpenConnectGithub(next);
+        if (!next) refreshConnections();
+      })}
+      {renderConnectGitlab(openConnectGitlab, (next) => {
+        setOpenConnectGitlab(next);
+        if (!next) refreshConnections();
+      })}
+      {renderConnectSource(openConnect, (next) => {
+        setOpenConnect(next);
+        if (!next) refreshConnections();
       })}
       {renderAddClientId(clientIdTarget, () => {
         setClientIdTarget(null);
@@ -551,20 +501,6 @@ export function SourceProvidersScreen({
       />
 
       <ConfirmDialog
-        open={deleteKeyTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setDeleteKeyTarget(null);
-        }}
-        title={deleteKeyTarget ? `Delete SSH key ${deleteKeyTarget.name}?` : "Delete SSH key?"}
-        description="Remove the matching public key from any repo deploy-key lists first, otherwise git operations will fail abruptly. The private key is erased from the secrets backend."
-        confirmLabel="Delete key"
-        destructive
-        onConfirm={async () => {
-          if (deleteKeyTarget) await deleteKey(deleteKeyTarget);
-        }}
-      />
-
-      <ConfirmDialog
         open={rotateSecretTarget !== null}
         onOpenChange={(next) => {
           if (!next) setRotateSecretTarget(null);
@@ -579,6 +515,152 @@ export function SourceProvidersScreen({
         destructive
         onConfirm={async () => {
           if (rotateSecretTarget) setRevealedSecret(await rotateSecret(rotateSecretTarget));
+        }}
+      />
+    </Section>
+  );
+}
+
+export type DeployKeysViewProps = DeployKeysData & {
+  /** The generate sheet, a container from the route. */
+  renderGenerateKey: DialogSlot;
+};
+
+/**
+ * The SSH deploy keys section: the org's keys on an embedded list (views
+ * All · Mine, scope and app filters on the server, cursor pages), delete in
+ * each row's `⋯`. Pure; the data half is useDeployKeys.
+ */
+export function DeployKeysView({
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
+  deletingKey,
+  deleteKey,
+  refreshKeys,
+  renderGenerateKey,
+}: DeployKeysViewProps) {
+  const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
+  const [deleteKeyTarget, setDeleteKeyTarget] = React.useState<AstroliftSshDeployKey | null>(null);
+
+  const keyColumns: Column<AstroliftSshDeployKey>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cellClassName: "max-w-64",
+      cell: (k) => (
+        <span className="block truncate font-medium" title={k.name}>
+          {k.name}
+        </span>
+      ),
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      cellClassName: "max-w-56",
+      cell: (k) =>
+        k.registeredAppSlug ? (
+          <Badge variant="secondary" className="max-w-full truncate">
+            app: {k.registeredAppSlug}
+          </Badge>
+        ) : (
+          <Badge variant="outline">org-scoped</Badge>
+        ),
+    },
+    {
+      id: "fingerprint",
+      header: "Fingerprint",
+      cellClassName: "max-w-64",
+      cell: (k) => (
+        <span className="text-2xs block truncate font-mono" title={k.fingerprintSha256}>
+          {k.fingerprintSha256}
+        </span>
+      ),
+    },
+    {
+      id: "publicKey",
+      header: "Public key",
+      cell: (k) => <PublicKeyCell value={k.publicKey} />,
+    },
+  ];
+
+  return (
+    <Section
+      headingLevel="h3"
+      title={
+        <span className="flex items-center gap-2">
+          <KeyRoundIcon className="size-4" />
+          SSH deploy keys
+        </span>
+      }
+      description={
+        <span className="block max-w-2xl">
+          ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to paste
+          into the repo&apos;s deploy-key settings; the private key stays encrypted in the platform
+          secrets backend.
+        </span>
+      }
+      action={
+        <Can permission="scm.key_create">
+          <Button size="sm" onClick={() => setOpenGenerateKey(true)}>
+            <PlusIcon className="size-4" />
+            Generate key
+          </Button>
+        </Can>
+      }
+    >
+      <ListPage<AstroliftSshDeployKey>
+        embedded
+        list={list}
+        label="SSH deploy keys"
+        columns={keyColumns}
+        rows={rows}
+        getRowId={(k) => k.id}
+        rowActions={(k) => (
+          <Can permission="scm.key_delete">
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={deletingKey}
+              onSelect={() => setDeleteKeyTarget(k)}
+            >
+              <Trash2Icon className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </Can>
+        )}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={{
+          icon: <KeyRoundIcon className="size-5" />,
+          title: "No SSH deploy keys yet",
+          description:
+            "Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius.",
+        }}
+      />
+
+      {renderGenerateKey(openGenerateKey, (next) => {
+        setOpenGenerateKey(next);
+        if (!next) refreshKeys();
+      })}
+
+      <ConfirmDialog
+        open={deleteKeyTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteKeyTarget(null);
+        }}
+        title={deleteKeyTarget ? `Delete SSH key ${deleteKeyTarget.name}?` : "Delete SSH key?"}
+        description="Remove the matching public key from any repo deploy-key lists first, otherwise git operations will fail abruptly. The private key is erased from the secrets backend."
+        confirmLabel="Delete key"
+        destructive
+        onConfirm={async () => {
+          if (deleteKeyTarget) await deleteKey(deleteKeyTarget);
         }}
       />
     </Section>

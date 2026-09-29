@@ -3,7 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
-import { useCursorTable } from "@/components/data-table";
+import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import {
   LIST_EVENTS,
   LIST_EVENTS_AGGREGATED_PAGE,
@@ -22,10 +22,9 @@ export interface AggregatedEvent {
 }
 
 /**
- * `AstroliftEventPage` deliberately carries no `totalCount` — the stream is
- * unbounded and counting it is a table scan — so the envelope here is
- * narrower than the aggregated one. `useCursorTable` treats a missing count
- * as null and DataTable simply omits the "N results" readout.
+ * `AstroliftEventPage` deliberately carries no `totalCount`: the stream is
+ * unbounded and counting it is a table scan, so the envelope here is
+ * narrower than the aggregated one.
  */
 interface RawPageResp {
   astroliftEventsPage: {
@@ -49,7 +48,7 @@ interface ListResp {
 const DEFAULT_AGGREGATE_WINDOW_SECONDS = 300;
 export const RATE_WINDOW_DAYS = 14;
 // The stream is the one surface where a stale row is actively misleading,
-// so both tables keep the 5s poll the pre-pagination version had.
+// so both feeds keep the 5s poll; new events wait behind the "n new" pill.
 const EVENT_POLL_MS = 5000;
 // The rate card samples the most recent N events rather than the page on
 // screen: a sparkline of 25 rows is not a 14-day rate. Its own poll is slow
@@ -80,7 +79,7 @@ function perDayCounts(timestamps: string[], windowDays = RATE_WINDOW_DAYS): numb
  * Event velocity over the last two weeks.
  *
  * Sourced from its own bounded fetch (the 200 most recent events) rather
- * than from either table's page, and deliberately unfiltered: the card is
+ * than from either feed's page, and deliberately unfiltered: the card is
  * the baseline the operator searches *against*, so it must not move under
  * them while they type. Both views share it — grouping is a presentation
  * of the same raw stream, so the per-day counts are identical either way.
@@ -97,34 +96,39 @@ export function useEventRate() {
 }
 
 /**
- * The raw stream, cursor-paged. The search box is the controller's own:
- * server-side, debounced, and matching on event type, resource kind/id and
- * app slug.
+ * The raw stream as a Feed (list rule 5), newest first, loading older
+ * events on the server's cursor as the reader nears the end. `search` is
+ * the settled (debounced) term: server-side, matching on event type,
+ * resource kind/id and app slug.
  */
-export function useRawEvents() {
-  const table = useCursorTable<AstroliftEvent>({
-    query: LIST_EVENTS_PAGE,
-    extract: (d) => (d as RawPageResp | undefined)?.astroliftEventsPage,
-    searchVariable: "search",
-    urlKey: "ev",
+export function useRawEvents(search: string) {
+  const { feed } = useCursorFeed<RawPageResp, AstroliftEvent>(LIST_EVENTS_PAGE, {
+    variables: { search: search.trim() || null },
+    select: (d) => d?.astroliftEventsPage,
+    keyOf: (e) => e.id,
     pollInterval: EVENT_POLL_MS,
   });
-  return { table };
+  return { events: feed };
 }
 
-/** The stream folded server-side into buckets of repeats. */
-export function useAggregatedEvents() {
-  const table = useCursorTable<AggregatedEvent>({
-    query: LIST_EVENTS_AGGREGATED_PAGE,
-    // The roll-up window is part of the question, so it is a static
-    // controller variable: changing it restarts the walk at page one.
-    variables: { aggregateWindowSeconds: DEFAULT_AGGREGATE_WINDOW_SECONDS },
-    extract: (d) => (d as AggPageResp | undefined)?.astroliftEventsAggregatedPage,
-    searchVariable: "search",
-    urlKey: "ev",
+/** A bucket's identity: its fold key plus the event that stands for it. */
+export function bucketKey(b: AggregatedEvent): string {
+  return `${b.eventType}|${b.resourceKind}|${b.resourceId}|${b.representative.id}`;
+}
+
+/** The stream folded server-side into buckets of repeats, as a Feed. */
+export function useAggregatedEvents(search: string) {
+  const { feed } = useCursorFeed<AggPageResp, AggregatedEvent>(LIST_EVENTS_AGGREGATED_PAGE, {
+    // The roll-up window is part of the question: changing it starts over.
+    variables: {
+      aggregateWindowSeconds: DEFAULT_AGGREGATE_WINDOW_SECONDS,
+      search: search.trim() || null,
+    },
+    select: (d) => d?.astroliftEventsAggregatedPage,
+    keyOf: bucketKey,
     pollInterval: EVENT_POLL_MS,
   });
-  return { table };
+  return { buckets: feed };
 }
 
 /**

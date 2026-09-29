@@ -1,6 +1,5 @@
 import { activeSection, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
-import { LIST_ROLE_BINDINGS, LIST_ROLES } from "@/graphql/identity/identity.queries";
-import { LIST_APP_DEPLOY_TOKENS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_APP_DEPLOY_TOKENS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
@@ -11,7 +10,7 @@ export const metadata = { title: "Access · App · Astrolift" };
 
 /**
  * The Access tab (spec 44 §5.2, §10.3): who may reach and change the app.
- * Members, Deploy tokens, Security scans and Edge access (the central-auth
+ * People with access, Deploy tokens, Security scans and Edge access (the central-auth
  * rule in front of the app), one section at a time by `?section=`, on the
  * settings archetype. `/members`, `/tokens` and `/security` redirect here.
  * Only the active section's queries are preloaded.
@@ -26,7 +25,11 @@ export default async function AppAccessPage({
   const { slug } = await params;
   const section = activeSection("access", await searchParams);
   return section === "tokens" ? (
-    <PreloadQuery query={LIST_APP_DEPLOY_TOKENS} variables={{ appSlug: slug }}>
+    // The first page the tokens list asks for (use-deploy-tokens, use-cursor-list).
+    <PreloadQuery
+      query={LIST_APP_DEPLOY_TOKENS_PAGE}
+      variables={{ appSlug: slug, search: null, limit: 25, after: null }}
+    >
       <AppAccessClient slug={slug} />
     </PreloadQuery>
   ) : section === "security" ? (
@@ -38,12 +41,10 @@ export default async function AppAccessPage({
   ) : section === "edge" ? (
     <AppAccessClient slug={slug} />
   ) : (
+    // People with access reads its rows through the list's URL state (view,
+    // search, cursor), so only the app is preloaded here.
     <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery query={LIST_ROLE_BINDINGS}>
-        <PreloadQuery query={LIST_ROLES}>
-          <AppAccessClient slug={slug} />
-        </PreloadQuery>
-      </PreloadQuery>
+      <AppAccessClient slug={slug} />
     </PreloadQuery>
   );
 }

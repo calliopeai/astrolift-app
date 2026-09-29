@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { SOFT_DELETE_PROJECT } from "@/graphql/identity/identity.mutations";
 import { LIST_PROJECTS, LIST_PROJECTS_PAGE, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type {
@@ -12,6 +13,8 @@ import type {
   AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+
+import { narrowProjects, narrows, PROJECTS_LIST, projectsVariables } from "./projects-list";
 
 interface ProjectsPageResp {
   astroliftProjectsPage: CursorPage<AstroliftProject>;
@@ -21,18 +24,21 @@ interface TeamsResp {
 }
 
 /**
- * The data half of ProjectsScreen: the projects table walk, the team list
- * for the create sheet and the empty state, and the soft-delete mutation.
+ * The data half of ProjectsScreen: URL list state and one cursor page of
+ * `astroliftProjectsPage` (Team narrows a wider page, see projects-list.ts),
+ * the team list for the create sheet and the empty state, and the
+ * soft-delete mutation.
  */
 export function useProjects() {
   // `astroliftProjectsPage` takes `search`, `limit` and `after` only — no sort
   // argument, so no column declares a `sortKey`.
-  const table = useCursorTable<AstroliftProject>({
-    query: LIST_PROJECTS_PAGE,
-    extract: (d) => (d as ProjectsPageResp | undefined)?.astroliftProjectsPage,
-    searchVariable: "search",
-    urlKey: "proj",
+  const list = useListState(PROJECTS_LIST);
+  const query = useQuery<ProjectsPageResp>(LIST_PROJECTS_PAGE, {
+    variables: projectsVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const data = query.data ?? query.previousData;
+  const page = data?.astroliftProjectsPage;
 
   // Still the flat list: it feeds the create sheet's team picker and the
   // "you have no teams yet" branch of the empty state, neither of which is a
@@ -70,7 +76,15 @@ export function useProjects() {
   }
 
   return {
-    table,
+    list,
+    rows: narrowProjects(page?.items ?? [], list.filters),
+    totalCount: narrows(list.filters) ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: query.loading && !data,
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
     teams: teams.data?.astroliftTeams ?? [],
     teamsLoading: teams.loading,
     noTeams: teams.data?.astroliftTeams.length === 0,

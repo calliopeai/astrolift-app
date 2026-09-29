@@ -1,9 +1,15 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import { useLocalListState } from "@/components/list/use-list-state";
+import {
+  SECTION_PARAM,
+  type SectionSelection,
+  sectionHref,
+} from "@/components/settings/use-settings-section";
 import {
   DELETE_SSH_DEPLOY_KEY,
   DISCONNECT_SOURCE,
@@ -24,6 +30,14 @@ import type {
   AstroliftWebhookSecretReveal,
   MutationResult,
 } from "@/graphql/scm/scm.types";
+
+import {
+  DEPLOY_KEYS_LIST,
+  hostsVariables,
+  keysVariables,
+  narrowHosts,
+  SOURCE_HOSTS_LIST,
+} from "./source-providers-list";
 
 interface ConnectionsResp {
   astroliftSourceConnections: AstroliftSourceConnection[];
@@ -46,63 +60,59 @@ interface KeysPageResp {
 }
 
 // Refetched by operation NAME, not by document: the cursor, page size and
-// search term live inside the controller, so no literal variables object
-// names the page the operator is actually looking at.
+// search term live in the list state, so no literal variables object names
+// the page the operator is actually looking at.
 const REFETCH_CONNECTIONS = "ListSourceConnectionsPage";
 const REFETCH_KEYS = "ListSshDeployKeysPage";
 
 /**
- * The connection and deploy-key walks plus the row mutations behind the
- * Source providers panel. The data half of SourceProvidersScreen.
- *
- * The confirm handlers throw on failure: ConfirmDialog keeps itself open
- * and toasts the message.
+ * Which Source section is on screen: `?section=hosts|keys`, kept beside the
+ * Providers page's `#source` tab hash so a section can be linked and the
+ * tab survives the switch.
  */
-export function useSourceProviders() {
-  // OAuth-callback outcome toasts moved to a layout-level component
-  // (#759, `components/ScmCallbackToast`) so they surface regardless
-  // of where `return_to` lands. Refetching the list when we land on
-  // this page with a success param is now the only page-specific
-  // bit; the toast handler in the layout consumes the param before
-  // we run, so we can't read it directly. The queries already
-  // cache-and-network-fetch on mount, so the row state is up to
-  // date without an explicit refetch hook here.
-  const connTable = useCursorTable<AstroliftSourceConnection>({
-    query: LIST_SOURCE_CONNECTIONS_PAGE,
-    extract: (d) => (d as ConnectionsPageResp | undefined)?.astroliftSourceConnectionsPage,
-    searchVariable: "search",
-    urlKey: "conn",
-  });
+export function useSourceSection(): SectionSelection {
+  const params = useSearchParams();
+  const pathname = usePathname() ?? "";
+  const router = useRouter();
+  const query = params?.toString() ?? "";
+  const href = (id: string) => `${sectionHref(pathname, query, id)}#source`;
+  return {
+    active: params?.get(SECTION_PARAM) ?? null,
+    href,
+    select: (id) => router.replace(href(id), { scroll: false }),
+  };
+}
 
-  const keyTable = useCursorTable<AstroliftSshDeployKey>({
-    query: LIST_SSH_DEPLOY_KEYS_PAGE,
-    // `null` keeps the list field's meaning: every key in the org,
-    // org-scoped and per-app alike. `""` would narrow to org-scoped only.
-    variables: { appSlug: null },
-    extract: (d) => (d as KeysPageResp | undefined)?.astroliftSshDeployKeysPage,
-    searchVariable: "search",
-    urlKey: "key",
+/**
+ * The Hosts section: one cursor page of connections (list state in memory,
+ * since the Providers page owns its query string) plus the row mutations.
+ * The data half of SourceHostsView. The confirm handlers throw on failure:
+ * ConfirmDialog keeps itself open and toasts the message.
+ */
+export function useSourceHosts() {
+  // OAuth-callback outcome toasts live in a layout-level component (#759,
+  // `components/ScmCallbackToast`) so they surface regardless of where
+  // `return_to` lands; the page query cache-and-network-fetches on mount,
+  // so the row state is up to date without an explicit refetch here.
+  const list = useLocalListState(SOURCE_HOSTS_LIST);
+  const page = useQuery<ConnectionsPageResp>(LIST_SOURCE_CONNECTIONS_PAGE, {
+    variables: hostsVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const data = page.data ?? page.previousData;
+  const connections = data?.astroliftSourceConnectionsPage;
+  const narrowed = narrowHosts(connections?.items ?? [], list.filters);
 
-  // Org-wide connection list, kept for the "needs a Client ID" callout
-  // — NOT for table rows. The callout enumerates every incomplete
-  // GitHub App connection in the org; sourcing it from the table's page
-  // would silently scope the prompt to whichever 25 rows are on screen.
-  // It is the same document `/providers` already preloads and the repo
-  // pickers already watch, so on this route it costs nothing extra.
+  // Org-wide connection list, kept for the "needs a Client ID" callout,
+  // NOT for rows. The callout enumerates every incomplete GitHub App
+  // connection in the org; sourcing it from the page would silently scope
+  // the prompt to whichever rows are on screen.
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
   const [disconnect, disconnectState] = useMutation<{
     disconnectSource: MutationResult<{ id: string }>;
   }>(DISCONNECT_SOURCE, {
     refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }, REFETCH_CONNECTIONS],
-    awaitRefetchQueries: true,
-  });
-
-  const [deleteKey, deleteKeyState] = useMutation<{
-    deleteSshDeployKey: MutationResult<{ id: string }>;
-  }>(DELETE_SSH_DEPLOY_KEY, {
-    refetchQueries: [REFETCH_KEYS],
     awaitRefetchQueries: true,
   });
 
@@ -132,34 +142,82 @@ export function useSourceProviders() {
     else throw new Error(data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed");
   }
 
+  const refetch = () => {
+    void page.refetch();
+  };
+
+  return {
+    list,
+    rows: narrowed.rows,
+    totalCount: narrowed.narrowed ? null : (connections?.totalCount ?? null),
+    nextCursor: connections?.nextCursor ?? null,
+    loading: page.loading && !data,
+    error: page.error && !data ? { message: page.error.message } : null,
+    onRetry: refetch,
+    incompleteClientIdConnections: (conns.data?.astroliftSourceConnections ?? []).filter(
+      (c) => c.needsClientId
+    ),
+    disconnecting: disconnectState.loading,
+    rotatingSecret: rotateSecretState.loading,
+    disconnect: handleDisconnect,
+    rotateSecret: handleRotateSecret,
+    // The connect dialogs live in their own files and still refetch the
+    // flat list, which does not feed these rows. Refreshing on close is the
+    // in-place fix: a dialog that closes after a successful mutation is
+    // exactly when the page needs new rows.
+    refreshConnections: refetch,
+  };
+}
+
+export type SourceHostsData = ReturnType<typeof useSourceHosts>;
+
+/**
+ * The SSH deploy keys section: one cursor page of keys (list state in
+ * memory) and the delete mutation. The data half of DeployKeysView.
+ */
+export function useDeployKeys() {
+  const list = useLocalListState(DEPLOY_KEYS_LIST);
+  const page = useQuery<KeysPageResp>(LIST_SSH_DEPLOY_KEYS_PAGE, {
+    variables: keysVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
+  });
+  const data = page.data ?? page.previousData;
+  const keys = data?.astroliftSshDeployKeysPage;
+  // No creator on a key: Mine holds nothing, never everything.
+  const mine = Boolean(list.filters.createdBy);
+
+  const [deleteKey, deleteKeyState] = useMutation<{
+    deleteSshDeployKey: MutationResult<{ id: string }>;
+  }>(DELETE_SSH_DEPLOY_KEY, {
+    refetchQueries: [REFETCH_KEYS],
+    awaitRefetchQueries: true,
+  });
+
   async function handleDeleteKey(k: AstroliftSshDeployKey) {
     const { data } = await deleteKey({ variables: { input: { id: k.id } } });
     if (data?.deleteSshDeployKey.ok) toast.success(`Deleted ${k.name}`);
     else throw new Error(data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed");
   }
 
+  const refetch = () => {
+    void page.refetch();
+  };
+
   return {
-    connTable,
-    keyTable,
-    incompleteClientIdConnections: (conns.data?.astroliftSourceConnections ?? []).filter(
-      (c) => c.needsClientId
-    ),
-    disconnecting: disconnectState.loading,
+    list,
+    rows: mine ? [] : (keys?.items ?? []),
+    totalCount: mine ? 0 : (keys?.totalCount ?? null),
+    nextCursor: mine ? null : (keys?.nextCursor ?? null),
+    loading: page.loading && !data,
+    error: page.error && !data ? { message: page.error.message } : null,
+    onRetry: refetch,
     deletingKey: deleteKeyState.loading,
-    rotatingSecret: rotateSecretState.loading,
-    disconnect: handleDisconnect,
     deleteKey: handleDeleteKey,
-    rotateSecret: handleRotateSecret,
-    // The connect / generate dialogs live in their own files and still
-    // refetch the deprecated flat lists, which no longer feed these tables.
-    // Refreshing on close is the in-place fix: a dialog that closes after a
-    // successful mutation is exactly when the page needs new rows.
-    refreshConnections: connTable.refetch,
-    refreshKeys: keyTable.refetch,
+    refreshKeys: refetch,
   };
 }
 
-export type SourceProvidersData = ReturnType<typeof useSourceProviders>;
+export type DeployKeysData = ReturnType<typeof useDeployKeys>;
 
 interface UpdateResp {
   updateSourceConnection: MutationResult<{

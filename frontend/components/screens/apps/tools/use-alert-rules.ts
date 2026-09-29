@@ -4,16 +4,19 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   ACKNOWLEDGE_ALERT_EVENT,
   CREATE_ALERT_RULE,
   DELETE_ALERT_RULE,
-  LIST_ALERT_EVENTS,
+  LIST_ALERT_EVENTS_PAGE,
   LIST_ALERT_RULES,
   MUTE_ALERT_RULE,
   UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
+
+import { APP_ALERT_RULES_LIST, selectAlertRules } from "./metrics-panels";
 
 // #648 — Alert-rules panel typings. Mirrors the AlertsClient at
 // app/(app)/alerts/alerts-client.tsx; declared locally here because the
@@ -67,11 +70,16 @@ interface AlertRulesResp {
   astroliftAlertRules: AlertRule[];
 }
 
-interface AlertEventsResp {
-  astroliftAlertEvents: AlertEvent[];
+interface AlertEventsPageResp {
+  astroliftAlertEventsPage: { items: AlertEvent[]; nextCursor?: string | null };
 }
 
-/** #648 — an app's alert rules and the create / mute / unmute / delete actions. */
+/**
+ * #648: an app's alert rules for the Alerts panel's list (filtered, sorted
+ * and paged in the browser, see metrics-panels.ts; in-memory list state, as
+ * the panel sits under `?section=metrics&panel=alerts`), and the create /
+ * mute / unmute / delete actions.
+ */
 export function useAlertRules(appId: string) {
   const refetchVars = React.useMemo(
     () => ({ target: "app", targetId: appId, activeOnly: false }),
@@ -105,6 +113,8 @@ export function useAlertRules(appId: string) {
     createState.loading || deleteState.loading || muteState.loading || unmuteState.loading;
 
   const ruleList = rules.data?.astroliftAlertRules ?? [];
+  const list = useLocalListState(APP_ALERT_RULES_LIST);
+  const page = selectAlertRules(ruleList, list.filters, list.state);
 
   async function onUnmute(r: AlertRule) {
     const { data } = await unmuteRule({ variables: { input: { ruleId: r.id } } });
@@ -153,6 +163,9 @@ export function useAlertRules(appId: string) {
   return {
     appId,
     rules: ruleList,
+    list,
+    rows: page.rows,
+    totalCount: page.totalCount,
     loading: rules.loading && ruleList.length === 0,
     busy,
     creating: createState.loading,
@@ -164,19 +177,54 @@ export function useAlertRules(appId: string) {
   };
 }
 
-/** The last five events for one alert rule, plus acknowledge. */
+/** One page of a rule's events; older pages load as the reader nears the end. */
+const EVENTS_PAGE_SIZE = 25;
+
+/**
+ * One alert rule's events, newest first, on the events cursor (a Feed), plus
+ * acknowledge.
+ */
 export function useAlertEvents(ruleId: string) {
-  const events = useQuery<AlertEventsResp>(LIST_ALERT_EVENTS, {
-    variables: { ruleId, unresolvedOnly: false, limit: 5 },
+  const vars = { ruleId, unresolvedOnly: false, limit: EVENTS_PAGE_SIZE };
+  const events = useQuery<AlertEventsPageResp>(LIST_ALERT_EVENTS_PAGE, {
+    variables: vars,
     fetchPolicy: "cache-and-network",
   });
+  const nextCursor = events.data?.astroliftAlertEventsPage?.nextCursor ?? null;
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [moreError, setMoreError] = React.useState<string | null>(null);
+
+  async function onLoadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      await events.fetchMore({
+        variables: { ...vars, after: nextCursor },
+        updateQuery: (prev, { fetchMoreResult }) => {
+          if (!fetchMoreResult) return prev;
+          return {
+            astroliftAlertEventsPage: {
+              ...fetchMoreResult.astroliftAlertEventsPage,
+              items: [
+                ...(prev.astroliftAlertEventsPage?.items ?? []),
+                ...fetchMoreResult.astroliftAlertEventsPage.items,
+              ],
+            },
+          } as AlertEventsPageResp;
+        },
+      });
+    } catch (e) {
+      setMoreError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const [ackEvent, ackState] = useMutation<{
     acknowledgeAlertEvent: MutationResult<AlertEvent>;
   }>(ACKNOWLEDGE_ALERT_EVENT, {
-    refetchQueries: [
-      { query: LIST_ALERT_EVENTS, variables: { ruleId, unresolvedOnly: false, limit: 5 } },
-    ],
+    refetchQueries: [{ query: LIST_ALERT_EVENTS_PAGE, variables: vars }],
     awaitRefetchQueries: true,
   });
 
@@ -187,11 +235,16 @@ export function useAlertEvents(ruleId: string) {
     }
   }
 
-  const eventList = events.data?.astroliftAlertEvents ?? [];
+  const eventList = events.data?.astroliftAlertEventsPage?.items ?? [];
 
   return {
     events: eventList,
     loading: events.loading && eventList.length === 0,
+    error: events.data ? moreError : (events.error?.message ?? null),
+    onRetry: () => void events.refetch(),
+    hasMore: Boolean(nextCursor),
+    loadingMore,
+    onLoadMore: () => void onLoadMore(),
     acking: ackState.loading,
     onAck,
   };

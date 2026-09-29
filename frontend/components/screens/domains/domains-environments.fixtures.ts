@@ -92,8 +92,18 @@ export const DOMAIN_LONG: AstroliftManagedDomain = {
   ]),
 };
 
-export const MANAGED_DOMAINS: ManagedDomainsScreenProps = {
+/** The screen's props less the list and its page; the story pages `domains`. */
+export type ManagedDomainsFixture = Omit<
+  ManagedDomainsScreenProps,
+  "list" | "rows" | "totalCount"
+> & {
+  domains: AstroliftManagedDomain[];
+};
+
+export const MANAGED_DOMAINS: ManagedDomainsFixture = {
   loading: false,
+  error: null,
+  onRetry: noop,
   domains: [DOMAIN_ACTIVE, DOMAIN_PROVISIONING, DOMAIN_UNPROVISIONED],
   creating: false,
   deleting: false,

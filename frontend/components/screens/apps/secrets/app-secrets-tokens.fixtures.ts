@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 
@@ -177,8 +176,25 @@ export const PROPOSALS: AstroliftSecretChangeProposal[] = [
   proposal(2),
 ];
 
-export const SECRETS_SCREEN: Omit<SecretsScreenProps, "tabs" | "pushToGitHub" | "renderHistory"> = {
+/**
+ * The screen's props less its slots and its list state: the stories answer
+ * `keysList` / `keyRows` and `bundlesList` / `bundleRows` in memory.
+ */
+export const SECRETS_SCREEN: Omit<
+  SecretsScreenProps,
+  | "tabs"
+  | "pushToGitHub"
+  | "renderHistory"
+  | "sectionHref"
+  | "keysList"
+  | "keyRows"
+  | "keyTotal"
+  | "bundlesList"
+  | "bundleRows"
+  | "bundleTotal"
+> = {
   slug: "storefront",
+  section: "keys",
   envName: ALL_ENVS,
   setEnvName: noop,
   secretsError: null,
@@ -188,6 +204,8 @@ export const SECRETS_SCREEN: Omit<SecretsScreenProps, "tabs" | "pushToGitHub" | 
   secretsLoading: false,
   attachments: ATTACHMENTS,
   attachmentsLoading: false,
+  attachmentsError: null,
+  retryAttachments: noop,
   pendingProposals: PROPOSALS,
   revealedValues: {},
   editingId: null,
@@ -328,9 +346,16 @@ export const TOKEN_REVEAL: DeployTokenSecretReveal = {
   rotationGraceSeconds: 86400,
 };
 
-export const TOKENS_SCREEN: Omit<DeployTokensScreenProps, "tabs"> = {
+/** The screen's props less its tab bar and its list state (the stories keep that in memory). */
+export const TOKENS_SCREEN: Omit<DeployTokensScreenProps, "tabs" | "list"> = {
   slug: "storefront",
-  table: fakeController<DeployToken>({ rows: TOKENS, totalCount: TOKENS.length }),
+  rows: TOKENS,
+  loading: false,
+  stale: false,
+  error: null,
+  onRetry: noop,
+  nextCursor: null,
+  totalCount: TOKENS.length,
   busy: false,
   reveal: null,
   onDismissReveal: noop,
@@ -342,15 +367,13 @@ export const TOKENS_SCREEN: Omit<DeployTokensScreenProps, "tabs"> = {
 export const TOKENS_LONG: typeof TOKENS_SCREEN = {
   ...TOKENS_SCREEN,
   slug: LONG,
-  table: fakeController<DeployToken>({
-    rows: [
-      {
-        ...TOKENS[0],
-        name: LONG,
-        scopes: ["deploy", "rollback", LONG],
-        lastUsedAgent: `Mozilla/5.0 ${LONG} ${LONG}`,
-      },
-    ],
-    totalCount: 1,
-  }),
+  rows: [
+    {
+      ...TOKENS[0],
+      name: LONG,
+      scopes: ["deploy", "rollback", LONG],
+      lastUsedAgent: `Mozilla/5.0 ${LONG} ${LONG}`,
+    },
+  ],
+  totalCount: 1,
 };

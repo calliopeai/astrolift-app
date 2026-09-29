@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { SecuritySettingsView } from "./SecuritySettings";
+import { useLocalListState } from "@/components/list/use-list-state";
+
+import { SecuritySettingsView as View, type SecuritySettingsViewProps } from "./SecuritySettings";
+import { SESSIONS_LIST } from "./sessions-list";
 import {
   SECURITY_LONG_SESSIONS,
   SESSIONS,
@@ -13,6 +16,12 @@ const meta: Meta = {
 export default meta;
 
 type Story = StoryObj;
+
+/** The view with its list state in memory, as the hook keeps it. */
+function SecuritySettingsView(props: SecuritySettingsViewProps) {
+  const list = useLocalListState(SESSIONS_LIST);
+  return <View {...props} list={list} />;
+}
 
 export const Full: Story = {
   render: () => <SecuritySettingsView {...securityProps()} />,
@@ -51,4 +60,12 @@ export const SigningOut: Story = {
 
 export const LongStrings: Story = {
   render: () => <SecuritySettingsView {...securityProps({ sessions: SECURITY_LONG_SESSIONS })} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <SecuritySettingsView {...securityProps({ sessions: SECURITY_LONG_SESSIONS })} />
+    </div>
+  ),
 };

@@ -1,19 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftSourceConnection, AstroliftSshDeployKey } from "@/graphql/scm/scm.types";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 import { AddClientIdSheet } from "./AddClientIdSheet";
 import { GenerateSshKeySheet } from "./GenerateSshKeySheet";
 import {
   ADD_CLIENT_ID,
+  DEPLOY_KEYS,
   GENERATE_KEY,
+  HOSTS,
   LONG_CONNECTIONS,
   LONG_KEYS,
   REVEAL,
-  SCREEN,
 } from "./settings-source-providers.fixtures";
-import { SourceProvidersScreen, WebhookSecretReveal } from "./SourceProvidersScreen";
+import { DEPLOY_KEYS_LIST, SOURCE_HOSTS_LIST } from "./source-providers-list";
+import {
+  DeployKeysView,
+  type DeployKeysViewProps,
+  SourceHostsView,
+  type SourceHostsViewProps,
+  SourceProvidersScreen,
+  WebhookSecretReveal,
+} from "./SourceProvidersScreen";
 
 const meta: Meta = {
   title: "Screens/Settings/SourceProviders/SourceProvidersScreen",
@@ -28,104 +38,138 @@ type Story = StoryObj;
  * another group's files under app/, so stories leave them empty; the two
  * sheets from this folder render their views.
  */
-const slots = {
+const hostSlots = {
   renderConnectGithub: () => null,
   renderConnectGitlab: () => null,
   renderConnectSource: () => null,
-  renderGenerateKey: (open: boolean, onOpenChange: (next: boolean) => void) => (
-    <GenerateSshKeySheet {...GENERATE_KEY} open={open} onOpenChange={onOpenChange} />
-  ),
   renderAddClientId: (connection: AstroliftSourceConnection | null, onClose: () => void) => (
     <AddClientIdSheet {...ADD_CLIENT_ID} connection={connection} onClose={onClose} />
   ),
 };
 
-export const Full: Story = {
-  render: () => <SourceProvidersScreen {...SCREEN} {...slots} />,
-};
+const renderGenerateKey = (open: boolean, onOpenChange: (next: boolean) => void) => (
+  <GenerateSshKeySheet {...GENERATE_KEY} open={open} onOpenChange={onOpenChange} />
+);
+
+type Initial = { initial?: Partial<ListState> };
+
+function Hosts({ initial, ...over }: Partial<Omit<SourceHostsViewProps, "list">> & Initial) {
+  const list = useLocalListState(SOURCE_HOSTS_LIST, initial);
+  return <SourceHostsView {...HOSTS} {...hostSlots} {...over} list={list} />;
+}
+
+function Keys({ initial, ...over }: Partial<Omit<DeployKeysViewProps, "list">> & Initial) {
+  const list = useLocalListState(DEPLOY_KEYS_LIST, initial);
+  return (
+    <DeployKeysView {...DEPLOY_KEYS} renderGenerateKey={renderGenerateKey} {...over} list={list} />
+  );
+}
+
+function Screen({
+  section = null,
+  hosts = <Hosts />,
+  keys = <Keys />,
+}: {
+  section?: string | null;
+  hosts?: React.ReactNode;
+  keys?: React.ReactNode;
+}) {
+  return (
+    <SourceProvidersScreen section={useLocalSettingsSection(section)} hosts={hosts} keys={keys} />
+  );
+}
+
+/** Hosts, the default section. */
+export const Full: Story = { render: () => <Screen /> };
+
+/** SSH deploy keys: only that section is mounted. */
+export const KeysSection: Story = { render: () => <Screen section="keys" /> };
 
 export const Loading: Story = {
-  render: () => (
-    <SourceProvidersScreen
-      {...SCREEN}
-      {...slots}
-      incompleteClientIdConnections={[]}
-      connTable={fakeController<AstroliftSourceConnection>({ state: "loading" })}
-      keyTable={fakeController<AstroliftSshDeployKey>({ state: "loading" })}
-    />
-  ),
+  render: () => <Screen hosts={<Hosts rows={[]} loading incompleteClientIdConnections={[]} />} />,
+};
+
+export const KeysLoading: Story = {
+  render: () => <Screen section="keys" keys={<Keys rows={[]} loading />} />,
 };
 
 export const Empty: Story = {
   render: () => (
-    <SourceProvidersScreen
-      {...SCREEN}
-      {...slots}
-      incompleteClientIdConnections={[]}
-      connTable={fakeController<AstroliftSourceConnection>({ state: "empty", totalCount: 0 })}
-      keyTable={fakeController<AstroliftSshDeployKey>({ state: "empty", totalCount: 0 })}
-    />
+    <Screen hosts={<Hosts rows={[]} totalCount={0} incompleteClientIdConnections={[]} />} />
   ),
 };
 
-/** A search that matches nothing in either table. */
+export const KeysEmpty: Story = {
+  render: () => <Screen section="keys" keys={<Keys rows={[]} totalCount={0} />} />,
+};
+
+/** A search that matches no connection. */
 export const EmptyFiltered: Story = {
-  render: () => (
-    <SourceProvidersScreen
-      {...SCREEN}
-      {...slots}
-      connTable={fakeController<AstroliftSourceConnection>({
-        state: "emptyFiltered",
-        search: "bitbucket",
-        isFiltered: true,
-        totalCount: 0,
-      })}
-      keyTable={fakeController<AstroliftSshDeployKey>({
-        state: "emptyFiltered",
-        search: "nope",
-        isFiltered: true,
-        totalCount: 0,
-      })}
-    />
-  ),
+  render: () => <Screen hosts={<Hosts rows={[]} initial={{ q: "bitbucket" }} />} />,
 };
 
-/** Both page queries failed: each table shows its retry state. */
+/** The page query failed: the list shows its retry state. */
 export const LoadFailed: Story = {
   render: () => (
-    <SourceProvidersScreen
-      {...SCREEN}
-      {...slots}
-      incompleteClientIdConnections={[]}
-      connTable={fakeController<AstroliftSourceConnection>({
-        state: "error",
-        error: new Error("Network error: failed to fetch"),
-      })}
-      keyTable={fakeController<AstroliftSshDeployKey>({
-        state: "error",
-        error: new Error("Network error: failed to fetch"),
-      })}
+    <Screen
+      hosts={
+        <Hosts
+          rows={[]}
+          incompleteClientIdConnections={[]}
+          error={{ message: "Network error: failed to fetch" }}
+        />
+      }
+    />
+  ),
+};
+
+export const KeysLoadFailed: Story = {
+  render: () => (
+    <Screen
+      section="keys"
+      keys={<Keys rows={[]} error={{ message: "Network error: failed to fetch" }} />}
+    />
+  ),
+};
+
+/** Mine: your personal connections, with the note saying how. */
+export const MineHosts: Story = {
+  render: () => (
+    <Screen
+      hosts={
+        <Hosts
+          rows={HOSTS.rows.filter((c) => c.isPersonal)}
+          initial={{ view: "mine" }}
+          incompleteClientIdConnections={[]}
+        />
+      }
     />
   ),
 };
 
 export const LongStrings: Story = {
   render: () => (
-    <SourceProvidersScreen
-      {...SCREEN}
-      {...slots}
-      incompleteClientIdConnections={LONG_CONNECTIONS.filter((c) => c.needsClientId)}
-      connTable={fakeController<AstroliftSourceConnection>({
-        rows: LONG_CONNECTIONS,
-        totalCount: LONG_CONNECTIONS.length,
-        sortEnabled: false,
-      })}
-      keyTable={fakeController<AstroliftSshDeployKey>({
-        rows: LONG_KEYS,
-        totalCount: LONG_KEYS.length,
-        sortEnabled: false,
-      })}
+    <Screen
+      hosts={
+        <Hosts
+          rows={LONG_CONNECTIONS}
+          totalCount={LONG_CONNECTIONS.length}
+          incompleteClientIdConnections={LONG_CONNECTIONS.filter((c) => c.needsClientId)}
+        />
+      }
     />
+  ),
+};
+
+export const LongKeys: Story = {
+  render: () => <Screen section="keys" keys={<Keys rows={LONG_KEYS} nextCursor="c2" />} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Screen hosts={<Hosts rows={LONG_CONNECTIONS} />} />
+    </div>
   ),
 };
 

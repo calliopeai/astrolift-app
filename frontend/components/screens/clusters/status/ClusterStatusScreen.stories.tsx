@@ -47,10 +47,10 @@ const FULL: ClusterStatusBodyProps = {
   slug: CLUSTER.slug,
   liveState: LIVE_CONNECTED,
   metrics: <StatusMetricsCard slug={CLUSTER.slug} {...METRICS} />,
-  workloads: <StatusWorkloadHealthCard {...WORKLOADS} />,
+  workloads: <StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS} />,
   liveHealth: <StatusLiveHealthCard {...HEALTH} />,
-  workflows: <StatusRecentWorkflowsCard {...WORKFLOWS} />,
-  lifecycle: <StatusLifecycleCard {...AUDIT} />,
+  workflows: <StatusRecentWorkflowsCard slug={CLUSTER.slug} {...WORKFLOWS} />,
+  lifecycle: <StatusLifecycleCard slug={CLUSTER.slug} {...AUDIT} />,
 };
 
 function Screen(props: Partial<ClusterStatusBodyProps> & { cluster?: typeof CLUSTER }) {
@@ -70,7 +70,7 @@ export const Loading: Story = {
   render: () => (
     <Screen
       liveState={LIVE_LOADING}
-      lifecycle={<StatusLifecycleCard entries={[]} loading {...QUERY_OK} />}
+      lifecycle={<StatusLifecycleCard slug={CLUSTER.slug} entries={[]} loading {...QUERY_OK} />}
     />
   ),
 };
@@ -80,10 +80,10 @@ export const CardsLoading: Story = {
   render: () => (
     <Screen
       metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS_LOADING} />}
-      workloads={<StatusWorkloadHealthCard rows={[]} loading {...QUERY_OK} />}
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} rows={[]} loading {...QUERY_OK} />}
       liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading {...QUERY_OK} />}
-      workflows={<StatusRecentWorkflowsCard runs={[]} loading {...QUERY_OK} />}
-      lifecycle={<StatusLifecycleCard entries={[]} loading {...QUERY_OK} />}
+      workflows={<StatusRecentWorkflowsCard slug={CLUSTER.slug} runs={[]} loading {...QUERY_OK} />}
+      lifecycle={<StatusLifecycleCard slug={CLUSTER.slug} entries={[]} loading {...QUERY_OK} />}
     />
   ),
 };
@@ -93,10 +93,16 @@ export const Empty: Story = {
   render: () => (
     <Screen
       metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS_NO_ENDPOINT} />}
-      workloads={<StatusWorkloadHealthCard rows={[]} loading={false} {...QUERY_OK} />}
+      workloads={
+        <StatusWorkloadHealthCard slug={CLUSTER.slug} rows={[]} loading={false} {...QUERY_OK} />
+      }
       liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading={false} {...QUERY_OK} />}
-      workflows={<StatusRecentWorkflowsCard runs={[]} loading={false} {...QUERY_OK} />}
-      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_OK} />}
+      workflows={
+        <StatusRecentWorkflowsCard slug={CLUSTER.slug} runs={[]} loading={false} {...QUERY_OK} />
+      }
+      lifecycle={
+        <StatusLifecycleCard slug={CLUSTER.slug} entries={[]} loading={false} {...QUERY_OK} />
+      }
     />
   ),
 };
@@ -120,10 +126,10 @@ export const LongStrings: Story = {
       cluster={LONG_CLUSTER}
       liveState={LIVE_LONG}
       metrics={<StatusMetricsCard slug={LONG_CLUSTER.slug} {...METRICS_LONG} />}
-      workloads={<StatusWorkloadHealthCard {...WORKLOADS_LONG} />}
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS_LONG} />}
       liveHealth={<StatusLiveHealthCard {...HEALTH_LONG} />}
-      workflows={<StatusRecentWorkflowsCard {...WORKFLOWS_LONG} />}
-      lifecycle={<StatusLifecycleCard {...AUDIT_LONG} />}
+      workflows={<StatusRecentWorkflowsCard slug={CLUSTER.slug} {...WORKFLOWS_LONG} />}
+      lifecycle={<StatusLifecycleCard slug={CLUSTER.slug} {...AUDIT_LONG} />}
     />
   ),
 };
@@ -133,7 +139,9 @@ export const LoadError: Story = {
   render: () => (
     <Screen
       liveState={{ state: null, loading: false, ...QUERY_FAILED }}
-      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_FAILED} />}
+      lifecycle={
+        <StatusLifecycleCard slug={CLUSTER.slug} entries={[]} loading={false} {...QUERY_FAILED} />
+      }
     />
   ),
 };
@@ -151,10 +159,21 @@ export const CardsError: Story = {
           {...QUERY_FAILED}
         />
       }
-      workloads={<StatusWorkloadHealthCard rows={[]} loading={false} {...QUERY_FAILED} />}
+      workloads={
+        <StatusWorkloadHealthCard slug={CLUSTER.slug} rows={[]} loading={false} {...QUERY_FAILED} />
+      }
       liveHealth={<StatusLiveHealthCard pods={[]} events={[]} loading={false} {...QUERY_FAILED} />}
-      workflows={<StatusRecentWorkflowsCard runs={[]} loading={false} {...QUERY_FAILED} />}
-      lifecycle={<StatusLifecycleCard entries={[]} loading={false} {...QUERY_FAILED} />}
+      workflows={
+        <StatusRecentWorkflowsCard
+          slug={CLUSTER.slug}
+          runs={[]}
+          loading={false}
+          {...QUERY_FAILED}
+        />
+      }
+      lifecycle={
+        <StatusLifecycleCard slug={CLUSTER.slug} entries={[]} loading={false} {...QUERY_FAILED} />
+      }
     />
   ),
 };
@@ -166,10 +185,10 @@ export const Width768: Story = {
         cluster={LONG_CLUSTER}
         liveState={LIVE_LONG}
         metrics={<StatusMetricsCard slug={LONG_CLUSTER.slug} {...METRICS_LONG} />}
-        workloads={<StatusWorkloadHealthCard {...WORKLOADS_LONG} />}
+        workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS_LONG} />}
         liveHealth={<StatusLiveHealthCard {...HEALTH_LONG} />}
-        workflows={<StatusRecentWorkflowsCard {...WORKFLOWS_LONG} />}
-        lifecycle={<StatusLifecycleCard {...AUDIT_LONG} />}
+        workflows={<StatusRecentWorkflowsCard slug={CLUSTER.slug} {...WORKFLOWS_LONG} />}
+        lifecycle={<StatusLifecycleCard slug={CLUSTER.slug} {...AUDIT_LONG} />}
       />
     </div>
   ),

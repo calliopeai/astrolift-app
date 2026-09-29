@@ -13,9 +13,10 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { type Column } from "@/components/data-table";
-import { ListPage } from "@/components/list/ListPage";
+import { Feed } from "@/components/feed/Feed";
+import { FilterBar } from "@/components/list/FilterBar";
 import type { ListStateController } from "@/components/list/use-list-state";
+import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,17 +49,24 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import { adminCrumbs } from "./header";
 
-export interface AuditLogScreenProps {
-  /** List state: views, search, filter chips, cursor (see audit-list.ts). */
-  list: ListStateController;
-  rows: AstroliftAuditEvent[];
-  /** Events that arrived after the page was read, behind the "new" pill. */
-  newRows?: { count: number; onReveal: () => void };
+export interface AuditEventsFeed {
+  items: AstroliftAuditEvent[];
   loading: boolean;
-  stale: boolean;
-  error: { message: string } | null;
+  error: string | null;
   onRetry: () => void;
-  nextCursor: string | null;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  /** Events that arrived above the ones being read, behind the "new" pill. */
+  newCount: number;
+  onShowNew: () => void;
+}
+
+export interface AuditLogScreenProps {
+  /** List state: views, search and filter chips (see audit-list.ts). */
+  list: ListStateController;
+  /** The events as a feed: newest first, older ones on the server's cursor. */
+  events: AuditEventsFeed;
   totalCount: number | null;
   /** A target-kind chip narrows the page in hand, not the query (no argument yet). */
   targetFilteredLocally: boolean;
@@ -97,20 +105,17 @@ function targetText(row: AstroliftAuditEvent): string {
 }
 
 /**
- * Admin › Usage & governance › Audit (spec 44 §5.1): the audit trail on the
- * list archetype. Views All · Mine · Denied; chips for actor, action, target
- * kind, decision and since; cursor paged, newest first, live on the first
- * page. A row opens the detail sheet; export and retention stay as they were.
+ * Admin › Usage & governance › Audit: the audit trail as a Feed (list rule
+ * 5: it only grows), under the list's own views and filter bar (rule 4).
+ * Views All · Mine · Denied as the header's tabs; chips for actor, action,
+ * target kind, decision and since; newest first, grouped by day, older
+ * events loading on the server's cursor as the reader nears the end, new
+ * ones behind the pill. A line opens the detail sheet; export and retention
+ * stay as they were. Pure; the data half is useAuditLog.
  */
 export function AuditLogScreen({
   list,
-  rows,
-  newRows,
-  loading,
-  stale,
-  error,
-  onRetry,
-  nextCursor,
+  events,
   totalCount,
   targetFilteredLocally,
   retentionDays,
@@ -121,155 +126,92 @@ export function AuditLogScreen({
   saveRetention,
 }: AuditLogScreenProps) {
   const t = useTranslations("lists.audit");
-  const fmt = useFormatters();
 
   const [activeRow, setActiveRow] = React.useState<AstroliftAuditEvent | null>(null);
 
-  const columns: Column<AstroliftAuditEvent>[] = [
-    {
-      id: "when",
-      header: t("columns.when"),
-      cellClassName: "font-mono text-xs whitespace-nowrap",
-      // Rows open the detail sheet; they are not links. One button per
-      // row, stretched over it, named by action and time: what tells one
-      // audit row from the next.
-      cell: (row) => (
-        <button
-          type="button"
-          aria-label={`${row.action} ${fmt.formatDateTime(row.occurredAt)}`}
-          onClick={() => setActiveRow(row)}
-          className="focus-visible:ring-ring rounded-sm text-left after:absolute after:inset-0 focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {fmt.formatDateTime(row.occurredAt)}
-        </button>
-      ),
-    },
-    {
-      id: "actor",
-      header: t("columns.actor"),
-      cellClassName: "max-w-64",
-      cell: (row) => (
-        <div className="min-w-0">
-          <div className="truncate text-sm" title={row.actorDisplay || row.actorKind}>
-            {row.actorDisplay || row.actorKind}
-          </div>
-          <div
-            className="text-muted-foreground truncate font-mono text-xs"
-            title={row.actorId || undefined}
-          >
-            {row.actorKind}
-            {row.actorId ? ` · ${row.actorId}` : ""}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "action",
-      header: t("columns.action"),
-      cellClassName: "max-w-72",
-      cell: (row) => (
-        <Badge
-          variant="outline"
-          className="block max-w-full truncate font-mono text-xs"
-          title={row.action}
-        >
-          {row.action}
-        </Badge>
-      ),
-    },
-    {
-      id: "target",
-      header: t("columns.target"),
-      cellClassName: "max-w-72 text-sm",
-      cell: (row) =>
-        row.targetKind ? (
-          <div className="truncate font-mono text-xs" title={targetText(row)}>
-            {targetText(row)}
-          </div>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    },
-    {
-      id: "decision",
-      header: t("columns.decision"),
-      cell: (row) => {
-        const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
-        return (
-          <Badge className={style.cls + " gap-1 px-2 py-0.5 font-mono text-xs"} variant="secondary">
-            {style.icon}
-            {row.decision}
-          </Badge>
-        );
-      },
-    },
-  ];
+  const { definition: def, state } = list;
+  const view = def.views.find((v) => v.key === state.view);
+
+  const exportMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={t("export.button")} disabled={exporting}>
+          {exporting ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <MoreHorizontalIcon className="size-4" />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => handleExport("csv")}>
+          <DownloadIcon className="size-4" />
+          {t("export.formatCsv")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
+          <DownloadIcon className="size-4" />
+          {t("export.formatNdjson")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3 p-6">
-      <ListPage<AstroliftAuditEvent>
-        header={{
-          crumbs: adminCrumbs("audit", "Audit"),
-          title: t("title"),
-          context:
-            retentionDays != null ? (
-              <span className="font-mono">retained {retentionDays} days</span>
-            ) : undefined,
-          primaryAction: (
-            <RetentionDialog
-              currentDays={retentionDays}
-              canSave={canEditRetention}
-              saving={savingRetention}
-              onSave={saveRetention}
-            />
-          ),
-        }}
-        list={list}
-        label="Audit events"
-        columns={columns}
-        rows={rows}
-        getRowId={(row) => row.id}
-        rowClassName={() => "relative cursor-pointer"}
-        loading={loading}
-        stale={stale}
-        error={error}
-        onRetry={onRetry}
-        empty={{
-          icon: <ScrollTextIcon className="size-5" />,
-          title: t("emptyTitle"),
-          description: t("emptyDescription"),
-        }}
-        totalCount={totalCount}
-        nextCursor={nextCursor}
-        newRows={newRows}
-        menu={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("export.button")}
-                disabled={exporting}
-              >
-                {exporting ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <MoreHorizontalIcon className="size-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => handleExport("csv")}>
-                <DownloadIcon className="size-4" />
-                {t("export.formatCsv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
-                <DownloadIcon className="size-4" />
-                {t("export.formatNdjson")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
+      <ShellHeader
+        crumbs={adminCrumbs("audit", "Audit")}
+        title={t("title")}
+        context={
+          <span className="font-mono">
+            {totalCount != null ? `${totalCount.toLocaleString("en-US")} events` : null}
+            {totalCount != null && retentionDays != null ? " · " : null}
+            {retentionDays != null ? `retained ${retentionDays} days` : null}
+          </span>
         }
+        primaryAction={
+          <RetentionDialog
+            currentDays={retentionDays}
+            canSave={canEditRetention}
+            saving={savingRetention}
+            onSave={saveRetention}
+          />
+        }
+        tabs={def.views.map((v) => ({
+          key: v.key,
+          label: v.label,
+          href: list.viewHref(v.key),
+          active: v.key === state.view,
+        }))}
+        tabsAriaLabel="Views"
+      />
+      {view?.note && (
+        <p className="text-muted-foreground -mt-2 min-w-0 text-xs [overflow-wrap:anywhere]">
+          {view.note}
+        </p>
+      )}
+      <FilterBar list={list} columns={[]} cards={false} menu={exportMenu} />
+
+      <Feed<AstroliftAuditEvent>
+        label="Audit events"
+        {...events}
+        keyOf={(row) => row.id}
+        groupBy={{ day: (row) => row.occurredAt }}
+        maxHeight="max-h-160"
+        dense
+        empty={
+          list.isFiltered
+            ? {
+                icon: <ScrollTextIcon className="size-5" />,
+                title: "No audit events match",
+                description: "Remove a filter or change the search to see more.",
+              }
+            : {
+                icon: <ScrollTextIcon className="size-5" />,
+                title: t("emptyTitle"),
+                description: t("emptyDescription"),
+              }
+        }
+        renderItem={(row) => <AuditLine row={row} onOpen={() => setActiveRow(row)} />}
       />
 
       {targetFilteredLocally && (
@@ -280,6 +222,55 @@ export function AuditLogScreen({
 
       <AuditDetailsSheet row={activeRow} onOpenChange={(open) => !open && setActiveRow(null)} />
     </div>
+  );
+}
+
+/**
+ * One audit event: when, who, what, on which target, and the decision. The
+ * whole line is one button, named by action and time (what tells one event
+ * from the next), that opens the detail sheet.
+ */
+function AuditLine({ row, onOpen }: { row: AstroliftAuditEvent; onOpen: () => void }) {
+  const fmt = useFormatters();
+  const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
+  return (
+    <button
+      type="button"
+      aria-label={`${row.action} ${fmt.formatDateTime(row.occurredAt)}`}
+      onClick={onOpen}
+      className="hover:bg-muted/50 focus-visible:ring-ring flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-sm px-1 py-0.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <time dateTime={row.occurredAt} className="text-muted-foreground shrink-0 font-mono text-xs">
+        {fmt.formatDateTime(row.occurredAt)}
+      </time>
+      <Badge
+        variant="outline"
+        className="max-w-72 min-w-0 truncate font-mono text-xs"
+        title={row.action}
+      >
+        {row.action}
+      </Badge>
+      <span className="max-w-64 min-w-0 truncate text-sm" title={row.actorDisplay || row.actorKind}>
+        {row.actorDisplay || row.actorKind}
+      </span>
+      {row.targetKind ? (
+        <span
+          className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs"
+          title={targetText(row)}
+        >
+          {targetText(row)}
+        </span>
+      ) : (
+        <span className="flex-1" />
+      )}
+      <Badge
+        className={style.cls + " shrink-0 gap-1 px-2 py-0.5 font-mono text-xs"}
+        variant="secondary"
+      >
+        {style.icon}
+        {row.decision}
+      </Badge>
+    </button>
   );
 }
 

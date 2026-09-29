@@ -17,13 +17,13 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { type Column, DataTable } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { PageShell } from "@/components/PageShell";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { staticController } from "@/components/viz/core/static-table";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
@@ -59,12 +59,14 @@ export function pickShownDomain(list: AppDomain[], pickedId: string | null): App
 }
 
 /**
- * The app's Domains tab (spec 44 §5.1, §5.2): the domains on a DataTable in
- * a Panel, the picked domain's handshake panel under it (DNS records to add,
- * certificate, redirects, path routes), then one ingress panel per
- * environment. Add domain and a certificate upload open sheets (§5.4). Data
- * and mutations come from useAppDomains; this holds only UI state (which
- * domain is shown, removed or given a certificate).
+ * The app's Domains tab (spec 44 §5.1, §5.2): the domains on the embedded
+ * list (the tab's one list: filtered, sorted and paged in the browser, see
+ * domains-list.ts), the picked domain's handshake panel under it (DNS
+ * records to add, certificate, redirects, path routes), then one ingress
+ * panel per environment. A row links to `?domain=<id>`, which picks it. Add
+ * domain and a certificate upload open sheets (§5.4). Data and mutations
+ * come from useAppDomains; this holds only UI state (which domain is removed
+ * or given a certificate).
  */
 export function DomainsScreen({
   slug,
@@ -72,7 +74,12 @@ export function DomainsScreen({
   loading,
   error,
   refetch,
-  domains: list,
+  domains: all,
+  list,
+  rows,
+  totalCount,
+  pickedId,
+  domainHref,
   environments: envList,
   workloadOptions,
   busy,
@@ -96,21 +103,13 @@ export function DomainsScreen({
   const tCert = useTranslations("apps.domains.cert");
   const [removeTarget, setRemoveTarget] = React.useState<AppDomain | null>(null);
   const [byoTarget, setByoTarget] = React.useState<AppDomain | null>(null);
-  const [pickedId, setPickedId] = React.useState<string | null>(null);
-  const shown = pickShownDomain(list, pickedId);
-
-  const controller = React.useMemo(() => {
-    const base = staticController(list);
-    if (loading && list.length === 0) return { ...base, state: "loading" as const };
-    if (error && list.length === 0)
-      return { ...base, state: "error" as const, error, retry: refetch };
-    return base;
-  }, [list, loading, error, refetch]);
+  const shown = pickShownDomain(all, pickedId);
 
   const columns: Column<AppDomain>[] = [
     {
       id: "hostname",
       header: t("columns.hostname"),
+      sortKey: "hostname",
       cellClassName: "whitespace-normal",
       cell: (d) => (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -128,6 +127,7 @@ export function DomainsScreen({
     {
       id: "status",
       header: t("columns.status"),
+      sortKey: "status",
       width: "w-40",
       cell: (d) => {
         const key = CERT_LABEL_KEYS[d.certState];
@@ -156,6 +156,7 @@ export function DomainsScreen({
     {
       id: "checked",
       header: t("columns.lastChecked"),
+      sortKey: "checked",
       width: "w-44",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (d) =>
@@ -230,26 +231,20 @@ export function DomainsScreen({
       {tabs}
 
       <PanelGrid>
-        <Panel
-          title={t("listTitle")}
-          icon={<GlobeIcon className="size-4" />}
-          description={
-            list.length > 0 ? (
-              <span className="font-mono tabular-nums">{list.length}</span>
-            ) : undefined
-          }
-          flush
-        >
-          <DataTable
-            chrome="table"
-            className="[&>div]:rounded-none [&>div]:border-0"
+        <div className="col-span-12 min-w-0">
+          <ListPage<AppDomain>
+            embedded
+            list={list}
             label={t("listTitle")}
-            controller={controller}
             columns={columns}
+            rows={rows}
             getRowId={(d) => d.id}
-            onRowActivate={(d) => setPickedId(d.id)}
-            rowLabel={(d) => (d.isWildcard ? `*.${d.hostname}` : d.hostname)}
+            rowHref={domainHref}
             rowClassName={(d) => (d.id === shown?.id ? "bg-muted/50" : undefined)}
+            loading={loading && all.length === 0}
+            error={error && all.length === 0 ? error : null}
+            onRetry={refetch}
+            totalCount={totalCount}
             empty={{
               icon: <GlobeIcon className="size-5" />,
               title: t("emptyTitle"),
@@ -257,7 +252,7 @@ export function DomainsScreen({
               learnMoreHref: DOC_LINKS.customDomains,
             }}
           />
-        </Panel>
+        </div>
 
         {shown && (
           <DomainHandshakeCard
@@ -277,7 +272,7 @@ export function DomainsScreen({
           <IngressStatusCard
             key={env.id}
             env={env}
-            domains={list}
+            domains={all}
             busy={busy}
             onToggle={() => toggleIngress(env)}
           />

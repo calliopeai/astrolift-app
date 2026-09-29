@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
 import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import type {
@@ -12,6 +12,10 @@ import type {
   AstroliftApiTokenPlaintext,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { GET_ME } from "@/graphql/user/user.queries";
+import type { MeQueryData } from "@/graphql/user/user.types";
+
+import { narrows, narrowTokens, TOKENS_LIST, tokensVariables } from "./tokens-list";
 
 interface Resp {
   astroliftApiTokensPage: {
@@ -29,9 +33,10 @@ export interface CreateApiTokenInput {
 }
 
 /**
- * The org API keys page: the paged token table, create / revoke, the
- * one-time plaintext reveal, and the MCP endpoint. The data half of
- * TokensScreen.
+ * The org API keys page: URL list state, one cursor page of
+ * `astroliftApiTokensPage` (status, scope and Mine narrow a wider page, see
+ * tokens-list.ts), create / revoke, the one-time plaintext reveal, and the
+ * MCP endpoint. The data half of TokensScreen.
  */
 export function useTokens() {
   const [createdToken, setCreatedToken] = React.useState<AstroliftApiTokenPlaintext | null>(null);
@@ -41,16 +46,19 @@ export function useTokens() {
     setMcpEndpoint(`${window.location.origin}/api/mcp/v1/`);
   }, []);
 
-  const table = useCursorTable<AstroliftApiToken>({
-    query: LIST_API_TOKENS_PAGE,
-    extract: (d) => (d as Resp | undefined)?.astroliftApiTokensPage,
-    searchVariable: "search",
-    urlKey: "tok",
+  const list = useListState(TOKENS_LIST);
+  const me = useQuery<MeQueryData>(GET_ME).data?.me?.profile?.username ?? null;
+  const query = useQuery<Resp>(LIST_API_TOKENS_PAGE, {
+    variables: tokensVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const data = query.data ?? query.previousData;
+  const page = data?.astroliftApiTokensPage;
+  const rows = narrowTokens(page?.items ?? [], list.filters, me);
 
-  // Refetched by operation name, not by document: the walk's cursor, page
-  // size and search term live in the controller, so only the active query
-  // knows the variables of the page the operator is looking at.
+  // Refetched by operation name, not by document: the cursor, page size and
+  // search term live in the URL, so only the active query knows the
+  // variables of the page the operator is looking at.
   const refetchPage = ["ListApiTokensPage"];
 
   const [createToken, { loading: creating }] = useMutation<{
@@ -112,7 +120,17 @@ export function useTokens() {
   }
 
   return {
-    table,
+    list,
+    rows,
+    // A narrowed page's count is the server's, not what is shown.
+    totalCount: narrows(list.filters) ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: query.loading && !data,
+    stale: query.loading && Boolean(data) && query.data === undefined,
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
     creating,
     revoking,
     createdToken,

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
+import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -71,15 +72,23 @@ export interface WorkflowTimelineProps {
   onRetryActivity?: (activityId: string) => void | Promise<void>;
   /** Pending action — disables operator buttons while a mutation is in-flight. */
   busy?: boolean;
+  /** The caller's cursor, for a long history: older activities load near the end. */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+  /** Height class for the activity frame; defaults to the Feed's. */
+  maxHeight?: string;
   className?: string;
 }
 
 /**
  * Workflow run viewer — header + activity timeline. Spec 06 §8.
  *
- * Activities render as a vertical timeline with status icons; failed
- * activities expand inline to show the error message and stack.
- * Operator actions (cancel run, retry activity) are wired via callbacks.
+ * Activities render as a timeline with status icons in a Feed (list rule
+ * 5): the list scrolls in its own frame and, when the caller pages its
+ * history, loads older activities as the reader nears the end. Failed
+ * activities expand inline to show the error message and stack. Operator
+ * actions (cancel run, retry activity) are wired via callbacks.
  */
 export function WorkflowTimeline({
   run,
@@ -87,6 +96,10 @@ export function WorkflowTimeline({
   onCancel,
   onRetryActivity,
   busy,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  maxHeight,
   className,
 }: WorkflowTimelineProps) {
   const isTerminal = run.status !== "running";
@@ -144,21 +157,21 @@ export function WorkflowTimeline({
         </div>
       )}
 
-      <ol className="divide-y">
-        {activities.map((activity) => (
-          <ActivityRow
-            key={activity.id}
-            activity={activity}
-            onRetry={onRetryActivity}
-            busy={busy}
-          />
-        ))}
-        {activities.length === 0 && (
-          <li className="text-muted-foreground p-6 text-center text-sm">
-            No activities recorded yet.
-          </li>
+      <Feed<WorkflowActivity>
+        label="Activities"
+        items={activities}
+        keyOf={(a) => a.id}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
+        maxHeight={maxHeight}
+        dense
+        className="px-2"
+        empty={{ icon: <CircleIcon className="size-5" />, title: "No activities recorded yet." }}
+        renderItem={(activity) => (
+          <ActivityRow activity={activity} onRetry={onRetryActivity} busy={busy} />
         )}
-      </ol>
+      />
     </div>
   );
 }
@@ -179,8 +192,8 @@ function ActivityRow({
   const expandable = activity.status === "failed" || activity.attempts.length > 1;
 
   return (
-    <li className="px-4 py-3">
-      <div className="flex items-start gap-3">
+    <div className="min-w-0 px-2">
+      <div className="flex min-w-0 items-start gap-3">
         <div className="mt-0.5">
           <Icon className={cn("size-4", ACTIVITY_TONE[activity.status])} />
         </div>
@@ -245,6 +258,6 @@ function ActivityRow({
           </Button>
         )}
       </div>
-    </li>
+    </div>
   );
 }

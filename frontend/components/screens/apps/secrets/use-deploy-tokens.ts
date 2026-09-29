@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CREATE_DEPLOY_TOKEN,
@@ -14,36 +15,35 @@ import {
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_APP_DEPLOY_TOKENS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 
+import { useCursorList } from "../use-cursor-list";
+import { APP_DEPLOY_TOKENS_LIST } from "./deploy-tokens-list";
 import type { CreateDeployTokenInput, DeployToken, DeployTokenSecretReveal } from "./secrets.types";
 
 interface Resp {
-  astroliftAppDeployTokensPage: {
-    items: DeployToken[];
-    nextCursor?: string | null;
-    totalCount?: number | null;
-  };
+  astroliftAppDeployTokensPage: CursorPage<DeployToken>;
 }
 
 /**
- * The app Deploy tokens tab: the paged token table, the create / rotate /
- * revoke mutations, and the one-time plaintext reveal they produce. The data
- * half of DeployTokensScreen.
+ * The app's Access › Deploy tokens section: one cursor page of tokens for
+ * the embedded list, the create / rotate / revoke mutations, and the
+ * one-time plaintext reveal they produce. The data half of
+ * DeployTokensScreen. The list state is in memory: the section lives under
+ * `?section=tokens`, which a URL list state would drop on its first search.
  */
 export function useDeployTokens(slug: string) {
   const tr = useTranslations("apps.tokens");
   const [reveal, setReveal] = React.useState<DeployTokenSecretReveal | null>(null);
 
-  const table = useCursorTable<DeployToken>({
+  const tokens = useCursorList<DeployToken>({
     query: LIST_APP_DEPLOY_TOKENS_PAGE,
     variables: { appSlug: slug },
     extract: (d) => (d as Resp | undefined)?.astroliftAppDeployTokensPage,
-    searchVariable: "search",
-    urlKey: "tok",
+    list: useLocalListState(APP_DEPLOY_TOKENS_LIST),
   });
 
-  // Refetched by operation name, not by document: the walk's cursor, page
-  // size and search term live in the controller, so only the active query
-  // knows the variables of the page the operator is looking at.
+  // Refetched by operation name, not by document: the cursor, page size and
+  // search term live in the list state, so only the active query knows the
+  // variables of the page the operator is looking at.
   const refetch = ["ListAppDeployTokensPage"];
 
   const [createToken, createState] = useMutation<{
@@ -98,7 +98,7 @@ export function useDeployTokens(slug: string) {
 
   return {
     slug,
-    table,
+    ...tokens,
     busy,
     reveal,
     onDismissReveal: () => setReveal(null),

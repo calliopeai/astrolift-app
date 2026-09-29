@@ -10921,6 +10921,22 @@ export type ZentinelleClusterInput = {
   clusterId: Scalars['GUID']['input'];
 };
 
+export type PermissionDiagnoseQueryVariables = Exact<{
+  userId: Scalars['ID']['input'];
+  permission: Scalars['String']['input'];
+}>;
+
+
+export type PermissionDiagnoseQuery = { permissionDiagnose?: { userId: string, username: string, permission: string, granted: boolean, isSuperuser: boolean, steps: Array<{ check: string, result: boolean, detail: string }> } | null };
+
+export type PermissionCompareQueryVariables = Exact<{
+  userIdA: Scalars['ID']['input'];
+  userIdB: Scalars['ID']['input'];
+}>;
+
+
+export type PermissionCompareQuery = { permissionCompare?: { userAUsername: string, userBUsername: string, onlyA: Array<string>, onlyB: Array<string>, shared: Array<string> } | null };
+
 export type CreateSkillMutationVariables = Exact<{
   orgId: Scalars['ID']['input'];
   input: SkillInput;

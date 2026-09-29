@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
 import type { AstroliftAppTeamAccess } from "@/graphql/registry/registry.types";
 
@@ -120,14 +119,16 @@ export const TEAMS: AstroliftTeam[] = [
   team("t-5", "Security", "security"),
 ];
 
-export const TEAMS_CARD: TeamsCardViewProps = {
+/** The card's props less its list state (the stories keep that in memory). */
+export const TEAMS_CARD: Omit<TeamsCardViewProps, "list"> = {
   homeTeamSlug: "platform",
-  table: fakeController<AstroliftAppTeamAccess>({
-    rows: ACCESSES,
-    totalCount: ACCESSES.length,
-    sort: undefined,
-    sortEnabled: false,
-  }),
+  rows: ACCESSES,
+  loading: false,
+  stale: false,
+  error: null,
+  onRetry: noop,
+  nextCursor: null,
+  totalCount: ACCESSES.length,
   teams: TEAMS,
   teamsLoading: false,
   candidateTeams: TEAMS.slice(3),

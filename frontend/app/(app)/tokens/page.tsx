@@ -1,9 +1,16 @@
-import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
+import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
 import { TokensClient } from "./tokens-client";
 
 export const metadata = { title: "API keys · Astrolift" };
+
+/**
+ * Preloads the list's first page, the query the page reads. The variables
+ * have to be exactly the ones `useTokens` sends for the default list state
+ * (tokensVariables: no search, the first page size, no cursor).
+ */
+const FIRST_PAGE = { search: null, limit: 25, after: null };
 
 // /tokens is the canonical Tokens surface but lives at the top level rather
 // than under /administration (#893). It keeps its place in the admin control
@@ -11,7 +18,7 @@ export const metadata = { title: "API keys · Astrolift" };
 // `Admin ▾` switcher on every Admin page.
 export default function TokensPage() {
   return (
-    <PreloadQuery query={LIST_API_TOKENS}>
+    <PreloadQuery query={LIST_API_TOKENS_PAGE} variables={FIRST_PAGE}>
       <TokensClient />
     </PreloadQuery>
   );

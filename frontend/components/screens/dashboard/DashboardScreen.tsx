@@ -38,8 +38,8 @@ import {
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { EmptyState } from "@/components/EmptyState";
 import { KpiTile } from "@/components/KpiTile";
+import { ListSummary } from "@/components/list/ListSummary";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -372,65 +372,53 @@ export function DashboardScreen({
           {(activeAgentTasks.length > 0 || activeWorkflowRuns.length > 0) && (
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               {canViewAgents && activeAgentTasks.length > 0 && (
-                <div className="rounded-lg border">
-                  <div className="border-b px-4 py-3">
-                    <h3 className="font-medium">Agents running now</h3>
-                  </div>
-                  <ul className="divide-y">
-                    {activeAgentTasks.slice(0, 5).map((task) => (
-                      <li
-                        key={task.id}
-                        className="flex items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={`/agents/runs/${encodeURIComponent(task.id)}`}
-                            className="truncate font-medium hover:underline"
-                          >
-                            {task.agentName || task.agentSlug || task.id}
-                          </Link>
-                          <p className="text-muted-foreground truncate font-mono text-xs">
-                            {task.projectSlug || "unassigned"} · {task.id}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="capitalize">
-                          {task.status}
-                        </Badge>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <ListSummary<DashboardAgentTask>
+                  title="Agents running now"
+                  count={activeAgentTasks.length}
+                  rows={activeAgentTasks}
+                  keyOf={(task) => task.id}
+                  rowHref={(task) => `/agents/runs/${encodeURIComponent(task.id)}`}
+                  viewAllHref="/agents?tab=active"
+                  renderRow={(task) => (
+                    <span className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {task.agentName || task.agentSlug || task.id}
+                        </span>
+                        <span className="text-muted-foreground block truncate font-mono text-xs">
+                          {task.projectSlug || "unassigned"} · {task.id}
+                        </span>
+                      </span>
+                      <Badge variant="secondary" className="shrink-0 capitalize">
+                        {task.status}
+                      </Badge>
+                    </span>
+                  )}
+                />
               )}
               {canViewWorkflows && activeWorkflowRuns.length > 0 && (
-                <div className="rounded-lg border">
-                  <div className="border-b px-4 py-3">
-                    <h3 className="font-medium">Workflows running now</h3>
-                  </div>
-                  <ul className="divide-y">
-                    {activeWorkflowRuns.slice(0, 5).map((run) => (
-                      <li
-                        key={run.guid}
-                        className="flex items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={`/workflows/${encodeURIComponent(run.definitionSlug)}/builder`}
-                            className="truncate font-medium hover:underline"
-                          >
-                            {run.definitionName}
-                          </Link>
-                          <p className="text-muted-foreground truncate text-xs">
-                            {run.projectSlug || "Reusable template"}
-                            {run.currentStageOrder != null
-                              ? ` · stage ${run.currentStageOrder + 1}${run.currentStageRole ? ` ${run.currentStageRole}` : ""}`
-                              : ""}
-                          </p>
-                        </div>
-                        <Badge>Running</Badge>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <ListSummary<DashboardWorkflowRun>
+                  title="Workflows running now"
+                  count={activeWorkflowRuns.length}
+                  rows={activeWorkflowRuns}
+                  keyOf={(run) => run.guid}
+                  rowHref={(run) => `/workflows/${encodeURIComponent(run.definitionSlug)}/builder`}
+                  viewAllHref="/workflows?tab=running"
+                  renderRow={(run) => (
+                    <span className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{run.definitionName}</span>
+                        <span className="text-muted-foreground block truncate text-xs">
+                          {run.projectSlug || "Reusable template"}
+                          {run.currentStageOrder != null
+                            ? ` · stage ${run.currentStageOrder + 1}${run.currentStageRole ? ` ${run.currentStageRole}` : ""}`
+                            : ""}
+                        </span>
+                      </span>
+                      <Badge className="shrink-0">Running</Badge>
+                    </span>
+                  )}
+                />
               )}
             </div>
           )}
@@ -503,46 +491,37 @@ export function DashboardScreen({
       {(canViewProjects || canViewAudit) && (
         <div className="grid gap-4 lg:grid-cols-3">
           {canViewProjects && (
-            <Card className={canViewAudit ? "lg:col-span-2" : "lg:col-span-3"}>
-              <CardHeader>
-                <CardTitle>{t("recentProjects.title")}</CardTitle>
-                <CardDescription>{t("recentProjects.description")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {projectsLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ) : recentProjects.length === 0 ? (
-                  <EmptyState
-                    icon={<FileBoxIcon className="size-5" />}
-                    title={t("recentProjects.emptyTitle")}
-                    description={t("recentProjects.emptyDescription")}
-                    actionHref="/administration/teams"
-                    actionLabel={t("recentProjects.emptyAction")}
-                  />
-                ) : (
-                  <ul className="divide-y">
-                    {recentProjects.map((p) => (
-                      <li key={p.id} className="flex items-center justify-between py-3">
-                        <div>
-                          <Link
-                            href={`/projects/${encodeURIComponent(p.slug)}`}
-                            className="font-medium hover:underline"
-                          >
-                            {p.team.slug}/{p.slug}
-                          </Link>
-                          <p className="text-muted-foreground text-xs">{p.name}</p>
-                        </div>
-                        <Badge variant="outline">{p.team.slug}</Badge>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+            <ListSummary<DashboardProject>
+              className={canViewAudit ? "lg:col-span-2" : "lg:col-span-3"}
+              title={t("recentProjects.title")}
+              description={t("recentProjects.description")}
+              count={projectsLoading ? null : projectsCount}
+              rows={recentProjects}
+              keyOf={(p) => p.id}
+              rowHref={(p) => `/projects/${encodeURIComponent(p.slug)}`}
+              viewAllHref="/administration/projects"
+              loading={projectsLoading}
+              empty={{
+                icon: <FileBoxIcon className="size-5" />,
+                title: t("recentProjects.emptyTitle"),
+                description: t("recentProjects.emptyDescription"),
+                actionHref: "/administration/teams",
+                actionLabel: t("recentProjects.emptyAction"),
+              }}
+              renderRow={(p) => (
+                <span className="flex min-w-0 items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {p.team.slug}/{p.slug}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-xs">{p.name}</span>
+                  </span>
+                  <Badge variant="outline" className="max-w-40 shrink-0 truncate">
+                    {p.team.slug}
+                  </Badge>
+                </span>
+              )}
+            />
           )}
 
           {canViewAudit && (

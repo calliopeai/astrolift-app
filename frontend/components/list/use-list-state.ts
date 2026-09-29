@@ -182,6 +182,27 @@ export function serializeListState(def: ListDefinition, state: ListState): strin
 }
 
 /** The view's filters under the person's own: what the query is sent. */
+/**
+ * A list's query merged into the page's own: params the list does not own
+ * (a host tab's `?section=`, `?kind=`) survive every list change.
+ */
+export function mergeListQuery(def: ListDefinition, current: string, listQuery: string): string {
+  const owned = new Set([
+    "view",
+    "q",
+    "sort",
+    "page",
+    "after",
+    "pageSize",
+    ...def.fields.map((f) => f.key),
+  ]);
+  const p = new URLSearchParams();
+  for (const [key, value] of new URLSearchParams(current))
+    if (!owned.has(key)) p.append(key, value);
+  for (const [key, value] of new URLSearchParams(listQuery)) p.append(key, value);
+  return p.toString();
+}
+
 export function effectiveFilters(def: ListDefinition, state: ListState): Record<string, string> {
   const view = def.views.find((v) => v.key === state.view);
   return { ...view?.filters, ...state.filters };
@@ -399,7 +420,10 @@ export function useListState(def: ListDefinition): ListStateController {
   const router = useRouter();
   const qs = params?.toString() ?? "";
   const state = React.useMemo(() => parseListState(def, qs), [def, qs]);
-  const href = (query: string) => (query ? `${pathname}?${query}` : pathname);
+  const href = (query: string) => {
+    const merged = mergeListQuery(def, qs, query);
+    return merged ? `${pathname}?${merged}` : pathname;
+  };
   return useController(
     def,
     state,

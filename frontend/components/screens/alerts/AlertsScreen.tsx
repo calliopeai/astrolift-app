@@ -1,68 +1,54 @@
 "use client";
 
 import {
+  ArrowRightIcon,
   BellIcon,
   BellOffIcon,
-  CheckIcon,
-  MoreHorizontalIcon,
   PlusIcon,
   Trash2Icon,
   VolumeOffIcon,
   Volume2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { StatusDot } from "@/components/StatusDot";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { formatRemaining } from "./alert-format";
 import { CreateAlertRuleSheet } from "./CreateAlertRuleSheet";
 import { MuteAlertRuleSheet } from "./MuteAlertRuleSheet";
-import type { AlertEvent, AlertRule, useAlerts } from "./use-alerts";
-
-/**
- * Cells that carry their own controls have to sit above `rowHref`'s
- * stretched row link, which is an overlay across the whole row.
- */
-const ABOVE_ROW_LINK = "relative z-10";
-
-const SEVERITY_TONE: Record<string, "ok" | "warn" | "error" | "muted"> = {
-  info: "ok",
-  warn: "warn",
-  warning: "warn",
-  critical: "error",
-  error: "error",
-};
+import type { AlertRule, useAlerts } from "./use-alerts";
 
 export type AlertsScreenProps = ReturnType<typeof useAlerts>;
 
-/** Alerts: the rule and event tables, stat cards, and rule create / mute / delete. */
+/**
+ * Admin › Alerts (spec 44 §5.1): the rules on the shared list, views All ·
+ * Mine · Active · Muted, cursor paged, mute and delete in each row's `⋯`.
+ * The firing events are a Feed on their own route (/alerts/events); the
+ * counts above the filters link to it. Pure; the data half is useAlerts.
+ */
 export function AlertsScreen({
-  rulesTable,
-  eventsTable,
-  ruleCount,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   activeRuleCount,
   unresolvedCount,
-  eventCount,
   busy,
   createRule,
   deleteRule,
-  acknowledge,
   mutePreset,
   muteCustom,
   unmute,
@@ -80,8 +66,9 @@ export function AlertsScreen({
     {
       id: "name",
       header: t("rules.columns.name"),
+      cellClassName: "max-w-80",
       cell: (r) => (
-        <span className="flex items-center gap-2 font-medium">
+        <span className="flex min-w-0 items-center gap-2 font-medium">
           {r.activeMute ? (
             <VolumeOffIcon className="text-muted-foreground size-4 shrink-0" />
           ) : r.isActive ? (
@@ -89,7 +76,9 @@ export function AlertsScreen({
           ) : (
             <BellOffIcon className="text-muted-foreground size-4 shrink-0" />
           )}
-          {r.name}
+          <span className="min-w-0 truncate" title={r.name}>
+            {r.name}
+          </span>
           {r.activeMute && (
             <Badge variant="secondary" className="text-2xs">
               {t("mute.badge", { remaining: formatRemaining(r.activeMute.ttlUntil) })}
@@ -101,13 +90,19 @@ export function AlertsScreen({
     {
       id: "target",
       header: t("rules.columns.target"),
+      cellClassName: "max-w-64",
       cell: (r) => (
-        <>
+        <span className="flex min-w-0 items-center gap-2">
           <Badge variant="outline">{r.target}</Badge>
           {r.targetId && (
-            <span className="text-muted-foreground text-2xs ml-2 font-mono">{r.targetId}</span>
+            <span
+              className="text-muted-foreground text-2xs min-w-0 truncate font-mono"
+              title={r.targetId}
+            >
+              {r.targetId}
+            </span>
           )}
-        </>
+        </span>
       ),
     },
     {
@@ -123,248 +118,118 @@ export function AlertsScreen({
       id: "createdAt",
       header: t("rules.columns.created"),
       cell: (r) => (
-        <span className="text-muted-foreground text-xs">{fmt.formatDate(r.createdAt)}</span>
-      ),
-    },
-    {
-      id: "actions",
-      // The header stayed blank in the old table; sr-only keeps that look
-      // without leaving the column unnamed for a screen reader.
-      header: <span className="sr-only">Actions</span>,
-      align: "right",
-      width: "w-16",
-      cellClassName: ABOVE_ROW_LINK,
-      cell: (r) => (
-        <div className="flex items-center justify-end gap-1">
-          <Can permission="org.update">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={busy}
-                  aria-label={t("mute.menuLabel")}
-                >
-                  <MoreHorizontalIcon className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {r.activeMute ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      void unmute(r);
-                    }}
-                  >
-                    <Volume2Icon className="size-4" />
-                    {t("mute.unmute")}
-                  </DropdownMenuItem>
-                ) : (
-                  <>
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        void mutePreset(r, 1, "1h");
-                      }}
-                    >
-                      <VolumeOffIcon className="size-4" />
-                      {t("mute.preset1h")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        void mutePreset(r, 4, "4h");
-                      }}
-                    >
-                      <VolumeOffIcon className="size-4" />
-                      {t("mute.preset4h")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        void mutePreset(r, 24, "24h");
-                      }}
-                    >
-                      <VolumeOffIcon className="size-4" />
-                      {t("mute.preset24h")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setMuteTarget(r)}>
-                      <VolumeOffIcon className="size-4" />
-                      {t("mute.presetCustom")}
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setDeleteTarget(r)} variant="destructive">
-                  <Trash2Icon className="size-4" />
-                  {t("delete.confirm")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </Can>
-        </div>
-      ),
-    },
-  ];
-
-  const eventColumns: Column<AlertEvent>[] = [
-    {
-      id: "summary",
-      header: t("events.columns.summary"),
-      cell: (e) => (
-        <span className="flex items-center gap-2">
-          <StatusDot status={SEVERITY_TONE[e.severity] ?? "muted"} />
-          <span className="max-w-md truncate">{e.summary}</span>
+        <span className="text-muted-foreground font-mono text-xs">
+          {fmt.formatDate(r.createdAt)}
         </span>
       ),
     },
-    {
-      id: "severity",
-      header: t("events.columns.severity"),
-      cell: (e) => (
-        <Badge variant="secondary" className="capitalize">
-          {e.severity}
-        </Badge>
-      ),
-    },
-    {
-      id: "firedAt",
-      header: t("events.columns.fired"),
-      cell: (e) => (
-        <span className="text-muted-foreground text-xs">{fmt.formatDateTime(e.firedAt)}</span>
-      ),
-    },
-    {
-      id: "state",
-      header: t("events.columns.state"),
-      cell: (e) =>
-        e.resolvedAt ? (
-          <Badge variant="outline">{t("events.resolved")}</Badge>
-        ) : e.acknowledgedAt ? (
-          <Badge variant="secondary">{t("events.acknowledged")}</Badge>
-        ) : (
-          <Badge variant="destructive">{t("events.firing")}</Badge>
-        ),
-    },
-    {
-      id: "actions",
-      header: <span className="sr-only">{t("events.ack")}</span>,
-      align: "right",
-      width: "w-24",
-      cellClassName: ABOVE_ROW_LINK,
-      cell: (e) =>
-        !e.resolvedAt && !e.acknowledgedAt ? (
-          <Can permission="org.update">
-            <Button variant="ghost" size="sm" onClick={() => acknowledge(e)} disabled={busy}>
-              <CheckIcon className="size-3.5" />
-              {t("events.ack")}
-            </Button>
-          </Can>
-        ) : null,
-    },
   ];
 
-  return (
-    <PageShell
-      title={t("title")}
-      description={t("description")}
-      actions={
-        <Can permission="org.update">
-          <Button onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="size-4" />
-            {t("newRule")}
-          </Button>
-        </Can>
-      }
-    >
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-muted-foreground text-xs tracking-wide uppercase">
-              {t("stats.rules")}
-            </p>
-            <p className="mt-1 text-2xl font-bold">{ruleCount}</p>
-            <p className="text-muted-foreground text-xs">
-              {t("stats.active", { count: activeRuleCount })}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-muted-foreground text-xs tracking-wide uppercase">
-              {t("stats.unresolved")}
-            </p>
-            <p className="text-destructive mt-1 text-2xl font-bold">{unresolvedCount}</p>
-            <p className="text-muted-foreground text-xs">{t("stats.inWindow")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-muted-foreground text-xs tracking-wide uppercase">
-              {t("stats.total")}
-            </p>
-            <p className="mt-1 text-2xl font-bold">{eventCount}</p>
-            {/* `stats.latest` ("latest 100") described the capped fetch this
-                card used to count. The number above it is the server's total
-                now, so the caption is dropped rather than left saying
-                something false. */}
-          </CardContent>
-        </Card>
+  function rowActions(r: AlertRule) {
+    return (
+      <Can permission="org.update">
+        {r.activeMute ? (
+          <DropdownMenuItem disabled={busy} onSelect={() => void unmute(r)}>
+            <Volume2Icon className="size-4" />
+            {t("mute.unmute")}
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem disabled={busy} onSelect={() => void mutePreset(r, 1, "1h")}>
+              <VolumeOffIcon className="size-4" />
+              {t("mute.preset1h")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={busy} onSelect={() => void mutePreset(r, 4, "4h")}>
+              <VolumeOffIcon className="size-4" />
+              {t("mute.preset4h")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={busy} onSelect={() => void mutePreset(r, 24, "24h")}>
+              <VolumeOffIcon className="size-4" />
+              {t("mute.preset24h")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={busy} onSelect={() => setMuteTarget(r)}>
+              <VolumeOffIcon className="size-4" />
+              {t("mute.presetCustom")}
+            </DropdownMenuItem>
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={busy} onSelect={() => setDeleteTarget(r)} variant="destructive">
+          <Trash2Icon className="size-4" />
+          {t("delete.confirm")}
+        </DropdownMenuItem>
+      </Can>
+    );
+  }
+
+  // The counts sit above the filters; the unresolved one opens the feed.
+  const counts = (
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <div className="min-w-0 rounded-md border p-3">
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">{t("stats.rules")}</p>
+        <p className="mt-1 font-mono text-2xl font-bold">{totalCount ?? "—"}</p>
+        <p className="text-muted-foreground text-xs">
+          {t("stats.active", { count: activeRuleCount })}
+        </p>
       </div>
+      <Link
+        href="/alerts/events?view=firing"
+        className="hover:bg-muted/50 focus-visible:ring-ring block min-w-0 rounded-md border p-3 focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <p className="text-muted-foreground flex items-center justify-between gap-2 text-xs tracking-wide uppercase">
+          {t("stats.unresolved")}
+          <ArrowRightIcon className="size-3.5" aria-hidden />
+        </p>
+        <p className="text-destructive mt-1 font-mono text-2xl font-bold">{unresolvedCount}</p>
+        <p className="text-muted-foreground text-xs">{t("stats.inWindow")}</p>
+      </Link>
+    </div>
+  );
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
-          <div>
-            <h2 className="font-medium">{t("rules.title")}</h2>
-            <p className="text-muted-foreground text-xs">{t("rules.description")}</p>
-          </div>
-          <DataTable
-            label="Alert rules"
-            controller={rulesTable}
-            columns={ruleColumns}
-            getRowId={(r) => r.id}
-            rowHref={(r) => `/alerts/rules/${r.id}`}
-            rowClassName={(r) => (r.activeMute ? "opacity-70" : undefined)}
-            searchPlaceholder="Search rules…"
-            empty={{
-              icon: <BellIcon className="size-5" />,
-              title: t("rules.emptyTitle"),
-              description: t("rules.emptyDescription"),
-            }}
-            // Hardcoded rather than translated: adding a key here means
-            // editing all eight locale files, which is a separate change.
-            emptyFiltered={{
-              title: "No matching rules",
-              description:
-                "No rule matches that search. The server matches the rule name and the target it covers (app slug, env name, workload slug).",
-            }}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
-          <div>
-            <h2 className="font-medium">{t("events.title")}</h2>
-            <p className="text-muted-foreground text-xs">{t("events.description")}</p>
-          </div>
-          <DataTable
-            label="Alert events"
-            controller={eventsTable}
-            columns={eventColumns}
-            getRowId={(e) => e.id}
-            rowHref={(e) => `/alerts/events/${e.id}`}
-            searchPlaceholder="Search events…"
-            empty={{
-              icon: <BellIcon className="size-5" />,
-              title: t("events.emptyTitle"),
-              description: t("events.emptyDescription"),
-            }}
-            emptyFiltered={{
-              title: "No matching events",
-              description:
-                "No firing event matches that search. The server matches the event summary and the name of the rule that fired it.",
-            }}
-          />
-        </CardContent>
-      </Card>
+  return (
+    <>
+      <ListPage<AlertRule>
+        header={{
+          crumbs: adminCrumbs("alerts", t("title")),
+          title: t("title"),
+          context: t("description"),
+          primaryAction: (
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline">
+                <Link href="/alerts/events">
+                  <BellIcon className="size-4" />
+                  {t("events.title")}
+                </Link>
+              </Button>
+              <Can permission="org.update">
+                <Button onClick={() => setCreateOpen(true)}>
+                  <PlusIcon className="size-4" />
+                  {t("newRule")}
+                </Button>
+              </Can>
+            </div>
+          ),
+        }}
+        notice={counts}
+        list={list}
+        label="Alert rules"
+        columns={ruleColumns}
+        rows={rows}
+        getRowId={(r) => r.id}
+        rowHref={(r) => `/alerts/rules/${r.id}`}
+        rowActions={rowActions}
+        rowClassName={(r) => (r.activeMute ? "opacity-70" : undefined)}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={{
+          icon: <BellIcon className="size-5" />,
+          title: t("rules.emptyTitle"),
+          description: t("rules.emptyDescription"),
+        }}
+      />
 
       <CreateAlertRuleSheet
         open={createOpen}
@@ -407,6 +272,6 @@ export function AlertsScreen({
         }}
         busy={busy}
       />
-    </PageShell>
+    </>
   );
 }

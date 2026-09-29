@@ -30,14 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 import type {
   AppDomain,
@@ -262,38 +254,34 @@ export function DomainHandshakeCard({
                   ? t("liveHelp")
                   : t("needsHelp")}
             </div>
-            <div className="border-border min-w-0 overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-6"></TableHead>
-                    <TableHead className="w-16">{t("dnsColumns.type")}</TableHead>
-                    <TableHead>{t("dnsColumns.name")}</TableHead>
-                    <TableHead>{t("dnsColumns.value")}</TableHead>
-                    <TableHead className="w-16">{t("dnsColumns.ttl")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {records.map((r, i) => (
-                    <TableRow key={`${r.kind}-${r.name}-${i}`}>
-                      <TableCell>
-                        <StatusDot status={r.propagated ? "ok" : "pending"} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{r.kind}</TableCell>
-                      <TableCell className="font-mono text-xs whitespace-normal">
+            {/* The records to add: a handful per domain, each read and copied
+                whole, so a row of labelled fields rather than a table. */}
+            <ul className="border-border min-w-0 divide-y rounded-md border">
+              {records.map((r, i) => (
+                <li
+                  key={`${r.kind}-${r.name}-${i}`}
+                  className="flex min-w-0 items-start gap-3 px-3 py-2"
+                >
+                  <StatusDot status={r.propagated ? "ok" : "pending"} className="mt-1" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+                      <span className="font-mono font-medium">{r.kind}</span>
+                      <span className="text-muted-foreground font-mono">
+                        {t("dnsColumns.ttl")} {r.ttl}s
+                      </span>
+                    </div>
+                    <div className="grid min-w-0 gap-2 md:grid-cols-2">
+                      <RecordField label={t("dnsColumns.name")}>
                         <CopyValue value={r.name} label={`${r.kind} name`} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs whitespace-normal">
+                      </RecordField>
+                      <RecordField label={t("dnsColumns.value")}>
                         <CopyValue value={r.value} label={`${r.kind} value`} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {r.ttl}s
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </RecordField>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
             {allPropagated && domain.certState !== "validated" && (
               <p className="text-muted-foreground text-xs">{t("allPropagated")}</p>
             )}
@@ -315,6 +303,16 @@ export function DomainHandshakeCard({
 }
 
 /** A DNS record field in mono, wrapping anywhere, with its copy button. */
+/** One labelled field of a record, rule or route row. */
+function RecordField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-muted-foreground text-2xs">{label}</p>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function CopyValue({ value, label }: { value: string; label: string }) {
   return (
     <span className="flex min-w-0 items-start gap-1">
@@ -450,50 +448,45 @@ function DomainRedirectsSection({
       </div>
 
       {rules.length > 0 ? (
-        <div className="border-border rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-32">Kind</TableHead>
-                <TableHead>Source pattern</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead className="w-16">Status</TableHead>
-                <TableHead className="w-20">Query string</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rules.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">{r.kind}</TableCell>
-                  <TableCell className="font-mono text-xs break-all">
-                    {r.sourcePattern || "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs break-all">
-                    {r.destinationUrl || "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.httpStatus}</TableCell>
-                  <TableCell className="text-xs">
-                    {r.preserveQueryString ? "preserve" : "drop"}
-                  </TableCell>
-                  <TableCell>
-                    <Can permission="app.deploy">
-                      <button
-                        type="button"
-                        onClick={() => deleteRule(r.id)}
-                        className="hover:bg-muted text-muted-foreground hover:text-destructive rounded p-1"
-                        title="Remove rule"
-                        disabled={busy}
-                      >
-                        <Trash2Icon className="size-3.5" />
-                      </button>
-                    </Can>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ul className="border-border min-w-0 divide-y rounded-md border">
+          {rules.map((r) => (
+            <li key={r.id} className="flex min-w-0 items-start gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+                  <span className="font-mono font-medium">{r.kind}</span>
+                  <span className="text-muted-foreground font-mono">{r.httpStatus}</span>
+                  <span className="text-muted-foreground">
+                    Query string {r.preserveQueryString ? "preserve" : "drop"}
+                  </span>
+                </div>
+                <div className="grid min-w-0 gap-2 md:grid-cols-2">
+                  <RecordField label="Source pattern">
+                    <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                      {r.sourcePattern || "—"}
+                    </span>
+                  </RecordField>
+                  <RecordField label="Destination">
+                    <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                      {r.destinationUrl || "—"}
+                    </span>
+                  </RecordField>
+                </div>
+              </div>
+              <Can permission="app.deploy">
+                <button
+                  type="button"
+                  onClick={() => deleteRule(r.id)}
+                  className="hover:bg-muted text-muted-foreground hover:text-destructive shrink-0 rounded p-1"
+                  title="Remove rule"
+                  aria-label="Remove rule"
+                  disabled={busy}
+                >
+                  <Trash2Icon className="size-3.5" />
+                </button>
+              </Can>
+            </li>
+          ))}
+        </ul>
       ) : (
         !addOpen && (
           <p className="text-muted-foreground text-xs">
@@ -706,44 +699,42 @@ function DomainPathRoutesSection({
       </div>
 
       {routes.length > 0 ? (
-        <div className="border-border rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Path prefix</TableHead>
-                <TableHead>Workload</TableHead>
-                <TableHead className="w-16">Port</TableHead>
-                <TableHead className="w-20">Strip</TableHead>
-                <TableHead className="w-20">Priority</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {routes.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs break-all">{r.pathPrefix}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.targetWorkloadSlug}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.targetPort}</TableCell>
-                  <TableCell className="text-xs">{r.stripPrefix ? "yes" : "no"}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.priority}</TableCell>
-                  <TableCell>
-                    <Can permission="app.deploy">
-                      <button
-                        type="button"
-                        onClick={() => deleteRoute(r.id)}
-                        className="hover:bg-muted text-muted-foreground hover:text-destructive rounded p-1"
-                        title="Remove route"
-                        disabled={busy}
-                      >
-                        <Trash2Icon className="size-3.5" />
-                      </button>
-                    </Can>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ul className="border-border min-w-0 divide-y rounded-md border">
+          {routes.map((r) => (
+            <li key={r.id} className="flex min-w-0 items-start gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="font-mono text-xs font-medium [overflow-wrap:anywhere]">
+                  {r.pathPrefix}
+                </p>
+                <p className="text-muted-foreground flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    Workload{" "}
+                    <span className="text-foreground font-mono">{r.targetWorkloadSlug}</span>
+                  </span>
+                  <span>
+                    Port <span className="text-foreground font-mono">{r.targetPort}</span>
+                  </span>
+                  <span>Strip {r.stripPrefix ? "yes" : "no"}</span>
+                  <span>
+                    Priority <span className="text-foreground font-mono">{r.priority}</span>
+                  </span>
+                </p>
+              </div>
+              <Can permission="app.deploy">
+                <button
+                  type="button"
+                  onClick={() => deleteRoute(r.id)}
+                  className="hover:bg-muted text-muted-foreground hover:text-destructive shrink-0 rounded p-1"
+                  title="Remove route"
+                  aria-label="Remove route"
+                  disabled={busy}
+                >
+                  <Trash2Icon className="size-3.5" />
+                </button>
+              </Can>
+            </li>
+          ))}
+        </ul>
       ) : (
         !addOpen && (
           <p className="text-muted-foreground text-xs">

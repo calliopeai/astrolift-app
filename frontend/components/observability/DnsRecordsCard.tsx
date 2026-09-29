@@ -9,7 +9,9 @@
  * Empty state is keyed off the resolver's `reason` (#1111) so the card
  * renders one honest message — "Not configured", "Not available on this
  * cloud", "No DNS records yet", or "Couldn't load" — instead of the old
- * hedged "either/or" copy.
+ * hedged "either/or" copy. The records are the card's embedded list
+ * (search, type and propagation filters, sort, numbered pages over the
+ * driver's answer), with its list state kept in the card.
  */
 
 import { GlobeIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react";
@@ -17,7 +19,11 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
+import { ListPage } from "@/components/list/ListPage";
+import { selectRows } from "@/components/list/select-rows";
+import { useLocalListState } from "@/components/list/use-list-state";
 import {
   type ObservabilityPanelReason,
   panelEmptyState,
@@ -26,18 +32,12 @@ import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type {
   AstroliftAppDnsRecord,
   DnsPropagationStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+
+import { DNS_RECORDS_LIST, DNS_RECORDS_SELECT, dnsKey } from "./network-lists";
 
 export interface DnsRecordsCardData {
   astroliftAppDnsRecords: {
@@ -87,6 +87,67 @@ export function DnsRecordsCard({
   // (not-configured / no-data). NOT_SUPPORTED is informational; ERROR
   // is transient.
   const showSetupAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
+
+  const list = useLocalListState(DNS_RECORDS_LIST);
+  const page = selectRows(
+    records,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    DNS_RECORDS_SELECT
+  );
+  const columns: Column<AstroliftAppDnsRecord>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortKey: "name",
+      cellClassName: "max-w-72",
+      cell: (r) => (
+        <span className="block truncate font-mono text-xs" title={r.name}>
+          {r.name}
+        </span>
+      ),
+    },
+    {
+      id: "type",
+      header: "Type",
+      sortKey: "type",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => r.type,
+    },
+    {
+      id: "value",
+      header: "Value",
+      cellClassName: "text-muted-foreground max-w-80",
+      cell: (r) => (
+        <span className="block truncate font-mono text-xs" title={r.value}>
+          {r.value}
+        </span>
+      ),
+    },
+    {
+      id: "ttl",
+      header: "TTL",
+      sortKey: "ttl",
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => r.ttl,
+    },
+    {
+      id: "propagation",
+      header: "Propagation",
+      cell: (r) => (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <StatusDot status={PROPAGATION_DOT[r.propagationStatus]} />
+          <span>{PROPAGATION_LABEL[r.propagationStatus]}</span>
+        </span>
+      ),
+    },
+  ];
 
   return (
     <Card>
@@ -157,35 +218,18 @@ export function DnsRecordsCard({
             />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead className="text-right">TTL</TableHead>
-                <TableHead>Propagation</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((r, i) => (
-                <TableRow key={`${r.name}-${r.type}-${r.value}-${i}`}>
-                  <TableCell className="font-mono text-xs">{r.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.type}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">
-                    {r.value}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">{r.ttl}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-2 text-xs">
-                      <StatusDot status={PROPAGATION_DOT[r.propagationStatus]} />
-                      <span>{PROPAGATION_LABEL[r.propagationStatus]}</span>
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="px-4 pb-4">
+            <ListPage<AstroliftAppDnsRecord>
+              embedded
+              list={list}
+              label="DNS records"
+              columns={columns}
+              rows={page.rows}
+              getRowId={dnsKey}
+              totalCount={page.totalCount}
+              empty={{ icon: <GlobeIcon className="size-5" />, title: empty.title }}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

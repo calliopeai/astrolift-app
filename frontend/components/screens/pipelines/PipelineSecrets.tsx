@@ -5,23 +5,18 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { selectRows } from "@/components/list/select-rows";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 
+import { PIPELINE_SECRETS_SELECT } from "./pipelines-list";
 import type { usePipelineSecrets } from "./use-pipeline-secrets";
 
 // ---------------------------------------------------------------------------
@@ -102,18 +97,72 @@ function AddSecretForm({
   );
 }
 
-export type PipelineSecretsViewProps = ReturnType<typeof usePipelineSecrets>;
+export type PipelineSecretsViewProps = Omit<ReturnType<typeof usePipelineSecrets>, "list">;
 
-/** A pipeline's Secrets tab (#100): write-only notice, secret list, add and delete. */
+/**
+ * A pipeline's Secrets tab (#100): write-only notice, the secrets as the
+ * tab's one embedded list (search, sort, numbered pages, run over the names
+ * in hand), add and delete. Pure.
+ */
 export function PipelineSecretsView({
+  list,
   secrets,
   loading,
   deleting,
   saveSecret,
   deleteSecret,
-}: PipelineSecretsViewProps) {
+}: PipelineSecretsViewProps & { list: ListStateController }) {
   const [addOpen, setAddOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<PipelineSecret | null>(null);
+  const { state } = list;
+  const page = selectRows(
+    secrets,
+    {
+      filters: list.filters,
+      q: state.q,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    },
+    PIPELINE_SECRETS_SELECT
+  );
+
+  const columns: Column<PipelineSecret>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortKey: "name",
+      cellClassName: "max-w-80",
+      cell: (s) => (
+        <span className="block truncate font-mono text-xs" title={s.name}>
+          {s.name}
+        </span>
+      ),
+    },
+    {
+      id: "value",
+      header: "Value",
+      cell: () => (
+        <Badge variant="secondary" className="text-2xs font-mono">
+          Value set
+        </Badge>
+      ),
+    },
+    {
+      id: "created",
+      header: "Created",
+      sortKey: "created",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (s) => new Date(s.createdAt).toLocaleString(),
+    },
+    {
+      id: "updated",
+      header: "Updated",
+      sortKey: "updated",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (s) => new Date(s.updatedAt).toLocaleString(),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -133,68 +182,33 @@ export function PipelineSecretsView({
       {/* Add secret form (toggled) */}
       {addOpen && <AddSecretForm onSave={saveSecret} onDone={() => setAddOpen(false)} />}
 
-      <Card>
-        <CardContent className="p-0">
-          {loading && secrets.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : secrets.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<KeyIcon className="size-5" />}
-                title="No secrets"
-                description="Add a secret to make it available in this pipeline via ${secrets.NAME}."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="w-12 text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {secrets.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">{s.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-2xs font-mono">
-                        Value set
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {new Date(s.createdAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {new Date(s.updatedAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Can permission="pipeline.secret_manage">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => setDeleteTarget(s)}
-                          disabled={deleting}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Delete {s.name}</span>
-                        </Button>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <ListPage<PipelineSecret>
+        embedded
+        list={list}
+        label="Secrets"
+        columns={columns}
+        rows={page.rows}
+        getRowId={(s) => s.id}
+        rowActions={(s) => (
+          <Can permission="pipeline.secret_manage">
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={deleting}
+              onSelect={() => setDeleteTarget(s)}
+            >
+              <Trash2Icon className="size-4" />
+              Delete {s.name}
+            </DropdownMenuItem>
+          </Can>
+        )}
+        loading={loading && secrets.length === 0}
+        totalCount={page.totalCount}
+        empty={{
+          icon: <KeyIcon className="size-5" />,
+          title: "No secrets",
+          description: "Add a secret to make it available in this pipeline via ${secrets.NAME}.",
+        }}
+      />
 
       {/* "Add secret" action — only when the form is not already open */}
       {!addOpen && (

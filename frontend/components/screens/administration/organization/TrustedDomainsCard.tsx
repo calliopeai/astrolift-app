@@ -1,9 +1,11 @@
 "use client";
 
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,15 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftOrganizationAllowlistedDomain } from "@/graphql/identity/identity.types";
 
 import type { useTrustedDomains } from "./use-trusted-domains";
@@ -35,9 +29,18 @@ const NONE_ROLE_VALUE = "__none__";
 const NONE_REVIEW_VALUE = "auto";
 const REVIEW_VALUE = "review";
 
+/**
+ * Admin › Organization › Trusted domains: the add form over the allowlist,
+ * which is the section's one embedded list (search, mode and role filters,
+ * numbered pages), remove in each row's `⋯`. Pure.
+ */
 export function TrustedDomainsCard({
+  list,
   rows,
+  totalCount,
   loading,
+  error,
+  onRetry,
   roleOptions,
   adding,
   removing,
@@ -64,6 +67,44 @@ export function TrustedDomainsCard({
 
   const [removeTarget, setRemoveTarget] =
     React.useState<AstroliftOrganizationAllowlistedDomain | null>(null);
+
+  const columns: Column<AstroliftOrganizationAllowlistedDomain>[] = [
+    {
+      id: "domain",
+      header: "Domain",
+      sortKey: "domain",
+      cellClassName: "max-w-80",
+      cell: (row) => (
+        <span className="block truncate font-mono" title={row.domain}>
+          {row.domain}
+        </span>
+      ),
+    },
+    {
+      id: "role",
+      header: "Default role",
+      sortKey: "role",
+      cellClassName: "max-w-56",
+      cell: (row) =>
+        row.defaultRoleSlug ? (
+          <Badge variant="secondary" className="max-w-full truncate font-mono">
+            {row.defaultRoleSlug}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">none</span>
+        ),
+    },
+    {
+      id: "mode",
+      header: "Mode",
+      cell: (row) =>
+        row.requiresReview ? (
+          <Badge variant="outline">Review required</Badge>
+        ) : (
+          <Badge variant="outline">Auto-join</Badge>
+        ),
+    },
+  ];
 
   return (
     <Section
@@ -127,68 +168,34 @@ export function TrustedDomainsCard({
           </div>
         </form>
 
-        {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No trusted domains yet. SSO users without a domain match still need an explicit
-            invitation to join.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Domain</TableHead>
-                <TableHead>Default role</TableHead>
-                <TableHead>Mode</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-mono [overflow-wrap:anywhere] whitespace-normal">
-                    {row.domain}
-                  </TableCell>
-                  <TableCell className="whitespace-normal">
-                    {row.defaultRoleSlug ? (
-                      <Badge
-                        variant="secondary"
-                        className="max-w-full font-mono [overflow-wrap:anywhere] whitespace-normal"
-                      >
-                        {row.defaultRoleSlug}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">none</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.requiresReview ? (
-                      <Badge variant="outline">Review required</Badge>
-                    ) : (
-                      <Badge variant="outline">Auto-join</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={removing}
-                      onClick={() => setRemoveTarget(row)}
-                      aria-label={`Remove ${row.domain}`}
-                    >
-                      <Trash2Icon className="size-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <ListPage<AstroliftOrganizationAllowlistedDomain>
+          embedded
+          list={list}
+          label="Trusted domains"
+          columns={columns}
+          rows={rows}
+          getRowId={(row) => row.id}
+          rowActions={(row) => (
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={removing}
+              onSelect={() => setRemoveTarget(row)}
+            >
+              <Trash2Icon className="size-4" />
+              Remove {row.domain}
+            </DropdownMenuItem>
+          )}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          totalCount={totalCount}
+          empty={{
+            icon: <GlobeIcon className="size-5" />,
+            title: "No trusted domains yet",
+            description:
+              "SSO users without a domain match still need an explicit invitation to join.",
+          }}
+        />
       </div>
 
       <ConfirmDialog

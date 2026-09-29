@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,13 +47,21 @@ export type DeployTokensScreenProps = ReturnType<typeof useDeployTokens> & {
 };
 
 /**
- * The app Deploy tokens tab. Holds only UI state (the create sheet and the
- * rotate / revoke confirms); everything that talks to the server comes in
- * from useDeployTokens.
+ * The app's Access › Deploy tokens section, on the embedded list (spec 44
+ * §5.1): cursor pages, search over name, last 4, IP and user agent. Holds
+ * only UI state (the create sheet and the rotate / revoke confirms);
+ * everything that talks to the server comes in from useDeployTokens.
  */
 export function DeployTokensScreen({
   slug,
-  table,
+  list,
+  rows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
   busy,
   reveal,
   onDismissReveal,
@@ -171,21 +180,23 @@ export function DeployTokensScreen({
     >
       {tabs}
       <TooltipProvider>
-        <DataTable
+        <ListPage<DeployToken>
+          embedded
+          list={list}
           label={tr("title")}
-          controller={table}
           columns={columns}
+          rows={rows}
           getRowId={(token) => token.id}
-          searchPlaceholder={tr("searchPlaceholder")}
+          loading={loading}
+          stale={stale}
+          error={error}
+          onRetry={onRetry}
+          nextCursor={nextCursor}
+          totalCount={totalCount}
           empty={{
             icon: <KeyRoundIcon className="size-5" />,
             title: tr("emptyTitle"),
             description: tr("emptyDescription"),
-          }}
-          emptyFiltered={{
-            title: "No matching deploy tokens",
-            description:
-              "No token matches that name, last 4, IP, or user agent. Clear the search to see every token for this app.",
           }}
         />
       </TooltipProvider>

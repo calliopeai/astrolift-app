@@ -135,12 +135,18 @@ const domain = (
   updatedAt: "2026-09-01T12:00:00Z",
 });
 
-export const trustedDomains: TrustedDomainsCardProps = {
+/** The card's props less the list controller, which the story builds. */
+export type TrustedDomainsFixture = Omit<TrustedDomainsCardProps, "list">;
+
+export const trustedDomains: TrustedDomainsFixture = {
   rows: [
     domain("d1", "acme.example", "team_viewer", false),
     domain("d2", "contractors.acme.example", null, true),
   ],
+  totalCount: 2,
   loading: false,
+  error: null,
+  onRetry: () => {},
   roleOptions: ROLES,
   adding: false,
   removing: false,
@@ -148,15 +154,19 @@ export const trustedDomains: TrustedDomainsCardProps = {
   onRemove: async () => {},
 };
 
-export const trustedDomainsLoading: TrustedDomainsCardProps = {
+export const trustedDomainsLoading: TrustedDomainsFixture = {
   ...trustedDomains,
   rows: [],
   loading: true,
 };
 
-export const trustedDomainsEmpty: TrustedDomainsCardProps = { ...trustedDomains, rows: [] };
+export const trustedDomainsEmpty: TrustedDomainsFixture = {
+  ...trustedDomains,
+  rows: [],
+  totalCount: 0,
+};
 
-export const trustedDomainsRemoveFails: TrustedDomainsCardProps = {
+export const trustedDomainsRemoveFails: TrustedDomainsFixture = {
   ...trustedDomains,
   onAdd: fail,
   onRemove: async () => {
@@ -164,8 +174,9 @@ export const trustedDomainsRemoveFails: TrustedDomainsCardProps = {
   },
 };
 
-export const trustedDomainsLong: TrustedDomainsCardProps = {
+export const trustedDomainsLong: TrustedDomainsFixture = {
   ...trustedDomains,
+  totalCount: 1,
   rows: [
     domain(
       "d3",

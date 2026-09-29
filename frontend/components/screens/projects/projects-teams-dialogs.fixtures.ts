@@ -1,5 +1,3 @@
-import type { CursorTableController } from "@/components/data-table";
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
 
 import type { CreateTeamSheetProps } from "../teams/CreateTeamSheet";
@@ -70,18 +68,17 @@ export const LONG_PROJECT = project("customer-facing-realtime-analytics-pipeline
   name: "Customer-facing realtime analytics pipeline for the EU data residency region",
 });
 
+/** The screen's props less the list controller, which the story builds. */
 export function projectsProps(
-  controller: Partial<CursorTableController<AstroliftProject>> = {},
-  patch: Partial<ProjectsScreenProps> = {}
-): ProjectsScreenProps {
+  patch: Partial<Omit<ProjectsScreenProps, "list">> = {}
+): Omit<ProjectsScreenProps, "list"> {
   return {
-    table: fakeController<AstroliftProject>({
-      rows: PROJECTS,
-      totalCount: PROJECTS.length,
-      sort: undefined,
-      sortEnabled: false,
-      ...controller,
-    }),
+    rows: PROJECTS,
+    totalCount: PROJECTS.length,
+    nextCursor: null,
+    loading: false,
+    error: null,
+    onRetry: noop,
     teams: TEAMS,
     teamsLoading: false,
     noTeams: false,

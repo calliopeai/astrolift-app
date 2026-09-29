@@ -14,7 +14,10 @@ import { useClusterHealth } from "@/components/screens/clusters/status/use-clust
 import { useClusterLifecycleAudit } from "@/components/screens/clusters/status/use-cluster-lifecycle-audit";
 import { useClusterLiveState } from "@/components/screens/clusters/status/use-cluster-live-state";
 import { useClusterMetrics } from "@/components/screens/clusters/status/use-cluster-metrics";
-import { useClusterWorkloadHealth } from "@/components/screens/clusters/status/use-cluster-workload-health";
+import {
+  useClusterWorkloadHealth,
+  useClusterWorkloadList,
+} from "@/components/screens/clusters/status/use-cluster-workload-health";
 import { useRecentClusterWorkflows } from "@/components/screens/clusters/status/use-recent-cluster-workflows";
 
 /*
@@ -32,10 +35,10 @@ export function ClusterStatusContainer({ clusterId, slug }: ClusterProps & { slu
       slug={slug}
       liveState={useClusterLiveState(clusterId)}
       metrics={<StatusMetricsContainer clusterId={clusterId} slug={slug} />}
-      workloads={<StatusWorkloadHealthContainer clusterId={clusterId} />}
+      workloads={<StatusWorkloadHealthContainer clusterId={clusterId} slug={slug} />}
       liveHealth={<StatusLiveHealthContainer clusterId={clusterId} />}
-      workflows={<StatusRecentWorkflowsContainer clusterId={clusterId} />}
-      lifecycle={<StatusLifecycleContainer clusterId={clusterId} />}
+      workflows={<StatusRecentWorkflowsContainer clusterId={clusterId} slug={slug} />}
+      lifecycle={<StatusLifecycleContainer clusterId={clusterId} slug={slug} />}
     />
   );
 }
@@ -44,20 +47,27 @@ function StatusMetricsContainer({ clusterId, slug }: ClusterProps & { slug: stri
   return <StatusMetricsCard slug={slug} {...useClusterMetrics(clusterId)} />;
 }
 
-function StatusWorkloadHealthContainer({ clusterId }: ClusterProps) {
-  return <StatusWorkloadHealthCard {...useClusterWorkloadHealth(clusterId)} />;
+function StatusWorkloadHealthContainer({ clusterId, slug }: ClusterProps & { slug: string }) {
+  return <StatusWorkloadHealthCard slug={slug} {...useClusterWorkloadHealth(clusterId)} />;
 }
 
+// The overview shows the top five of each; the Health and Activity tabs
+// hold the whole list or feed and fetch it there.
 function StatusLiveHealthContainer({ clusterId }: ClusterProps) {
-  return <StatusLiveHealthCard {...useClusterHealth(clusterId, 20)} />;
+  return <StatusLiveHealthCard {...useClusterHealth(clusterId, 5)} />;
 }
 
-function StatusRecentWorkflowsContainer({ clusterId }: ClusterProps) {
-  return <StatusRecentWorkflowsCard {...useRecentClusterWorkflows(clusterId, { limit: 10 })} />;
+function StatusRecentWorkflowsContainer({ clusterId, slug }: ClusterProps & { slug: string }) {
+  return (
+    <StatusRecentWorkflowsCard
+      slug={slug}
+      {...useRecentClusterWorkflows(clusterId, { limit: 5 })}
+    />
+  );
 }
 
-function StatusLifecycleContainer({ clusterId }: ClusterProps) {
-  return <StatusLifecycleCard {...useClusterLifecycleAudit(clusterId, { limit: 20 })} />;
+function StatusLifecycleContainer({ clusterId, slug }: ClusterProps & { slug: string }) {
+  return <StatusLifecycleCard slug={slug} {...useClusterLifecycleAudit(clusterId, { limit: 5 })} />;
 }
 
 /** Health tab body. */
@@ -65,7 +75,7 @@ export function ClusterHealthContainer({ clusterId }: ClusterProps) {
   return (
     <ClusterHealthBody
       health={useClusterHealth(clusterId, 25)}
-      workloads={useClusterWorkloadHealth(clusterId)}
+      workloads={useClusterWorkloadList(clusterId)}
     />
   );
 }
@@ -74,7 +84,7 @@ export function ClusterHealthContainer({ clusterId }: ClusterProps) {
 export function ClusterActivityContainer({ clusterId }: ClusterProps) {
   return (
     <ClusterActivityBody
-      workflows={useRecentClusterWorkflows(clusterId, { limit: 10, pollInterval: 15000 })}
+      workflows={useRecentClusterWorkflows(clusterId, { limit: 25, pollInterval: 15000 })}
       lifecycle={useClusterLifecycleAudit(clusterId, { limit: 50, pollInterval: 30000 })}
     />
   );

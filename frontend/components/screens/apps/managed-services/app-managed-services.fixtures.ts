@@ -1,6 +1,5 @@
 import type { ComponentProps } from "react";
 
-import { fakeController } from "@/components/data-table/fixtures";
 import type { ManagedServiceMetricsPanelProps } from "@/components/observability/ManagedServiceMetricsPanel";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type {
@@ -104,9 +103,16 @@ function env(name: string): AstroliftAppEnvironment {
 
 export const ENVS: AstroliftAppEnvironment[] = [env("production"), env("staging"), env("preview")];
 
-export const SCREEN: ManagedServicesScreenProps = {
+/** The screen's props less its list state (the stories keep that in memory). */
+export const SCREEN: Omit<ManagedServicesScreenProps, "list"> = {
   slug: "storefront",
-  table: fakeController<ManagedService>({ rows: SERVICES, totalCount: SERVICES.length }),
+  rows: SERVICES,
+  loading: false,
+  stale: false,
+  error: null,
+  onRetry: () => {},
+  nextCursor: null,
+  totalCount: SERVICES.length,
   envs: ENVS,
   busy: false,
   deprovisioning: false,

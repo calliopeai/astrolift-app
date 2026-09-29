@@ -37,18 +37,28 @@ export interface AppAccessScreenProps {
   restrictedMode?: RestrictedSettings;
 }
 
-const SECTIONS: { id: keyof AppAccessSlots; permission: string }[] = [
-  { id: "members", permission: "org.manage_members" },
+const SECTIONS: { id: keyof AppAccessSlots; permission: string; description?: string }[] = [
+  {
+    id: "members",
+    permission: "org.manage_members",
+    description: "Who may see and change this app: their roles here, and teams it is shared with.",
+  },
   { id: "tokens", permission: "app.deploy" },
   { id: "security", permission: "app.update" },
-  { id: "edge", permission: "app.access" },
+  {
+    id: "edge",
+    permission: "app.access",
+    description:
+      "Who may reach the app's URL. The edge decides who gets through to the app; roles decide who may change it.",
+  },
 ];
 
 /**
- * The app's Access tab (spec 44 §5.2, §10.3): who may reach and change the
- * app, on the settings archetype in single-section mode. Members, Deploy
- * tokens, Security scans and Edge access (the central-auth rule in front of
- * the app), one at a time by `?section=`. A section the viewer may not
+ * The app's Access tab (spec 44 §5.2, §10.3; access design 3.3): who may
+ * reach and change the app, on the settings archetype in single-section
+ * mode. People with access (roles and team shares), Deploy tokens, Security
+ * scans and Edge access (the central-auth rule in front of the app, with how
+ * it combines with roles said once), one at a time by `?section=`. A section the viewer may not
  * change shows disabled with the permission that would allow it, or, when
  * the person hides what they can't change, leaves the nav. Only the active
  * section is mounted, so only its query runs. Pure.
@@ -64,7 +74,7 @@ export function AppAccessScreen({ section, access, slots, restrictedMode }: AppA
     id: s.id,
     title: t(s.id),
     content: (
-      <Section title={t(s.id)} divided className="min-w-0">
+      <Section title={t(s.id)} description={s.description} divided className="min-w-0">
         <Restricted mode={restrictedMode} allowed={access[s.id]} permission={s.permission}>
           {slots[s.id]}
         </Restricted>

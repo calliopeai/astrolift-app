@@ -6,9 +6,7 @@ import {
   BotIcon,
   BoxIcon,
   ChevronRightIcon,
-  ExternalLinkIcon,
   FileBoxIcon,
-  GitBranchIcon,
   PlusIcon,
   RocketIcon,
   Settings2Icon,
@@ -23,6 +21,7 @@ import * as React from "react";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { ListSummary } from "@/components/list/ListSummary";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
@@ -38,14 +37,6 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ProjectWorkflowTopology } from "@/components/workflows/workflow-topology";
 import type {
   AstroliftAgentListItem,
@@ -71,9 +62,10 @@ const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending">
 export type ProjectDetailScreenProps = ReturnType<typeof useProjectDetail>;
 
 /**
- * Project overview: workload-aware stats, workflow topology, agents,
- * apps, direct members, and the settings sheet. Pure view; the data comes
- * from useProjectDetail.
+ * Project overview: workload-aware stats, workflow topology, then agents,
+ * apps and direct members as summaries of their top rows (list rule 3: an
+ * overview holds no full table), each with "View all" to its own list, and
+ * the settings sheet. Pure view; the data comes from useProjectDetail.
  */
 export function ProjectDetailScreen({
   slug,
@@ -498,118 +490,44 @@ export function ProjectDetailScreen({
       )}
 
       {hasAgents && (
-        <Card id="agents" className="scroll-mt-20">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <BotIcon className="size-4" /> Agents in this project
-              </CardTitle>
-              <CardDescription>
-                Registered agent workloads for {project.team.slug}/{project.slug}. Live status
-                refreshes automatically.
-              </CardDescription>
-            </div>
-            {canCreateAgent && (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/agents/new">
-                  <PlusIcon className="size-4" /> Register repo
-                </Link>
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table aria-label="Agents in this project">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Used by</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Run mode</TableHead>
-                  <TableHead>Live status</TableHead>
-                  <TableHead>Last run</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projectAgents.map((agent) => (
-                  <TableRow key={agent.id}>
-                    <TableCell>
-                      <Link
-                        href={`/agents/${encodeURIComponent(agent.slug)}/build`}
-                        className="font-medium hover:underline"
-                      >
-                        {agent.name}
-                      </Link>
-                      <div className="text-muted-foreground font-mono text-xs">{agent.slug}</div>
-                    </TableCell>
-                    <TableCell>
-                      {(workflowMembershipByAgent.get(agent.slug) ?? []).length > 0 ? (
-                        <div className="flex max-w-64 flex-wrap gap-1">
-                          {(workflowMembershipByAgent.get(agent.slug) ?? []).map((workflow) => (
-                            <Badge key={workflow.guid} variant="secondary" asChild>
-                              <Link
-                                href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}
-                              >
-                                {workflow.slug}
-                              </Link>
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <Badge variant="outline">Standalone</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {agent.sourceRepo ? (
-                        agent.sourceUrl ? (
-                          <a
-                            href={agent.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-                          >
-                            <GitBranchIcon className="size-3.5" />
-                            {agent.sourceRepo}
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
-                            <GitBranchIcon className="size-3.5" />
-                            {agent.sourceRepo}
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {formatAgentRunMode(agent.runFamily, agent.runMode)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <AgentLiveStatus agent={agent} live={liveByWorkloadId.get(agent.id)} />
-                    </TableCell>
-                    <TableCell>
-                      <AgentLastRun
-                        status={
-                          liveByWorkloadId.get(agent.id)?.lastRunStatus ?? agent.lastRunStatus
-                        }
-                        at={liveByWorkloadId.get(agent.id)?.lastRunAt ?? agent.lastRunAt}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild size="sm" variant="ghost">
-                        <Link href={`/agents/${encodeURIComponent(agent.slug)}/build`}>
-                          Open <ExternalLinkIcon className="size-3" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <ListSummary<AstroliftAgentListItem>
+          className="scroll-mt-20"
+          icon={<BotIcon className="size-4" />}
+          title="Agents in this project"
+          description={`Registered agent workloads for ${project.team.slug}/${project.slug}. Live status refreshes automatically.`}
+          count={projectAgents.length}
+          rows={projectAgents}
+          keyOf={(agent) => agent.id}
+          rowHref={(agent) => `/agents/${encodeURIComponent(agent.slug)}`}
+          viewAllHref={`/agents?project=${encodeURIComponent(project.slug)}`}
+          renderRow={(agent) => {
+            const usedBy = workflowMembershipByAgent.get(agent.slug) ?? [];
+            const live = liveByWorkloadId.get(agent.id);
+            return (
+              <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{agent.name}</span>
+                  <span className="text-muted-foreground block truncate font-mono text-xs">
+                    {agent.slug} · {formatAgentRunMode(agent.runFamily, agent.runMode)}
+                  </span>
+                </span>
+                {usedBy.length > 0 ? (
+                  <Badge variant="secondary" className="max-w-48 truncate font-mono">
+                    {usedBy[0]!.slug}
+                    {usedBy.length > 1 ? ` +${usedBy.length - 1}` : ""}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">Standalone</Badge>
+                )}
+                <AgentLiveStatus agent={agent} live={live} />
+                <AgentLastRun
+                  status={live?.lastRunStatus ?? agent.lastRunStatus}
+                  at={live?.lastRunAt ?? agent.lastRunAt}
+                />
+              </span>
+            );
+          }}
+        />
       )}
 
       {!workloadQueriesLoading &&
@@ -654,133 +572,74 @@ export function ProjectDetailScreen({
 
       {/* ─── app workloads ────────────────────────────────────────────── */}
       {hasApps && (
-        <Card id="apps" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <RocketIcon className="size-4" /> Apps in this project
-            </CardTitle>
-            <CardDescription>
-              Registered apps associated with {project.team.slug}/{project.slug}. Click a row to
-              open the app detail page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {appsLoading && projectApps.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead>App</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projectApps.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="w-8">
-                        <StatusDot status={statusDot[a.provisioningStatus]} />
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/apps/${a.slug}`} className="hover:underline">
-                          <div className="font-medium">{a.name}</div>
-                          <div className="text-muted-foreground font-mono text-xs">{a.slug}</div>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {a.sourceRepo ? (
-                          <span className="font-mono text-xs">{a.sourceRepo}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {a.provisioningStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {fmt.formatDate(a.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild size="sm" variant="ghost">
-                          <Link href={`/apps/${a.slug}`}>
-                            Open <ExternalLinkIcon className="size-3" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <ListSummary<(typeof projectApps)[number]>
+          className="scroll-mt-20"
+          icon={<RocketIcon className="size-4" />}
+          title="Apps in this project"
+          description={`Registered apps associated with ${project.team.slug}/${project.slug}.`}
+          count={projectApps.length}
+          rows={projectApps}
+          keyOf={(a) => a.id}
+          rowHref={(a) => `/apps/${a.slug}`}
+          viewAllHref={`/apps?project=${encodeURIComponent(project.slug)}`}
+          loading={appsLoading && projectApps.length === 0}
+          renderRow={(a) => (
+            <span className="flex min-w-0 items-center gap-3">
+              <StatusDot status={statusDot[a.provisioningStatus]} className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{a.name}</span>
+                <span className="text-muted-foreground block truncate font-mono text-xs">
+                  {a.slug}
+                  {a.sourceRepo ? ` · ${a.sourceRepo}` : ""}
+                </span>
+              </span>
+              <Badge variant="secondary" className="shrink-0 capitalize">
+                {a.provisioningStatus}
+              </Badge>
+              <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                {fmt.formatDate(a.createdAt)}
+              </span>
+            </span>
+          )}
+        />
       )}
 
       {/* ─── members ───────────────────────────────────────────────────── */}
       {canManageMembers && (
-        <Card id="members" className="scroll-mt-20">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldIcon className="size-4" /> Project members
-              </CardTitle>
-              <CardDescription>
-                Members with explicit access granted at the project scope. Org-wide and team-wide
-                members are not listed here.
-              </CardDescription>
-            </div>
-            <Can permission="org.manage_members">
-              <Button asChild size="sm">
-                <Link href="/administration/members">
-                  <PlusIcon className="size-4" /> Invite
-                </Link>
-              </Button>
-            </Can>
-          </CardHeader>
-          <CardContent className="p-0">
-            {membersLoading && directMembers.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : directMembers.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<UsersIcon className="size-5" />}
-                  title="No direct project members"
-                  description="Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page."
-                  actionHref="/administration/members"
-                  actionLabel="Manage members"
-                />
-              </div>
-            ) : (
-              <ul className="divide-y">
-                {directMembers.map((m) => (
-                  <li key={m.id} className="flex items-center justify-between px-6 py-3">
-                    <div>
-                      <div className="font-medium">{m.user.username || m.user.email}</div>
-                      <div className="text-muted-foreground text-xs">
-                        {m.user.email} · joined {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="text-xs uppercase">
-                      {m.scopeKind}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <ListSummary<(typeof directMembers)[number]>
+          className="scroll-mt-20"
+          icon={<ShieldIcon className="size-4" />}
+          title="Project members"
+          description="Members with explicit access granted at the project scope. Org-wide and team-wide members are not listed here."
+          count={directMembers.length}
+          rows={directMembers}
+          keyOf={(m) => m.id}
+          viewAllHref="/administration/members"
+          loading={membersLoading && directMembers.length === 0}
+          empty={{
+            icon: <UsersIcon className="size-5" />,
+            title: "No direct project members",
+            description:
+              "Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page.",
+            actionHref: "/administration/members",
+            actionLabel: "Manage members",
+          }}
+          renderRow={(m) => (
+            <span className="flex min-w-0 items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">
+                  {m.user.username || m.user.email}
+                </span>
+                <span className="text-muted-foreground block truncate text-xs">
+                  {m.user.email} · joined {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
+                </span>
+              </span>
+              <Badge variant="outline" className="shrink-0 text-xs uppercase">
+                {m.scopeKind}
+              </Badge>
+            </span>
+          )}
+        />
       )}
 
       {/* ─── settings sheet ────────────────────────────────────────────── */}

@@ -4,36 +4,54 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /**
- * The /events page chrome: the rate card, then whichever list the grouping
- * toggle picked. Both arrive as slots so only the mounted list runs its
- * query.
+ * The /events page chrome: the rate card, the search box and grouping
+ * toggle, then whichever feed the toggle picked. The rate and the feed
+ * arrive as slots so only the mounted feed runs its query. Both feeds take
+ * the same search term, so toggling grouping keeps what the operator typed.
  */
 export function EventsScreen({
   rate,
+  search,
+  onSearchChange,
+  aggregate,
+  onAggregateChange,
   children,
 }: {
   rate: React.ReactNode;
+  /** The box's text as typed; the caller debounces it into the query. */
+  search: string;
+  onSearchChange: (next: string) => void;
+  aggregate: boolean;
+  onAggregateChange: (next: boolean) => void;
   children: React.ReactNode;
 }) {
   const t = useTranslations("lists.events");
   return (
     <PageShell title={t("title")} description={t("description")}>
       {rate}
-      {/* Both lists read and write `?ev-q=`, so toggling grouping keeps the
-          search term the operator typed. Only one is ever mounted. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={t("filterPlaceholder")}
+          aria-label={t("filterPlaceholder")}
+          className="max-w-md min-w-0 flex-1"
+        />
+        <EventsAggregateToggle checked={aggregate} onCheckedChange={onAggregateChange} />
+      </div>
       {children}
     </PageShell>
   );
 }
 
 /**
- * Rides in DataTable's toolbar, beside the search box. The box is the
- * controller's own: server-side, debounced, and matching on event type,
- * resource kind/id and app slug — it replaces both the per-keystroke
- * `eventType` input and the client-side filter that sat on top of it.
+ * Beside the search box. The box is server-side, debounced, and matches on
+ * event type, resource kind/id and app slug.
  */
 export function EventsAggregateToggle({
   checked,

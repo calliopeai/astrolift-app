@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+
 import { AuthUsersView } from "./AuthUsers";
 import { BootstrapPlanView } from "./BootstrapPlan";
 import { CentralAuthView, IngressClassView } from "./CentralAuth";
@@ -256,3 +258,20 @@ export const HistoryEmpty: Story = {
 };
 
 export const History: Story = { render: () => <BootstrapHistoryView {...HISTORY} /> };
+
+function Sectioned({ initial }: { initial: string | null }) {
+  return (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      cards={cards}
+      bootstrapHistory={history}
+      section={useLocalSettingsSection(initial)}
+    />
+  );
+}
+
+/** As the route mounts it: one section at a time, the agent first. */
+export const AgentSection: Story = { render: () => <Sectioned initial={null} /> };
+
+/** Only the users section, and so only its list's query, is mounted. */
+export const UsersSection: Story = { render: () => <Sectioned initial="users" /> };

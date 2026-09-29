@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AgentTaskTransition,
   AstroliftAgentEnvironmentSpec,
@@ -6,18 +5,15 @@ import type {
   AstroliftAgentTask,
   FleetTaskDispatcher,
 } from "@/graphql/agents/agents.types";
-import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
-
-import type { FunctionsScreenProps } from "../functions/FunctionsScreen";
-import type { FunctionWorkloadsTableProps } from "../functions/FunctionWorkloadsTable";
 
 import type { FleetClusterLiveness } from "./FleetMap";
 import type { FleetMapPanelProps } from "./FleetMapPanel";
 import type { FleetOverviewScreenProps } from "./FleetOverviewScreen";
 
 /**
- * Hand-typed fixtures for the fleet-functions-logs group: /fleet, /fleet/map
- * and /functions. /logs and /traces are static and take no props.
+ * Hand-typed fixtures for the fleet-functions-logs group: /fleet and
+ * /fleet/map (Functions keeps its own now). /logs and /traces are static and
+ * take no props.
  */
 
 /** The generated JSON scalar is typed Record<string, unknown>; real values can be any JSON. */
@@ -151,9 +147,14 @@ export const FLEET_OVERVIEW: FleetOverviewFixture = {
   loading: false,
   runtimes: RUNTIMES,
   runtimesLoading: false,
+  runtimesError: null,
   refresh: noop,
-  agentTable: fakeController<AstroliftAgentListItem>({ rows: AGENTS, totalCount: AGENTS.length }),
-  taskTable: fakeController<AstroliftAgentTask>({ rows: TASKS, totalCount: TASKS.length }),
+  recentTasks: TASKS,
+  tasksLoading: false,
+  tasksError: null,
+  agents: AGENTS,
+  agentsLoading: false,
+  agentsError: null,
 };
 
 export const FLEET_OVERVIEW_LOADING: FleetOverviewFixture = {
@@ -166,8 +167,10 @@ export const FLEET_OVERVIEW_LOADING: FleetOverviewFixture = {
   loading: true,
   runtimes: [],
   runtimesLoading: true,
-  agentTable: fakeController<AstroliftAgentListItem>({ state: "loading" }),
-  taskTable: fakeController<AstroliftAgentTask>({ state: "loading" }),
+  recentTasks: [],
+  tasksLoading: true,
+  agents: [],
+  agentsLoading: true,
 };
 
 export const FLEET_OVERVIEW_EMPTY: FleetOverviewFixture = {
@@ -178,32 +181,28 @@ export const FLEET_OVERVIEW_EMPTY: FleetOverviewFixture = {
   activeTaskCount: 0,
   incidentCount: 0,
   runtimes: [],
-  agentTable: fakeController<AstroliftAgentListItem>({ state: "empty" }),
-  taskTable: fakeController<AstroliftAgentTask>({ state: "empty" }),
+  recentTasks: [],
+  agents: [],
 };
 
 export const FLEET_OVERVIEW_ERROR: FleetOverviewFixture = {
   ...FLEET_OVERVIEW_EMPTY,
   runtimeCount: undefined,
-  agentTable: fakeController<AstroliftAgentListItem>({
-    state: "error",
-    error: new Error("Network error: failed to fetch agentFleetPage"),
-  }),
-  taskTable: fakeController<AstroliftAgentTask>({
-    state: "error",
-    error: new Error("Network error: failed to fetch agentTasksPage"),
-  }),
+  agentsError: "Network error: failed to fetch agentFleet",
+  tasksError: "Network error: failed to fetch agentTasks",
+  runtimesError: "Network error: failed to fetch agentEnvironmentSpecs",
 };
 
 export const FLEET_OVERVIEW_LONG: FleetOverviewFixture = {
   ...FLEET_OVERVIEW,
   runtimes: RUNTIMES.map((r) => ({ ...r, name: `${r.name} ${LONG}`, runtime: LONG })),
-  agentTable: fakeController<AstroliftAgentListItem>({
-    rows: AGENTS.map((a) => ({ ...a, name: LONG, projectSlug: LONG, runningCount: 1234 })),
-  }),
-  taskTable: fakeController<AstroliftAgentTask>({
-    rows: TASKS.map((t) => ({ ...t, agentName: LONG, projectSlug: LONG, status: "timed_out" })),
-  }),
+  agents: AGENTS.map((a) => ({ ...a, name: LONG, projectSlug: LONG, runningCount: 1234 })),
+  recentTasks: TASKS.map((t) => ({
+    ...t,
+    agentName: LONG,
+    projectSlug: LONG,
+    status: "timed_out",
+  })),
 };
 
 // ── /fleet/map ──────────────────────────────────────────────────────────────
@@ -301,74 +300,4 @@ export const FLEET_MAP_LONG: FleetMapPanelProps = {
     podName: `${t.podName || "pod"}-${LONG}`,
     dispatcher: t.dispatcher && { ...t.dispatcher, name: LONG, clusterName: LONG },
   })),
-};
-
-// ── /functions ──────────────────────────────────────────────────────────────
-
-const WORKLOAD: AstroliftWorkload = {
-  id: "wl-fn-1",
-  name: "resize-image",
-  slug: "resize-image",
-  kind: "function",
-  registeredAppSlug: "media",
-  concurrencyPolicy: "",
-  cpuLimit: "500m",
-  cpuRequest: "100m",
-  memoryLimit: "512Mi",
-  memoryRequest: "128Mi",
-  hpaMinReplicas: 0,
-  hpaMaxReplicas: 20,
-  hpaTargetCpuPct: 70,
-  inClusterServiceFqdn: "resize-image.media.svc.cluster.local",
-  isPublic: false,
-  replicas: 0,
-  schedule: "",
-  storageClass: "",
-  storageSize: "",
-  // Generated JSON scalar intersected with the facade's array type.
-  volumes: json([]) as AstroliftWorkload["volumes"],
-};
-
-export const FUNCTION_WORKLOADS_ROWS: AstroliftWorkload[] = [
-  WORKLOAD,
-  {
-    ...WORKLOAD,
-    id: "wl-fn-2",
-    name: "stripe-webhook",
-    slug: "stripe-webhook",
-    registeredAppSlug: "billing",
-    hpaMaxReplicas: null,
-  },
-  { ...WORKLOAD, id: "wl-fn-3", name: "queue-drain", slug: "queue-drain", hpaMinReplicas: null },
-];
-
-export const FUNCTION_WORKLOADS: FunctionWorkloadsTableProps = {
-  table: fakeController<AstroliftWorkload>({ rows: FUNCTION_WORKLOADS_ROWS }),
-};
-
-export const FUNCTION_WORKLOADS_LOADING: FunctionWorkloadsTableProps = {
-  table: fakeController<AstroliftWorkload>({ state: "loading" }),
-};
-
-export const FUNCTION_WORKLOADS_EMPTY: FunctionWorkloadsTableProps = {
-  table: fakeController<AstroliftWorkload>({ state: "empty", hasNext: true }),
-};
-
-export const FUNCTION_WORKLOADS_ERROR: FunctionWorkloadsTableProps = {
-  table: fakeController<AstroliftWorkload>({
-    state: "error",
-    error: new Error("Network error: failed to fetch astroliftWorkloadsPage"),
-  }),
-};
-
-export const FUNCTION_WORKLOADS_LONG: FunctionWorkloadsTableProps = {
-  table: fakeController<AstroliftWorkload>({
-    rows: FUNCTION_WORKLOADS_ROWS.map((w) => ({ ...w, name: LONG, registeredAppSlug: LONG })),
-  }),
-};
-
-/** Everything but the fleet slot, which stories fill with a FunctionWorkloadsTable. */
-export const FUNCTIONS_TAB: Omit<FunctionsScreenProps, "fleet"> = {
-  tab: "fleet",
-  setTab: noop,
 };

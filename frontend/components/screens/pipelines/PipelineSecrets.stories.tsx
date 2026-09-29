@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
-import { PipelineSecretsView } from "./PipelineSecrets";
+import { useLocalListState } from "@/components/list/use-list-state";
+
+import { PipelineSecretsView as View, type PipelineSecretsViewProps } from "./PipelineSecrets";
+import { PIPELINE_SECRETS_LIST } from "./pipelines-list";
 import { LONG_SECRET, secretsProps } from "./pipelines-previews.fixtures";
 
 const meta: Meta = {
@@ -10,6 +13,12 @@ const meta: Meta = {
 export default meta;
 
 type Story = StoryObj;
+
+/** The view with its list state in memory, as the hook keeps it. */
+function PipelineSecretsView(props: PipelineSecretsViewProps) {
+  const list = useLocalListState(PIPELINE_SECRETS_LIST);
+  return <View {...props} list={list} />;
+}
 
 export const Full: Story = { render: () => <PipelineSecretsView {...secretsProps()} /> };
 
@@ -29,7 +38,7 @@ export const ErrorState: Story = {
   render: () => <PipelineSecretsView {...secretsProps({ secrets: [] })} />,
 };
 
-/** A delete in flight: every row's delete button is disabled. */
+/** A delete in flight: every row's delete action is disabled. */
 export const Deleting: Story = {
   render: () => <PipelineSecretsView {...secretsProps({ deleting: true })} />,
 };
@@ -46,4 +55,12 @@ export const AddForm: Story = {
 
 export const LongStrings: Story = {
   render: () => <PipelineSecretsView {...secretsProps({ secrets: [LONG_SECRET] })} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <PipelineSecretsView {...secretsProps({ secrets: [LONG_SECRET] })} />
+    </div>
+  ),
 };

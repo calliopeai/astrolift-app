@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { EventsAggregateToggle } from "./EventsScreen";
-import { EVENTS_LONG, eventsTable, TABLE_ERROR } from "./events-downloads.fixtures";
+import { EVENTS_LONG, eventsFeed, FEED_ERROR } from "./events-downloads.fixtures";
 import { RawEventsList } from "./RawEventsList";
 
 const meta: Meta = { title: "Screens/Events/RawEventsList" };
@@ -9,46 +8,41 @@ export default meta;
 
 type Story = StoryObj;
 
-const toolbar = <EventsAggregateToggle checked={false} onCheckedChange={() => {}} />;
-
-export const Full: Story = {
-  render: () => <RawEventsList table={eventsTable()} toolbar={toolbar} />,
-};
+export const Full: Story = { render: () => <RawEventsList events={eventsFeed()} /> };
 
 export const Loading: Story = {
-  render: () => (
-    <RawEventsList table={eventsTable({ state: "loading", rows: [] })} toolbar={toolbar} />
-  ),
+  render: () => <RawEventsList events={eventsFeed({ items: [], loading: true })} />,
 };
 
-export const Empty: Story = {
-  render: () => (
-    <RawEventsList table={eventsTable({ state: "empty", rows: [] })} toolbar={toolbar} />
-  ),
-};
-
-export const EmptyFiltered: Story = {
-  render: () => (
-    <RawEventsList
-      table={eventsTable({ state: "emptyFiltered", rows: [], isFiltered: true, search: "nope" })}
-      toolbar={toolbar}
-    />
-  ),
-};
+export const Empty: Story = { render: () => <RawEventsList events={eventsFeed({ items: [] })} /> };
 
 export const ErrorState: Story = {
-  render: () => (
-    <RawEventsList
-      table={eventsTable({ state: "error", rows: [], error: TABLE_ERROR })}
-      toolbar={toolbar}
-    />
-  ),
+  render: () => <RawEventsList events={eventsFeed({ items: [], error: FEED_ERROR })} />,
 };
 
-export const NextPage: Story = {
-  render: () => <RawEventsList table={eventsTable({ hasNext: true })} toolbar={toolbar} />,
+/** Older events behind the cursor: Load older at the end of the frame. */
+export const HasOlder: Story = {
+  render: () => <RawEventsList events={eventsFeed({ hasMore: true })} />,
+};
+
+/** An older page failed: the events stay, the error sits at the end. */
+export const OlderPageFailed: Story = {
+  render: () => <RawEventsList events={eventsFeed({ hasMore: true, error: FEED_ERROR })} />,
+};
+
+/** New events arrived above the ones being read. */
+export const NewEvents: Story = {
+  render: () => <RawEventsList events={eventsFeed({ newCount: 4 })} />,
 };
 
 export const LongStrings: Story = {
-  render: () => <RawEventsList table={eventsTable({ rows: EVENTS_LONG })} toolbar={toolbar} />,
+  render: () => <RawEventsList events={eventsFeed({ items: EVENTS_LONG })} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <RawEventsList events={eventsFeed({ items: EVENTS_LONG })} />
+    </div>
+  ),
 };

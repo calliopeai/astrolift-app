@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { selectRows } from "@/components/list/select-rows";
+import { useListState } from "@/components/list/use-list-state";
+
 import type {
   RevalidateManagedDomainMutation,
   RevalidateManagedDomainMutationVariables,
@@ -17,6 +20,8 @@ import {
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+
+import { MANAGED_DOMAINS_LIST, MANAGED_DOMAINS_SELECT } from "./managed-domains-list";
 
 interface Resp {
   astroliftManagedDomains: AstroliftManagedDomain[];
@@ -31,13 +36,16 @@ export interface CreateManagedDomainInput {
 }
 
 /**
- * The org's managed DNS zones and every mutation the list drives (add,
- * revalidate delegation, soft delete). Polls while any zone is still
- * provisioning. The data half of ManagedDomainsScreen.
+ * The org's managed DNS zones (URL list state, filtered, sorted and paged
+ * in the client: see managed-domains-list.ts) and every mutation the list
+ * drives (add, revalidate delegation, soft delete). Polls while any zone is
+ * still provisioning. The data half of ManagedDomainsScreen.
  */
 export function useManagedDomains() {
   const router = useRouter();
-  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
+  const list = useListState(MANAGED_DOMAINS_LIST);
+  const { data, loading, error, refetch, startPolling, stopPolling } =
+    useQuery<Resp>(LIST_MANAGED_DOMAINS);
 
   // NS records land on the row a few seconds after the provisioning
   // workflow creates the zone; poll until every domain settles so the
@@ -123,9 +131,29 @@ export function useManagedDomains() {
     router.push(`/domains/${d.id}`);
   }
 
+  const all = data?.astroliftManagedDomains ?? [];
+  const { state } = list;
+  const page = selectRows(
+    all,
+    {
+      filters: list.filters,
+      q: state.q,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    },
+    MANAGED_DOMAINS_SELECT
+  );
+
   return {
-    loading,
-    domains: data?.astroliftManagedDomains ?? [],
+    list,
+    rows: page.rows,
+    totalCount: page.totalCount,
+    loading: loading && all.length === 0,
+    error: error && all.length === 0 ? { message: error.message } : null,
+    onRetry: () => {
+      void refetch();
+    },
     creating,
     deleting,
     revalidating,

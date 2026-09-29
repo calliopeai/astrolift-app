@@ -74,7 +74,7 @@ describe("clusterCrumbs", () => {
     const [admin, clusters, name] = clusterCrumbs("prd");
     expect(admin.label).toBe("Admin");
     expect(admin.switcher?.find((o) => o.active)?.href).toBe("/clusters");
-    expect(admin.switcher?.some((o) => o.href === "/administration/members")).toBe(true);
+    expect(admin.switcher?.some((o) => o.href === "/administration/access")).toBe(true);
     expect(clusters).toEqual({ label: "Clusters", href: "/clusters" });
     expect(name).toEqual({ label: "prd" });
   });

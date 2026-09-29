@@ -149,6 +149,12 @@ interface ListPageBodyProps<TRow> {
   newRows?: { count: number; onReveal: () => void };
   /** The filter bar's overflow `⋯` menu: CSV export on Admin lists. */
   menu?: React.ReactNode;
+  /**
+   * Between the header and the filter bar: a one-time reveal or a notice
+   * the list's reader must see first (a new token's plaintext). Not a
+   * second list, and not a panel of settings.
+   */
+  notice?: React.ReactNode;
   rowClassName?: (row: TRow) => string | undefined;
 }
 
@@ -180,6 +186,7 @@ export function ListPage<TRow>({
   nextCursor,
   newRows,
   menu,
+  notice,
   rowClassName,
 }: ListPageProps<TRow>) {
   const { definition: def, state } = list;
@@ -281,6 +288,7 @@ export function ListPage<TRow>({
       )}
 
       {!embedded && view?.note && <ViewNote note={view.note} className="-mt-2" />}
+      {notice}
       <FilterBar
         list={list}
         columns={barColumns}

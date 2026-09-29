@@ -17,6 +17,7 @@ import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my
 import { useArchiveApp } from "../settings/use-archive-app";
 
 import type { AppFrameApp, AppFrameProps } from "./AppFrame";
+import { appDeploysVariables, useAppDeploys } from "./use-app-deploys";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -27,13 +28,11 @@ interface EnvsResp {
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
 }
-interface DeploysResp {
-  astroliftDeployments: AstroliftDeployment[];
-}
 
 /**
  * The data half of AppFrame: the app, where it runs, the latest deployment
- * the header's Deploy re-runs, and the Deploy, Archive, Restore, Delete and
+ * the header's Deploy re-runs (from the deploys read it shares with the
+ * Overview), and the Deploy, Archive, Restore, Delete and
  * Copy ID actions. The same queries and permissions the overview header
  * used (`app.deploy`, `app.update`, `app.delete`).
  */
@@ -50,15 +49,13 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
   const appQ = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloadsQ = useQuery<WorkloadsResp>(LIST_WORKLOADS, { variables: { appSlug: slug } });
   const envsQ = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: slug } });
-  const deploysQ = useQuery<DeploysResp>(LIST_DEPLOYMENTS, {
-    variables: { appSlug: slug, limit: 1 },
-  });
-  const latest = deploysQ.data?.astroliftDeployments?.[0] ?? null;
+  // The Overview's panels read the same deploys (one query, see use-app-deploys).
+  const latest = useAppDeploys(slug).deployments[0] ?? null;
 
   const [startDeploy, { loading: deploying }] = useMutation<{
     startDeployment: MutationResult<AstroliftDeployment>;
   }>(START_DEPLOYMENT, {
-    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { appSlug: slug, limit: 1 } }],
+    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: appDeploysVariables(slug) }],
   });
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeleteApp: MutationResult<{ id: string; deleted: boolean }>;

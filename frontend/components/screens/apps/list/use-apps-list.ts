@@ -38,7 +38,7 @@ type Page<T> = Record<string, CursorPage<T> | undefined>;
  * through `useQuery`, the rest walked by cursor, so nothing past the first
  * page is dropped (the Clusters list's walk, #1230).
  */
-function useWalk<T>(
+export function useWalk<T>(
   query: DocumentNode,
   field: string,
   cursorVariable: "cursor" | "after",

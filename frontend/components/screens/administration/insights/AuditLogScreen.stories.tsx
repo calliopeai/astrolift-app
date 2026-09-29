@@ -4,8 +4,8 @@ import { expect, userEvent, within } from "storybook/test";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { AUDIT_LIST } from "./audit-list";
-import { AuditLogScreen, type AuditLogScreenProps } from "./AuditLogScreen";
-import { AUDIT, AUDIT_EVENTS, AUDIT_EVENTS_LONG } from "./fixtures";
+import { type AuditEventsFeed, AuditLogScreen, type AuditLogScreenProps } from "./AuditLogScreen";
+import { AUDIT, AUDIT_EVENTS, AUDIT_EVENTS_LONG, AUDIT_FEED } from "./fixtures";
 
 const meta: Meta = {
   title: "Screens/Administration/Insights/AuditLog",
@@ -15,33 +15,39 @@ export default meta;
 
 type Story = StoryObj;
 
-type Props = Partial<Omit<AuditLogScreenProps, "list">> & { initial?: Partial<ListState> };
+type Props = Partial<Omit<AuditLogScreenProps, "list" | "events">> & {
+  initial?: Partial<ListState>;
+  feed?: Partial<AuditEventsFeed>;
+};
 
-/** The screen over in-memory list state, so tabs, chips and paging all click. */
-function Audit({ initial, ...props }: Props) {
+/** The screen over in-memory list state, so tabs and chips all click. */
+function Audit({ initial, feed, ...props }: Props) {
   const list = useLocalListState(AUDIT_LIST, initial);
-  return <AuditLogScreen {...AUDIT} list={list} {...props} />;
+  return <AuditLogScreen {...AUDIT} list={list} events={{ ...AUDIT_FEED, ...feed }} {...props} />;
 }
 
 export const Full: Story = { render: () => <Audit /> };
 
 export const Loading: Story = {
-  render: () => <Audit rows={[]} loading retentionDays={null} totalCount={null} />,
+  render: () => (
+    <Audit feed={{ items: [], loading: true }} retentionDays={null} totalCount={null} />
+  ),
 };
 
-export const Empty: Story = { render: () => <Audit rows={[]} nextCursor={null} totalCount={0} /> };
+export const Empty: Story = {
+  render: () => <Audit feed={{ items: [], hasMore: false }} totalCount={0} />,
+};
 
 /** The Denied view with nothing in it. */
 export const EmptyView: Story = {
-  render: () => <Audit rows={[]} nextCursor={null} initial={{ view: "denied" }} />,
+  render: () => <Audit feed={{ items: [], hasMore: false }} initial={{ view: "denied" }} />,
 };
 
 /** The action filter matches exactly, so a partial action finds nothing. */
 export const EmptyFiltered: Story = {
   render: () => (
     <Audit
-      rows={[]}
-      nextCursor={null}
+      feed={{ items: [], hasMore: false }}
       initial={{ q: "team", filters: { decision: "DENY", since: "7d" } }}
     />
   ),
@@ -50,23 +56,26 @@ export const EmptyFiltered: Story = {
 export const Error: Story = {
   render: () => (
     <Audit
-      rows={[]}
-      error={{ message: "upstream timed out after 30s (astroliftAuditEventsPage)" }}
+      feed={{
+        items: [],
+        error: "upstream timed out after 30s (astroliftAuditEventsPage)",
+      }}
     />
   ),
 };
 
-/** Mine, filtered by chips, on an older page. */
+/** An older page failed: the events stay, Load older retries. */
+export const OlderPageFailed: Story = {
+  render: () => <Audit feed={{ error: "upstream timed out" }} />,
+};
+
+/** Mine, filtered by chips. */
 export const Filtered: Story = {
   render: () => (
     <Audit
-      rows={AUDIT_EVENTS.slice(0, 2)}
+      feed={{ items: AUDIT_EVENTS.slice(0, 2), hasMore: false }}
       totalCount={2}
-      initial={{
-        view: "mine",
-        filters: { action: "app.env.update", since: "24h" },
-        after: "cursor-1",
-      }}
+      initial={{ view: "mine", filters: { action: "app.env.update", since: "24h" } }}
     />
   ),
 };
@@ -75,7 +84,7 @@ export const Filtered: Story = {
 export const TargetKindLocal: Story = {
   render: () => (
     <Audit
-      rows={AUDIT_EVENTS.filter((e) => e.targetKind === "app")}
+      feed={{ items: AUDIT_EVENTS.filter((e) => e.targetKind === "app") }}
       totalCount={null}
       targetFilteredLocally
       initial={{ filters: { target: "app" } }}
@@ -83,10 +92,8 @@ export const TargetKindLocal: Story = {
   ),
 };
 
-/** Polled events wait behind the pill; the rows being read hold still. */
-export const NewEvents: Story = {
-  render: () => <Audit newRows={{ count: 3, onReveal: () => {} }} />,
-};
+/** Polled events wait behind the pill; the events being read hold still. */
+export const NewEvents: Story = { render: () => <Audit feed={{ newCount: 3 }} /> };
 
 export const Exporting: Story = { render: () => <Audit exporting /> };
 
@@ -94,23 +101,23 @@ export const Exporting: Story = { render: () => <Audit exporting /> };
 export const LongStrings: Story = {
   render: () => (
     <Audit
-      rows={AUDIT_EVENTS_LONG}
+      feed={{ items: AUDIT_EVENTS_LONG }}
       totalCount={AUDIT_EVENTS_LONG.length}
       initial={{ filters: { actor: AUDIT_EVENTS_LONG[1].actorId } }}
     />
   ),
 };
 
-/** The narrowest the web console goes (spec 44 §6): the table scrolls in its frame. */
+/** The narrowest the web console goes (spec 44 §6): the feed scrolls in its frame. */
 export const Width768: Story = {
   render: () => (
     <div style={{ width: 768 }} className="overflow-hidden border">
-      <Audit rows={[...AUDIT_EVENTS, ...AUDIT_EVENTS_LONG]} />
+      <Audit feed={{ items: [...AUDIT_EVENTS, ...AUDIT_EVENTS_LONG] }} />
     </div>
   ),
 };
 
-/** A row opens the detail sheet with the before/after diff. */
+/** A line opens the detail sheet with the before/after diff. */
 export const RowDetails: Story = {
   render: () => <Audit />,
   play: async ({ canvasElement }) => {
@@ -131,7 +138,7 @@ export const RetentionEditor: Story = {
   },
 };
 
-/** Export lives in the list's overflow menu. */
+/** Export lives in the filter bar's overflow menu. */
 export const ExportMenu: Story = {
   render: () => <Audit />,
   play: async ({ canvasElement }) => {

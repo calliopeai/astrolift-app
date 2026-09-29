@@ -259,12 +259,18 @@ export const CERTS: ClusterCertificate[] = [
   },
 ];
 
-/** The full hook result, as the route would pass it. */
-export const APP_DOMAINS: AppDomainsState = {
+/**
+ * The hook result, as the route would pass it, less the list state: the
+ * stories answer `list`, `rows` and `totalCount` in memory (see the story's
+ * Domains wrapper).
+ */
+export const APP_DOMAINS: Omit<AppDomainsState, "list" | "rows" | "totalCount"> = {
   loading: false,
   error: null,
   refetch: noop,
   domains: [DOMAIN_ACTIVE, DOMAIN_PENDING, DOMAIN_CERT_FAILED, DOMAIN_BYO, DOMAIN_WILDCARD],
+  pickedId: null,
+  domainHref: (d) => `/apps/storefront/domains?domain=${d.id}`,
   environments: [ENV_PROD, ENV_STAGING_PAUSED],
   workloadOptions: WORKLOADS,
   busy: false,

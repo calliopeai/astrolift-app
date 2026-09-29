@@ -36,71 +36,6 @@
  */
 const NO_PAGE_FIELD = [
   {
-    file: "components/screens/administration/organization/TrustedDomainsCard.tsx",
-    reason: "astroliftOrganizationAllowlistDomains is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/agents/detail/AgentRunScreen.tsx",
-    reason: "agentTasks is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/agents/list/ActiveTasksPanel.tsx",
-    reason: "agentTasks is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/agents/list/TaskHistoryPanel.tsx",
-    reason: "agentTasks is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/agents/list/AgentRegistryPanel.tsx",
-    reason: "The registry table is still on the legacy useListControls.",
-  },
-  {
-    file: "components/screens/apps/domains/DomainHandshakeCard.tsx",
-    reason: "All three tables read astroliftAppDomains, an unpaginated list field.",
-  },
-  {
-    file: "components/screens/apps/tools/ObservabilityScreen.tsx",
-    reason:
-      "The pod table reads astroliftAppPods, unpaginated. The alert-rule and alert-event tables beside it are Page-capable and could move independently.",
-  },
-  {
-    file: "components/screens/domains/ManagedDomainsScreen.tsx",
-    reason: "astroliftManagedDomains is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/metrics/MetricsScreen.tsx",
-    reason: "astroliftAppHealthSummary is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/pipelines/PipelineSecrets.tsx",
-    reason: "astroliftPipelineSecrets is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/settings/identity-provider/IdentityProvidersScreen.tsx",
-    reason: "astroliftIdentityProviders is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/settings/security/SecuritySettings.tsx",
-    reason: "astroliftActiveSessions is an unpaginated list field.",
-  },
-  {
-    file: "components/screens/teams/TeamMembersPanel.tsx",
-    reason: "astroliftTeamMembers is an unpaginated list field.",
-  },
-  {
-    file: "components/observability/DnsRecordsCard.tsx",
-    reason: "astroliftAppDnsRecords is an unpaginated list field.",
-  },
-  {
-    file: "components/observability/EndpointMetricsPanel.tsx",
-    reason: "astroliftAppEndpointMetrics returns a fixed per-route metric set, unpaginated.",
-  },
-  {
-    file: "components/observability/TlsCertificatesCard.tsx",
-    reason: "astroliftAppCertificates is an unpaginated list field.",
-  },
-  {
     file: "components/observability/TraceExplorerPanel.tsx",
     reason: "astroliftAppTraces returns a bounded trace window, unpaginated.",
   },
@@ -143,11 +78,6 @@ const NOT_A_SERVER_COLLECTION = [
   {
     file: "components/screens/documentation/DriversScreen.tsx",
     reason: "A capability matrix computed by crossing provider plugins with registered clusters.",
-  },
-  {
-    file: "components/screens/projects/ProjectDetailScreen.tsx",
-    reason:
-      "The agents table is a client-side join across three queries; only the apps table beside it is a server collection.",
   },
 ];
 

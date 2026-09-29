@@ -5,7 +5,7 @@ import * as React from "react";
 import { AggregatedEventsList } from "@/components/screens/events/AggregatedEventsList";
 import { BucketMembers } from "@/components/screens/events/BucketMembers";
 import { EventRate } from "@/components/screens/events/EventRate";
-import { EventsAggregateToggle, EventsScreen } from "@/components/screens/events/EventsScreen";
+import { EventsScreen } from "@/components/screens/events/EventsScreen";
 import { RawEventsList } from "@/components/screens/events/RawEventsList";
 import {
   type AggregatedEvent,
@@ -14,17 +14,26 @@ import {
   useEventRate,
   useRawEvents,
 } from "@/components/screens/events/use-events";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export function EventsClient() {
   const [aggregate, setAggregate] = React.useState(true);
-  const toolbar = <EventsAggregateToggle checked={aggregate} onCheckedChange={setAggregate} />;
+  const [search, setSearch] = React.useState("");
+  // Only the settled term reaches the server, never each keystroke.
+  const settled = useDebounce(search, 300);
 
   return (
-    <EventsScreen rate={<EventRateContainer />}>
+    <EventsScreen
+      rate={<EventRateContainer />}
+      search={search}
+      onSearchChange={setSearch}
+      aggregate={aggregate}
+      onAggregateChange={setAggregate}
+    >
       {aggregate ? (
-        <AggregatedListContainer toolbar={toolbar} />
+        <AggregatedFeedContainer search={settled} />
       ) : (
-        <RawListContainer toolbar={toolbar} />
+        <RawFeedContainer search={settled} />
       )}
     </EventsScreen>
   );
@@ -34,15 +43,14 @@ function EventRateContainer() {
   return <EventRate {...useEventRate()} />;
 }
 
-function RawListContainer({ toolbar }: { toolbar: React.ReactNode }) {
-  return <RawEventsList {...useRawEvents()} toolbar={toolbar} />;
+function RawFeedContainer({ search }: { search: string }) {
+  return <RawEventsList {...useRawEvents(search)} />;
 }
 
-function AggregatedListContainer({ toolbar }: { toolbar: React.ReactNode }) {
+function AggregatedFeedContainer({ search }: { search: string }) {
   return (
     <AggregatedEventsList
-      {...useAggregatedEvents()}
-      toolbar={toolbar}
+      {...useAggregatedEvents(search)}
       renderMembers={(bucket) => <BucketMembersContainer bucket={bucket} />}
     />
   );

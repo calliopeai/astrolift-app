@@ -4,11 +4,12 @@ import { CopyIcon, GlobeIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,15 +27,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -60,13 +52,19 @@ function provisionBadge(state: string): { label: string; className: string } {
 }
 
 /**
- * Org-level managed DNS zones: the zone table, the Add zone sheet, and the
- * delete confirmation. Data and mutations come from useManagedDomains; this
+ * Admin › Domains (spec 44 §5.1): the org's managed DNS zones on the shared
+ * list (views All · Mine · Not active, status, driver and default-for
+ * filters, numbered pages), revalidate and delete in each row's `⋯`, the
+ * Add zone sheet. Data and mutations come from useManagedDomains; this
  * holds only UI state (the sheet, its form, the delete target).
  */
 export function ManagedDomainsScreen({
+  list,
+  rows,
+  totalCount,
   loading,
-  domains: list,
+  error,
+  onRetry,
   creating,
   deleting,
   revalidating,
@@ -74,7 +72,6 @@ export function ManagedDomainsScreen({
   onDelete,
   onRevalidate,
   onCopyNameservers,
-  onOpen,
 }: ManagedDomainsScreenProps) {
   const fmt = useFormatters();
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -98,135 +95,139 @@ export function ManagedDomainsScreen({
     if (await onCreate({ zone, dnsDriver, defaultFor, wildcard })) setCreateOpen(false);
   }
 
+  const columns: Column<AstroliftManagedDomain>[] = [
+    {
+      id: "zone",
+      header: "Zone",
+      sortKey: "zone",
+      cellClassName: "max-w-72",
+      cell: (d) => (
+        <span className="block truncate font-mono" title={d.zone}>
+          {d.zone}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (d) => (
+        <Badge className={provisionBadge(d.provisionState).className} variant="secondary">
+          {provisionBadge(d.provisionState).label}
+        </Badge>
+      ),
+    },
+    {
+      id: "nameservers",
+      header: "Nameservers (point your registrar here)",
+      label: "Nameservers",
+      cellClassName: "relative z-10 max-w-80",
+      cell: (d) =>
+        d.provisionNameservers.length > 0 ? (
+          <div className="flex min-w-0 items-start gap-2">
+            <div className="min-w-0 font-mono text-xs leading-5">
+              {d.provisionNameservers.map((ns) => (
+                <div key={ns} className="truncate" title={ns}>
+                  {ns}
+                </div>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Copy nameservers for ${d.zone}`}
+              onClick={() => onCopyNameservers(d)}
+            >
+              <CopyIcon className="size-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">
+            {d.provisionState === "" ? "—" : "pending…"}
+          </span>
+        ),
+    },
+    {
+      id: "driver",
+      header: "DNS driver",
+      sortKey: "driver",
+      cell: (d) => <Badge variant="outline">{d.dnsDriver}</Badge>,
+    },
+    {
+      id: "defaultFor",
+      header: "Default for",
+      cell: (d) => (
+        <Badge className={defaultForBadge[d.defaultFor]} variant="secondary">
+          {d.defaultFor.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      id: "wildcard",
+      header: "Wildcard",
+      cell: (d) => (d.isWildcardManaged ? "yes" : "no"),
+    },
+    {
+      id: "created",
+      header: "Created",
+      sortKey: "created",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (d) => fmt.formatDate(d.createdAt),
+    },
+  ];
+
   return (
-    <PageShell
-      title="Managed domains"
-      description="Org-level DNS zones the platform manages for apps and preview environments. Per-app hostnames are configured on each app's Domains tab."
-      actions={
-        <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="size-4" />
-          Add zone
-        </Button>
-      }
-    >
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<GlobeIcon className="size-5" />}
-                title="No managed domains"
-                description="Bind a DNS zone to a DnsDriver. The install playbook seeds one zone per cloud profile."
-                learnMoreHref="/documentation/custom-domains"
-                learnMoreLabel="Custom domains"
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Zone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Nameservers (point your registrar here)</TableHead>
-                  <TableHead>DNS driver</TableHead>
-                  <TableHead>Default for</TableHead>
-                  <TableHead>Wildcard</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((d) => (
-                  <TableRow
-                    key={d.id}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open managed domain ${d.zone}`}
-                    onClick={() => onOpen(d)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "Enter" || ev.key === " ") {
-                        ev.preventDefault();
-                        onOpen(d);
-                      }
-                    }}
-                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                  >
-                    <TableCell className="font-mono">{d.zone}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={provisionBadge(d.provisionState).className}
-                        variant="secondary"
-                      >
-                        {provisionBadge(d.provisionState).label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(ev) => ev.stopPropagation()}>
-                      {d.provisionNameservers.length > 0 ? (
-                        <div className="flex items-start gap-2">
-                          <div className="font-mono text-xs leading-5">
-                            {d.provisionNameservers.map((ns) => (
-                              <div key={ns}>{ns}</div>
-                            ))}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={`Copy nameservers for ${d.zone}`}
-                            onClick={() => onCopyNameservers(d)}
-                          >
-                            <CopyIcon className="size-3.5" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">
-                          {d.provisionState === "" ? "—" : "pending…"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{d.dnsDriver}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={defaultForBadge[d.defaultFor]} variant="secondary">
-                        {d.defaultFor.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{d.isWildcardManaged ? "yes" : "no"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {fmt.formatDate(d.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void onRevalidate(d)}
-                        disabled={revalidating || !d.provisionClusterId}
-                        title="Revalidate public DNS delegation"
-                      >
-                        <RefreshCwIcon className="size-4" />
-                        <span className="sr-only">Revalidate DNS</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(d)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+    <>
+      <ListPage<AstroliftManagedDomain>
+        header={{
+          crumbs: adminCrumbs("domains", "Domains"),
+          title: "Managed domains",
+          context:
+            "Org-level DNS zones the platform manages for apps and preview environments. Per-app hostnames are configured on each app's Domains tab.",
+          primaryAction: (
+            <Button onClick={() => setCreateOpen(true)}>
+              <PlusIcon className="size-4" />
+              Add zone
+            </Button>
+          ),
+        }}
+        list={list}
+        label="Managed domains"
+        columns={columns}
+        rows={rows}
+        getRowId={(d) => d.id}
+        rowHref={(d) => `/domains/${d.id}`}
+        rowActions={(d) => (
+          <>
+            <DropdownMenuItem
+              disabled={revalidating || !d.provisionClusterId}
+              onSelect={() => void onRevalidate(d)}
+            >
+              <RefreshCwIcon className="size-4" />
+              Revalidate DNS
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={deleting}
+              onSelect={() => setDeleteTarget(d)}
+            >
+              <Trash2Icon className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </>
+        )}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        empty={{
+          icon: <GlobeIcon className="size-5" />,
+          title: "No managed domains",
+          description:
+            "Bind a DNS zone to a DnsDriver. The install playbook seeds one zone per cloud profile.",
+          learnMoreHref: "/documentation/custom-domains",
+          learnMoreLabel: "Custom domains",
+        }}
+      />
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
         <SheetContent className="flex flex-col">
@@ -316,6 +317,6 @@ export function ManagedDomainsScreen({
           if (deleteTarget) await onDelete(deleteTarget);
         }}
       />
-    </PageShell>
+    </>
   );
 }

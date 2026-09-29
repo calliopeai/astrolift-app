@@ -2,9 +2,6 @@ import { DEPLOY_FAILURE, LONG_ARN, LONG_SHA, LONG_URL } from "@/components/panel
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { ACCESSES, LONG_ACCESS } from "./app-overview-cards-a.fixtures";
-import { AUTOWIRE_FAILING } from "./app-overview-banners.fixtures";
-import { SYNC_CONFLICT, SYNC_IN_SYNC } from "./app-ci-observability-section.fixtures";
-import type { CiSetupApp, CiSetupPanelProps } from "./CiSetupPanel";
 import type { LatestDeployPanelProps } from "./LatestDeployPanel";
 import type { OwnershipPanelProps } from "./OwnershipPanel";
 
@@ -93,42 +90,4 @@ export const OWNERSHIP_LONG: OwnershipPanelProps = {
   accesses: [...ACCESSES, LONG_ACCESS],
   projectName: LONG,
   teamName: LONG,
-};
-
-export const CI_APP: CiSetupApp = {
-  sourceKind: "github",
-  sourceRepo: "acme/checkout",
-  deployBranch: "main",
-  defaultBranch: "main",
-  autowire: {
-    connected: true,
-    ciWorkflow: "ok",
-    webhook: "ok",
-    secrets: "ok",
-    detail: "",
-    checkedAt: "2026-09-28T11:00:00Z",
-  },
-  sourceWebhookInstalledAt: "2026-09-20T09:00:00Z",
-  ciWorkflowSyncStatus: SYNC_IN_SYNC,
-};
-
-export const CI: CiSetupPanelProps = {
-  app: CI_APP,
-  settingsHref: "/apps/checkout/settings",
-  tokensHref: "/apps/checkout/access?section=tokens",
-};
-
-export const CI_PROBLEMS: CiSetupPanelProps = {
-  ...CI,
-  app: {
-    ...CI_APP,
-    autowire: AUTOWIRE_FAILING,
-    sourceWebhookInstalledAt: null,
-    ciWorkflowSyncStatus: SYNC_CONFLICT,
-  },
-};
-
-export const CI_LONG: CiSetupPanelProps = {
-  ...CI,
-  app: { ...CI_APP, sourceRepo: `acme/${LONG}`, deployBranch: `feature/${LONG}` },
 };

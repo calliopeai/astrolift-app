@@ -39,3 +39,29 @@ export const Loading: StoryObj = { render: () => <EndpointMetricsPanel loading m
 export const Empty: StoryObj = {
   render: () => <EndpointMetricsPanel loading={false} metrics={[]} />,
 };
+
+const MANY_ROUTES = Array.from({ length: 40 }, (_, i) =>
+  m(`/api/v1/resource-${i}`, 40 - i, i % 7 === 0 ? 0.08 : 0.002, 12, 40, 90 + i)
+);
+
+/** Forty routes: the embedded list pages them, busiest first. */
+export const ManyRoutes: StoryObj = {
+  render: () => <EndpointMetricsPanel loading={false} metrics={MANY_ROUTES} />,
+};
+
+export const LongStrings: StoryObj = {
+  render: () => (
+    <EndpointMetricsPanel
+      loading={false}
+      metrics={[m(`/api/v1/${"segment/".repeat(30)}{id}`, 3.2, 0.12, 20, 80, 400)]}
+    />
+  ),
+};
+
+export const Width768: StoryObj = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <EndpointMetricsPanel loading={false} metrics={MANY_ROUTES} />
+    </div>
+  ),
+};

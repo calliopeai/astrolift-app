@@ -5,6 +5,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
+import { LIST_ARCHETYPE_ALLOWLIST_FILES } from "./eslint/list-archetype-allowlist.mjs";
 import { RAW_TABLE_ALLOWLIST_FILES } from "./eslint/raw-table-allowlist.mjs";
 
 /**
@@ -91,6 +92,57 @@ const dataSurfacePlugin = {
           ImportDeclaration(node) {
             if (node.source.value === "@/components/ui/table") {
               context.report({ node, messageId: "rawTable" });
+            }
+          },
+        };
+      },
+    },
+    /**
+     * `list-archetype` (Leo's list rules 3 to 5, 2026-09-28): every list is
+     * `ListPage` (full or embedded), a second list on an overview is a
+     * `ListSummary`, and a thing that grows is a `Feed`. Rendering
+     * `DataTable` yourself skips the filters, sort, paging and URL state the
+     * archetype carries, so importing it (as a value; types are fine) is an
+     * error outside components/list, components/data-table and
+     * components/feed. The residue is an exact-path allowlist,
+     * eslint/list-archetype-allowlist.mjs, held in step by its test.
+     */
+    "list-archetype": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "Disallow rendering DataTable directly; use ListPage, ListSummary or Feed.",
+        },
+        messages: {
+          listArchetype:
+            "`DataTable` rendered directly. A list is `ListPage` (or `ListPage embedded` in a detail tab); a second list on an overview is `ListSummary`; a growing stream is `Feed`. If this surface cannot move yet, add it to eslint/list-archetype-allowlist.mjs with the blocker written out.",
+        },
+        schema: [{ type: "array", items: { type: "string" }, uniqueItems: true }],
+      },
+      create(context) {
+        const allowlist = context.options[0] ?? [];
+        const relative = path.relative(context.cwd, context.filename).split(path.sep).join("/");
+        if (allowlist.some((entry) => relative === entry || relative.endsWith(`/${entry}`))) {
+          return {};
+        }
+        return {
+          ImportDeclaration(node) {
+            const source = node.source.value;
+            if (
+              source !== "@/components/data-table" &&
+              !source.startsWith("@/components/data-table/")
+            ) {
+              return;
+            }
+            if (node.importKind === "type") return;
+            for (const spec of node.specifiers) {
+              if (
+                spec.type === "ImportSpecifier" &&
+                spec.importKind !== "type" &&
+                (spec.imported.name ?? spec.imported.value) === "DataTable"
+              ) {
+                context.report({ node: spec, messageId: "listArchetype" });
+              }
             }
           },
         };
@@ -308,6 +360,19 @@ const eslintConfig = defineConfig([
       // `error`: the sweep is done, every call site is a ConfirmDialog, and
       // there is no legitimate reason to add a new one.
       "astroliftData/no-native-confirm": "error",
+    },
+  },
+  // List-archetype guardrail: see the rule's doc block above. The three
+  // primitives that are built on DataTable are exempt; everyone else renders
+  // them.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["components/data-table/**", "components/list/**", "components/feed/**"],
+    plugins: { astroliftData: dataSurfacePlugin },
+    rules: {
+      // `error` from day one, with the residue in
+      // eslint/list-archetype-allowlist.mjs; that list may only shrink.
+      "astroliftData/list-archetype": ["error", LIST_ARCHETYPE_ALLOWLIST_FILES],
     },
   },
   // Radix is wrapped once, in components/ui; everything else composes those

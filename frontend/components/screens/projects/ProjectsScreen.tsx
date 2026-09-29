@@ -5,10 +5,12 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -33,8 +35,19 @@ export type ProjectsScreenProps = ReturnType<typeof useProjects> & {
   renderEditDialog: (props: EditProjectDialogSlotProps) => React.ReactNode;
 };
 
+/**
+ * Admin › Projects (spec 44 §5.1): the org's projects on the shared list,
+ * views All · Mine, cursor paged, edit and delete in each row's `⋯`. Pure;
+ * the data half is useProjects.
+ */
 export function ProjectsScreen({
-  table,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   teams,
   teamsLoading,
   noTeams,
@@ -59,84 +72,94 @@ export function ProjectsScreen({
   // appear until a navigation. Refetch the walk when the sheet closes.
   function handleCreateOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) table.refetch();
+    if (!next) onRetry();
   }
 
   const columns: Column<AstroliftProject>[] = [
     {
       id: "name",
       header: "Project",
+      cellClassName: "max-w-80",
       cell: (p) => (
-        <>
-          <div className="font-medium">{p.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">
+        <span className="block min-w-0">
+          <span className="block truncate font-medium" title={p.name}>
+            {p.name}
+          </span>
+          <span className="text-muted-foreground block truncate font-mono text-xs">
             {p.team.slug}/{p.slug}
-          </div>
-        </>
+          </span>
+        </span>
       ),
     },
     {
       id: "team",
       header: "Team",
-      cell: (p) => <Badge variant="secondary">{p.team.slug}</Badge>,
+      cellClassName: "max-w-48",
+      cell: (p) => (
+        <Badge variant="secondary" className="max-w-full truncate">
+          {p.team.slug}
+        </Badge>
+      ),
     },
     {
       id: "createdAt",
       header: "Created",
       cell: (p) => (
-        <span className="text-muted-foreground text-sm">{fmt.formatDate(p.createdAt)}</span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (p) => (
-        // The row link is a stretched overlay on the first cell, so the row
-        // actions need their own stacking context to stay clickable.
-        <div className="relative z-10 flex justify-end">
-          <Can permission="project.update">
-            <Button size="sm" variant="ghost" onClick={() => setEditTarget(p)}>
-              <PencilIcon className="size-4" />
-              <span className="sr-only">Edit</span>
-            </Button>
-          </Can>
-          <Can permission="project.delete">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDeleteTarget(p)}
-              disabled={deleting}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Delete</span>
-            </Button>
-          </Can>
-        </div>
+        <span className="text-muted-foreground font-mono text-xs">
+          {fmt.formatDate(p.createdAt)}
+        </span>
       ),
     },
   ];
 
   return (
-    <PageShell
-      title="Projects"
-      description="Group apps that share a deploy cadence, a domain, or a stack. Cost reporting rolls up at this level."
-      actions={
-        <Can permission="project.create">
-          <Button onClick={() => setOpen(true)} disabled={teamsLoading}>
-            <PlusIcon className="size-4" />
-            New project
-          </Button>
-        </Can>
-      }
-    >
-      <DataTable
+    <>
+      <ListPage<AstroliftProject>
+        header={{
+          crumbs: adminCrumbs("projects", "Projects"),
+          title: "Projects",
+          context:
+            "Group apps that share a deploy cadence, a domain, or a stack. Cost reporting rolls up at this level.",
+          primaryAction: (
+            <Can permission="project.create">
+              <Button onClick={() => setOpen(true)} disabled={teamsLoading}>
+                <PlusIcon className="size-4" />
+                New project
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
         label="Projects"
-        controller={table}
         columns={columns}
+        rows={rows}
         getRowId={(p) => p.id}
         rowHref={(p) => `/projects/${p.slug}`}
-        searchPlaceholder="Search projects..."
+        rowActions={(p) => (
+          <>
+            <Can permission="project.update">
+              <DropdownMenuItem onSelect={() => setEditTarget(p)}>
+                <PencilIcon className="size-4" />
+                Edit
+              </DropdownMenuItem>
+            </Can>
+            <Can permission="project.delete">
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleting}
+                onSelect={() => setDeleteTarget(p)}
+              >
+                <Trash2Icon className="size-4" />
+                Delete
+              </DropdownMenuItem>
+            </Can>
+          </>
+        )}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
         empty={{
           icon: <FileBoxIcon className="size-5" />,
           title: "No projects yet",
@@ -145,11 +168,6 @@ export function ProjectsScreen({
             : "Group your apps under a project so cost and quotas roll up cleanly.",
           actionHref: noTeams ? "/administration/teams" : undefined,
           actionLabel: noTeams ? "Manage teams" : undefined,
-        }}
-        emptyFiltered={{
-          title: "No matching projects",
-          description:
-            "No project matches that search. The server matches project name, slug and description, plus the owning team.",
         }}
       />
 
@@ -180,6 +198,6 @@ export function ProjectsScreen({
           if (deleteTarget) await deleteProject(deleteTarget);
         }}
       />
-    </PageShell>
+    </>
   );
 }

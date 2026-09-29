@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertTriangleIcon,
   GlobeIcon,
   KeyRoundIcon,
   LogOutIcon,
@@ -16,25 +15,25 @@ import Link from "next/link";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { selectRows } from "@/components/list/select-rows";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { AstroliftClientKind } from "@/graphql/identity/identity.types";
+import type {
+  AstroliftActiveSession,
+  AstroliftClientKind,
+} from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { SESSIONS_SELECT } from "./sessions-list";
 import type { useSecuritySettings } from "./use-security-settings";
 
-export type SecuritySettingsViewProps = ReturnType<typeof useSecuritySettings>;
+export type SecuritySettingsViewProps = Omit<ReturnType<typeof useSecuritySettings>, "list">;
 
 const CLIENT_KIND_ICONS: Record<
   AstroliftClientKind,
@@ -48,10 +47,13 @@ const CLIENT_KIND_ICONS: Record<
 };
 
 /**
- * Settings > Security: the account's active sessions (sign out everywhere,
- * revoke one), plus the API tokens and MFA pointers.
+ * Settings > Security: the account's active sessions as the page's one
+ * embedded list (search, kind and status filters, sort, numbered pages run
+ * over the sessions in hand; sign out everywhere, revoke one in `⋯`), plus
+ * the API tokens and MFA pointers.
  */
 export function SecuritySettingsView({
+  list,
   sessions,
   otherCount,
   loading,
@@ -61,7 +63,7 @@ export function SecuritySettingsView({
   onRequestSignOutAll,
   onSignOutAll,
   onRevoke,
-}: SecuritySettingsViewProps) {
+}: SecuritySettingsViewProps & { list: ListStateController }) {
   const t = useTranslations("securitySessions");
   const fmt = useFormatters();
 
@@ -122,6 +124,66 @@ export function SecuritySettingsView({
 
   const pendingTarget = pendingRevokeId ? sessions.find((s) => s.id === pendingRevokeId) : null;
 
+  const { state } = list;
+  const page = selectRows(
+    sessions,
+    {
+      filters: list.filters,
+      q: state.q,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    },
+    SESSIONS_SELECT
+  );
+
+  const columns: Column<AstroliftActiveSession>[] = [
+    {
+      id: "kind",
+      header: t("columns.kind"),
+      sortKey: "kind",
+      cell: (s) => clientKindBadge(s.clientKind),
+    },
+    {
+      id: "label",
+      header: t("columns.label"),
+      cellClassName: "text-muted-foreground max-w-72",
+      cell: (s) => (
+        <span className="block truncate text-xs" title={s.label || undefined}>
+          {s.label || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: t("columns.status"),
+      cell: (s) =>
+        s.isCurrent ? (
+          <Badge className="bg-success/15 text-success-fg">{t("status.current")}</Badge>
+        ) : (
+          <Badge variant="secondary">{t("status.other")}</Badge>
+        ),
+    },
+    {
+      id: "lastSeen",
+      header: t("columns.lastSeen"),
+      sortKey: "lastSeen",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (s) => (
+        <span title={s.lastSeenAt ? fmt.formatDateTime(s.lastSeenAt) : undefined}>
+          {relativeFromNow(s.lastSeenAt)}
+        </span>
+      ),
+    },
+    {
+      id: "expires",
+      header: t("columns.expires"),
+      sortKey: "expires",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (s) => (s.expiresAt ? fmt.formatDateTime(s.expiresAt) : "—"),
+    },
+  ];
+
   return (
     <div className="grid gap-4">
       <Section
@@ -142,69 +204,30 @@ export function SecuritySettingsView({
           </Button>
         }
       >
-        {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : errorMessage !== null ? (
-          <div className="border-destructive/40 bg-destructive/5 flex items-start gap-2 rounded-md border p-3 text-sm">
-            <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
-            <div className="flex-1">
-              <p className="text-destructive font-medium">{t("loadError")}</p>
-              <p className="text-muted-foreground text-xs">{errorMessage}</p>
-            </div>
-          </div>
-        ) : sessions.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noSessions")}</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("columns.kind")}</TableHead>
-                <TableHead>{t("columns.label")}</TableHead>
-                <TableHead>{t("columns.status")}</TableHead>
-                <TableHead>{t("columns.lastSeen")}</TableHead>
-                <TableHead>{t("columns.expires")}</TableHead>
-                <TableHead className="text-right">{t("columns.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessions.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell>{clientKindBadge(s.clientKind)}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{s.label || "—"}</TableCell>
-                  <TableCell>
-                    {s.isCurrent ? (
-                      <Badge className="bg-success/15 text-success-fg">{t("status.current")}</Badge>
-                    ) : (
-                      <Badge variant="secondary">{t("status.other")}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="text-muted-foreground text-xs"
-                    title={s.lastSeenAt ? fmt.formatDateTime(s.lastSeenAt) : undefined}
-                  >
-                    {relativeFromNow(s.lastSeenAt)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {s.expiresAt ? fmt.formatDateTime(s.expiresAt) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={s.isCurrent || revoking}
-                      onClick={() => setPendingRevokeId(s.id)}
-                    >
-                      {t("actions.revoke")}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <ListPage<AstroliftActiveSession>
+          embedded
+          list={list}
+          label={t("title")}
+          columns={columns}
+          rows={page.rows}
+          getRowId={(s) => s.id}
+          rowActions={(s) => (
+            <DropdownMenuItem
+              disabled={s.isCurrent || revoking}
+              onSelect={() => setPendingRevokeId(s.id)}
+            >
+              <LogOutIcon className="size-4" />
+              {t("actions.revoke")}
+            </DropdownMenuItem>
+          )}
+          loading={loading}
+          error={errorMessage !== null ? { message: errorMessage } : null}
+          totalCount={page.totalCount}
+          empty={{
+            icon: <MonitorIcon className="size-5" />,
+            title: t("noSessions"),
+          }}
+        />
       </Section>
 
       <div className="grid gap-4 md:grid-cols-2">

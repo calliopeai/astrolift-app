@@ -2,7 +2,7 @@ import { activeSection, type SearchParams } from "@/components/screens/apps/deta
 import { AppTabSections } from "@/components/screens/apps/detail/AppTabSections";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
-import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
+import { LIST_MANAGED_SERVICES_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
 import { ManagedServicesClient } from "../managed-services/managed-services-client";
@@ -37,9 +37,16 @@ export default async function AppWorkloadsPage({
     <AppTabSections slug={slug} tab="workloads" active={section}>
       {section === "managed-services" ? (
         <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
+          {/* The first page the section's list asks for (use-managed-services). */}
           <PreloadQuery
-            query={LIST_MANAGED_SERVICES}
-            variables={{ appSlug: slug, environmentName: null }}
+            query={LIST_MANAGED_SERVICES_PAGE}
+            variables={{
+              appSlug: slug,
+              environmentName: null,
+              search: null,
+              limit: 25,
+              after: null,
+            }}
           >
             <ManagedServicesClient slug={slug} />
           </PreloadQuery>

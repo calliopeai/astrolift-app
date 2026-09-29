@@ -12,11 +12,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Feed } from "@/components/feed/Feed";
 import type { AstroliftActivityItem } from "@/graphql/operations/operations.types";
 
 export interface ActivityFeedProps {
@@ -26,6 +23,9 @@ export interface ActivityFeedProps {
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
+  onRetry?: () => void;
+  /** Frame height class; see Feed. */
+  maxHeight?: string;
 }
 
 /**
@@ -40,6 +40,9 @@ export interface ActivityFeedProps {
  * ``/apps/<slug>/deployments/<id>``, cluster → ``/clusters/<id>``,
  * secret rotation → ``/apps/<slug>/secrets``, etc.
  *
+ * A thin wrapper over Feed (list rule 5): the frame scrolls on its own,
+ * older pages load as the reader nears the end, grouped by day.
+ *
  * Pure (Storybook first): the page and its load-more come from
  * useRecentActivity, which pages by cursor over ``(occurred_at, guid)``.
  */
@@ -50,55 +53,37 @@ export function ActivityFeed({
   hasMore,
   loadingMore,
   onLoadMore,
+  onRetry,
+  maxHeight,
 }: ActivityFeedProps) {
   const t = useTranslations("overview.activity");
-  if (loading && items.length === 0) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    );
-  }
-
-  if (error && items.length === 0) {
-    return (
-      <EmptyState
-        icon={<ActivityIcon className="size-5" />}
-        title={t("errorTitle")}
-        description={error}
-      />
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={<ActivityIcon className="size-5" />}
-        title={t("emptyTitle")}
-        description={t("emptyDescription")}
-      />
-    );
-  }
-
   return (
-    <div>
-      <ul className="divide-y">
-        {items.map((item) => (
-          <ActivityRow key={item.id} item={item} />
-        ))}
-      </ul>
-      {hasMore && (
-        <div className="mt-3 flex justify-center">
-          <Button variant="ghost" size="sm" onClick={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? t("loadingMore") : t("loadMore")}
-          </Button>
-        </div>
-      )}
-    </div>
+    <Feed
+      label="Activity"
+      items={items}
+      keyOf={(item) => item.id}
+      renderItem={(item) => <ActivityRow item={item} />}
+      groupBy={BY_DAY}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      empty={{
+        icon: <ActivityIcon className="size-5" />,
+        title: t("emptyTitle"),
+        description: t("emptyDescription"),
+      }}
+      hasMore={hasMore}
+      loadingMore={loadingMore}
+      onLoadMore={onLoadMore}
+      errorTitle={t("errorTitle")}
+      loadOlderLabel={t("loadMore")}
+      loadingOlderLabel={t("loadingMore")}
+      maxHeight={maxHeight}
+    />
   );
 }
+
+const BY_DAY = { day: (item: AstroliftActivityItem) => item.occurredAt };
 
 interface ActivityRowProps {
   item: AstroliftActivityItem;
@@ -109,7 +94,7 @@ function ActivityRow({ item }: ActivityRowProps) {
   const timestamp = formatRelative(item.occurredAt);
 
   const body = (
-    <div className="flex items-start gap-3 py-3">
+    <div className="flex min-w-0 items-start gap-3">
       <div className="bg-muted text-muted-foreground mt-0.5 rounded-md p-1.5">
         <Icon className="size-4" />
       </div>

@@ -15,14 +15,16 @@ import {
 import { useClusterAgent } from "@/components/screens/clusters/settings/use-cluster-agent";
 import { useClusterSettings } from "@/components/screens/clusters/settings/use-cluster-settings";
 import { useIngressAuth } from "@/components/screens/clusters/settings/use-ingress-auth";
+import { useSettingsSection } from "@/components/settings/use-settings-section";
 
 import { AuthUsersCard } from "./auth-users-card";
 import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
 
 /**
- * Cluster settings tab. The screen owns the markup; each section with data
- * of its own gets a container here so its hook runs only when it is rendered
- * (the permission-gated users list, the history disclosure).
+ * Cluster settings tab, one section at a time (`?section=`). The screen owns
+ * the markup; each section with data of its own gets a container here so its
+ * hook runs only when its section is shown (the permission-gated users list,
+ * the history disclosure).
  */
 export function ClusterSettingsClient({ slug }: { slug: string }) {
   const settings = useClusterSettings(slug);
@@ -32,6 +34,7 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
     <ClusterSettingsScreen
       {...settings}
       slug={slug}
+      section={useSettingsSection()}
       cards={
         cluster
           ? {

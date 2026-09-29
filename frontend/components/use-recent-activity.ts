@@ -12,10 +12,13 @@ interface RecentActivityResp {
 
 /** The recent activity page, cursor-paged with load more: the data half of ActivityFeed. */
 export function useRecentActivity(pageSize = 10) {
-  const { data, loading, error, fetchMore } = useQuery<RecentActivityResp>(GET_RECENT_ACTIVITY, {
-    variables: { limit: pageSize },
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, loading, error, fetchMore, refetch } = useQuery<RecentActivityResp>(
+    GET_RECENT_ACTIVITY,
+    {
+      variables: { limit: pageSize },
+      fetchPolicy: "cache-and-network",
+    }
+  );
 
   const page = data?.astroliftRecentActivity;
   const items = page?.items ?? [];
@@ -55,5 +58,6 @@ export function useRecentActivity(pageSize = 10) {
     hasMore: Boolean(nextCursor),
     loadingMore,
     onLoadMore: handleLoadMore,
+    onRetry: () => void refetch(),
   };
 }

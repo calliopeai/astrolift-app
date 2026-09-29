@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftWebhookDelivery } from "@/graphql/operations/operations.types";
-
-import { LONG_DELIVERY, LONG_SUBSCRIPTIONS, WEBHOOK_DETAIL } from "./webhooks-zentinelle.fixtures";
+import {
+  DELIVERIES_FEED,
+  LONG_DELIVERY,
+  LONG_SUBSCRIPTIONS,
+  WEBHOOK_DETAIL,
+} from "./webhooks-zentinelle.fixtures";
 import { WebhookDetailScreen } from "./WebhookDetailScreen";
 
 const meta: Meta = {
@@ -25,10 +27,7 @@ export const Loading: Story = {
 /** The subscription resolved but has never delivered. */
 export const Empty: Story = {
   render: () => (
-    <WebhookDetailScreen
-      {...WEBHOOK_DETAIL}
-      deliveries={fakeController<AstroliftWebhookDelivery>({ state: "empty", totalCount: 0 })}
-    />
+    <WebhookDetailScreen {...WEBHOOK_DETAIL} deliveries={{ ...DELIVERIES_FEED, items: [] }} />
   ),
 };
 
@@ -41,15 +40,12 @@ export const NotFound: Story = {
   render: () => <WebhookDetailScreen {...WEBHOOK_DETAIL} subscription={null} />,
 };
 
-/** The deliveries page query failed: the table shows its retry state. */
+/** The deliveries page query failed: the feed shows its retry state. */
 export const DeliveriesFailed: Story = {
   render: () => (
     <WebhookDetailScreen
       {...WEBHOOK_DETAIL}
-      deliveries={fakeController<AstroliftWebhookDelivery>({
-        state: "error",
-        error: new Error("Network error: failed to fetch"),
-      })}
+      deliveries={{ ...DELIVERIES_FEED, items: [], error: "Network error: failed to fetch" }}
     />
   ),
 };
@@ -60,11 +56,7 @@ export const LongStrings: Story = {
       {...WEBHOOK_DETAIL}
       id={LONG_SUBSCRIPTIONS[0].id}
       subscription={LONG_SUBSCRIPTIONS[0]}
-      deliveries={fakeController<AstroliftWebhookDelivery>({
-        rows: [LONG_DELIVERY],
-        totalCount: 1,
-        sortEnabled: false,
-      })}
+      deliveries={{ ...DELIVERIES_FEED, items: [LONG_DELIVERY], hasMore: true }}
     />
   ),
 };

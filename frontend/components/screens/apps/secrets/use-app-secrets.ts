@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -25,6 +26,13 @@ import {
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 
+import {
+  APP_SECRET_BUNDLES_LIST,
+  APP_SECRETS_LIST,
+  type SecretsSection,
+  selectBundles,
+  selectSecrets,
+} from "./secrets-list";
 import type { AppSecret, AppSecretBundleAttachment, RevealedSecretData } from "./secrets.types";
 
 export const ALL_ENVS = "__all__";
@@ -55,8 +63,10 @@ interface AttachmentsResp {
 /**
  * The app Secrets tab: queries, mutations, toasts, and the per-row reveal /
  * edit / rotate state those mutations drive. The data half of SecretsScreen.
+ * `section` is the one on screen: only its list is fetched (Leo's page rule
+ * 2), the keys on `keys`, the attached bundles on `bundles`.
  */
-export function useAppSecrets(slug: string) {
+export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
   const t = useTranslations("apps.secrets");
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   // revealedValues maps secret.id -> plaintext while revealed.
@@ -92,10 +102,12 @@ export function useAppSecrets(slug: string) {
   const secrets = useQuery<SecretsResp>(LIST_APP_SECRETS, {
     variables,
     fetchPolicy: "cache-and-network",
+    skip: section !== "keys",
   });
   const attachments = useQuery<AttachmentsResp>(LIST_APP_SECRET_BUNDLE_ATTACHMENTS, {
     variables,
     fetchPolicy: "cache-and-network",
+    skip: section !== "bundles",
   });
   // #488 — show inline "N pending proposal" banner when the app has
   // pending secret-change proposals. Poll lazily; the banner is
@@ -168,6 +180,13 @@ export function useAppSecrets(slug: string) {
   const list = secrets.data?.astroliftAppSecrets ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
   const attachmentList = attachments.data?.astroliftAppSecretBundleAttachments ?? [];
+  // The keys are the tab's default section, so their list state is the URL's;
+  // the bundles sit under `?section=bundles`, which a URL list state would
+  // drop on its first filter change, so theirs is in memory.
+  const keysList = useListState(APP_SECRETS_LIST);
+  const bundlesList = useLocalListState(APP_SECRET_BUNDLES_LIST);
+  const keys = selectSecrets(list, keysList.filters, keysList.state);
+  const bundles = selectBundles(attachmentList, bundlesList.filters, bundlesList.state);
 
   /** Resolves true when the delete confirm may open for this row. */
   function onRequestDelete(s: AppSecret): boolean {
@@ -364,7 +383,11 @@ export function useAppSecrets(slug: string) {
     envName,
     setEnvName,
     environments: envList,
+    section,
     secrets: list,
+    keysList,
+    keyRows: keys.rows,
+    keyTotal: keys.totalCount,
     secretsLoading: secrets.loading && list.length === 0,
     /** The secrets query failed with nothing cached. */
     secretsError: secrets.data ? null : (secrets.error ?? null),
@@ -372,7 +395,14 @@ export function useAppSecrets(slug: string) {
       void secrets.refetch();
     },
     attachments: attachmentList,
+    bundlesList,
+    bundleRows: bundles.rows,
+    bundleTotal: bundles.totalCount,
     attachmentsLoading: attachments.loading && attachmentList.length === 0,
+    attachmentsError: attachments.data ? null : (attachments.error ?? null),
+    retryAttachments: (): void => {
+      void attachments.refetch();
+    },
     pendingProposals: pendingProposals.data?.astroliftSecretChangeProposals ?? [],
     revealedValues,
     editingId,

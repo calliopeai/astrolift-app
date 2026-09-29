@@ -1,10 +1,10 @@
 "use client";
 
 import { PlugIcon } from "lucide-react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { Panel, type PanelSpan } from "@/components/panel/Panel";
+import { ListSummary } from "@/components/list/ListSummary";
+import type { PanelSpan } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 
 import type { SummaryService, useManagedServicesSummary } from "./use-managed-services-summary";
@@ -29,10 +29,10 @@ const DOT: Record<string, "ok" | "warn" | "error" | "pending" | "muted"> = {
 };
 
 /**
- * The overview's managed-services summary: each bound service with its
- * state, failed first (the hook sorts). Reading only; connection details,
- * test email and the rest live on the Workloads tab's managed-services
- * section, which the heading links to.
+ * The overview's managed-services summary (Leo's list rule 3): a count and
+ * the top bound services with their state, failed first (the hook sorts),
+ * then "View all" to the Workloads tab's managed-services section, where
+ * connection details, test email and the rest live. Reading only.
  */
 export function ManagedServicesPanel({
   loading,
@@ -40,50 +40,37 @@ export function ManagedServicesPanel({
   managedServicesHref,
   error,
   onRetry,
-  span = 4,
+  span = 6,
 }: ManagedServicesPanelProps) {
   const t = useTranslations("apps.overview.managedServices");
   const live = services.filter((s) => s.status !== "deleted");
   return (
-    <Panel
+    <ListSummary
       title={t("title")}
       icon={<PlugIcon className="size-4" />}
       span={span}
+      count={loading && live.length === 0 ? null : live.length}
+      rows={live}
+      keyOf={(svc) => svc.id}
+      renderRow={(svc) => <ServiceRow svc={svc} />}
+      viewAllHref={managedServicesHref}
       loading={loading}
       error={error}
       onRetry={onRetry}
-      flush
-      actions={
-        live.length > 0 ? (
-          <Link href={managedServicesHref} className="text-primary text-xs hover:underline">
-            {t("manage")}
-          </Link>
-        ) : undefined
-      }
-      empty={
-        live.length === 0
-          ? {
-              icon: <PlugIcon className="size-5" />,
-              title: t("emptyTitle"),
-              description: t("emptyDescription"),
-              actionHref: managedServicesHref,
-              actionLabel: t("emptyAction"),
-            }
-          : null
-      }
-    >
-      <ul className="divide-y">
-        {live.map((svc) => (
-          <ServiceRow key={svc.id} svc={svc} />
-        ))}
-      </ul>
-    </Panel>
+      empty={{
+        icon: <PlugIcon className="size-5" />,
+        title: t("emptyTitle"),
+        description: t("emptyDescription"),
+        actionHref: managedServicesHref,
+        actionLabel: t("emptyAction"),
+      }}
+    />
   );
 }
 
 function ServiceRow({ svc }: { svc: SummaryService }) {
   return (
-    <li className="flex min-w-0 items-start gap-3 px-4 py-2.5">
+    <div className="flex min-w-0 items-start gap-3">
       <StatusDot status={DOT[svc.status] ?? "muted"} className="mt-1.5" />
       <div className="min-w-0 flex-1">
         <p className="font-mono text-sm [overflow-wrap:anywhere]">{svc.name || svc.kind}</p>
@@ -101,6 +88,6 @@ function ServiceRow({ svc }: { svc: SummaryService }) {
           </p>
         )}
       </div>
-    </li>
+    </div>
   );
 }

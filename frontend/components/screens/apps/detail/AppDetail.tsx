@@ -40,26 +40,25 @@ export interface AppDetailSlots {
   autowire?: React.ReactNode;
 
   // ── The panels, in reading order ──
+  // About two screens at 1440x900 (Leo's page rule 1): what the app is doing
+  // first, then its surroundings. Deploy throughput and the doctor's
+  // neighbours live on their tabs: metrics on Logs & metrics, CI on
+  // Settings, and the tab row is the quick-links list.
   /** First: the latest deploy, its failure reason first when it failed. */
   latestDeploy?: React.ReactNode;
   /** Uptime and probe latency. */
   health?: React.ReactNode;
   /** The public URL and its live health. */
   url?: React.ReactNode;
-  /** Deploy throughput, failure rate, unresolved alerts. */
-  observability?: React.ReactNode;
-  /** AppView over the app's topology (the former Topology tab). */
-  topology?: React.ReactNode;
-  /** The deploy heatmap and the event feed. */
-  activity?: React.ReactNode;
-  /** Six places to go, as one list. */
-  links?: React.ReactNode;
+  /** A ListSummary of the bound managed services. */
   managedServices?: React.ReactNode;
+  /** The deploy heatmap and the event Feed. */
+  activity?: React.ReactNode;
   /** Project, home team and granted teams. */
   ownership?: React.ReactNode;
-  /** How a push reaches a deploy. */
-  ci?: React.ReactNode;
-  /** The cloud-side doctor (#1550). */
+  /** AppView over the app's topology (the former Topology tab). */
+  topology?: React.ReactNode;
+  /** The cloud-side doctor (#1550); its checks run on request. */
   doctor?: React.ReactNode;
 }
 
@@ -175,13 +174,10 @@ export function AppDetailScreen({
           {slots.latestDeploy}
           {slots.health}
           {slots.url}
-          {slots.observability}
-          {slots.topology}
-          {slots.activity}
-          {slots.links}
           {slots.managedServices}
+          {slots.activity}
           {slots.ownership}
-          {slots.ci}
+          {slots.topology}
           {slots.doctor}
         </PanelGrid>
       )}

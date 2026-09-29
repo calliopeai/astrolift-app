@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import { PipelineDetailScreen, RunGraphView } from "./PipelineDetail";
 import { PipelineSecretsView } from "./PipelineSecrets";
+import { PIPELINE_SECRETS_LIST } from "./pipelines-list";
 import { DETAIL, LONG_RUN, RUN_GRAPH, secretsProps } from "./pipelines-previews.fixtures";
 
 const meta: Meta = {
@@ -12,7 +15,12 @@ export default meta;
 
 type Story = StoryObj;
 
-const secrets = <PipelineSecretsView {...secretsProps()} />;
+function Secrets() {
+  const list = useLocalListState(PIPELINE_SECRETS_LIST);
+  return <PipelineSecretsView {...secretsProps()} list={list} />;
+}
+
+const secrets = <Secrets />;
 const graph = <RunGraphView {...RUN_GRAPH} />;
 
 export const Full: Story = {

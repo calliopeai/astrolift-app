@@ -12,28 +12,27 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { selectRows } from "@/components/list/select-rows";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { MiniBar, RadialGauge, Sparkline } from "@/components/viz";
-import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
+import type {
+  AstroliftAppHealthSummary,
+  DeploymentStatus,
+} from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
+import { METRICS_APPS_SELECT } from "./metrics-apps-list";
 import type { useMetrics } from "./use-metrics";
 
-export type MetricsScreenProps = ReturnType<typeof useMetrics>;
+export type MetricsScreenProps = Omit<ReturnType<typeof useMetrics>, "list">;
 
 const STATUS_DOT: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   pending_approval: "warn",
@@ -171,15 +170,102 @@ function SuccessRateCard({
   );
 }
 
-/** Platform health rollups: deployment KPIs, outcomes, per-app status. */
+/**
+ * Platform health rollups: deployment KPIs, outcomes, then per-app status
+ * as the page's one embedded list (search, filters, sort, numbered pages,
+ * run over the summary in hand: the field returns every app at once).
+ */
 export function MetricsScreen({
   windowDays,
   metrics,
   metricsLoading,
   apps,
   healthLoading,
-}: MetricsScreenProps) {
+  list,
+}: MetricsScreenProps & { list: ListStateController }) {
   const fmt = useFormatters();
+  const { state } = list;
+  const page = selectRows(
+    apps,
+    {
+      filters: list.filters,
+      q: state.q,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    },
+    METRICS_APPS_SELECT
+  );
+
+  const columns: Column<AstroliftAppHealthSummary>[] = [
+    {
+      id: "app",
+      header: "App",
+      sortKey: "name",
+      cellClassName: "max-w-72",
+      cell: (a) => (
+        <span className="flex min-w-0 items-start gap-2">
+          <StatusDot
+            status={a.latestDeploymentStatus ? STATUS_DOT[a.latestDeploymentStatus] : "muted"}
+            className="mt-1.5 shrink-0"
+          />
+          <span className="block min-w-0">
+            <span className="block truncate font-medium" title={a.appName}>
+              {a.appName}
+            </span>
+            <span className="text-muted-foreground block truncate font-mono text-xs">
+              {a.appSlug}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "envs",
+      header: "Envs",
+      sortKey: "envs",
+      cellClassName: "font-mono text-xs",
+      cell: (a) => a.environmentCount,
+    },
+    {
+      id: "latest",
+      header: "Latest deploy",
+      cell: (a) => (
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          {a.latestDeploymentStatus ? (
+            <Badge variant="secondary" className="capitalize">
+              {a.latestDeploymentStatus.replace(/_/g, " ")}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">never</span>
+          )}
+          {a.hasRecentFailure && (
+            <Badge variant="outline" className="border-danger-border text-danger-fg gap-1">
+              <FlameIcon className="size-3" />
+              recent failure
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "image",
+      header: "Image",
+      cellClassName: "max-w-56",
+      cell: (a) => (
+        <span className="block truncate font-mono text-xs" title={a.latestImageTag || undefined}>
+          {a.latestImageTag || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "deployed",
+      header: "Last deployed",
+      sortKey: "deployed",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (a) => (a.lastDeployedAt ? fmt.formatDateTime(a.lastDeployedAt) : "—"),
+    },
+  ];
 
   const rateTrend = metrics ? successRateSeries(metrics.dailySucceeded, metrics.dailyFailed) : [];
   const durationTrend = metrics ? durationTrendSeries(metrics.dailyMeanDurationSeconds) : [];
@@ -275,83 +361,30 @@ export function MetricsScreen({
         </Card>
       )}
 
-      {/* Per-app health table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Apps</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {healthLoading && apps.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : apps.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BarChart3Icon className="size-5" />}
-                title="No apps yet"
-                description="Register an app on the Apps page; metrics will populate once it deploys."
-                actionHref="/apps"
-                actionLabel="Open apps"
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>App</TableHead>
-                  <TableHead>Envs</TableHead>
-                  <TableHead>Latest deploy</TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Last deployed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {apps.map((a) => (
-                  <TableRow key={a.appSlug}>
-                    <TableCell className="w-8">
-                      <StatusDot
-                        status={
-                          a.latestDeploymentStatus ? STATUS_DOT[a.latestDeploymentStatus] : "muted"
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{a.appName}</div>
-                      <div className="text-muted-foreground font-mono text-xs">{a.appSlug}</div>
-                    </TableCell>
-                    <TableCell>{a.environmentCount}</TableCell>
-                    <TableCell>
-                      {a.latestDeploymentStatus ? (
-                        <Badge variant="secondary" className="capitalize">
-                          {a.latestDeploymentStatus.replace(/_/g, " ")}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">never</span>
-                      )}
-                      {a.hasRecentFailure && (
-                        <Badge
-                          variant="outline"
-                          className="border-danger-border text-danger-fg ml-2 gap-1"
-                        >
-                          <FlameIcon className="size-3" />
-                          recent failure
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{a.latestImageTag || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {a.lastDeployedAt ? fmt.formatDateTime(a.lastDeployedAt) : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Per-app health: the page's one list */}
+      <section className="flex min-w-0 flex-col gap-3" aria-label="Apps">
+        <h2 className="text-base font-semibold">Apps</h2>
+        <ListPage<AstroliftAppHealthSummary>
+          embedded
+          list={list}
+          label="Apps"
+          columns={columns}
+          rows={page.rows}
+          getRowId={(a) => a.appSlug}
+          rowHref={(a) =>
+            `/${a.primitiveKind === "agent" ? "agents" : "apps"}/${encodeURIComponent(a.appSlug)}`
+          }
+          loading={healthLoading && apps.length === 0}
+          totalCount={page.totalCount}
+          empty={{
+            icon: <BarChart3Icon className="size-5" />,
+            title: "No apps yet",
+            description: "Register an app on the Apps page; metrics will populate once it deploys.",
+            actionHref: "/apps",
+            actionLabel: "Open apps",
+          }}
+        />
+      </section>
 
       {/* Power-user links */}
       <div className="text-muted-foreground flex flex-wrap gap-4 border-t pt-4 text-xs">

@@ -4,7 +4,6 @@ import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/regist
 import type { AppDetailScreenProps } from "./AppDetail";
 import type { AppTabsViewProps } from "./AppTabs";
 import type { DeployActivityStripProps } from "./DeployActivityStrip";
-import type { QuickLinksGridProps } from "./QuickLinksGrid";
 import type { RepoBadgeProps } from "./RepoBadge";
 
 /**
@@ -101,14 +100,6 @@ export const ACTIVITY: DeployActivityStripProps = {
   deployments: DEPLOYMENTS,
   loading: false,
   limit: 20,
-};
-
-// ─── QuickLinksGrid ───────────────────────────────────────────────────────────
-
-export const QUICK_LINKS: QuickLinksGridProps = {
-  appHref: APP_HREF,
-  count: 42,
-  loading: false,
 };
 
 // ─── AppDetailScreen ──────────────────────────────────────────────────────────

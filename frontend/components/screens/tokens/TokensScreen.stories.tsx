@@ -1,16 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import {
-  SCOPE_PICKER,
-  TOKEN_CREATED,
-  TOKENS_SCREEN,
-  TOKENS_SCREEN_LONG,
-} from "@/components/screens/teams/teams-tokens.fixtures";
-import type { AstroliftApiToken } from "@/graphql/identity/identity.types";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+import { SCOPE_PICKER, TOKEN_CREATED } from "@/components/screens/teams/teams-tokens.fixtures";
 
 import { ScopePicker } from "./ScopePicker";
+import { TOKENS_LIST } from "./tokens-list";
+import { type TokensData, TOKENS_SCREEN, TOKENS_SCREEN_LONG } from "./tokens.fixtures";
 import { TokensScreen } from "./TokensScreen";
 
 const meta: Meta = { title: "Screens/Tokens/TokensScreen" };
@@ -18,10 +14,12 @@ export default meta;
 
 type Story = StoryObj;
 
-function Screen(props: typeof TOKENS_SCREEN) {
+function Screen({ initial, ...props }: TokensData & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(TOKENS_LIST, initial);
   return (
     <TokensScreen
       {...props}
+      list={list}
       renderScopePicker={(picker) => <ScopePicker {...SCOPE_PICKER} {...picker} />}
     />
   );
@@ -31,38 +29,28 @@ function Screen(props: typeof TOKENS_SCREEN) {
 export const Full: Story = { render: () => <Screen {...TOKENS_SCREEN} /> };
 
 export const Loading: Story = {
-  render: () => (
-    <Screen {...TOKENS_SCREEN} table={fakeController<AstroliftApiToken>({ state: "loading" })} />
-  ),
+  render: () => <Screen {...TOKENS_SCREEN} rows={[]} loading />,
 };
 
 export const Empty: Story = {
-  render: () => (
-    <Screen {...TOKENS_SCREEN} table={fakeController<AstroliftApiToken>({ state: "empty" })} />
-  ),
+  render: () => <Screen {...TOKENS_SCREEN} rows={[]} totalCount={0} />,
 };
 
 export const NoSearchMatch: Story = {
-  render: () => (
-    <Screen
-      {...TOKENS_SCREEN}
-      table={fakeController<AstroliftApiToken>({
-        state: "emptyFiltered",
-        isFiltered: true,
-        search: "zzz",
-      })}
-    />
-  ),
+  render: () => <Screen {...TOKENS_SCREEN} rows={[]} initial={{ q: "zzz" }} />,
 };
 
 export const LoadFailed: Story = {
+  render: () => <Screen {...TOKENS_SCREEN} rows={[]} error={{ message: "upstream timed out" }} />,
+};
+
+/** Revoked: the view's note says it narrows the newest page. */
+export const RevokedView: Story = {
   render: () => (
     <Screen
       {...TOKENS_SCREEN}
-      table={fakeController<AstroliftApiToken>({
-        state: "error",
-        error: new globalThis.Error("upstream timed out"),
-      })}
+      rows={TOKENS_SCREEN.rows.filter((t) => t.isRevoked)}
+      initial={{ view: "revoked" }}
     />
   ),
 };
@@ -80,3 +68,11 @@ export const CreateSheet: Story = {
 };
 
 export const LongStrings: Story = { render: () => <Screen {...TOKENS_SCREEN_LONG} /> };
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Screen {...TOKENS_SCREEN_LONG} />
+    </div>
+  ),
+};

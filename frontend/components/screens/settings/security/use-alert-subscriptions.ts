@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CLEAR_ALERT_SUBSCRIPTION,
@@ -16,6 +17,11 @@ import { LIST_APPS_PAGE } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import { ALERT_KINDS, subKey } from "./alert-kinds";
+import {
+  ALERT_SUBSCRIPTIONS_LIST,
+  alertSubscriptionsVariables,
+  narrowAlertApps,
+} from "./alert-subscriptions-list";
 
 // The in-app/web notifications surface maps to the backend's "web" channel
 // (UserAlertSubscription.Channel = email | web | both). "in_app" is not a
@@ -31,22 +37,21 @@ interface SubsResp {
 }
 
 /**
- * The app x alert-kind subscription matrix: a server-paged app list, the
+ * The app x alert-kind subscription matrix: a server-paged app list (list
+ * state in memory, since the Notifications page owns its query string), the
  * caller's web-channel subscriptions, and the set/clear mutations. The data
  * half of AlertSubscriptionsView.
  */
 export function useAlertSubscriptions() {
-  // `astroliftAppsPage` takes `search`, `limit` and `cursor` (not `after`),
-  // and no sort argument — so the filter is a server argument and no column
-  // declares a `sortKey`. The previous version asked for 200 apps and
-  // filtered them in the browser, which silently hid app 201.
-  const table = useCursorTable<AstroliftRegisteredApp>({
-    query: LIST_APPS_PAGE,
-    extract: (d) => (d as AppsPageResp | undefined)?.astroliftAppsPage,
-    searchVariable: "search",
-    cursorVariable: "cursor",
-    urlKey: "alerts",
+  // `astroliftAppsPage` takes `search`, `limit` and `cursor` (not `after`):
+  // the search is a server argument, and no column declares a `sortKey`.
+  const list = useLocalListState(ALERT_SUBSCRIPTIONS_LIST);
+  const apps = useQuery<AppsPageResp>(LIST_APPS_PAGE, {
+    variables: alertSubscriptionsVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const data = apps.data ?? apps.previousData;
+  const page = data?.astroliftAppsPage;
 
   const subs = useQuery<SubsResp>(LIST_MY_ALERT_SUBSCRIPTIONS, {
     variables: { appSlug: null },
@@ -127,5 +132,20 @@ export function useAlertSubscriptions() {
     toast.success(`Unsubscribed from ${appSlug}`);
   }
 
-  return { table, subMap, busy, onToggle, onSubscribeAll, onUnsubscribeAll };
+  return {
+    list,
+    rows: narrowAlertApps(page?.items ?? [], list.filters, subMap),
+    totalCount: list.filters.alerts ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: apps.loading && !data,
+    error: apps.error && !data ? { message: apps.error.message } : null,
+    onRetry: () => {
+      void apps.refetch();
+    },
+    subMap,
+    busy,
+    onToggle,
+    onSubscribeAll,
+    onUnsubscribeAll,
+  };
 }

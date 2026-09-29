@@ -6,8 +6,6 @@ import {
   BellOffIcon,
   BoxIcon,
   CheckIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
   HistoryIcon,
   InfoIcon,
   PauseIcon,
@@ -28,6 +26,10 @@ import type { MetricScopeOptions } from "@/components/observability/MetricScopeP
 import type { PodEventRow } from "@/components/observability/PodEventsPanel";
 import type { PodResourceUsage } from "@/components/observability/use-pod-resource-usage";
 import { PageShell } from "@/components/PageShell";
+import type { Column } from "@/components/data-table";
+import { Feed } from "@/components/feed/Feed";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { LogView } from "@/components/run/LogView";
 import {
@@ -58,19 +60,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { cn } from "@/lib/utils";
 
+import { METRICS_PANEL_LABELS, METRICS_PANELS, type MetricsPanel } from "./metrics-panels";
 import type { AlertEvent, AlertRule, CreateAlertRuleInput } from "./use-alert-rules";
 import {
   HISTORICAL_RANGES,
@@ -121,11 +117,20 @@ export interface ObservabilityScreenProps {
   slug: string;
   app: Pick<AstroliftRegisteredApp, "id" | "name" | "slug"> | null;
   loading: boolean;
-  // Pods
+  /** The panel on screen (`?panel=`); only its content mounts. */
+  panel: MetricsPanel;
+  /** A panel's link, keeping the section and the metric scope. */
+  panelHref: (panel: MetricsPanel) => string;
+  // Pods (the Pods panel)
   pods: AstroliftAppPod[];
   podsLoading: boolean;
+  /** The pods list: in-memory state, one page of `pods` in `podRows`. */
+  podsList: ListStateController;
+  podRows: AstroliftAppPod[];
+  podTotal: number;
+  /** A pod row's link: this panel with `?pod=<name>`, which picks it. */
+  podHref: (pod: AstroliftAppPod) => string;
   selectedPod: string | null;
-  onPickPod: (pod: string) => void;
   podContainers: string[];
   selectedContainer: string | null;
   onPickContainer: (container: string | null) => void;
@@ -159,28 +164,37 @@ export interface ObservabilityScreenProps {
   /** The app tab bar. */
   tabs?: React.ReactNode;
   /**
-   * The metric panels between the scope picker and the log viewer (golden
-   * signals, endpoints, traces, PromQL, managed services, DNS / TLS /
-   * workload identity), each wired to its own hook.
+   * The Signals panel's metric panels under the scope picker (the deploy
+   * summary, golden signals, endpoints, traces, PromQL, managed services),
+   * each wired to its own hook. Rendered only on Signals.
    */
-  panels?: React.ReactNode;
-  /** The alert-rules panel (#648), wired to its own hook. */
+  signals?: React.ReactNode;
+  /** The Network panel: DNS, TLS and workload identity, each on its own hook. */
+  network?: React.ReactNode;
+  /** The Alerts panel (#648), wired to its own hook. */
   alertRules?: React.ReactNode;
 }
 
 /**
- * Logs & metrics › Metrics (spec 44 §5.2): pods, the metric scope and its
- * panels, the scoped log in the shared LogView, platform events and alert
- * rules, each on a Panel.
+ * Logs & metrics › Metrics (spec 44 §5.2), one panel at a time (Leo's page
+ * rules 1 and 2): Signals (the metric scope and its panels), Pods (the pod
+ * list, the picked pod's usage and scoped log in the shared LogView, and
+ * platform events), Alert rules, and DNS & TLS. The panel is in the URL
+ * (`?panel=`), and only the one on screen mounts, so only its queries run.
  */
 export function ObservabilityScreen({
   slug,
   app: a,
   loading,
-  pods: podRows,
+  panel,
+  panelHref,
+  pods: podRowsAll,
   podsLoading,
+  podsList,
+  podRows,
+  podTotal,
+  podHref,
   selectedPod,
-  onPickPod,
   podContainers,
   selectedContainer,
   onPickContainer,
@@ -207,7 +221,8 @@ export function ObservabilityScreen({
   eventsLoading,
   deploymentsHref,
   tabs,
-  panels,
+  signals,
+  network,
   alertRules,
 }: ObservabilityScreenProps) {
   const tCommon = useTranslations("apps.common");
@@ -235,6 +250,90 @@ export function ObservabilityScreen({
     );
   }
 
+  const picked = podRowsAll.find((p) => p.name === selectedPod) ?? null;
+
+  const podColumns: Column<AstroliftAppPod>[] = [
+    {
+      id: "pod",
+      header: t("pods.columns.pod"),
+      sortKey: "name",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere] whitespace-normal",
+      cell: (pod) => pod.name,
+    },
+    {
+      id: "workload",
+      header: t("pods.columns.workload"),
+      sortKey: "workload",
+      cellClassName: "font-mono text-xs",
+      cell: (pod) => pod.workload || "—",
+    },
+    {
+      id: "status",
+      header: t("pods.columns.status"),
+      sortKey: "status",
+      cell: (pod) => (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <StatusDot status={statusToDot(pod.status)} />
+          <span>{pod.status}</span>
+          {pod.status !== pod.phase && pod.phase && (
+            <span className="text-muted-foreground font-mono">({pod.phase})</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "ready",
+      header: t("pods.columns.ready"),
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (pod) =>
+        `${pod.containerStatuses.filter((c) => c.ready).length}/${pod.containerStatuses.length || 0}`,
+    },
+    {
+      id: "restarts",
+      header: t("pods.columns.restarts"),
+      sortKey: "restarts",
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (pod) => pod.restarts,
+    },
+    {
+      id: "age",
+      header: t("pods.columns.age"),
+      sortKey: "age",
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (pod) => formatAge(pod.age),
+    },
+    {
+      id: "node",
+      header: t("pods.columns.node"),
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (pod) => pod.node || "—",
+    },
+  ];
+
+  const scopePicker = (
+    // #380 golden signals and the panels below read this scope; #422 keeps it in the URL.
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+      <h3 className="text-base font-medium">{t("scope.title")}</h3>
+      <MetricScopePicker
+        environmentName={scopedEnv}
+        workloadSlug={scopedWorkload}
+        onEnvironmentChange={onEnvChange}
+        onWorkloadChange={onWorkloadChange}
+        labels={{
+          environment: t("scope.environment"),
+          workload: t("scope.workload"),
+          allWorkloads: t("scope.allWorkloads"),
+          environmentPlaceholder: t("scope.environmentPlaceholder"),
+          workloadPlaceholder: t("scope.workloadPlaceholder"),
+        }}
+        {...scopeOptions}
+      />
+    </div>
+  );
+
   return (
     <PageShell
       title={t("title", { name: a.name })}
@@ -246,160 +345,106 @@ export function ObservabilityScreen({
     >
       {tabs}
 
-      <PanelGrid>
-        <Panel
-          title={t("pods.title")}
-          icon={<BoxIcon className="size-4" />}
-          description={t("pods.description", { seconds: POD_POLL_MS / 1000 })}
-          loading={podsLoading}
-          empty={
-            podRows.length === 0
-              ? {
-                  icon: <BoxIcon className="size-5" />,
-                  title: t("pods.emptyTitle"),
-                  description: t("pods.emptyDescription"),
-                  actionHref: deploymentsHref,
-                  actionLabel: t("pods.emptyAction"),
-                }
-              : null
-          }
-          flush
-        >
-          {/* The pod list is unpaginated (astroliftAppPods), and a picked row
-              expands in place, which DataTable has no slot for yet. */}
-          <div className="min-w-0 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("pods.columns.pod")}</TableHead>
-                  <TableHead>{t("pods.columns.workload")}</TableHead>
-                  <TableHead>{t("pods.columns.status")}</TableHead>
-                  <TableHead className="text-right">{t("pods.columns.ready")}</TableHead>
-                  <TableHead className="text-right">{t("pods.columns.restarts")}</TableHead>
-                  <TableHead className="text-right">{t("pods.columns.age")}</TableHead>
-                  <TableHead>{t("pods.columns.node")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {podRows.map((pod) => {
-                  const readyCount = pod.containerStatuses.filter((c) => c.ready).length;
-                  const total = pod.containerStatuses.length;
-                  const isSelected = pod.name === selectedPod;
-                  // #713: picking a pod row opens an expander under it with
-                  // per-pod CPU and memory, restarts and a console deep link,
-                  // as a colspan row in the same table.
-                  return (
-                    <React.Fragment key={pod.name}>
-                      <TableRow
-                        onClick={() => onPickPod(pod.name)}
-                        data-selected={isSelected}
-                        className="hover:bg-muted/40 data-[selected=true]:bg-muted/60 cursor-pointer"
-                      >
-                        <TableCell className="font-mono text-xs [overflow-wrap:anywhere] whitespace-normal">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onPickPod(pod.name);
-                            }}
-                            aria-pressed={isSelected}
-                            className="text-left"
-                          >
-                            {pod.name}
-                          </button>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{pod.workload || "—"}</TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-2 text-xs">
-                            <StatusDot status={statusToDot(pod.status)} />
-                            <span>{pod.status}</span>
-                            {pod.status !== pod.phase && pod.phase && (
-                              <span className="text-muted-foreground font-mono">({pod.phase})</span>
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {readyCount}/{total || 0}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {pod.restarts}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatAge(pod.age)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground font-mono text-xs">
-                          {pod.node || "—"}
-                        </TableCell>
-                      </TableRow>
-                      {isSelected ? (
-                        <TableRow className="hover:bg-transparent">
-                          <TableCell colSpan={7} className="p-0 whitespace-normal">
-                            <PodExpander
-                              appSlug={a.slug}
-                              podName={pod.name}
-                              defaultContainer={selectedContainer}
-                              fallbackRestartCount={pod.restarts}
-                              {...podUsage}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ) : null}
-                    </React.Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Panel>
-      </PanelGrid>
+      <nav aria-label={t("title", { name: a.name })} className="min-w-0">
+        <ul className="bg-muted/40 inline-flex max-w-full min-w-0 flex-wrap gap-1 rounded-md border p-1">
+          {METRICS_PANELS.map((p) => (
+            <li key={p} className="min-w-0">
+              <Link
+                href={panelHref(p)}
+                aria-current={p === panel ? "page" : undefined}
+                className={cn(
+                  "block rounded-sm px-2.5 py-1 text-sm transition-colors",
+                  p === panel
+                    ? "bg-background text-foreground font-medium shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {METRICS_PANEL_LABELS[p]}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-      {/* #380 golden signals and the panels below read this scope; #422 keeps it in the URL. */}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-medium">{t("scope.title")}</h3>
-        <MetricScopePicker
-          environmentName={scopedEnv}
-          workloadSlug={scopedWorkload}
-          onEnvironmentChange={onEnvChange}
-          onWorkloadChange={onWorkloadChange}
-          labels={{
-            environment: t("scope.environment"),
-            workload: t("scope.workload"),
-            allWorkloads: t("scope.allWorkloads"),
-            environmentPlaceholder: t("scope.environmentPlaceholder"),
-            workloadPlaceholder: t("scope.workloadPlaceholder"),
-          }}
-          {...scopeOptions}
-        />
-      </div>
+      {panel === "signals" ? (
+        <>
+          {scopePicker}
+          {signals}
+        </>
+      ) : panel === "network" ? (
+        network
+      ) : panel === "alerts" ? (
+        alertRules
+      ) : (
+        <>
+          <ListPage<AstroliftAppPod>
+            embedded
+            list={podsList}
+            label={t("pods.title")}
+            columns={podColumns}
+            rows={podRows}
+            getRowId={(pod) => pod.name}
+            rowHref={podHref}
+            rowClassName={(pod) => (pod.name === selectedPod ? "bg-muted/50" : undefined)}
+            loading={podsLoading}
+            totalCount={podTotal}
+            empty={{
+              icon: <BoxIcon className="size-5" />,
+              title: t("pods.emptyTitle"),
+              description: t("pods.emptyDescription"),
+              actionHref: deploymentsHref,
+              actionLabel: t("pods.emptyAction"),
+            }}
+          />
 
-      {panels}
+          {picked ? (
+            // #713: the picked pod's CPU and memory, restarts and a console
+            // deep link, under the list rather than inside a table row.
+            <PanelGrid>
+              <Panel
+                title={picked.name}
+                icon={<BoxIcon className="size-4" />}
+                description={t("pods.description", { seconds: POD_POLL_MS / 1000 })}
+                flush
+              >
+                <PodExpander
+                  appSlug={a.slug}
+                  podName={picked.name}
+                  defaultContainer={selectedContainer}
+                  fallbackRestartCount={picked.restarts}
+                  {...podUsage}
+                />
+              </Panel>
+            </PanelGrid>
+          ) : null}
 
-      <ScopedLogs
-        appSlug={a.slug}
-        logBuffer={logBuffer}
-        onClearLogs={onClearLogs}
-        onDownloadLogs={onDownloadLogs}
-        streaming={streaming}
-        onToggleStreaming={onToggleStreaming}
-        allReplicas={allReplicas}
-        onToggleAllReplicas={onToggleAllReplicas}
-        historicalRange={historicalRange}
-        onHistoricalRangeChange={onHistoricalRangeChange}
-        isHistorical={isHistorical}
-        historicalUnavailable={historicalUnavailable}
-        historicalLoading={historicalLoading}
-        onRefreshHistorical={onRefreshHistorical}
-        selectedPod={selectedPod}
-        podContainers={podContainers}
-        selectedContainer={selectedContainer}
-        onPickContainer={onPickContainer}
-      />
+          {scopePicker}
 
-      {/* #422 platform events: auto-expands on warnings. */}
-      <PodEventsPanel appEvents={appEvents} loading={eventsLoading} />
+          <ScopedLogs
+            appSlug={a.slug}
+            logBuffer={logBuffer}
+            onClearLogs={onClearLogs}
+            onDownloadLogs={onDownloadLogs}
+            streaming={streaming}
+            onToggleStreaming={onToggleStreaming}
+            allReplicas={allReplicas}
+            onToggleAllReplicas={onToggleAllReplicas}
+            historicalRange={historicalRange}
+            onHistoricalRangeChange={onHistoricalRangeChange}
+            isHistorical={isHistorical}
+            historicalUnavailable={historicalUnavailable}
+            historicalLoading={historicalLoading}
+            onRefreshHistorical={onRefreshHistorical}
+            selectedPod={selectedPod}
+            podContainers={podContainers}
+            selectedContainer={selectedContainer}
+            onPickContainer={onPickContainer}
+          />
 
-      {/* #648 alert rules. */}
-      {alertRules}
+          {/* #422 platform events: auto-expands on warnings. */}
+          <PodEventsPanel appEvents={appEvents} loading={eventsLoading} />
+        </>
+      )}
     </PageShell>
   );
 }
@@ -768,11 +813,20 @@ function predicateSummary(predicate: Record<string, unknown>): string {
 export interface AlertRulesPanelViewProps {
   appId: string;
   appName: string;
+  /** Every rule for the app: for the count, and the picked rule's lookup. */
   rules: AlertRule[];
+  /** The list: in-memory state, one page of `rules` in `rows`. */
+  list: ListStateController;
+  rows: AlertRule[];
+  totalCount: number;
   loading: boolean;
   busy: boolean;
   creating: boolean;
   muting: boolean;
+  /** The rule in `?rule=`, whose events show under the list. */
+  pickedRuleId: string | null;
+  /** A rule row's link: this panel with `?rule=<id>`, which picks it. */
+  ruleHref: (rule: AlertRule) => string;
   /** Resolves true when created; the sheet closes then. */
   onCreate: (input: CreateAlertRuleInput) => Promise<boolean>;
   /** Resolves true when muted; the sheet closes then. */
@@ -780,19 +834,27 @@ export interface AlertRulesPanelViewProps {
   onUnmute: (rule: AlertRule) => Promise<void>;
   /** Throws on failure (the confirm dialog shows it). */
   onDelete: (rule: AlertRule) => Promise<void>;
-  /** The expanded row's recent events, wired to their own hook. */
+  /** The picked rule's events, wired to their own hook. */
   renderEvents: (ruleId: string) => React.ReactNode;
 }
 
-/** #648 — the app's alert rules: list, expand for recent events, create / mute / delete. */
+/**
+ * #648: the app's alert rules on the embedded list (the panel's one list),
+ * the picked rule's events as a Feed under it, and create / mute / delete.
+ */
 export function AlertRulesPanelView({
   appId,
   appName,
   rules: ruleList,
+  list,
+  rows,
+  totalCount,
   loading,
   busy,
   creating,
   muting,
+  pickedRuleId,
+  ruleHref,
   onCreate,
   onMute,
   onUnmute,
@@ -802,159 +864,138 @@ export function AlertRulesPanelView({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
-  const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set());
+  const picked = ruleList.find((r) => r.id === pickedRuleId) ?? null;
 
-  function toggleExpanded(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const columns: Column<AlertRule>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortKey: "name",
+      cellClassName: "whitespace-normal",
+      cell: (r) => (
+        <span className="flex min-w-0 flex-col">
+          <span className="font-medium [overflow-wrap:anywhere]">{r.name}</span>
+          <span className="text-muted-foreground text-2xs font-mono [overflow-wrap:anywhere]">
+            {predicateSummary(r.predicate)}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "severity",
+      header: "Severity",
+      sortKey: "severity",
+      cell: (r) => {
+        const sev = severityBadgeProps(r.severity);
+        return (
+          <Badge variant={sev.variant} className={sev.className}>
+            {sev.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (r) =>
+        r.activeMute ? (
+          <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
+            Muted · {formatRemaining(r.activeMute.ttlUntil)}
+          </Badge>
+        ) : r.isActive ? (
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <StatusDot status="ok" />
+            Active
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <StatusDot status="muted" />
+            Inactive
+          </span>
+        ),
+    },
+    {
+      id: "created",
+      header: "Created",
+      sortKey: "created",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (r) => new Date(r.createdAt).toLocaleDateString(),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">Actions</span>,
+      align: "right",
+      // Above the row's stretched link, so these act instead of picking the row.
+      cellClassName: "relative z-10",
+      cell: (r) => (
+        <span className="inline-flex items-center gap-1">
+          {r.activeMute ? (
+            <Button variant="ghost" size="sm" onClick={() => void onUnmute(r)} disabled={busy}>
+              <Volume2Icon className="size-3.5" /> Unmute
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setMuteTarget(r)} disabled={busy}>
+              <BellOffIcon className="size-3.5" /> Mute
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setDeleteTarget(r)}
+            disabled={busy}
+            aria-label={`Delete ${r.name}`}
+          >
+            <Trash2Icon className="size-3.5" />
+          </Button>
+        </span>
+      ),
+    },
+  ];
 
   return (
     <>
-      <Panel
-        title="Alert rules"
-        icon={<BellIcon className="size-4" />}
-        description={`Thresholds that page on-call when ${appName} crosses them. Mute to silence without losing the definition; delete to retire it.`}
-        actions={
-          <Button size="sm" onClick={() => setCreateOpen(true)} disabled={busy}>
-            <PlusIcon className="size-3.5" /> Add alert rule
-          </Button>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <p className="text-muted-foreground min-w-0 flex-1 text-sm">
+          Thresholds that page on-call when {appName} crosses them. Mute to silence without losing
+          the definition; delete to retire it.
+        </p>
+        <Button size="sm" onClick={() => setCreateOpen(true)} disabled={busy}>
+          <PlusIcon className="size-3.5" /> Add alert rule
+        </Button>
+      </div>
+
+      <ListPage<AlertRule>
+        embedded
+        list={list}
+        label="Alert rules"
+        columns={columns}
+        rows={rows}
+        getRowId={(r) => r.id}
+        rowHref={ruleHref}
+        rowClassName={(r) =>
+          cn(r.activeMute && "opacity-75", r.id === pickedRuleId && "bg-muted/50") || undefined
         }
         loading={loading}
-        empty={
-          ruleList.length === 0
-            ? {
-                icon: <BellIcon className="size-5" />,
-                title: "No alert rules for this app",
-                description:
-                  "Add a rule to page on-call when latency, error rate, or saturation crosses a threshold.",
-              }
-            : null
-        }
-        flush
-      >
-        <div className="min-w-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8" />
-                <TableHead>Name</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ruleList.map((r) => {
-                const isOpen = expanded.has(r.id);
-                const sev = severityBadgeProps(r.severity);
-                const muted = r.activeMute != null;
-                return (
-                  <React.Fragment key={r.id}>
-                    <TableRow className={muted ? "opacity-75" : undefined}>
-                      <TableCell className="w-8">
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(r.id)}
-                          className="text-muted-foreground hover:text-foreground inline-flex"
-                          aria-label={isOpen ? "Collapse" : "Expand"}
-                          aria-expanded={isOpen}
-                        >
-                          {isOpen ? (
-                            <ChevronDownIcon className="size-4" />
-                          ) : (
-                            <ChevronRightIcon className="size-4" />
-                          )}
-                        </button>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{r.name}</span>
-                          <span className="text-muted-foreground text-2xs font-mono">
-                            {predicateSummary(r.predicate)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={sev.variant} className={sev.className}>
-                          {sev.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {muted && r.activeMute ? (
-                          <Badge
-                            variant="outline"
-                            className="border-muted-foreground/30 text-muted-foreground"
-                          >
-                            Muted · {formatRemaining(r.activeMute.ttlUntil)}
-                          </Badge>
-                        ) : r.isActive ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs">
-                            <StatusDot status="ok" />
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs">
-                            <StatusDot status="muted" />
-                            Inactive
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {new Date(r.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1">
-                          {muted ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void onUnmute(r)}
-                              disabled={busy}
-                            >
-                              <Volume2Icon className="size-3.5" /> Unmute
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setMuteTarget(r)}
-                              disabled={busy}
-                            >
-                              <BellOffIcon className="size-3.5" /> Mute
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setDeleteTarget(r)}
-                            disabled={busy}
-                            aria-label={`Delete ${r.name}`}
-                          >
-                            <Trash2Icon className="size-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {isOpen ? (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={6} className="bg-muted/30 p-0">
-                          {renderEvents(r.id)}
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </React.Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </Panel>
+        totalCount={totalCount}
+        empty={{
+          icon: <BellIcon className="size-5" />,
+          title: "No alert rules for this app",
+          description:
+            "Add a rule to page on-call when latency, error rate, or saturation crosses a threshold.",
+        }}
+      />
+
+      {picked ? (
+        <PanelGrid>
+          <Panel
+            title={`Events · ${picked.name}`}
+            icon={<BellIcon className="size-4" />}
+            description={predicateSummary(picked.predicate)}
+          >
+            {renderEvents(picked.id)}
+          </Panel>
+        </PanelGrid>
+      ) : null}
 
       <CreateAlertRuleSheet
         open={createOpen}
@@ -1002,73 +1043,73 @@ export function AlertRulesPanelView({
 export interface AlertEventsListViewProps {
   events: AlertEvent[];
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   acking: boolean;
   onAck: (event: AlertEvent) => Promise<void>;
 }
 
-/** The last few events for one alert rule, shown under its expanded row. */
+/**
+ * One alert rule's events, newest first, as a Feed (Leo's list rule 5): it
+ * scrolls in its own frame, grouped by day, and loads older events on the
+ * cursor as the reader nears the end.
+ */
 export function AlertEventsListView({
   events: eventList,
   loading,
+  error,
+  onRetry,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   acking,
   onAck,
 }: AlertEventsListViewProps) {
-  if (loading) {
-    return (
-      <div className="space-y-2 p-4">
-        <Skeleton className="h-8 w-full" />
-      </div>
-    );
-  }
-
-  if (eventList.length === 0) {
-    return (
-      <div className="text-muted-foreground p-4 text-xs italic">
-        No alert events yet for this rule.
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4">
-      <p className="text-muted-foreground text-2xs mb-2 tracking-wide uppercase">
-        Last {eventList.length} event{eventList.length === 1 ? "" : "s"}
-      </p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fired</TableHead>
-            <TableHead>Resolved</TableHead>
-            <TableHead>Summary</TableHead>
-            <TableHead className="text-right">Ack</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {eventList.map((e) => (
-            <TableRow key={e.id}>
-              <TableCell className="font-mono text-xs">
-                {new Date(e.firedAt).toLocaleString()}
-              </TableCell>
-              <TableCell className="text-muted-foreground font-mono text-xs">
-                {e.resolvedAt ? new Date(e.resolvedAt).toLocaleString() : "—"}
-              </TableCell>
-              <TableCell className="text-xs">{e.summary || "—"}</TableCell>
-              <TableCell className="text-right">
-                {e.acknowledgedAt ? (
-                  <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                    <CheckIcon className="size-3.5" /> Acked
-                  </span>
-                ) : (
-                  <Button size="sm" variant="ghost" onClick={() => void onAck(e)} disabled={acking}>
-                    <CheckIcon className="size-3.5" /> Ack
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <Feed
+      label="Alert events"
+      items={eventList}
+      keyOf={(e) => e.id}
+      groupBy={{ day: (e) => e.firedAt }}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      empty={{ icon: <BellIcon className="size-5" />, title: "No alert events yet for this rule" }}
+      hasMore={hasMore}
+      loadingMore={loadingMore}
+      onLoadMore={onLoadMore}
+      maxHeight="max-h-80"
+      dense
+      renderItem={(e) => (
+        <div className="flex min-w-0 items-start gap-3 text-xs">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="[overflow-wrap:anywhere]">{e.summary || "—"}</p>
+            <p className="text-muted-foreground font-mono">
+              {new Date(e.firedAt).toLocaleString()}
+              {e.resolvedAt ? ` → resolved ${new Date(e.resolvedAt).toLocaleString()}` : ""}
+            </p>
+          </div>
+          {e.acknowledgedAt ? (
+            <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1">
+              <CheckIcon className="size-3.5" /> Acked
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="shrink-0"
+              onClick={() => void onAck(e)}
+              disabled={acking}
+            >
+              <CheckIcon className="size-3.5" /> Ack
+            </Button>
+          )}
+        </div>
+      )}
+    />
   );
 }
 

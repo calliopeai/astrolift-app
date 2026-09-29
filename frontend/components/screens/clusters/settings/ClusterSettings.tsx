@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
 import { PermissionNote, Restricted, useRestrictedMode } from "@/components/settings/Restricted";
 import { DangerAction, SettingsPage } from "@/components/settings/SettingsPage";
+import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +71,12 @@ export type ClusterSettingsScreenProps = ReturnType<typeof useClusterSettings> &
   bootstrapHistory?: React.ReactNode;
   /** Overrides the person's "settings you can't change" preference (stories). */
   restrictedMode?: "show" | "hide";
+  /**
+   * Which section is shown (`?section=`). Set by the route, so only the
+   * active section's cards mount and fetch (list rules 1 and 2); without it
+   * every section renders, as in the catalog's overview story.
+   */
+  section?: SectionSelection;
 };
 
 /**
@@ -97,6 +104,7 @@ export function ClusterSettingsScreen({
   cards = {},
   bootstrapHistory,
   restrictedMode,
+  section,
 }: ClusterSettingsScreenProps) {
   const fmt = useFormatters();
   const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
@@ -166,6 +174,7 @@ export function ClusterSettingsScreen({
       )}
 
       <SettingsPage
+        single={section}
         sections={[
           {
             id: "agent",

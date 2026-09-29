@@ -76,3 +76,42 @@ export const Failed: StoryObj = {
     />
   ),
 };
+
+export const Empty: StoryObj = {
+  render: () => <WorkflowTimeline run={RUN} activities={[]} />,
+};
+
+/** A long history on the caller's cursor: Load older at the end of the frame. */
+export const HasOlder: StoryObj = {
+  render: () => (
+    <WorkflowTimeline run={RUN} activities={ACTIVITIES} hasMore onLoadMore={() => {}} />
+  ),
+};
+
+export const LongStrings: StoryObj = {
+  render: () => (
+    <WorkflowTimeline
+      run={{
+        ...RUN,
+        workflowId: `nightly-sync-${"x".repeat(180)}`,
+        status: "failed",
+        errorMessage: `https://temporal.example.com/${"a".repeat(200)}`,
+      }}
+      activities={[
+        {
+          ...ACTIVITIES[0]!,
+          name: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        },
+        ...ACTIVITIES.slice(1),
+      ]}
+    />
+  ),
+};
+
+export const Width768: StoryObj = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <WorkflowTimeline run={RUN} activities={ACTIVITIES} />
+    </div>
+  ),
+};

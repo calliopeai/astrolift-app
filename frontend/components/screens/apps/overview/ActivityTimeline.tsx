@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
-import { Panel, SkeletonRows, type PanelSpan } from "@/components/panel/Panel";
+import { Feed } from "@/components/feed/Feed";
+import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -35,24 +36,32 @@ export type ActivityTimelineViewProps = Pick<
   ReturnType<typeof useActivityTimeline>,
   "events" | "loading"
 > &
-  Partial<Pick<ReturnType<typeof useActivityTimeline>, "error" | "onRetry">> & {
-    limit?: number;
+  Partial<
+    Pick<
+      ReturnType<typeof useActivityTimeline>,
+      "error" | "onRetry" | "hasMore" | "loadingMore" | "onLoadMore"
+    >
+  > & {
     /** The deploy heatmap (DeployActivityStrip), shown above the event feed. */
     strip?: React.ReactNode;
     span?: PanelSpan;
   };
 
 /**
- * Recent platform events for this app — deploys, config changes, token
- * rotations, etc. `events` is every event loaded for the app; the chips and
- * search filter it locally.
+ * Recent platform events for this app (deploys, config changes, token
+ * rotations and the rest) as a Feed (Leo's list rule 5): it scrolls in its
+ * own frame, grouped by day, and loads older events on the cursor as the
+ * reader nears the end. The chips and search narrow the events loaded so
+ * far.
  */
 export function ActivityTimelineView({
   events: allForApp,
   loading,
   error,
   onRetry,
-  limit = 20,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   strip,
   span = 8,
 }: ActivityTimelineViewProps) {
@@ -66,20 +75,18 @@ export function ActivityTimelineView({
   const activeFilter = TYPE_FILTERS.find((f) => f.key === typeKey) ?? TYPE_FILTERS[0];
   const needle = search.trim().toLowerCase();
 
-  const events = allForApp
-    .filter((e) => {
-      if (activeFilter.prefixes.length > 0) {
-        const hit = activeFilter.prefixes.some((p) => e.eventType.startsWith(p));
-        if (!hit) return false;
-      }
-      if (needle) {
-        const summary = summaryFor(e).toLowerCase();
-        const hay = `${summary} ${e.eventType}`.toLowerCase();
-        if (!hay.includes(needle)) return false;
-      }
-      return true;
-    })
-    .slice(0, limit);
+  const events = allForApp.filter((e) => {
+    if (activeFilter.prefixes.length > 0) {
+      const hit = activeFilter.prefixes.some((p) => e.eventType.startsWith(p));
+      if (!hit) return false;
+    }
+    if (needle) {
+      const summary = summaryFor(e).toLowerCase();
+      const hay = `${summary} ${e.eventType}`.toLowerCase();
+      if (!hay.includes(needle)) return false;
+    }
+    return true;
+  });
 
   const filterActive = typeKey !== "all" || needle.length > 0;
 
@@ -88,14 +95,12 @@ export function ActivityTimelineView({
       title="Activity"
       icon={<ActivityIcon className="size-4" />}
       span={span}
-      error={error}
-      onRetry={onRetry}
       actions={
         events.length > 0 ? (
           <p className="text-muted-foreground text-2xs font-mono">
             {filterActive
               ? `${events.length} of ${allForApp.length} events`
-              : `Last ${events.length} events`}
+              : `${events.length} events`}
           </p>
         ) : undefined
       }
@@ -139,29 +144,38 @@ export function ActivityTimelineView({
         </div>
       </div>
 
-      {loading && events.length === 0 ? (
-        <SkeletonRows />
-      ) : events.length === 0 ? (
+      {filterActive && events.length === 0 && allForApp.length > 0 ? (
         <p className="text-muted-foreground py-1 text-xs italic">
-          {filterActive ? (
-            <>
-              No events match{" "}
-              <Badge variant="secondary" className="text-2xs">
-                {activeFilter.label}
-                {needle ? ` · "${needle}"` : ""}
-              </Badge>
-              .
-            </>
-          ) : (
-            "No recent events for this app."
-          )}
+          No events match{" "}
+          <Badge variant="secondary" className="text-2xs">
+            {activeFilter.label}
+            {needle ? ` · "${needle}"` : ""}
+          </Badge>
+          .
         </p>
       ) : (
-        <ol className="divide-border max-h-80 divide-y overflow-y-auto">
-          {events.map((e) => (
-            <TimelineRow key={e.id} event={e} relativeTime={fmt.formatRelativeTime(e.occurredAt)} />
-          ))}
-        </ol>
+        <Feed
+          label="Activity"
+          items={events}
+          keyOf={(e) => e.id}
+          groupBy={{ day: (e) => e.occurredAt }}
+          renderItem={(e) => (
+            <TimelineRow event={e} relativeTime={fmt.formatRelativeTime(e.occurredAt)} />
+          )}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          errorTitle="Could not load activity"
+          empty={{
+            icon: <ActivityIcon className="size-5" />,
+            title: "No recent events for this app",
+          }}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
+          maxHeight="max-h-80"
+          dense
+        />
       )}
     </Panel>
   );
@@ -171,7 +185,7 @@ function TimelineRow({ event, relativeTime }: { event: AstroliftEvent; relativeT
   const summary = summaryFor(event);
 
   return (
-    <li className="flex items-start gap-3 py-2.5 text-sm">
+    <div className="flex min-w-0 items-start gap-3 py-0.5 text-sm">
       <EventIcon
         eventType={event.eventType}
         className="text-muted-foreground mt-0.5 size-3.5 shrink-0"
@@ -182,7 +196,7 @@ function TimelineRow({ event, relativeTime }: { event: AstroliftEvent; relativeT
           <span className="font-mono">{event.eventType}</span> · {relativeTime}
         </p>
       </div>
-    </li>
+    </div>
   );
 }
 

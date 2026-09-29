@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import {
   SET_ACTIVE_IDENTITY_PROVIDER,
   SOFT_DELETE_IDENTITY_PROVIDER,
@@ -10,6 +12,8 @@ import {
 import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
 import type { AstroliftIdentityProvider, MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+
+import { IDENTITY_PROVIDERS_LIST } from "./identity-providers-list";
 
 interface Resp {
   astroliftIdentityProviders: AstroliftIdentityProvider[];
@@ -21,6 +25,8 @@ interface Resp {
  * IdentityProvidersScreen.
  */
 export function useIdentityProviders() {
+  // In memory: the Providers page keeps its tab in the hash and owns the query string.
+  const list = useLocalListState(IDENTITY_PROVIDERS_LIST);
   const { can } = useMyPermissions();
   const canManageIdp = can("org.update");
   const { data, loading, error } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
@@ -64,6 +70,7 @@ export function useIdentityProviders() {
   }
 
   return {
+    list,
     providers: data?.astroliftIdentityProviders ?? [],
     loading,
     error,

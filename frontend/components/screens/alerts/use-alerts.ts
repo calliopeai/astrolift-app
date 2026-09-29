@@ -4,7 +4,9 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useCursorFeed } from "@/components/feed/use-cursor-feed";
+import { useListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   ACKNOWLEDGE_ALERT_EVENT,
@@ -17,6 +19,13 @@ import {
 } from "@/graphql/operations/alerts.queries";
 
 import { formatDurationSeconds } from "./alert-format";
+import {
+  ALERT_RULES_LIST,
+  type AlertEventsView,
+  narrowRules,
+  narrows,
+  rulesVariables,
+} from "./alerts-list";
 
 export interface AlertMute {
   id: string;
@@ -67,35 +76,25 @@ interface EventsPageResp {
   astroliftAlertEventsPage: CursorPage<AlertEvent>;
 }
 
-/** The data half of AlertsScreen: both table walks, the stat counts, and every mutation. */
+/**
+ * The data half of AlertsScreen: URL list state and one cursor page of
+ * rules (severity and Muted narrow a wider page, see alerts-list.ts), the
+ * two stat counts, and the rule mutations. Events are their own route
+ * (useAlertEvents), so this page never fetches them as a list.
+ */
 export function useAlerts() {
   const t = useTranslations("lists.alerts");
 
-  // Both page fields take `search`; neither takes a sort argument, so no
-  // column declares a `sortKey`. The comparators this file used to run
-  // (name / severity / created) only ever reordered the rows already in
-  // hand, which is the wrong order at every page boundary.
-  const rulesTable = useCursorTable<AlertRule>({
-    query: LIST_ALERT_RULES_PAGE,
-    variables: { activeOnly: false },
-    extract: (d) => (d as RulesPageResp | undefined)?.astroliftAlertRulesPage,
-    searchVariable: "search",
-    urlKey: "rule",
+  const list = useListState(ALERT_RULES_LIST);
+  const rules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
+    variables: rulesVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const rulesData = rules.data ?? rules.previousData;
+  const rulesPage = rulesData?.astroliftAlertRulesPage;
 
-  const eventsTable = useCursorTable<AlertEvent>({
-    query: LIST_ALERT_EVENTS_PAGE,
-    variables: { unresolvedOnly: false },
-    extract: (d) => (d as EventsPageResp | undefined)?.astroliftAlertEventsPage,
-    searchVariable: "search",
-    urlKey: "event",
-    pollInterval: 30000,
-  });
-
-  // Stat-card counts. `totalCount` is computed over the whole filtered
-  // set, so `limit: 1` buys the number without the rows — the cards used
-  // to count a capped array in the browser, which stopped being true at
-  // the 201st rule and the 101st event.
+  // Stat counts. `totalCount` is computed over the whole filtered set, so
+  // `limit: 1` buys the number without the rows.
   const activeRules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
     variables: { activeOnly: true, limit: 1 },
     fetchPolicy: "cache-and-network",
@@ -106,10 +105,8 @@ export function useAlerts() {
     pollInterval: 30000,
   });
 
-  const ruleCount = rulesTable.totalCount ?? 0;
   const activeRuleCount = activeRules.data?.astroliftAlertRulesPage.totalCount ?? 0;
   const unresolvedCount = unresolved.data?.astroliftAlertEventsPage.totalCount ?? 0;
-  const eventCount = eventsTable.totalCount ?? 0;
 
   // Refetch by operation name: every mutation below moves rows in both
   // walks *and* in the two count queries, which are the same documents at
@@ -123,12 +120,6 @@ export function useAlerts() {
   const [deleteRuleMutation, deleteState] = useMutation<{
     deleteAlertRule: MutationResult<{ id: string; deleted: boolean }>;
   }>(DELETE_ALERT_RULE, { refetchQueries: refetch, awaitRefetchQueries: true });
-  const [ackEvent, ackState] = useMutation<{
-    acknowledgeAlertEvent: MutationResult<AlertEvent>;
-  }>(ACKNOWLEDGE_ALERT_EVENT, {
-    refetchQueries: refetch,
-    awaitRefetchQueries: true,
-  });
   const [muteRule, muteState] = useMutation<{
     muteAlertRule: MutationResult<AlertRule>;
   }>(MUTE_ALERT_RULE, {
@@ -143,11 +134,7 @@ export function useAlerts() {
   });
 
   const busy =
-    createState.loading ||
-    deleteState.loading ||
-    ackState.loading ||
-    muteState.loading ||
-    unmuteState.loading;
+    createState.loading || deleteState.loading || muteState.loading || unmuteState.loading;
 
   /** True when the rule was created, so the sheet can close. */
   async function createRule(input: CreateAlertRuleInput): Promise<boolean> {
@@ -167,13 +154,6 @@ export function useAlerts() {
       toast.success(`Deleted ${r.name}`);
     } else {
       throw new Error(data?.deleteAlertRule.errors?.[0]?.message ?? "Delete failed");
-    }
-  }
-
-  async function acknowledge(e: AlertEvent) {
-    const { data } = await ackEvent({ variables: { input: { id: e.id } } });
-    if (!data?.acknowledgeAlertEvent.ok) {
-      toast.error(data?.acknowledgeAlertEvent.errors?.[0]?.message ?? "Ack failed");
     }
   }
 
@@ -230,19 +210,54 @@ export function useAlerts() {
     }
   }
 
+  const narrowed = narrows(list.filters);
   return {
-    rulesTable,
-    eventsTable,
-    ruleCount,
+    list,
+    rows: narrowRules(rulesPage?.items ?? [], list.filters),
+    totalCount: narrowed ? null : (rulesPage?.totalCount ?? null),
+    nextCursor: rulesPage?.nextCursor ?? null,
+    loading: rules.loading && !rulesData,
+    error: rules.error && !rulesData ? { message: rules.error.message } : null,
+    onRetry: () => {
+      void rules.refetch();
+    },
     activeRuleCount,
     unresolvedCount,
-    eventCount,
     busy,
     createRule,
     deleteRule,
-    acknowledge,
     mutePreset,
     muteCustom,
     unmute,
   };
+}
+
+/**
+ * Admin › Alerts › Events: the firing instances as a Feed on
+ * `astroliftAlertEventsPage`, All or Firing, polled, new ones held behind
+ * the pill, and Ack. The data half of AlertEventsScreen.
+ */
+export function useAlertEvents(view: AlertEventsView) {
+  const { feed } = useCursorFeed<EventsPageResp, AlertEvent>(LIST_ALERT_EVENTS_PAGE, {
+    variables: { unresolvedOnly: view === "firing", search: null },
+    select: (d) => d?.astroliftAlertEventsPage,
+    keyOf: (e) => e.id,
+    pollInterval: 30000,
+  });
+
+  const [ackEvent, ackState] = useMutation<{
+    acknowledgeAlertEvent: MutationResult<AlertEvent>;
+  }>(ACKNOWLEDGE_ALERT_EVENT, {
+    refetchQueries: ["ListAlertEventsPage"],
+    awaitRefetchQueries: true,
+  });
+
+  async function acknowledge(e: AlertEvent) {
+    const { data } = await ackEvent({ variables: { input: { id: e.id } } });
+    if (!data?.acknowledgeAlertEvent.ok) {
+      toast.error(data?.acknowledgeAlertEvent.errors?.[0]?.message ?? "Ack failed");
+    }
+  }
+
+  return { view, events: feed, busy: ackState.loading, acknowledge };
 }

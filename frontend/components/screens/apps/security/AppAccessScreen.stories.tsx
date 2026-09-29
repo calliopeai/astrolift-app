@@ -3,20 +3,16 @@ import type * as React from "react";
 import { expect, within } from "storybook/test";
 
 import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
-import { fakeController } from "@/components/data-table/fixtures";
+import { useLocalListState } from "@/components/list/use-list-state";
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
-import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 
 import { TOKENS_LONG, TOKENS_SCREEN } from "../secrets/app-secrets-tokens.fixtures";
 import { DeployTokensScreen } from "../secrets/DeployTokensScreen";
-import type { DeployToken } from "../secrets/secrets.types";
-import {
-  APP as MEMBERS_APP,
-  BINDINGS,
-  LONG,
-  MEMBERS,
-} from "../settings/app-settings-members.fixtures";
-import { AppMembersScreen } from "../settings/AppMembersScreen";
+import { APP_DEPLOY_TOKENS_LIST } from "../secrets/deploy-tokens-list";
+import { ACCESS_ROWS_LONG, membersProps } from "../settings/app-access-members.fixtures";
+import { APP_ACCESS_LIST } from "../settings/app-access-rows";
+import { APP as MEMBERS_APP, LONG } from "../settings/app-settings-members.fixtures";
+import { AppMembersScreen, type AppMembersScreenProps } from "../settings/AppMembersScreen";
 
 import { AccessCardView, AccessEditorView } from "./AccessCard";
 import {
@@ -43,9 +39,21 @@ type Story = StoryObj;
 
 const ALL: AppAccessAccess = { members: true, tokens: true, security: true, edge: true };
 
+/** People with access around a list controller of its own, as the route's client has. */
+function Members(overrides: Partial<AppMembersScreenProps>) {
+  const list = useLocalListState(APP_ACCESS_LIST);
+  return <AppMembersScreen {...membersProps(list, overrides)} />;
+}
+
+/** Deploy tokens around a list controller of its own, as the route's client has. */
+function Tokens(props: Omit<React.ComponentProps<typeof DeployTokensScreen>, "list">) {
+  const list = useLocalListState(APP_DEPLOY_TOKENS_LIST);
+  return <DeployTokensScreen {...props} list={list} />;
+}
+
 const SLOTS: AppAccessSlots = {
-  members: <AppMembersScreen {...MEMBERS} />,
-  tokens: <DeployTokensScreen {...TOKENS_SCREEN} tabs={null} />,
+  members: <Members />,
+  tokens: <Tokens {...TOKENS_SCREEN} tabs={null} />,
   security: <AppSecurityScreen {...SECURITY} />,
   edge: <AccessCardView {...ACCESS_RESTRICTED} editor={<AccessEditorView {...EDITOR} />} />,
 };
@@ -124,12 +132,7 @@ export const Loading: Story = {
     <Tab
       slots={{
         ...SLOTS,
-        members: (
-          <AppMembersScreen
-            {...MEMBERS}
-            table={fakeController<AstroliftRoleBinding>({ state: "loading" })}
-          />
-        ),
+        members: <Members rows={[]} rowsLoading />,
       }}
     />
   ),
@@ -142,36 +145,15 @@ export const LoadFailed: Story = {
       initial="tokens"
       slots={{
         ...SLOTS,
-        tokens: (
-          <DeployTokensScreen
-            {...TOKENS_SCREEN}
-            tabs={null}
-            table={fakeController<DeployToken>({
-              state: "error",
-              error: new globalThis.Error("upstream timed out"),
-            })}
-          />
-        ),
+        tokens: <Tokens {...TOKENS_SCREEN} tabs={null} error={{ message: "upstream timed out" }} />,
       }}
     />
   ),
 };
 
 const LONG_SLOTS: AppAccessSlots = {
-  members: (
-    <AppMembersScreen
-      {...MEMBERS}
-      app={{ ...MEMBERS_APP, slug: LONG }}
-      table={fakeController<AstroliftRoleBinding>({
-        rows: BINDINGS.map((b) => ({
-          ...b,
-          user: b.user ? { ...b.user, username: LONG, email: `${LONG}@example.com` } : null,
-          groupExternalId: b.user ? "" : LONG,
-        })) as AstroliftRoleBinding[],
-      })}
-    />
-  ),
-  tokens: <DeployTokensScreen {...TOKENS_LONG} tabs={null} />,
+  members: <Members app={{ ...MEMBERS_APP, slug: LONG }} slug={LONG} rows={ACCESS_ROWS_LONG} />,
+  tokens: <Tokens {...TOKENS_LONG} tabs={null} />,
   security: <AppSecurityScreen {...SECURITY_LONG} />,
   edge: <AccessCardView {...ACCESS_LONG} />,
 };

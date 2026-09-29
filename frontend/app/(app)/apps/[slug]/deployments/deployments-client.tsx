@@ -48,7 +48,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 }
 
 function Approvals({ appSlug }: { appSlug: string }) {
-  return <PendingDeploymentsView {...usePendingDeployments(appSlug)} onlyForApprovers />;
+  return (
+    <PendingDeploymentsView {...usePendingDeployments(appSlug, { live: true })} onlyForApprovers />
+  );
 }
 
 function CompareSheet(props: {

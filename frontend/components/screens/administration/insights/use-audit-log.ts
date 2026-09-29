@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useHeldRows } from "@/components/list/use-held-rows";
+import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import { useListState } from "@/components/list/use-list-state";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
@@ -43,14 +43,13 @@ interface ExportResp {
   };
 }
 
-const EMPTY: AstroliftAuditEvent[] = [];
-
 /**
- * The audit trail's data half: the cursor-paged event list (state in the
- * URL, spec 44 §5.1), the retention window, the server-side export of the
- * filter set in view, and the retention editor's write (through
- * `updateOrganization`, the same field the /administration/organization
- * settings page edits).
+ * The audit trail's data half: the event feed (views, search and chips in
+ * the URL, spec 44 §5.1; older events load on the server's cursor as the
+ * reader nears the end, list rule 5), the retention window, the server-side
+ * export of the filter set in view, and the retention editor's write
+ * (through `updateOrganization`, the same field the
+ * /administration/organization settings page edits).
  */
 export function useAuditLog(): AuditLogScreenProps {
   const t = useTranslations("lists.audit");
@@ -64,36 +63,30 @@ export function useAuditLog(): AuditLogScreenProps {
 
   const { variables, ready } = auditVariables(list.filters, list.state.q, {
     pageSize: list.state.pageSize,
-    after: list.state.after,
+    after: null,
     viewerId: user?.id ?? null,
     now,
   });
+  // The feed owns the page size and the cursor.
+  const { limit: _limit, after: _after, ...question } = variables;
 
-  const firstPage = list.state.after === null;
-  const { data, previousData, loading, error, refetch } = useQuery<PageResp>(
+  const { feed, totalCount } = useCursorFeed<PageResp, AstroliftAuditEvent>(
     LIST_AUDIT_EVENTS_PAGE,
     {
-      variables,
+      variables: question,
+      select: (d) => d?.astroliftAuditEventsPage,
+      keyOf: (r) => r.id,
+      pageSize: list.state.pageSize,
       skip: !ready,
-      fetchPolicy: "cache-and-network",
-      // Live on the newest page only; an older page is a fixed window.
-      pollInterval: firstPage ? 5000 : 0,
+      pollInterval: 5000,
     }
   );
 
-  const page = (data ?? previousData)?.astroliftAuditEventsPage;
   const targetKind = list.filters.target;
-  const rows = React.useMemo(
-    () => (page?.items ?? EMPTY).filter((r) => matchesTargetKind(r, targetKind)),
-    [page, targetKind]
+  const items = React.useMemo(
+    () => feed.items.filter((r) => matchesTargetKind(r, targetKind)),
+    [feed.items, targetKind]
   );
-  const stale = loading && !data && Boolean(previousData);
-  const held = useHeldRows(rows, (r) => r.id, {
-    // Not while the rows on screen answer the previous question: those
-    // must not become the held set of the new one.
-    live: firstPage && !stale,
-    resetKey: JSON.stringify(list.filters) + list.state.q + list.state.pageSize,
-  });
 
   const { data: retentionData } = useQuery<RetentionResp>(GET_AUDIT_RETENTION, {
     fetchPolicy: "cache-first",
@@ -189,15 +182,9 @@ export function useAuditLog(): AuditLogScreenProps {
 
   return {
     list,
-    rows: held.rows,
-    newRows: { count: held.newCount, onReveal: held.reveal },
-    loading: (!ready || loading) && !page,
-    stale,
-    error: error && !page ? error : null,
-    onRetry: () => void refetch(),
-    nextCursor: page?.nextCursor ?? null,
+    events: { ...feed, items, loading: feed.loading || !ready },
     // A client-side target filter makes the server's count wrong for the rows shown.
-    totalCount: targetKind ? null : (page?.totalCount ?? null),
+    totalCount: targetKind ? null : totalCount,
     targetFilteredLocally: Boolean(targetKind),
     retentionDays: retentionData?.astroliftAuditRetention?.days ?? null,
     exporting,

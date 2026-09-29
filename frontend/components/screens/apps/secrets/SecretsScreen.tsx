@@ -21,9 +21,10 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { type Column, DataTable } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { DetailTabSections } from "@/components/detail/DetailTabSections";
+import { ListPage } from "@/components/list/ListPage";
 import { PageShell } from "@/components/PageShell";
-import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,9 +46,10 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { staticController } from "@/components/viz/core/static-table";
+import type { ListStateController } from "@/components/list/use-list-state";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 
+import { SECRETS_SECTIONS, type SecretsSection } from "./secrets-list";
 import type { AppSecret, AppSecretBundleAttachment } from "./secrets.types";
 import { ALL_ENVS, scopeBadgeLabel, type useAppSecrets } from "./use-app-secrets";
 
@@ -58,6 +60,8 @@ export type SecretsScreenProps = ReturnType<typeof useAppSecrets> & {
   pushToGitHub: React.ReactNode;
   /** The audit history popover body for one key; runs its query only while open. */
   renderHistory: (secretKey: string) => React.ReactNode;
+  /** A section's link: the tab's route, with `?section=bundles` for the bundles. */
+  sectionHref: (section: SecretsSection) => string;
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -205,24 +209,34 @@ function RevertWarningBanner({ secrets }: { secrets: AppSecret[] }) {
 }
 
 /**
- * The app Secrets tab (spec 44 §5.1, §5.2, §5.4): the keys on a DataTable in
- * a Panel, keys in mono and values masked until revealed (reveal needs
- * `secret.read`, as before), a key's audit history in a side sheet, and New
- * secret as a sheet of three fields. Attached bundles sit in their own panel.
- * Holds only UI state (which sheet, confirm or history is open); everything
- * that talks to the server comes in from useAppSecrets.
+ * The app Secrets tab (spec 44 §5.1, §5.2, §5.4), one list per section
+ * (Leo's list rule 3): Secrets, the keys on the embedded list, in mono and
+ * masked until revealed (reveal needs `secret.read`, as before), a key's
+ * audit history in a side sheet, and New secret as a sheet of three fields;
+ * and Attached bundles (`?section=bundles`) on a list of its own. The
+ * environment picker scopes both. Holds only UI state (which sheet, confirm
+ * or history is open); everything that talks to the server comes in from
+ * useAppSecrets.
  */
 export function SecretsScreen({
   slug,
+  section,
   envName,
   setEnvName,
   environments: envList,
   secrets: list,
+  keysList,
+  keyRows,
+  keyTotal,
   secretsLoading,
   secretsError,
   retrySecrets,
-  attachments: attachmentList,
+  bundlesList,
+  bundleRows,
+  bundleTotal,
   attachmentsLoading,
+  attachmentsError,
+  retryAttachments,
   pendingProposals,
   revealedValues,
   editingId,
@@ -244,6 +258,7 @@ export function SecretsScreen({
   tabs,
   pushToGitHub,
   renderHistory,
+  sectionHref,
 }: SecretsScreenProps) {
   const t = useTranslations("apps.secrets");
   const [setOpen, setSetOpen] = React.useState(false);
@@ -252,15 +267,6 @@ export function SecretsScreen({
   const [detachTarget, setDetachTarget] = React.useState<AppSecretBundleAttachment | null>(null);
   // #714: whose audit history is open in the side sheet.
   const [historyTarget, setHistoryTarget] = React.useState<AppSecret | null>(null);
-
-  const controller = React.useMemo(() => {
-    const base = staticController(list);
-    if (secretsLoading) return { ...base, state: "loading" as const };
-    if (secretsError && list.length === 0) {
-      return { ...base, state: "error" as const, error: secretsError, retry: retrySecrets };
-    }
-    return base;
-  }, [list, secretsLoading, secretsError, retrySecrets]);
 
   const columns = secretColumns({
     t,
@@ -293,6 +299,23 @@ export function SecretsScreen({
         <>
           {/* #681: the Settings tab's "Push & rotate", here too, where the
               operator is already working with secrets. */}
+          <Select value={envName} onValueChange={setEnvName}>
+            <SelectTrigger
+              size="sm"
+              aria-label={t("environment")}
+              className="w-44 max-w-full min-w-0 font-mono text-xs"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_ENVS}>{t("allEnvironments")}</SelectItem>
+              {envList.map((e) => (
+                <SelectItem key={e.id} value={e.name} className="font-mono">
+                  {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Can permission="app.deploy">{pushToGitHub}</Can>
           <Can permission="app.deploy">
             <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
@@ -311,61 +334,52 @@ export function SecretsScreen({
     >
       {tabs}
 
-      <PendingProposalsBanner proposals={pendingProposals} />
-      <RevertWarningBanner secrets={list} />
-
-      <PanelGrid>
-        <Panel
-          title={t("title")}
-          icon={<KeyIcon className="size-4" />}
-          description={
-            <span className="font-mono tabular-nums">{t("keysCount", { count: list.length })}</span>
-          }
-          actions={
-            <Select value={envName} onValueChange={setEnvName}>
-              <SelectTrigger
-                size="sm"
-                aria-label={t("environment")}
-                className="w-44 max-w-full min-w-0 font-mono text-xs"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_ENVS}>{t("allEnvironments")}</SelectItem>
-                {envList.map((e) => (
-                  <SelectItem key={e.id} value={e.name} className="font-mono">
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-          flush
-        >
-          <TooltipProvider delayDuration={200}>
-            <DataTable
-              chrome="table"
-              className="[&>div]:rounded-none [&>div]:border-0"
-              label={t("title")}
-              controller={controller}
-              columns={columns}
-              getRowId={(s) => s.id}
-              empty={{
-                icon: <KeyIcon className="size-5" />,
-                title: t("emptyTitle"),
-                description: t("emptyDescription"),
-              }}
-            />
-          </TooltipProvider>
-        </Panel>
-
-        <AttachedBundlesPanel
-          loading={attachmentsLoading}
-          attachments={attachmentList}
-          onDetach={(a) => setDetachTarget(a)}
-          busy={detaching}
-        />
-      </PanelGrid>
+      <DetailTabSections
+        ariaLabel={t("title")}
+        sections={SECRETS_SECTIONS.map((id) => ({
+          id,
+          label: id === "bundles" ? t("attached.title") : t("title"),
+          href: sectionHref(id),
+        }))}
+        active={section}
+      >
+        {section === "bundles" ? (
+          <AttachedBundlesList
+            list={bundlesList}
+            rows={bundleRows}
+            totalCount={bundleTotal}
+            loading={attachmentsLoading}
+            error={attachmentsError}
+            onRetry={retryAttachments}
+            onDetach={(a) => setDetachTarget(a)}
+            busy={detaching}
+          />
+        ) : (
+          <>
+            <PendingProposalsBanner proposals={pendingProposals} />
+            <RevertWarningBanner secrets={list} />
+            <TooltipProvider delayDuration={200}>
+              <ListPage<AppSecret>
+                embedded
+                list={keysList}
+                label={t("title")}
+                columns={columns}
+                rows={keyRows}
+                getRowId={(s) => s.id}
+                loading={secretsLoading}
+                error={secretsError && list.length === 0 ? secretsError : null}
+                onRetry={retrySecrets}
+                totalCount={keyTotal}
+                empty={{
+                  icon: <KeyIcon className="size-5" />,
+                  title: t("emptyTitle"),
+                  description: t("emptyDescription"),
+                }}
+              />
+            </TooltipProvider>
+          </>
+        )}
+      </DetailTabSections>
 
       <Sheet
         open={historyTarget !== null}
@@ -494,6 +508,7 @@ function secretColumns({
     {
       id: "key",
       header: t("columns.key"),
+      sortKey: "key",
       cellClassName: "whitespace-normal",
       cell: (s) => (
         <span className="flex min-w-0 flex-wrap items-center">
@@ -555,6 +570,7 @@ function secretColumns({
     },
     {
       id: "env",
+      sortKey: "env",
       header: t("columns.env"),
       cell: (s) => (
         <Badge variant="outline" className="text-2xs max-w-48 truncate font-mono">
@@ -564,6 +580,7 @@ function secretColumns({
     },
     {
       id: "edited",
+      sortKey: "edited",
       header: t("columns.lastEdited"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (s) => {
@@ -809,27 +826,31 @@ function InlineValueEditor({
   );
 }
 
-function AttachedBundlesPanel({
+function AttachedBundlesList({
+  list,
+  rows,
+  totalCount,
   loading,
-  attachments,
+  error,
+  onRetry,
   onDetach,
   busy,
 }: {
+  list: ListStateController;
+  rows: AppSecretBundleAttachment[];
+  totalCount: number;
   loading: boolean;
-  attachments: AppSecretBundleAttachment[];
+  error: { message: string } | null;
+  onRetry: () => void;
   onDetach: (a: AppSecretBundleAttachment) => void;
   busy: boolean;
 }) {
   const t = useTranslations("apps.secrets.attached");
-  const controller = React.useMemo(() => {
-    const base = staticController(attachments);
-    return loading ? { ...base, state: "loading" as const } : base;
-  }, [attachments, loading]);
-
   const columns: Column<AppSecretBundleAttachment>[] = [
     {
       id: "bundle",
       header: t("columns.bundle"),
+      sortKey: "bundle",
       cellClassName: "whitespace-normal",
       cell: (a) => (
         <span className="flex min-w-0 flex-wrap items-baseline gap-2 font-mono text-xs">
@@ -876,6 +897,7 @@ function AttachedBundlesPanel({
     {
       id: "order",
       header: t("columns.order"),
+      sortKey: "order",
       cell: (a) => (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -890,6 +912,7 @@ function AttachedBundlesPanel({
     {
       id: "attached",
       header: t("columns.attached"),
+      sortKey: "attached",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (a) => (a.attachedAt ? new Date(a.attachedAt).toLocaleString() : "—"),
     },
@@ -908,24 +931,24 @@ function AttachedBundlesPanel({
   ];
 
   return (
-    <Panel
-      title={t("title")}
-      icon={<LayersIcon className="size-4" />}
-      description={t("description")}
-      flush
-    >
+    <div className="min-w-0 space-y-3">
+      <p className="text-muted-foreground text-sm">{t("description")}</p>
       <TooltipProvider delayDuration={200}>
-        <DataTable
-          chrome="table"
-          className="[&>div]:rounded-none [&>div]:border-0"
+        <ListPage<AppSecretBundleAttachment>
+          embedded
+          list={list}
           label={t("title")}
-          controller={controller}
           columns={columns}
+          rows={rows}
           getRowId={(a) => a.id}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          totalCount={totalCount}
           empty={{ icon: <LayersIcon className="size-5" />, title: t("empty") }}
         />
       </TooltipProvider>
-    </Panel>
+    </div>
   );
 }
 

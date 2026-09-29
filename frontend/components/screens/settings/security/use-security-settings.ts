@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import {
   LOGOUT_ALL_SESSIONS,
   REVOKE_ASTROLIFT_SESSION,
@@ -16,6 +18,8 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
+import { SESSIONS_LIST } from "./sessions-list";
+
 interface SessionsResp {
   astroliftActiveSessions: AstroliftActiveSession[];
 }
@@ -26,6 +30,8 @@ interface SessionsResp {
  */
 export function useSecuritySettings() {
   const t = useTranslations("securitySessions");
+  // In memory: the Security settings page owns its query string.
+  const list = useLocalListState(SESSIONS_LIST);
   const { data, loading, error, refetch } = useQuery<SessionsResp>(LIST_ACTIVE_SESSIONS, {
     fetchPolicy: "cache-and-network",
   });
@@ -83,6 +89,7 @@ export function useSecuritySettings() {
   }
 
   return {
+    list,
     sessions,
     otherCount,
     /** First load only: a background refetch keeps the table on screen. */

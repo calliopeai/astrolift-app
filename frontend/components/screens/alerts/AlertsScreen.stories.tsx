@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { alertsProps, LONG_EVENT, LONG_RULE } from "./alerts.fixtures";
-import { AlertsScreen } from "./AlertsScreen";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
+import { ALERT_RULES_LIST } from "./alerts-list";
+import { alertsProps, LONG_RULE, RULES } from "./alerts.fixtures";
+import { AlertsScreen, type AlertsScreenProps } from "./AlertsScreen";
 
 const meta: Meta = {
   title: "Screens/Alerts/AlertsScreen",
@@ -11,63 +14,58 @@ export default meta;
 
 type Story = StoryObj;
 
-export const Full: Story = { render: () => <AlertsScreen {...alertsProps()} /> };
+function Screen({
+  initial,
+  ...over
+}: Partial<Omit<AlertsScreenProps, "list">> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(ALERT_RULES_LIST, initial);
+  return <AlertsScreen {...alertsProps(over)} list={list} />;
+}
+
+export const Full: Story = { render: () => <Screen /> };
 
 export const Loading: Story = {
   render: () => (
-    <AlertsScreen
-      {...alertsProps(
-        { state: "loading", rows: [], totalCount: null },
-        { state: "loading", rows: [], totalCount: null },
-        { activeRuleCount: 0, unresolvedCount: 0 }
-      )}
-    />
+    <Screen rows={[]} loading totalCount={null} activeRuleCount={0} unresolvedCount={0} />
   ),
 };
 
 export const Empty: Story = {
-  render: () => (
-    <AlertsScreen
-      {...alertsProps(
-        { state: "empty", rows: [], totalCount: 0 },
-        { state: "empty", rows: [], totalCount: 0 },
-        { activeRuleCount: 0, unresolvedCount: 0 }
-      )}
-    />
-  ),
+  render: () => <Screen rows={[]} totalCount={0} activeRuleCount={0} unresolvedCount={0} />,
 };
 
 export const EmptyFiltered: Story = {
-  render: () => (
-    <AlertsScreen
-      {...alertsProps(
-        { state: "emptyFiltered", rows: [], isFiltered: true, search: "zzz" },
-        { state: "emptyFiltered", rows: [], isFiltered: true, search: "zzz" }
-      )}
-    />
-  ),
+  render: () => <Screen rows={[]} initial={{ q: "zzz" }} />,
 };
 
 export const ErrorState: Story = {
+  render: () => <Screen rows={[]} error={{ message: "upstream timed out" }} />,
+};
+
+/** Muted: narrowed on the page in hand, the note says so. */
+export const Muted: Story = {
   render: () => (
-    <AlertsScreen
-      {...alertsProps(
-        { state: "error", rows: [], error: new globalThis.Error("upstream timed out") },
-        { state: "error", rows: [], error: new globalThis.Error("upstream timed out") }
-      )}
+    <Screen
+      rows={RULES.filter((r) => r.activeMute)}
+      totalCount={null}
+      initial={{ view: "muted" }}
     />
   ),
 };
 
-/** A mutation in flight: every row action and the Ack buttons are disabled. */
-export const Busy: Story = {
-  render: () => <AlertsScreen {...alertsProps({}, {}, { busy: true })} />,
-};
+/** A mutation in flight: every row action is disabled. */
+export const Busy: Story = { render: () => <Screen busy /> };
 
 export const LongStrings: Story = {
   render: () => (
-    <AlertsScreen
-      {...alertsProps({ rows: [LONG_RULE], totalCount: 1 }, { rows: [LONG_EVENT], totalCount: 1 })}
-    />
+    <Screen rows={[LONG_RULE, ...RULES]} totalCount={RULES.length + 1} nextCursor="c2" />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <Screen rows={[LONG_RULE, ...RULES]} />
+    </div>
   ),
 };

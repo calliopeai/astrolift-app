@@ -12,9 +12,11 @@ import {
 import Link from "next/link";
 import type * as React from "react";
 
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -112,20 +114,44 @@ export type PipelineListViewProps = ReturnType<typeof usePipelineList> & {
   triggering: boolean;
 };
 
-/** The pipeline list tab (#106). */
-export function PipelineListView({ table, onTrigger, triggering }: PipelineListViewProps) {
+/**
+ * The pipeline list tab (#106): the one embedded list on it (views All ·
+ * Mine, cursor pages), Run in each row's `⋯`. Pure.
+ */
+export function PipelineListView({
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
+  onTrigger,
+  triggering,
+}: PipelineListViewProps) {
   const columns: Column<Pipeline>[] = [
     {
       id: "name",
       header: "Name",
-      cell: (p) => <span className="font-medium">{p.name}</span>,
+      cellClassName: "max-w-64",
+      cell: (p) => (
+        <span className="block truncate font-medium" title={p.name}>
+          {p.name}
+        </span>
+      ),
     },
     {
       id: "repo",
       header: "Repository",
-      cellClassName: cn("text-muted-foreground text-sm", ABOVE_ROW_LINK),
+      cellClassName: cn("text-muted-foreground max-w-72 text-sm", ABOVE_ROW_LINK),
       cell: (p) => (
-        <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+        <a
+          href={p.repoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block truncate hover:underline"
+          title={p.repoUrl}
+        >
           {p.repoUrl.replace(/^https?:\/\//, "")}
         </a>
       ),
@@ -139,32 +165,35 @@ export function PipelineListView({ table, onTrigger, triggering }: PipelineListV
     {
       id: "toml",
       header: "TOML path",
-      cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (p) => p.tomlPath,
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      width: "w-24",
-      cellClassName: ABOVE_ROW_LINK,
+      cellClassName: "text-muted-foreground max-w-56",
       cell: (p) => (
-        <Button variant="outline" size="sm" disabled={triggering} onClick={() => onTrigger(p)}>
-          <PlayIcon className="mr-1 size-3" />
-          Run
-        </Button>
+        <span className="block truncate font-mono text-xs" title={p.tomlPath}>
+          {p.tomlPath}
+        </span>
       ),
     },
   ];
 
   return (
-    <DataTable
+    <ListPage<Pipeline>
+      embedded
+      list={list}
       label="Pipelines"
-      controller={table}
       columns={columns}
+      rows={rows}
       getRowId={(p) => p.id}
       rowHref={(p) => `/pipelines/${p.id}`}
-      searchPlaceholder="Search pipelines…"
+      rowActions={(p) => (
+        <DropdownMenuItem disabled={triggering} onSelect={() => void onTrigger(p)}>
+          <PlayIcon className="size-4" />
+          Run
+        </DropdownMenuItem>
+      )}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      totalCount={totalCount}
+      nextCursor={nextCursor}
       empty={{
         icon: <GitBranchIcon className="size-5" />,
         title: "No pipelines yet",
@@ -172,20 +201,24 @@ export function PipelineListView({ table, onTrigger, triggering }: PipelineListV
         actionHref: "/pipelines/new",
         actionLabel: "New Pipeline",
       }}
-      emptyFiltered={{
-        title: "No matching pipelines",
-        description:
-          "No pipeline matches that search. The server matches the pipeline name, its repository URL, and the app it deploys.",
-      }}
     />
   );
 }
 
 export type RunHistoryViewProps = ReturnType<typeof useRunHistory>;
 
-/** The run history tab (#107): one pipeline's runs, picked from a select. */
+/**
+ * The run history tab (#107): one pipeline's runs, picked from a select,
+ * on the one embedded list (views All · Mine · Failed, cursor pages). Pure.
+ */
 export function RunHistoryView({
-  table,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   options,
   selected,
   onSelect,
@@ -212,19 +245,27 @@ export function RunHistoryView({
     {
       id: "ref",
       header: "Ref",
-      cellClassName: "font-mono text-xs",
-      cell: (run) => run.triggerRef?.replace(/^refs\/heads\//, ""),
+      cellClassName: "max-w-64",
+      cell: (run) => (
+        <span className="block truncate font-mono text-xs" title={run.triggerRef}>
+          {run.triggerRef?.replace(/^refs\/heads\//, "")}
+        </span>
+      ),
     },
     {
       id: "actor",
       header: "Actor",
-      cellClassName: "text-muted-foreground text-sm",
-      cell: (run) => run.triggerActor ?? "—",
+      cellClassName: "text-muted-foreground max-w-56 text-sm",
+      cell: (run) => (
+        <span className="block truncate" title={run.triggerActor ?? undefined}>
+          {run.triggerActor ?? "—"}
+        </span>
+      ),
     },
     {
       id: "duration",
       header: "Duration",
-      cellClassName: "text-muted-foreground text-sm",
+      cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (run) =>
         run.startedAt && run.finishedAt
           ? `${Math.round(
@@ -237,32 +278,33 @@ export function RunHistoryView({
   ];
 
   return (
-    <DataTable
-      label="Pipeline runs"
-      controller={table}
-      columns={columns}
-      getRowId={(run) => run.id}
-      searchPlaceholder="Search runs…"
-      toolbar={
-        <Select value={selected ?? ""} onValueChange={onSelect} disabled={options.length === 0}>
-          <SelectTrigger size="sm" className="w-56" aria-label="Pipeline">
-            <SelectValue
-              placeholder={loadingOptions ? "Loading pipelines…" : "Select a pipeline"}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      }
-      empty={
-        loadingOptions
-          ? { icon: <Loader2Icon className="size-5 animate-spin" />, title: "Loading pipelines…" }
-          : options.length === 0
+    <div className="flex min-w-0 flex-col gap-3">
+      <Select value={selected ?? ""} onValueChange={onSelect} disabled={options.length === 0}>
+        <SelectTrigger size="sm" className="w-56 max-w-full" aria-label="Pipeline">
+          <SelectValue placeholder={loadingOptions ? "Loading pipelines…" : "Select a pipeline"} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ListPage<PipelineRunRow>
+        embedded
+        list={list}
+        label="Pipeline runs"
+        columns={columns}
+        rows={rows}
+        getRowId={(run) => run.id}
+        loading={loading || loadingOptions}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={
+          options.length === 0 && !loadingOptions
             ? {
                 icon: <GitBranchIcon className="size-5" />,
                 title: "No pipelines yet",
@@ -275,12 +317,8 @@ export function RunHistoryView({
                 title: "No pipeline runs yet",
                 description: "Trigger a run manually or connect a webhook to your repository.",
               }
-      }
-      emptyFiltered={{
-        title: "No matching runs",
-        description:
-          "No run matches that search. The server matches the triggering ref, the actor, and the trigger kind.",
-      }}
-    />
+        }
+      />
+    </div>
   );
 }

@@ -2,8 +2,6 @@
  * Hand-typed story fixtures for the pipelines and previews screens, typed
  * against each view's props so a story cannot drift from its hook.
  */
-import { fakeController } from "@/components/data-table/fixtures";
-import type { CursorTableController } from "@/components/data-table/use-cursor-table";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
@@ -60,12 +58,17 @@ export const LONG_PIPELINE: Pipeline = {
   createdAt: "2026-09-20T08:15:00Z",
 };
 
+/** The list tab's props less the list controller, which the story builds. */
 export function pipelineListProps(
-  table: Partial<CursorTableController<Pipeline>> = {},
-  extra: Partial<Omit<PipelineListViewProps, "table">> = {}
-): PipelineListViewProps {
+  extra: Partial<Omit<PipelineListViewProps, "list">> = {}
+): Omit<PipelineListViewProps, "list"> {
   return {
-    table: fakeController<Pipeline>({ rows: PIPELINES, totalCount: PIPELINES.length, ...table }),
+    rows: PIPELINES,
+    totalCount: PIPELINES.length,
+    nextCursor: null,
+    loading: false,
+    error: null,
+    onRetry: noop,
     onTrigger: resolveVoid,
     triggering: false,
     ...extra,
@@ -126,16 +129,17 @@ export const LONG_RUN: PipelineRunRow = {
   finishedAt: "2026-09-27T13:15:42Z",
 };
 
+/** The run history tab's props less the list controller. */
 export function runHistoryProps(
-  table: Partial<CursorTableController<PipelineRunRow>> = {},
-  extra: Partial<Omit<RunHistoryViewProps, "table">> = {}
-): RunHistoryViewProps {
+  extra: Partial<Omit<RunHistoryViewProps, "list">> = {}
+): Omit<RunHistoryViewProps, "list"> {
   return {
-    table: fakeController<PipelineRunRow>({
-      rows: RUN_ROWS,
-      totalCount: RUN_ROWS.length,
-      ...table,
-    }),
+    rows: RUN_ROWS,
+    totalCount: RUN_ROWS.length,
+    nextCursor: null,
+    loading: false,
+    error: null,
+    onRetry: noop,
     options: PIPELINES,
     selected: PIPELINES[0].id,
     onSelect: noop,

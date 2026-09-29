@@ -1,10 +1,12 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useCursorFeed } from "@/components/feed/use-cursor-feed";
+import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CREATE_WEBHOOK,
@@ -26,6 +28,8 @@ import type {
 } from "@/graphql/operations/operations.types";
 import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 
+import { narrows, narrowWebhooks, WEBHOOKS_LIST, webhooksVariables } from "./webhooks-list";
+
 interface SubscriptionsPageResp {
   astroliftWebhookSubscriptionsPage: CursorPage<AstroliftWebhookSubscription>;
 }
@@ -42,8 +46,9 @@ export interface CreateWebhookInput {
 }
 
 /**
- * The subscription walk and every row mutation behind the Webhooks
- * screen (create, pause/resume, format, rotate, test fire, delete), plus
+ * The subscription list (URL list state platform-wide; in memory on an
+ * app's Settings tab, whose own `?section=` must survive a filter change)
+ * and every row mutation behind the Webhooks screen (create, pause/resume, format, rotate, test fire, delete), plus
  * the one-time secret reveal and the inline test result those mutations
  * produce. The data half of WebhooksScreen.
  *
@@ -55,15 +60,20 @@ export function useWebhooks(appSlug?: string) {
   const [testResult, setTestResult] = React.useState<AstroliftWebhookTestResult | null>(null);
 
   // `astroliftWebhookSubscriptionsPage` takes `appSlug`, `search`, `limit`
-  // and `after` — no sort argument, so no column declares a `sortKey` and
-  // the client-side URL comparator this file used to run is gone.
-  const table = useCursorTable<AstroliftWebhookSubscription>({
-    query: LIST_WEBHOOKS_PAGE,
-    variables: { appSlug: appSlug ?? null },
-    extract: (d) => (d as SubscriptionsPageResp | undefined)?.astroliftWebhookSubscriptionsPage,
-    searchVariable: "search",
-    urlKey: "wh",
+  // and `after`, no sort argument, so no column declares a `sortKey`.
+  const routed = useListState(WEBHOOKS_LIST);
+  const local = useLocalListState(WEBHOOKS_LIST);
+  const list = appSlug ? local : routed;
+  const query = useQuery<SubscriptionsPageResp>(LIST_WEBHOOKS_PAGE, {
+    variables: webhooksVariables(appSlug ?? null, list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
+  const data = query.data ?? query.previousData;
+  const page = data?.astroliftWebhookSubscriptionsPage;
+  const rows = narrowWebhooks(page?.items ?? [], list.filters);
+  const refetchList = () => {
+    void query.refetch();
+  };
 
   // Refetch by operation name: the app-scoped tab and the platform-wide
   // surface are the same document at different `appSlug`s, and a name
@@ -143,7 +153,7 @@ export function useWebhooks(appSlug?: string) {
     } else if (
       handleVersionMismatch(data?.updateWebhookSubscription, {
         label: "webhook subscription",
-        onRefresh: () => table.refetch(),
+        onRefresh: refetchList,
       })
     ) {
       // toast already raised by helper
@@ -161,7 +171,7 @@ export function useWebhooks(appSlug?: string) {
     } else if (
       handleVersionMismatch(data?.updateWebhookSubscription, {
         label: "webhook subscription",
-        onRefresh: () => table.refetch(),
+        onRefresh: refetchList,
       })
     ) {
       // toast already raised by helper
@@ -204,7 +214,13 @@ export function useWebhooks(appSlug?: string) {
   }
 
   return {
-    table,
+    list,
+    rows,
+    totalCount: narrows(list.filters) ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: query.loading && !data,
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: refetchList,
     creating,
     rotating,
     firing,
@@ -226,21 +242,24 @@ export function useWebhooks(appSlug?: string) {
 export type WebhooksData = ReturnType<typeof useWebhooks>;
 
 /**
- * The delivery walk for the subscription expanded under the table.
- * `subscriptionId` is required by the field, and the panel only mounts
- * for a selected subscription, so the walk never needs skipping. No
- * `urlKey`: the panel is transient and two subscriptions would fight over
- * the same query-string keys. The data half of SubscriptionDetailView.
+ * One subscription's delivery log, newest first, as a Feed that loads older
+ * attempts as the reader nears the end. `subscriptionId` is required by the
+ * field; `skip` holds it until the caller knows the subscription exists.
+ * The data half of the deliveries feed on SubscriptionDetailView and
+ * WebhookDetailScreen.
  */
-export function useSubscriptionDeliveries(subscriptionId: string) {
-  const deliveries = useCursorTable<AstroliftWebhookDelivery>({
-    query: LIST_WEBHOOK_DELIVERIES_PAGE,
-    variables: { subscriptionId },
-    extract: (d) => (d as DeliveriesPageResp | undefined)?.astroliftWebhookDeliveriesPage,
-    searchVariable: "search",
-    pageSize: 10,
-  });
-  return { deliveries };
+export function useSubscriptionDeliveries(subscriptionId: string, { skip = false } = {}) {
+  const { feed } = useCursorFeed<DeliveriesPageResp, AstroliftWebhookDelivery>(
+    LIST_WEBHOOK_DELIVERIES_PAGE,
+    {
+      variables: { subscriptionId },
+      select: (d) => d?.astroliftWebhookDeliveriesPage,
+      keyOf: (d) => d.id,
+      pageSize: 25,
+      skip,
+    }
+  );
+  return { deliveries: feed };
 }
 
 export type SubscriptionDeliveriesData = ReturnType<typeof useSubscriptionDeliveries>;

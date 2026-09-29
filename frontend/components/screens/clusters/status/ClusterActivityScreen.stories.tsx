@@ -34,6 +34,15 @@ function Screen({
 
 export const Full: Story = { render: () => <Screen workflows={WORKFLOWS} lifecycle={AUDIT} /> };
 
+const MORE = { hasMore: true, loadingMore: false, onLoadMore: () => {} };
+
+/** More behind each window: Load older at the end of each frame. */
+export const HasOlder: Story = {
+  render: () => (
+    <Screen workflows={{ ...WORKFLOWS, more: MORE }} lifecycle={{ ...AUDIT, more: MORE }} />
+  ),
+};
+
 export const Loading: Story = {
   render: () => (
     <Screen

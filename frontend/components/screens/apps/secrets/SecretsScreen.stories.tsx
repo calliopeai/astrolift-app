@@ -1,10 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
 
+import { useLocalListState } from "@/components/list/use-list-state";
 import { AppTabsView } from "@/components/screens/apps/detail/AppTabs";
 import { PushAndRotateButtonView } from "@/components/screens/apps/overview/CiSetupSection";
 
 import { SecretHistoryPanelView } from "./SecretHistoryPanel";
+import {
+  APP_SECRET_BUNDLES_LIST,
+  APP_SECRETS_LIST,
+  selectBundles,
+  selectSecrets,
+} from "./secrets-list";
 import { SecretsScreen } from "./SecretsScreen";
 import {
   HISTORY,
@@ -19,10 +26,26 @@ export default meta;
 
 type Story = StoryObj;
 
+/** The screen with in-memory list state, its rows answered as the hook would. */
 function Screen(props: typeof SECRETS_SCREEN) {
+  const keysList = useLocalListState(APP_SECRETS_LIST);
+  const bundlesList = useLocalListState(APP_SECRET_BUNDLES_LIST);
+  const keys = selectSecrets(props.secrets, keysList.filters, keysList.state);
+  const bundles = selectBundles(props.attachments, bundlesList.filters, bundlesList.state);
   return (
     <SecretsScreen
       {...props}
+      keysList={keysList}
+      keyRows={keys.rows}
+      keyTotal={keys.totalCount}
+      bundlesList={bundlesList}
+      bundleRows={bundles.rows}
+      bundleTotal={bundles.totalCount}
+      sectionHref={(s) =>
+        s === "bundles"
+          ? `/apps/${props.slug}/secrets?section=bundles`
+          : `/apps/${props.slug}/secrets`
+      }
       tabs={
         <AppTabsView
           slug={props.slug}
@@ -62,6 +85,36 @@ export const QueryFailed: Story = {
       }}
     />
   ),
+};
+
+/** The Attached bundles section: the bundles on their own list. */
+export const BundlesSection: Story = {
+  render: () => <Screen {...SECRETS_SCREEN} section="bundles" />,
+};
+
+export const BundlesEmpty: Story = {
+  render: () => <Screen {...SECRETS_EMPTY} section="bundles" />,
+};
+
+export const BundlesLoading: Story = {
+  render: () => <Screen {...SECRETS_LOADING} section="bundles" />,
+};
+
+export const BundlesQueryFailed: Story = {
+  render: () => (
+    <Screen
+      {...SECRETS_EMPTY}
+      section="bundles"
+      attachmentsError={{
+        name: "ApolloError",
+        message: "Network request failed: 503 Service Unavailable",
+      }}
+    />
+  ),
+};
+
+export const BundlesLongStrings: Story = {
+  render: () => <Screen {...SECRETS_LONG} section="bundles" />,
 };
 
 export const Revealed: Story = {

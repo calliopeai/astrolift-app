@@ -5,6 +5,8 @@ import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsPage } from "@/components/settings/SettingsPage";
+import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { AdministrationShell } from "@/components/screens/administration/organization/AdministrationShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,13 @@ import { cn } from "@/lib/utils";
 import { humanizeKey } from "./feature-key";
 import type { RuntimeFlag, useFeatureFlags } from "./use-feature-flags";
 
-export type FeaturesScreenProps = ReturnType<typeof useFeatureFlags>;
+export type FeaturesScreenProps = ReturnType<typeof useFeatureFlags> & {
+  /**
+   * Which list is shown (`?section=`): runtime flags or install-time
+   * features, one at a time (list rule 3). Without it both render.
+   */
+  section?: SectionSelection;
+};
 
 // Inline on/off switch — the repo has no shadcn/radix Switch primitive,
 // so a single-use styled button role="switch" is the right size here.
@@ -124,6 +132,7 @@ export function FeaturesScreen({
   onRetry,
   pendingKey,
   toggleFlag,
+  section,
 }: FeaturesScreenProps) {
   // A runtime flag is install-wide and takes effect for everyone the moment
   // it flips, so the switch stages the change here and the dialog commits it.
@@ -148,103 +157,117 @@ export function FeaturesScreen({
         />
       ) : (
         <TooltipProvider>
-          <div className="flex min-w-0 flex-col gap-8">
-            <Section
-              title={
-                <span className="flex items-center gap-2">
-                  <FlagIcon className="size-4" /> Runtime flags
-                </span>
-              }
-              description="Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only."
-            >
-              <Card>
-                <CardContent className="flex min-w-0 flex-col">
-                  {loading && runtimeFlags.length === 0 ? (
-                    <RowSkeletons />
-                  ) : runtimeFlags.length === 0 ? (
-                    <p className="text-muted-foreground py-6 text-center text-sm">
-                      No runtime feature flags are published on this install.
-                    </p>
-                  ) : (
-                    runtimeFlags.map((flag) => (
-                      <FeatureRow
-                        key={flag.key}
-                        featureKey={flag.key}
-                        description={flag.description}
-                        enabled={flag.enabled}
-                        control={
-                          <FlagSwitch
-                            checked={flag.enabled}
-                            pending={pendingKey === flag.key}
-                            disabled={pendingKey !== null && pendingKey !== flag.key}
-                            onToggle={() => setConfirmFlag(flag)}
-                            label={`Toggle ${flag.key}`}
-                          />
-                        }
-                      />
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </Section>
-
-            <Section
-              title={
-                <span className="flex items-center gap-2">
-                  <LockIcon className="size-4" /> Install-time features
-                </span>
-              }
-              description="These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility."
-            >
-              <Card>
-                <CardContent className="flex min-w-0 flex-col">
-                  {loading && buildTimeFeatures.length === 0 ? (
-                    <RowSkeletons />
-                  ) : buildTimeFeatures.length === 0 ? (
-                    <p className="text-muted-foreground py-6 text-center text-sm">
-                      No install-time features are reported by this install.
-                    </p>
-                  ) : (
-                    buildTimeFeatures.map((feat) => (
-                      <FeatureRow
-                        key={feat.key}
-                        featureKey={feat.key}
-                        description={feat.description}
-                        enabled={feat.enabled}
-                        meta={
-                          <Badge
-                            variant="outline"
-                            className="max-w-full font-mono [overflow-wrap:anywhere] whitespace-normal"
-                          >
-                            {feat.envVar}
-                          </Badge>
-                        }
-                        control={
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              {/* span wrapper: a disabled button won't emit the
-                                  hover events radix Tooltip listens for. */}
-                              <span className="inline-flex">
+          <SettingsPage
+            single={section}
+            sections={[
+              {
+                id: "runtime",
+                title: "Runtime flags",
+                content: (
+                  <Section
+                    title={
+                      <span className="flex items-center gap-2">
+                        <FlagIcon className="size-4" /> Runtime flags
+                      </span>
+                    }
+                    description="Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only."
+                  >
+                    <Card>
+                      <CardContent className="flex min-w-0 flex-col">
+                        {loading && runtimeFlags.length === 0 ? (
+                          <RowSkeletons />
+                        ) : runtimeFlags.length === 0 ? (
+                          <p className="text-muted-foreground py-6 text-center text-sm">
+                            No runtime feature flags are published on this install.
+                          </p>
+                        ) : (
+                          runtimeFlags.map((flag) => (
+                            <FeatureRow
+                              key={flag.key}
+                              featureKey={flag.key}
+                              description={flag.description}
+                              enabled={flag.enabled}
+                              control={
                                 <FlagSwitch
-                                  checked={feat.enabled}
-                                  disabled
-                                  label={`${feat.key} (requires redeploy)`}
+                                  checked={flag.enabled}
+                                  pending={pendingKey === flag.key}
+                                  disabled={pendingKey !== null && pendingKey !== flag.key}
+                                  onToggle={() => setConfirmFlag(flag)}
+                                  label={`Toggle ${flag.key}`}
                                 />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Requires a redeploy — set{" "}
-                              <span className="font-mono">{feat.envVar}</span> and restart.
-                            </TooltipContent>
-                          </Tooltip>
-                        }
-                      />
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </Section>
-          </div>
+                              }
+                            />
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Section>
+                ),
+              },
+              {
+                id: "install-time",
+                title: "Install-time features",
+                content: (
+                  <Section
+                    title={
+                      <span className="flex items-center gap-2">
+                        <LockIcon className="size-4" /> Install-time features
+                      </span>
+                    }
+                    description="These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility."
+                  >
+                    <Card>
+                      <CardContent className="flex min-w-0 flex-col">
+                        {loading && buildTimeFeatures.length === 0 ? (
+                          <RowSkeletons />
+                        ) : buildTimeFeatures.length === 0 ? (
+                          <p className="text-muted-foreground py-6 text-center text-sm">
+                            No install-time features are reported by this install.
+                          </p>
+                        ) : (
+                          buildTimeFeatures.map((feat) => (
+                            <FeatureRow
+                              key={feat.key}
+                              featureKey={feat.key}
+                              description={feat.description}
+                              enabled={feat.enabled}
+                              meta={
+                                <Badge
+                                  variant="outline"
+                                  className="max-w-full font-mono [overflow-wrap:anywhere] whitespace-normal"
+                                >
+                                  {feat.envVar}
+                                </Badge>
+                              }
+                              control={
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    {/* span wrapper: a disabled button won't emit the
+                                  hover events radix Tooltip listens for. */}
+                                    <span className="inline-flex">
+                                      <FlagSwitch
+                                        checked={feat.enabled}
+                                        disabled
+                                        label={`${feat.key} (requires redeploy)`}
+                                      />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Requires a redeploy — set{" "}
+                                    <span className="font-mono">{feat.envVar}</span> and restart.
+                                  </TooltipContent>
+                                </Tooltip>
+                              }
+                            />
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Section>
+                ),
+              },
+            ]}
+          />
         </TooltipProvider>
       )}
 

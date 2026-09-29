@@ -1,8 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+
 import { CreateIdentityProviderSheet } from "./CreateIdentityProviderSheet";
-import { IdentityProvidersScreen } from "./IdentityProvidersScreen";
+import { IDENTITY_PROVIDERS_LIST } from "./identity-providers-list";
+import {
+  IdentityProvidersScreen as Screen,
+  type IdentityProvidersScreenProps,
+} from "./IdentityProvidersScreen";
 import {
   CREATE_SHEET,
   LOAD_ERROR,
@@ -16,6 +22,12 @@ const meta: Meta = {
 export default meta;
 
 type Story = StoryObj;
+
+/** The screen with its list state in memory, as the hook keeps it. */
+function IdentityProvidersScreen(props: IdentityProvidersScreenProps) {
+  const list = useLocalListState(IDENTITY_PROVIDERS_LIST);
+  return <Screen {...props} list={list} />;
+}
 
 const renderCreateSheet = ({
   open,
@@ -31,7 +43,8 @@ export const Full: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Auth0 prod")).toBeInTheDocument();
-    await expect(canvas.getAllByText("Make active")).toHaveLength(3);
+    // Make active and Delete sit in each row's `⋯`.
+    await expect(canvas.getAllByRole("button", { name: /row actions/i })).toHaveLength(4);
   },
 };
 
@@ -52,7 +65,7 @@ export const Empty: Story = {
   ),
 };
 
-/** The list query failed: the error card shows and the table body stays empty. */
+/** The list query failed: the list shows its error with the message. */
 export const LoadFailed: Story = {
   render: () => (
     <IdentityProvidersScreen
@@ -83,5 +96,17 @@ export const LongStrings: Story = {
       providers={LONG_PROVIDERS}
       renderCreateSheet={renderCreateSheet}
     />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <IdentityProvidersScreen
+        {...SCREEN}
+        providers={LONG_PROVIDERS}
+        renderCreateSheet={renderCreateSheet}
+      />
+    </div>
   ),
 };

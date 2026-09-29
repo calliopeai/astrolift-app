@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { DeployActivityStrip } from "../detail/DeployActivityStrip";
 import { ACTIVITY as DEPLOY_ACTIVITY } from "../detail/app-detail-shell.fixtures";
 import { ActivityTimelineView } from "./ActivityTimeline";
-import { ACTIVITY, ACTIVITY_LONG } from "./app-overview-cards-b.fixtures";
+import { ACTIVITY, ACTIVITY_LONG, ACTIVITY_PAGED } from "./app-overview-cards-b.fixtures";
 
 const meta: Meta<typeof ActivityTimelineView> = {
   title: "Screens/Apps/Overview/ActivityTimeline",
@@ -32,6 +32,14 @@ export const Empty: Story = { args: { events: [] } };
 /** The events query failed: the error and Retry sit inside the panel. */
 export const QueryError: Story = {
   args: { events: [], error: "Network error: upstream timed out", onRetry: () => {} },
+};
+
+/** Forty events with older pages on the cursor: the feed scrolls in its frame. */
+export const LongHistory: Story = { args: ACTIVITY_PAGED };
+
+/** Older events failed to load: the loaded ones stay, the error sits at the end. */
+export const OlderPageError: Story = {
+  args: { ...ACTIVITY_PAGED, error: "Network error: upstream timed out" },
 };
 
 /** On the overview the deploy heatmap leads the panel. */

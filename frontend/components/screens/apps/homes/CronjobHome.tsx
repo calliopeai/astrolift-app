@@ -4,7 +4,7 @@ import cronstrue from "cronstrue";
 import { HistoryIcon, RepeatIcon, TimerIcon } from "lucide-react";
 import * as React from "react";
 
-import { DataTable, type Column } from "@/components/data-table";
+import { Feed } from "@/components/feed/Feed";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
@@ -50,48 +50,48 @@ function formatCountdown(ms: number): string {
   return `${sec}s`;
 }
 
-const columns: Column<AstroliftScheduledJobRun>[] = [
-  {
-    id: "status",
-    header: "Status",
-    cell: (r) => (
+/** One run in the history feed: status, when, how long, and its exit code. */
+function RunLine({ run }: { run: AstroliftScheduledJobRun }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <Badge
-        variant={runStatusDot(r.status) === "error" ? "destructive" : "secondary"}
+        variant={runStatusDot(run.status) === "error" ? "destructive" : "secondary"}
         className="gap-1.5"
       >
-        <StatusDot status={runStatusDot(r.status)} />
-        {titleCaseStatus(r.status)}
+        <StatusDot status={runStatusDot(run.status)} />
+        {titleCaseStatus(run.status)}
       </Badge>
-    ),
-  },
-  {
-    id: "started",
-    header: "Started",
-    cellClassName: "text-muted-foreground text-sm",
-    cell: (r) =>
-      r.startedAt ? <span title={r.startedAt}>{formatRelativeAge(r.startedAt)}</span> : "—",
-  },
-  {
-    id: "duration",
-    header: "Duration",
-    cellClassName: "text-muted-foreground text-sm tabular-nums",
-    cell: (r) => formatDuration(r.durationSeconds),
-  },
-  {
-    id: "exit",
-    header: "Exit",
-    align: "right",
-    cellClassName: "font-mono text-xs",
-    cell: (r) => (r.exitCode == null ? "—" : r.exitCode),
-  },
-];
+      <span className="text-muted-foreground font-mono text-xs" title={run.startedAt ?? undefined}>
+        {run.startedAt ? formatRelativeAge(run.startedAt) : "not started"}
+      </span>
+      <span className="text-muted-foreground font-mono text-xs tabular-nums">
+        {formatDuration(run.durationSeconds)}
+      </span>
+      <span className="text-muted-foreground ml-auto font-mono text-xs">
+        {run.exitCode == null ? "no exit code" : `exit ${run.exitCode}`}
+      </span>
+    </div>
+  );
+}
 
 /**
  * The Overview for a **cronjob**, schedule first: the cron expression, a
  * plain-English reading and a live countdown to the next fire time, then the
- * run history. A failed newest run puts its reason in the first panel.
+ * run history as a Feed: it scrolls in its own frame, grouped by day, and
+ * loads older runs on the cursor as the reader nears the end. A failed
+ * newest run puts its reason in the first panel.
  */
-export function CronjobHomeScreen({ workload, table }: CronjobHomeScreenProps) {
+export function CronjobHomeScreen({
+  workload,
+  runs,
+  totalCount,
+  loading,
+  error,
+  onRetry,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+}: CronjobHomeScreenProps) {
   const schedule = workload.schedule || "";
   const [now, setNow] = React.useState<number | null>(null);
   React.useEffect(() => {
@@ -104,7 +104,7 @@ export function CronjobHomeScreen({ workload, table }: CronjobHomeScreenProps) {
     () => (schedule && now != null ? nextCronRun(schedule, new Date(now)) : null),
     [schedule, now]
   );
-  const latest = table.search ? undefined : table.rows[0];
+  const latest = runs[0];
 
   return (
     <PanelGrid>
@@ -157,30 +157,31 @@ export function CronjobHomeScreen({ workload, table }: CronjobHomeScreenProps) {
         title="Run history"
         icon={<HistoryIcon className="size-4" />}
         actions={
-          table.totalCount != null ? (
+          totalCount != null ? (
             <span className="text-muted-foreground font-mono text-xs tabular-nums">
-              {table.totalCount} total
+              {totalCount} total
             </span>
           ) : undefined
         }
-        flush
       >
-        <DataTable
+        <Feed
           label="Run history"
-          controller={table}
-          columns={columns}
-          getRowId={(r) => r.id}
-          searchPlaceholder="Search runs by status or Job name…"
+          items={runs}
+          keyOf={(r) => r.id}
+          groupBy={{ day: (r) => r.startedAt ?? r.createdAt }}
+          renderItem={(r) => <RunLine run={r} />}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
           empty={{
             icon: <HistoryIcon className="size-5" />,
             title: "No runs recorded yet",
             description: "Each scheduled execution will appear here once it fires.",
           }}
-          emptyFiltered={{
-            title: "No matching runs",
-            description:
-              "No run of this job matches that search. The server matches the status and the batch/v1 Job name.",
-          }}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
+          dense
         />
       </Panel>
     </PanelGrid>

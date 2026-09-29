@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { useGrowingLimit } from "@/components/feed/use-growing-limit";
+
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   MARK_ALL_NOTIFICATIONS_READ,
@@ -17,13 +19,17 @@ interface Resp {
 
 /**
  * The caller's notification inbox (polled) and the mark-read mutations.
- * The data half of NotificationsScreen.
+ * The field takes a limit, not a cursor, so the feed asks for 100 more as
+ * the reader nears the end of the newest 100. The data half of
+ * NotificationsInbox.
  */
 export function useNotifications() {
+  const grow = useGrowingLimit(100);
   const { data, loading } = useQuery<Resp>(LIST_MY_NOTIFICATIONS, {
-    variables: { unreadOnly: false, limit: 100 },
+    variables: { unreadOnly: false, limit: grow.limit },
     pollInterval: 10000,
   });
+  const notifications = data?.astroliftMyNotifications ?? [];
 
   const [markRead, { loading: marking }] = useMutation<{
     markNotificationRead: MutationResult<{ id: string; readAt: string | null }>;
@@ -51,8 +57,9 @@ export function useNotifications() {
   }
 
   return {
-    notifications: data?.astroliftMyNotifications ?? [],
+    notifications,
     loading,
+    more: grow.feed(notifications.length, loading),
     marking,
     markingAll,
     onMarkRead,

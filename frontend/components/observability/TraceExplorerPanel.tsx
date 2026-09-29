@@ -79,57 +79,61 @@ export function TraceExplorerPanel({
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead>Root Service</TableHead>
-              <TableHead>Root Operation</TableHead>
-              <TableHead className="text-right">Spans</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isInitialLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={`skeleton-${i}`}>
-                  <TableCell />
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-48" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-8" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-12" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-12" />
+        {/* A bounded trace window, but expanded span trees grow it: the
+            table scrolls inside the card, never the page (list rule 1). */}
+        <div className="max-h-128 min-w-0 overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8" />
+                <TableHead>Root Service</TableHead>
+                <TableHead>Root Operation</TableHead>
+                <TableHead className="text-right">Spans</TableHead>
+                <TableHead className="text-right">Duration</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isInitialLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell />
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-48" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="ml-auto h-4 w-8" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="ml-auto h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : traces.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
+                    No traces — tracing backend not configured
                   </TableCell>
                 </TableRow>
-              ))
-            ) : traces.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
-                  No traces — tracing backend not configured
-                </TableCell>
-              </TableRow>
-            ) : (
-              traces.map((trace) => (
-                <TraceRow
-                  key={trace.traceId}
-                  trace={trace}
-                  spans={spans[trace.traceId]}
-                  onExpand={onExpand}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                traces.map((trace) => (
+                  <TraceRow
+                    key={trace.traceId}
+                    trace={trace}
+                    spans={spans[trace.traceId]}
+                    onExpand={onExpand}
+                  />
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

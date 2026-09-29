@@ -473,6 +473,7 @@
         "manifest": "Manifest",
         "webhooks": "Webhooks",
         "environments": "Environments",
+        "domains": "Domains",
         "dangerZone": "Danger zone"
       }
     },
@@ -2413,7 +2414,7 @@
     },
     "alerts": {
       "title": "Alerts",
-      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel.",
+      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events have their own feed.",
       "newRule": "New rule",
       "stats": {
         "rules": "Rules",
@@ -2436,8 +2437,8 @@
         }
       },
       "events": {
-        "title": "Recent events",
-        "description": "Firing instances from the rules above. Acknowledge to silence while the underlying issue is being worked.",
+        "title": "Events",
+        "description": "Firing instances of your alert rules. Acknowledge to silence while the underlying issue is being worked.",
         "emptyTitle": "No events yet",
         "emptyDescription": "Events appear here when an active rule's predicate matches incoming telemetry.",
         "columns": {

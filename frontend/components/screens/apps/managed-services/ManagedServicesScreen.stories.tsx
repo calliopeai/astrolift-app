@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { fakeController } from "@/components/data-table/fixtures";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import { ManagedServiceMetricsPanel } from "@/components/observability/ManagedServiceMetricsPanel";
 
 import {
@@ -13,6 +13,7 @@ import {
 } from "./app-managed-services.fixtures";
 import { EmailDetailSheetView } from "./EmailDetailSheet";
 import { ManagedServicesScreen, ProvisionSheet } from "./ManagedServicesScreen";
+import { APP_MANAGED_SERVICES_LIST } from "./managed-services-list";
 import { ServiceDetailSheet } from "./ServiceDetailSheet";
 import type { ManagedService } from "./use-managed-services";
 
@@ -43,72 +44,51 @@ const slots = {
   ),
 };
 
+/** The screen with in-memory list state and the slots filled with views. */
+function Screen({ initial, ...props }: Partial<typeof SCREEN> & { initial?: Partial<ListState> }) {
+  const list = useLocalListState(APP_MANAGED_SERVICES_LIST, initial);
+  return <ManagedServicesScreen {...SCREEN} {...slots} {...props} list={list} />;
+}
+
 export const Full: Story = {
-  render: () => <ManagedServicesScreen {...SCREEN} {...slots} />,
+  render: () => <Screen />,
 };
 
 export const Loading: Story = {
-  render: () => (
-    <ManagedServicesScreen
-      {...SCREEN}
-      {...slots}
-      table={fakeController<ManagedService>({ state: "loading" })}
-    />
-  ),
+  render: () => <Screen rows={[]} loading totalCount={null} />,
 };
 
 export const Empty: Story = {
-  render: () => (
-    <ManagedServicesScreen
-      {...SCREEN}
-      {...slots}
-      table={fakeController<ManagedService>({ state: "empty", rows: [], totalCount: 0 })}
-    />
-  ),
+  render: () => <Screen rows={[]} totalCount={0} />,
 };
 
 /** A search that matches nothing: the filtered empty state. */
 export const NoMatches: Story = {
-  render: () => (
-    <ManagedServicesScreen
-      {...SCREEN}
-      {...slots}
-      table={fakeController<ManagedService>({
-        state: "emptyFiltered",
-        rows: [],
-        totalCount: 0,
-        search: "kafka",
-        isFiltered: true,
-      })}
-    />
-  ),
+  render: () => <Screen rows={[]} totalCount={0} initial={{ q: "kafka" }} />,
 };
 
 export const LoadFailed: Story = {
   render: () => (
-    <ManagedServicesScreen
-      {...SCREEN}
-      {...slots}
-      table={fakeController<ManagedService>({
-        state: "error",
-        error: new Error("Network error: failed to fetch managed services"),
-      })}
-    />
+    <Screen rows={[]} error={{ message: "Network error: failed to fetch managed services" }} />
   ),
+};
+
+/** More services than one page: Older is live on the cursor. */
+export const MorePages: Story = {
+  render: () => <Screen nextCursor="cursor-2" totalCount={60} />,
 };
 
 /** A mutation in flight: the row delete buttons are disabled. */
 export const Busy: Story = {
-  render: () => <ManagedServicesScreen {...SCREEN} {...slots} busy deprovisioning />,
+  render: () => <Screen busy deprovisioning />,
 };
 
 export const LongStrings: Story = {
   render: () => (
-    <ManagedServicesScreen
-      {...SCREEN}
-      {...slots}
+    <Screen
       slug="storefront-with-a-deliberately-long-app-slug-for-overflow"
-      table={fakeController<ManagedService>({ rows: LONG_SERVICES, totalCount: 1 })}
+      rows={LONG_SERVICES}
+      totalCount={1}
     />
   ),
 };
@@ -117,11 +97,7 @@ export const LongStrings: Story = {
 export const Width768: Story = {
   render: () => (
     <div style={{ width: 768 }} className="overflow-hidden border">
-      <ManagedServicesScreen
-        {...SCREEN}
-        {...slots}
-        table={fakeController<ManagedService>({ rows: LONG_SERVICES, totalCount: 1 })}
-      />
+      <Screen rows={LONG_SERVICES} totalCount={1} />
     </div>
   ),
 };

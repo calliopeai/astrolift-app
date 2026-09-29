@@ -199,7 +199,13 @@ export function SettingsClient({
   );
 }
 
-function ResyncSourceCard({ app, agentMode }: { app: AstroliftRegisteredApp; agentMode: boolean }) {
+export function ResyncSourceCard({
+  app,
+  agentMode,
+}: {
+  app: AstroliftRegisteredApp;
+  agentMode: boolean;
+}) {
   return (
     <ResyncSourceView
       {...useResyncSource(app.slug)}
@@ -239,7 +245,7 @@ function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
   return <EnvironmentSettingsView {...useEnvironmentSettings(appSlug)} />;
 }
 
-function ArchiveAppCard({ app }: { app: AstroliftRegisteredApp }) {
+export function ArchiveAppCard({ app }: { app: AstroliftRegisteredApp }) {
   return (
     <ArchiveAppView
       {...useArchiveApp(app.slug)}
@@ -258,6 +264,6 @@ function RunScheduledJobCard({ appSlug, basePath }: { appSlug: string; basePath:
   return <RunScheduledJobView {...useRunScheduledJob(appSlug)} basePath={basePath} />;
 }
 
-function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string }) {
+export function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string }) {
   return <DangerZoneView {...useDangerZone(appSlug, appName)} />;
 }

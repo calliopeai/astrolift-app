@@ -50,3 +50,13 @@ export const W768: Story = {
     ),
   ],
 };
+
+/** A long history: grouped by day, scrolling in its own frame. */
+export const LongHistory: Story = {
+  args: {
+    entries: Array.from({ length: 40 }, (_, i) => ({
+      ...HISTORY.entries[i % HISTORY.entries.length]!,
+      timestamp: new Date(Date.UTC(2026, 8, 28, 12) - i * 6 * 3_600_000).toISOString(),
+    })),
+  },
+};

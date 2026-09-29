@@ -2,13 +2,11 @@
 
 import { AppDetailScreen, type AppDetailSlots } from "@/components/screens/apps/detail/AppDetail";
 import { useAppDetail } from "@/components/screens/apps/detail/use-app-detail";
-import { CiSetupPanel } from "@/components/screens/apps/overview/CiSetupPanel";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { classifyPrimitive } from "@/lib/primitive";
 
 import { ActivityTimeline } from "./components/activity-timeline";
 import { AppDoctorPanel } from "./components/app-doctor-panel";
-import { appPath, useAppChrome, type AppChrome } from "./components/app-chrome-context";
 import { AppTabs } from "./components/app-tabs";
 import { AutowireStatusBanner } from "./components/autowire-status-banner";
 import { ConfigDriftBanner } from "./components/config-drift-banner";
@@ -19,7 +17,6 @@ import { BundleHome } from "./components/homes/bundle-home";
 import { CronjobHome } from "./components/homes/cronjob-home";
 import { FunctionHome } from "./components/homes/function-home";
 import { TaskHome } from "./components/homes/task-home";
-import { ObservabilitySection } from "./components/observability-section";
 import {
   LatestDeployPanel,
   ManagedServicesPanel,
@@ -27,7 +24,6 @@ import {
 } from "./components/overview-panels";
 import { PendingDeployments } from "./components/pending-deployments";
 import { ProvisioningProgressPanel } from "./components/provisioning-progress";
-import { QuickLinksGrid } from "./components/quick-links-grid";
 import { ReprovisionCallout } from "./components/reprovision-callout";
 import { UptimeCard } from "./components/uptime-card";
 import { UrlCard } from "./components/url-card";
@@ -39,7 +35,6 @@ import { TopologyClient } from "./topology/topology-client";
  * when shown.
  */
 export function AppDetailClient({ slug }: { slug: string }) {
-  const chrome = useAppChrome();
   const detail = useAppDetail(slug);
   const a = detail.app;
 
@@ -49,7 +44,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
       slug={slug}
       tabs={a ? <AppTabs slug={a.slug} active="overview" /> : undefined}
       home={a ? primitiveHome(slug, a, detail.workloads) : undefined}
-      slots={a ? overviewSlots(chrome, a, detail.workloads) : undefined}
+      slots={a ? overviewSlots(a, detail.workloads) : undefined}
     />
   );
 }
@@ -87,11 +82,7 @@ function primitiveHome(slug: string, a: AstroliftRegisteredApp, wlList: Astrolif
   return undefined;
 }
 
-function overviewSlots(
-  chrome: AppChrome,
-  a: AstroliftRegisteredApp,
-  wlList: AstroliftWorkload[]
-): AppDetailSlots {
+function overviewSlots(a: AstroliftRegisteredApp, wlList: AstroliftWorkload[]): AppDetailSlots {
   return {
     deregisterBanner: <DeregisterPendingBanner appSlug={a.slug} />,
     provisioningProgress: <ProvisioningProgressPanel app={a} />,
@@ -122,26 +113,16 @@ function overviewSlots(
         provisioningStatus={a.provisioningStatus}
       />
     ),
-    observability: <ObservabilitySection appSlug={a.slug} />,
     topology: <TopologyClient slug={a.slug} />,
     activity: (
       <ActivityTimeline
         appSlug={a.slug}
-        limit={20}
         strip={<DeployActivityStrip appSlug={a.slug} limit={20} />}
       />
     ),
-    links: <QuickLinksGrid appSlug={a.slug} />,
     managedServices: <ManagedServicesPanel appSlug={a.slug} />,
     ownership: (
       <OwnershipPanel appSlug={a.slug} projectName={a.projectName} teamName={a.teamName} />
-    ),
-    ci: (
-      <CiSetupPanel
-        app={a}
-        settingsHref={appPath(chrome, a.slug, "settings")}
-        tokensHref={`${appPath(chrome, a.slug, "access")}?section=tokens`}
-      />
     ),
     doctor: <AppDoctorPanel appSlug={a.slug} />,
   };

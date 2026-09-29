@@ -13,11 +13,13 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,11 +54,21 @@ function isLongLivedAdmin(t: AstroliftApiToken): boolean {
 const DEFAULT_SELECTED_SCOPES: string[] = ["read:apps", "read:clusters", "mcp:read"];
 
 /**
- * The org API keys page. Holds only UI state (the create form, the revoke
- * confirm); everything that talks to the server comes in from useTokens.
+ * Admin › API keys (spec 44 §5.1): the org's tokens on the shared list,
+ * views All · Mine · Active · Revoked, cursor paged, revoke in each row's
+ * `⋯`. The MCP endpoint and the one-time plaintext reveal sit above the
+ * filters. Holds only UI state (the create form, the revoke confirm);
+ * everything that talks to the server comes in from useTokens.
  */
 export function TokensScreen({
-  table,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  stale,
+  error,
+  onRetry,
   creating,
   revoking,
   createdToken,
@@ -93,8 +105,12 @@ export function TokensScreen({
     {
       id: "name",
       header: "Name",
-      cellClassName: "font-medium",
-      cell: (t) => t.name,
+      cellClassName: "max-w-64 font-medium",
+      cell: (t) => (
+        <span className="block truncate" title={t.name}>
+          {t.name}
+        </span>
+      ),
     },
     {
       id: "suffix",
@@ -187,211 +203,205 @@ export function TokensScreen({
           <Badge variant="secondary">active</Badge>
         ),
     },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      width: "w-24",
-      // The row is a stretched link (`rowHref`), whose ::after covers the
-      // whole row — the button has to sit above it to stay clickable.
-      cell: (t) => (
-        <div className="relative z-10 flex justify-end">
-          <Can permission="api_token.revoke">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setRevokeTarget(t)}
-              disabled={revoking || t.isRevoked}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Revoke</span>
-            </Button>
-          </Can>
-        </div>
-      ),
-    },
   ];
 
-  return (
-    <TooltipProvider>
-      <PageShell
-        title="API keys"
-        description="Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation."
-        actions={
-          <Can permission="api_token.create">
-            <Button onClick={() => setOpen(true)}>
-              <PlusIcon className="size-4" />
-              New token
-            </Button>
-          </Can>
-        }
-      >
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 font-medium">
-                  <CableIcon className="size-4" /> Remote agent MCP
-                </div>
-                <p className="text-muted-foreground max-w-3xl text-xs">
-                  Connect CI or coding clients over authenticated Streamable HTTP. Send an API token
-                  as <code>Authorization: Bearer alft_at_…</code>. MCP scopes still require the
-                  token owner&apos;s matching agent permissions; secret values are not exposed.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="bg-muted rounded px-2 py-1.5 font-mono text-xs">
-                  {mcpEndpoint}
-                </code>
-                <Button size="sm" variant="outline" onClick={onCopyMcpEndpoint}>
-                  <CopyIcon className="size-4" /> Copy URL
-                </Button>
-              </div>
+  const notice = (
+    <>
+      {createdToken && (
+        <Card className="border-success-border bg-success/5">
+          <CardContent className="flex flex-col gap-3 p-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
+              <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+                Token <span className="font-mono">{createdToken.apiToken.name}</span> created
+              </p>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Badge variant="outline">mcp:read · inspect packages/tasks</Badge>
-              <Badge variant="outline">mcp:dispatch · run/kill</Badge>
-              <Badge variant="outline">mcp:write · sync repos</Badge>
+            <p className="text-muted-foreground text-xs">
+              Copy the value below now — it&apos;s never shown again. We store only the SHA-256 hash
+              and the last 4 characters.
+            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="bg-background min-w-0 flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
+                {createdToken.plaintext}
+              </code>
+              <Button size="sm" variant="outline" onClick={onCopyPlaintext}>
+                <CopyIcon className="size-4" />
+                Copy
+              </Button>
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" variant="ghost" onClick={onDismissCreated}>
+                I&apos;ve saved it — dismiss
+              </Button>
             </div>
           </CardContent>
         </Card>
-
-        {createdToken && (
-          <Card className="border-success-border bg-success/5">
-            <CardContent className="flex flex-col gap-3 p-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2Icon className="text-success-fg size-4" />
-                <p className="text-sm font-medium">
-                  Token <span className="font-mono">{createdToken.apiToken.name}</span> created
-                </p>
+      )}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 font-medium">
+                <CableIcon className="size-4" /> Remote agent MCP
               </div>
-              <p className="text-muted-foreground text-xs">
-                Copy the value below now — it&apos;s never shown again. We store only the SHA-256
-                hash and the last 4 characters.
+              <p className="text-muted-foreground max-w-3xl text-xs">
+                Connect CI or coding clients over authenticated Streamable HTTP. Send an API token
+                as <code>Authorization: Bearer alft_at_…</code>. MCP scopes still require the token
+                owner&apos;s matching agent permissions; secret values are not exposed.
               </p>
-              <div className="flex items-center gap-2">
-                <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
-                  {createdToken.plaintext}
-                </code>
-                <Button size="sm" variant="outline" onClick={onCopyPlaintext}>
-                  <CopyIcon className="size-4" />
-                  Copy
-                </Button>
-              </div>
-              <div className="flex justify-end">
-                <Button size="sm" variant="ghost" onClick={onDismissCreated}>
-                  I&apos;ve saved it — dismiss
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="bg-muted min-w-0 rounded px-2 py-1.5 font-mono text-xs [overflow-wrap:anywhere]">
+                {mcpEndpoint}
+              </code>
+              <Button size="sm" variant="outline" onClick={onCopyMcpEndpoint}>
+                <CopyIcon className="size-4" /> Copy URL
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline">mcp:read · inspect packages/tasks</Badge>
+            <Badge variant="outline">mcp:dispatch · run/kill</Badge>
+            <Badge variant="outline">mcp:write · sync repos</Badge>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+
+  return (
+    <TooltipProvider>
+      <ListPage<AstroliftApiToken>
+        header={{
+          crumbs: adminCrumbs("tokens", "API keys"),
+          title: "API keys",
+          context:
+            "Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation.",
+          primaryAction: (
+            <Can permission="api_token.create">
+              <Button onClick={() => setOpen(true)}>
+                <PlusIcon className="size-4" />
+                New token
+              </Button>
+            </Can>
+          ),
+        }}
+        notice={notice}
+        list={list}
+        label="API keys"
+        columns={columns}
+        rows={rows}
+        getRowId={(t) => t.id}
+        rowHref={(t) => `/tokens/${t.id}`}
+        rowActions={(t) => (
+          <Can permission="api_token.revoke">
+            <DropdownMenuItem
+              disabled={revoking || t.isRevoked}
+              onSelect={() => setRevokeTarget(t)}
+            >
+              <Trash2Icon className="size-4" />
+              Revoke
+            </DropdownMenuItem>
+          </Can>
         )}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={{
+          icon: <KeyIcon className="size-5" />,
+          title: "No API keys",
+          description:
+            "Create one to authenticate the CLI, CI runs, or your own scripts against the platform.",
+        }}
+      />
 
-        <DataTable
-          label="API keys"
-          controller={table}
-          columns={columns}
-          getRowId={(t) => t.id}
-          rowHref={(t) => `/tokens/${t.id}`}
-          searchPlaceholder="Search tokens…"
-          empty={{
-            icon: <KeyIcon className="size-5" />,
-            title: "No API keys",
-            description:
-              "Create one to authenticate the CLI, CI runs, or your own scripts against the platform.",
-          }}
-          emptyFiltered={{
-            title: "No matching API keys",
-            description:
-              "No token matches that name, owner, team, or last-4 suffix. Clear the search to see every key.",
-          }}
-        />
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) resetForm();
+        }}
+      >
+        <SheetContent className="flex flex-col">
+          <SheetHeader>
+            <SheetTitle>New API token</SheetTitle>
+            <SheetDescription>
+              The plaintext is shown exactly once after creation. Save it somewhere secure —
+              there&apos;s no way to retrieve it later.
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div className="space-y-2">
+              <Label htmlFor="token-name">Name</Label>
+              <Input
+                id="token-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ci-runner-prod"
+                autoFocus
+                required
+              />
+              <p className="text-muted-foreground text-xs">
+                Descriptive — appears in the audit log next to every action this token takes.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Scopes</Label>
+              <p className="text-muted-foreground text-xs">
+                A token can only narrow what you can do: it gets the permissions below that your
+                roles also grant.
+              </p>
+              {renderScopePicker({ value: selectedScopes, onChange: setSelectedScopes })}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="token-expires">Expires in (days)</Label>
+              <Input
+                id="token-expires"
+                type="number"
+                min={1}
+                max={365}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(e.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Leave 0 or empty for no expiry. Default 90 days, max 365.
+              </p>
+            </div>
+            <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating || !name || selectedScopes.length === 0}>
+                {creating ? "Creating…" : "Create token"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
 
-        <Sheet
-          open={open}
-          onOpenChange={(next) => {
-            setOpen(next);
-            if (!next) resetForm();
-          }}
-        >
-          <SheetContent className="flex flex-col">
-            <SheetHeader>
-              <SheetTitle>New API token</SheetTitle>
-              <SheetDescription>
-                The plaintext is shown exactly once after creation. Save it somewhere secure —
-                there&apos;s no way to retrieve it later.
-              </SheetDescription>
-            </SheetHeader>
-            <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
-              <div className="space-y-2">
-                <Label htmlFor="token-name">Name</Label>
-                <Input
-                  id="token-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="ci-runner-prod"
-                  autoFocus
-                  required
-                />
-                <p className="text-muted-foreground text-xs">
-                  Descriptive — appears in the audit log next to every action this token takes.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Scopes</Label>
-                <p className="text-muted-foreground text-xs">
-                  A token can only narrow what you can do: it gets the permissions below that your
-                  roles also grant.
-                </p>
-                {renderScopePicker({ value: selectedScopes, onChange: setSelectedScopes })}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="token-expires">Expires in (days)</Label>
-                <Input
-                  id="token-expires"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={expiresInDays}
-                  onChange={(e) => setExpiresInDays(e.target.value)}
-                />
-                <p className="text-muted-foreground text-xs">
-                  Leave 0 or empty for no expiry. Default 90 days, max 365.
-                </p>
-              </div>
-              <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setOpen(false);
-                    resetForm();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={creating || !name || selectedScopes.length === 0}>
-                  {creating ? "Creating…" : "Create token"}
-                </Button>
-              </SheetFooter>
-            </form>
-          </SheetContent>
-        </Sheet>
-
-        <ConfirmDialog
-          open={revokeTarget !== null}
-          onOpenChange={(next) => {
-            if (!next) setRevokeTarget(null);
-          }}
-          title={revokeTarget ? `Revoke token ${revokeTarget.name}?` : "Revoke token?"}
-          description="Existing CLIs and bots using this token stop working immediately. There's no way to un-revoke — mint a new token if you need to restore access."
-          confirmLabel="Revoke token"
-          destructive
-          onConfirm={async () => {
-            if (revokeTarget) await onRevoke(revokeTarget);
-          }}
-        />
-      </PageShell>
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={revokeTarget ? `Revoke token ${revokeTarget.name}?` : "Revoke token?"}
+        description="Existing CLIs and bots using this token stop working immediately. There's no way to un-revoke — mint a new token if you need to restore access."
+        confirmLabel="Revoke token"
+        destructive
+        onConfirm={async () => {
+          if (revokeTarget) await onRevoke(revokeTarget);
+        }}
+      />
     </TooltipProvider>
   );
 }

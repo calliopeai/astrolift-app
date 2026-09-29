@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+
 import { FEATURES, FEATURES_LONG } from "./fixtures";
 import { FeaturesScreen } from "./FeaturesScreen";
 
@@ -71,3 +73,12 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+function Sectioned({ initial }: { initial: string | null }) {
+  return <FeaturesScreen {...FEATURES} section={useLocalSettingsSection(initial)} />;
+}
+
+/** As the route mounts it: one list at a time, runtime flags first. */
+export const RuntimeSection: Story = { render: () => <Sectioned initial={null} /> };
+
+export const InstallTimeSection: Story = { render: () => <Sectioned initial="install-time" /> };

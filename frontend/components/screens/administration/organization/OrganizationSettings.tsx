@@ -4,6 +4,7 @@ import { ClockIcon, InfoIcon } from "lucide-react";
 import * as React from "react";
 
 import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPage";
+import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,12 @@ import type {
 } from "./use-organization-settings";
 
 export type OrganizationSettingsProps = ReturnType<typeof useOrganizationSettings> & {
+  /**
+   * Which section is shown (`?section=`). Set by the route, so only the
+   * active section is mounted and fetches (list rules 1 and 2); without
+   * it every section renders, as in the catalog's overview story.
+   */
+  section?: SectionSelection;
   /** The house-theme section; rendered only once the org has loaded. */
   houseTheme: React.ReactNode;
   trustedDomains: React.ReactNode;
@@ -37,6 +44,7 @@ export function OrganizationSettings({
   houseTheme,
   trustedDomains,
   modules,
+  section,
 }: OrganizationSettingsProps) {
   const saved = React.useMemo(
     () => ({
@@ -233,7 +241,7 @@ export function OrganizationSettings({
       title="Organization"
       description="Edit the platform's organization-level identity and retention defaults."
     >
-      <SettingsPage sections={sections} />
+      <SettingsPage sections={sections} single={section} />
     </AdministrationShell>
   );
 }

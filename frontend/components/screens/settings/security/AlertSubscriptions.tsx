@@ -4,7 +4,8 @@ import { BellRingIcon } from "lucide-react";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
@@ -15,9 +16,19 @@ import type { useAlertSubscriptions } from "./use-alert-subscriptions";
 
 export type AlertSubscriptionsViewProps = ReturnType<typeof useAlertSubscriptions>;
 
-/** Settings > Notifications: which apps and alert kinds reach the in-app channel. */
+/**
+ * Settings > Notifications: which apps and alert kinds reach the in-app
+ * channel, as the section's one embedded list (views All · Mine, filters,
+ * cursor pages). Pure; the data half is useAlertSubscriptions.
+ */
 export function AlertSubscriptionsView({
-  table,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  error,
+  onRetry,
   subMap,
   busy,
   onToggle,
@@ -31,11 +42,16 @@ export function AlertSubscriptionsView({
       id: "app",
       header: "App",
       width: "min-w-40",
+      cellClassName: "max-w-64",
       cell: (a) => (
-        <>
-          <div className="font-medium">{a.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">{a.slug}</div>
-        </>
+        <span className="block min-w-0">
+          <span className="block truncate font-medium" title={a.name}>
+            {a.name}
+          </span>
+          <span className="text-muted-foreground block truncate font-mono text-xs" title={a.slug}>
+            {a.slug}
+          </span>
+        </span>
       ),
     },
     ...ALERT_KINDS.map(
@@ -98,20 +114,22 @@ export function AlertSubscriptionsView({
       }
       description="Choose which apps and event types to receive alerts for."
     >
-      <DataTable
+      <ListPage<AstroliftRegisteredApp>
+        embedded
+        list={list}
         label="App alert subscriptions"
-        controller={table}
         columns={columns}
+        rows={rows}
         getRowId={(a) => a.id}
-        searchPlaceholder="Filter apps"
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
         empty={{
           icon: <BellRingIcon className="size-5" />,
           title: "No apps registered",
           description: "Register an app to start configuring alerts for it.",
-        }}
-        emptyFiltered={{
-          title: "No matching apps",
-          description: "No app matches that filter. The server matches app name and slug.",
         }}
       />
 

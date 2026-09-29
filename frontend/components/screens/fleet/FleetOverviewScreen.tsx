@@ -12,16 +12,16 @@ import {
 } from "lucide-react";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { DataTable, type Column } from "@/components/data-table";
+import type { AstroliftAgentListItem, AstroliftAgentTask } from "@/graphql/agents/agents.types";
+
+import { ListSummary } from "@/components/list/ListSummary";
 import { PageShell } from "@/components/PageShell";
+import { PanelGrid } from "@/components/panel/Panel";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { AstroliftAgentListItem, AstroliftAgentTask } from "@/graphql/agents/agents.types";
+import { Card } from "@/components/ui/card";
 
 import {
   ACTIVE_TASK_STATUSES,
@@ -33,58 +33,6 @@ export type FleetOverviewScreenProps = ReturnType<typeof useFleetOverview> & {
   /** The live fleet topology map (FleetMapPanel with its data). */
   map: React.ReactNode;
 };
-
-const AGENT_COLUMNS: Column<AstroliftAgentListItem>[] = [
-  { id: "agent", header: "Agent", cell: (row) => <span className="font-medium">{row.name}</span> },
-  {
-    id: "project",
-    header: "Project",
-    cell: (row) => (
-      <span className="text-muted-foreground font-mono text-xs">{row.projectSlug || "—"}</span>
-    ),
-  },
-  {
-    id: "status",
-    header: "Status",
-    cell: (row) => (
-      <Badge variant={row.runningCount > 0 ? "default" : "outline"}>
-        {row.runningCount > 0 ? `${row.runningCount} running` : "Idle"}
-      </Badge>
-    ),
-  },
-];
-
-const TASK_COLUMNS: Column<AstroliftAgentTask>[] = [
-  {
-    id: "agent",
-    header: "Agent",
-    cell: (row) => (
-      <span className="font-medium">{row.agentName || row.agentSlug || "Agent task"}</span>
-    ),
-  },
-  {
-    id: "project",
-    header: "Project",
-    cell: (row) => (
-      <span className="text-muted-foreground font-mono text-xs">{row.projectSlug || "—"}</span>
-    ),
-  },
-  {
-    id: "status",
-    header: "Status",
-    cell: (row) => (
-      <Badge variant={statusTone(row.status)} className="capitalize">
-        {row.status.replace(/_/g, " ")}
-      </Badge>
-    ),
-  },
-  {
-    id: "created",
-    header: "Created",
-    cell: (row) => <span className="text-muted-foreground text-xs">{age(row.createdAt)}</span>,
-    align: "right",
-  },
-];
 
 function age(iso: string | null): string {
   if (!iso) return "—";
@@ -105,7 +53,13 @@ function statusTone(status: string): "default" | "secondary" | "destructive" | "
   return "outline";
 }
 
-/** /fleet: the live command center for agents, runtimes, dispatch and task health. */
+/**
+ * /fleet: the live command center for agents, runtimes, dispatch and task
+ * health. An overview (list rule 3): the counts, the topology map, then the
+ * recent tasks, the runtimes and the roster as summaries of their top rows,
+ * each with "View all" to its own list. Pure; the data half is
+ * useFleetOverview.
+ */
 export function FleetOverviewScreen({
   agentCount,
   runningAgentCount,
@@ -115,9 +69,14 @@ export function FleetOverviewScreen({
   loading,
   runtimes,
   runtimesLoading,
+  runtimesError,
   refresh,
-  agentTable,
-  taskTable,
+  recentTasks,
+  tasksLoading,
+  tasksError,
+  agents,
+  agentsLoading,
+  agentsError,
   map,
 }: FleetOverviewScreenProps) {
   return (
@@ -174,87 +133,87 @@ export function FleetOverviewScreen({
         <Card className="overflow-hidden">{map}</Card>
       </Section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-        <Section title="Recent activity" description="The latest task transitions from Dispatch.">
-          <DataTable
-            label="Recent agent activity"
-            controller={taskTable}
-            columns={TASK_COLUMNS}
-            getRowId={(row) => row.id}
-            rowHref={(row) => `/agents/runs/${encodeURIComponent(row.id)}`}
-            searchPlaceholder="Search tasks"
-            empty={{
-              icon: <Clock3Icon className="size-5" />,
-              title: "No task activity yet",
-              description: "Tasks dispatched through this organization will appear here.",
-              actionHref: "/agents?tab=dispatch",
-              actionLabel: "Open dispatch",
-            }}
-            emptyFiltered={{ title: "No matching tasks", description: "Try a different search." }}
-          />
-        </Section>
+      <PanelGrid>
+        <ListSummary<AstroliftAgentTask>
+          span={4}
+          title="Recent activity"
+          icon={<Clock3Icon className="size-4" />}
+          description="The latest task transitions from Dispatch."
+          count={recentTasks.length}
+          rows={recentTasks}
+          keyOf={(t) => t.id}
+          rowHref={(t) => `/agents/runs/${encodeURIComponent(t.id)}`}
+          viewAllHref="/agents?tab=history"
+          loading={tasksLoading}
+          error={tasksError}
+          onRetry={refresh}
+          empty={{
+            icon: <Clock3Icon className="size-5" />,
+            title: "No task activity yet",
+            description: "Tasks dispatched through this organization will appear here.",
+            actionHref: "/agents?tab=dispatch",
+            actionLabel: "Open dispatch",
+          }}
+          renderRow={(t) => (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {t.agentName || t.agentSlug || "Agent task"}
+              </span>
+              <Badge variant={statusTone(t.status)} className="shrink-0 capitalize">
+                {t.status.replace(/_/g, " ")}
+              </Badge>
+              <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                {age(t.createdAt)}
+              </span>
+            </span>
+          )}
+        />
 
-        <Section
+        <ListSummary<(typeof runtimes)[number]>
+          span={4}
           title="Runtime health"
+          icon={<RadioTowerIcon className="size-4" />}
           description="Reusable environments currently available to the fleet."
-        >
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <RadioTowerIcon className="size-4" /> Environment specs
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {runtimesLoading ? (
-                <div className="space-y-3 px-5 pb-5">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              ) : runtimes.length ? (
-                <ul className="divide-y">
-                  {runtimes.slice(0, 8).map((runtime) => (
-                    <li
-                      key={runtime.id}
-                      className="flex items-center justify-between gap-3 px-5 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{runtime.name}</p>
-                        <p className="text-muted-foreground truncate font-mono text-xs">
-                          {runtime.runtime} · {runtime.agentType}
-                        </p>
-                      </div>
-                      <CircleDotIcon
-                        className="text-success size-4 shrink-0"
-                        aria-label="Available"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState
-                  icon={<CpuIcon className="size-5" />}
-                  title="No runtimes configured"
-                  description="Add an environment spec before dispatching an agent."
-                  actionHref="/agents?tab=boxes"
-                  actionLabel="Manage runtimes"
-                />
-              )}
-            </CardContent>
-          </Card>
-        </Section>
-      </div>
+          count={runtimes.length}
+          rows={runtimes}
+          keyOf={(r) => r.id}
+          viewAllHref="/agents?tab=boxes"
+          loading={runtimesLoading && runtimes.length === 0}
+          error={runtimesError}
+          onRetry={refresh}
+          empty={{
+            icon: <CpuIcon className="size-5" />,
+            title: "No runtimes configured",
+            description: "Add an environment spec before dispatching an agent.",
+            actionHref: "/agents?tab=boxes",
+            actionLabel: "Manage runtimes",
+          }}
+          renderRow={(r) => (
+            <span className="flex min-w-0 items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{r.name}</span>
+                <span className="text-muted-foreground block truncate font-mono text-xs">
+                  {r.runtime} · {r.agentType}
+                </span>
+              </span>
+              <CircleDotIcon className="text-success size-4 shrink-0" aria-label="Available" />
+            </span>
+          )}
+        />
 
-      <Section
-        title="Agent roster"
-        description="Registered agents and the runtime work they are carrying now."
-      >
-        <DataTable
-          label="Agent roster"
-          controller={agentTable}
-          columns={AGENT_COLUMNS}
-          getRowId={(row) => row.id}
-          rowHref={(row) => `/agents/${encodeURIComponent(row.slug)}`}
-          searchPlaceholder="Search agents"
+        <ListSummary<AstroliftAgentListItem>
+          span={4}
+          title="Agent roster"
+          icon={<BotIcon className="size-4" />}
+          description="Registered agents and the runtime work they are carrying now."
+          count={agents.length}
+          rows={agents}
+          keyOf={(a) => a.id}
+          rowHref={(a) => `/agents/${encodeURIComponent(a.slug)}`}
+          viewAllHref="/agents"
+          loading={agentsLoading}
+          error={agentsError}
+          onRetry={refresh}
           empty={{
             icon: <BotIcon className="size-5" />,
             title: "No agents registered",
@@ -262,9 +221,25 @@ export function FleetOverviewScreen({
             actionHref: "/agents?tab=registry",
             actionLabel: "Open agent registry",
           }}
-          emptyFiltered={{ title: "No matching agents", description: "Try a different search." }}
+          renderRow={(a) => (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{a.name}</span>
+                <span className="text-muted-foreground block truncate font-mono text-xs">
+                  {a.projectSlug || "—"}
+                </span>
+              </span>
+              <Badge variant={a.runningCount > 0 ? "default" : "outline"} className="shrink-0">
+                {a.runningCount > 0 ? (
+                  <span className="font-mono">{a.runningCount} running</span>
+                ) : (
+                  "Idle"
+                )}
+              </Badge>
+            </span>
+          )}
         />
-      </Section>
+      </PanelGrid>
     </PageShell>
   );
 }

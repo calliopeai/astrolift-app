@@ -1,5 +1,3 @@
-import type { CursorTableController } from "@/components/data-table";
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftActiveSession } from "@/graphql/identity/identity.types";
 import type { AstroliftUserAlertSubscription } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftNotification } from "@/graphql/operations/operations.types";
@@ -7,7 +5,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import { subKey } from "./alert-kinds";
 import type { AlertSubscriptionsViewProps } from "./AlertSubscriptions";
-import type { NotificationsScreenProps } from "./Notifications";
+import type { NotificationsInboxProps } from "./NotificationsInbox";
 import type { PairDeviceViewProps } from "./PairDevice";
 import type { SecuritySettingsViewProps } from "./SecuritySettings";
 
@@ -175,16 +173,17 @@ function subMapOf(list: AstroliftUserAlertSubscription[]) {
   return new Map(list.map((s) => [subKey(s.appSlug, s.alertKind), s]));
 }
 
+/** The view's props less the list controller, which the story builds. */
 export function alertProps(
-  table: Partial<CursorTableController<AstroliftRegisteredApp>> = {},
-  over: Partial<AlertSubscriptionsViewProps> = {}
-): AlertSubscriptionsViewProps {
+  over: Partial<Omit<AlertSubscriptionsViewProps, "list">> = {}
+): Omit<AlertSubscriptionsViewProps, "list"> {
   return {
-    table: fakeController<AstroliftRegisteredApp>({
-      rows: APPS,
-      totalCount: APPS.length,
-      ...table,
-    }),
+    rows: APPS,
+    totalCount: APPS.length,
+    nextCursor: null,
+    loading: false,
+    error: null,
+    onRetry: () => {},
     subMap: subMapOf(SUBS),
     busy: false,
     onToggle: resolved,
@@ -253,9 +252,7 @@ export const LONG_NOTIFICATIONS: AstroliftNotification[] = [
   notification({ id: "n-long-2", title: LONG, readAt: ago(DAY) }),
 ];
 
-export function notificationsProps(
-  over: Partial<NotificationsScreenProps> = {}
-): NotificationsScreenProps {
+export function inboxProps(over: Partial<NotificationsInboxProps> = {}): NotificationsInboxProps {
   return {
     notifications: NOTIFICATIONS,
     loading: false,
@@ -263,7 +260,6 @@ export function notificationsProps(
     markingAll: false,
     onMarkRead: resolved,
     onMarkAll: resolved,
-    alertSubscriptions: null,
     ...over,
   };
 }

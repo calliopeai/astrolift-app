@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+
 import {
   houseTheme,
   modules,
@@ -19,7 +22,14 @@ import {
 import { HouseThemeCard } from "./HouseThemeCard";
 import { ModulesCard } from "./ModulesCard";
 import { OrganizationSettings } from "./OrganizationSettings";
+import { TRUSTED_DOMAINS_LIST } from "./trusted-domains-list";
 import { TrustedDomainsCard } from "./TrustedDomainsCard";
+
+/** The trusted-domains section with its list state in memory, as the hook keeps it. */
+function TrustedDomains(props: typeof trustedDomains) {
+  const list = useLocalListState(TRUSTED_DOMAINS_LIST);
+  return <TrustedDomainsCard {...props} list={list} />;
+}
 
 const meta: Meta<typeof OrganizationSettings> = {
   title: "Screens/Administration/Organization/OrganizationSettings",
@@ -28,7 +38,7 @@ const meta: Meta<typeof OrganizationSettings> = {
   args: {
     ...orgSettings,
     houseTheme: <HouseThemeCard {...houseTheme} />,
-    trustedDomains: <TrustedDomainsCard {...trustedDomains} />,
+    trustedDomains: <TrustedDomains {...trustedDomains} />,
     modules: <ModulesCard {...modules} />,
   },
 };
@@ -41,7 +51,7 @@ export const Full: Story = {};
 export const Loading: Story = {
   args: {
     ...orgSettingsLoading,
-    trustedDomains: <TrustedDomainsCard {...trustedDomainsLoading} />,
+    trustedDomains: <TrustedDomains {...trustedDomainsLoading} />,
     modules: <ModulesCard {...modulesLoading} />,
   },
 };
@@ -50,7 +60,7 @@ export const Loading: Story = {
 export const Empty: Story = {
   args: {
     ...orgSettingsNoOrg,
-    trustedDomains: <TrustedDomainsCard {...trustedDomainsEmpty} />,
+    trustedDomains: <TrustedDomains {...trustedDomainsEmpty} />,
   },
 };
 
@@ -61,7 +71,7 @@ export const LongStrings: Story = {
   args: {
     ...orgSettingsLong,
     houseTheme: <HouseThemeCard {...houseTheme} org={ORG_LONG} />,
-    trustedDomains: <TrustedDomainsCard {...trustedDomainsLong} />,
+    trustedDomains: <TrustedDomains {...trustedDomainsLong} />,
     modules: <ModulesCard {...modulesLong} />,
   },
 };
@@ -74,4 +84,22 @@ export const Width768: Story = {
     </div>
   ),
   args: LongStrings.args,
+};
+
+/** One section at a time, chosen by `?section=`, as the route mounts it. */
+function SingleSection({ initial }: { initial: string }) {
+  const section = useLocalSettingsSection(initial);
+  return (
+    <OrganizationSettings
+      {...orgSettings}
+      section={section}
+      houseTheme={<HouseThemeCard {...houseTheme} />}
+      trustedDomains={<TrustedDomains {...trustedDomains} />}
+      modules={<ModulesCard {...modules} />}
+    />
+  );
+}
+
+export const TrustedDomainsSection: Story = {
+  render: () => <SingleSection initial="trusted-domains" />,
 };

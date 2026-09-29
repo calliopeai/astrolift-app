@@ -8,8 +8,6 @@
  * its functions do. Workflows and Functions sit in the Agents area but stay
  * gated by the workflows module, so an install entitled to one and not the
  * other sees exactly what it did before.
- *
- * Not here yet: Workloads (Agents area), which waits for its list screen.
  */
 import {
   ActivityIcon,
@@ -17,6 +15,7 @@ import {
   BookOpenIcon,
   BotIcon,
   BoltIcon,
+  BoxesIcon,
   BrainCircuitIcon,
   BuildingIcon,
   CalendarClockIcon,
@@ -31,16 +30,13 @@ import {
   HomeIcon,
   KeyRoundIcon,
   LayersIcon,
-  LockIcon,
   type LucideIcon,
   PackageIcon,
   RocketIcon,
   ScrollTextIcon,
   ServerIcon,
   SettingsIcon,
-  ShieldIcon,
   UsersIcon,
-  UsersRoundIcon,
   WebhookIcon,
   WorkflowIcon,
   WrenchIcon,
@@ -57,6 +53,8 @@ export interface NavFunction {
   module?: ModuleKey;
   /** Anchor for the first-run spotlight tour (`data-onboarding-tour`). */
   tourTarget?: string;
+  /** Other path prefixes this row owns (a function whose pages sit under several routes). */
+  also?: string[];
 }
 
 export interface NavGroup {
@@ -134,6 +132,15 @@ export const NAV: NavArea[] = [
             icon: BrainCircuitIcon,
             module: "agents",
           },
+          {
+            // The runtime units behind agents, workflows and functions
+            // (spec 44 §10.2); an app's own workloads stay on its tab.
+            key: "workloads",
+            label: "Workloads",
+            href: "/workloads",
+            icon: BoxesIcon,
+            module: "agents",
+          },
         ],
       },
     ],
@@ -188,38 +195,18 @@ export const NAV: NavArea[] = [
             module: "admin",
           },
           {
-            key: "members",
-            label: "Members",
-            href: "/administration/members",
+            key: "access",
+            label: "Access",
+            href: "/administration/access",
             icon: UsersIcon,
             module: "admin",
-          },
-          {
-            key: "teams",
-            label: "Teams",
-            href: "/administration/teams",
-            icon: UsersRoundIcon,
-            module: "admin",
+            also: ["/administration/permissions", "/administration/policies"],
           },
           {
             key: "projects",
             label: "Projects",
             href: "/administration/projects",
             icon: FolderIcon,
-            module: "admin",
-          },
-          {
-            key: "policies",
-            label: "Policies",
-            href: "/administration/policies",
-            icon: ShieldIcon,
-            module: "admin",
-          },
-          {
-            key: "permissions",
-            label: "Permissions",
-            href: "/administration/permissions",
-            icon: LockIcon,
             module: "admin",
           },
         ],
@@ -340,12 +327,33 @@ export function activeFor(
   for (const area of nav) {
     for (const group of area.groups) {
       for (const f of group.functions) {
-        const matches = pathname === f.href || pathname.startsWith(`${f.href}/`);
-        if (matches && (!best || f.href.length > best.len)) {
-          best = { area: area.key, fn: f.key, len: f.href.length };
+        for (const prefix of [f.href, ...(f.also ?? [])]) {
+          const matches = pathname === prefix || pathname.startsWith(`${prefix}/`);
+          if (matches && (!best || prefix.length > best.len)) {
+            best = { area: area.key, fn: f.key, len: prefix.length };
+          }
         }
       }
     }
   }
   return best ? { area: best.area, fn: best.fn } : null;
+}
+
+/**
+ * The first crumb of a page inside an area (spec 44 §4.4 rule 3): the area's
+ * name, switching between its functions, with `active` checked. Read from
+ * this model so the rail and the breadcrumb always agree (rule 7).
+ */
+export function areaSwitcher(
+  nav: NavArea[],
+  area: NavArea["key"],
+  active: string
+): { label: string; switcher: { label: string; href: string; active: boolean }[] } {
+  const found = nav.find((a) => a.key === area);
+  return {
+    label: found?.label ?? area,
+    switcher: (found?.groups ?? []).flatMap((g) =>
+      g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === active }))
+    ),
+  };
 }

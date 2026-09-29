@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftSourceConnection,
   AstroliftSshDeployKey,
@@ -7,8 +6,9 @@ import type {
 
 import type {
   AddClientIdData,
+  DeployKeysData,
   GenerateSshKeyData,
-  SourceProvidersData,
+  SourceHostsData,
 } from "./use-source-providers";
 
 /**
@@ -114,25 +114,32 @@ export const REVEAL: AstroliftWebhookSecretReveal = {
   webhookUrlPath: "/app/scm/webhooks/github/sc-acme-github-app",
 };
 
-export const SCREEN: SourceProvidersData = {
-  connTable: fakeController<AstroliftSourceConnection>({
-    rows: CONNECTIONS,
-    totalCount: CONNECTIONS.length,
-    sortEnabled: false,
-  }),
-  keyTable: fakeController<AstroliftSshDeployKey>({
-    rows: KEYS,
-    totalCount: KEYS.length,
-    sortEnabled: false,
-  }),
+/** The Hosts section's props less the list controller, which the story builds. */
+export const HOSTS: Omit<SourceHostsData, "list"> = {
+  rows: CONNECTIONS,
+  totalCount: CONNECTIONS.length,
+  nextCursor: null,
+  loading: false,
+  error: null,
+  onRetry: noop,
   incompleteClientIdConnections: CONNECTIONS.filter((c) => c.needsClientId),
   disconnecting: false,
-  deletingKey: false,
   rotatingSecret: false,
   disconnect: resolved,
-  deleteKey: resolved,
   rotateSecret: async () => REVEAL,
   refreshConnections: noop,
+};
+
+/** The SSH deploy keys section's props less the list controller. */
+export const DEPLOY_KEYS: Omit<DeployKeysData, "list"> = {
+  rows: KEYS,
+  totalCount: KEYS.length,
+  nextCursor: null,
+  loading: false,
+  error: null,
+  onRetry: noop,
+  deletingKey: false,
+  deleteKey: resolved,
   refreshKeys: noop,
 };
 

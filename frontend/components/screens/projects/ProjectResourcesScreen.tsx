@@ -18,6 +18,8 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { SettingsPage } from "@/components/settings/SettingsPage";
+import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,11 +39,18 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { useProjectResources } from "./use-project-resources";
 
-export type ProjectResourcesScreenProps = ReturnType<typeof useProjectResources>;
+export type ProjectResourcesScreenProps = ReturnType<typeof useProjectResources> & {
+  /**
+   * Which list is shown (`?section=`): managed infrastructure or shared
+   * secret bundles, one at a time (list rule 3). Without it both render.
+   */
+  section?: SectionSelection;
+};
 
 /**
- * Project resources: managed infrastructure and shared secret bundles,
- * with the Add resource, New bundle, and consumer dialogs. Pure view; the
+ * Project resources: managed infrastructure and shared secret bundles, one
+ * section at a time, with the Add resource, New bundle, and consumer
+ * dialogs. Pure view; the
  * form fields live here, everything that talks to the server comes from
  * useProjectResources.
  */
@@ -92,6 +101,7 @@ export function ProjectResourcesScreen({
   onAttachBundleToAgent,
   onAttachBundleToApp,
   onDetachBundleConsumer,
+  section,
 }: ProjectResourcesScreenProps) {
   const [resourceOpen, setResourceOpen] = React.useState(false);
   const [bundleOpen, setBundleOpen] = React.useState(false);
@@ -222,292 +232,318 @@ export function ProjectResourcesScreen({
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Managed infrastructure</CardTitle>
-          <CardDescription>
-            Project-owned databases, caches, indexes, buckets, and queues can be shared by multiple
-            apps and workflow agents.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          {resourcesLoading ? (
-            <Skeleton className="col-span-full h-32" />
-          ) : services.length === 0 ? (
-            <div className="text-muted-foreground col-span-full rounded-lg border border-dashed p-8 text-center text-sm">
-              No project resources yet.
-            </div>
-          ) : (
-            services.map((service) => (
-              <article key={service.id} className="rounded-lg border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-medium">{service.name}</h3>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {service.kind.replace(/_/g, " ")} · {service.clusterSlug}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={service.status === "failed" ? "destructive" : "secondary"}
-                    className="capitalize"
-                  >
-                    {service.status}
-                  </Badge>
-                </div>
-                {service.statusError && (
-                  <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
-                )}
-                {service.operationKind && (
-                  <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-                    <p>
-                      Last operation: <span className="font-medium">{service.operationKind}</span>
-                      {service.operationCompletedAt
-                        ? ` · completed ${new Date(service.operationCompletedAt).toLocaleString()}`
-                        : " · running"}
-                    </p>
-                    {service.operationWorkflowId && (
-                      <p className="truncate font-mono" title={service.operationWorkflowId}>
-                        {service.operationWorkflowId}
-                        {service.operationRunId ? ` · ${service.operationRunId}` : ""}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {service.attachments.map((attachment) => (
-                    <Badge key={attachment.id} variant="outline">
-                      {attachment.consumerSlug}
-                    </Badge>
-                  ))}
-                  {service.attachments.length === 0 && (
-                    <span className="text-muted-foreground text-xs">Not attached yet</span>
-                  )}
-                </div>
-                {service.volumeBindings.length > 0 && (
-                  <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
-                    <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-                      Runtime mounts
-                    </p>
-                    {service.volumeBindings.map((binding) => (
-                      <div
-                        key={binding.id}
-                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-                      >
-                        <code>{binding.mountPath}</code>
-                        <Badge variant="outline">{binding.protocol}</Badge>
-                        <span className="text-muted-foreground">
-                          {binding.sourceKind === "csi"
-                            ? binding.csiDriver
-                            : binding.sourceKind === "dynamic_pvc"
-                              ? `StorageClass ${binding.storageClassName}`
-                              : `${binding.claimNamespace}/${binding.claimName}`}
-                        </span>
-                        {binding.readOnly && <Badge variant="secondary">read only</Badge>}
-                        {binding.credentialReferenceCount > 0 && (
-                          <span className="text-muted-foreground">
-                            {binding.credentialReferenceCount} credential refs
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {costPreviews[service.id] && (
-                  <div className="bg-muted/30 mt-3 rounded-md border p-3 text-xs">
-                    {costPreviews[service.id].available ? (
-                      <>
-                        <span className="font-medium">
-                          {costPreviews[service.id].approximate ? "Approx. " : ""}
-                          {new Intl.NumberFormat(undefined, {
-                            style: "currency",
-                            currency: costPreviews[service.id].currency,
-                          }).format(costPreviews[service.id].monthlyTotal ?? 0)}
-                          /month
-                        </span>
-                        {costPreviews[service.id].pricingSourceUrl && (
-                          <a
-                            className="ml-2 underline underline-offset-2"
-                            href={costPreviews[service.id].pricingSourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            pricing source
-                          </a>
-                        )}
-                        {costPreviews[service.id].notes[0] && (
-                          <p className="text-muted-foreground mt-1">
-                            {costPreviews[service.id].notes[0]}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        Cost unavailable:{" "}
-                        {costPreviews[service.id].message || costPreviews[service.id].reason}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={costPreviewLoading}
-                    onClick={() => onCostPreview(service.id)}
-                  >
-                    <CircleDollarSignIcon className="size-3" /> Cost preview
-                  </Button>
-                  {service.providerPortalUrl && (
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={service.providerPortalUrl} target="_blank" rel="noreferrer">
-                        <ExternalLinkIcon className="size-3" /> Provider portal
-                      </a>
-                    </Button>
-                  )}
-                </div>
-                {canUpdate && (
-                  <div className="mt-3 flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setConsumerService(service)}>
-                      <UnplugIcon className="size-3" /> Consumers
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => onReprovision(service.id)}>
-                      <RefreshCwIcon className="size-3" /> Reprovision
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-danger-fg"
-                      onClick={() => onDeprovision(service)}
-                    >
-                      <Trash2Icon className="size-3" /> Deprovision
-                    </Button>
-                  </div>
-                )}
-              </article>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Shared secret bundles</CardTitle>
-          <CardDescription>
-            Project-scoped credentials that can be attached to selected apps and agent environments.
-            Values are stored only in the cluster secrets backend.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {bundles.length === 0 ? (
-            <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-              No shared secret bundles yet.
-            </div>
-          ) : (
-            bundles.map((bundle) => {
-              const entry = keyInputs[bundle.id] ?? { key: "", value: "" };
-              return (
-                <section key={bundle.id} className="rounded-lg border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-medium">{bundle.name}</h3>
-                      <p className="text-muted-foreground font-mono text-xs">
-                        {bundle.slug} · {bundle.clusterSlug}
-                      </p>
+      <SettingsPage
+        single={section}
+        sections={[
+          {
+            id: "infrastructure",
+            title: "Managed infrastructure",
+            content: (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Managed infrastructure</CardTitle>
+                  <CardDescription>
+                    Project-owned databases, caches, indexes, buckets, and queues can be shared by
+                    multiple apps and workflow agents.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  {resourcesLoading ? (
+                    <Skeleton className="col-span-full h-32" />
+                  ) : services.length === 0 ? (
+                    <div className="text-muted-foreground col-span-full rounded-lg border border-dashed p-8 text-center text-sm">
+                      No project resources yet.
                     </div>
-                    {canWriteSecrets && (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setConsumerBundle(bundle)}
-                        >
-                          <UnplugIcon className="size-3" /> Consumers
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-danger-fg"
-                          onClick={() => onDeleteBundle(bundle)}
-                        >
-                          <Trash2Icon className="size-3" /> Delete
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {bundle.keyNames.map((key) => (
-                      <div
-                        key={key}
-                        className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                      >
-                        <span className="font-mono">{key}</span>
-                        {revealed[`${bundle.id}:${key}`] && (
-                          <code className="text-danger-fg max-w-48 truncate">
-                            {revealed[`${bundle.id}:${key}`]}
-                          </code>
-                        )}
-                        {canReadSecrets && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-6"
-                            onClick={() => onToggleReveal(bundle.id, key)}
+                  ) : (
+                    services.map((service) => (
+                      <article key={service.id} className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-medium">{service.name}</h3>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              {service.kind.replace(/_/g, " ")} · {service.clusterSlug}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={service.status === "failed" ? "destructive" : "secondary"}
+                            className="capitalize"
                           >
-                            {revealed[`${bundle.id}:${key}`] ? (
-                              <EyeOffIcon className="size-3" />
-                            ) : (
-                              <EyeIcon className="size-3" />
+                            {service.status}
+                          </Badge>
+                        </div>
+                        {service.statusError && (
+                          <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
+                        )}
+                        {service.operationKind && (
+                          <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                            <p>
+                              Last operation:{" "}
+                              <span className="font-medium">{service.operationKind}</span>
+                              {service.operationCompletedAt
+                                ? ` · completed ${new Date(service.operationCompletedAt).toLocaleString()}`
+                                : " · running"}
+                            </p>
+                            {service.operationWorkflowId && (
+                              <p className="truncate font-mono" title={service.operationWorkflowId}>
+                                {service.operationWorkflowId}
+                                {service.operationRunId ? ` · ${service.operationRunId}` : ""}
+                              </p>
                             )}
-                          </Button>
+                          </div>
                         )}
-                        {canWriteSecrets && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {service.attachments.map((attachment) => (
+                            <Badge key={attachment.id} variant="outline">
+                              {attachment.consumerSlug}
+                            </Badge>
+                          ))}
+                          {service.attachments.length === 0 && (
+                            <span className="text-muted-foreground text-xs">Not attached yet</span>
+                          )}
+                        </div>
+                        {service.volumeBindings.length > 0 && (
+                          <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
+                            <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+                              Runtime mounts
+                            </p>
+                            {service.volumeBindings.map((binding) => (
+                              <div
+                                key={binding.id}
+                                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+                              >
+                                <code>{binding.mountPath}</code>
+                                <Badge variant="outline">{binding.protocol}</Badge>
+                                <span className="text-muted-foreground">
+                                  {binding.sourceKind === "csi"
+                                    ? binding.csiDriver
+                                    : binding.sourceKind === "dynamic_pvc"
+                                      ? `StorageClass ${binding.storageClassName}`
+                                      : `${binding.claimNamespace}/${binding.claimName}`}
+                                </span>
+                                {binding.readOnly && <Badge variant="secondary">read only</Badge>}
+                                {binding.credentialReferenceCount > 0 && (
+                                  <span className="text-muted-foreground">
+                                    {binding.credentialReferenceCount} credential refs
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {costPreviews[service.id] && (
+                          <div className="bg-muted/30 mt-3 rounded-md border p-3 text-xs">
+                            {costPreviews[service.id].available ? (
+                              <>
+                                <span className="font-medium">
+                                  {costPreviews[service.id].approximate ? "Approx. " : ""}
+                                  {new Intl.NumberFormat(undefined, {
+                                    style: "currency",
+                                    currency: costPreviews[service.id].currency,
+                                  }).format(costPreviews[service.id].monthlyTotal ?? 0)}
+                                  /month
+                                </span>
+                                {costPreviews[service.id].pricingSourceUrl && (
+                                  <a
+                                    className="ml-2 underline underline-offset-2"
+                                    href={costPreviews[service.id].pricingSourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    pricing source
+                                  </a>
+                                )}
+                                {costPreviews[service.id].notes[0] && (
+                                  <p className="text-muted-foreground mt-1">
+                                    {costPreviews[service.id].notes[0]}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">
+                                Cost unavailable:{" "}
+                                {costPreviews[service.id].message ||
+                                  costPreviews[service.id].reason}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-2">
                           <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-danger-fg size-6"
-                            onClick={() => onDeleteBundleKey(bundle.id, key)}
+                            size="sm"
+                            variant="outline"
+                            disabled={costPreviewLoading}
+                            onClick={() => onCostPreview(service.id)}
                           >
-                            <Trash2Icon className="size-3" />
+                            <CircleDollarSignIcon className="size-3" /> Cost preview
                           </Button>
+                          {service.providerPortalUrl && (
+                            <Button size="sm" variant="outline" asChild>
+                              <a href={service.providerPortalUrl} target="_blank" rel="noreferrer">
+                                <ExternalLinkIcon className="size-3" /> Provider portal
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                        {canUpdate && (
+                          <div className="mt-3 flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConsumerService(service)}
+                            >
+                              <UnplugIcon className="size-3" /> Consumers
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onReprovision(service.id)}
+                            >
+                              <RefreshCwIcon className="size-3" /> Reprovision
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-danger-fg"
+                              onClick={() => onDeprovision(service)}
+                            >
+                              <Trash2Icon className="size-3" /> Deprovision
+                            </Button>
+                          </div>
                         )}
-                      </div>
-                    ))}
-                    {bundle.keyNames.length === 0 && (
-                      <span className="text-muted-foreground text-xs">No keys yet</span>
-                    )}
-                  </div>
-                  {canWriteSecrets && (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
-                      <Input
-                        placeholder="KEY_NAME"
-                        value={entry.key}
-                        onChange={(event) =>
-                          setKeyInputs((current) => ({
-                            ...current,
-                            [bundle.id]: { ...entry, key: event.target.value },
-                          }))
-                        }
-                      />
-                      <Input
-                        type="password"
-                        placeholder="Secret value"
-                        value={entry.value}
-                        onChange={(event) =>
-                          setKeyInputs((current) => ({
-                            ...current,
-                            [bundle.id]: { ...entry, value: event.target.value },
-                          }))
-                        }
-                      />
-                      <Button onClick={() => setBundleKey(bundle.id)}>Set key</Button>
-                    </div>
+                      </article>
+                    ))
                   )}
-                </section>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
+            ),
+          },
+          {
+            id: "bundles",
+            title: "Shared secret bundles",
+            content: (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Shared secret bundles</CardTitle>
+                  <CardDescription>
+                    Project-scoped credentials that can be attached to selected apps and agent
+                    environments. Values are stored only in the cluster secrets backend.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {bundles.length === 0 ? (
+                    <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+                      No shared secret bundles yet.
+                    </div>
+                  ) : (
+                    bundles.map((bundle) => {
+                      const entry = keyInputs[bundle.id] ?? { key: "", value: "" };
+                      return (
+                        <section key={bundle.id} className="rounded-lg border p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-medium">{bundle.name}</h3>
+                              <p className="text-muted-foreground font-mono text-xs">
+                                {bundle.slug} · {bundle.clusterSlug}
+                              </p>
+                            </div>
+                            {canWriteSecrets && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConsumerBundle(bundle)}
+                                >
+                                  <UnplugIcon className="size-3" /> Consumers
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-danger-fg"
+                                  onClick={() => onDeleteBundle(bundle)}
+                                >
+                                  <Trash2Icon className="size-3" /> Delete
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {bundle.keyNames.map((key) => (
+                              <div
+                                key={key}
+                                className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                              >
+                                <span className="font-mono">{key}</span>
+                                {revealed[`${bundle.id}:${key}`] && (
+                                  <code className="text-danger-fg max-w-48 truncate">
+                                    {revealed[`${bundle.id}:${key}`]}
+                                  </code>
+                                )}
+                                {canReadSecrets && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-6"
+                                    onClick={() => onToggleReveal(bundle.id, key)}
+                                  >
+                                    {revealed[`${bundle.id}:${key}`] ? (
+                                      <EyeOffIcon className="size-3" />
+                                    ) : (
+                                      <EyeIcon className="size-3" />
+                                    )}
+                                  </Button>
+                                )}
+                                {canWriteSecrets && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-danger-fg size-6"
+                                    onClick={() => onDeleteBundleKey(bundle.id, key)}
+                                  >
+                                    <Trash2Icon className="size-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                            {bundle.keyNames.length === 0 && (
+                              <span className="text-muted-foreground text-xs">No keys yet</span>
+                            )}
+                          </div>
+                          {canWriteSecrets && (
+                            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+                              <Input
+                                placeholder="KEY_NAME"
+                                value={entry.key}
+                                onChange={(event) =>
+                                  setKeyInputs((current) => ({
+                                    ...current,
+                                    [bundle.id]: { ...entry, key: event.target.value },
+                                  }))
+                                }
+                              />
+                              <Input
+                                type="password"
+                                placeholder="Secret value"
+                                value={entry.value}
+                                onChange={(event) =>
+                                  setKeyInputs((current) => ({
+                                    ...current,
+                                    [bundle.id]: { ...entry, value: event.target.value },
+                                  }))
+                                }
+                              />
+                              <Button onClick={() => setBundleKey(bundle.id)}>Set key</Button>
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
+            ),
+          },
+        ]}
+      />
 
       <Dialog open={resourceOpen} onOpenChange={setResourceOpen}>
         <DialogContent>

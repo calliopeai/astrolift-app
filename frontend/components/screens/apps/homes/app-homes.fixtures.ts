@@ -1,4 +1,3 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type { GoldenSignalsPanelProps } from "@/components/observability/GoldenSignalsPanel";
 import type {
   AstroliftAppGoldenSignal,
@@ -110,28 +109,50 @@ export const JOB_RUNS: AstroliftScheduledJobRun[] = [
 export const CRONJOB: CronjobHomeScreenProps = {
   name: "Weekly digest",
   workload: CRON_WORKLOAD,
-  table: fakeController<AstroliftScheduledJobRun>({
-    rows: JOB_RUNS,
-    totalCount: JOB_RUNS.length,
-  }),
+  runs: JOB_RUNS,
+  totalCount: JOB_RUNS.length,
+  loading: false,
+  error: null,
+  onRetry: () => {},
+  hasMore: false,
+  loadingMore: false,
+  onLoadMore: () => {},
 };
 
 export const CRONJOB_LOADING: CronjobHomeScreenProps = {
   ...CRONJOB,
-  table: fakeController<AstroliftScheduledJobRun>({ state: "loading" }),
+  runs: [],
+  totalCount: null,
+  loading: true,
 };
 
 export const CRONJOB_EMPTY: CronjobHomeScreenProps = {
   ...CRONJOB,
-  table: fakeController<AstroliftScheduledJobRun>({ rows: [], totalCount: 0 }),
+  runs: [],
+  totalCount: 0,
 };
 
 export const CRONJOB_ERROR: CronjobHomeScreenProps = {
   ...CRONJOB,
-  table: fakeController<AstroliftScheduledJobRun>({
-    state: "error",
-    error: new Error("Network error: failed to fetch"),
-  }),
+  runs: [],
+  totalCount: null,
+  error: "Network error: failed to fetch",
+};
+
+/** A long history: weekly runs for most of a year, older pages still on the cursor. */
+export const CRONJOB_LONG_HISTORY: CronjobHomeScreenProps = {
+  ...CRONJOB,
+  runs: Array.from({ length: 40 }, (_, i) =>
+    jobRun(
+      String(100 - i).padStart(3, "0"),
+      i % 9 === 4 ? "failed" : "succeeded",
+      new Date(Date.UTC(2026, 8, 28, 2) - i * 7 * 86_400_000).toISOString(),
+      12 + i,
+      i % 9 === 4 ? 1 : 0
+    )
+  ),
+  totalCount: 120,
+  hasMore: true,
 };
 
 // ── Task ───────────────────────────────────────────────────────────────────

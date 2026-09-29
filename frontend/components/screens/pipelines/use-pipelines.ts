@@ -6,14 +6,26 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { useLocalListState } from "@/components/list/use-list-state";
+import { GET_ME } from "@/graphql/user/user.queries";
+import type { MeQueryData } from "@/graphql/user/user.types";
+
+import {
+  narrowPipelines,
+  narrowRuns,
+  PIPELINE_RUNS_LIST,
+  PIPELINES_LIST,
+  pipelinesVariables,
+  runsVariables,
+} from "./pipelines-list";
 
 // ---------------------------------------------------------------------------
 // GraphQL
 //
 // Kept inline, as the rest of this file's operations are. Both fields are
 // the cursor-paginated ones: `{ items, nextCursor, totalCount }` out,
-// `limit` + `after` (+ `search`) in, which is what `useCursorTable` walks.
+// `limit` + `after` (+ `search`) in.
 // `$limit: Int` is nullable against the schema's `limit: Int! = 50` because
 // that argument carries a default; `$pipelineId: String!` does not, so the
 // run stream declares it non-null.
@@ -158,34 +170,42 @@ export function usePipelines() {
   return { tab, onTabChange, onTrigger, triggering };
 }
 
-/** The pipeline list tab's table walk (#106). */
+/** The pipeline list tab (#106): list state in memory, one cursor page. */
 export function usePipelineList() {
-  // `astroliftPipelinesPage` takes `search`, `limit` and `after` only —
-  // no sort argument, so no column declares a `sortKey`. The name / repo /
-  // branch comparators this tab used to run reordered one page of a
-  // server-ordered catalogue, which is the wrong order at every boundary.
-  const table = useCursorTable<Pipeline>({
-    query: LIST_PIPELINES_PAGE,
-    extract: (d) => (d as PipelinesPageResp | undefined)?.astroliftPipelinesPage,
-    searchVariable: "search",
-    urlKey: "pipe",
+  // `astroliftPipelinesPage` takes `search`, `limit` and `after` only, no
+  // sort argument, so no column declares a `sortKey`.
+  const list = useLocalListState(PIPELINES_LIST);
+  const query = useQuery<PipelinesPageResp>(LIST_PIPELINES_PAGE, {
+    variables: pipelinesVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
   });
-  return { table };
+  const data = query.data ?? query.previousData;
+  const page = data?.astroliftPipelinesPage;
+  return {
+    list,
+    rows: narrowPipelines(page?.items ?? [], list.filters),
+    totalCount: list.filters.branch || list.filters.owner ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: query.loading && !data,
+    error: query.error && !data ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
+  };
 }
 
 /**
  * The run history tab (#107).
  *
- * `astroliftPipelineRunsPage` is single-pipeline by construction —
+ * `astroliftPipelineRunsPage` is single-pipeline by construction:
  * `run_number` is a per-pipeline counter, which is what makes it a valid
- * seek key — so `pipelineId` is a required argument. The cross-pipeline
- * stream this tab used to ask for does not exist server-side: it sent a
- * nullable `$pipelineId: ID` into a `String!` argument, which the server
- * rejects at validation, so the tab has been rendering its empty state
- * unconditionally. It now picks a pipeline instead.
+ * seek key, so `pipelineId` is a required argument and the tab picks a
+ * pipeline first.
  */
 export function useRunHistory() {
   const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const list = useLocalListState(PIPELINE_RUNS_LIST);
+  const me = useQuery<MeQueryData>(GET_ME).data?.me?.profile?.username ?? null;
 
   const pipelines = useQuery<PipelinesPageResp>(LIST_PIPELINES_PAGE, {
     variables: { limit: 100 },
@@ -195,14 +215,32 @@ export function useRunHistory() {
   const selected = pipelineId ?? (options.length > 0 ? options[0].id : null);
   const loadingOptions = pipelines.loading && options.length === 0;
 
-  const table = useCursorTable<PipelineRunRow>({
-    query: LIST_PIPELINE_RUNS_PAGE,
-    variables: { pipelineId: selected },
-    extract: (d) => (d as RunsPageResp | undefined)?.astroliftPipelineRunsPage,
-    searchVariable: "search",
-    urlKey: "run",
+  const runs = useQuery<RunsPageResp>(LIST_PIPELINE_RUNS_PAGE, {
+    variables: runsVariables(selected, list.filters, list.state),
+    fetchPolicy: "cache-and-network",
     skip: !selected,
   });
+  const data = runs.data ?? runs.previousData;
+  const page = data?.astroliftPipelineRunsPage;
+  const narrowed = narrowRuns(page?.items ?? [], list.filters, me);
 
-  return { table, options, selected, onSelect: setPipelineId, loadingOptions };
+  return {
+    list,
+    rows: narrowed.rows,
+    totalCount: narrowed.narrowed ? null : (page?.totalCount ?? null),
+    nextCursor: page?.nextCursor ?? null,
+    loading: Boolean(selected) && runs.loading && !data,
+    error: runs.error && !data ? { message: runs.error.message } : null,
+    onRetry: () => {
+      void runs.refetch();
+    },
+    options,
+    selected,
+    onSelect: (id: string) => {
+      setPipelineId(id);
+      // A new pipeline is a new question: back to its newest runs, filters kept.
+      list.setSearch(list.state.q);
+    },
+    loadingOptions,
+  };
 }

@@ -3,7 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { type CursorPage, useCursorTable } from "@/components/data-table";
+import type { CursorPage } from "@/components/data-table";
+import { type ListDefinition, useLocalListState } from "@/components/list/use-list-state";
 import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
 import {
@@ -18,6 +19,8 @@ import {
 } from "@/graphql/registry/registry.queries";
 import type { AppTeamAccessLevel, AstroliftAppTeamAccess } from "@/graphql/registry/registry.types";
 
+import { useCursorList } from "../use-cursor-list";
+
 interface TeamAccessesPageResp {
   astroliftAppTeamAccessesPage: CursorPage<AstroliftAppTeamAccess>;
 }
@@ -28,6 +31,23 @@ interface TeamsResp {
   astroliftTeams: AstroliftTeam[];
 }
 
+/**
+ * The grants as a list (spec 44 §5.1): cursor pages of
+ * `astroliftAppTeamAccessesPage`, which searches the team's name and slug
+ * and takes no filter and no sort, so the list declares none. Its state is
+ * in memory: the card sits in a settings section, whose `?section=` a URL
+ * list state would drop.
+ */
+export const APP_TEAM_ACCESS_LIST: ListDefinition = {
+  id: "apps.settings.team-access",
+  fields: [],
+  searchPlaceholder: "Search teams by name or slug…",
+  defaultSort: [],
+  views: [{ key: "all", label: "All", filters: {} }],
+  paging: "cursor",
+  pageSizes: [25, 50, 100],
+};
+
 export interface UseTeamsCardArgs {
   appSlug: string;
   appId: string;
@@ -36,20 +56,17 @@ export interface UseTeamsCardArgs {
 }
 
 /**
- * Data half of TeamsCardView: the paged grants table, the flat grant list
+ * Data half of TeamsCardView: the paged grants list, the flat grant list
  * the Add-Team picker subtracts from, the org's teams, and the grant /
  * revoke / move mutations with their toasts.
  */
 export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs) {
-  // The table's rows. `astroliftAppTeamAccessesPage` searches the team's
-  // name and slug and takes no sort argument, so no column declares a
-  // `sortKey`. First consumer this field has had.
-  const table = useCursorTable<AstroliftAppTeamAccess>({
+  // The list's rows: one page of `astroliftAppTeamAccessesPage`.
+  const grants = useCursorList<AstroliftAppTeamAccess>({
     query: LIST_APP_TEAM_ACCESSES_PAGE,
     variables: { appSlug },
     extract: (d) => (d as TeamAccessesPageResp | undefined)?.astroliftAppTeamAccessesPage,
-    searchVariable: "search",
-    fetchPolicy: "cache-and-network",
+    list: useLocalListState(APP_TEAM_ACCESS_LIST),
   });
 
   // The flat list stays, and it is not the table's source. It is what the
@@ -165,7 +182,7 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
 
   return {
     homeTeamSlug,
-    table,
+    ...grants,
     teams: teamList,
     teamsLoading: teams.loading,
     candidateTeams,

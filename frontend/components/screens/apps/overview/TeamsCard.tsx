@@ -12,7 +12,8 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { type Column, DataTable } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,13 +53,20 @@ const LEVEL_BADGE: Record<AppTeamAccessLevel, string> = {
 };
 
 /**
- * Teams that can reach this app: the grants table with per-row access
- * level and revoke, plus the Add-Team and Move-home-team sheets. The data
+ * Teams that can reach this app: the grants on the embedded list (cursor
+ * pages, server search) with per-row access level and revoke, plus the Add-Team and Move-home-team sheets. The data
  * half is useTeamsCard.
  */
 export function TeamsCardView({
   homeTeamSlug,
-  table,
+  list,
+  rows,
+  loading,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
   teams,
   teamsLoading,
   candidateTeams,
@@ -200,20 +208,23 @@ export function TeamsCardView({
         </div>
       </CardHeader>
       <CardContent>
-        <DataTable
+        <ListPage<AstroliftAppTeamAccess>
+          embedded
+          list={list}
           label="Team access grants"
-          controller={table}
           columns={columns}
+          rows={rows}
           getRowId={(a) => a.id}
-          searchPlaceholder="Search teams by name or slug…"
+          loading={loading}
+          stale={stale}
+          error={error}
+          onRetry={onRetry}
+          nextCursor={nextCursor}
+          totalCount={totalCount}
           empty={{
             icon: <UsersIcon className="size-5" />,
             title: "No team access grants",
             description: "Add a team to give it visibility and operational rights on this app.",
-          }}
-          emptyFiltered={{
-            title: "No matching teams",
-            description: "No team with a grant on this app matches that search.",
           }}
         />
       </CardContent>

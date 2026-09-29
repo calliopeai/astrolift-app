@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
+import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
+
 import { ProjectResourcesScreen } from "./ProjectResourcesScreen";
 import { BUNDLES, LONG, RESOURCES, RESOURCES_EMPTY, SERVICES } from "./projects-detail.fixtures";
 
@@ -100,3 +102,12 @@ export const LongStrings: Story = {
     })),
   },
 };
+
+function Sectioned({ initial }: { initial: string | null }) {
+  return <ProjectResourcesScreen {...RESOURCES} section={useLocalSettingsSection(initial)} />;
+}
+
+/** As the route mounts it: one list at a time, managed infrastructure first. */
+export const InfrastructureSection: Story = { render: () => <Sectioned initial={null} /> };
+
+export const BundlesSection: Story = { render: () => <Sectioned initial="bundles" /> };
