@@ -136,6 +136,10 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
         )
     elif app.source_kind != RegisteredApp.SourceKind.DIRECT_UPLOAD:
         raise ImportedAgentRegistrationError(f"agent slug {effective_slug!r} is not an imported agent")
+    elif app.project_id != project.pk:
+        # Re-importing under an existing slug updates that agent in place; it
+        # never moves another project's agent into this one (#1866).
+        raise ImportedAgentRegistrationError(f"agent slug {effective_slug!r} is already in use")
     app.name = name
     app.project = project
     app.team = project.team
@@ -218,13 +222,12 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     container.env = (package.get("environment") or {}).get("values") or {}
     container.save()
 
-    spec = AgentEnvironmentSpec.objects.filter(
-        organization=organization,
-        slug=effective_slug,
-        deleted_at__isnull=True,
-    ).first()
-    if spec is None:
-        spec = AgentEnvironmentSpec(organization=organization, slug=effective_slug)
+    from astrolift_agents.services.project_membership import SpecOwnedElsewhere, spec_for_registration
+
+    try:
+        spec = spec_for_registration(organization=organization, slug=effective_slug, app=app)
+    except SpecOwnedElsewhere as exc:
+        raise ImportedAgentRegistrationError(str(exc)) from exc
     spec.name = f"{name} runtime"
     spec.agent_type = (
         AgentEnvironmentSpec.AgentType.CODEX

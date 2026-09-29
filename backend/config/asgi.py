@@ -18,6 +18,7 @@ For production, use ``daphne`` or ``uvicorn`` against this same
 """
 
 import os
+from importlib import import_module
 
 from django.core.asgi import get_asgi_application
 
@@ -47,6 +48,14 @@ def _build_websocket_app():
 
 
 _websocket_app = None
+
+# The WebSocket routes besides GraphQL's, as (path prefix, module, handler).
+# GraphQL serves the schema, whose fields the surface guardrail walks one by
+# one; each handler here declares its own ``route_auth`` (#1866).
+WEBSOCKET_ROUTES = (
+    ("/app/exec/", "core.schema.exec_ws", "exec_ws_application"),
+    ("/app/vnc/", "core.schema.vnc_ws", "vnc_ws_application"),
+)
 
 
 def _websocket_origin_ok(scope) -> bool:
@@ -79,14 +88,9 @@ async def application(scope, receive, send):
             if _websocket_app is None:
                 _websocket_app = _build_websocket_app()
             return await _websocket_app(scope, receive, send)
-        if path.startswith("/app/exec/"):
-            from core.schema.exec_ws import exec_ws_application
-
-            return await exec_ws_application(scope, receive, send)
-        if path.startswith("/app/vnc/"):
-            from core.schema.vnc_ws import vnc_ws_application
-
-            return await vnc_ws_application(scope, receive, send)
+        for prefix, module, handler in WEBSOCKET_ROUTES:
+            if path.startswith(prefix):
+                return await getattr(import_module(module), handler)(scope, receive, send)
         # Unknown WS path — close politely.
         await send({"type": "websocket.close", "code": 4404})
         return

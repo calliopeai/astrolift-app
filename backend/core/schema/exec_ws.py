@@ -30,8 +30,10 @@ app path's tenancy check to admit one.
 
 Auth re-uses the cookie-aware resolution from ws_views: the user must be
 authenticated, scoped to a tenant that owns the target, and hold the
-grant that target's kind requires — ``app.exec_pod`` for an app,
-``agent_box.attach`` for a box. Misses close with the right WS code:
+grant that target's kind requires at the target's own scope —
+``app.exec_pod`` on the app, ``agent_box.attach`` on the box's project,
+team, agent app or org (#1866) — under a bearer token's scope ceiling.
+Misses close with the right WS code:
 
   4401 — unauthenticated
   4403 — the caller lacks the grant for this target's kind
@@ -74,6 +76,8 @@ import logging
 from typing import Any
 
 from asgiref.sync import sync_to_async
+
+from core.permissions import Permission, route_auth
 
 # ws_views.py top-level imports starlette (via strawberry.asgi); import
 # its helpers lazily so this module loads in environments that don't
@@ -242,12 +246,17 @@ async def _resolve_exec_target(*, target_slug: str, tenant_org_id) -> str | None
     return None
 
 
-def _holds(permission, *, tenant_org_id, actor_user_id) -> bool:
-    """Deny-by-default check of one permission for the resolved tenant.
+def _holds(permission, *, scope_for, tenant_org_id, actor_user_id, api_token=None) -> bool:
+    """Deny-by-default check of one permission at the target's scope.
+
+    ``scope_for`` names the target once the tenant is installed, since a
+    scope resolves inside the caller's org. A bearer's token row is pinned
+    so its scopes cap the check, as HTTP middleware pins it (#1866).
 
     Also installs the tenant context the backend's cluster resolution
     reads back out of the contextvar once the handshake is through.
     """
+    from astrolift_identity.api_tokens import set_current_api_token
     from core.permissions import PermissionDenied, check_permission
     from core.tenancy import TenantContext, set_current_tenant
 
@@ -259,37 +268,55 @@ def _holds(permission, *, tenant_org_id, actor_user_id) -> bool:
             actor_user_id=actor_user_id,
         ),
     )
+    if api_token is not None:
+        set_current_api_token(api_token)
     try:
-        check_permission(permission)
+        check_permission(permission, scope=scope_for())
     except PermissionDenied:
         return False
     return True
 
 
 @sync_to_async
-def _check_exec_permission(*, tenant_org_id, actor_user_id) -> bool:
+def _check_exec_permission(*, app_slug: str, tenant_org_id, actor_user_id, api_token=None) -> bool:
     """Resolver-entry permission check — deny-by-default. Returns True
-    iff the resolved tenant + user holds ``app.exec_pod``."""
+    iff the resolved tenant + user holds ``app.exec_pod`` on this app."""
+    from astrolift_lifecycle.scopes import live_app_scope
     from core.permissions import Permission
 
     return _holds(
         Permission.APP_EXEC_POD,
+        scope_for=lambda: live_app_scope("app_slug")({"app_slug": app_slug}),
         tenant_org_id=tenant_org_id,
         actor_user_id=actor_user_id,
+        api_token=api_token,
     )
 
 
 @sync_to_async
-def _check_box_attach_permission(*, tenant_org_id, actor_user_id) -> bool:
+def _check_box_attach_permission(*, box_slug: str, tenant_org_id, actor_user_id, api_token=None) -> bool:
     """Deny-by-default gate on ``agent_box.attach`` — the box-shaped
     counterpart to ``app.exec_pod``. See the permission's own comment
-    for why attaching an agent is not authorized by an app grant."""
+    for why attaching an agent is not authorized by an app grant.
+
+    Checked at the box's own scope, and the box must be among the rows the
+    grant reaches, so a team token cannot reach past its team (#1866)."""
+    from astrolift_agents.scopes import agent_box_scope
+    from astrolift_agents.visibility import agent_boxes
     from core.permissions import Permission
 
-    return _holds(
+    if not _holds(
         Permission.AGENT_BOX_ATTACH,
+        scope_for=lambda: agent_box_scope("slug", Permission.AGENT_BOX_ATTACH)({"slug": box_slug}),
         tenant_org_id=tenant_org_id,
         actor_user_id=actor_user_id,
+        api_token=api_token,
+    ):
+        return False
+    return (
+        agent_boxes(tenant_org_id, Permission.AGENT_BOX_ATTACH)
+        .filter(slug=box_slug, organization_id=tenant_org_id)
+        .exists()
     )
 
 
@@ -412,6 +439,11 @@ def _parse_target_id(path: str) -> tuple[str, str] | None:
 # ---- ASGI app --------------------------------------------------------
 
 
+@route_auth(
+    credential="session cookie or alft_ API bearer (its scopes cap the check)",
+    permissions=(Permission.APP_EXEC_POD, Permission.AGENT_BOX_ATTACH),
+    scope="app.exec_pod at the named app; agent_box.attach at the named box's project, team, agent app or org",
+)
 async def exec_ws_application(scope: dict, receive, send) -> None:
     """ASGI WebSocket handler for /app/exec/<app>/<workload>."""
     if scope["type"] != "websocket":
@@ -428,8 +460,8 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
         _bearer_from_scope,
         _header_from_scope,
         _parse_cookies,
+        _resolve_bearer_identity,
         _resolve_tenant_for_user,
-        _resolve_user_and_tenant_from_bearer,
         _resolve_user_from_sessionid,
     )
 
@@ -438,8 +470,9 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     # back to the cookie so both surfaces share one relay.
     bearer = _bearer_from_scope(scope)
     tenant = None
+    api_token = None
     if bearer:
-        user, tenant = await _resolve_user_and_tenant_from_bearer(
+        user, tenant, api_token = await sync_to_async(_resolve_bearer_identity)(
             bearer, _header_from_scope(scope, "x-astrolift-organization")
         )
         if getattr(user, "is_authenticated", False) and tenant is None:
@@ -477,13 +510,17 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     # at the handshake so the frontend never sees the terminal pane.
     granted = (
         await _check_box_attach_permission(
+            box_slug=app_slug,
             tenant_org_id=org_id,
             actor_user_id=actor_user_id,
+            api_token=api_token,
         )
         if target == TARGET_BOX
         else await _check_exec_permission(
+            app_slug=app_slug,
             tenant_org_id=org_id,
             actor_user_id=actor_user_id,
+            api_token=api_token,
         )
     )
     if not granted:
