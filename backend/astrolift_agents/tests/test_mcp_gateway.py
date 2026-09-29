@@ -722,6 +722,10 @@ def test_dispatch_and_cancel_are_scoped_and_share_runtime_contract(permission_re
     assert task["timeout_seconds"] == 900
     assert starts[0][0] == "DispatchAgentTaskWorkflow"
     assert starts[0][1][0].actor.kind == "api_token"
+    # A token started it, on behalf of its owner (#2152).
+    dispatched = AgentTask.objects.get(guid=task["task_id"])
+    assert dispatched.trigger_kind == "api"
+    assert dispatched.triggered_by_user_id == user.id
 
     _, cancelled = _call(
         org,

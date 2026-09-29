@@ -879,6 +879,12 @@ class ScheduledJobRunType:
     run worked without leaving the page. The full tail lives behind
     the per-app logs surface; the UI footer flags truncation."""
     created_at: dt.datetime
+    # Who and what started the run (#2152): the job's own trigger word
+    # (``scheduled`` or ``manual``) and the initiator's user pk, null for a
+    # scheduled fire.
+    trigger_kind: str = "scheduled"
+    triggered_by_user_id: str | None = None
+    triggered_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftCommandRun")
@@ -915,7 +921,18 @@ def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
         log_excerpt=log_excerpt,
         output=_last_n_lines(log_excerpt),
         created_at=r.created_at,
+        trigger_kind=r.trigger_kind,
+        triggered_by_user_id=str(r.triggered_by_id) if r.triggered_by_id else None,
+        triggered_by_me=_viewer_started(r.triggered_by_id),
     )
+
+
+def _viewer_started(user_id: int | None) -> bool:
+    """Whether ``user_id`` is the caller, for a run's ``triggeredByMe``."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
 
 
 def command_run_to_type(r) -> CommandRunType:

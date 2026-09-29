@@ -49,6 +49,7 @@ from astrolift_workflows.inputs import (
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.run_trigger import request_trigger
 from core.tenancy import get_current_tenant
 
 
@@ -135,6 +136,7 @@ class PreviewMutations:
                 registered_app_id=preview.registered_app_id,
                 app_environment_id=None,
                 actor=actor,
+                trigger_kind=request_trigger(),
             )
 
         latest = (
@@ -448,6 +450,7 @@ class PreviewMutations:
                 registered_app_id=preview.registered_app_id,
                 app_environment_id=env.pk,
                 actor=actor,
+                trigger_kind=request_trigger(),
             )
 
         return gql_success(preview_to_type(preview))

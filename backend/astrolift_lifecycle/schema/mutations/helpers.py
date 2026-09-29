@@ -215,6 +215,7 @@ def _record_workflow_run(
     registered_app_id: int | None,
     app_environment_id: int | None,
     actor: Actor,
+    trigger_kind: str,
 ) -> WorkflowRun:
     return WorkflowRun.objects.create(
         workflow_kind=kind,
@@ -228,6 +229,7 @@ def _record_workflow_run(
         trigger_actor_user_id=actor.user_id,
         trigger_actor_token_kind="",
         trigger_actor_token_id=None,
+        trigger_kind=trigger_kind,
     )
 
 
@@ -253,6 +255,14 @@ def _start_deploy_workflow_on_commit(
     itself is written by the caller inside the atomic block; only the start and
     the ``WorkflowRun`` mirror link happen post-commit.
     """
+    from astrolift_identity.api_tokens import get_current_api_token
+    from core.run_trigger import deployment_run_trigger
+
+    # Read while the request is still current: the mirror row is written on
+    # commit, and a token-started manual deploy is ``api`` (#2152).
+    run_trigger = deployment_run_trigger(
+        deployment.trigger_kind, via_token=get_current_api_token() is not None
+    )
 
     def _start() -> None:
         handle = start_workflow(workflow_kind, args=args, workflow_id=workflow_id)
@@ -265,6 +275,7 @@ def _start_deploy_workflow_on_commit(
                 registered_app_id=registered_app_id,
                 app_environment_id=app_environment_id,
                 actor=actor,
+                trigger_kind=run_trigger,
             )
             deployment.workflow_run = run
             deployment.save(update_fields=["workflow_run", "updated_at", "version"])

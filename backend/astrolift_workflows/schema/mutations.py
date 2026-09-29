@@ -573,6 +573,7 @@ class WorkflowsMutation:
         from django.core.exceptions import ValidationError as DjangoValidationError
 
         from astrolift_workflows.inputs import Actor
+        from core.run_trigger import request_trigger
         from workflows.models import Workflow, WorkflowInstance
         from workflows.run_service import start_workflow_definition_run
 
@@ -626,6 +627,7 @@ class WorkflowsMutation:
                 display=getattr(user, "username", "") or "",
             ),
             stage_bindings=wf.stage_bindings,
+            trigger_kind=request_trigger(),
         )
 
         # Tier-3 run record linked to the Workflow (denormalized org, §2.3).

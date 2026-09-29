@@ -171,6 +171,7 @@ def dispatch_agent_task_from_webhook(webhook, payload: dict | None) -> object | 
     from astrolift_registry.models import Workload
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+    from core.run_trigger import RunTrigger
 
     workload = getattr(webhook, "agent_definition", None)
     if workload is None:
@@ -202,6 +203,7 @@ def dispatch_agent_task_from_webhook(webhook, payload: dict | None) -> object | 
             # Freeze the mapped webhook payload on the task so the spawner
             # surfaces it to the pod as ASTROLIFT_TRIGGER_PAYLOAD (#930).
             dispatch_input=mapped or None,
+            trigger_kind=RunTrigger.WEBHOOK,
         )
 
     from astrolift_agents.services.task_preparation import (
@@ -553,13 +555,23 @@ def _enqueue_temporal(
     """
     try:
         from astrolift_workflows.inputs import Actor
+        from core.run_trigger import RunTrigger
         from workflows.run_service import start_workflow_definition_run
 
+        # The callers pass ``webhook`` or ``scm_<event>`` (an inbound
+        # delivery either way), or the ``manual`` default.
+        if trigger_kind == "webhook" or trigger_kind.startswith("scm_"):
+            run_trigger = RunTrigger.WEBHOOK
+        elif trigger_kind == "manual":
+            run_trigger = RunTrigger.MANUAL
+        else:
+            run_trigger = RunTrigger.UNKNOWN
         _run, workflow_id = start_workflow_definition_run(
             instance.workflow,
             trigger_payload=input_data,
             organization_id=instance.organization_id,
             actor=Actor(kind="system", user_id=None, display=trigger_kind),
+            trigger_kind=run_trigger,
         )
         # Store the Temporal workflow_id + run_id on the instance — the latter
         # lets a historical run's DAG overlay without a live describe (#1180).
@@ -604,6 +616,7 @@ def _create_temporal_schedule(
 
     from astrolift_workflows.client import _get_client_async
     from astrolift_workflows.inputs import Actor
+    from core.run_trigger import RunTrigger
     from workflows.run_service import build_workflow_definition_run_input
 
     _run, run_input, run_workflow_id = build_workflow_definition_run_input(
@@ -613,6 +626,7 @@ def _create_temporal_schedule(
         # definition's (#1984).
         organization_id=definition.organization_id,
         actor=Actor(kind="system", user_id=None, display="scheduled"),
+        trigger_kind=RunTrigger.SCHEDULE,
     )
     task_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")
 

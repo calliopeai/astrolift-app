@@ -450,6 +450,8 @@ def test_run_workflow_persists_temporal_run_id(
     run = WorkflowRun.objects.get(workflow_id=inst.temporal_workflow_id)
     assert run.run_id == inst.temporal_run_id
     assert run.workflow_definition_id == d.pk
+    # A session call, by the member who made it (#2152).
+    assert (run.trigger_kind, run.trigger_actor_user_id) == ("manual", member.id)
 
 
 def test_workflow_runs_query_exposes_temporal_run_id(

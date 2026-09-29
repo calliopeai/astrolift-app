@@ -96,6 +96,11 @@ class WorkflowDefinitionRunType:
     child_run_count: int
     started_at: datetime | None
     ended_at: datetime | None
+    # Who and what started the run (#2152): manual, api, schedule, webhook,
+    # parent or unknown (``core.run_trigger``), and the initiator's user pk.
+    trigger_kind: str = "unknown"
+    triggered_by_user_id: str | None = None
+    triggered_by_me: bool = False
 
 
 @strawberry.type(name="PendingHumanGate")
@@ -270,7 +275,18 @@ def definition_run_to_type(run) -> WorkflowDefinitionRunType:
         child_run_count=getattr(run, "child_run_count", 0),
         started_at=run.started_at,
         ended_at=run.ended_at,
+        trigger_kind=run.trigger_kind,
+        triggered_by_user_id=str(run.trigger_actor_user_id) if run.trigger_actor_user_id else None,
+        triggered_by_me=_is_viewer(run.trigger_actor_user_id),
     )
+
+
+def _is_viewer(user_id: int | None) -> bool:
+    """Whether ``user_id`` is the caller, for a run's ``triggeredByMe``."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
 
 
 def pending_gate_to_type(execution) -> PendingHumanGateType:

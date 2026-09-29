@@ -135,6 +135,8 @@ def test_create_agent_task_queues_in_draft_then_queued(org, env_spec):
     assert task.timeout_seconds == 1800
     # No config_repo on the env spec -> no Brief assembled, no network call.
     assert task.brief_id is None
+    # Only a workflow stage runs this activity (#2152).
+    assert task.trigger_kind == "parent"
 
 
 def test_create_agent_task_unknown_org_raises():

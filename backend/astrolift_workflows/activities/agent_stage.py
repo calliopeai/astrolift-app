@@ -117,6 +117,7 @@ def _create_agent_task_sync(params: dict[str, Any], *, task_guid: UUID | None = 
     )
     from astrolift_agents.services.brief_assembler import assemble_agent_brief
     from astrolift_identity.models import Organization
+    from core.run_trigger import RunTrigger
 
     org_slug = params["org_slug"]
     skill_slug = params.get("skill_slug") or ""
@@ -169,6 +170,8 @@ def _create_agent_task_sync(params: dict[str, Any], *, task_guid: UUID | None = 
         "environment_spec": env_spec,
         "status": AgentTask.Status.DRAFT,
         "timeout_seconds": timeout_seconds,
+        # Only a workflow stage runs this activity.
+        "trigger_kind": RunTrigger.PARENT,
         # Freeze VNC eligibility from the spec so the task stays
         # self-describing if the spec is later edited or deleted.
         "vnc_enabled": bool(env_spec and env_spec.vnc_enabled),

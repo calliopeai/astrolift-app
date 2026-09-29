@@ -184,6 +184,12 @@ class AgentTaskType:
     pod_name: str
     namespace: str
     dispatcher: AgentTaskDispatcherType | None
+    # Who and what started the run (#2152). ``trigger_kind`` is one of
+    # manual, api, schedule, webhook, parent, unknown (``core.run_trigger``);
+    # the user id is the initiator's pk, null when no person started it.
+    trigger_kind: str = "unknown"
+    triggered_by_user_id: str | None = None
+    triggered_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftAgentInteraction")
@@ -639,7 +645,18 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         pod_name=t.pod_name or "",
         namespace=t.namespace or "",
         dispatcher=_agent_task_dispatcher_to_type(dispatcher),
+        trigger_kind=t.trigger_kind,
+        triggered_by_user_id=str(t.triggered_by_user_id) if t.triggered_by_user_id else None,
+        triggered_by_me=_is_viewer(t.triggered_by_user_id),
     )
+
+
+def _is_viewer(user_id: int | None) -> bool:
+    """Whether ``user_id`` is the caller, for a run's ``triggeredByMe``."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
 
 
 def agent_interaction_to_type(ixn) -> AgentInteractionType:

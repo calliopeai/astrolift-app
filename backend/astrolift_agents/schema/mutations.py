@@ -87,6 +87,7 @@ from astrolift_registry.models import Workload
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.run_trigger import request_trigger
 from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
@@ -1893,12 +1894,15 @@ class AgentsMutation:
         if brief is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "brief not found", field="briefId")
 
+        tenant = get_current_tenant()
         with transaction.atomic():
             task = AgentTask.objects.create(
                 organization=org,
                 brief=brief,
                 status=AgentTask.Status.DRAFT,
                 callback_url=(callback_url or "")[:200],
+                triggered_by_user_id=tenant.actor_user_id if tenant else None,
+                trigger_kind=request_trigger(),
             )
             task.transition_to(AgentTask.Status.QUEUED)
         return gql_success(LaunchTaskResult(ok=True, task_id=GUID(str(task.guid))))
@@ -2141,6 +2145,7 @@ class AgentsMutation:
                 trigger_payload=input.trigger_payload or None,
                 timeout_seconds=input.timeout_seconds,
                 trigger="manual",
+                trigger_kind=request_trigger(),
                 client_request_id=input.client_request_id,
             )
         except AgentDispatchError as exc:
