@@ -6,7 +6,7 @@
  * have no owner of their own, so there is no Mine. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 
 import { clientNote, lower, selectPage, time } from "./catalog";
 import { ADAPTERS } from "./tool-adapters";

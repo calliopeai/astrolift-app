@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  effectiveFilters,
-  parseListState,
-  RESERVED_PARAMS,
-} from "@/components/list/use-list-state";
+import { effectiveFilters, parseListState, RESERVED_PARAMS } from "@/components/list/list-state";
 import { taskRun } from "@/components/screens/jobs/jobs-tasks.fixtures";
 
 import { workflowRun } from "./runs.fixtures";

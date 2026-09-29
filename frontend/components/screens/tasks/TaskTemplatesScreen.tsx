@@ -5,7 +5,7 @@ import * as React from "react";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { Button } from "@/components/ui/button";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

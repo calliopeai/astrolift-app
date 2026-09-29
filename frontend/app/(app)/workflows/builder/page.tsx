@@ -1,17 +1,12 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useSearchParams } from "next/navigation";
-
-import { WorkflowBuilderScreen } from "@/components/screens/workflows/new/WorkflowBuilderScreen";
-import { useWorkflowBuilder } from "@/components/screens/workflows/new/use-workflow-builder";
-import { parsePattern } from "@/components/screens/workflows/new/workflow-patterns";
-
-export default function NewWorkflowBuilderPage() {
-  const searchParams = useSearchParams();
-  return (
-    <WorkflowBuilderScreen
-      {...useWorkflowBuilder()}
-      initialPattern={parsePattern(searchParams.get("pattern"))}
-    />
-  );
+/** Authoring a new workflow is the stepped New workflow page now; `?pattern=` carries over. */
+export default async function NewWorkflowBuilderPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { pattern } = await searchParams;
+  const value = Array.isArray(pattern) ? pattern[0] : pattern;
+  redirect(value ? `/workflows/new?pattern=${encodeURIComponent(value)}` : "/workflows/new");
 }

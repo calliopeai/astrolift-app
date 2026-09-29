@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { effectiveFilters, parseListState } from "@/components/list/use-list-state";
+import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
 import { CLUSTERS_LIST, clusterCrumbs, selectClusters } from "./clusters-list";
 import { CLUSTERS, FLEET, ME } from "./fixtures";

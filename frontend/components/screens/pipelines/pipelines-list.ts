@@ -12,7 +12,7 @@
  * triggered) narrow a wider page the same way.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 
 import type { Pipeline, PipelineRunRow } from "./use-pipelines";

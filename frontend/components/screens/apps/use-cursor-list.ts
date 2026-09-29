@@ -4,7 +4,7 @@ import type { DocumentNode } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 
 import type { CursorPage } from "@/components/data-table";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 
 /**
  * One cursor page of an app-scoped `…Page` field for a ListPage embedded in

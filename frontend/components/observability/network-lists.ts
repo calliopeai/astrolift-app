@@ -6,7 +6,7 @@
  * certificates are the cluster's, not a person's, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type {
   AstroliftAppCertificate,
   AstroliftAppDnsRecord,

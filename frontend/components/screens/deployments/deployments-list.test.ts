@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseListState, effectiveFilters } from "@/components/list/use-list-state";
+import { parseListState, effectiveFilters } from "@/components/list/list-state";
 import {
   DEPLOY_DEPLOYING,
   DEPLOY_FAILED,

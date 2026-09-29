@@ -6,7 +6,7 @@
  * empty until they do.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 
 /** A zone's provisioning as one word: active, provisioning, or not provisioned. */

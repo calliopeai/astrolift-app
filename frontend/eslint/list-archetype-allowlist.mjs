@@ -26,11 +26,6 @@ const ON_CURSOR_TABLE = [
     reason:
       "Walks agent boxes with useCursorTable in use-agent-boxes.ts; the hook moves to useListState first.",
   },
-  {
-    file: "components/screens/workflows/list/WorkflowsListScreen.tsx",
-    reason:
-      "Five views on useCursorTable in use-workflows-list.ts; they become standardViews on useListState.",
-  },
 ];
 
 /**

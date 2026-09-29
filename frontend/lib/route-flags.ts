@@ -13,11 +13,9 @@
 //                 a public submit page, so /forms/[slug]/submit parks
 //                 with the rest of the tree).
 //   /playground — prompt playground demo surface (static demo data).
-//   /dev/viz    — viz-primitive gallery (#1053 design review page).
 export const ROUTE_FLAGS: Record<string, boolean> = {
   "/forms": false,
   "/playground": false,
-  "/dev/viz": false,
 };
 
 /** True unless `path` (or a prefix of it) is flagged off in ROUTE_FLAGS. */

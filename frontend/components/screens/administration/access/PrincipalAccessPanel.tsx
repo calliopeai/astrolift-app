@@ -11,7 +11,7 @@ import { RoleSummary } from "@/components/access/RoleSummary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column, RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";

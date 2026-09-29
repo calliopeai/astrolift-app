@@ -631,6 +631,13 @@ jobs:
       # this proves the catalog itself still builds.
       - name: Build the component catalog
         run: npm run build-storybook
+      # The production build is the only check that sees the server/client
+      # boundary: a server page calling into a "use client" module passes
+      # lint, typecheck and vitest and then fails the image build on main.
+      - name: Build the app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen

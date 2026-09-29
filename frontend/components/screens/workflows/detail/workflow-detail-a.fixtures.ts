@@ -1,4 +1,3 @@
-import { STAGES } from "@/components/workflows/fixtures";
 import type {
   WorkflowDefinitionRun,
   WorkflowDefinitionSummary,
@@ -7,17 +6,9 @@ import type {
 } from "@/graphql/workflows/tiered.types";
 import type { WorkflowInstanceDetail } from "@/graphql/workflows/workflows.types";
 
-import type {
-  DefinitionObserveViewProps,
-  DefinitionRunPanelViewProps,
-  DefinitionRunViewProps,
-  DefinitionWorkflowScreenProps,
-} from "./DefinitionWorkflow";
 import type { GateReviewViewProps } from "./GateReview";
-import { buildRunDagStages } from "./run-dag-stages";
-import type { WorkflowRunDagViewProps } from "./WorkflowRunDag";
 
-/** Hand-typed fixtures for the definition workflow page, its run graph and gate review. */
+/** Hand-typed fixtures for a definition's Runs tab, its run graph and gate review. */
 
 const yes = async () => true;
 
@@ -90,13 +81,6 @@ export const LONG_DEFINITION: WorkflowDefinitionSummary = {
   })),
 };
 
-export const SCREEN: DefinitionWorkflowScreenProps = {
-  slug: DEFINITION.slug,
-  definition: DEFINITION,
-  loading: false,
-  error: null,
-};
-
 const run = (n: number, patch: Partial<WorkflowDefinitionRun> = {}): WorkflowDefinitionRun => ({
   guid: `run-${n}`,
   definitionGuid: DEFINITION.guid,
@@ -132,22 +116,6 @@ export const RUNS: WorkflowDefinitionRun[] = [
   run(5, { status: "cancelled", parentRunGuid: "run-parent-1", nestingDepth: 1 }),
 ];
 
-export const RUN: DefinitionRunViewProps = {
-  definition: DEFINITION,
-  canRun: true,
-  running: false,
-  latest: RUNNING_RUN,
-  run: yes,
-};
-
-export const OBSERVE: Omit<DefinitionObserveViewProps, "renderRunPanel"> = {
-  runs: RUNS,
-  loading: false,
-  error: undefined,
-  refetch: (async () => ({})) as unknown as DefinitionObserveViewProps["refetch"],
-  requestedRunGuid: null,
-};
-
 export const DETAIL: WorkflowInstanceDetail = {
   instance: {
     workflowId: RUNNING_RUN.temporalWorkflowId,
@@ -174,17 +142,6 @@ export const DETAIL: WorkflowInstanceDetail = {
     retryCount: 0,
     decision: "",
   })),
-};
-
-export const PANEL: Omit<DefinitionRunPanelViewProps, "runDag"> = {
-  run: RUNNING_RUN,
-  canRun: true,
-  terminal: false,
-  detail: DETAIL,
-  detailLoading: false,
-  detailError: null,
-  cancelling: false,
-  cancel: yes,
 };
 
 const execution = (
@@ -252,28 +209,3 @@ export const LONG_EXECUTIONS: WorkflowStageExecution[] = [
     stageApprovers: [`team:${LONG}`, `${LONG}@example.com`],
   }),
 ];
-
-export const DAG: WorkflowRunDagViewProps = {
-  loading: false,
-  dagStages: buildRunDagStages(STAGES, EXECUTIONS),
-  signature: "full",
-};
-
-/** Planned stages only: the run has not reported any execution yet. */
-export const PLANNED_DAG: WorkflowRunDagViewProps = {
-  loading: false,
-  dagStages: buildRunDagStages(STAGES, []),
-  signature: "planned",
-};
-
-export const LONG_DAG: WorkflowRunDagViewProps = {
-  loading: false,
-  dagStages: buildRunDagStages(
-    STAGES.map((s) => ({
-      ...s,
-      agentDefinitionName: s.agentDefinitionName && `${s.agentDefinitionName}-${LONG}`,
-    })),
-    EXECUTIONS
-  ),
-  signature: "long",
-};

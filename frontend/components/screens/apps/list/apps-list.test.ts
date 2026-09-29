@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { effectiveFilters, parseListState } from "@/components/list/use-list-state";
+import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
 import { APPS_LIST, appsCrumbs, appStatusKey, selectApps } from "./apps-list";
 import { APPS, MANY } from "./fixtures";

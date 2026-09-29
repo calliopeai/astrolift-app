@@ -6,7 +6,7 @@
  * (each view says so in its note; each field is in needsBackend). Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListView } from "@/components/list/use-list-state";
+import type { ListView } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

@@ -9,7 +9,7 @@
  * answer the rest exactly, with numbered pages; each view says so. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 import type { AstroliftAgentSkill, AstroliftToolDef } from "@/graphql/agents/agents.types";
 
 const CLIENT_NOTE =

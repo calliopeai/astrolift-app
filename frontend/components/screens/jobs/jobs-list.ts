@@ -18,7 +18,7 @@ import { commandRunStatus, type RunStatus } from "@/components/jobs/RunStatusBad
 import type { PanelFailure } from "@/components/panel/Panel";
 import type { LogLine } from "@/components/run/LogView";
 import type { TimelineStep } from "@/components/run/Timeline";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import { spanMs } from "@/components/screens/deployments/run-support";
 import type {
   AstroliftCommandRun,

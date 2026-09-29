@@ -5,7 +5,7 @@ import { UsersIcon } from "lucide-react";
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { TEAMS_HREF } from "./access-nav";

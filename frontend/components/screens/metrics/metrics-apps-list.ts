@@ -6,7 +6,7 @@
  * summary carries no owner, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftAppHealthSummary } from "@/graphql/lifecycle/lifecycle.types";
 
 const STATUSES = [

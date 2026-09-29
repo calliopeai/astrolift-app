@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 
 import { SECRETS_SECTIONS, type SecretsSection } from "./secrets-list";

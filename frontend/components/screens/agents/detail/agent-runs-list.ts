@@ -14,7 +14,7 @@ import {
   type ListDefinition,
   type ListFieldOption,
   standardViews,
-} from "@/components/list/use-list-state";
+} from "@/components/list/list-state";
 
 export type RunDot = "ok" | "warn" | "error" | "muted" | "pending";
 

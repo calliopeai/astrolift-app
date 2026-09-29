@@ -7,7 +7,7 @@
  * platform accounts, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftClusterAuthUser } from "@/graphql/__generated__/schema";
 
 export const AUTH_USERS_LIST: ListDefinition = {

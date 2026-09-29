@@ -7,7 +7,7 @@ import type { Column, RowSelection } from "@/components/data-table";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { Identifier } from "@/components/Identifier";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { Button } from "@/components/ui/button";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";

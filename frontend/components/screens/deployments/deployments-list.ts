@@ -11,8 +11,8 @@
  * on it say so in their note. When the query grows those arguments the
  * hook sends them and this step goes away; the screen does not change.
  */
-import type { ListDefinition } from "@/components/list/use-list-state";
-import { standardViews } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
+import { standardViews } from "@/components/list/list-state";
 import type { TimelineStep } from "@/components/run/Timeline";
 import type { LogLine } from "@/components/run/LogView";
 import type { PanelFailure } from "@/components/panel/Panel";

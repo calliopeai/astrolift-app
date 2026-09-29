@@ -6,7 +6,7 @@
  * rest in the browser, with numbered pages and the view's note saying so.
  * Pure.
  */
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 
 import { CLIENT_LIST_NOTE, type ClientListSpec, selectClientRows } from "../client-list";
 import type { AppDomain } from "./use-app-domains";

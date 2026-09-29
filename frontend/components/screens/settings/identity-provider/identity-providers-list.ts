@@ -6,7 +6,7 @@
  * creator, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftIdentityProvider } from "@/graphql/identity/identity.types";
 
 const KINDS = ["oidc", "saml", "cognito", "auth0", "okta", "azure_ad", "google", "github", "local"];

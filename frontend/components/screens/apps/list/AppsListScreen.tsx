@@ -16,7 +16,7 @@ import * as React from "react";
 import { Can } from "@/components/Can";
 import type { Column, EmptyStateSpec, RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

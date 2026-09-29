@@ -11,7 +11,7 @@
  * `null` is every key and `""` the org-scoped ones only, so Scope goes to
  * the server. Keys record no creator, so Mine is empty until they do.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 export const NARROW_LIMIT = 100;

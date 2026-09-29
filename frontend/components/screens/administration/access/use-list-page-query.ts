@@ -4,7 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import type { DocumentNode } from "graphql";
 
 import type { CursorPage } from "@/components/data-table";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 
 /** What a ListPage needs from one cursor-paged query. */
 export interface ListPageData<TRow> {

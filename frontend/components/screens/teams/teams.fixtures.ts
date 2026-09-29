@@ -2,7 +2,7 @@
  * Story fixtures for the Teams list and a team's page, typed against each
  * screen's props and selected the way the hooks select them.
  */
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type {
   AstroliftMember,
   AstroliftProject,

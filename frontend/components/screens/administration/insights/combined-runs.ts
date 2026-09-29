@@ -15,7 +15,7 @@ import type {
 import type { WorkflowDefinitionRun } from "@/graphql/workflows/tiered.types";
 
 import type { CsvColumn } from "@/components/list/exportCsv";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 
 import { SINCE_OPTIONS, sinceToIso } from "./audit-list";
 

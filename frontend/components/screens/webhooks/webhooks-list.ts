@@ -7,7 +7,7 @@
  * and the views that lean on it say so. Subscriptions record no creator, so
  * Mine is empty until they do.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftWebhookSubscription } from "@/graphql/operations/operations.types";
 
 export const NARROW_LIMIT = 100;

@@ -5,7 +5,7 @@
  * declares no fields and no sortable column; state and order filters wait on
  * the backend. Pure.
  */
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 
 export const APP_DEPLOY_TOKENS_LIST: ListDefinition = {
   id: "apps.access.tokens",

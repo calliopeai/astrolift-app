@@ -22,7 +22,7 @@
  */
 import type { SortState } from "@/components/data-table";
 import type { Principal } from "@/components/access/access-model";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type {
   AstroliftInvitation,
   AstroliftMember,

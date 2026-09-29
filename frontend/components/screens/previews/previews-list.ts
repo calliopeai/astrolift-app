@@ -6,7 +6,7 @@
  * Previews record who pinned them but not who opened the pull request, so
  * Mine is empty until they do.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type {
   AstroliftPreviewEnvironment,
   PreviewStatus,
