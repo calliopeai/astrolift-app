@@ -11,20 +11,33 @@ from collections.abc import Iterable
 import strawberry
 from django.conf import settings
 from django.db import models
-from django.db.models import OuterRef, Q, Subquery
-from django.db.models.functions import Lower
+from django.db.models import Case, Exists, F, OuterRef, Q, Subquery, Value, When
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_graphql import PageType, keyset_page, search_q
+from astrolift_graphql import (
+    FilterField,
+    PageType,
+    SortKey,
+    filter_q,
+    filter_values,
+    keyset_page,
+    numbered_page,
+    resolve_list_sort,
+    search_q,
+)
 from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
+    STALE_DEPLOY_WINDOW_DAYS,
     AppDoctorReportType,
     AppFreshness,
     AppHealthPulseType,
+    AppListState,
+    AppsListFilterInput,
     AppsListSortKey,
     AppTeamAccessType,
     AstroliftAppHealthPulseStatus,
@@ -49,6 +62,7 @@ from astrolift_registry.schema.types import (
     workload_to_type,
 )
 from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_slug
+from astrolift_registry.topology import classify_topology
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -70,6 +84,8 @@ from core.tenancy import get_current_tenant
 
 _APPS_LIST_PAGE_DEFAULT_LIMIT = 50
 _APPS_LIST_PAGE_MAX_LIMIT = 200
+#: What the one search box matches (spec 44 §5.1), plus a prefix of the id.
+_APPS_SEARCH_FIELDS = ("name", "slug", "description", "source_repo", "source_url")
 
 
 def _encode_apps_cursor(sort_by: AppsListSortKey, *values: object) -> str:
@@ -119,13 +135,7 @@ def _apply_apps_list_filters(
     if search:
         needle = search.strip()
         if needle:
-            qs = qs.filter(
-                Q(name__icontains=needle)
-                | Q(slug__icontains=needle)
-                | Q(description__icontains=needle)
-                | Q(source_repo__icontains=needle)
-                | Q(source_url__icontains=needle)
-            )
+            qs = qs.filter(search_q(needle, *_APPS_SEARCH_FIELDS, prefix=("guid",)))
     if team_slug:
         qs = qs.filter(team__slug=team_slug)
     if project_slug:
@@ -365,21 +375,10 @@ def _build_apps_page(
     if not _status_filter_active(status):
         items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size, sort_by=sort_by)
         freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
-        preview_counts = _active_preview_counts(items)
-        managed_hostnames = _managed_hostnames_for_apps(items)
-        viewer_perms = _viewer_permissions_for_apps(items)
         return RegisteredAppPageType(
-            items=[
-                app_to_type(
-                    a,
-                    info=info,
-                    freshness=freshness_by_app.get(a.pk) if include_freshness else None,
-                    active_preview_count=preview_counts.get(a.pk, 0),
-                    managed_hostname=managed_hostnames.get(a.pk, ""),
-                    viewer_permissions=viewer_perms.get(a.pk),
-                )
-                for a in items
-            ],
+            items=_app_page_items(
+                items, info=info, freshness_by_app=freshness_by_app, include_freshness=include_freshness
+            ),
             next_cursor=next_cursor,
             total_count=total_count,
         )
@@ -406,23 +405,300 @@ def _build_apps_page(
         next_cursor: str | None = _cursor_for_row(sort_by, anchor)
     else:
         next_cursor = None
-    preview_counts = _active_preview_counts(items)
-    managed_hostnames = _managed_hostnames_for_apps(items)
-    viewer_perms = _viewer_permissions_for_apps(items)
     return RegisteredAppPageType(
-        items=[
-            app_to_type(
-                a,
-                info=info,
-                freshness=freshness_by_app.get(a.pk) if include_freshness else None,
-                active_preview_count=preview_counts.get(a.pk, 0),
-                managed_hostname=managed_hostnames.get(a.pk, ""),
-                viewer_permissions=viewer_perms.get(a.pk),
-            )
-            for a in items
-        ],
+        items=_app_page_items(
+            items, info=info, freshness_by_app=freshness_by_app, include_freshness=include_freshness
+        ),
         next_cursor=next_cursor,
         total_count=total_count,
+    )
+
+
+def _app_page_items(
+    apps: list[RegisteredApp],
+    *,
+    info: Info,
+    freshness_by_app: dict[int, AppFreshness],
+    include_freshness: bool,
+) -> list[RegisteredAppType]:
+    """Map one page of apps to rows, with every per-row input fetched in bulk."""
+    preview_counts = _active_preview_counts(apps)
+    managed_hostnames = _managed_hostnames_for_apps(apps)
+    viewer_perms = _viewer_permissions_for_apps(apps)
+    topology = _topology_for_apps([a.pk for a in apps])
+    clusters = _cluster_slugs_for_apps(apps)
+    return [
+        app_to_type(
+            a,
+            info=info,
+            freshness=freshness_by_app.get(a.pk) if include_freshness else None,
+            active_preview_count=preview_counts.get(a.pk, 0),
+            managed_hostname=managed_hostnames.get(a.pk, ""),
+            viewer_permissions=viewer_perms.get(a.pk),
+            topology_kind=topology.get(a.pk),
+            cluster_slugs=clusters.get(a.pk, []),
+        )
+        for a in apps
+    ]
+
+
+# ---------------------------------------------------------------------------
+# The list contract on the Apps list (spec 44 §5.1, #2149)
+# ---------------------------------------------------------------------------
+#
+# The reference application of ``astrolift_graphql``'s list helpers (see the
+# README there). Everything the Apps screen used to work out in the browser,
+# status, failing, kind, cluster, the deploy pulse and the column sorts, is
+# either a column or an annotation here, so a numbered page's OFFSET and its
+# totalCount are exact. Kind is the one exception: it is classified from the
+# workloads in Python, once per request, and folded back in as ``pk__in``.
+
+#: Header statuses in the order the Status column sorts them.
+_APP_STATE_ORDER = [state.value for state in AppListState]
+
+_APPS_DEFAULT_SORT = "-created"
+
+_APPS_SORT_KEYS: dict[str, SortKey] = {
+    "name": SortKey(Lower("name")),
+    "created": SortKey("created_at"),
+    # Never deployed sorts below the oldest deploy, as it did in the browser.
+    "deployed": SortKey("_deployed_at", nulls_low=True),
+    "status": SortKey("_state_rank"),
+}
+
+#: The legacy ``sortBy`` enum, spelled as a sort spec for the numbered path.
+_LEGACY_APPS_SORT_SPEC = {
+    AppsListSortKey.CREATED_DESC: "-created",
+    AppsListSortKey.DEPLOYED_DESC: "-deployed",
+    AppsListSortKey.NAME_ASC: "name",
+}
+
+#: The legacy single-value ``status`` argument, as a ``deploy`` filter value.
+_LEGACY_STATUS_TO_PULSE = {
+    AstroliftAppListStatusFilter.OK: "ok",
+    AstroliftAppListStatusFilter.DEGRADED: "degraded",
+    AstroliftAppListStatusFilter.STALE: "stale",
+    AstroliftAppListStatusFilter.NEVER_DEPLOYED: "never",
+}
+
+
+def _iexact_any(path: str, values: list[str]) -> Q:
+    query = Q()
+    for value in values:
+        query |= Q(**{f"{path}__iexact": value})
+    return query
+
+
+def _apps_on_clusters(slugs: list[str]) -> Q:
+    envs = AppEnvironment.objects.filter(_iexact_any("tenant_cluster__slug", slugs), deleted_at__isnull=True)
+    return Q(pk__in=envs.values("registered_app_id"))
+
+
+_APPS_FILTERS: dict[str, FilterField] = {
+    "failing": FilterField("_failing"),
+    "status": FilterField("_list_state"),
+    "deploy": FilterField("_deploy_pulse"),
+    "cluster": FilterField(q=_apps_on_clusters),
+    "project": FilterField(q=lambda v: _iexact_any("project__slug", v) | _iexact_any("project__name", v)),
+    "team": FilterField("team__slug"),
+    # ``archived`` is a tri-state the resolver applies, ``kind`` is Python.
+}
+
+
+def _annotate_apps_list(qs):
+    """Annotate the columns the Apps list filters and sorts on.
+
+    Three correlated subqueries over the app's deployments (latest status,
+    latest time, latest successful time) feed the rest:
+
+    * ``_deployed_at``: the last successful deploy, else the latest one,
+      which is what the Deployed column shows.
+    * ``_deploy_pulse``: the health pulse as ``build_app_freshness`` derives
+      it, in SQL, so ``deploy`` filters without the post-DB scan.
+    * ``_failing``: provisioning failed or the latest deploy did.
+    * ``_list_state`` / ``_state_rank``: the header status and its sort rank.
+      ``live`` is ``ready`` with a managed zone, resolved the way
+      ``_managed_hostnames_for_apps`` resolves it.
+    """
+    deploys = Deployment.objects.filter(registered_app=OuterRef("pk"), deleted_at__isnull=True).order_by(
+        "-created_at"
+    )
+    stale_before = timezone.now() - dt.timedelta(days=STALE_DEPLOY_WINDOW_DAYS)
+    org_zone = "organization__default_managed_domain"
+    from astrolift_clusters.models import ManagedDomain
+
+    qs = qs.annotate(
+        _latest_deploy_status=Subquery(deploys.values("status")[:1]),
+        _latest_deploy_at=Subquery(deploys.values("created_at")[:1]),
+        _last_success_at=Subquery(
+            deploys.filter(status=Deployment.Status.RUNNING.value).values("created_at")[:1]
+        ),
+    ).annotate(
+        _deployed_at=Coalesce("_last_success_at", "_latest_deploy_at"),
+        _has_zone=Case(
+            When(
+                Q(**{f"{org_zone}__isnull": False, f"{org_zone}__deleted_at__isnull": True})
+                & ~Q(**{f"{org_zone}__verification_state": ManagedDomain.VerificationState.PENDING}),
+                then=Value(True),
+            ),
+            When(Exists(_platform_zone_sq()), then=Value(True)),
+            default=Value(False),
+            output_field=models.BooleanField(),
+        ),
+    )
+    qs = qs.annotate(
+        _deploy_pulse=Case(
+            When(_latest_deploy_at__isnull=True, then=Value("never")),
+            When(_latest_deploy_status=Deployment.Status.FAILED.value, then=Value("degraded")),
+            When(_deployed_at__lte=stale_before, then=Value("stale")),
+            default=Value("ok"),
+            output_field=models.CharField(),
+        ),
+        _failing=Case(
+            When(
+                Q(provisioning_status=RegisteredApp.ProvisioningStatus.FAILED.value)
+                | Q(_latest_deploy_status=Deployment.Status.FAILED.value),
+                then=Value(True),
+            ),
+            default=Value(False),
+            output_field=models.BooleanField(),
+        ),
+        _list_state=Case(
+            When(archived_at__isnull=False, then=Value(AppListState.ARCHIVED.value)),
+            When(
+                provisioning_status=RegisteredApp.ProvisioningStatus.READY.value,
+                _has_zone=True,
+                then=Value(AppListState.LIVE.value),
+            ),
+            default=F("provisioning_status"),
+            output_field=models.CharField(),
+        ),
+    )
+    return qs.annotate(
+        _state_rank=Case(
+            *(When(_list_state=state, then=Value(rank)) for rank, state in enumerate(_APP_STATE_ORDER)),
+            default=Value(len(_APP_STATE_ORDER)),
+            output_field=models.IntegerField(),
+        )
+    )
+
+
+def _apply_apps_contract_filter(qs, values: dict):
+    """Apply the ``filter`` input's declared fields to an annotated queryset.
+
+    ``archived`` is left to the resolver (it composes with the legacy
+    ``includeArchived``); ``kind`` is classified here from the workloads of
+    the apps still in the set.
+    """
+    qs = qs.filter(filter_q(values, _APPS_FILTERS))
+    kinds = values.get("kind")
+    if kinds:
+        topology = _topology_for_apps(qs.values("pk"))
+        qs = qs.filter(pk__in=[pk for pk, kind in topology.items() if kind in kinds])
+    return qs
+
+
+def _topology_for_apps(app_ids) -> dict[int, str]:
+    """Each app's topology kind, from its live workloads; apps without any are absent.
+
+    ``app_ids`` is a list or a ``values("pk")`` queryset, so the kind filter
+    classifies the whole filtered set in one query and a page classifies
+    only its own rows.
+    """
+    by_app: dict[int, list[tuple[str, str]]] = {}
+    rows = Workload.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True).values_list(
+        "registered_app_id", "kind", "name"
+    )
+    for app_id, kind, name in rows:
+        by_app.setdefault(app_id, []).append((kind, name))
+    return {app_id: classify_topology(workloads) for app_id, workloads in by_app.items()}
+
+
+def _cluster_slugs_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, list[str]]:
+    """Distinct cluster slugs per app, in environment-name order, in one query."""
+    rows = (
+        AppEnvironment.objects.filter(
+            registered_app_id__in=[a.pk for a in apps],
+            deleted_at__isnull=True,
+            tenant_cluster__isnull=False,
+        )
+        .order_by("registered_app_id", "name")
+        .values_list("registered_app_id", "tenant_cluster__slug")
+    )
+    out: dict[int, list[str]] = {}
+    for app_id, slug in rows:
+        seen = out.setdefault(app_id, [])
+        if slug not in seen:
+            seen.append(slug)
+    return out
+
+
+def _apps_list_page(
+    qs,
+    *,
+    info: Info,
+    include_archived: bool,
+    filter: AppsListFilterInput | None,
+    cursor: str | None,
+    limit: int,
+    include_freshness: bool,
+    status: AstroliftAppListStatusFilter,
+    sort_by: AppsListSortKey,
+    sort: str | None,
+    page: int | None,
+    page_size: int | None,
+) -> RegisteredAppPageType:
+    """One Apps page from a scoped, legacy-filtered queryset (both resolvers).
+
+    ``qs`` arrives scoped to the viewer and narrowed by the legacy
+    arguments (search, teamSlug, projectSlug, sourceKind). This applies
+    the ``filter`` input and pages in one of two modes:
+
+    * numbered, when ``page``, ``pageSize`` or ``sort`` is given: every
+      filter and sort in SQL, an exact ``totalCount``, ``page`` and
+      ``pageSize`` echoed, ``nextCursor`` null. The legacy ``sortBy`` and
+      ``status`` still apply, spelled as a sort spec and a ``deploy`` filter.
+    * cursor, otherwise: the pre-#2149 walk, unchanged, with the ``filter``
+      input applied first.
+    """
+    values = filter_values(filter)
+    archived = values.pop("archived", None)
+    if archived is True:
+        qs = qs.filter(archived_at__isnull=False)
+    elif archived is False or not include_archived:
+        qs = qs.filter(archived_at__isnull=True)
+
+    if page is None and page_size is None and sort is None:
+        if values:
+            qs = _apply_apps_contract_filter(_annotate_apps_list(qs), values)
+        return _build_apps_page(
+            qs,
+            info=info,
+            cursor=cursor,
+            limit=limit,
+            include_freshness=include_freshness,
+            status=status,
+            sort_by=sort_by,
+        )
+
+    if _status_filter_active(status) and "deploy" not in values:
+        values["deploy"] = [_LEGACY_STATUS_TO_PULSE[status]]
+    order_by = resolve_list_sort(
+        sort or _LEGACY_APPS_SORT_SPEC.get(sort_by), _APPS_SORT_KEYS, default=_APPS_DEFAULT_SORT
+    )
+    qs = _apply_apps_contract_filter(_annotate_apps_list(_annotate_managed_domain(qs)), values)
+    result = numbered_page(
+        qs.prefetch_related("approver_users"), order_by=order_by, page=page, page_size=page_size
+    )
+    freshness_by_app = _freshness_for_apps(result.rows) if include_freshness else {}
+    return RegisteredAppPageType(
+        items=_app_page_items(
+            result.rows, info=info, freshness_by_app=freshness_by_app, include_freshness=include_freshness
+        ),
+        next_cursor=None,
+        total_count=result.total_count,
+        page=result.page,
+        page_size=result.page_size,
     )
 
 
@@ -473,9 +749,16 @@ def _annotate_managed_domain(qs):
     (#1931), the same as ``resolve_managed_domain`` -- a hostname must not
     render for a zone nothing has proven the platform may use.
     """
+    return qs.select_related("organization__default_managed_domain").annotate(
+        _platform_zone=Subquery(_platform_zone_sq())
+    )
+
+
+def _platform_zone_sq():
+    """The platform-level zone for tenant apps (one global row), as a subquery."""
     from astrolift_clusters.models import ManagedDomain
 
-    platform_zone_sq = (
+    return (
         ManagedDomain.objects.filter(
             organization__isnull=True,
             default_for__in=[ManagedDomain.DefaultFor.TENANT_APPS, ManagedDomain.DefaultFor.BOTH],
@@ -484,9 +767,6 @@ def _annotate_managed_domain(qs):
         .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
         .order_by("pk")
         .values("zone")[:1]
-    )
-    return qs.select_related("organization__default_managed_domain").annotate(
-        _platform_zone=Subquery(platform_zone_sq)
     )
 
 
@@ -990,6 +1270,10 @@ class RegistryQuery:
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
         include_archived: bool = False,
+        filter: AppsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> RegisteredAppPageType:
         """Cursor-paginated org-scoped apps list (#481, #729).
 
@@ -1027,6 +1311,13 @@ class RegistryQuery:
         showing archived apps. The standard list view hides them so
         operators don't see scaled-to-zero rows mixed in; the future
         "Archived apps" admin page flips this flag on.
+
+        The list contract (spec 44 §5.1, #2149): ``filter`` takes the
+        declared filters (archived-only, failing, status, deploy, kind,
+        cluster, project, team), ``sort`` a multi-key spec over ``name``,
+        ``created``, ``deployed`` and ``status`` (``-deployed,name``), and
+        ``page`` / ``pageSize`` a numbered page. Any of ``sort``, ``page``
+        or ``pageSize`` selects numbered paging; see ``_apps_list_page``.
         """
         status = _coerce_apps_status(status)
         org_id = _caller_org_id()
@@ -1039,8 +1330,6 @@ class RegistryQuery:
             if org_id is not None
             else qs.none()
         )
-        if not include_archived:
-            qs = qs.filter(archived_at__isnull=True)
         qs = _apply_apps_list_filters(
             qs,
             search=search,
@@ -1048,14 +1337,19 @@ class RegistryQuery:
             project_slug=project_slug,
             source_kind=source_kind,
         )
-        return _build_apps_page(
+        return _apps_list_page(
             qs,
             info=info,
+            include_archived=include_archived,
+            filter=filter,
             cursor=cursor,
             limit=limit,
             include_freshness=include_freshness,
             status=status,
             sort_by=sort_by,
+            sort=sort,
+            page=page,
+            page_size=page_size,
         )
 
     @strawberry.field
@@ -1167,6 +1461,10 @@ class RegistryQuery:
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
         include_archived: bool = False,
+        filter: AppsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> RegisteredAppPageType:
         """Cursor-paginated viewer-scoped apps list (#481, #729).
 
@@ -1178,7 +1476,8 @@ class RegistryQuery:
 
         ``include_archived`` (default False, #743) opts the page into
         showing archived apps the viewer can reach. Same opt-in shape
-        as :func:`astrolift_apps_page`.
+        as :func:`astrolift_apps_page`, and so are ``filter``, ``sort``,
+        ``page`` and ``pageSize`` (#2149).
         """
         status = _coerce_apps_status(status)
         scope_filter = _viewer_scope_filter()
@@ -1189,8 +1488,6 @@ class RegistryQuery:
         base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
             deleted_at__isnull=True
         )
-        if not include_archived:
-            base_qs = base_qs.filter(archived_at__isnull=True)
         if tenant is not None and tenant.organization_id is not None:
             base_qs = base_qs.filter(organization_id=tenant.organization_id)
 
@@ -1202,14 +1499,19 @@ class RegistryQuery:
             project_slug=project_slug,
             source_kind=source_kind,
         )
-        return _build_apps_page(
+        return _apps_list_page(
             qs,
             info=info,
+            include_archived=include_archived,
+            filter=filter,
             cursor=cursor,
             limit=limit,
             include_freshness=include_freshness,
             status=status,
             sort_by=sort_by,
+            sort=sort,
+            page=page,
+            page_size=page_size,
         )
 
     @strawberry.field
