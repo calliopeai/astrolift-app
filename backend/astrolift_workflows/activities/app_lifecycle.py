@@ -1209,9 +1209,8 @@ def _dry_run_deploy_set(
     the deploy with nothing written; ``apply_manifests`` dry-runs again
     against whatever changed in between.
     """
-    from core.app_deploy import AppDeployError, render_resources_for_deployment
-
     from astrolift_workflows.activities.image_retention import retain_deployment_images
+    from core.app_deploy import AppDeployError, render_resources_for_deployment
 
     workloads = render_resources_for_deployment(d)
     retain_deployment_images(d, workloads)

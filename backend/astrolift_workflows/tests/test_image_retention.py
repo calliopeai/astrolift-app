@@ -21,13 +21,16 @@ class RegistryFake:
         self.released = []
         self.fail = False
 
+    def _registry_uri(self):
+        return "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+
     def retain_deployment_images(self, refs, *, environment, deployment):
         if self.fail:
             raise RuntimeError("retention unavailable")
         return [
             {
                 "repository": "acme/api",
-                "tag": f"retain-astrolift-{UUID(environment).hex}-{UUID(deployment).hex}-aaaaaaaaaaaa",
+                "tag": f"retain-astrolift-{UUID(environment).hex}-{UUID(deployment).hex}-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "digest": DIGEST,
                 "source_ref": ref,
                 "pinned_ref": ref.rsplit(":", 1)[0] + "@" + DIGEST,
@@ -238,3 +241,35 @@ def test_retention_gate_precedes_secret_deletion_and_writes(app, env, registry, 
     else:
         assert _update_secrets_sync(current.pk) == 0
         assert calls == ["dry_run", "delete"]
+
+
+def test_retry_freezes_source_digest_without_a_second_registry_write(app, env, registry):
+    current = deployment(app, env)
+    retain_deployment_images(current, resources())
+    stale = Deployment.objects.get(pk=current.pk)
+    registry.fail = True
+    manifests = resources()
+    retain_deployment_images(stale, manifests)
+    assert manifests[0]["spec"]["template"]["spec"]["containers"][0]["image"].endswith("@" + DIGEST)
+
+
+def test_already_pinned_ref_reuses_owned_snapshot(app, env, registry):
+    from astrolift_workflows.activities.image_retention import retain_deployment_image_refs
+
+    current = deployment(app, env)
+    first = retain_deployment_image_refs(current, [REF])[REF]
+    registry.fail = True
+    assert retain_deployment_image_refs(current, [first]) == {first: first}
+
+
+@pytest.mark.parametrize(
+    "key,value", [("digest", "sha256:" + "b" * 64), ("pinned_ref", "evil.example/api@" + DIGEST)]
+)
+def test_inconsistent_snapshot_is_not_trusted_as_a_cached_pin(app, env, registry, key, value):
+    current = deployment(app, env)
+    retain_deployment_images(current, resources())
+    current.config_snapshot["ecr_retention_pins"][0][key] = value
+    current.save(update_fields=["config_snapshot", "updated_at", "version"])
+    registry.fail = True
+    with pytest.raises(RuntimeError, match="retention unavailable"):
+        retain_deployment_images(current, resources())

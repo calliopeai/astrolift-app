@@ -19,6 +19,8 @@ def _containers(value):
 
 def retain_deployment_image_refs(deployment, refs: list[str]) -> dict[str, str]:
     """Protect image refs before any service or cluster write; persist owned pins."""
+    import re
+
     from django.db import transaction
 
     from astrolift_lifecycle.models import Deployment
@@ -27,21 +29,41 @@ def retain_deployment_image_refs(deployment, refs: list[str]) -> dict[str, str]:
     cluster = deployment.app_environment.tenant_cluster
     if cluster.provider_plugin.slug != "aws":
         return {}
-    pins = []
-    if refs:
-        driver = driver_for_capability(cluster, "registry")
-        pins = driver.retain_deployment_images(
-            refs,
-            environment=str(deployment.app_environment.guid),
-            deployment=str(deployment.guid),
-        )
-    # Different rollout stages may hold stale Deployment instances. Merge into
-    # the current locked snapshot so FaaS, build jobs, and workload pins survive.
+    # Different rollout stages may hold stale Deployment instances. Lock the
+    # current snapshot so one rollout keeps the first protected source digest.
     with transaction.atomic():
         current = Deployment.all_objects.select_for_update().get(pk=deployment.pk)
         snapshot = dict(current.config_snapshot or {})
         prefix = f"retain-astrolift-{deployment.app_environment.guid.hex}-{deployment.guid.hex}-"
-        existing = [pin for pin in snapshot.get("ecr_retention_pins", []) if pin["tag"].startswith(prefix)]
+        owned = [
+            pin for pin in snapshot.get("ecr_retention_pins", []) if pin.get("tag", "").startswith(prefix)
+        ]
+        driver = driver_for_capability(cluster, "registry") if refs or owned else None
+        registry_uri = driver._registry_uri() if owned else ""
+        existing = []
+        for pin in owned:
+            digest = pin.get("digest", "")
+            repository = pin.get("repository", "")
+            source = pin.get("source_ref", "")
+            canonical = f"{registry_uri}/{repository}@{digest}"
+            source_repo = source.split("@", 1)[0].split(":", 1)[0]
+            if (
+                re.fullmatch(r"sha256:[a-f0-9]{64}", digest)
+                and pin["tag"] == prefix + digest[7:]
+                and source_repo == f"{registry_uri}/{repository}"
+                and pin.get("pinned_ref") == canonical
+            ):
+                existing.append({**pin, "pinned_ref": canonical})
+        resolved = {pin["source_ref"]: pin["pinned_ref"] for pin in existing}
+        resolved.update({pin["pinned_ref"]: pin["pinned_ref"] for pin in existing})
+        pending = [ref for ref in refs if ref not in resolved]
+        pins = []
+        if pending:
+            pins = driver.retain_deployment_images(
+                pending,
+                environment=str(deployment.app_environment.guid),
+                deployment=str(deployment.guid),
+            )
         by_tag = {(pin["repository"], pin["tag"]): pin for pin in [*existing, *pins]}
         if by_tag or "ecr_retention_pins" in snapshot:
             snapshot["ecr_retention_pins"] = list(by_tag.values())
@@ -49,7 +71,8 @@ def retain_deployment_image_refs(deployment, refs: list[str]) -> dict[str, str]:
             current.save(update_fields=["config_snapshot", "updated_at", "version"])
         deployment.config_snapshot = current.config_snapshot
         deployment.version = current.version
-    return {pin["source_ref"]: pin["pinned_ref"] for pin in pins}
+        resolved.update({pin["source_ref"]: pin["pinned_ref"] for pin in pins})
+    return {ref: resolved[ref] for ref in refs if ref in resolved}
 
 
 def retain_deployment_images(deployment, resources):
