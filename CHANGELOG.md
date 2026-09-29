@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- AWS deployments and rollbacks protect ECR images with immutable per-environment,
+  per-deployment tags before applying workloads, and pin container references to
+  the protected digest. Successful rollout history retains ten deployments per
+  workload; live, failed and in-flight deployments remain protected. Repositories
+  enroll in the preview-first age/count cleanup job on creation or adoption
+  (calliopeai/astrolift-opscode#69).
+
 - Rendered hostnames, not just app labels, are now unique per managed zone
   (#2012, follow-up to #1930). A multi-workload app's suffixed hostname
   (`<label>-<workload>.<zone>`) can equal another org's plain label of that

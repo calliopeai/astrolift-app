@@ -98,6 +98,7 @@ class ECRDriver(ImageRegistryDriver):
         try:
             kwargs: dict[str, Any] = {
                 "repositoryName": name,
+                "tags": [{"Key": "astrolift.io/ecr-retention", "Value": "enabled"}],
                 "imageScanningConfiguration": {
                     "scanOnPush": self._config.image_scanning_enabled,
                 },
@@ -119,9 +120,113 @@ class ECRDriver(ImageRegistryDriver):
             # re-registering an app under the same slug restores pushability
             # instead of silently inheriting the old deny.
             self._clear_archive_policy(name=name)
-            return self._describe_repo(name=name)
+            try:
+                existing = self._client.describe_repositories(repositoryNames=[name])["repositories"][0]
+                self._client.tag_resource(
+                    resourceArn=existing["repositoryArn"],
+                    tags=[{"Key": "astrolift.io/ecr-retention", "Value": "enabled"}],
+                )
+                return Repo(name=name, uri=existing["repositoryUri"])
+            except Exception as exc:
+                raise map_client_error(exc) from exc
         except Exception as exc:
             raise map_client_error(exc) from exc
+
+    @driver_op(cloud="aws", driver="registry", audit=True)
+    def retain_deployment_images(self, refs: list[str], *, environment: str, deployment: str) -> list[dict[str, str]]:
+        """Pin this rollout's images before apply; return tags for later retirement.
+
+        Pins are immutable and unique per environment/deployment/digest, so
+        concurrent rollouts cannot move another deployment's protection tag.
+        External registries are outside this driver's ownership.
+        """
+        from uuid import UUID
+
+        prefix = f"retain-astrolift-{UUID(environment).hex}-{UUID(deployment).hex}-"
+        registry = self._registry_uri() + "/"
+        pins = []
+        for ref in sorted(set(refs)):
+            if not ref.startswith(registry):
+                continue
+            path = ref[len(registry) :]
+            if "@" in path:
+                repo, digest = path.rsplit("@", 1)
+                repo = repo.split(":", 1)[0]
+                image_id = {"imageDigest": digest}
+            elif ":" in path:
+                repo, tag = path.rsplit(":", 1)
+                image_id = {"imageTag": tag}
+            else:
+                repo, image_id = path, {"imageTag": "latest"}
+            try:
+                response = self._client.batch_get_image(repositoryName=repo, imageIds=[image_id])
+                images = response.get("images", [])
+                if response.get("failures") or len(images) != 1:
+                    raise ProviderError(f"cannot retain deployment image {ref}: image unavailable")
+                image = images[0]
+                digest = image["imageId"]["imageDigest"]
+                tag = prefix + digest.removeprefix("sha256:")[:12]
+                kwargs = {
+                    "repositoryName": repo,
+                    "imageManifest": image["imageManifest"],
+                    "imageTag": tag,
+                }
+                if image.get("imageManifestMediaType"):
+                    kwargs["imageManifestMediaType"] = image["imageManifestMediaType"]
+                try:
+                    self._client.put_image(**kwargs)
+                except (
+                    self._client.exceptions.ImageAlreadyExistsException,
+                    self._client.exceptions.ImageTagAlreadyExistsException,
+                ):
+                    existing = self._client.describe_images(repositoryName=repo, imageIds=[{"imageTag": tag}])
+                    if existing["imageDetails"][0]["imageDigest"] != digest:
+                        raise ProviderError(f"retention tag collision in {repo}: {tag}") from None
+                pins.append(
+                    {
+                        "repository": repo,
+                        "tag": tag,
+                        "digest": digest,
+                        "source_ref": ref,
+                        "pinned_ref": f"{registry}{repo}@{digest}",
+                    }
+                )
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+        return pins
+
+    @driver_op(cloud="aws", driver="registry", audit=True)
+    def release_deployment_images(self, pins: list[dict[str, str]], *, environment: str, deployment: str) -> None:
+        """Remove only this deployment's protection tags, never its last tag."""
+        from uuid import UUID
+
+        prefix = f"retain-astrolift-{UUID(environment).hex}-{UUID(deployment).hex}-"
+        for pin in pins:
+            if not pin["tag"].startswith(prefix):
+                raise ProviderError("refusing to release another deployment's retention tag")
+            try:
+                try:
+                    response = self._client.describe_images(
+                        repositoryName=pin["repository"],
+                        imageIds=[{"imageTag": pin["tag"]}],
+                    )
+                except self._client.exceptions.ImageNotFoundException:
+                    continue
+                image = response["imageDetails"][0]
+                if image["imageDigest"] != pin["digest"]:
+                    raise ProviderError("retention tag no longer points to the recorded digest")
+                # ECR deletes an image when its final tag is removed. Leave that
+                # case pinned rather than bypassing the janitor's age/count gate.
+                if len(image.get("imageTags", [])) <= 1:
+                    continue
+                result = self._client.batch_delete_image(
+                    repositoryName=pin["repository"],
+                    imageIds=[{"imageTag": pin["tag"]}],
+                )
+                if any(f["failureCode"] != "ImageNotFound" for f in result.get("failures", [])):
+                    raise ProviderError("could not release deployment retention tag")
+            except Exception as exc:
+                raise map_client_error(exc) from exc
 
     @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.delete")
     def delete_repo(self, name: str, *, archive: bool = True) -> None:
