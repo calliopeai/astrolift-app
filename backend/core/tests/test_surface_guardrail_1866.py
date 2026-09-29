@@ -60,6 +60,11 @@ ALLOWED: dict[str, str] = {
     "Query.formFieldTypes": "the static palette of form widget kinds; no tenant data",
     "Query.agentRuntimes": "install-wide agent runtime catalog, the same for every org; refuses anonymous callers",
     "Query.astroliftServerInfo": "public: install and build metadata the shell renders, no tenant data",
+    "/app/metrics/": "install-wide: Prometheus registry, active platform operator only with an admin bearer ceiling (#2174)",
+    "Mutation.confirmPreSignedUrlImageUpload": (
+        "self-service: own live upload in the active legacy org with live membership, or its platform operator; "
+        "generic bearer writes require admin and the same organization GUID (#2174)"
+    ),
     # -- Sign-in, sign-out and session flows ----------------------------------
     "auth:Mutation.login": "auth flow: username/password sign-in on the login-only schema",
     "auth:Mutation.logout": "auth flow: ends the caller's own session",
@@ -631,7 +636,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.librarySetIcon",
         "Mutation.generateRocketChatToken",
         "Mutation.preSignedUrlImageUpload",
-        "Mutation.confirmPreSignedUrlImageUpload",
         "Mutation.uploadTextFile",
         "Mutation.processFile",
         "Mutation.fileUpload",
@@ -641,11 +645,8 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.organization",
         "Mutation.upsertOrganization",
         "Mutation.organizationMemberStatus",
-        "/app/sentry-debug/",
         "/app/export/",
-        "/app/test/open_telemetry/",
         "/api/support/v1/tickets/",
-        "/app/metrics/",
     ),
     # TODO(#2111): observability routes without a scoped gate; the issue says what each checks today.
     "#2111": (
