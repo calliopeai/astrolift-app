@@ -22,6 +22,7 @@ from strawberry.types import Info
 
 from astrolift_clusters.models import TenantCluster
 from astrolift_clusters.schema.mutations import _require_operator_for_shared
+from astrolift_clusters.scopes import cluster_org_scope
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -167,7 +168,7 @@ def _email(value: str) -> str:
 @strawberry.type
 class ClusterAuthUsersQuery:
     @strawberry.field
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS))
     @tenant_scoped()
     def astrolift_cluster_auth_users(
         self, info: Info, cluster_id: GUID, search: str = ""
@@ -208,7 +209,9 @@ class ClusterAuthUsersQuery:
 class ClusterAuthUsersMutation:
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.create")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def create_cluster_auth_user(
         self, info: Info, input: CreateClusterAuthUserInput
@@ -231,7 +234,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.set_password")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def set_cluster_auth_user_password(
         self, info: Info, input: SetClusterAuthUserPasswordInput
@@ -249,7 +254,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.reset_password")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def reset_cluster_auth_user_password(
         self, info: Info, input: ClusterAuthUserRefInput
@@ -259,7 +266,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.set_enabled")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def set_cluster_auth_user_enabled(
         self, info: Info, input: SetClusterAuthUserEnabledInput
@@ -271,7 +280,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.delete")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def delete_cluster_auth_user(
         self, info: Info, input: ClusterAuthUserRefInput
@@ -281,7 +292,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_user.set_groups")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def set_cluster_auth_user_groups(
         self, info: Info, input: SetClusterAuthUserGroupsInput
@@ -297,7 +310,9 @@ class ClusterAuthUsersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.auth_group.create")
-    @require_permission(Permission.CLUSTER_USERS)
+    @require_permission(
+        Permission.CLUSTER_USERS, scope=cluster_org_scope(Permission.CLUSTER_USERS, "input.cluster_id")
+    )
     @tenant_scoped()
     def create_cluster_auth_group(
         self, info: Info, input: CreateClusterAuthGroupInput

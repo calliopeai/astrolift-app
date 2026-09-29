@@ -39,6 +39,14 @@
 - Request-ID and trace context cleanup now consumes each token once, so a
   handled view exception preserves its original HTTP status and request-ID
   header when Django subsequently runs response middleware (#2174).
+- Cluster, managed-domain and provider-configuration routes require their
+  explicit organization owner scope (#2108). Team/project grants and
+  team-bound bearer tokens, including operator/admin tokens, cannot authorize
+  organization resources through a selected team. Shared domain workflow writes
+  check both the cluster and domain; shared bootstrap history requires the
+  platform operator. All 48 tracked routes have real RoleBinding coverage and
+  no surface-guardrail exemptions remain for this issue.
+
 - Agent surfaces are isolated per team and project, and a guardrail keeps
   every surface declaring its permission and scope (#1866).
   `AgentEnvironmentSpec` and `AgentBox` gain nullable `team` and `project`

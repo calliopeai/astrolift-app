@@ -55,6 +55,7 @@ from astrolift_clusters.schema.types import (
     domain_to_type,
     plugin_to_type,
 )
+from astrolift_clusters.scopes import cluster_catalog_org_scope, cluster_org_scope
 from astrolift_graphql import (
     GUID,
     FilterField,
@@ -336,14 +337,18 @@ class ClustersQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftClustersPage."
     )
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(
+        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
+    )
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
         qs = _clusters_qs().order_by("slug")[:200]
         return [cluster_to_type(c) for c in qs]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(
+        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
+    )
     @tenant_scoped()
     def astrolift_clusters_page(
         self,
@@ -405,7 +410,10 @@ class ClustersQuery:
         return result.map(cluster_to_type)
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(
+        Permission.CLUSTER_REGISTER,
+        scope=cluster_org_scope(Permission.CLUSTER_REGISTER, "slug", by_slug=True),
+    )
     @tenant_scoped()
     def astrolift_cluster(self, info: Info, slug: str) -> TenantClusterType | None:
         """One cluster by slug, or null when the caller cannot see it (#2150).
@@ -420,7 +428,7 @@ class ClustersQuery:
         return cluster_to_type(cluster) if cluster is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.APP_CREATE, scope=cluster_catalog_org_scope(Permission.APP_CREATE))
     @tenant_scoped()
     def astrolift_cluster_count(self, info: Info) -> int:
         """Count of managed clusters bound to the caller's org.
@@ -450,7 +458,9 @@ class ClustersQuery:
         ).count()
 
     @strawberry.field
-    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
     @tenant_scoped()
     def astrolift_managed_domains(self, info: Info) -> list[ManagedDomainType]:
         tenant = get_current_tenant()
@@ -478,7 +488,9 @@ class ClustersQuery:
         return [plugin_to_type(p) for p in qs]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(
+        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
+    )
     @tenant_scoped()
     def astrolift_provider_regions(
         self,
@@ -513,7 +525,7 @@ class ClustersQuery:
         return [ProviderRegionType(id=r["id"], label=r["label"], continent=r["continent"]) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_lifecycle_audit(
         self,
@@ -617,7 +629,7 @@ class ClustersQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_recent_cluster_workflows(
         self,
@@ -659,7 +671,7 @@ class ClustersQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_app_count_for_cluster(self, info: Info, cluster_id: GUID) -> int:
         """Active apps bound to a specific cluster (#393).
@@ -692,7 +704,7 @@ class ClustersQuery:
         return len(set(default_bound) | set(env_bound))
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_health(
         self,
@@ -765,7 +777,7 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_live_state(
         self,
@@ -797,7 +809,7 @@ class ClustersQuery:
         return cluster_live_state_to_type(cluster)
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_UPDATE)
+    @require_permission(Permission.CLUSTER_UPDATE, scope=cluster_org_scope(Permission.CLUSTER_UPDATE))
     @tenant_scoped()
     def astrolift_cognito_user_pools(
         self,
@@ -859,7 +871,7 @@ class ClustersQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_UPDATE)
+    @require_permission(Permission.CLUSTER_UPDATE, scope=cluster_org_scope(Permission.CLUSTER_UPDATE))
     @tenant_scoped()
     def astrolift_cognito_user_pool_clients(
         self,
@@ -909,7 +921,7 @@ class ClustersQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE))
     @tenant_scoped()
     def astrolift_cluster_bootstrap_plan(self, info: Info, cluster_id: GUID) -> BootstrapPlanType | None:
         """Driver-owned bootstrap recipe for ``cluster_id``.
@@ -950,7 +962,7 @@ class ClustersQuery:
         return bootstrap_plan_to_type(cluster, components)
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_prometheus_metrics(
         self,
@@ -1066,7 +1078,7 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_prometheus_range_metrics(
         self,
@@ -1280,7 +1292,7 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_system_metrics(
         self,
@@ -1454,7 +1466,7 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(Permission.CLUSTER_REGISTER, scope=cluster_org_scope(Permission.CLUSTER_REGISTER))
     @tenant_scoped()
     def astrolift_cluster_workload_health(
         self,
@@ -1543,7 +1555,7 @@ class ClustersQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.APP_DEPLOY, scope=cluster_org_scope(Permission.APP_DEPLOY))
     @tenant_scoped()
     def astrolift_cluster_certificates(
         self,
@@ -1611,7 +1623,9 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
     @tenant_scoped()
     def astrolift_dns_zones(
         self,
@@ -1654,7 +1668,9 @@ class ClustersQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
     @tenant_scoped()
     def astrolift_dns_certificates(
         self,
