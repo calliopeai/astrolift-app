@@ -51,7 +51,7 @@ class DeliverWebhookWorkflow:
                 # on a permanent failure.
                 return {**last, "attempts": attempt}
 
-            delay = next_retry_delay_seconds(attempt=attempt)
+            delay = next_retry_delay_seconds(attempt=attempt, rng=workflow.random())
             if delay is None:
                 return {**last, "attempts": attempt, "exhausted": True}
 
