@@ -8,7 +8,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { accessCrumbs, TEAMS_HREF } from "@/components/screens/administration/access/access-nav";
-import { WALK_CAP } from "@/components/screens/members/use-walk";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
@@ -42,7 +41,6 @@ export function TeamsScreen({
   loading,
   stale,
   error,
-  truncated,
   onRetry,
   canUpdate,
   canDelete,
@@ -57,7 +55,7 @@ export function TeamsScreen({
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftTeam | null>(null);
 
   // The create sheet refetches LIST_TEAMS, a different root field from this
-  // walk, so a new team would not appear until a navigation.
+  // page, so a new team would not appear until a navigation.
   function handleCreateOpenChange(next: boolean) {
     setOpen(next);
     if (!next) onRetry();
@@ -95,9 +93,7 @@ export function TeamsScreen({
         header={{
           crumbs: accessCrumbs("teams"),
           title: "Teams",
-          context: truncated
-            ? `Sort and pages cover the first ${WALK_CAP.toLocaleString()} teams.`
-            : "Teams scope projects, apps and the grants on them.",
+          context: "Teams scope projects, apps and the grants on them.",
           primaryAction: (
             <Can permission="team.create">
               <Button size="sm" onClick={() => setOpen(true)}>

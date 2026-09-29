@@ -26,7 +26,17 @@ function Assignments({
 
 export const Full: Story = {
   render: () => (
-    <Assignments {...assignmentsProps({ page: pageData(BINDINGS, { nextCursor: "c2" }) })} />
+    <Assignments {...assignmentsProps({ page: pageData(BINDINGS, { totalCount: 57 }) })} />
+  ),
+};
+
+/** Mine: the viewer's own bindings and those on the IdP groups they are in. */
+export const Mine: Story = {
+  render: () => (
+    <Assignments
+      {...assignmentsProps({ page: pageData(BINDINGS.slice(0, 2)) })}
+      initial={{ view: "mine" }}
+    />
   ),
 };
 
@@ -76,7 +86,7 @@ export const LongStrings: Story = {
   render: () => (
     <Assignments
       {...assignmentsProps({
-        page: pageData([...LONG_BINDINGS, ...BINDINGS], { totalCount: 1_284, nextCursor: "c2" }),
+        page: pageData([...LONG_BINDINGS, ...BINDINGS], { totalCount: 1_284 }),
       })}
     />
   ),

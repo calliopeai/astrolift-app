@@ -1,7 +1,7 @@
 "use client";
 
-import { holderLabel } from "@/components/screens/administration/access/principal-access";
-import { usePrincipalAccess } from "@/components/screens/administration/access/use-principal-access";
+import { grantHref, TEAMS_HREF } from "@/components/screens/administration/access/access-nav";
+import { useEntityAccess } from "@/components/screens/administration/access/use-entity-access";
 import { TeamAccessPanel } from "@/components/screens/teams/TeamAccessPanel";
 import { TeamDetailScreen } from "@/components/screens/teams/TeamDetailScreen";
 import { TeamMembersPanel } from "@/components/screens/teams/TeamMembersPanel";
@@ -11,11 +11,18 @@ import { useTeamProjects } from "@/components/screens/teams/use-team-projects";
 
 export function TeamAccessClient({ slug }: { slug: string }) {
   const detail = useTeamDetail(slug);
-  const access = usePrincipalAccess(detail.team ? { kind: "team", slug } : null);
+  const team = detail.team;
+  const access = useEntityAccess(team ? { kind: "TEAM", id: team.id } : null, `team ${slug}`);
   const reach = useTeamProjects(slug);
+  const grant = team
+    ? grantHref({
+        scope: { kind: "TEAM", id: team.id, name: team.slug },
+        returnTo: `${TEAMS_HREF}/${encodeURIComponent(slug)}`,
+      })
+    : undefined;
   return (
     <TeamDetailScreen {...detail} tab="access">
-      <TeamAccessPanel slug={slug} access={{ ...access, holderLabel }} reach={reach} />
+      <TeamAccessPanel slug={slug} access={{ ...access, grantHref: grant }} reach={reach} />
     </TeamDetailScreen>
   );
 }

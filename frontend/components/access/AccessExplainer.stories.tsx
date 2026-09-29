@@ -6,6 +6,7 @@ import {
   COMPARISON,
   DIAGNOSIS_LONG,
   DIAGNOSIS_NO,
+  DIAGNOSIS_POLICY_DENIED,
   DIAGNOSIS_SUPERUSER,
   DIAGNOSIS_YES,
   LONG,
@@ -33,8 +34,13 @@ export const Yes: Story = {
 /** Held on a team, asked at org scope: the #1717 shape. */
 export const No: Story = { args: { diagnosis: DIAGNOSIS_NO } };
 
-/** Asked about an app: the note says the backend checks at org scope. */
+/** Asked about an app: the answer is for that app. */
 export const WithTarget: Story = { args: { diagnosis: DIAGNOSIS_NO, target: CHECKOUT } };
+
+/** On an app: the role grants it there and a policy denies it anyway; the chain says which. */
+export const PolicyDenied: Story = {
+  args: { diagnosis: DIAGNOSIS_POLICY_DENIED, target: CHECKOUT },
+};
 
 export const Superuser: Story = { args: { diagnosis: DIAGNOSIS_SUPERUSER } };
 

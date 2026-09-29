@@ -11,7 +11,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 
 import { LONG, TEAM_LONG, TEAMS } from "./teams-tokens.fixtures";
-import { selectTeamMembers, selectTeams } from "./teams-list";
+import { selectTeamMembers } from "./teams-list";
 import type { TeamDetailScreenProps } from "./TeamDetailScreen";
 import type { TeamMembersPanelProps } from "./TeamMembersPanel";
 import type { TeamsScreenProps } from "./TeamsScreen";
@@ -22,24 +22,17 @@ const noop = () => {};
 
 type TeamsData = Omit<TeamsScreenProps, "list" | "renderCreateDialog" | "renderEditDialog">;
 
+/** The page the server answers: `teams` as the rows, `totalCount` their count unless given. */
 export function teamsScreenProps(
-  list: ListStateController,
   teams: AstroliftTeam[] = TEAMS,
   overrides: Partial<TeamsData> = {}
 ): TeamsData {
-  const selected = selectTeams(teams, {
-    filters: list.filters,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-  });
   return {
-    rows: selected.rows,
-    totalCount: selected.totalCount,
+    rows: teams,
+    totalCount: teams.length,
     loading: false,
     stale: false,
     error: null,
-    truncated: false,
     onRetry: noop,
     canUpdate: true,
     canDelete: true,

@@ -2,20 +2,16 @@
 
 import * as React from "react";
 
-import type { CursorPage, SortState } from "@/components/data-table";
+import type { SortState } from "@/components/data-table";
 import { type ListDefinition, useListState } from "@/components/list/use-list-state";
-import { useWalk } from "@/components/screens/members/use-walk";
-import { LIST_ROLE_BINDINGS_PAGE } from "@/graphql/identity/identity.queries";
-import type { AstroliftMember, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
-
-import { teamSlugIndex } from "./principal-access";
+import type { AstroliftMember } from "@/graphql/identity/identity.types";
 
 export interface TeamMembershipRow {
   /** The TEAM-scope Member row. */
   member: AstroliftMember;
-  /** The team's pk, which is all a Member row carries. */
+  /** The team's pk, the row's `scopeId`. */
   pk: string;
-  /** Named from a TEAM binding's label, where one exists. */
+  /** The team's slug, which the server sets on a TEAM-scope row. */
   slug: string | null;
 }
 
@@ -58,29 +54,23 @@ export function selectMemberships(
 
 /**
  * A person's Teams tab: their TEAM-scope Member rows (from the page's
- * LIST_MEMBERS read), named from their own bindings' labels. A team they are
- * on without a binding there stays `team #<pk>` until the Member row carries
- * the team's name (design 6).
+ * LIST_MEMBERS read), each named by the team the server puts on the row
+ * (`teamSlug`). A person is on a handful of teams, so the search, sort and
+ * page run here over them.
  */
 export function usePersonTeams(
   member: AstroliftMember | null,
   memberships: readonly AstroliftMember[]
 ) {
   const list = useListState(PERSON_TEAMS_LIST);
-  const bindings = useWalk<AstroliftRoleBinding>(
-    LIST_ROLE_BINDINGS_PAGE,
-    (d) =>
-      (d as { astroliftRoleBindingsPage?: CursorPage<AstroliftRoleBinding> } | undefined)
-        ?.astroliftRoleBindingsPage,
-    { variables: { search: member?.user.username ?? null }, skip: !member }
-  );
 
-  const rows = React.useMemo<TeamMembershipRow[]>(() => {
-    const names = teamSlugIndex(bindings.rows.filter((b) => b.user?.id === member?.user.id));
-    return memberships
-      .filter((m) => m.scopeKind === "TEAM")
-      .map((m) => ({ member: m, pk: m.scopeId, slug: names.get(m.scopeId) ?? null }));
-  }, [bindings.rows, member, memberships]);
+  const rows = React.useMemo<TeamMembershipRow[]>(
+    () =>
+      memberships
+        .filter((m) => m.scopeKind === "TEAM")
+        .map((m) => ({ member: m, pk: m.scopeId, slug: m.teamSlug ?? null })),
+    [memberships]
+  );
 
   const selected = selectMemberships(rows, {
     q: list.state.q,
@@ -94,8 +84,7 @@ export function usePersonTeams(
     rows: selected.rows,
     totalCount: selected.totalCount,
     loading: !member,
-    stale: bindings.stale,
-    error: bindings.error,
-    onRetry: bindings.refetch,
+    error: null,
+    onRetry: () => {},
   };
 }

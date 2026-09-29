@@ -5,8 +5,8 @@ import { useListState } from "@/components/list/use-list-state";
 import { LIST_ROLES_PAGE } from "@/graphql/identity/identity.queries";
 import type { AstroliftRole } from "@/graphql/identity/identity.types";
 
-import { useListPageQuery } from "../access/use-list-page-query";
-import { ROLES_LIST } from "./permissions-lists";
+import { useNumberedListQuery } from "../access/use-list-page-query";
+import { ROLES_LIST, rolesFilter } from "./permissions-lists";
 
 interface RolesPageResp {
   astroliftRolesPage: CursorPage<AstroliftRole>;
@@ -19,13 +19,14 @@ interface RolesPageResp {
  * fetches only what it shows.
  */
 export function useRoles() {
-  // `astroliftRolesPage` searches slug, name and description. The document
-  // sends no sort argument, so no column declares a `sortKey`.
+  // `astroliftRolesPage` searches slug, name and description, and filters,
+  // sorts and numbers the pages (#2153).
   const list = useListState(ROLES_LIST);
-  const page = useListPageQuery<AstroliftRole>(
+  const page = useNumberedListQuery<AstroliftRole, ReturnType<typeof rolesFilter>>(
     LIST_ROLES_PAGE,
     list,
-    (d) => (d as RolesPageResp | undefined)?.astroliftRolesPage
+    (d) => (d as RolesPageResp | undefined)?.astroliftRolesPage,
+    { toFilter: rolesFilter }
   );
   return { list, page };
 }

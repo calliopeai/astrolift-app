@@ -1,11 +1,14 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import type { DocumentNode } from "graphql";
 import * as React from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
+import { exportCsv } from "@/components/list/exportCsv";
 import { useListState } from "@/components/list/use-list-state";
+import { PRINCIPAL_SEARCH } from "@/graphql/access/access.queries";
 import {
   ANONYMIZE_USER,
   DELETE_INVITATION,
@@ -25,106 +28,165 @@ import type {
   AstroliftRoleBinding,
   MutationResult,
 } from "@/graphql/identity/identity.types";
-import { GET_ME } from "@/graphql/user/user.queries";
-import type { MeQueryData } from "@/graphql/user/user.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import {
-  buildPeopleRows,
-  type InvitationRow,
+  type GroupPrincipal,
+  groupRow,
+  groupsVariables,
+  invitationRow,
+  invitationsVariables,
+  membersVariables,
   PEOPLE_LIST,
   type PeopleRow,
   peopleList,
-  selectPeople,
-  viewNeeds,
+  sourceOf,
+  userRows,
 } from "./people-model";
-import { useWalk } from "./use-walk";
+import { PEOPLE_CSV } from "./people-csv";
+
+type Page<T> = CursorPage<T> & { page?: number | null; pageSize?: number | null };
+
+interface MembersResp {
+  astroliftMembersPage: Page<AstroliftMember>;
+}
+interface InvitationsResp {
+  astroliftInvitationsPage: Page<AstroliftInvitation>;
+}
+interface GroupsResp {
+  astroliftPrincipalSearch: Page<GroupPrincipal>;
+}
+interface BindingsResp {
+  astroliftRoleBindingsPage: Page<AstroliftRoleBinding>;
+}
+
+/** The export walks the view this many rows at a time, and stops at the cap. */
+const EXPORT_PAGE = 200;
+const EXPORT_CAP = 5_000;
 
 /**
  * The data half of the People list (access UX design 3.1): the list state
- * (URL), the walks its view needs, and the invitation and anonymize
- * mutations. Only the active view's walks run: All, Mine and Admins read
- * members and bindings; Groups reads bindings; Invited reads invitations.
- * Grants and revokes moved to the Grant access page and the principal
- * pages' Access tab.
+ * (URL), the one query its view needs (members, IdP groups or
+ * invitations; see people-model.ts), the roles of the people on the page,
+ * and the invitation and anonymize mutations. The server filters, sorts,
+ * counts and numbers the pages. Grants and revokes are on the Grant access
+ * page and the principal pages' Access tab.
  */
 export function useMembers() {
+  const client = useApolloClient();
   const perms = useMyPermissions();
   const canManageMembers = perms.can("org.manage_members");
 
   const list = useListState(PEOPLE_LIST);
-  const { state } = list;
-  const search = state.q.trim() || null;
-  const needs = viewNeeds(list.filters);
-  const [now] = React.useState(() => Date.now());
-
-  const members = useWalk<AstroliftMember>(
-    LIST_MEMBERS_PAGE,
-    (d) =>
-      (d as { astroliftMembersPage?: CursorPage<AstroliftMember> } | undefined)
-        ?.astroliftMembersPage,
-    { variables: { search }, skip: !needs.members }
-  );
-  // Unsearched: a user's roles are all of their bindings, whatever the search.
-  const bindings = useWalk<AstroliftRoleBinding>(
-    LIST_ROLE_BINDINGS_PAGE,
-    (d) =>
-      (d as { astroliftRoleBindingsPage?: CursorPage<AstroliftRoleBinding> } | undefined)
-        ?.astroliftRoleBindingsPage,
-    { skip: !needs.bindings }
-  );
-  // Every status: the Invited view is `status:pending`, a chip shows the history.
-  const invitations = useWalk<AstroliftInvitation>(
-    LIST_INVITATIONS_PAGE,
-    (d) =>
-      (d as { astroliftInvitationsPage?: CursorPage<AstroliftInvitation> } | undefined)
-        ?.astroliftInvitationsPage,
-    { variables: { search, status: null }, skip: !needs.invitations }
-  );
-  const roles = useQuery<{ astroliftRoles: AstroliftRole[] }>(LIST_ROLES);
-  const me = useQuery<MeQueryData>(GET_ME).data?.me?.profile?.username ?? null;
-
-  const roleList = React.useMemo(() => roles.data?.astroliftRoles ?? [], [roles.data]);
-  const people = React.useMemo(
-    () => buildPeopleRows({ members: members.rows, bindings: bindings.rows, roles: roleList }),
-    [members.rows, bindings.rows, roleList]
-  );
-  const allRows = React.useMemo<PeopleRow[]>(
-    () => [
-      ...people.users,
-      ...people.groups,
-      ...invitations.rows.map(
-        (invitation): InvitationRow => ({
-          kind: "invitation",
-          key: `invitation:${invitation.id}`,
-          invitation,
-        })
-      ),
-    ],
-    [people, invitations.rows]
-  );
-
-  const selected = selectPeople(allRows, {
+  const question = {
+    q: list.state.q,
     filters: list.filters,
-    q: state.q,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-    me,
-    now,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  };
+  const source = sourceOf(list.filters);
+  const common = { fetchPolicy: "cache-and-network" as const };
+
+  const members = useQuery<MembersResp>(LIST_MEMBERS_PAGE, {
+    ...common,
+    variables: membersVariables(question),
+    skip: source !== "members",
   });
+  const groups = useQuery<GroupsResp>(PRINCIPAL_SEARCH, {
+    ...common,
+    variables: groupsVariables(question),
+    skip: source !== "groups",
+  });
+  const invitations = useQuery<InvitationsResp>(LIST_INVITATIONS_PAGE, {
+    ...common,
+    variables: invitationsVariables(question),
+    skip: source !== "invitations",
+  });
+  const roles = useQuery<{ astroliftRoles: AstroliftRole[] }>(LIST_ROLES);
+  const roleList = React.useMemo(() => roles.data?.astroliftRoles ?? [], [roles.data]);
 
-  const teamSlugs = [
-    ...new Set(people.users.flatMap((u) => u.teams.map((t) => t.slug)).filter(Boolean)),
-  ] as string[];
-  const withOptions = { ...list, definition: peopleList(roleList, teamSlugs.sort()) };
+  const active = { members, groups, invitations }[source];
+  const data = active.data ?? active.previousData;
+  const memberPage = (members.data ?? members.previousData)?.astroliftMembersPage;
+  const memberItems = React.useMemo(
+    () => (source === "members" ? (memberPage?.items ?? []) : []),
+    [source, memberPage]
+  );
 
-  const walks = [
-    needs.members && members,
-    needs.bindings && bindings,
-    needs.invitations && invitations,
-  ].filter((w): w is typeof members => Boolean(w));
-  const failed = walks.find((w) => w.error);
+  // The roles column: every binding of the people on this page, in one read.
+  const usernames = memberItems.map((m) => m.user.username);
+  const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS_PAGE, {
+    ...common,
+    variables: {
+      search: null,
+      filter: { holder: usernames, kind: ["user"] },
+      sort: "name",
+      page: 1,
+      pageSize: 200,
+    },
+    skip: usernames.length === 0,
+  });
+  const bindingRows = React.useMemo(
+    () => (bindings.data ?? bindings.previousData)?.astroliftRoleBindingsPage.items ?? [],
+    [bindings.data, bindings.previousData]
+  );
+
+  const rows = React.useMemo<PeopleRow[]>(() => {
+    if (source === "members") return userRows(memberItems, bindingRows, roleList);
+    if (source === "groups")
+      return ((data as GroupsResp | undefined)?.astroliftPrincipalSearch.items ?? []).map(groupRow);
+    return ((data as InvitationsResp | undefined)?.astroliftInvitationsPage.items ?? []).map(
+      invitationRow
+    );
+  }, [source, memberItems, bindingRows, roleList, data]);
+
+  const totalCount =
+    source === "members"
+      ? memberPage?.totalCount
+      : source === "groups"
+        ? (data as GroupsResp | undefined)?.astroliftPrincipalSearch.totalCount
+        : (data as InvitationsResp | undefined)?.astroliftInvitationsPage.totalCount;
+
+  /** Every row the view and chips match, walked page by page, as CSV. */
+  async function onExportCsv() {
+    type Walk = [DocumentNode, object, (d: unknown) => PeopleRow[]];
+    const [doc, vars, pick]: Walk =
+      source === "members"
+        ? [
+            LIST_MEMBERS_PAGE,
+            membersVariables(question),
+            (d) => userRows((d as MembersResp).astroliftMembersPage.items, [], roleList),
+          ]
+        : source === "groups"
+          ? [
+              PRINCIPAL_SEARCH,
+              groupsVariables(question),
+              (d) => (d as GroupsResp).astroliftPrincipalSearch.items.map(groupRow),
+            ]
+          : [
+              LIST_INVITATIONS_PAGE,
+              invitationsVariables(question),
+              (d) => (d as InvitationsResp).astroliftInvitationsPage.items.map(invitationRow),
+            ];
+    const out: PeopleRow[] = [];
+    try {
+      for (let page = 1; out.length < EXPORT_CAP; page++) {
+        const res = await client.query({
+          query: doc,
+          variables: { ...vars, page, pageSize: EXPORT_PAGE },
+          fetchPolicy: "network-only",
+        });
+        const chunk = res.data ? pick(res.data) : [];
+        out.push(...chunk);
+        if (chunk.length < EXPORT_PAGE) break;
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "The export failed");
+      return;
+    }
+    exportCsv("people", out, PEOPLE_CSV);
+  }
 
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
@@ -199,15 +261,18 @@ export function useMembers() {
 
   return {
     canManageMembers,
-    list: withOptions,
-    rows: selected.rows,
-    totalCount: selected.totalCount,
-    filtered: selected.filtered,
-    loading: walks.some((w) => w.loading),
-    stale: walks.some((w) => w.stale),
-    error: failed?.error ?? null,
-    truncated: walks.some((w) => w.truncated),
-    onRetry: () => walks.forEach((w) => w.refetch()),
+    list: { ...list, definition: peopleList(roleList) },
+    rows,
+    totalCount: totalCount ?? rows.length,
+    loading: active.loading && !data,
+    stale: active.loading && !active.data && Boolean(data),
+    error: active.error ? { message: active.error.message } : null,
+    onRetry: () => {
+      void active.refetch();
+    },
+    onExportCsv: () => {
+      void onExportCsv();
+    },
     revokingInvite,
     deletingInvite,
     resendingInvite,

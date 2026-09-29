@@ -29,7 +29,38 @@ const base: RolePermissionsTabProps = {
   duplicateHref: "/administration/permissions/roles/new?from=r-auditor",
 };
 
-export const Custom: Story = { render: () => <RolePermissionsTab {...base} /> };
+/** Duplicated from Viewer: the tab says how far it has moved and compares with it on a click. */
+export const Custom: Story = {
+  render: () => <RolePermissionsTab {...base} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(c.getByText(/Duplicated from/)).toHaveTextContent("+2");
+    await userEvent.click(c.getByRole("button", { name: "Compare with Viewer" }));
+    await expect(c.queryByRole("button", { name: "Compare with Viewer" })).toBeNull();
+  },
+};
+
+/** Read-only, it opens compared with the role it came from, even once that is deleted. */
+export const LineageDeletedReadOnly: Story = {
+  render: () => (
+    <RolePermissionsTab
+      {...base}
+      canManage={false}
+      role={{
+        ...AUDITOR_ROLE,
+        duplicatedFrom: { ...AUDITOR_ROLE.duplicatedFrom!, deleted: true },
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText(/since deleted/)).toBeInTheDocument();
+  },
+};
+
+/** A custom role written from scratch: no lineage line. */
+export const CustomNoLineage: Story = {
+  render: () => <RolePermissionsTab {...base} role={{ ...AUDITOR_ROLE, duplicatedFrom: null }} />,
+};
 
 /** A cell ticked: the diff against the saved version counts it, and Save turns on. */
 export const Edited: Story = {

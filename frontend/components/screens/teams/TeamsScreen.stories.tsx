@@ -28,7 +28,7 @@ function Screen({
   return (
     <TeamsScreen
       list={list}
-      {...teamsScreenProps(list, teams, overrides)}
+      {...teamsScreenProps(teams, overrides)}
       renderCreateDialog={() => null}
       renderEditDialog={() => null}
     />
@@ -41,8 +41,18 @@ export const Loading: Story = { render: () => <Screen teams={[]} loading /> };
 
 export const Empty: Story = { render: () => <Screen teams={[]} /> };
 
-/** Mine says why it is empty. */
-export const Mine: Story = { render: () => <Screen initial={{ view: "mine" }} /> };
+/** Mine: the teams the viewer is on, answered by the server. */
+export const Mine: Story = {
+  render: () => <Screen teams={TEAMS.slice(0, 1)} initial={{ view: "mine" }} />,
+};
+
+/** Mine with nothing in it: the viewer is on no team. */
+export const MineEmpty: Story = { render: () => <Screen teams={[]} initial={{ view: "mine" }} /> };
+
+/** Past one page: the numbers come from the server's count. */
+export const ManyPages: Story = {
+  render: () => <Screen totalCount={137} initial={{ page: 2 }} />,
+};
 
 export const NoSearchMatch: Story = {
   render: () => <Screen teams={[]} initial={{ q: "zzz" }} />,

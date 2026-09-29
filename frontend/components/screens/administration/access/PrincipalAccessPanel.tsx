@@ -38,7 +38,7 @@ export interface PrincipalAccessPanelProps {
   onBulkRevoke: (ids: string[]) => Promise<boolean>;
   /** A team's page lists every holder, so it adds a Who column. */
   showHolder?: boolean;
-  /** A caveat above the list, e.g. that group grants are not evaluated yet. */
+  /** A caveat above the list. */
   note?: React.ReactNode;
   /** The Grant access link for the empty state. */
   grantHref?: string;
@@ -177,8 +177,8 @@ export function PrincipalAccessPanel({
           )}
           {truncated && (
             <Note>
-              The org has more role bindings than one walk reads, so this list may be missing grants
-              until the backend can list a principal&apos;s access directly.
+              They hold more grants than one read returns, so this list shows the first 200. Narrow
+              it on Assignments, where every grant is paged on the server.
             </Note>
           )}
           {note && <Note>{note}</Note>}

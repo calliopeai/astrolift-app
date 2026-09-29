@@ -59,23 +59,27 @@ const role = (
 export const OWNER_ROLE = role("r-owner", "org_owner", "Org Owner", ALL_PERMISSIONS, {
   isSystem: true,
   description: "Full control of the organization.",
+  bindingsCount: 2,
 });
 export const VIEWER_ROLE = role("r-viewer", "viewer", "Viewer", ["app.read", "cluster.read"], {
   isSystem: true,
   description: "Read-only access to apps and clusters.",
+  bindingsCount: 41,
 });
 export const RELEASE_ROLE = role(
   "r-release",
   "release-manager",
   "Release Manager",
   ["app.deploy", "app.read", "app.rollback"],
-  { scopeLevel: "PROJECT", description: "Ships and rolls back releases." }
+  { scopeLevel: "PROJECT", description: "Ships and rolls back releases.", bindingsCount: 3 }
 );
 export const TEAM_ROLE = role("r-team", "team-lead", "Team Lead", ["team.manage", "app.read"], {
   scopeLevel: "TEAM",
+  bindingsCount: 6,
 });
 export const APP_ROLE = role("r-app", "app-operator", "App Operator", ["app.deploy"], {
   scopeLevel: "APP",
+  bindingsCount: 0,
 });
 
 export const ROLES: AstroliftRole[] = [OWNER_ROLE, VIEWER_ROLE, RELEASE_ROLE, TEAM_ROLE, APP_ROLE];
@@ -109,7 +113,18 @@ export const AUDITOR_ROLE = role(
   "auditor",
   "Auditor",
   ["app.read", "audit_log.read", "billing.read", "cluster.read"],
-  { description: "Reads everything an audit needs, changes nothing." }
+  {
+    description: "Reads everything an audit needs, changes nothing.",
+    bindingsCount: 4,
+    duplicatedFrom: {
+      id: "r-viewer",
+      slug: "viewer",
+      name: "Viewer",
+      isSystem: true,
+      permissions: ["app.read", "cluster.read"],
+      deleted: false,
+    },
+  }
 );
 
 export const DETAIL_ROLES: AstroliftRole[] = [...ROLES, AUDITOR_ROLE];

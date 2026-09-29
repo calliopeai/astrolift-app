@@ -20,7 +20,6 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
-import { exportCsv } from "@/components/list/exportCsv";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import {
@@ -44,7 +43,6 @@ import { AnonymizeUserDialog } from "./AnonymizeUserDialog";
 import { InvitationExpiryBadge } from "./InvitationExpiryBadge";
 import { type PeopleRow, principalHref, principalOf, type UserRow } from "./people-model";
 import type { useMembers } from "./use-members";
-import { WALK_CAP } from "./use-walk";
 
 export type MembersScreenProps = Omit<ReturnType<typeof useMembers>, "list"> & {
   list: ListStateController;
@@ -70,22 +68,21 @@ type InviteTarget = { kind: "resend" | "revoke" | "delete"; invitation: Astrolif
 
 /**
  * Admin › Access › People (access UX design 3.1): one numbered list of
- * principals. Users and IdP groups are rows of it; invitations are the
- * Invited view. Invite and Grant access are the primary actions; a row opens
- * the person's or group's page, where their access is managed at its
- * source. Pure view; data comes from useMembers.
+ * principals. Users are the list, IdP groups its Groups view and
+ * invitations its Invited view. Invite and Grant access are the primary
+ * actions; a row opens the person's or group's page, where their access is
+ * managed at its source. Pure view; data comes from useMembers.
  */
 export function MembersScreen({
   canManageMembers,
   list,
   rows,
   totalCount,
-  filtered,
   loading,
   stale,
   error,
-  truncated,
   onRetry,
+  onExportCsv,
   revokingInvite,
   deletingInvite,
   resendingInvite,
@@ -198,7 +195,7 @@ export function MembersScreen({
         </DropdownMenuItem>
       );
     }
-    const anonymized = row.memberships.some((m) => m.lifecycle === "anonymized");
+    const anonymized = row.lifecycle === "anonymized";
     return (
       <>
         <DropdownMenuItem asChild>
@@ -233,9 +230,7 @@ export function MembersScreen({
           header={{
             crumbs: accessCrumbs("people"),
             title: "People",
-            context: truncated
-              ? `Filters and sort cover the first ${WALK_CAP.toLocaleString()} rows until the members query filters on the server.`
-              : "Users and IdP groups with access to this organization.",
+            context: "Users and IdP groups with access to this organization.",
             primaryAction: (
               <Can permission="org.manage_members">
                 <div className="flex flex-wrap items-center gap-2">
@@ -269,7 +264,7 @@ export function MembersScreen({
           error={error}
           onRetry={onRetry}
           totalCount={totalCount}
-          menu={<ExportMenu rows={filtered} />}
+          menu={<ExportMenu count={totalCount} onExport={onExportCsv} />}
           empty={{
             icon: <UsersIcon className="size-5" />,
             title: "No people yet",
@@ -339,9 +334,10 @@ const INVITE_CONFIRM: Record<
 
 /**
  * CSV export from the filter bar's `⋯` (spec 44 §5.1, Admin lists): every
- * row the view and filters match, not only the page on screen.
+ * row the view and filters match, walked from the server, not only the page
+ * on screen.
  */
-function ExportMenu({ rows }: { rows: PeopleRow[] }) {
+function ExportMenu({ count, onExport }: { count: number; onExport: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -350,57 +346,9 @@ function ExportMenu({ rows }: { rows: PeopleRow[] }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          disabled={rows.length === 0}
-          onSelect={() =>
-            exportCsv("people", rows, [
-              { header: "Kind", value: (r) => r.kind },
-              { header: "Name", value: (r) => principalOf(r).name },
-              {
-                header: "Email",
-                value: (r) =>
-                  r.kind === "user"
-                    ? r.user.email
-                    : r.kind === "invitation"
-                      ? r.invitation.email
-                      : "",
-              },
-              {
-                header: "Roles",
-                value: (r) =>
-                  r.kind === "invitation"
-                    ? (r.invitation.roleSlug ?? "")
-                    : r.bindings.map((b) => `${b.role.slug}@${b.scopeKind}`).join(" "),
-              },
-              {
-                header: "Teams",
-                value: (r) =>
-                  r.kind === "user" ? r.teams.map((t) => t.slug ?? `#${t.pk}`).join(" ") : "",
-              },
-              {
-                header: "Status",
-                value: (r) =>
-                  r.kind === "user"
-                    ? r.lifecycle
-                    : r.kind === "invitation"
-                      ? r.invitation.status
-                      : "idp group",
-              },
-              { header: "Last active", value: (r) => (r.kind === "user" ? r.lastActiveAt : null) },
-              {
-                header: "Joined",
-                value: (r) =>
-                  r.kind === "user"
-                    ? r.joinedAt
-                    : r.kind === "invitation"
-                      ? r.invitation.createdAt
-                      : null,
-              },
-            ])
-          }
-        >
+        <DropdownMenuItem disabled={count === 0} onSelect={onExport}>
           <DownloadIcon className="size-4" />
-          Export {rows.length} as CSV
+          Export {count.toLocaleString("en-US")} as CSV
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -408,6 +356,15 @@ function ExportMenu({ rows }: { rows: PeopleRow[] }) {
 }
 
 function RolesCell({ row }: { row: PeopleRow }) {
+  if (row.kind === "group") {
+    return (
+      <span className="text-muted-foreground text-xs">
+        {row.bindingsCount} {row.bindingsCount === 1 ? "grant" : "grants"}
+        {row.mappingsCount > 0 &&
+          `, ${row.mappingsCount} ${row.mappingsCount === 1 ? "mapping" : "mappings"}`}
+      </span>
+    );
+  }
   if (row.kind === "invitation") {
     return row.invitation.roleSlug ? (
       <Badge variant="outline" className="max-w-full font-mono text-xs">
@@ -443,11 +400,11 @@ function TeamsCell({ row }: { row: PeopleRow }) {
     <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
       {row.teams.slice(0, TEAMS_SHOWN).map((team) => (
         <span
-          key={team.pk}
+          key={team.id}
           className="text-muted-foreground min-w-0 truncate font-mono text-xs"
-          title={team.slug ?? `team #${team.pk}`}
+          title={team.name}
         >
-          {team.slug ?? `#${team.pk}`}
+          {team.slug}
         </span>
       ))}
       {row.teams.length > TEAMS_SHOWN && (
@@ -462,12 +419,9 @@ function TeamsCell({ row }: { row: PeopleRow }) {
 function StatusCell({ row }: { row: PeopleRow }) {
   if (row.kind === "group") {
     return (
-      <div className="flex flex-wrap items-center gap-1">
-        <Badge variant="secondary" className="text-2xs">
-          IdP group
-        </Badge>
-        {row.admin && <AdminBadge />}
-      </div>
+      <Badge variant="secondary" className="text-2xs">
+        IdP group
+      </Badge>
     );
   }
   if (row.kind === "invitation") {

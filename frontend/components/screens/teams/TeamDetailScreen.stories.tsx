@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
-import { ROLE_BINDINGS } from "@/components/screens/administration/access/fixtures";
-import { accessProps } from "@/components/screens/administration/access/principal.fixtures";
-import { ACCESS_LIST } from "@/components/screens/administration/access/principal-access";
+import { ENTITY_ACCESS_LIST } from "@/components/screens/administration/access/entity-access";
+import { entityAccessProps } from "@/components/screens/administration/access/principal.fixtures";
 
 import { TeamAccessPanel } from "./TeamAccessPanel";
 import { TeamDetailScreen } from "./TeamDetailScreen";
@@ -27,11 +26,11 @@ export default meta;
 type Story = StoryObj;
 
 function Access() {
-  const list = useLocalListState(ACCESS_LIST);
+  const list = useLocalListState(ENTITY_ACCESS_LIST);
   return (
     <TeamAccessPanel
       slug="platform"
-      access={{ list, ...accessProps(list, ROLE_BINDINGS) }}
+      access={{ list, ...entityAccessProps() }}
       reach={{ projects: PROJECTS, loading: false, error: null, onRetry: () => {} }}
     />
   );

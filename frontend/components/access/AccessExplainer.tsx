@@ -5,7 +5,6 @@ import {
   CheckCircle2Icon,
   CircleDashedIcon,
   CircleIcon,
-  InfoIcon,
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,7 +40,7 @@ export interface BindingLabel {
 
 export interface AccessExplainerProps {
   diagnosis: Diagnosis | null;
-  /** What was asked about. The backend checks at org scope only (design 6, item 8). */
+  /** What was asked about: the check runs on it (`scopeType` / `scopeId`), or org-wide when absent. */
   target?: ScopeRef | null;
   loading?: boolean;
   error?: { message: string } | null;
@@ -58,11 +57,16 @@ const STEP_LABEL: Record<string, string> = {
   has_active_organization: "The request is in an organization",
   role_bindings_in_this_org: "They hold roles in this organization",
   bindings_carrying_this_permission: "A role they hold carries it",
+  target_scope: "The object is in this organization",
+  idp_groups: "Their IdP groups",
+  team_shares: "A team share on the app carries it",
+  rbac: "Their roles grant it here",
+  abac_policies: "No policy denies it",
   resolver_verdict: "The resolver's answer",
 };
 
 /** Steps whose false is information, not the reason for a No. */
-const NEUTRAL_WHEN_FALSE = new Set(["is_superuser"]);
+const NEUTRAL_WHEN_FALSE = new Set(["is_superuser", "idp_groups", "team_shares"]);
 
 const BINDING = /^([\w.-]+)@(ORG|TEAM|PROJECT|APP):(\S+)$/;
 
@@ -82,8 +86,9 @@ export function parseBindingLabels(detail: string): BindingLabel[] | null {
  * in the status tone, then `permissionDiagnose`'s chain in the resolver's
  * order, each step passed, failed or informational, with its detail. Role
  * bindings the chain names become links to where they can be changed. The
- * chain ends on the policy step, said plainly while ABAC is not evaluated.
- * Scrolls in its own frame. Pure.
+ * chain is the resolver's own, policies included (`abac_policies`): a DENY
+ * that matches, or a condition the request cannot answer, turns a Yes into
+ * a No. Scrolls in its own frame. Pure.
  */
 export function AccessExplainer({
   diagnosis,
@@ -166,16 +171,6 @@ export function AccessExplainer({
         </p>
       </div>
 
-      {target && target.kind !== "ORG" && (
-        <p className="text-muted-foreground flex min-w-0 items-start gap-2 text-xs">
-          <InfoIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-          <span className="min-w-0">
-            The check runs at organization scope: the backend does not take a target yet, so a grant
-            held only on a team, project or app shows as carried but not granted here.
-          </span>
-        </p>
-      )}
-
       <ol aria-label="Reasoning" className="max-h-96 min-w-0 overflow-auto rounded-md border">
         {d.steps.map((s, i) => {
           const tone = s.result ? "pass" : NEUTRAL_WHEN_FALSE.has(s.check) ? "info" : "fail";
@@ -207,18 +202,6 @@ export function AccessExplainer({
             </li>
           );
         })}
-        {!d.isSuperuser && (
-          <li className="flex min-w-0 gap-3 p-3">
-            <StepIcon tone="pending" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-sm font-medium">Policies</p>
-              <p className="text-muted-foreground text-xs">
-                Not applied. ABAC policies are stored but the resolver does not evaluate them yet,
-                so none can turn this answer into a No.
-              </p>
-            </div>
-          </li>
-        )}
       </ol>
     </div>
   );

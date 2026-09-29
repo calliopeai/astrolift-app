@@ -27,9 +27,7 @@ function Holders({
 /** Two people and an IdP group's mapping, which links to the group. */
 export const Full: Story = {
   render: () => (
-    <Holders
-      {...holdersProps({ page: pageData(RELEASE_HOLDERS, { nextCursor: "c2", totalCount: null }) })}
-    />
+    <Holders {...holdersProps({ page: pageData(RELEASE_HOLDERS, { totalCount: 31 }) })} />
   ),
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
@@ -38,6 +36,16 @@ export const Full: Story = {
       "/administration/access/people/group%3Aokta%3Arelease-captains"
     );
   },
+};
+
+/** Only the IdP groups that hold it: a `kind:group` chip. */
+export const GroupsOnly: Story = {
+  render: () => (
+    <Holders
+      {...holdersProps({ page: pageData(RELEASE_HOLDERS.filter((b) => !b.user)) })}
+      initial={{ filters: { kind: "group" } }}
+    />
+  ),
 };
 
 export const Loading: Story = {

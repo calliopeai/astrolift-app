@@ -15,7 +15,7 @@ import { SCOPE_TONE } from "./scope-tone";
  * binding) and a role's Holders tab (the bindings of one role, where the
  * role column is left out). A group-held binding is an IdP group mapping:
  * the principal is the group, linked to its page, and the source says so
- * (design 3.2). Pure.
+ * (design 3.2). The sort keys are `astroliftRoleBindingsPage`'s. Pure.
  */
 export function bindingColumns({
   showRole = true,
@@ -28,6 +28,7 @@ export function bindingColumns({
     {
       id: "principal",
       header: "Held by",
+      sortKey: "name",
       cellClassName: "max-w-72",
       cell: (b) => {
         const p = principalOfBinding(b);
@@ -46,6 +47,7 @@ export function bindingColumns({
     columns.push({
       id: "role",
       header: "Role",
+      sortKey: "role",
       cellClassName: "max-w-64",
       cell: (b) => (
         <Link
@@ -69,6 +71,7 @@ export function bindingColumns({
     {
       id: "scope",
       header: "Where",
+      sortKey: "scope",
       cellClassName: "max-w-64",
       cell: (b) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
@@ -100,12 +103,14 @@ export function bindingColumns({
     {
       id: "granted",
       header: "Granted",
+      sortKey: "created",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (b) => formatDate(b.grantedAt),
     },
     {
       id: "expires",
       header: "Expires",
+      sortKey: "expires",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (b) => (b.expiresAt ? formatDate(b.expiresAt) : "never"),
     }

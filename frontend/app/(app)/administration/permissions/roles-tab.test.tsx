@@ -51,7 +51,15 @@ vi.mock("@apollo/client/react", () => ({
     const data =
       op === "ListRolesPage"
         ? // One row only: the page the operator is looking at.
-          { astroliftRolesPage: { items: [VIEWER], nextCursor: "c1", totalCount: 2 } }
+          {
+            astroliftRolesPage: {
+              items: [VIEWER],
+              nextCursor: null,
+              totalCount: 2,
+              page: 1,
+              pageSize: 25,
+            },
+          }
         : { astroliftRoles: [OWNER, VIEWER] };
     return {
       data,
@@ -106,11 +114,17 @@ describe("RolesTab", () => {
     );
   });
 
-  it("asks the server to search rather than filtering a page in the browser", () => {
+  it("asks the server to search, filter, sort and number the page", () => {
     state.calls.length = 0;
     render(<RolesTab />);
     const page = state.calls.find((c) => c.op === "ListRolesPage");
     expect(page).toBeDefined();
-    expect(page?.variables).toHaveProperty("search");
+    expect(page?.variables).toEqual({
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
+    });
   });
 });

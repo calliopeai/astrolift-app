@@ -22,6 +22,7 @@ const COLUMNS: Column<AstroliftRole>[] = [
   {
     id: "role",
     header: "Role",
+    sortKey: "name",
     cellClassName: "max-w-72",
     cell: (role) => (
       <span className="block min-w-0">
@@ -50,6 +51,7 @@ const COLUMNS: Column<AstroliftRole>[] = [
   {
     id: "scope",
     header: "Binds at",
+    sortKey: "scopeLevel",
     cell: (role) => (
       <Badge className={`${SCOPE_TONE[role.scopeLevel] ?? ""} font-mono`} variant="secondary">
         {SCOPE_NOUN[role.scopeLevel]}
@@ -66,7 +68,18 @@ const COLUMNS: Column<AstroliftRole>[] = [
           built-in
         </Badge>
       ) : (
-        <Badge variant="secondary">custom</Badge>
+        <span className="flex min-w-0 flex-col items-start gap-0.5">
+          <Badge variant="secondary">custom</Badge>
+          {role.duplicatedFrom && (
+            <span
+              className="text-muted-foreground block max-w-40 truncate text-xs"
+              title={`Duplicated from ${role.duplicatedFrom.name}`}
+            >
+              from {role.duplicatedFrom.name}
+              {role.duplicatedFrom.deleted ? " (deleted)" : ""}
+            </span>
+          )}
+        </span>
       ),
   },
   {
@@ -75,6 +88,15 @@ const COLUMNS: Column<AstroliftRole>[] = [
     align: "right",
     cellClassName: "font-mono tabular-nums",
     cell: (role) => role.permissions.length,
+  },
+  {
+    // Bindings in this org; a shared built-in counts only this org's.
+    id: "holders",
+    header: "Holders",
+    sortKey: "bindings",
+    align: "right",
+    cellClassName: "font-mono tabular-nums",
+    cell: (role) => role.bindingsCount ?? "—",
   },
 ];
 

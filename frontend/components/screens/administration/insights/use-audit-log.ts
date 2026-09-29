@@ -22,10 +22,9 @@ import type {
   AstroliftAuditRetention,
   AuditExportFormat,
 } from "@/graphql/operations/operations.types";
-import { useMe } from "@/graphql/user/user.hooks";
 
 import type { AuditLogScreenProps } from "./AuditLogScreen";
-import { AUDIT_LIST, auditVariables, matchesTargetKind } from "./audit-list";
+import { AUDIT_LIST, auditVariables } from "./audit-list";
 
 interface PageResp {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
@@ -54,17 +53,15 @@ interface ExportResp {
 export function useAuditLog(): AuditLogScreenProps {
   const t = useTranslations("lists.audit");
   const { org } = useActiveOrg();
-  const { user } = useMe();
   const list = useListState(AUDIT_LIST);
   const [exporting, setExporting] = React.useState(false);
   // `since:24h` is anchored when the page opens, so the variables stay
   // stable across renders; the 5s poll still brings in newer events.
   const [now] = React.useState(() => Date.now());
 
-  const { variables, ready } = auditVariables(list.filters, list.state.q, {
+  const variables = auditVariables(list.filters, list.state.q, {
     pageSize: list.state.pageSize,
     after: null,
-    viewerId: user?.id ?? null,
     now,
   });
   // The feed owns the page size and the cursor.
@@ -77,15 +74,8 @@ export function useAuditLog(): AuditLogScreenProps {
       select: (d) => d?.astroliftAuditEventsPage,
       keyOf: (r) => r.id,
       pageSize: list.state.pageSize,
-      skip: !ready,
       pollInterval: 5000,
     }
-  );
-
-  const targetKind = list.filters.target;
-  const items = React.useMemo(
-    () => feed.items.filter((r) => matchesTargetKind(r, targetKind)),
-    [feed.items, targetKind]
   );
 
   const { data: retentionData } = useQuery<RetentionResp>(GET_AUDIT_RETENTION, {
@@ -104,11 +94,8 @@ export function useAuditLog(): AuditLogScreenProps {
           variables: {
             input: {
               format: format.toUpperCase(),
-              action: variables.action,
-              decision: variables.decision,
-              actorId: variables.actorId,
-              createdAtGte: variables.createdAtGte,
-              createdAtLte: variables.createdAtLte,
+              search: variables.search,
+              filter: variables.filter,
             },
           },
         });
@@ -136,15 +123,7 @@ export function useAuditLog(): AuditLogScreenProps {
         setExporting(false);
       }
     },
-    [
-      exportMutation,
-      t,
-      variables.action,
-      variables.decision,
-      variables.actorId,
-      variables.createdAtGte,
-      variables.createdAtLte,
-    ]
+    [exportMutation, t, variables.search, variables.filter]
   );
 
   const [updateOrg, { loading: savingRetention }] = useMutation<{
@@ -182,10 +161,8 @@ export function useAuditLog(): AuditLogScreenProps {
 
   return {
     list,
-    events: { ...feed, items, loading: feed.loading || !ready },
-    // A client-side target filter makes the server's count wrong for the rows shown.
-    totalCount: targetKind ? null : totalCount,
-    targetFilteredLocally: Boolean(targetKind),
+    events: feed,
+    totalCount,
     retentionDays: retentionData?.astroliftAuditRetention?.days ?? null,
     exporting,
     onExport,

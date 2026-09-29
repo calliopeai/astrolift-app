@@ -1,44 +1,41 @@
 /**
  * The combined run audit (spec 44 §4.4, decision 14): agent runs, workflow
- * runs, deployments and job runs in one list at Admin › Usage & governance ›
- * Runs, with who or what started each, when, and the outcome.
+ * runs, deployments, job runs and task runs in one list at Admin › Usage &
+ * governance › Runs, with who or what started each, when, and the outcome.
  *
- * Pure: the list declaration, one mapper per source into `CombinedRun`, and
- * the merge, filter and page steps the hook runs client-side until the
- * backend has one paged query over all four (see `useCombinedRuns`).
+ * The server answers it (#2152): `astroliftRunAudit` reads every kind under
+ * its own permission, normalises the outcome, records the initiator and
+ * pages one cursor over all of them with an exact count. Pure: the list
+ * declaration, the list state as the query's variables, and the one mapper
+ * from the server's row into `CombinedRun`.
  */
-import type { AstroliftAgentTask } from "@/graphql/agents/agents.types";
-import type {
-  AstroliftDeployment,
-  AstroliftScheduledJobRun,
-} from "@/graphql/lifecycle/lifecycle.types";
-import type { WorkflowDefinitionRun } from "@/graphql/workflows/tiered.types";
+import type { AstroliftRunAuditItem } from "@/graphql/__generated__/schema";
 
 import type { CsvColumn } from "@/components/list/exportCsv";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
 
 import { SINCE_OPTIONS, sinceToIso } from "./audit-list";
 
-export type RunKind = "agent" | "workflow" | "deployment" | "job";
+export type RunKind = "agent" | "workflow" | "deployment" | "job" | "task";
 
-/** The outcome, normalised across the four sources' status vocabularies. */
+/** The outcome, normalised by the server across the kinds' status words. */
 export type RunOutcome = "running" | "waiting" | "succeeded" | "failed" | "cancelled" | "unknown";
 
 export interface CombinedRun {
-  /** `<kind>:<source id>`: unique across the four sources. */
+  /** `<kind>:<source id>`: unique across the kinds. */
   key: string;
   kind: RunKind;
   /** The source row's own id, as its detail page takes it. */
   id: string;
-  /** What ran: the agent, the workflow, the app and environment, the job. */
+  /** What ran: the agent, the workflow, the app and environment, the job or task. */
   subject: string;
-  /** The project or app it belongs to, when the source says. */
+  /** The project or app it belongs to. */
   scope: string;
-  /** Who started it: a person, a commit author; empty when the source does not say. */
+  /** Who started it: a person, else a deployment's commit author; empty when nobody did. */
   startedBy: string;
-  /** How it started: manual, push, ci, schedule, api, a parent run. */
+  /** How it started: manual, api, schedule, webhook, parent, and the source's own word. */
   trigger: string;
-  /** True when the viewer started it, where the source can tell. */
+  /** True when the viewer started it. */
   startedByMe: boolean;
   /** ISO time it started, or was created when it has not started yet. */
   at: string;
@@ -54,9 +51,11 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   workflow: "Workflow run",
   deployment: "Deployment",
   job: "Job run",
+  task: "Task run",
 };
 
 const OUTCOMES: RunOutcome[] = ["running", "waiting", "succeeded", "failed", "cancelled"];
+const TRIGGERS = ["manual", "api", "schedule", "webhook", "parent", "unknown"];
 
 export const RUN_AUDIT_LIST: ListDefinition = {
   id: "admin.runs",
@@ -70,15 +69,18 @@ export const RUN_AUDIT_LIST: ListDefinition = {
       })),
     },
     { key: "outcome", label: "Outcome", options: OUTCOMES.map((o) => ({ value: o, label: o })) },
+    { key: "trigger", label: "Trigger", options: TRIGGERS.map((t) => ({ value: t, label: t })) },
+    // A user id, or `me`: the server matches the initiator exactly.
     { key: "startedBy", label: "Started by" },
+    { key: "project", label: "Project" },
+    { key: "app", label: "App" },
     { key: "since", label: "Since", options: SINCE_OPTIONS },
   ],
+  // The server matches the run id prefix, status, subject, environment,
+  // branch, commit author and the initiator's username.
   searchPlaceholder: "Search runs, agents, apps, ids…",
   defaultSort: [{ key: "at", dir: "desc" }],
-  views: standardViews({ startedBy: "me" }, [], {
-    mineNote:
-      "Mine covers deployments you triggered. Agent, workflow and job runs don't record who started them yet.",
-  }),
+  views: standardViews({ startedBy: "me" }),
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };
@@ -111,9 +113,10 @@ const GENERIC: Record<string, RunOutcome> = {
 };
 
 /**
- * A source status as an outcome. Deployments speak their own dialect: a
- * `running` deployment is live, so it succeeded, and `superseded` means it
- * was live until the next one replaced it.
+ * A source status as an outcome, for the surfaces that read one kind's own
+ * rows (the run audit gets the server's). Deployments speak their own
+ * dialect: a `running` deployment is live, so it succeeded, and
+ * `superseded` means it was live until the next one replaced it.
  */
 export function outcomeOf(kind: RunKind, status: string): RunOutcome {
   const s = status.toLowerCase();
@@ -126,187 +129,125 @@ export function outcomeOf(kind: RunKind, status: string): RunOutcome {
   return GENERIC[s] ?? "unknown";
 }
 
-// ---------------------------------------------------------------------------
-// One mapper per source
-// ---------------------------------------------------------------------------
-
-export type AgentTaskSource = Pick<
-  AstroliftAgentTask,
-  | "id"
-  | "agentSlug"
-  | "agentName"
-  | "projectSlug"
-  | "status"
-  | "createdAt"
-  | "startedAt"
-  | "finishedAt"
->;
-
-function seconds(from: string | null | undefined, to: string | null | undefined): number | null {
-  if (!from || !to) return null;
-  const d = (Date.parse(to) - Date.parse(from)) / 1000;
-  return Number.isFinite(d) && d >= 0 ? Math.round(d) : null;
+/** The `AstroliftRunAuditFilter` fields the list sends; unset ones are left out. */
+export interface RunAuditFilter {
+  kind?: string[];
+  outcome?: string[];
+  trigger?: string[];
+  startedBy?: string[];
+  project?: string[];
+  app?: string[];
+  since?: string;
 }
 
-/** An agent task. The source names no initiator, so Started by stays empty. */
-export function fromAgentTask(t: AgentTaskSource): CombinedRun {
-  return {
-    key: `agent:${t.id}`,
-    kind: "agent",
-    id: t.id,
-    subject: t.agentSlug || t.agentName,
-    scope: t.projectSlug ?? "",
-    startedBy: "",
-    trigger: "",
-    startedByMe: false,
-    at: t.startedAt ?? t.createdAt,
-    durationSeconds: seconds(t.startedAt, t.finishedAt),
-    status: t.status,
-    outcome: outcomeOf("agent", t.status),
-    href: `/agents/runs/${encodeURIComponent(t.id)}`,
-  };
+export interface RunAuditVariables {
+  filter: RunAuditFilter | null;
+  search: string | null;
+  sort: string;
+  first: number;
+  after: string | null;
 }
 
-/** A workflow run. A child run says so; the source names no person. */
-export function fromWorkflowRun(r: WorkflowDefinitionRun): CombinedRun {
-  return {
-    key: `workflow:${r.guid}`,
-    kind: "workflow",
-    id: r.guid,
-    subject: r.definitionName || r.definitionSlug,
-    scope: r.projectSlug,
-    startedBy: "",
-    trigger: r.parentRunGuid ? "parent run" : "",
-    startedByMe: false,
-    at: r.startedAt ?? "",
-    durationSeconds: seconds(r.startedAt, r.endedAt),
-    status: r.status,
-    outcome: outcomeOf("workflow", r.status),
-    href: `/workflows/${encodeURIComponent(r.definitionSlug)}/observe`,
-  };
-}
-
-export type DeploymentSource = Pick<
-  AstroliftDeployment,
-  | "id"
-  | "registeredAppSlug"
-  | "environmentName"
-  | "workloadSlug"
-  | "triggerKind"
-  | "status"
-  | "startedAt"
-  | "createdAt"
-  | "durationSeconds"
-  | "commitAuthor"
-  | "ciProvider"
-  | "triggeredByUserId"
-  | "triggeredByMe"
->;
-
-/** A deployment: the commit author or the triggering user, and how it started. */
-export function fromDeployment(d: DeploymentSource): CombinedRun {
-  return {
-    key: `deployment:${d.id}`,
-    kind: "deployment",
-    id: d.id,
-    subject: `${d.registeredAppSlug} · ${d.environmentName}`,
-    scope: d.registeredAppSlug,
-    startedBy: d.commitAuthor || d.triggeredByUserId || "",
-    trigger: d.ciProvider ? `${d.triggerKind} · ${d.ciProvider}` : d.triggerKind,
-    startedByMe: d.triggeredByMe,
-    at: d.startedAt ?? d.createdAt,
-    durationSeconds: d.durationSeconds ?? null,
-    status: d.status,
-    outcome: outcomeOf("deployment", d.status),
-    href: `/deployments/${encodeURIComponent(d.id)}`,
-  };
-}
-
-export type JobRunSource = Pick<
-  AstroliftScheduledJobRun,
-  | "id"
-  | "registeredAppSlug"
-  | "environmentName"
-  | "workloadSlug"
-  | "status"
-  | "startedAt"
-  | "createdAt"
-  | "durationSeconds"
->;
-
-/** A scheduled job's run: its schedule started it. */
-export function fromJobRun(j: JobRunSource): CombinedRun {
-  return {
-    key: `job:${j.id}`,
-    kind: "job",
-    id: j.id,
-    subject: j.workloadSlug,
-    scope: `${j.registeredAppSlug} · ${j.environmentName}`,
-    startedBy: "",
-    trigger: "schedule",
-    startedByMe: false,
-    at: j.startedAt ?? j.createdAt,
-    durationSeconds: j.durationSeconds ?? null,
-    status: j.status,
-    outcome: outcomeOf("job", j.status),
-    href: `/jobs/runs/${encodeURIComponent(j.id)}`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Merge, filter, page (CLIENT-SIDE until the backend has the combined query)
-// ---------------------------------------------------------------------------
-
-/** Newest first; a run with no time sorts last. Ties break on the key, so the order is stable. */
-export function mergeRuns(...sources: CombinedRun[][]): CombinedRun[] {
-  return sources.flat().sort((a, b) => {
-    const ta = a.at ? Date.parse(a.at) : -Infinity;
-    const tb = b.at ? Date.parse(b.at) : -Infinity;
-    return tb - ta || a.key.localeCompare(b.key);
-  });
-}
+/** The list keys that go to the filter as a one-value list. */
+const LIST_KEYS = ["kind", "outcome", "trigger", "startedBy", "project", "app"] as const;
 
 /**
- * The list's filters over merged rows. `startedBy: me` keeps only the runs
- * a source marks as the viewer's (deployments today); any other value
- * matches the Started by text. Search matches subject, scope, id, started
- * by and status, case-insensitive.
+ * The list state as `astroliftRunAudit` variables. `sort` is `-at` or `at`,
+ * the only two orders the server takes; an empty filter is `null`.
  */
-export function filterRuns(
-  runs: CombinedRun[],
-  filters: Record<string, string>,
-  q: string,
+export function runAuditVariables(
+  {
+    filters,
+    q,
+    sort,
+    pageSize,
+    after,
+  }: {
+    filters: Record<string, string>;
+    q: string;
+    sort: { key: string; dir: "asc" | "desc" }[];
+    pageSize: number;
+    after: string | null;
+  },
   now: number
-): CombinedRun[] {
+): RunAuditVariables {
+  const filter: RunAuditFilter = {};
+  for (const key of LIST_KEYS) if (filters[key]) filter[key] = [filters[key]];
   const since = sinceToIso(filters.since, now);
-  const sinceTs = since ? Date.parse(since) : null;
-  const needle = q.trim().toLowerCase();
-  const by = filters.startedBy?.toLowerCase();
-  return runs.filter((r) => {
-    if (filters.kind && r.kind !== filters.kind) return false;
-    if (filters.outcome && r.outcome !== filters.outcome) return false;
-    if (by === "me" ? !r.startedByMe : by && !r.startedBy.toLowerCase().includes(by)) return false;
-    if (sinceTs !== null && (!r.at || Date.parse(r.at) < sinceTs)) return false;
-    if (!needle) return true;
-    return [r.subject, r.scope, r.id, r.startedBy, r.status, r.trigger].some((f) =>
-      f.toLowerCase().includes(needle)
-    );
-  });
+  if (since) filter.since = since;
+  const at = sort.find((s) => s.key === "at");
+  return {
+    filter: Object.keys(filter).length ? filter : null,
+    search: q.trim() || null,
+    sort: at?.dir === "asc" ? "at" : "-at",
+    first: pageSize,
+    after,
+  };
+}
+
+export type RunAuditItem = Pick<
+  AstroliftRunAuditItem,
+  | "kind"
+  | "id"
+  | "subject"
+  | "scope"
+  | "agentSlug"
+  | "workflowSlug"
+  | "trigger"
+  | "sourceTrigger"
+  | "startedByDisplay"
+  | "startedByMe"
+  | "at"
+  | "durationSeconds"
+  | "status"
+  | "outcome"
+>;
+
+const KINDS = new Set<string>(Object.keys(RUN_KIND_LABEL));
+const OUTCOME_SET = new Set<string>([...OUTCOMES, "unknown"]);
+
+/** Where each kind's row opens: its own detail page. */
+function hrefOf(r: RunAuditItem): string {
+  const id = encodeURIComponent(r.id);
+  switch (r.kind) {
+    case "agent":
+      return `/agents/runs/${id}`;
+    case "workflow":
+      return `/workflows/${encodeURIComponent(r.workflowSlug)}/runs/${id}`;
+    case "deployment":
+      return `/deployments/${id}`;
+    case "job":
+      return `/jobs/runs/${id}`;
+    default:
+      return `/tasks/runs/${id}`;
+  }
 }
 
 /**
- * One page of the filtered rows. The cursor is an offset (`o:50`), which
- * is only honest because the whole set is in memory; the backend query
- * will hand out real cursors.
+ * One server row as the list's row. The trigger reads as the normalised
+ * word with the source's own beside it where they differ (`webhook · push`).
  */
-export function pageRuns(
-  runs: CombinedRun[],
-  after: string | null,
-  pageSize: number
-): { rows: CombinedRun[]; nextCursor: string | null } {
-  const offset = after?.startsWith("o:") ? Math.max(0, Number(after.slice(2)) || 0) : 0;
-  const end = offset + pageSize;
-  return { rows: runs.slice(offset, end), nextCursor: end < runs.length ? `o:${end}` : null };
+export function fromRunAuditItem(r: RunAuditItem): CombinedRun {
+  const kind = (KINDS.has(r.kind) ? r.kind : "task") as RunKind;
+  const trigger =
+    r.sourceTrigger && r.sourceTrigger !== r.trigger
+      ? `${r.trigger} · ${r.sourceTrigger}`
+      : r.trigger;
+  return {
+    key: `${kind}:${r.id}`,
+    kind,
+    id: r.id,
+    subject: r.subject,
+    scope: r.scope,
+    startedBy: r.startedByDisplay,
+    trigger: trigger === "unknown" ? "" : trigger,
+    startedByMe: r.startedByMe,
+    at: r.at,
+    durationSeconds: r.durationSeconds ?? null,
+    status: r.status,
+    outcome: (OUTCOME_SET.has(r.outcome) ? r.outcome : "unknown") as RunOutcome,
+    href: hrefOf({ ...r, kind }),
+  };
 }
 
 /** The CSV columns: what an auditor pastes into a spreadsheet. */

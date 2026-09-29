@@ -6,6 +6,8 @@
 import type { Principal, RoleRef, ScopeNode } from "./access-model";
 import type { Comparison, Diagnosis } from "./AccessExplainer";
 import type { GrantPreview } from "./GrantAccessFlow";
+import type { ConditionCatalogEntry } from "./PolicyConditionHelp";
+import type { PolicySimulation } from "./PolicySimulationPanel";
 import type { PolicyShape } from "./policy-model";
 
 export const LONG = "platform-engineering-release-captains-for-the-north-america-region-2026";
@@ -352,6 +354,40 @@ export const DIAGNOSIS_NO: Diagnosis = {
   ],
 };
 
+/** Asked on one app: the role grants it there, and a policy denies it anyway. */
+export const DIAGNOSIS_POLICY_DENIED: Diagnosis = {
+  username: "dana",
+  permission: "app.deploy",
+  granted: false,
+  isSuperuser: false,
+  steps: [
+    { check: "is_active", result: true, detail: "User dana is active" },
+    { check: "is_superuser", result: false, detail: "User dana is NOT a Django superuser" },
+    {
+      check: "permission_is_declared",
+      result: true,
+      detail: "'app.deploy' is a declared Astrolift permission",
+    },
+    { check: "has_active_organization", result: true, detail: "Active organization id: 1" },
+    { check: "target_scope", result: true, detail: "Checked on APP:0192f0c4-7b1e-7c55-9d10" },
+    { check: "idp_groups", result: true, detail: "IdP groups at last sign-in: okta:eng" },
+    { check: "role_bindings_in_this_org", result: true, detail: "team_developer@TEAM:14" },
+    { check: "bindings_carrying_this_permission", result: true, detail: "team_developer@TEAM:14" },
+    { check: "rbac", result: true, detail: "granted by role:team_developer@TEAM:14" },
+    {
+      check: "abac_policies",
+      result: false,
+      detail:
+        "denied by policy deploy-in-business-hours: outside mon-fri 09:00-18:00 Europe/Madrid",
+    },
+    {
+      check: "resolver_verdict",
+      result: false,
+      detail: "denied by policy deploy-in-business-hours",
+    },
+  ],
+};
+
 export const DIAGNOSIS_SUPERUSER: Diagnosis = {
   username: "root",
   permission: "org.delete",
@@ -421,6 +457,140 @@ export const PREVIEW_MANY: GrantPreview = {
     permissions: ["app.deploy"],
   })),
   already: [],
-  approximate:
-    "Lists what the role carries, not what is new to each person: the backend has no grant preview.",
+  gainingCount: 212,
+  alreadyCount: 0,
+  groups: [{ groupExternalId: "okta:eng", memberCount: 212 }],
+  notes: ["The first 14 of 212 are listed."],
+};
+
+/** The caller's grant ceiling refuses it: nothing would be written. */
+export const PREVIEW_REFUSED: GrantPreview = {
+  ...PREVIEW,
+  refusal: "You cannot grant app.rollback: you do not hold it on app checkout.",
+};
+
+// ---------------------------------------------------------------------------
+// Policy condition catalog and simulation
+// ---------------------------------------------------------------------------
+
+export const CONDITION_CATALOG: ConditionCatalogEntry[] = [
+  {
+    kind: "time_window",
+    label: "During hours",
+    description: "Holds on the listed days, inside the listed hours, in a time zone.",
+    needs: "clock",
+  },
+  {
+    kind: "ip_allowlist",
+    label: "From network",
+    description: "Holds when the caller's address is inside one of the ranges.",
+    needs: "client_ip",
+  },
+  {
+    kind: "approval_required",
+    label: "Approved",
+    description: "Holds when the operation carries at least this many approvals.",
+    needs: "operation",
+  },
+  {
+    kind: "env_match",
+    label: "In environment",
+    description: "Holds when the operation targets one of these environments.",
+    needs: "operation",
+  },
+  {
+    kind: "device_assertion",
+    label: "Signed in with",
+    description: "Holds when the session was established with these factors.",
+    needs: "session",
+  },
+  {
+    kind: "freshness",
+    label: "Signed in recently",
+    description: "Holds when the session is younger than this many minutes.",
+    needs: "session",
+  },
+];
+
+const simUser = (id: string, username: string) => ({
+  id,
+  username,
+  email: `${username}@example.com`,
+});
+
+export const SIMULATION: PolicySimulation = {
+  ok: true,
+  errors: [],
+  actions: ["app.deploy"],
+  holdersCount: 41,
+  holdersDeniedCount: 3,
+  holdersUnknownCount: 1,
+  holders: [
+    {
+      user: simUser("61", "dana"),
+      memberId: "m-dana",
+      outcome: "DENIED",
+      denied: ["app.deploy"],
+      unknown: [],
+      sourceScopeLabel: "team payments",
+      detail: "outside mon-fri 09:00-18:00 Europe/Madrid",
+    },
+    {
+      user: simUser("62", "sam"),
+      memberId: "m-sam",
+      outcome: "DENIED",
+      denied: ["app.deploy"],
+      unknown: [],
+      sourceScopeLabel: "organization acme",
+      detail: "outside mon-fri 09:00-18:00 Europe/Madrid",
+    },
+    {
+      user: simUser("63", "lee"),
+      memberId: null,
+      outcome: "UNKNOWN",
+      denied: [],
+      unknown: ["app.deploy"],
+      sourceScopeLabel: "app checkout",
+      detail: "ip_allowlist needs the client address",
+    },
+  ],
+  auditRecorded: true,
+  windowDays: 7,
+  decisionsEvaluated: 212,
+  decisionsDeniedCount: 9,
+  decisionsUnknownCount: 2,
+  decisions: [
+    {
+      id: "d-1",
+      occurredAt: "2026-09-26T21:14:00Z",
+      action: "app.deploy",
+      actorDisplay: "dana",
+      outcome: "DENIED",
+      detail: "",
+    },
+    {
+      id: "d-2",
+      occurredAt: "2026-09-25T06:02:00Z",
+      action: "app.deploy",
+      actorDisplay: "ci-bot token",
+      outcome: "UNKNOWN",
+      detail: "",
+    },
+  ],
+  notes: ["Holders are today's; a policy on a narrower scope only reaches the holders there."],
+};
+
+/** A new org: nothing recorded, and nobody holds what it covers. */
+export const SIMULATION_EMPTY: PolicySimulation = {
+  ...SIMULATION,
+  holdersCount: 0,
+  holdersDeniedCount: 0,
+  holdersUnknownCount: 0,
+  holders: [],
+  auditRecorded: false,
+  decisionsEvaluated: 0,
+  decisionsDeniedCount: 0,
+  decisionsUnknownCount: 0,
+  decisions: [],
+  notes: [],
 };

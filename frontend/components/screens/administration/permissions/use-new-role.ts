@@ -45,6 +45,7 @@ export function useNewRole() {
           scopeLevel: draft.scopeLevel,
           permissions: draft.permissions,
           description: draft.description.trim(),
+          duplicatedFromId: draft.duplicatedFromId,
         },
       },
     });

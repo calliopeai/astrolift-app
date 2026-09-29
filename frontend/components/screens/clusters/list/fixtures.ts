@@ -69,6 +69,7 @@ export const CLUSTERS: ClusterRow[] = [
   }),
   cluster("stg-us-east-1", {
     name: "Staging US East",
+    createdByUsername: "sam",
     region: "us-east-1",
     lifecycle: "managing",
     heartbeatStatus: "degraded",

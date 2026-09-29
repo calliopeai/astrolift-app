@@ -31,6 +31,8 @@ export interface RoleDraft {
   scopeLevel: ScopeKind;
   /** Sorted permission slugs. */
   permissions: string[];
+  /** The role it started from, recorded as its lineage (`duplicatedFromId`); null for a blank one. */
+  duplicatedFromId: string | null;
 }
 
 type Step = 0 | 1 | 2;
@@ -70,6 +72,7 @@ function seed(from: AstroliftRole | null): RoleDraft {
     description: from?.description ?? "",
     scopeLevel: from?.scopeLevel ?? "ORG",
     permissions: [...(from?.permissions ?? [])].sort(),
+    duplicatedFromId: from?.id ?? null,
   };
 }
 
@@ -109,6 +112,7 @@ export function NewRoleScreen({
     patch({
       permissions: [...(r?.permissions ?? [])].sort(),
       scopeLevel: r?.scopeLevel ?? draft.scopeLevel,
+      duplicatedFromId: r?.id ?? null,
     });
   }
 
@@ -275,8 +279,8 @@ export function NewRoleScreen({
             />
             {origin && (
               <p className="text-muted-foreground text-xs">
-                Compared with {origin.name}. The role will not remember it came from there: the
-                backend does not record lineage yet.
+                Compared with {origin.name}. The new role records that it was duplicated from{" "}
+                {origin.name}, so its Permissions tab can show how far it moves from it.
               </p>
             )}
             {submitError && (

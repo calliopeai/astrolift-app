@@ -4,7 +4,7 @@ import { expect, within } from "storybook/test";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { pageData } from "../access/fixtures";
-import { LONG_ROLE, ROLES, rolesProps } from "./fixtures";
+import { AUDITOR_ROLE, LONG_ROLE, ROLES, rolesProps } from "./fixtures";
 import { ROLES_LIST } from "./permissions-lists";
 import { RolesView, type RolesViewProps } from "./RolesView";
 
@@ -25,6 +25,41 @@ function Roles({
 }
 
 export const Full: Story = { render: () => <Roles {...rolesProps()} /> };
+
+/** Built-in roles only: the server's `isSystem: true`. */
+export const BuiltInView: Story = {
+  render: () => (
+    <Roles
+      {...rolesProps({ page: pageData(ROLES.filter((r) => r.isSystem)) })}
+      initial={{ view: "builtin" }}
+    />
+  ),
+};
+
+/** A custom role says what it was duplicated from. */
+export const CustomWithLineage: Story = {
+  render: () => (
+    <Roles
+      {...rolesProps({ page: pageData([AUDITOR_ROLE, ...ROLES.filter((r) => !r.isSystem)]) })}
+      initial={{ view: "custom" }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText(/from Viewer/)).toBeInTheDocument();
+  },
+};
+
+/** Sorted by holders, most first: the server's `-bindings`. */
+export const SortedByHolders: Story = {
+  render: () => (
+    <Roles
+      {...rolesProps({
+        page: pageData([...ROLES].sort((a, b) => (b.bindingsCount ?? 0) - (a.bindingsCount ?? 0))),
+      })}
+      initial={{ sort: [{ key: "bindings", dir: "desc" }] }}
+    />
+  ),
+};
 
 export const Loading: Story = {
   render: () => <Roles {...rolesProps({ page: pageData([], { loading: true }) })} />,
@@ -48,7 +83,7 @@ export const LongStrings: Story = {
   render: () => (
     <Roles
       {...rolesProps({
-        page: pageData([LONG_ROLE, ...ROLES], { totalCount: 214, nextCursor: "c2" }),
+        page: pageData([LONG_ROLE, ...ROLES], { totalCount: 214 }),
       })}
     />
   ),

@@ -3,15 +3,16 @@
  * JSON (`resource_pattern`, `conditions`, `actor_pattern`) into typed parts,
  * says them in words, and writes them back.
  *
- * The shapes are spec 03 §5's; the backend stores them and (2026-09-28) has
- * no evaluator, so these are the documented shapes, not enforced ones. A
- * condition of a kind this file does not know is kept verbatim, shown as a
- * custom condition, and written back untouched.
+ * The shapes are spec 03 §5's, and the resolver evaluates them on every
+ * check (#2157); `astroliftPolicyConditionCatalog` is the server's own table
+ * of the kinds. A condition of a kind this file does not know is kept
+ * verbatim, shown as a custom condition, and written back untouched.
  *
  * How a DENY reads: every spec 03 condition is a requirement (a working-hours
  * window, an IP allowlist, approvers, a fresh session), so a DENY policy
  * denies the action *unless* its conditions hold, and an ALLOW policy allows
- * it *only when* they hold. The evaluator, when it lands, must agree.
+ * it *only when* they hold, as the evaluator reads them. A condition the
+ * request cannot answer denies.
  */
 
 import type { ScopeKind } from "@/graphql/identity/identity.types";

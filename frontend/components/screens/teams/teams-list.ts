@@ -1,19 +1,17 @@
 /**
  * Admin › Access › Teams (access UX design 3.1) and a team's Members tab:
- * the list declarations and the pure filter, sort and page step.
+ * the list declarations, and the team members' pure filter, sort and page.
  *
- * `astroliftTeamsPage` takes `search`, `limit` and `after` only, so the hook
- * walks the org's teams (a few hundred at most) and numbers the pages here,
- * as the Clusters list does. Mine cannot be answered: a TEAM-scope Member
- * row carries the team's integer pk and a team is exposed by GUID only, so
- * nothing joins "teams I am on" to this list yet (design 6).
+ * The Teams list is on `astroliftTeamsPage`'s list contract (#2153): Mine
+ * (the teams the viewer is on), the name and created sorts and numbered
+ * pages, all on the server.
  *
- * `astroliftTeamMembers` returns up to 500 rows unpaged, so a team's members
- * are filtered, sorted and paged here too.
+ * `astroliftTeamMembers` returns up to 500 rows unpaged, so a team's
+ * members are filtered, sorted and paged here.
  */
 import type { SortState } from "@/components/data-table";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
-import type { AstroliftMember, AstroliftTeam } from "@/graphql/identity/identity.types";
+import type { AstroliftMember } from "@/graphql/identity/identity.types";
 
 export const TEAMS_LIST: ListDefinition = {
   id: "admin.access.teams",
@@ -21,13 +19,19 @@ export const TEAMS_LIST: ListDefinition = {
   // The server matches team name, slug and description.
   searchPlaceholder: "Search teams…",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews({ mine: "me" }, [], {
-    mineNote:
-      "The teams query does not say who is on a team yet, so Mine is empty. A person's Teams tab lists the teams they are on.",
-  }),
+  views: standardViews({ mine: "me" }),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
+
+export interface TeamsListFilter {
+  mine?: boolean;
+}
+
+/** Mine is the viewer's own teams; the server knows who is on each. */
+export function teamsFilter(filters: Record<string, string>): TeamsListFilter {
+  return { mine: filters.mine === "me" ? true : undefined };
+}
 
 function ordered<T>(
   rows: T[],
@@ -51,24 +55,6 @@ function ordered<T>(
 function page<T>(rows: T[], p: number, size: number) {
   const start = (Math.max(1, p) - 1) * size;
   return rows.slice(start, start + size);
-}
-
-const TEAM_SORT: Record<string, (t: AstroliftTeam) => string | number> = {
-  name: (t) => t.name.toLowerCase(),
-  created: (t) => Date.parse(t.createdAt) || 0,
-};
-
-export function selectTeams(
-  teams: readonly AstroliftTeam[],
-  {
-    filters,
-    sort,
-    page: p,
-    pageSize,
-  }: { filters: Record<string, string>; sort: SortState[]; page: number; pageSize: number }
-): { rows: AstroliftTeam[]; totalCount: number } {
-  const kept = filters.mine ? [] : ordered([...teams], sort, TEAM_SORT, (t) => t.slug);
-  return { rows: page(kept, p, pageSize), totalCount: kept.length };
 }
 
 // ---------------------------------------------------------------------------

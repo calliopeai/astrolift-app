@@ -150,6 +150,17 @@ describe("ClustersClient", () => {
     expect(within(table).getByText("STAGING")).toBeInTheDocument();
   });
 
+  it("says who registered each cluster", () => {
+    state.page = {
+      items: [cluster("prod", { createdByUsername: "dana" }), cluster("staging")],
+      totalCount: 2,
+    };
+    renderClusters();
+    const table = screen.getByRole("table", { name: "Clusters" });
+    expect(within(table).getByRole("columnheader", { name: "Registered by" })).toBeInTheDocument();
+    expect(within(table).getByText("dana")).toBeInTheDocument();
+  });
+
   it("shows the same rows as cards without a second fetch", () => {
     renderClusters();
     const fetches = state.variables.length;

@@ -14,8 +14,8 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { type ListPageData, useListPageQuery } from "../access/use-list-page-query";
-import { ROLE_HOLDERS_LIST } from "./permissions-lists";
+import { type ListPageData, useNumberedListQuery } from "../access/use-list-page-query";
+import { bindingsFilter, ROLE_HOLDERS_LIST } from "./permissions-lists";
 
 interface BindingsPageResp {
   astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
@@ -26,26 +26,19 @@ const REVOKE_REFETCH = ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }];
 
 /**
  * The data half of RoleHoldersTab: who holds `role`, and revoke. Mounted only
- * on the Holders tab, so the bindings query runs only there.
- *
- * `astroliftRoleBindingsPage` has no role argument. It searches role slugs,
- * so the page is asked for the slug (or the person's own search) and the
- * rows of other roles that match the text are dropped. The count is then the
- * search's, not the role's, so it is not shown.
+ * on the Holders tab, so the bindings query runs only there. The page is
+ * `astroliftRoleBindingsPage(roleId:)`, so the rows, the count and the
+ * pages are this role's (#2153).
  */
-export function useRoleHolders(role: Pick<AstroliftRole, "id" | "slug">) {
+export function useRoleHolders(role: Pick<AstroliftRole, "id">) {
   const perms = useMyPermissions();
   const list = useListState(ROLE_HOLDERS_LIST);
-  const searched = useListPageQuery<AstroliftRoleBinding>(
+  const page: ListPageData<AstroliftRoleBinding> = useNumberedListQuery(
     LIST_ROLE_BINDINGS_PAGE,
-    { ...list, state: { ...list.state, q: list.state.q.trim() || role.slug } },
-    (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage
+    list,
+    (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    { toFilter: bindingsFilter, variables: { roleId: role.id } }
   );
-  const page: ListPageData<AstroliftRoleBinding> = {
-    ...searched,
-    rows: searched.rows.filter((b) => b.role.id === role.id),
-    totalCount: null,
-  };
 
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;

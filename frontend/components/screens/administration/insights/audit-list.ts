@@ -3,9 +3,12 @@
  * views All · Mine · Denied, filters actor, action, target kind, decision
  * and since. Shared by the hook (URL state, query variables) and the
  * screen (tabs, chips), and pure, so the variable mapping is unit-tested.
+ *
+ * The server answers all of it (#2151): the search box is
+ * `astroliftAuditEventsPage(search:)` and every chip is a field of its
+ * `filter`, target kind included, so the rows, the count and the export
+ * all answer the same question.
  */
-import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
-
 import {
   type ListDefinition,
   type ListFieldOption,
@@ -30,10 +33,12 @@ export const AUDIT_PAGE_SIZE = 100;
 export const AUDIT_LIST: ListDefinition = {
   id: "admin.audit",
   fields: [
-    // `actor` is the event's actor id; Mine sends the viewer's own id.
+    // `actor` is the event's actor id; Mine sends "me", which the server resolves.
     { key: "actor", label: "Actor" },
-    // The server matches the action exactly: `team.create`, not `team`.
+    // A chip matches the action exactly (`team.create`); the search box
+    // matches a prefix (`team.`).
     { key: "action", label: "Action" },
+    // Case-insensitive: `user`, `role_binding`, `app`.
     { key: "target", label: "Target kind" },
     {
       key: "decision",
@@ -45,7 +50,7 @@ export const AUDIT_LIST: ListDefinition = {
     },
     { key: "since", label: "Since", options: SINCE_OPTIONS },
   ],
-  searchPlaceholder: "Action, exact: team.create",
+  searchPlaceholder: "Search actions, actors, targets, request ids…",
   defaultSort: [{ key: "occurredAt", dir: "desc" }],
   views: standardViews({ actor: "me" }, [
     { key: "denied", label: "Denied", filters: { decision: "DENY" } },
@@ -79,51 +84,47 @@ export function sinceToIso(value: string | undefined, now: number): string | nul
   return null;
 }
 
+/** The `AstroliftAuditEventsFilter` fields the list sends; unset ones are left out. */
+export interface AuditEventsFilter {
+  actor?: string[];
+  action?: string[];
+  targetKind?: string[];
+  decision?: string[];
+  since?: string;
+}
+
 export interface AuditQueryVariables {
   limit: number;
   after: string | null;
-  action: string | null;
-  decision: string | null;
-  actorId: string | null;
-  createdAtGte: string | null;
-  createdAtLte: null;
+  search: string | null;
+  filter: AuditEventsFilter | null;
   includeTotal: boolean;
 }
 
 /**
- * The list state as ListAuditEventsPage's variables. The search box is the
- * exact action match until the backend has a search argument; an `action`
- * chip wins over it. `actor: me` resolves to the viewer's id, and before
- * that id is known the query waits (see `ready`), so Mine never shows
- * everyone's events for a frame.
+ * The list state as ListAuditEventsPage's variables: the search box as
+ * `search`, each chip as its `filter` field. `actor: me` goes as it is;
+ * the server reads it as the viewer. An empty filter is `null`, so a cold
+ * load asks exactly what the route preloads.
  */
 export function auditVariables(
   filters: Record<string, string>,
   q: string,
-  opts: { pageSize: number; after: string | null; viewerId: string | null; now: number }
-): { variables: AuditQueryVariables; ready: boolean } {
-  const actor = filters.actor === "me" ? opts.viewerId : (filters.actor ?? null);
+  opts: { pageSize: number; after: string | null; now: number }
+): AuditQueryVariables {
+  const filter: AuditEventsFilter = {};
+  if (filters.actor) filter.actor = [filters.actor];
+  if (filters.action) filter.action = [filters.action];
+  if (filters.target) filter.targetKind = [filters.target];
+  if (filters.decision) filter.decision = [filters.decision];
+  const since = sinceToIso(filters.since, opts.now);
+  if (since) filter.since = since;
   return {
-    ready: filters.actor !== "me" || Boolean(opts.viewerId),
-    variables: {
-      limit: opts.pageSize,
-      after: opts.after,
-      action: filters.action || q.trim() || null,
-      decision: filters.decision || null,
-      actorId: actor || null,
-      createdAtGte: sinceToIso(filters.since, opts.now),
-      createdAtLte: null,
-      // `totalCount` is opt-in on this page: the audit list shows it.
-      includeTotal: true,
-    },
+    limit: opts.pageSize,
+    after: opts.after,
+    search: q.trim() || null,
+    filter: Object.keys(filter).length ? filter : null,
+    // `totalCount` is opt-in on this page: the audit list shows it.
+    includeTotal: true,
   };
-}
-
-/**
- * Target kind has no query argument yet, so it narrows the page in hand.
- * CLIENT-SIDE, and marked as such on the screen: a page can come back
- * shorter than its size. Case-insensitive exact match on `targetKind`.
- */
-export function matchesTargetKind(row: AstroliftAuditEvent, kind: string | undefined): boolean {
-  return !kind || row.targetKind.toLowerCase() === kind.toLowerCase();
 }

@@ -4,6 +4,7 @@ import {
   GroupDetail,
   GroupMembersPanel,
 } from "@/components/screens/administration/access/GroupDetail";
+import { GroupMappingsPanel } from "@/components/screens/administration/access/GroupMappingsPanel";
 import { MemberDetail } from "@/components/screens/administration/access/MemberDetail";
 import { PersonActivityPanel } from "@/components/screens/administration/access/PersonActivityPanel";
 import { PersonTeamsPanel } from "@/components/screens/administration/access/PersonTeamsPanel";
@@ -13,10 +14,8 @@ import { useMemberDetail } from "@/components/screens/administration/access/use-
 import { usePersonActivity } from "@/components/screens/administration/access/use-person-activity";
 import { usePersonTeams } from "@/components/screens/administration/access/use-person-teams";
 import { usePrincipalAccess } from "@/components/screens/administration/access/use-principal-access";
-import {
-  GROUP_ACCESS_NOTE,
-  holderLabel,
-} from "@/components/screens/administration/access/principal-access";
+import { holderLabel } from "@/components/screens/administration/access/principal-access";
+import { useGroupMappings } from "@/components/screens/administration/access/use-group-mappings";
 
 /** The Access tab, for whichever principal the route names. */
 export function PrincipalAccessClient({ param }: { param: string }) {
@@ -43,9 +42,11 @@ function PersonAccessClient({ memberId }: { memberId: string }) {
 
 function GroupAccessClient({ externalId }: { externalId: string }) {
   const access = usePrincipalAccess({ kind: "group", externalId });
+  const mappings = useGroupMappings(externalId);
   return (
     <GroupDetail externalId={externalId} tab="access">
-      <PrincipalAccessPanel {...access} holderLabel={holderLabel} note={GROUP_ACCESS_NOTE} />
+      <PrincipalAccessPanel {...access} holderLabel={holderLabel} />
+      <GroupMappingsPanel {...mappings} />
     </GroupDetail>
   );
 }

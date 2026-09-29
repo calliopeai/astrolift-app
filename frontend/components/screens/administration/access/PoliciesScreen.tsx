@@ -26,8 +26,8 @@ export type PoliciesScreenProps = ReturnType<typeof usePolicies>;
 /**
  * Admin › Policies: the ABAC policy list (design 3.6, spec 44 §5.1), each row
  * read as its sentence and opening the policy's page, with soft-delete. The
- * backend stores policies and does not evaluate them yet (design 1), so
- * nothing here claims a policy denies anything today.
+ * permission check evaluates every policy (#2157): a DENY that matches wins
+ * over any role, and a condition the request cannot answer denies.
  */
 export function PoliciesScreen({
   list,
@@ -43,6 +43,7 @@ export function PoliciesScreen({
     {
       id: "policy",
       header: "Policy",
+      sortKey: "name",
       cellClassName: "max-w-[36rem]",
       // The sentence is the row (design 3.6): what it denies, on what, for
       // whom and unless what, read the way the editor builds it.
@@ -64,8 +65,19 @@ export function PoliciesScreen({
       ),
     },
     {
+      id: "effect",
+      header: "Effect",
+      sortKey: "effect",
+      cell: (p) => (
+        <Badge variant={p.effect === "DENY" ? "destructive" : "secondary"} className="font-mono">
+          {p.effect.toLowerCase()}
+        </Badge>
+      ),
+    },
+    {
       id: "scope",
       header: "Scope",
+      sortKey: "scopeLevel",
       cell: (p) => (
         <Badge variant="outline" className="font-mono">
           {SCOPE_NOUN[p.scopeLevel] ?? p.scopeLevel}
@@ -88,6 +100,7 @@ export function PoliciesScreen({
     {
       id: "updatedAt",
       header: "Updated",
+      sortKey: "updated",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (p) => fmt.formatDate(p.updatedAt || p.createdAt),
     },
@@ -99,7 +112,8 @@ export function PoliciesScreen({
         header={{
           crumbs: policiesCrumbs(),
           title: "Policies",
-          context: "Rules that narrow what roles allow. Stored, not yet enforced.",
+          context:
+            "Rules that narrow what roles allow, checked on every request. A condition the request cannot answer denies.",
           primaryAction: (
             <Can permission="org.update">
               <Button size="sm" asChild>
@@ -122,7 +136,6 @@ export function PoliciesScreen({
         error={page.error}
         onRetry={page.refetch}
         totalCount={page.totalCount}
-        nextCursor={page.nextCursor}
         // DENY rows get a flush left border in destructive tone so the
         // danger-zone read is obvious at a glance: a DENY can lock operators
         // out even when role bindings would otherwise permit the call.
@@ -157,10 +170,10 @@ export function PoliciesScreen({
       <div className="border-warning-border bg-warning/10 flex min-w-0 items-start gap-2 rounded-md border p-3">
         <InfoIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground min-w-0 text-xs leading-relaxed">
-          <span className="text-foreground font-medium">Not enforced yet.</span> Astrolift stores
-          these policies and reads them back as written, but the permission check does not evaluate
-          them: today a policy changes no one&apos;s access. Search matches name, slug, description
-          and action.{" "}
+          <span className="text-foreground font-medium">Enforced on every check.</span> A DENY that
+          matches the action, resource and person wins over any role that allows it. A condition the
+          request cannot answer (no client address, no session) denies, so a policy fails closed.
+          Search matches name, slug, description and action.{" "}
           <Link className="underline underline-offset-2" href={DOC_LINKS.policies}>
             Learn more
           </Link>
@@ -173,7 +186,7 @@ export function PoliciesScreen({
           if (!next) setDeleteTarget(null);
         }}
         title={deleteTarget ? `Delete policy ${deleteTarget.slug}?` : "Delete policy?"}
-        description="Soft-deletes the policy and frees its slug for a new one. Policies are not enforced yet, so no one's access changes today; once they are, whatever this policy denied is allowed again."
+        description="Soft-deletes the policy and frees its slug for a new one. Whatever it denied is allowed again at once, wherever a role allows it."
         confirmLabel="Delete policy"
         destructive
         onConfirm={async () => {

@@ -1,7 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
-import { EVERY_KIND, INVALID_POLICY, LONG_POLICY } from "@/components/access/fixtures";
+import {
+  EVERY_KIND,
+  INVALID_POLICY,
+  LONG_POLICY,
+  SIMULATION,
+  SIMULATION_EMPTY,
+} from "@/components/access/fixtures";
 
 import { editPolicyProps, LONG_POLICIES, NEW_POLICY } from "./fixtures";
 import { PolicyEditorScreen } from "./PolicyEditorScreen";
@@ -51,9 +57,77 @@ export const InvalidCondition: Story = {
   },
 };
 
-/** New, step 3: the sentence, the not-enforced note, and the simulation it cannot run yet. */
+/** New, step 3: the sentence, what saving does, and the server's simulation of it. */
 export const NewReview: Story = {
-  render: () => <PolicyEditorScreen {...NEW_POLICY} initialStep={2} initialDraft={FILLED} />,
+  render: () => (
+    <PolicyEditorScreen
+      {...NEW_POLICY}
+      initialStep={2}
+      initialDraft={FILLED}
+      initialSimulation={SIMULATION}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(c.getByTestId("simulation-summary")).toHaveTextContent("3 of 41");
+  },
+};
+
+/** Continue from the rule runs the simulation, then shows it. */
+export const ReviewSimulates: Story = {
+  render: () => <PolicyEditorScreen {...NEW_POLICY} initialStep={1} initialDraft={FILLED} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Continue" }));
+    await expect(await c.findByTestId("simulation-summary")).toHaveTextContent("3 of 41");
+  },
+};
+
+/** Nobody holds it and nothing is recorded yet: the review says so. */
+export const ReviewNothingToSimulate: Story = {
+  render: () => (
+    <PolicyEditorScreen
+      {...NEW_POLICY}
+      initialStep={2}
+      initialDraft={FILLED}
+      initialSimulation={SIMULATION_EMPTY}
+    />
+  ),
+};
+
+/** The simulation failed: Retry in place; saving is still possible. */
+export const ReviewSimulationFailed: Story = {
+  render: () => (
+    <PolicyEditorScreen
+      {...NEW_POLICY}
+      simulate={async () => {
+        throw new globalThis.Error("upstream timed out after 30s");
+      }}
+      initialStep={1}
+      initialDraft={FILLED}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Continue" }));
+    await expect(await c.findByText(/Could not simulate/)).toBeInTheDocument();
+  },
+};
+
+/** The rule step says, from the server's catalog, what each condition needs. */
+export const RuleConditionNeeds: Story = {
+  render: () => (
+    <PolicyEditorScreen
+      {...NEW_POLICY}
+      initialStep={1}
+      initialDraft={{ ...FILLED, shape: EVERY_KIND }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getAllByText(/cannot answer it, so it denies/).length
+    ).toBeGreaterThan(0);
+  },
 };
 
 /** A blank name: the error sits under the field. */

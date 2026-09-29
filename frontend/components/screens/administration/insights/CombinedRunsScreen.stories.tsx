@@ -23,22 +23,30 @@ function Runs({ initial, ...props }: Props) {
   return <CombinedRunsScreen {...RUN_AUDIT} list={list} {...props} />;
 }
 
-/** All four kinds, newest first, with who or what started each. */
+/** Every kind, newest first, with who or what started each. */
 export const Full: Story = { render: () => <Runs /> };
 
 export const Loading: Story = {
-  render: () => <Runs rows={[]} loading totalCount={null} coverage={null} />,
+  render: () => <Runs rows={[]} loading totalCount={null} />,
 };
 
 export const Empty: Story = {
-  render: () => (
-    <Runs rows={[]} nextCursor={null} totalCount={0} approximateCount={false} coverage={null} />
-  ),
+  render: () => <Runs rows={[]} nextCursor={null} totalCount={0} />,
 };
 
-/** Mine with nothing in it: only sources that record the initiator can say. */
+/** Mine with nothing in it: the viewer started no run. */
 export const EmptyMine: Story = {
-  render: () => <Runs rows={[]} nextCursor={null} initial={{ view: "mine" }} coverage={null} />,
+  render: () => <Runs rows={[]} nextCursor={null} totalCount={0} initial={{ view: "mine" }} />,
+};
+
+/** Mine: the runs the server records the viewer as starting, of every kind. */
+export const Mine: Story = {
+  render: () => {
+    const rows = COMBINED_RUNS.filter((r) => r.startedByMe);
+    return (
+      <Runs rows={rows} nextCursor={null} totalCount={rows.length} initial={{ view: "mine" }} />
+    );
+  },
 };
 
 export const EmptyFiltered: Story = {
@@ -46,29 +54,15 @@ export const EmptyFiltered: Story = {
     <Runs
       rows={[]}
       nextCursor={null}
+      totalCount={0}
       initial={{ filters: { kind: "job", outcome: "cancelled" } }}
-      coverage={null}
     />
   ),
 };
 
 export const Error: Story = {
   render: () => (
-    <Runs
-      rows={[]}
-      error={{ message: "upstream timed out after 30s (astroliftDeploymentsPage)" }}
-      coverage={null}
-    />
-  ),
-};
-
-/** One source failed; the others still show, and the page names the missing one. */
-export const PartialSources: Story = {
-  render: () => (
-    <Runs
-      rows={COMBINED_RUNS.filter((r) => r.kind !== "workflow")}
-      unavailable={["workflow runs"]}
-    />
+    <Runs rows={[]} error={{ message: "upstream timed out after 30s (astroliftRunAudit)" }} />
   ),
 };
 
@@ -78,9 +72,7 @@ export const ByKind: Story = {
     <Runs
       rows={COMBINED_RUNS.filter((r) => r.kind === "deployment")}
       totalCount={5}
-      approximateCount={false}
       nextCursor={null}
-      coverage={null}
       initial={{ filters: { kind: "deployment", since: "7d" } }}
     />
   ),
@@ -88,6 +80,13 @@ export const ByKind: Story = {
 
 export const NewRuns: Story = {
   render: () => <Runs newRows={{ count: 2, onReveal: () => {} }} />,
+};
+
+/** Oldest first: the When header sorted ascending. */
+export const OldestFirst: Story = {
+  render: () => (
+    <Runs rows={[...COMBINED_RUNS].reverse()} initial={{ sort: [{ key: "at", dir: "asc" }] }} />
+  ),
 };
 
 /** A 64-char SHA, a 200-char ARN and an unbroken URL never widen the page. */

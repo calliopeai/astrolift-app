@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangleIcon, DownloadIcon, HistoryIcon, MoreHorizontalIcon } from "lucide-react";
+import { DownloadIcon, HistoryIcon, MoreHorizontalIcon } from "lucide-react";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -23,23 +23,17 @@ import { adminCrumbs } from "./header";
 export interface CombinedRunsScreenProps {
   /** List state: views, search, chips, cursor (see combined-runs.ts). */
   list: ListStateController;
-  /** The page of merged runs, newest first. */
+  /** One page of runs of every kind, newest first unless sorted oldest first. */
   rows: CombinedRun[];
   newRows?: { count: number; onReveal: () => void };
   loading: boolean;
   stale: boolean;
-  /** Every source failed. One failing source is `unavailable` instead. */
   error: { message: string } | null;
   onRetry: () => void;
   nextCursor: string | null;
-  /** Runs matching the filters across what was fetched. */
+  /** Runs matching the filters, every kind, across all pages (the server's exact count). */
   totalCount: number | null;
-  /** True while the count covers only the newest page of each source. */
-  approximateCount: boolean;
-  /** Sources that failed to load, by label: the list shows the rest. */
-  unavailable: string[];
-  /** How much of each source the list covers, in words, while it is merged client-side. */
-  coverage: string | null;
+  /** Every run the filters match, not only the page on screen. */
   onExportCsv: () => void;
 }
 
@@ -62,9 +56,10 @@ function took(s: number | null): string {
 
 /**
  * Admin › Usage & governance › Runs (spec 44 §4.4, decision 14): the audit
- * of everything that ran. Agent runs, workflow runs, deployments and job
- * runs in one list, filtered by kind, with who or what started each, when,
- * and the outcome; CSV from `⋯`. Each row links to its own detail page.
+ * of everything that ran. Agent runs, workflow runs, deployments, job runs
+ * and task runs in one list, filtered by kind, with who or what started
+ * each, when, and the outcome; CSV from `⋯`. Each row links to its own
+ * detail page. Pure; the data half is useCombinedRuns.
  */
 export function CombinedRunsScreen({
   list,
@@ -76,9 +71,6 @@ export function CombinedRunsScreen({
   onRetry,
   nextCursor,
   totalCount,
-  approximateCount,
-  unavailable,
-  coverage,
   onExportCsv,
 }: CombinedRunsScreenProps) {
   const fmt = useFormatters();
@@ -132,6 +124,7 @@ export function CombinedRunsScreen({
     {
       id: "at",
       header: "When",
+      sortKey: "at",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (r) => (r.at ? fmt.formatDateTime(r.at) : "—"),
     },
@@ -177,10 +170,9 @@ export function CombinedRunsScreen({
           icon: <HistoryIcon className="size-5" />,
           title: "No runs yet",
           description:
-            "Agent runs, workflow runs, deployments and job runs appear here as they start.",
+            "Agent runs, workflow runs, deployments, job runs and task runs appear here as they start.",
         }}
         totalCount={totalCount}
-        approximateCount={approximateCount}
         nextCursor={nextCursor}
         newRows={newRows}
         menu={
@@ -199,19 +191,6 @@ export function CombinedRunsScreen({
           </DropdownMenu>
         }
       />
-
-      {unavailable.length > 0 && !error && (
-        <p role="status" className="text-warning-fg flex min-w-0 items-start gap-1.5 text-xs">
-          <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <span className="min-w-0 [overflow-wrap:anywhere]">
-            Not shown, could not load: {unavailable.join(", ")}.{" "}
-            <button type="button" onClick={onRetry} className="underline underline-offset-2">
-              Retry
-            </button>
-          </span>
-        </p>
-      )}
-      {coverage && <p className="text-muted-foreground text-xs">{coverage}</p>}
     </div>
   );
 }

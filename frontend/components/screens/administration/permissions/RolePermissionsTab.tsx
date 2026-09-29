@@ -33,15 +33,18 @@ export interface RolePermissionsTabProps {
 
 const SAVED = "saved";
 const NONE = "none";
+/** The role this one was duplicated from (`duplicatedFrom`), even after it was deleted. */
+const LINEAGE = "lineage";
 
 /**
  * A role's Permissions tab (design 3.5): the `PermissionMatrix`, areas by
  * verbs. A built-in role is read-only with Duplicate to customise; a custom
  * role edits in place, a cell, a row or an area at a time, with Save and
- * Discard, and diffs against its saved version while it has edits. Any role
- * can be compared with another, which is how a custom role is read against
- * the built-in it came from (the backend does not record lineage yet). The
- * caller keys it by the saved set, so a save or a refetch starts it afresh. Pure.
+ * Discard, and diffs against its saved version while it has edits. A role
+ * made by duplicating says what it came from and how far it has moved, and
+ * can be compared with that source (`duplicatedFrom`, kept even when the
+ * source is deleted) as with any other role. The caller keys it by the
+ * saved set, so a save or a refetch starts it afresh. Pure.
  */
 export function RolePermissionsTab({
   role,
@@ -53,15 +56,22 @@ export function RolePermissionsTab({
   duplicateHref,
 }: RolePermissionsTabProps) {
   const editable = canManage && !role.isSystem;
+  const lineage = role.duplicatedFrom ?? null;
   const [draft, setDraft] = React.useState<string[]>(role.permissions);
-  const [compare, setCompare] = React.useState(editable ? SAVED : NONE);
+  const [compare, setCompare] = React.useState(editable ? SAVED : lineage ? LINEAGE : NONE);
   const [error, setError] = React.useState<string | null>(null);
 
   const pending = diffPermissions(draft, role.permissions);
   const dirty = pending.added.length + pending.removed.length > 0;
+  const moved = lineage ? diffPermissions(role.permissions, lineage.permissions) : null;
   const other = roles.find((r) => r.id === compare);
-  const base = compare === SAVED ? role.permissions : other?.permissions;
-  const baseLabel = compare === SAVED ? "saved" : other?.name;
+  const base =
+    compare === SAVED
+      ? role.permissions
+      : compare === LINEAGE
+        ? lineage?.permissions
+        : other?.permissions;
+  const baseLabel = compare === SAVED ? "saved" : compare === LINEAGE ? lineage?.name : other?.name;
 
   async function save() {
     setError(await onSave([...draft].sort((a, b) => a.localeCompare(b))));
@@ -87,6 +97,31 @@ export function RolePermissionsTab({
         </div>
       )}
 
+      {lineage && moved && (
+        <p className="text-muted-foreground min-w-0 text-sm [overflow-wrap:anywhere]">
+          Duplicated from <span className="text-foreground font-medium">{lineage.name}</span>
+          {lineage.isSystem ? " (built-in)" : ""}
+          {lineage.deleted ? ", since deleted" : ""}:{" "}
+          <span className="font-mono text-xs tabular-nums">
+            <span className="text-success-fg">+{moved.added.length}</span>{" "}
+            <span className="text-danger-fg">−{moved.removed.length}</span>
+          </span>{" "}
+          since.
+          {compare !== LINEAGE && (
+            <>
+              {" "}
+              <button
+                type="button"
+                onClick={() => setCompare(LINEAGE)}
+                className="text-foreground underline underline-offset-2"
+              >
+                Compare with {lineage.name}
+              </button>
+            </>
+          )}
+        </p>
+      )}
+
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Label htmlFor="role-compare" className="text-muted-foreground text-sm font-normal">
           Compare with
@@ -101,8 +136,13 @@ export function RolePermissionsTab({
             ) : (
               <SelectItem value={NONE}>Nothing</SelectItem>
             )}
+            {lineage && (
+              <SelectItem value={LINEAGE}>
+                {lineage.name} (duplicated from{lineage.deleted ? ", deleted" : ""})
+              </SelectItem>
+            )}
             {roles
-              .filter((r) => r.id !== role.id)
+              .filter((r) => r.id !== role.id && r.id !== lineage?.id)
               .map((r) => (
                 <SelectItem key={r.id} value={r.id}>
                   {r.name}
