@@ -2540,6 +2540,7 @@
       "abort": "Abort",
       "rollback": "Rollback",
       "redeploy": "Redeploy",
+      "redeployFailed": "重新部署失败",
       "approvalsCount": "{received}/{required} approvals",
       "fields": {
         "imageTag": "Image tag",

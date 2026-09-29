@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The deployment detail Redeploy action sends the selected deployment ID required
+  by the API, and reports server or network failures in a toast (#2173).
+
 - AWS deployments and rollbacks protect ECR images with immutable per-environment,
   per-deployment tags before applying workloads, and pin container references to
   the protected digest. Successful rollout history retains ten deployments per

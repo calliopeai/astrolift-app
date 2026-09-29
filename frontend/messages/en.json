@@ -2189,6 +2189,7 @@
       "abort": "Abort",
       "rollback": "Rollback",
       "redeploy": "Redeploy",
+      "redeployFailed": "Redeploy failed",
       "approvalsCount": "{received}/{required} approvals",
       "fields": {
         "imageTag": "Image tag",

@@ -2540,6 +2540,7 @@
       "abort": "Abort",
       "rollback": "Rollback",
       "redeploy": "Redeploy",
+      "redeployFailed": "재배포에 실패했습니다",
       "approvalsCount": "{received}/{required} approvals",
       "fields": {
         "imageTag": "Image tag",

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import type { DeploymentByIdInput } from "@/graphql/__generated__/schema";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
@@ -102,8 +103,8 @@ function reportResult(
  * One deployment's detail page data: the row, its lifecycle log, the
  * rendered manifest, recent events, the approval trail, release notes,
  * live push and the lifecycle mutations. The data half of
- * DeploymentDetailScreen. Every handler throws on failure, so
- * ConfirmDialog holds open with the reason.
+ * DeploymentDetailScreen. Confirmed actions throw so their dialog stays
+ * open with the reason; direct redeploy actions surface failures in a toast.
  */
 export function useDeploymentDetail(id: string) {
   const t = useTranslations("lists.deploymentDetail");
@@ -193,9 +194,10 @@ export function useDeploymentDetail(id: string) {
   const [rollback, rollbackState] = useMutation<{
     rollbackDeployment: MutationResultLite<AstroliftDeployment>;
   }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
-  const [redeploy, redeployState] = useMutation<{
-    redeployApp: MutationResultLite<AstroliftDeployment>;
-  }>(REDEPLOY_APP, { refetchQueries: refetch });
+  const [redeploy, redeployState] = useMutation<
+    { redeployApp: MutationResultLite<AstroliftDeployment> },
+    { input: DeploymentByIdInput }
+  >(REDEPLOY_APP, { refetchQueries: refetch });
   const [deleteDeployment, deleteState] = useMutation<{
     deleteDeployment: MutationResultLite<Pick<AstroliftDeployment, "id" | "status">>;
   }>(DELETE_DEPLOYMENT);
@@ -245,16 +247,17 @@ export function useDeploymentDetail(id: string) {
 
   async function onRedeploy() {
     if (!deployment) return;
-    const { data } = await redeploy({
-      variables: {
-        input: {
-          appSlug: deployment.registeredAppSlug,
-          environmentName: deployment.environmentName,
-          imageTag: deployment.imageTag || undefined,
-        },
-      },
-    });
-    reportResult("redeployApp", data?.redeployApp);
+    try {
+      const { data } = await redeploy({
+        variables: { input: { id: deployment.id } },
+      });
+      if (!data?.redeployApp?.ok) {
+        throw new Error(data?.redeployApp?.errors[0]?.message || t("redeployFailed"));
+      }
+      reportResult(t("redeploy"), data.redeployApp);
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t("redeployFailed"));
+    }
   }
 
   async function onDelete() {
