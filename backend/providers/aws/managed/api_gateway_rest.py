@@ -301,6 +301,10 @@ class ApiGatewayRestDriver(ManagedServiceDriver):
         reserved = {"name", "tags"}.intersection((cfg.get("rest_api") or {}).keys())
         if reserved:
             return f"config.rest_api cannot override Astrolift-owned fields: {', '.join(sorted(reserved))}"
+        # cloneFrom copies another API's resources, integrations and their
+        # credentials into this one, whoever owns it (#2087).
+        if any(str(key).casefold() == "clonefrom" for key in cfg.get("rest_api") or {}):
+            return "config.rest_api cannot set cloneFrom: an API copies no other API from config"
         return ""
 
     def _api_name(self, spec: ProvisionSpec) -> str:

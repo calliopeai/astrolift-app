@@ -31,6 +31,7 @@ from _sdk.managed_service import (
 
 KIND = "document_db"
 _API_ROOT = "https://firestore.googleapis.com/v1"
+_REMOVED_CLONE_KEYS = frozenset({"clone_source_database", "clone_snapshot_time", "clone_encryption_config"})
 _DATABASE_MUTABLE_FIELDS = {
     "concurrency_mode": "concurrencyMode",
     "point_in_time_recovery": "pointInTimeRecoveryEnablement",
@@ -112,9 +113,6 @@ class FirestoreRestClient:
     def delete_database(self, name: str, *, etag: str = "") -> dict[str, Any]:
         params = {"etag": etag} if etag else None
         return self._request("DELETE", name, params=params)
-
-    def clone_database(self, project_id: str, body: dict[str, Any]) -> dict[str, Any]:
-        return self._request("POST", f"projects/{project_id}/databases:clone", json=body)
 
     def restore_database(self, project_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", f"projects/{project_id}/databases:restore", json=body)
@@ -273,7 +271,11 @@ class FirestoreNativeDriver(ManagedServiceDriver):
             if current is None:
                 # Nothing to adopt: a tenant-chosen database_id is free to
                 # name a database that does not exist yet.
-                operation = self._create_or_clone(database_id, cfg)
+                operation = self._firestore.create_database(
+                    self._config.project_id,
+                    database_id,
+                    self._database_document(database_id, cfg),
+                )
                 self._wait_operation(operation)
                 current = self._firestore.get_database(name)
             elif not adopt_restored and self._requires_adoption(database_id, cfg):
@@ -739,9 +741,6 @@ class FirestoreNativeDriver(ManagedServiceDriver):
                     "type": "string",
                     "enum": ["DATA_ACCESS_MODE_ENABLED", "DATA_ACCESS_MODE_DISABLED"],
                 },
-                "clone_source_database": {"type": "string"},
-                "clone_snapshot_time": {"type": "string", "format": "date-time"},
-                "clone_encryption_config": source_encryption,
                 "restore_encryption_config": source_encryption,
                 "backup_schedules": {"type": "array", "maxItems": 2, "items": scheduling},
                 "prune_backup_schedules": {"type": "boolean", "default": False},
@@ -791,29 +790,6 @@ class FirestoreNativeDriver(ManagedServiceDriver):
             "prune_composite_indexes",
             "replace_backup_schedules",
         ]
-
-    def _create_or_clone(self, database_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
-        if cfg.get("clone_source_database"):
-            source = str(cfg["clone_source_database"])
-            if not source.startswith("projects/"):
-                source = self._database_name(source)
-            body: dict[str, Any] = {
-                "databaseId": database_id,
-                "pitrSnapshot": {
-                    "database": source,
-                    "snapshotTime": cfg["clone_snapshot_time"],
-                },
-            }
-            if cfg.get("clone_encryption_config"):
-                body["encryptionConfig"] = _camelize(cfg["clone_encryption_config"])
-            if cfg.get("tags"):
-                body["tags"] = dict(cfg["tags"])
-            return self._firestore.clone_database(self._config.project_id, body)
-        return self._firestore.create_database(
-            self._config.project_id,
-            database_id,
-            self._database_document(database_id, cfg),
-        )
 
     def _database_document(self, database_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
         edition = str(cfg.get("database_edition") or "STANDARD")
@@ -1084,11 +1060,18 @@ class FirestoreNativeDriver(ManagedServiceDriver):
             and cfg.get("mongodb_compatible_data_access_mode") == "DATA_ACCESS_MODE_DISABLED"
         ):
             return "MongoDB client bindings require MongoDB-compatible data access"
-        clone_source = cfg.get("clone_source_database")
-        clone_time = cfg.get("clone_snapshot_time")
-        if bool(clone_source) != bool(clone_time):
-            return "clone_source_database and clone_snapshot_time must be set together"
-        for field in ("clone_encryption_config", "restore_encryption_config"):
+        # A clone copied any database the platform can read, in any project,
+        # into this one: a restore that skipped the platform's check that the
+        # source is this app's own retained snapshot (#2087). Refused by name,
+        # since this driver ignores unknown keys and an update never meets the
+        # config schema.
+        removed = sorted(_REMOVED_CLONE_KEYS.intersection(cfg))
+        if removed:
+            return (
+                f"cloning a database is no longer supported ({', '.join(removed)}); restore from a "
+                "snapshot Astrolift retained for this app instead"
+            )
+        for field in ("restore_encryption_config",):
             encryption = cfg.get(field)
             if encryption is None:
                 continue

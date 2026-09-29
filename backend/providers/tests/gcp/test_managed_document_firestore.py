@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import (
     DeprovisionSpec,
@@ -83,17 +84,6 @@ class FakeFirestoreClient:
         self.calls.append(("delete_database", {"name": name, "etag": etag}))
         del self.state.databases[name]
         return self._operation()
-
-    def clone_database(self, project_id: str, body: dict[str, Any]) -> dict[str, Any]:
-        target = f"projects/{project_id}/databases/{body['databaseId']}"
-        source = body["pitrSnapshot"]["database"]
-        row = copy.deepcopy(self.state.databases[source])
-        row.update({"name": target, "etag": "clone-etag"})
-        if body.get("encryptionConfig"):
-            row["cmekConfig"] = copy.deepcopy(body["encryptionConfig"])
-        self.calls.append(("clone_database", copy.deepcopy(body)))
-        self.state.databases[target] = row
-        return self._operation(row)
 
     def restore_database(self, project_id: str, body: dict[str, Any]) -> dict[str, Any]:
         target = f"projects/{project_id}/databases/{body['databaseId']}"
@@ -621,27 +611,51 @@ def test_invalid_native_options_fail_before_cloud_calls(
     assert harness.client.calls == []
 
 
-def test_clone_uses_pitr_source_and_reconciles_target(harness: Harness) -> None:
+@pytest.mark.parametrize(
+    "clone",
+    [
+        {"clone_source_database": "astrolift-records", "clone_snapshot_time": "2026-08-14T12:00:00Z"},
+        {
+            "clone_source_database": "projects/other-tenant/databases/records",
+            "clone_snapshot_time": "2026-08-14T12:00:00Z",
+        },
+        {"clone_encryption_config": {"use_source_encryption": {}}},
+    ],
+)
+def test_clone_from_a_named_database_is_refused(harness: Harness, clone: dict[str, Any]) -> None:
+    # A clone copied any database the platform could read, in any project, and
+    # skipped the platform's check that a restore source is this app's own
+    # retained snapshot (#2087).
     source_config = _full_config()
     assert harness.driver.provision(_spec(source_config)).ok
+    calls = len(harness.client.calls)
 
-    clone_config = {
-        "database_id": "astrolift-clone",
-        "location": "nam5",
-        "database_edition": "ENTERPRISE",
-        "kms_key_name": source_config["kms_key_name"],
-        "clone_source_database": "astrolift-records",
-        "clone_snapshot_time": "2026-08-14T12:00:00Z",
-        "delete_protection": False,
-    }
-    result = harness.driver.provision(_spec(clone_config))
+    result = harness.driver.provision(
+        _spec({"database_id": "astrolift-clone", "location": "nam5", "database_edition": "ENTERPRISE", **clone}),
+    )
 
-    assert result.ok, result
-    clone_call = next(payload for name, payload in harness.client.calls if name == "clone_database")
-    assert clone_call["pitrSnapshot"] == {
-        "database": "projects/acme-prod/databases/astrolift-records",
-        "snapshotTime": "2026-08-14T12:00:00Z",
-    }
+    assert not result.ok
+    assert "cloning a database is no longer supported" in result.message
+    assert len(harness.client.calls) == calls
+    assert "projects/acme-prod/databases/astrolift-clone" not in harness.state.databases
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        # Each value is one the schema accepted while the key existed, so the
+        # refusal is the key's removal, not a malformed value.
+        ("clone_source_database", "projects/other-tenant/databases/records"),
+        ("clone_snapshot_time", "2026-08-14T12:00:00Z"),
+        ("clone_encryption_config", {"use_source_encryption": {}}),
+    ],
+)
+def test_removed_clone_keys_fail_the_config_schema(harness: Harness, key: str, value: Any) -> None:
+    validator = Draft202012Validator(harness.driver.config_schema())
+    base = {"location": "nam5"}
+
+    assert validator.is_valid(base)
+    assert not validator.is_valid({**base, key: value})
 
 
 def test_weekly_backup_day_change_requires_explicit_replacement(harness: Harness) -> None:

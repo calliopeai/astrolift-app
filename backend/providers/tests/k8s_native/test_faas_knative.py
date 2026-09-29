@@ -150,6 +150,25 @@ def test_public_route_requires_install_policy() -> None:
     assert "networking.knative.dev/visibility" not in _manifest(cluster)["metadata"]["labels"]
 
 
+def test_a_shared_namespace_runs_only_listed_service_accounts() -> None:
+    # In a namespace shared between tenants a ServiceAccount name can resolve
+    # to another tenant's account and the cloud identity annotated on it (#2087).
+    shared, shared_cluster = _driver(namespace="functions")
+    listed, listed_cluster = _driver(namespace="functions", allowed_service_accounts=("functions-runner",))
+    own, own_cluster = _driver()
+
+    refused = shared.provision(_spec(service_account_name="other-tenant-runner"))
+    accepted = listed.provision(_spec(service_account_name="functions-runner"))
+    per_app = own.provision(_spec(service_account_name="triage-function"))
+
+    assert refused.ok is False and "knative_allowed_service_accounts" in refused.message
+    assert shared_cluster.applied == []
+    assert accepted.ok is True
+    assert _manifest(listed_cluster)["spec"]["template"]["spec"]["serviceAccountName"] == "functions-runner"
+    assert per_app.ok is True
+    assert _manifest(own_cluster)["spec"]["template"]["spec"]["serviceAccountName"] == "triage-function"
+
+
 def test_tagged_image_requires_install_policy() -> None:
     denied, _ = _driver()
     allowed, _ = _driver(allow_tagged_images=True)

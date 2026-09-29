@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
+from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from aws.managed.memorydb import MemoryDBConfig, MemoryDBDriver
 
 
@@ -307,3 +307,27 @@ def test_provision_does_not_adopt_another_services_resource():
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
     assert not any(name.startswith(("Create", "Update", "Modify")) for name, _ in client.calls[calls:])
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        {"snapshot_arns_to_restore": ["arn:aws:memorydb:us-west-2:123456789012:snapshot/other-tenant"]},
+        {"snapshot_name_to_restore": "other-tenant-final"},
+    ],
+)
+def test_config_cannot_name_a_snapshot_to_copy_data_from(source):
+    # restore() takes only the snapshot the platform retained for this app; a
+    # config naming one itself, or naming a second one beside it, skipped that
+    # check (#2087).
+    subject, memorydb, _ = driver()
+
+    provisioned = subject.provision(spec(**source))
+    restored = subject.restore(
+        SnapshotHandle("redis/retained", "arn:aws:memorydb:us-west-2:123456789012:snapshot/retained", ""),
+        spec(**source),
+    )
+
+    assert not provisioned.ok and "cannot name a snapshot to copy data from" in provisioned.message
+    assert not restored.ok and "cannot name a snapshot to copy data from" in restored.message
+    assert not [operation for operation, _ in memorydb.calls if operation == "CreateCluster"]

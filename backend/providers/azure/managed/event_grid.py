@@ -38,6 +38,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "event_bus"
@@ -128,6 +129,9 @@ class AzureEventGridConfig:
     public_network_access_default: str = "Enabled"
     mgmt_client: Any | None = None
     locks_client: Any | None = None
+    # User-assigned identities a topic may attach and deliver or dead-letter
+    # with. Empty refuses every one (#2087).
+    allowed_identity_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.default_input_schema not in {"CloudEventSchemaV1_0", "EventGridSchema"}:
@@ -586,6 +590,13 @@ class AzureEventGridDriver(ManagedServiceDriver):
             return "Event Grid topic user-assigned identity IDs must be a unique list"
         if any(not _is_arm_id(value) for value in uamis):
             return "Event Grid topic user-assigned identities must be ARM resource IDs"
+        for value in uamis:
+            unlisted = unlisted_identity(value, self._config.allowed_identity_resource_ids)
+            if unlisted:
+                return (
+                    f"Event Grid topic identity {unlisted!r} is not allowed by the cluster install policy "
+                    "eventgrid_allowed_identity_resource_ids"
+                )
         subscriptions = cfg.get("subscriptions", []) or []
         if not isinstance(subscriptions, list):
             return "Event Grid subscriptions must be a list"
@@ -815,6 +826,12 @@ class AzureEventGridDriver(ManagedServiceDriver):
             resource_id = identity.get("user_assigned_identity_resource_id")
             if not _is_arm_id(resource_id):
                 return "Event Grid UserAssigned delivery identity requires an ARM resource ID"
+            unlisted = unlisted_identity(resource_id, self._config.allowed_identity_resource_ids)
+            if unlisted:
+                return (
+                    f"Event Grid delivery identity {unlisted!r} is not allowed by the cluster install policy "
+                    "eventgrid_allowed_identity_resource_ids"
+                )
             if resource_id not in (topic_cfg.get("topic_user_assigned_identity_resource_ids", []) or []):
                 return "Event Grid delivery UAMI must also be attached to the topic"
         return ""

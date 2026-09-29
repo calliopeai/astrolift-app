@@ -39,6 +39,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._managed_identities import unlisted_identity
 from azure.managed.event_grid import (
     _ADVANCED_FILTER_MODELS,
     _NO_VALUE_FILTERS,
@@ -103,6 +104,9 @@ class AzureEventGridNamespaceConfig:
     mgmt_client: Any | None = None
     locks_client: Any | None = None
     secret_client: Any | None = None
+    # User-assigned identities a namespace may attach and deliver or
+    # dead-letter with. Empty refuses every one (#2087).
+    allowed_identity_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for field_name, value, maximum in (
@@ -688,6 +692,13 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             return "Event Grid namespace user-assigned identity IDs must be a unique list"
         if any(not _is_arm_id(value) for value in uamis):
             return "Event Grid namespace user-assigned identities must be ARM resource IDs"
+        for value in uamis:
+            unlisted = unlisted_identity(value, self._config.allowed_identity_resource_ids)
+            if unlisted:
+                return (
+                    f"Event Grid namespace identity {unlisted!r} is not allowed by the cluster install policy "
+                    "eventgrid_namespace_allowed_identity_resource_ids"
+                )
         if cfg.get("prune_subscriptions") and not cfg.get("confirm_message_loss"):
             return "prune_subscriptions requires confirm_message_loss=true"
         if str(cfg.get("access_mode", "publish")) not in {"publish", "pull", "publish_pull", "manage"}:
@@ -876,6 +887,12 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             return "Event Grid namespace identity delivery requires destination_preauthorized=true until #1356"
         if not _is_arm_id(resource_id):
             return "Event Grid namespace UserAssigned identity requires an ARM resource ID"
+        unlisted = unlisted_identity(resource_id, self._config.allowed_identity_resource_ids)
+        if unlisted:
+            return (
+                f"Event Grid namespace delivery identity {unlisted!r} is not allowed by the cluster install "
+                "policy eventgrid_namespace_allowed_identity_resource_ids"
+            )
         if resource_id not in (cfg.get("user_assigned_identity_resource_ids", []) or []):
             return "Event Grid namespace delivery UAMI must also be attached to the namespace"
         return ""

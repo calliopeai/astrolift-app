@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from gcp.plugin import PLUGIN
 
 
@@ -196,6 +198,24 @@ def test_cloud_functions_operator_controls_are_exposed() -> None:
         "cloud_functions_allowed_service_accounts",
     ):
         assert field in properties
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "workflows_allowed_service_accounts",
+        "eventarc_allowed_service_accounts",
+        "pubsub_allowed_service_accounts",
+        "api_gateway_allowed_service_accounts",
+        "cloud_operations_allowed_writer_identities",
+        "bigquery_allowed_connections",
+    ],
+)
+def test_identity_allowlists_are_operator_controls(field: str) -> None:
+    schema = PLUGIN.config_schema["properties"][field]
+    assert schema["type"] == "array"
+    assert schema["items"] == {"type": "string"}
+    assert "Empty refuses every" in schema["description"]
 
 
 def test_filestore_operator_controls_are_exposed() -> None:

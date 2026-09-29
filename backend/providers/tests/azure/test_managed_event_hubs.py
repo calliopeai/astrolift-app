@@ -225,6 +225,16 @@ def _spec(**overrides: Any) -> ProvisionSpec:
     return ProvisionSpec(**values)
 
 
+EVENT_HUBS_UAMI_ID = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-events/"
+    "providers/Microsoft.ManagedIdentity/userAssignedIdentities/event-hubs"
+)
+FOREIGN_UAMI_ID = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-other-tenant/"
+    "providers/Microsoft.ManagedIdentity/userAssignedIdentities/their-identity"
+)
+
+
 def _driver(
     variant: str,
     *,
@@ -242,7 +252,7 @@ def _driver(
             location="eastus2",
             mgmt_client=mgmt,
             locks_client=locks,
-            **config,
+            **{"allowed_identity_resource_ids": (EVENT_HUBS_UAMI_ID,), **config},
         ),
     )
     return driver, mgmt, locks
@@ -299,6 +309,64 @@ def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
     rejected = driver.provision(_spec())
     assert not rejected.ok and "belongs to managed service other, not service-id" in rejected.message
     assert len(mgmt.namespaces.update_calls) == before
+
+
+_CAPTURE_STORAGE = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-events/"
+    "providers/Microsoft.Storage/storageAccounts/capture"
+)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        pytest.param(
+            {
+                "sku": "Standard",
+                "capture_enabled": True,
+                "capture_storage_account_resource_id": _CAPTURE_STORAGE,
+                "capture_blob_container": "events",
+                "capture_identity_type": "UserAssigned",
+                "capture_user_assigned_identity_resource_id": FOREIGN_UAMI_ID,
+            },
+            id="capture",
+        ),
+        # The Capture identity is attached to the namespace whenever it is
+        # set, even with Capture off and no identity type chosen.
+        pytest.param(
+            {"capture_enabled": False, "capture_user_assigned_identity_resource_id": FOREIGN_UAMI_ID},
+            id="capture-off",
+        ),
+        pytest.param(
+            {
+                "sku": "Premium",
+                "customer_managed_key_name": "event-hubs",
+                "customer_managed_key_vault_uri": "https://keys.vault.azure.net/",
+                "customer_managed_identity_resource_id": FOREIGN_UAMI_ID,
+            },
+            id="customer-managed-key",
+        ),
+    ],
+)
+def test_a_namespace_cannot_attach_an_unlisted_identity(config: dict[str, Any]) -> None:
+    driver, mgmt, _ = _driver("event_hubs")
+
+    result = driver.provision(_spec(config=config))
+
+    assert not result.ok
+    assert "eventhubs_allowed_identity_resource_ids" in result.message
+    assert mgmt.namespaces.create_calls == []
+
+
+def test_no_allowlist_refuses_every_config_supplied_identity() -> None:
+    driver, mgmt, _ = _driver("event_hubs", allowed_identity_resource_ids=())
+
+    result = driver.provision(
+        _spec(config={"capture_enabled": False, "capture_user_assigned_identity_resource_id": EVENT_HUBS_UAMI_ID}),
+    )
+
+    assert not result.ok and "eventhubs_allowed_identity_resource_ids" in result.message
+    assert mgmt.namespaces.create_calls == []
 
 
 def test_provision_exposes_scaling_retention_compaction_capture_network_and_cmk() -> None:

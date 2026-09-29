@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -86,10 +86,24 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, snapshot_arn: str = "") -> ProvisionResult:
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_serverless_cache_config"])
+        # restore() takes only the snapshot the platform retained for this
+        # service's own app; a config naming one itself skipped that check
+        # (#2087).
+        if "snapshot_arns_to_restore" in cfg:
+            return ProvisionResult(
+                False,
+                "",
+                "ElastiCache Serverless config cannot name a snapshot to copy data from "
+                "(snapshot_arns_to_restore); restore from a snapshot Astrolift retained for this app instead",
+                ["invalid_serverless_cache_config"],
+            )
         name = self._cache_name(spec)
         handle = handle_for(kind=self.kind, resource_id=name)
         existing = self._describe(name)
@@ -132,8 +146,8 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
                     kwargs["DailySnapshotTime"] = str(cfg["daily_snapshot_time"])
                 if user_group_id:
                     kwargs["UserGroupId"] = user_group_id
-            if cfg.get("snapshot_arns_to_restore"):
-                kwargs["SnapshotArnsToRestore"] = list(cfg["snapshot_arns_to_restore"])
+            if snapshot_arn:
+                kwargs["SnapshotArnsToRestore"] = [snapshot_arn]
             self._ec.create_serverless_cache(**kwargs)
         except Exception as exc:
             return ProvisionResult(False, handle, f"create_serverless_cache: {exc}", [str(exc)])
@@ -338,9 +352,7 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
         if self._config.engine == "memcached":
             raise ManagedServiceError("ElastiCache Memcached does not support snapshots")
-        cfg = dict(target.config or {})
-        cfg["snapshot_arns_to_restore"] = [snapshot.snapshot_id]
-        return self.provision(replace(target, config=cfg))
+        return self._provision(target, snapshot_arn=snapshot.snapshot_id)
 
     @driver_op(cloud="aws", driver="elasticache_serverless", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:

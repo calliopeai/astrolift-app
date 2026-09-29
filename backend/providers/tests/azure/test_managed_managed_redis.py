@@ -214,6 +214,15 @@ def _spec(**config: Any) -> ProvisionSpec:
     )
 
 
+REDIS_UAMI_ID = (
+    "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/redis-cmk"
+)
+FOREIGN_UAMI_ID = (
+    "/subscriptions/sub/resourceGroups/rg-other-tenant/providers/Microsoft.ManagedIdentity/"
+    "userAssignedIdentities/their-identity"
+)
+
+
 def _driver() -> tuple[AzureManagedRedisDriver, FakeManagement, FakeSecrets]:
     management = FakeManagement()
     secrets = FakeSecrets()
@@ -225,6 +234,7 @@ def _driver() -> tuple[AzureManagedRedisDriver, FakeManagement, FakeSecrets]:
             keyvault_url="https://vault.vault.azure.net",
             mgmt_client=management,
             secret_client=secrets,
+            allowed_identity_resource_ids=(REDIS_UAMI_ID,),
         ),
     )
     return driver, management, secrets
@@ -334,6 +344,21 @@ def test_unsafe_or_unbound_modes_fail_before_cloud_mutation(
     result = driver.provision(_spec(**config))
     assert not result.ok
     assert message in result.message
+    assert management.calls == []
+
+
+def test_a_cluster_cannot_unwrap_its_key_as_an_unlisted_identity() -> None:
+    driver, management, _ = _driver()
+
+    result = driver.provision(
+        _spec(
+            customer_managed_key_url="https://vault.vault.azure.net/keys/redis/version",
+            customer_managed_identity_resource_id=FOREIGN_UAMI_ID,
+        ),
+    )
+
+    assert not result.ok
+    assert "managed_redis_allowed_identity_resource_ids" in result.message
     assert management.calls == []
 
 
