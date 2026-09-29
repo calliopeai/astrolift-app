@@ -77,7 +77,9 @@ export function GenerateSshKeySheet({
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             <div className="space-y-2">
               <Label>Fingerprint</Label>
-              <div className="font-mono text-xs">{pasted.fingerprintSha256}</div>
+              <div className="font-mono text-xs [overflow-wrap:anywhere]">
+                {pasted.fingerprintSha256}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Public key (paste into the repo&apos;s deploy keys)</Label>

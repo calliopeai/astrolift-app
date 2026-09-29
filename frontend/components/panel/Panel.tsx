@@ -200,8 +200,8 @@ function PanelError({
   return (
     <div role="alert" className="flex flex-col items-center gap-3 py-6 text-center">
       <AlertTriangleIcon className="text-danger size-5" aria-hidden />
-      <div className="min-w-0">
-        <p className="font-medium">Could not load {title.toLowerCase()}</p>
+      <div className="max-w-full min-w-0">
+        <p className="font-medium [overflow-wrap:anywhere]">Could not load {title.toLowerCase()}</p>
         <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
           {message}
         </p>

@@ -27,8 +27,10 @@ export function SourceBadge({
   const display = resourceKind ? `${resourceKind}:${resourceId || "?"}` : (label ?? "");
   if (!href) {
     return (
-      <Badge variant="outline" className="font-mono text-xs">
-        {display}
+      <Badge variant="outline" className="max-w-full shrink font-mono text-xs">
+        <span className="min-w-0 truncate" title={display}>
+          {display}
+        </span>
       </Badge>
     );
   }
@@ -36,11 +38,16 @@ export function SourceBadge({
     <NextLink
       href={href}
       onClick={(ev) => ev.stopPropagation()}
-      className="inline-flex items-center"
+      className="inline-flex max-w-full min-w-0 items-center"
       aria-label={`${t("sourceLabel")}: ${display}`}
     >
-      <Badge variant="secondary" className="hover:bg-primary/10 cursor-pointer font-mono text-xs">
-        {display}
+      <Badge
+        variant="secondary"
+        className="hover:bg-primary/10 max-w-full shrink cursor-pointer font-mono text-xs"
+      >
+        <span className="min-w-0 truncate" title={display}>
+          {display}
+        </span>
       </Badge>
     </NextLink>
   );

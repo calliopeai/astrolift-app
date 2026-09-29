@@ -35,8 +35,10 @@ export function BucketMembers({ loading, members }: BucketMembersProps) {
             className="hover:bg-accent/30 focus-visible:outline-ring -m-1 flex flex-wrap items-center gap-2 rounded-md p-1 focus-visible:outline-2"
             aria-label={`Open event ${e.eventType}`}
           >
-            <Badge variant="outline" className="font-mono text-xs">
-              {e.eventType}
+            <Badge variant="outline" className="max-w-full shrink font-mono text-xs">
+              <span className="min-w-0 truncate" title={e.eventType}>
+                {e.eventType}
+              </span>
             </Badge>
             <span className="text-muted-foreground text-xs">
               {fmt.formatDateTime(e.occurredAt)}

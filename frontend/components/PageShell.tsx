@@ -98,12 +98,16 @@ export function PageShell({
   }
   if (!collapsibleHeader) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <header className="flex flex-col gap-2 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
+        <header className="flex min-w-0 flex-col gap-2 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">
+              {title}
+            </h1>
             {description && (
-              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm [overflow-wrap:anywhere]">
+                {description}
+              </p>
             )}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

@@ -64,10 +64,12 @@ export function ServiceDetailSheet({ service, onOpenChange, metrics }: ServiceDe
                 ) : null}
               </SheetTitle>
               <SheetDescription>
-                <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-2 text-xs">
                   <span>Environment:</span>
-                  <Badge variant="outline" className="text-2xs font-mono">
-                    {service.environmentName}
+                  <Badge variant="outline" className="text-2xs max-w-full shrink font-mono">
+                    <span className="min-w-0 truncate" title={service.environmentName}>
+                      {service.environmentName}
+                    </span>
                   </Badge>
                   <span>·</span>
                   <span className="capitalize">{service.status}</span>
