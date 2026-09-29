@@ -44,6 +44,10 @@ EXEMPT: dict[str, str] = {
         "gate; no other tenant's data is reachable."
     ),
     "IdentityQuery.astrolift_my_profile": "self-service: editable profile fields",
+    "IdentityQuery.astrolift_my_ui_preferences": (
+        "self-service (#2154): the caller's own UI preferences, read by viewer pk; "
+        "the only org data is the active tenant's restricted-settings default"
+    ),
     "IdentityQuery.my_memberships": (
         "self-service: enumerates orgs the caller belongs to — needed before any tenant context can be picked"
     ),

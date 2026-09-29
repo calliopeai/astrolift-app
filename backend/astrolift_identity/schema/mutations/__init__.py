@@ -67,6 +67,7 @@ from astrolift_identity.schema.mutations.types import (  # noqa: F401
     SoftDeleteByGuidInput,
     UpdateIdentityProviderInput,
     UpdateMyProfileInput,
+    UpdateMyUiPreferencesInput,
     UpdateOrganizationInput,
     UpdatePolicyInput,
     UpdateProjectInput,

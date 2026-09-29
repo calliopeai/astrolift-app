@@ -24,11 +24,14 @@ from astrolift_identity.schema.mutations.helpers import (
 from astrolift_identity.schema.mutations.types import (
     MarkOnboardingCompleteInput,
     UpdateMyProfileInput,
+    UpdateMyUiPreferencesInput,
     _MarkOnboardingCompletePayload,
 )
 from astrolift_identity.schema.types import (
     MyProfileType,
+    UiPreferencesType,
     organization_to_type,
+    ui_preferences_to_type,
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -131,6 +134,69 @@ class ProfileMutations:
             viewer.preferences = prefs
 
         return gql_success(_my_profile_payload(viewer, org, locked))
+
+    @strawberry.field
+    @mutation_audit(action="profile.update_ui_preferences")
+    def update_my_ui_preferences(
+        self, info: Info, input: UpdateMyUiPreferencesInput
+    ) -> MutationResultType[UiPreferencesType]:
+        """Save the viewer's own UI preferences (#2154), so they follow the
+        person across browsers.
+
+        Self-service like ``update_my_profile``: every signed-in person may
+        change their own display choices, so there is no permission gate, and
+        the row is keyed on the viewer, never on an id from the input. The
+        whole input is validated before anything is written, so a bad value
+        leaves the stored preferences as they were.
+        """
+        from strawberry import UNSET
+
+        from astrolift_identity.models import UserPreferences
+        from astrolift_identity.ui_preferences import (
+            CHOICE_FIELDS,
+            UiPreferenceError,
+            org_restricted_default,
+            validate_choice,
+        )
+        from core.appearance import AppearanceError, validate_appearance
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        changes: dict[str, object] = {}
+        try:
+            for column in CHOICE_FIELDS:
+                value = getattr(input, column)
+                if value is UNSET:
+                    continue
+                changes[column] = "" if value is None else validate_choice(column, value)
+        except UiPreferenceError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        if input.home_layout_asked is not UNSET:
+            changes["home_layout_asked"] = bool(input.home_layout_asked)
+        if input.flow_particles is not UNSET:
+            changes["flow_particles"] = input.flow_particles
+        if input.appearance is not UNSET:
+            try:
+                changes["appearance"] = validate_appearance(input.appearance)
+            except AppearanceError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="appearance")
+        # Choosing a layout answers the first-sign-in question, as it does
+        # in the browser store.
+        if changes.get("home_layout"):
+            changes["home_layout_asked"] = True
+
+        prefs = UserPreferences.for_user(viewer)
+        if changes:
+            for column, value in changes.items():
+                setattr(prefs, column, value)
+            prefs.save(update_fields=sorted(changes))
+
+        tenant = get_current_tenant()
+        org_default = org_restricted_default(tenant.organization_id if tenant else None)
+        return gql_success(ui_preferences_to_type(prefs, org_default=org_default))
 
     @strawberry.field
     @mutation_audit(action="organization.mark_onboarding_complete")

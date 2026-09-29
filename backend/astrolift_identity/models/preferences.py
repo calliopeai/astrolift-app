@@ -37,6 +37,37 @@ class UserPreferences(models.Model):
         ),
     )
 
+    # UI preferences that follow the person across browsers (#2154). Each
+    # choice column is empty until the person chooses; the read resolves an
+    # empty column to the default in ``astrolift_identity.ui_preferences``.
+    # Values are validated against the frontend registries on write.
+    home_layout = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Home layout key (spec 44 §4.3). Empty means the default from access.",
+    )
+    home_layout_asked = models.BooleanField(
+        default=False,
+        help_text="The first-sign-in layout question was answered, so it is not asked again.",
+    )
+    fleet_view = models.CharField(max_length=32, blank=True, default="")
+    workflow_view = models.CharField(max_length=32, blank=True, default="")
+    app_view = models.CharField(max_length=32, blank=True, default="")
+    flow_particles = models.BooleanField(null=True, blank=True, default=None)
+    motion = models.CharField(max_length=16, blank=True, default="")
+    restricted_settings = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        help_text="Settings the person cannot change: show or hide. Empty follows the org default.",
+    )
+    appearance = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="The person's own partial appearance, validated by core.appearance.",
+    )
+
     class Meta:
         app_label = "astrolift_identity"
         verbose_name = "user preferences"

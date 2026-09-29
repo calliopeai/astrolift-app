@@ -53,6 +53,9 @@ class UpdateOrganizationInput:
     # as the tags above: `{}` has to mean "no house theme".
     appearance_default: strawberry.scalars.JSON | None = None
     appearance_locked: bool | None = None
+    # "show" or "hide": settings a person cannot change, for everyone who has
+    # not chosen for themselves (#2154).
+    restricted_settings_default: str | None = None
 
 
 @strawberry.input
@@ -208,6 +211,9 @@ class CreateRoleInput:
     scope_level: str
     permissions: list[str]
     description: str = ""
+    # The role this one duplicates (#2126 lineage): a system role or one of
+    # this org's own. Recorded so the role page can diff against it.
+    duplicated_from_id: GUID | None = None
 
 
 @strawberry.input
@@ -233,6 +239,27 @@ class UpdateMyProfileInput:
     Pass an empty string to clear the override (fall back to
     browser-detected zone). Pass ``None`` to leave the current value
     unchanged. Validated against ``zoneinfo.available_timezones()``."""
+
+
+@strawberry.input
+class UpdateMyUiPreferencesInput:
+    """A partial update of the viewer's UI preferences (#2154).
+
+    A field left out is unchanged; a field sent as null goes back to the
+    default (for ``restrictedSettings``, to following the organization).
+    Values are checked against the frontend registries and a bad one is
+    refused with the allowed set named.
+    """
+
+    home_layout: str | None = strawberry.UNSET
+    home_layout_asked: bool | None = strawberry.UNSET
+    fleet_view: str | None = strawberry.UNSET
+    workflow_view: str | None = strawberry.UNSET
+    app_view: str | None = strawberry.UNSET
+    flow_particles: bool | None = strawberry.UNSET
+    motion: str | None = strawberry.UNSET
+    restricted_settings: str | None = strawberry.UNSET
+    appearance: strawberry.scalars.JSON | None = strawberry.UNSET
 
 
 @strawberry.input
