@@ -25,6 +25,14 @@ Astrolift API token and the normal MCP initialization/session handshake.
 `mcp:dispatch` plus `agent.dispatch`. Tool discovery reflects both token scopes
 and the user's current RBAC grants.
 
+The same `mcp:dispatch` token scope permits box pod discovery and attachment
+when the account holds `agent_box.attach` in the target organization. Normal
+browser-approved `astro auth login` credentials include this scope; the IDE's
+Connect Astrolift command uses that CLI flow. Token scopes remain a ceiling,
+not an account grant. Read-only tokens and generic IDE/mobile/browser enrollment
+cannot attach. Refresh uses the persisted session kind's current scope set;
+no role change or administrator token is needed to repair the CLI scope mapping.
+
 | Tool | Use |
 |---|---|
 | `astrolift_list_agents` | Discover registered agents and their source/package state. |

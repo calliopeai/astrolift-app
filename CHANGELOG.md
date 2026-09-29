@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- CLI and IDE sign-in credentials can discover and attach to agent boxes when
+  account permissions allow it. The existing `mcp:dispatch` scope now includes
+  `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
+  enforced (#2188).
+
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
   `restore.snapshot_id` and `restore.source_handle` came from the manifest
