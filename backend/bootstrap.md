@@ -83,6 +83,10 @@ calliopeai/calliope-installer#304).
 
 ## Conventions
 
+- **Request context cleanup**: request-ID and trace middleware consume their
+  context tokens once. Django can run both exception and response hooks for
+  the same request; error responses keep their original status and echoed
+  request ID while restoring the enclosing request context.
 - **Models**: Inherit from `Tracking` (audit) or `BaseCoreModel` (named entities with guid/slug)
 - **Soft deletes**: Set `deleted_at`, never call `.delete()` on business objects
 - **GraphQL**: Per-app `schema/types.py`, `queries.py`, `mutations.py`. Merged in `config/schema.py`
