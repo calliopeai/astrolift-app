@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { WorkflowTemplatesScreen } from "@/components/screens/workflows/list/WorkflowTemplatesScreen";
-import { useWorkflowTemplates } from "@/components/screens/workflows/list/use-workflow-templates";
-
+/** The templates catalog is the Workflows list's Templates view now. */
 export default function WorkflowTemplatesPage() {
-  return <WorkflowTemplatesScreen {...useWorkflowTemplates()} />;
+  redirect("/workflows?view=templates");
 }

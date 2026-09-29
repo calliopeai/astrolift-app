@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * Stage-based workflow definition builder (spec 40 §5.1, #970).
+ * Stage-based workflow definition builder (spec 40 §5.1, #970), the
+ * workflow's Builder tab (spec 44 §5.2).
  *
- * The persisted model is an ORDERED pipeline with fan-out — not a free
- * DAG. Edges are always DERIVED from stage order + fan_out + aggregation;
- * nothing is user-drawable. Three views over the same ordered stage cards:
+ * The persisted model is an ORDERED pipeline with fan-out, not a free DAG.
+ * Edges are always DERIVED from stage order + fan_out + aggregation;
+ * nothing is user-drawable. Two views over the same ordered stages:
  *
- *  - **List**  — ordered stack, inline per-stage editors, up/down reorder.
- *  - **Graph** — React Flow render of the same cards; auto-layout from
- *    order via the shared rankLayout helper.
- *  - **Code**  — the canonical TOML manifest (exportWorkflowManifest /
+ *  - **Stages**: the workflow drawn in the person's chosen workflow view
+ *    (WorkflowView: loops, fan-out, supervisors and nested workflows from
+ *    definition-line.ts) beside the ordered stage cards. One card is open
+ *    at a time, picked in the list or by clicking its station, so the
+ *    page stays within about two screens.
+ *  - **Code**: the canonical TOML manifest (exportWorkflowManifest /
  *    previewWorkflowManifest). In-place apply is intentionally disabled:
  *    TOML stages carry no stable identity, so edits cannot be mapped
- *    safely onto existing stage guids — Export + Import-as-new instead.
+ *    safely onto existing stage guids; Export + Import-as-new instead.
  *
  * Global (organization == null) and repository-managed definitions render
  * read-only with an ownership banner. All affordances are gated on the
@@ -29,19 +32,6 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ReactFlow,
-  Controls,
-  Background,
-  MiniMap,
-  Handle,
-  Position,
-  MarkerType,
-  type Edge,
-  type Node,
-  type NodeTypes,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import {
   AlertTriangleIcon,
   ArrowDownIcon,
@@ -59,7 +49,6 @@ import {
   Loader2Icon,
   LockIcon,
   MergeIcon,
-  NetworkIcon,
   PlusIcon,
   SaveIcon,
   TrashIcon,
@@ -85,8 +74,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
-import { rankLayout } from "@/components/viz/flow-layout";
+import { WorkflowView } from "@/components/viz/WorkflowView";
 import { AgentWorkloadPicker, SkillRefsPicker } from "@/components/workflows/pickers";
+
+import { definitionLine, definitionSnapshot, lineShape } from "./definition-line";
 
 import type { useStageBuilder } from "./use-stage-builder";
 import type { WorkflowManifestPreview, WorkflowStage } from "@/graphql/workflows/tiered.types";
@@ -129,7 +120,7 @@ const STAGE_KINDS: {
     value: "checkpoint",
     label: "Checkpoint",
     icon: FlagIcon,
-    hint: "Snapshots state at this point — no external dispatch.",
+    hint: "Snapshots state at this point, with no external dispatch.",
   },
 ];
 
@@ -215,8 +206,8 @@ function emptyDraft(): StageDraft {
 
 type PickerOptions = ReturnType<typeof useStageBuilder>["pickerOptions"];
 
-// The pickers' options, provided once by StageBuilder so the list cards,
-// the graph nodes and the add form all read the same listings.
+// The pickers' options, provided once by StageBuilder so the stage cards
+// and the add form all read the same listings.
 const PickerOptionsContext = createContext<PickerOptions>({
   workloads: [],
   workloadsLoading: false,
@@ -455,7 +446,7 @@ function StageEditorFields({
   );
 }
 
-// ─── Stage card (one node — collapsed header + expandable editor) ───────
+// ─── Stage card (collapsed header + expandable editor) ─────────────────
 
 type StageCardProps = {
   stage: WorkflowStage;
@@ -469,7 +460,6 @@ type StageCardProps = {
   onSave: (guid: string, draft: StageDraft) => Promise<void>;
   onDelete: (guid: string) => void;
   onMove: (index: number, dir: -1 | 1) => void;
-  inGraph?: boolean;
 };
 
 function StageCard({
@@ -484,17 +474,14 @@ function StageCard({
   onSave,
   onDelete,
   onMove,
-  inGraph = false,
 }: StageCardProps) {
   const [draft, setDraft] = useState<StageDraft>(() => draftFromStage(stage));
   const meta = stageKindMeta(stage.kind);
   const KindIcon = meta.icon;
 
   return (
-    <Card className={inGraph ? "w-80 shadow-md" : undefined}>
-      <CardContent
-        className={inGraph ? "nodrag nowheel flex flex-col gap-3 p-4" : "flex flex-col gap-3"}
-      >
+    <Card className={expanded ? "border-primary/60" : undefined}>
+      <CardContent className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -609,22 +596,6 @@ function StageCard({
   );
 }
 
-// ─── Graph node wrapper ──────────────────────────────────────────────────
-
-function StageFlowNode({ data }: { data: StageCardProps }) {
-  return (
-    <div>
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground" />
-      <StageCard {...data} inGraph />
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground" />
-    </div>
-  );
-}
-
-const stageNodeTypes: NodeTypes = {
-  stageNode: StageFlowNode as unknown as NodeTypes[string],
-};
-
 // ─── Add-stage form ──────────────────────────────────────────────────────
 
 function AddStageCard({
@@ -682,7 +653,7 @@ function CodeView({
   canCreate: boolean;
   manifest: StageBuilderProps["manifest"];
 }) {
-  // null = "not user-edited yet" — the export result seeds the editor.
+  // null = "not user-edited yet": the export result seeds the editor.
   const [editedToml, setEditedToml] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkflowManifestPreview | null>(null);
   const [validating, setValidating] = useState(false);
@@ -849,14 +820,14 @@ function CodeView({
             <div className="border-success/40 bg-success/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <CheckCircle2Icon className="text-success-fg mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                Valid — <span className="font-medium">{preview.definition.name}</span> (
+                Valid: <span className="font-medium">{preview.definition.name}</span> (
                 {preview.definition.pattern}), {preview.stages.length} stage
                 {preview.stages.length === 1 ? "" : "s"}.
               </p>
             </div>
           )}
           <p className="text-muted-foreground text-xs">
-            Applying code edits to this definition in place isn&apos;t supported yet — TOML stages
+            Applying code edits to this definition in place isn&apos;t supported yet: TOML stages
             carry no stable identity, so edits can&apos;t be mapped safely onto existing stages.
             Export, edit, and use &quot;Import as new&quot; to create a definition from the edited
             manifest.
@@ -869,15 +840,14 @@ function CodeView({
 
 // ─── Main builder ────────────────────────────────────────────────────────
 
-type BuilderView = "list" | "graph" | "code";
+type BuilderView = "stages" | "code";
 
 const VIEW_OPTIONS: {
   value: BuilderView;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { value: "list", label: "List", icon: ListIcon },
-  { value: "graph", label: "Graph", icon: NetworkIcon },
+  { value: "stages", label: "Stages", icon: ListIcon },
   { value: "code", label: "Code", icon: CodeIcon },
 ];
 
@@ -903,8 +873,9 @@ export function StageBuilder({
   manifest,
   pickerOptions,
 }: StageBuilderProps) {
-  const [view, setView] = useState<BuilderView>("list");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [view, setView] = useState<BuilderView>("stages");
+  // One open card at a time keeps the tab within about two screens.
+  const [openGuid, setOpenGuid] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
   const isGlobal =
@@ -913,68 +884,25 @@ export function StageBuilder({
   const readOnly = isGlobal || isSourceManaged || !canManage;
 
   const toggleExpanded = useCallback((guid: string) => {
-    setExpanded((prev) => ({ ...prev, [guid]: !prev[guid] }));
+    setOpenGuid((prev) => (prev === guid ? null : guid));
   }, []);
 
   const handleCreateStage = async (draft: StageDraft) => {
     if (await onCreateStage(draft)) setAdding(false);
   };
 
-  // Graph derivation: nodes from stage order (rankLayout over the ordered
-  // chain), edges strictly consecutive — fan-out and aggregation annotate
-  // the derived edges, they never add user-drawable ones.
-  const { flowNodes, flowEdges } = useMemo(() => {
-    const ids = sorted.map((s) => s.guid);
-    const chain = ids.slice(1).map((id, i) => ({ source: ids[i], target: id }));
-    const pos = rankLayout(ids, chain, { colWidth: 400, rowHeight: 260 });
-    const nodes: Node[] = sorted.map((stage, index) => ({
-      id: stage.guid,
-      type: "stageNode",
-      position: pos.get(stage.guid) ?? { x: index * 400, y: 0 },
-      draggable: false,
-      data: {
-        stage,
-        index,
-        total: sorted.length,
-        orgScoped: orgId,
-        readOnly,
-        expanded: !!expanded[stage.guid],
-        saving: busyGuid === stage.guid,
-        onToggle: toggleExpanded,
-        onSave: handleSaveStage,
-        onDelete: handleDeleteStage,
-        onMove: handleMoveStage,
-      } satisfies StageCardProps,
-    }));
-    const edges: Edge[] = sorted.slice(1).map((stage, i) => {
-      const prev = sorted[i];
-      const fanned = prev.fanOutCount != null && prev.fanOutCount > 1;
-      return {
-        id: `${prev.guid}-${stage.guid}`,
-        source: prev.guid,
-        target: stage.guid,
-        animated: fanned,
-        label: fanned
-          ? `fan-out ×${prev.fanOutCount}`
-          : stage.kind === "aggregation"
-            ? "merge"
-            : undefined,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2 },
-      };
-    });
-    return { flowNodes: nodes, flowEdges: edges };
-  }, [
-    sorted,
-    orgId,
-    readOnly,
-    expanded,
-    busyGuid,
-    toggleExpanded,
-    handleSaveStage,
-    handleDeleteStage,
-    handleMoveStage,
-  ]);
+  // The definition as one line of the workflow views: stations in stage
+  // order, fan-out and its join, supervisors, nested workflows and retries.
+  const line = useMemo(
+    () =>
+      definition
+        ? definitionLine(
+            definition,
+            sorted.map((stage) => ({ ...stage, agentName: stage.agentDefinitionName }))
+          )
+        : null,
+    [definition, sorted]
+  );
 
   if (defLoading && !definition) {
     return (
@@ -1001,7 +929,7 @@ export function StageBuilder({
   return (
     <PickerOptionsContext.Provider value={pickerOptions}>
       <PageShell
-        title={`${definition.name} — Builder`}
+        title={`Builder · ${definition.name}`}
         description={
           definition.description || `Ordered stage pipeline (${definition.patternKind}).`
         }
@@ -1031,7 +959,7 @@ export function StageBuilder({
             <div className="flex items-center gap-2 text-sm">
               <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
               <span>
-                <span className="font-medium">Platform template</span> — read-only. Clone it to
+                <span className="font-medium">Platform template</span>, read-only. Clone it to
                 create an editable copy in your organization.
               </span>
             </div>
@@ -1056,7 +984,7 @@ export function StageBuilder({
           <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
             <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
             <span>
-              <span className="font-medium">Repository managed</span> — edit{" "}
+              <span className="font-medium">Repository managed</span>: edit{" "}
               <code>
                 {definition.sourceRepo}/{definition.sourcePath}
               </code>{" "}
@@ -1073,7 +1001,7 @@ export function StageBuilder({
         ) : (
           <Section
             title="Stages"
-            description="An ordered pipeline — stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
+            description="An ordered pipeline: stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
             action={
               !readOnly && !adding ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
@@ -1103,46 +1031,36 @@ export function StageBuilder({
                   ) : undefined
                 }
               />
-            ) : view === "graph" ? (
-              <div className="flex flex-col gap-3">
-                <div className="bg-card h-[560px] rounded-lg border">
-                  <ReactFlow
-                    nodes={flowNodes}
-                    edges={flowEdges}
-                    nodeTypes={stageNodeTypes}
-                    nodesDraggable={false}
-                    nodesConnectable={false}
-                    fitView
-                    className="bg-dots-pattern"
-                  >
-                    <Controls />
-                    <Background />
-                    <MiniMap />
-                  </ReactFlow>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Edges are derived from stage order, fan-out and aggregation — the pipeline is
-                  ordered, not a free-form graph. Expand a stage card to edit it.
-                </p>
-              </div>
             ) : (
-              <div className="flex flex-col gap-3">
-                {sorted.map((stage, index) => (
-                  <StageCard
-                    key={stage.guid}
-                    stage={stage}
-                    index={index}
-                    total={sorted.length}
-                    orgScoped={orgId}
-                    readOnly={readOnly}
-                    expanded={!!expanded[stage.guid]}
-                    saving={busyGuid === stage.guid}
-                    onToggle={toggleExpanded}
-                    onSave={handleSaveStage}
-                    onDelete={handleDeleteStage}
-                    onMove={handleMoveStage}
+              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                {line && (
+                  <WorkflowView
+                    snapshot={definitionSnapshot(line)}
+                    title="Shape"
+                    description={`${lineShape(line)}. Pick a station to open its stage.`}
+                    onSelectStation={(_, stationId) => setOpenGuid(stationId)}
+                    className="min-w-0 self-start xl:sticky xl:top-4"
                   />
-                ))}
+                )}
+                <ol className="flex min-w-0 flex-col gap-3" aria-label="Stages">
+                  {sorted.map((stage, index) => (
+                    <li key={stage.guid} className="min-w-0">
+                      <StageCard
+                        stage={stage}
+                        index={index}
+                        total={sorted.length}
+                        orgScoped={orgId}
+                        readOnly={readOnly}
+                        expanded={openGuid === stage.guid}
+                        saving={busyGuid === stage.guid}
+                        onToggle={toggleExpanded}
+                        onSave={handleSaveStage}
+                        onDelete={handleDeleteStage}
+                        onMove={handleMoveStage}
+                      />
+                    </li>
+                  ))}
+                </ol>
               </div>
             )}
 

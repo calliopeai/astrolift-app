@@ -25,7 +25,7 @@ export const PATTERNS: PatternOption[] = [
   {
     value: "chained",
     label: "Chained",
-    description: "Sequential stages — output of each feeds the next.",
+    description: "Sequential stages: the output of each feeds the next.",
     diagram: "[ A ] → [ B ] → [ C ]",
   },
   {
@@ -43,7 +43,7 @@ export const PATTERNS: PatternOption[] = [
   {
     value: "review_loop",
     label: "Review loop",
-    description: "Agent produces output, human reviews, agent revises — up to N rounds.",
+    description: "Agent produces output, human reviews, agent revises, up to N rounds.",
     diagram: "[ Draft ] ⟷ [ Human gate ] → [ Deliver ]",
   },
   {
@@ -88,4 +88,61 @@ export function buildMinimalToml(input: {
     `description = ${tomlString(input.description)}`,
     "",
   ].join("\n");
+}
+
+// ─── The New workflow page's steps ───────────────────────────────────────────
+
+/** Where a new workflow's definition comes from: a pattern to fill in the Builder, or a manifest. */
+export type NewWorkflowSource = "pattern" | "manifest";
+
+export interface NewWorkflowErrors {
+  name?: string;
+  slug?: string;
+  toml?: string;
+  /** The submit failed for a reason no field owns. */
+  form?: string;
+}
+
+/** Step 1's errors, beside their fields (spec 44 §5.4); empty when it may continue. */
+export function validateSource(
+  source: NewWorkflowSource,
+  values: { name: string; slug: string; toml: string }
+): NewWorkflowErrors {
+  if (source === "manifest") {
+    return values.toml.trim() ? {} : { toml: "Paste or upload a workflow manifest." };
+  }
+  const errors: NewWorkflowErrors = {};
+  if (!values.name.trim()) errors.name = "Give the workflow a name.";
+  if (!(values.slug.trim() || slugify(values.name))) errors.slug = "A slug is required.";
+  return errors;
+}
+
+/** A manifest's stages in the shape the workflow views draw (components/workflows/definition-line). */
+export function manifestLineStages(
+  stages: {
+    order: number;
+    kind: string;
+    role: string;
+    agent: string | null;
+    workflow: string | null;
+    onFailure: string;
+    fanOut: string;
+  }[]
+) {
+  return stages.map((s) => {
+    const n = Number.parseInt(s.fanOut, 10);
+    const count = Number.isFinite(n) ? n : null;
+    return {
+      guid: `manifest-${s.order}`,
+      order: s.order,
+      kind: s.kind,
+      role: s.role,
+      workflowRef: s.workflow ?? "",
+      fanOutCount: count,
+      // A fan-out that is not a number is sized from data at run time.
+      fanOutDynamic: count === null && s.fanOut.trim() !== "" && s.fanOut.trim() !== "0",
+      onFailure: s.onFailure,
+      agentName: s.agent,
+    };
+  });
 }

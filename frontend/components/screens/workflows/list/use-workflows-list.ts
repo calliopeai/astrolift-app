@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-import { useCursorTable, type CursorPage } from "@/components/data-table";
+import { useListState } from "@/components/list/use-list-state";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import {
+  useCloneDefinition,
   useDeleteConfiguredWorkflow,
   useDeleteDefinition,
   useRunWorkflow,
@@ -20,28 +22,17 @@ import {
 } from "@/graphql/workflows/tiered.hooks";
 import type {
   ConfiguredWorkflowWithRuns,
-  WorkflowDefinitionSummary,
+  TieredValidationError,
 } from "@/graphql/workflows/tiered.types";
-import { LIST_WORKFLOW_RUNS } from "@/graphql/operations/operations.queries";
-import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
+import type { CursorPage } from "@/components/data-table";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-interface WorkflowRunsResp {
-  astroliftWorkflowRuns: AstroliftWorkflowRun[];
-}
+import { joinWorkflows, selectWorkflows, WORKFLOWS_LIST, type WorkflowRow } from "./workflows-list";
 
-export type WorkflowTab = "workflows" | "running" | "definitions" | "history";
-export const WORKFLOW_TABS: readonly WorkflowTab[] = [
-  "workflows",
-  "running",
-  "definitions",
-  "history",
-];
-
-// The module list needs each workflow's latest run status; the contracts
-// list doc (LIST_CONFIGURED_WORKFLOWS) doesn't fetch runs, so this
-// surface-local doc extends it. Fields verified against schema.graphql
-// (`workflows(orgId)` → ConfiguredWorkflow → runs: [WorkflowRun!]!).
+// The module list's configured-workflow fields; the contracts list doc
+// (LIST_CONFIGURED_WORKFLOWS) doesn't fetch runs, so this surface-local doc
+// extends it. Fields verified against schema.graphql
+// (`workflowsPage` → ConfiguredWorkflow → runs: [WorkflowRun!]!).
 const CONFIGURED_WORKFLOW_FIELDS = gql`
   fragment ConfiguredWorkflowFields on ConfiguredWorkflow {
     guid
@@ -73,7 +64,7 @@ const CONFIGURED_WORKFLOW_FIELDS = gql`
 /**
  * Cursor-paginated configured workflows (#1243). `workflows` is deprecated
  * for returning every one the org owns in one response; `workflowsPage`
- * shipped alongside it and had no document at all until this one.
+ * shipped alongside it.
  */
 const LIST_WORKFLOWS_PAGE = gql`
   ${CONFIGURED_WORKFLOW_FIELDS}
@@ -92,226 +83,177 @@ interface WorkflowsModulePageData {
   workflowsPage: CursorPage<ConfiguredWorkflowWithRuns>;
 }
 
-const TERMINAL_DEFINITION_RUN_STATES = new Set([
-  "completed",
-  "failed",
-  "cancelled",
-  "terminated",
-  "timed_out",
-]);
+/** The backend's page cap (MAX_PAGE_LIMIT): the list reads this many configured workflows. */
+export const CONFIGURED_LIMIT = 200;
+/** The newest definition runs read for a definition's last run. */
+export const DEFINITION_RUNS_LIMIT = 100;
+
+function toastErrors(errors: TieredValidationError[], fallback: string) {
+  if (errors.length === 0) toast.error(fallback);
+  for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
+}
 
 /**
- * Everything behind /workflows that talks to the server or the URL: the
- * tab in `?tab=`, the definitions, the configured-workflow cursor walk, the
- * definition runs, platform run history, and every mutation. The data half
- * of WorkflowsListScreen.
+ * The Workflows list: URL list state, the org's configured workflows (one
+ * page at the backend's cap), every visible definition, and the newest
+ * definition runs, joined and answered in the browser (see workflows-list.ts).
+ * The definition runs are skipped on Templates, whose rows are the
+ * platform's and carry no runs of this org's. Every row action is the
+ * mutation the old tabs used, behind the same workflows-module grants. The
+ * data half of WorkflowsListScreen.
  */
 export function useWorkflowsList() {
+  const list = useListState(WORKFLOWS_LIST);
+  const { state } = list;
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const rawTab = searchParams.get("tab") as WorkflowTab | null;
-  const tab: WorkflowTab = rawTab && WORKFLOW_TABS.includes(rawTab) ? rawTab : "workflows";
-
-  function setTab(next: WorkflowTab) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === "workflows") {
-      params.delete("tab");
-    } else {
-      params.set("tab", next);
-    }
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
-  }
-
-  const { definitions, loading: defsLoading, error: defsError } = useWorkflowDefinitions();
-  const [deleteDefinition] = useDeleteDefinition();
   const confirm = useConfirm();
-
-  // ── Tier-2 configured workflows (default tab) ──
+  const { org } = useActiveOrg();
   const entitlement = useWorkflowsEntitlement();
   const permissions = useMyPermissions();
-  const canViewPlatformRuns = permissions.can("audit_log.read");
-  // `workflowsPage` searches the workflow's own name / slug / description
-  // and the name / slug of the definition behind it. No sort argument, so
-  // no column declares a `sortKey`. Skipped off-tab, as the flat query was.
-  const table = useCursorTable<ConfiguredWorkflowWithRuns>({
-    query: LIST_WORKFLOWS_PAGE,
-    variables: { orgId: null },
-    extract: (d) => (d as WorkflowsModulePageData | undefined)?.workflowsPage,
-    searchVariable: "search",
-    urlKey: "wf",
-    skip: tab !== "workflows",
+  const templates = state.view === "templates";
+
+  const configuredQ = useQuery<WorkflowsModulePageData>(LIST_WORKFLOWS_PAGE, {
+    variables: { orgId: null, search: null, limit: CONFIGURED_LIMIT, after: null },
+    skip: templates,
     fetchPolicy: "cache-and-network",
   });
-  const wfRefetch = table.refetch;
-  const repositoryWorkflows = definitions.filter(
-    (definition) =>
-      !definition.isGlobal && Boolean(definition.sourceRepo) && Boolean(definition.projectGuid)
+  const definitionsQ = useWorkflowDefinitions();
+  const runsQ = useWorkflowDefinitionRuns({ limit: DEFINITION_RUNS_LIMIT, skip: templates });
+
+  const configured = configuredQ.data?.workflowsPage.items;
+  const all: WorkflowRow[] = useMemo(
+    () =>
+      joinWorkflows(configured ?? [], definitionsQ.definitions, runsQ.runs, {
+        runsComplete: runsQ.runs.length < DEFINITION_RUNS_LIMIT,
+      }),
+    [configured, definitionsQ.definitions, runsQ.runs]
   );
+  const { rows, totalCount } = selectWorkflows(all, {
+    q: state.q,
+    filters: list.filters,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+  });
+
   const [runConfigured] = useRunWorkflow();
+  const [runDefinition] = useRunWorkflowDefinition();
   const [updateConfigured] = useUpdateConfiguredWorkflow();
   const [deleteConfigured] = useDeleteConfiguredWorkflow();
+  const [deleteDefinition] = useDeleteDefinition();
+  const [cloneDefinition] = useCloneDefinition();
   const [busySlug, setBusySlug] = useState<string | null>(null);
-  const [runDefinition] = useRunWorkflowDefinition();
-  const definitionRuns = useWorkflowDefinitionRuns({
-    limit: 100,
-    pollInterval: tab === "running" ? 5_000 : 0,
-    skip: tab !== "running" && tab !== "history",
-  });
-  const runningDefinitionRuns = definitionRuns.runs.filter(
-    (run) => !TERMINAL_DEFINITION_RUN_STATES.has(run.status)
-  );
-  const historicalDefinitionRuns = definitionRuns.runs.filter((run) =>
-    TERMINAL_DEFINITION_RUN_STATES.has(run.status)
-  );
 
-  const handleRunConfigured = async (wf: ConfiguredWorkflowWithRuns) => {
-    setBusySlug(wf.slug);
+  const refetchConfigured = () => void configuredQ.refetch();
+
+  async function busy(slug: string, work: () => Promise<void>) {
+    setBusySlug(slug);
     try {
-      const { data } = await runConfigured({ variables: { workflowId: wf.guid } });
-      if (data?.runWorkflow?.ok) {
-        toast.success("Run started", { description: wf.name });
-        wfRefetch();
-      } else {
-        const errors = data?.runWorkflow?.errors ?? [];
-        if (errors.length > 0) {
-          for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
-        } else {
-          toast.error("Failed to start run");
-        }
-      }
+      await work();
     } finally {
       setBusySlug(null);
     }
-  };
+  }
 
-  const handleRunDefinition = async (workflow: WorkflowDefinitionSummary) => {
-    setBusySlug(workflow.slug);
-    try {
-      const { data } = await runDefinition({
-        variables: { workflowSlug: workflow.slug, triggerPayload: null },
-      });
-      if (data?.runWorkflowDefinition?.ok) {
-        toast.success("Run started", { description: workflow.name });
-        setTab("running");
+  const onRun = (row: WorkflowRow) =>
+    busy(row.slug, async () => {
+      if (row.configured) {
+        const { data } = await runConfigured({ variables: { workflowId: row.configured.guid } });
+        if (!data?.runWorkflow?.ok)
+          return toastErrors(data?.runWorkflow?.errors ?? [], "Failed to start run");
       } else {
-        const errors = data?.runWorkflowDefinition?.errors ?? [];
-        if (errors.length > 0) {
-          for (const error of errors) {
-            toast.error(`${error.field}: ${error.messages.join(", ")}`);
-          }
-        } else {
-          toast.error("Failed to start run");
-        }
+        const { data } = await runDefinition({
+          variables: { workflowSlug: row.slug, triggerPayload: null },
+        });
+        if (!data?.runWorkflowDefinition?.ok)
+          return toastErrors(data?.runWorkflowDefinition?.errors ?? [], "Failed to start run");
       }
-    } finally {
-      setBusySlug(null);
-    }
-  };
+      toast.success("Run started", { description: row.name });
+      router.push(`/workflows/${encodeURIComponent(row.slug)}/runs`);
+    });
 
-  const handleToggleConfigured = async (wf: ConfiguredWorkflowWithRuns) => {
-    setBusySlug(wf.slug);
-    try {
-      const next = !wf.isEnabled;
-      const { data } = await updateConfigured({
-        variables: { slug: wf.slug, isEnabled: next },
-      });
-      if (data?.updateWorkflow?.ok) {
-        toast.success(next ? "Workflow enabled" : "Workflow disabled", { description: wf.name });
-        wfRefetch();
-      } else {
-        const errors = data?.updateWorkflow?.errors ?? [];
-        if (errors.length > 0) {
-          for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
-        } else {
-          toast.error("Failed to update workflow");
-        }
-      }
-    } finally {
-      setBusySlug(null);
-    }
-  };
+  const onToggle = (row: WorkflowRow) =>
+    busy(row.slug, async () => {
+      const next = !row.isEnabled;
+      const { data } = await updateConfigured({ variables: { slug: row.slug, isEnabled: next } });
+      if (!data?.updateWorkflow?.ok)
+        return toastErrors(data?.updateWorkflow?.errors ?? [], "Failed to update workflow");
+      toast.success(next ? "Workflow enabled" : "Workflow disabled", { description: row.name });
+      refetchConfigured();
+    });
 
-  const handleDeleteConfigured = async (wf: ConfiguredWorkflowWithRuns) => {
+  const onDelete = async (row: WorkflowRow) => {
     const ok = await confirm({
-      title: `Delete "${wf.name}"?`,
-      description: "This will delete the configured workflow. Its definition is not affected.",
+      title: `Delete "${row.name}"?`,
+      description: row.configured
+        ? "This will delete the configured workflow. Its definition is not affected."
+        : "This will permanently delete the workflow definition and cannot be undone.",
       confirmLabel: "Delete",
       cancelLabel: "Cancel",
     });
     if (!ok) return;
-    setBusySlug(wf.slug);
-    try {
-      const { data } = await deleteConfigured({ variables: { slug: wf.slug } });
-      if (data?.deleteWorkflow?.ok) {
-        toast.success("Workflow deleted", { description: `${wf.name} has been removed.` });
-        wfRefetch();
+    await busy(row.slug, async () => {
+      if (row.configured) {
+        const { data } = await deleteConfigured({ variables: { slug: row.slug } });
+        if (!data?.deleteWorkflow?.ok)
+          return toastErrors(data?.deleteWorkflow?.errors ?? [], "Failed to delete workflow");
+        refetchConfigured();
       } else {
-        const errors = data?.deleteWorkflow?.errors ?? [];
-        if (errors.length > 0) {
-          for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
-        } else {
-          toast.error("Failed to delete workflow");
-        }
+        const { data } = await deleteDefinition({ variables: { slug: row.slug } });
+        if (!data?.deleteWorkflowDefinition?.ok)
+          return toastErrors(
+            data?.deleteWorkflowDefinition?.errors ?? [],
+            "Failed to delete workflow"
+          );
       }
-    } finally {
-      setBusySlug(null);
-    }
-  };
-
-  const { data: runsData, loading: runsLoading } = useQuery<WorkflowRunsResp>(LIST_WORKFLOW_RUNS, {
-    variables: { limit: 50 },
-    skip: tab !== "history" || permissions.loading || !canViewPlatformRuns,
-    fetchPolicy: "cache-and-network",
-  });
-  const historyRuns = runsData?.astroliftWorkflowRuns ?? [];
-
-  const handleDeleteDefinition = async (wf: WorkflowDefinitionSummary) => {
-    const ok = await confirm({
-      title: `Delete "${wf.name}"?`,
-      description: "This will permanently delete the workflow definition and cannot be undone.",
-      confirmLabel: "Delete",
-      cancelLabel: "Cancel",
+      toast.success("Workflow deleted", { description: `${row.name} has been removed.` });
     });
-    if (!ok) return;
-    const { data } = await deleteDefinition({ variables: { slug: wf.slug } });
-    if (data?.deleteWorkflowDefinition?.ok) {
-      toast.success("Workflow deleted", { description: `${wf.name} has been removed.` });
-    } else {
-      for (const e of data?.deleteWorkflowDefinition?.errors ?? []) {
-        toast.error(`${e.field}: ${e.messages.join(", ")}`);
-      }
-    }
   };
+
+  const onClone = (row: WorkflowRow) =>
+    busy(row.slug, async () => {
+      const { data } = await cloneDefinition({
+        variables: { slug: row.slug, orgId: org?.id ?? null },
+      });
+      const result = data?.cloneWorkflowDefinition;
+      if (!result?.ok || !result.slug)
+        return toastErrors(result?.errors ?? [], "Failed to clone template");
+      toast.success(`Cloned "${row.name}"`, {
+        description: "Your editable copy is ready in the builder.",
+      });
+      router.push(`/workflows/${encodeURIComponent(result.slug)}`);
+    });
+
+  const configuredWaiting = !templates && configuredQ.loading && !configuredQ.data;
+  const definitionsWaiting = definitionsQ.loading && definitionsQ.definitions.length === 0;
+  const failed = (!templates && configuredQ.error) || definitionsQ.error;
+  const totalConfigured = configuredQ.data?.workflowsPage.totalCount ?? null;
 
   return {
-    tab,
-    setTab,
-    entitlement: {
-      canCreate: entitlement.canCreate,
-      canManage: entitlement.canManage,
-      canRun: entitlement.canRun,
+    list,
+    rows,
+    totalCount,
+    loading: configuredWaiting || definitionsWaiting,
+    stale:
+      (configuredQ.loading && Boolean(configuredQ.data)) ||
+      (definitionsQ.loading && definitionsQ.definitions.length > 0),
+    error: failed && all.length === 0 ? { message: failed.message } : null,
+    onRetry: () => {
+      refetchConfigured();
+      void definitionsQ.refetch();
     },
-    canViewPlatformRuns,
-    definitions,
-    defsLoading,
-    defsError,
-    repositoryWorkflows,
-    table,
+    /** Set when the org has more configured workflows than one page holds. */
+    truncatedAt:
+      totalConfigured !== null && totalConfigured > CONFIGURED_LIMIT ? CONFIGURED_LIMIT : null,
+    canCreate: entitlement.canCreate,
+    canManage: entitlement.canManage,
+    canRun: entitlement.canRun,
+    // Temporal instances are platform operations: behind the audit read, as before.
+    canViewPlatformRuns: permissions.can("audit_log.read"),
     busySlug,
-    definitionRuns: {
-      loading: definitionRuns.loading,
-      error: definitionRuns.error,
-      running: runningDefinitionRuns,
-      historical: historicalDefinitionRuns,
-    },
-    historyRuns,
-    runsLoading,
-    onRunConfigured: handleRunConfigured,
-    onToggleConfigured: handleToggleConfigured,
-    onDeleteConfigured: handleDeleteConfigured,
-    onRunDefinition: handleRunDefinition,
-    onDeleteDefinition: handleDeleteDefinition,
+    onRun,
+    onToggle,
+    onDelete,
+    onClone,
   };
 }

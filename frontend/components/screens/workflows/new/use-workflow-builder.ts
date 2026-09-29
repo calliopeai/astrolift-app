@@ -5,9 +5,19 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import { useManifestImport, useWorkflowsEntitlement } from "@/graphql/workflows/tiered.hooks";
+import {
+  useManifestImport,
+  useManifestPreview,
+  useWorkflowsEntitlement,
+} from "@/graphql/workflows/tiered.hooks";
+import type { WorkflowManifestPreview } from "@/graphql/workflows/tiered.types";
 
-import { buildMinimalToml, slugify, type PatternKind } from "./workflow-patterns";
+import {
+  buildMinimalToml,
+  type NewWorkflowErrors,
+  type PatternKind,
+  slugify,
+} from "./workflow-patterns";
 
 export interface NewDefinitionValues {
   name: string;
@@ -16,59 +26,88 @@ export interface NewDefinitionValues {
   pattern: PatternKind;
 }
 
+/** Where a manifest's parse failed, in words, with its line and path when it has them. */
+function manifestError(preview: WorkflowManifestPreview): string {
+  const at = [
+    preview.errorLine != null
+      ? `line ${preview.errorLine}${preview.errorColumn != null ? `, col ${preview.errorColumn}` : ""}`
+      : null,
+    preview.errorPath ? `at ${preview.errorPath}` : null,
+  ].filter(Boolean);
+  return `${preview.error ?? "Invalid manifest"}${at.length ? ` (${at.join(", ")})` : ""}`;
+}
+
 /**
- * Creates a workflow definition from the builder's metadata + pattern by
- * importing a minimal manifest, then opens the stage builder. The data half
- * of WorkflowBuilderScreen.
+ * Creates a workflow definition from the New workflow page: from a pattern
+ * (a minimal manifest, stages added in the Builder) or from a pasted
+ * manifest (validated for the Stages step first), then opens it on its
+ * Builder tab. Refusals come back as field errors; the toast is only the
+ * outcome. The data half of WorkflowBuilderScreen.
  */
 export function useWorkflowBuilder() {
   const router = useRouter();
   const { org } = useActiveOrg();
   const { canCreate } = useWorkflowsEntitlement();
   const [importManifest] = useManifestImport();
+  const [previewManifest, { loading: previewing }] = useManifestPreview();
   const [creating, setCreating] = useState(false);
 
-  async function onCreate(values: NewDefinitionValues): Promise<void> {
-    const { name, slug, description, pattern } = values;
-    const finalSlug = slug.trim() || slugify(name);
-    if (!name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    if (!finalSlug) {
-      toast.error("Slug is required");
-      return;
-    }
-
+  async function importToml(toml: string, onRefused: (message: string) => NewWorkflowErrors) {
     setCreating(true);
     try {
-      const toml = buildMinimalToml({
-        slug: finalSlug,
-        name: name.trim(),
-        pattern,
-        description: description.trim(),
-      });
       const { data } = await importManifest({
         variables: { toml, preview: false, orgId: org?.id ?? null },
       });
       const res = data?.importWorkflowManifest;
       if (res?.ok && res.createdSlug) {
-        toast.success("Definition created", { description: res.createdSlug });
-        router.push(`/workflows/${res.createdSlug}/builder`);
-        return;
+        toast.success("Workflow created", { description: res.createdSlug });
+        router.push(`/workflows/${encodeURIComponent(res.createdSlug)}`);
+        return {};
       }
+      if (res?.manifest && !res.manifest.ok) return onRefused(manifestError(res.manifest));
       const errors = res?.errors ?? [];
-      if (errors.length > 0) {
-        for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
-      } else if (res?.manifest?.error) {
-        toast.error(res.manifest.error);
-      } else {
-        toast.error("Failed to create the definition");
+      const byField = (field: string) =>
+        errors.find((e) => e.field === field)?.messages.join(", ") || undefined;
+      const found: NewWorkflowErrors = { name: byField("name"), slug: byField("slug") };
+      if (!found.name && !found.slug) {
+        found.form =
+          errors.map((e) => `${e.field}: ${e.messages.join(", ")}`).join("; ") ||
+          "The workflow could not be created.";
       }
+      toast.error("Workflow not created");
+      return found;
     } finally {
       setCreating(false);
     }
   }
 
-  return { canCreate, creating, onCreate };
+  /** From a pattern: the minimal manifest, then the Builder adds stages. */
+  function onCreate(values: NewDefinitionValues): Promise<NewWorkflowErrors> {
+    const slug = values.slug.trim() || slugify(values.name);
+    const toml = buildMinimalToml({
+      slug,
+      name: values.name.trim(),
+      pattern: values.pattern,
+      description: values.description.trim(),
+    });
+    return importToml(toml, (message) => ({ form: message }));
+  }
+
+  /** From a manifest, as pasted. */
+  function onImport(toml: string): Promise<NewWorkflowErrors> {
+    return importToml(toml, (message) => ({ toml: message }));
+  }
+
+  /** The manifest parsed for the Stages step, or its error for the field. */
+  async function onPreview(
+    toml: string
+  ): Promise<{ preview: WorkflowManifestPreview | null; error?: string }> {
+    const { data, error } = await previewManifest({ variables: { toml } });
+    const preview = data?.previewWorkflowManifest ?? null;
+    if (!preview)
+      return { preview: null, error: error?.message ?? "The manifest could not be read." };
+    return preview.ok ? { preview } : { preview: null, error: manifestError(preview) };
+  }
+
+  return { canCreate, creating, previewing, onCreate, onImport, onPreview };
 }

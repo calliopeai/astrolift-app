@@ -1,608 +1,376 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  ClockIcon,
-  Loader2Icon,
+  ActivityIcon,
+  ClipboardListIcon,
+  CopyIcon,
+  LayoutTemplateIcon,
+  MoreHorizontalIcon,
   PlayIcon,
   PlusIcon,
   PowerIcon,
   PowerOffIcon,
+  TimerIcon,
   TrashIcon,
   WorkflowIcon,
-  WrenchIcon,
 } from "lucide-react";
 
+import type { Column, EmptyStateSpec } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable, type Column } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
-import { ListControls } from "@/components/ListControls";
-import { PageShell } from "@/components/PageShell";
-import { RunStateBadge } from "@/components/screens/workflows/detail/RunStateBadge";
-import { WorkflowTopology } from "@/components/workflows/workflow-topology";
-import type {
-  ConfiguredWorkflowWithRuns,
-  WorkflowDefinitionRun,
-  WorkflowDefinitionSummary,
-} from "@/graphql/workflows/tiered.types";
-import { useListControls } from "@/hooks/use-list-controls";
-
-import type { useWorkflowsList, WorkflowTab } from "./use-workflows-list";
-import { WORKFLOW_TABS } from "./use-workflows-list";
 import {
-  formatTriggerKind,
-  latestRun,
-} from "@/components/screens/workflows/detail/workflow-run-state";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { VizLegend } from "@/components/viz/core/VizLegend";
+import { formatTriggerKind } from "@/components/screens/workflows/detail/workflow-run-state";
+import { formatRelativeAge } from "@/lib/format";
 
-const TAB_LABELS: Record<WorkflowTab, string> = {
-  workflows: "Workflows",
-  running: "Running",
-  definitions: "Templates",
-  history: "History",
-};
+import { WORKFLOW_GLYPH_LEGEND, WorkflowGlyph } from "./WorkflowGlyph";
+import {
+  LAST_RUN_DOT,
+  LAST_RUN_LABEL,
+  type WorkflowRow,
+  workflowPatternLabel,
+  workflowsCrumbs,
+} from "./workflows-list";
 
-export type WorkflowsListScreenProps = ReturnType<typeof useWorkflowsList> & {
-  /** Platform Temporal instances panel, shown on the Running tab to audit readers. */
-  instancesPanel?: ReactNode;
-};
+export interface WorkflowsListScreenProps {
+  list: ListStateController;
+  /** The page on screen, already filtered, searched, sorted and sliced. */
+  rows: WorkflowRow[];
+  /** Workflows matching the view, filters and search, across all pages. */
+  totalCount: number;
+  loading: boolean;
+  stale: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+  /** The configured-workflow page cap, when the org has more than it. */
+  truncatedAt: number | null;
+  /** The workflows module's grants: New workflow and clone; enable, disable and delete; Run. */
+  canCreate: boolean;
+  canManage: boolean;
+  canRun: boolean;
+  /** `audit_log.read`: the platform's Temporal instances. */
+  canViewPlatformRuns: boolean;
+  /** The row with a mutation in flight. */
+  busySlug: string | null;
+  onRun: (row: WorkflowRow) => Promise<void>;
+  onToggle: (row: WorkflowRow) => Promise<void>;
+  onDelete: (row: WorkflowRow) => Promise<void>;
+  onClone: (row: WorkflowRow) => Promise<void>;
+}
 
-function DefinitionRunList({ runs }: { runs: WorkflowDefinitionRun[] }) {
+const workflowHref = (w: Pick<WorkflowRow, "slug">, tail = "") =>
+  `/workflows/${encodeURIComponent(w.slug)}${tail}`;
+
+/** Where the workflow comes from, in one muted line. */
+function Origin({ row }: { row: WorkflowRow }) {
+  const text =
+    row.kind === "configured"
+      ? `from ${row.definitionName}`
+      : row.kind === "template"
+        ? "Platform template"
+        : (row.sourcePath ?? "Organization definition");
   return (
-    <div className="flex flex-col gap-2">
-      {runs.map((run) => (
-        <div
-          key={run.guid}
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-4 py-3 text-sm"
-        >
-          <Badge
-            variant={
-              run.status === "running"
-                ? "default"
-                : run.status === "completed"
-                  ? "secondary"
-                  : run.status === "cancelled"
-                    ? "outline"
-                    : "destructive"
-            }
-            className="capitalize"
-          >
-            {run.status.replace(/_/g, " ")}
+    <span
+      className={`text-muted-foreground block truncate text-xs ${row.sourcePath ? "font-mono" : ""}`}
+      title={text}
+    >
+      {text}
+    </span>
+  );
+}
+
+function Name({ row }: { row: WorkflowRow }) {
+  return (
+    <span className="block min-w-0">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 truncate font-medium" title={row.name}>
+          {row.name}
+        </span>
+        {!row.isEnabled && (
+          <Badge variant="secondary" className="shrink-0">
+            Disabled
           </Badge>
-          <Link
-            href={`/workflows/${encodeURIComponent(run.definitionSlug)}/builder`}
-            className="font-medium hover:underline"
-          >
-            {run.definitionName}
-          </Link>
-          {run.parentRunGuid && <Badge variant="outline">Nested · level {run.nestingDepth}</Badge>}
-          {run.childRunCount > 0 && (
-            <Badge variant="outline">{run.childRunCount} child run(s)</Badge>
-          )}
-          {run.projectSlug && (
-            <Link
-              href={`/projects/${encodeURIComponent(run.projectSlug)}`}
-              className="text-muted-foreground hover:text-foreground hover:underline"
-            >
-              {run.projectSlug}
-            </Link>
-          )}
-          {run.currentStageRole && (
-            <span className="text-muted-foreground">
-              Stage {run.currentStageOrder == null ? "" : `${run.currentStageOrder + 1}: `}
-              {run.currentStageRole}
-            </span>
-          )}
+        )}
+      </span>
+      <Origin row={row} />
+    </span>
+  );
+}
+
+function LastRun({ row }: { row: WorkflowRow }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs">
+      <StatusDot status={LAST_RUN_DOT[row.lastRun]} />
+      <span className="truncate">{LAST_RUN_LABEL[row.lastRun]}</span>
+      {row.lastRunAt && (
+        <span className="text-muted-foreground shrink-0 font-mono" title={row.lastRunAt}>
+          {formatRelativeAge(row.lastRunAt)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Trigger({ row }: { row: WorkflowRow }) {
+  if (row.triggerKind === null)
+    return <span className="text-muted-foreground text-xs">Manual</span>;
+  return (
+    <span className="block min-w-0">
+      <span className="block truncate text-sm">{formatTriggerKind(row.triggerKind)}</span>
+      {row.scheduleCron && (
+        <span className="text-muted-foreground block truncate font-mono text-xs">
+          {row.scheduleCron}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Stages({ row }: { row: WorkflowRow }) {
+  return row.stageCount === null ? (
+    <span className="text-muted-foreground text-xs">unknown</span>
+  ) : (
+    <span className="font-mono text-xs tabular-nums">{row.stageCount}</span>
+  );
+}
+
+/** A card: the stage-shape glyph, name, pattern, stage count and last run. */
+function WorkflowCard({ row }: { row: WorkflowRow }) {
+  return (
+    <div className="bg-card hover:bg-accent/30 flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
+      <div className="min-w-0">
+        <Name row={row} />
+      </div>
+      <WorkflowGlyph line={row.line} />
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+        <Badge variant="outline">{workflowPatternLabel(row.patternKind)}</Badge>
+        {row.stageCount !== null && (
+          <span className="text-muted-foreground font-mono tabular-nums">
+            {row.stageCount} {row.stageCount === 1 ? "stage" : "stages"}
+          </span>
+        )}
+        {row.projectSlug && (
           <span
-            className="text-muted-foreground ml-auto max-w-full truncate font-mono text-xs"
-            title={run.temporalWorkflowId}
+            className="text-muted-foreground min-w-0 truncate font-mono"
+            title={row.projectSlug}
           >
-            {run.temporalWorkflowId}
+            {row.projectSlug}
           </span>
-          <span className="text-muted-foreground shrink-0 text-xs">
-            {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
-          </span>
-        </div>
-      ))}
+        )}
+      </div>
+      <div className="mt-auto min-w-0">
+        <LastRun row={row} />
+      </div>
     </div>
   );
 }
 
-/** /workflows: repository pipelines, configured workflows, runs, templates, history. */
-export function WorkflowsListScreen({
-  tab,
-  setTab,
-  entitlement,
-  canViewPlatformRuns,
-  definitions,
-  defsLoading,
-  defsError,
-  repositoryWorkflows,
-  table,
-  busySlug,
-  definitionRuns,
-  historyRuns,
-  runsLoading,
-  onRunConfigured,
-  onToggleConfigured,
-  onDeleteConfigured,
-  onRunDefinition,
-  onDeleteDefinition,
-  instancesPanel,
-}: WorkflowsListScreenProps) {
-  const wfLoading = table.state === "loading";
-  const wfError = table.error;
-  const runningDefinitionRuns = definitionRuns.running;
-  const historicalDefinitionRuns = definitionRuns.historical;
-
-  const workflowColumns: Column<ConfiguredWorkflowWithRuns>[] = [
-    {
-      id: "name",
-      header: "Name",
-      cell: (wf) => (
-        <>
-          <Link
-            href={`/workflows/${encodeURIComponent(wf.slug)}`}
-            className="font-medium hover:underline"
-          >
-            {wf.name}
+/** The header's `⋯`: workflow runs, and the platform's Temporal instances for audit readers. */
+function HeaderMenu({ canViewPlatformRuns }: { canViewPlatformRuns: boolean }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className="size-8" aria-label="More workflow actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuItem asChild>
+          <Link href="/tasks?kind=workflow">
+            <ClipboardListIcon className="size-4" />
+            Workflow runs
           </Link>
-          {wf.description && (
-            <div className="text-muted-foreground max-w-md truncate text-xs">{wf.description}</div>
-          )}
-        </>
-      ),
+        </DropdownMenuItem>
+        {canViewPlatformRuns && (
+          <DropdownMenuItem asChild>
+            <Link href="/workflows/instances">
+              <ActivityIcon className="size-4" />
+              Platform instances
+            </Link>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * Agents › Workflows (spec 44 §5.1, §4.4): every workflow on the shared list,
+ * views All · Mine · Templates, pattern, project and last-run filters,
+ * numbered pages, list or cards (each card draws the stage shape). The page
+ * is only this list (Leo's rule 3): runs are Agents › Runs, the platform's
+ * Temporal instances their own page, and a workflow's builder, runs,
+ * triggers and settings its tabs. Pure view; the data half is useWorkflowsList.
+ */
+export function WorkflowsListScreen({
+  list,
+  rows,
+  totalCount,
+  loading,
+  stale,
+  error,
+  onRetry,
+  truncatedAt,
+  canCreate,
+  canManage,
+  canRun,
+  canViewPlatformRuns,
+  busySlug,
+  onRun,
+  onToggle,
+  onDelete,
+  onClone,
+}: WorkflowsListScreenProps) {
+  const empty: EmptyStateSpec = {
+    icon: <WorkflowIcon className="size-5" />,
+    title: "No workflows",
+    description:
+      "Author a workflow from a pattern or a manifest, configure a platform template, or import one from an agent repository.",
+    ...(canCreate ? { actionHref: "/workflows/new", actionLabel: "New workflow" } : {}),
+    learnMoreHref: "https://github.com/calliopeai/astrolift-docs/blob/main/reference/workflows.md",
+  };
+
+  const columns: Column<WorkflowRow>[] = [
+    {
+      id: "workflow",
+      header: "Workflow",
+      sortKey: "name",
+      cellClassName: "max-w-80",
+      cell: (w) => <Name row={w} />,
     },
     {
-      id: "definition",
-      header: "Definition",
-      cellClassName: "text-muted-foreground text-sm",
-      cell: (wf) => wf.definitionName,
+      id: "pattern",
+      header: "Pattern",
+      sortKey: "pattern",
+      cell: (w) => <span className="text-sm">{workflowPatternLabel(w.patternKind)}</span>,
     },
+    { id: "stages", header: "Stages", sortKey: "stages", cell: (w) => <Stages row={w} /> },
     {
-      id: "trigger",
-      header: "Trigger",
-      cell: (wf) => (
-        <>
-          <Badge variant="outline">{formatTriggerKind(wf.triggerKind)}</Badge>
-          {wf.scheduleCron && (
-            <div className="text-muted-foreground mt-1 font-mono text-xs">{wf.scheduleCron}</div>
-          )}
-        </>
-      ),
-    },
-    {
-      id: "status",
-      header: "Status",
-      cell: (wf) => (
-        <Badge variant={wf.isEnabled ? "default" : "secondary"}>
-          {wf.isEnabled ? "Enabled" : "Disabled"}
-        </Badge>
-      ),
-    },
-    {
-      id: "lastRun",
-      header: "Last run",
-      cell: (wf) => {
-        const last = latestRun(wf.runs);
-        return last ? (
-          <div className="flex flex-col gap-1">
-            <RunStateBadge state={last.currentState} />
-            <span className="text-muted-foreground text-xs">
-              {new Date(last.startedAt).toLocaleString()}
-            </span>
-          </div>
+      id: "project",
+      header: "Project",
+      cellClassName: "max-w-48",
+      cell: (w) =>
+        w.projectSlug ? (
+          <span className="block truncate font-mono text-xs" title={w.projectSlug}>
+            {w.projectSlug}
+          </span>
         ) : (
-          <span className="text-muted-foreground text-sm">Never run</span>
-        );
-      },
+          <span className="text-muted-foreground text-xs">none</span>
+        ),
     },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (wf) => {
-        const busy = busySlug === wf.slug;
-        return (
-          <div className="flex items-center justify-end gap-2">
-            {entitlement.canRun && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onRunConfigured(wf)}
-                disabled={busy || !wf.isEnabled}
-              >
-                <PlayIcon className="mr-1 h-3 w-3" /> Run
-              </Button>
-            )}
-            {entitlement.canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleConfigured(wf)}
-                disabled={busy}
-              >
-                {wf.isEnabled ? (
-                  <PowerOffIcon className="mr-1 h-3 w-3" />
-                ) : (
-                  <PowerIcon className="mr-1 h-3 w-3" />
-                )}
-                {wf.isEnabled ? "Disable" : "Enable"}
-              </Button>
-            )}
-            {entitlement.canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDeleteConfigured(wf)}
-                disabled={busy}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <TrashIcon className="mr-1 h-3 w-3" /> Delete
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
+    { id: "trigger", header: "Trigger", cell: (w) => <Trigger row={w} /> },
+    { id: "lastRun", header: "Last run", sortKey: "lastRun", cell: (w) => <LastRun row={w} /> },
   ];
 
-  // No sort: the definitions grid renders cards, not table rows, and a
-  // sort control detached from a column header is a control with nothing
-  // to point at.
-  const defsCtrl = useListControls<WorkflowDefinitionSummary>({
-    data: definitions,
-    searchFn: (wf) => [wf.name, wf.description ?? "", wf.patternKind ?? ""].join(" "),
-    initialPageSize: 25,
-  });
+  const notices = (
+    <>
+      {truncatedAt !== null && (
+        <p className="text-muted-foreground text-xs">
+          Showing the newest <span className="font-mono">{truncatedAt}</span> configured workflows;
+          the list does not page past that yet.
+        </p>
+      )}
+      {list.mode === "card" && <VizLegend items={WORKFLOW_GLYPH_LEGEND} motion="full" />}
+    </>
+  );
 
   return (
-    <PageShell
-      title="Workflows"
-      description="Runnable repository pipelines, configured automations, and execution state."
-      actions={
-        (tab === "workflows" || tab === "definitions") && entitlement.canCreate ? (
-          <Button asChild>
+    <ListPage<WorkflowRow>
+      header={{
+        crumbs: workflowsCrumbs(),
+        title: "Workflows",
+        primaryAction: canCreate ? (
+          <Button size="sm" asChild>
             <Link href="/workflows/new">
-              <PlusIcon className="mr-1 h-4 w-4" /> New Workflow
+              <PlusIcon className="size-4" />
+              New workflow
             </Link>
           </Button>
-        ) : null
-      }
-    >
-      {/* Tab bar */}
-      <div className="mb-4 flex gap-1 border-b pb-0">
-        {WORKFLOW_TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={[
-              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-              t === tab
-                ? "border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground border-transparent",
-            ].join(" ")}
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
-
-      {/* Workflows — repository pipelines plus optional tier-2 configured wrappers */}
-      {tab === "workflows" && (
-        <div className="flex flex-col gap-4">
-          {(wfLoading || defsLoading) &&
-            (table.totalCount ?? 0) === 0 &&
-            repositoryWorkflows.length === 0 && (
-              <div className="flex items-center justify-center p-12">
-                <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-              </div>
+        ) : undefined,
+        menu: <HeaderMenu canViewPlatformRuns={canViewPlatformRuns} />,
+      }}
+      list={list}
+      label="Workflows"
+      columns={columns}
+      rows={rows}
+      getRowId={(w) => w.id}
+      rowHref={(w) => workflowHref(w)}
+      renderCard={(w) => <WorkflowCard row={w} />}
+      rowActions={(w) => {
+        const busy = busySlug === w.slug;
+        return (
+          <>
+            {canRun && w.kind !== "template" && (
+              <DropdownMenuItem disabled={busy || !w.isEnabled} onSelect={() => void onRun(w)}>
+                <PlayIcon className="size-4" />
+                Run now
+              </DropdownMenuItem>
             )}
-          {(wfError || defsError) && (
-            <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-              Error: {(wfError ?? defsError)?.message}
-            </div>
-          )}
-          {!wfLoading &&
-            !defsLoading &&
-            !wfError &&
-            !defsError &&
-            (table.totalCount ?? 0) === 0 &&
-            !table.isFiltered &&
-            repositoryWorkflows.length === 0 && (
-              <EmptyState
-                icon={<WorkflowIcon className="size-5" />}
-                title="No workflows"
-                description="Import a repository workflow or configure a reusable template to start automating."
-                actionHref={entitlement.canCreate ? "/workflows/new" : undefined}
-                actionLabel={entitlement.canCreate ? "New Workflow" : undefined}
-              />
+            {canManage && w.kind === "configured" && (
+              <DropdownMenuItem disabled={busy} onSelect={() => void onToggle(w)}>
+                {w.isEnabled ? (
+                  <PowerOffIcon className="size-4" />
+                ) : (
+                  <PowerIcon className="size-4" />
+                )}
+                {w.isEnabled ? "Disable" : "Enable"}
+              </DropdownMenuItem>
             )}
-          {repositoryWorkflows.length > 0 && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-semibold">Repository workflows</h2>
-                <p className="text-muted-foreground text-sm">
-                  Declarative pipelines imported from agent repositories. These definitions are
-                  directly runnable and do not require a configured wrapper.
-                </p>
-              </div>
-              <div className="grid gap-4">
-                {repositoryWorkflows.map((workflow) => (
-                  <div key={workflow.guid} className="rounded-lg border p-4">
-                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}
-                            className="font-semibold hover:underline"
-                          >
-                            {workflow.name}
-                          </Link>
-                          <Badge variant="outline" className="capitalize">
-                            {workflow.patternKind.replace(/_/g, " ")}
-                          </Badge>
-                          <Badge variant={workflow.isEnabled ? "default" : "secondary"}>
-                            {workflow.isEnabled ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </div>
-                        <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-3 text-xs">
-                          <Link
-                            href={`/projects/${encodeURIComponent(workflow.projectSlug)}`}
-                            className="hover:text-foreground hover:underline"
-                          >
-                            {workflow.projectTeamSlug}/{workflow.projectSlug}
-                          </Link>
-                          <span className="font-mono">{workflow.sourcePath}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {entitlement.canRun && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!workflow.isEnabled || busySlug === workflow.slug}
-                            onClick={() => onRunDefinition(workflow)}
-                          >
-                            <PlayIcon className="mr-1 size-3" /> Run
-                          </Button>
-                        )}
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}>
-                            <WrenchIcon className="mr-1 size-3" /> Open
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                    <WorkflowTopology stages={workflow.stages} />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-          {((table.totalCount ?? 0) > 0 || table.isFiltered) && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-semibold">Configured workflows</h2>
-                <p className="text-muted-foreground text-sm">
-                  Template-based workflows with custom inputs or triggers.
-                </p>
-              </div>
-              <DataTable
-                label="Configured workflows"
-                controller={table}
-                columns={workflowColumns}
-                getRowId={(wf) => wf.slug}
-                searchPlaceholder="Search by workflow or definition…"
-                empty={{
-                  icon: <WorkflowIcon className="size-5" />,
-                  title: "No configured workflows",
-                  description:
-                    "Configure a reusable template to give it custom inputs or a trigger.",
-                  actionHref: entitlement.canCreate ? "/workflows/new" : undefined,
-                  actionLabel: entitlement.canCreate ? "New Workflow" : undefined,
-                }}
-                emptyFiltered={{
-                  title: "No matching workflows",
-                  description:
-                    "No configured workflow matches that search. The server matches the workflow's name, slug and description, and the definition behind it.",
-                }}
-              />
-            </section>
-          )}
-        </div>
-      )}
-
-      {/* Running — source pipelines plus fleet-wide Temporal monitoring */}
-      {tab === "running" && (
-        <div className="flex flex-col gap-4">
-          <section className="space-y-3">
-            <div>
-              <h2 className="font-semibold">Agent workflow runs</h2>
-              <p className="text-muted-foreground text-sm">
-                Active repository-defined pipelines, with their project and current stage.
-              </p>
-            </div>
-            {definitionRuns.loading && runningDefinitionRuns.length === 0 && (
-              <div className="flex items-center justify-center p-8">
-                <Loader2Icon className="text-muted-foreground size-5 animate-spin" />
-              </div>
+            {w.kind === "configured" && (
+              <DropdownMenuItem asChild>
+                <Link href={workflowHref(w, "/triggers")}>
+                  <TimerIcon className="size-4" />
+                  Edit triggers
+                </Link>
+              </DropdownMenuItem>
             )}
-            {definitionRuns.error && (
-              <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-                Error: {definitionRuns.error.message}
-              </div>
+            {canCreate && w.kind !== "configured" && (
+              <DropdownMenuItem asChild>
+                <Link href={`/workflows/new?definition=${encodeURIComponent(w.slug)}`}>
+                  <LayoutTemplateIcon className="size-4" />
+                  Create workflow from
+                </Link>
+              </DropdownMenuItem>
             )}
-            {!definitionRuns.loading &&
-              !definitionRuns.error &&
-              runningDefinitionRuns.length === 0 && (
-                <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
-                  No agent workflows are running.
-                </div>
-              )}
-            {runningDefinitionRuns.length > 0 && <DefinitionRunList runs={runningDefinitionRuns} />}
-          </section>
-          {canViewPlatformRuns && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-semibold">Platform workflow instances</h2>
-                <p className="text-muted-foreground text-sm">
-                  Active Temporal operations across apps and platform services. Authorized operators
-                  can cancel or terminate a stuck instance.
-                </p>
-              </div>
-              {instancesPanel}
-            </section>
-          )}
-        </div>
-      )}
-
-      {/* Templates — complete WorkflowDefinition catalog */}
-      {tab === "definitions" && (
-        <div className="flex flex-col gap-4">
-          {defsLoading && (
-            <div className="flex items-center justify-center p-12">
-              <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-            </div>
-          )}
-          {defsError && (
-            <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-              Error: {defsError.message}
-            </div>
-          )}
-          {!defsLoading && definitions.length === 0 && (
-            <EmptyState
-              icon={<WrenchIcon className="size-5" />}
-              title="No workflow definitions"
-              description="Workflow definitions let you model multi-step automation chains."
-              actionHref="/workflows/builder"
-              actionLabel="New Definition"
-            />
-          )}
-          {definitions.length > 0 && (
-            <ListControls controls={defsCtrl} searchPlaceholder="Search workflows…" />
-          )}
-          <div className="grid gap-4">
-            {defsCtrl.rows.map((wf) => (
-              <div
-                key={wf.slug}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{wf.name}</span>
-                    <Badge variant={wf.isEnabled ? "default" : "secondary"}>
-                      {wf.isEnabled ? "Active" : "Disabled"}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {wf.patternKind}
-                    </Badge>
-                    {(wf.isGlobal || wf.organizationGuid == null) && (
-                      <Badge variant="outline" className="text-xs">
-                        Global
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground text-sm">
-                    {wf.description || "No description"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-muted-foreground text-sm">
-                    {wf.stageCount} {wf.stageCount === 1 ? "stage" : "stages"}
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/workflows/${encodeURIComponent(wf.slug)}/builder`}>
-                      <WrenchIcon className="mr-1 h-3 w-3" /> Builder
-                    </Link>
-                  </Button>
-                  {entitlement.canManage && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onDeleteDefinition(wf)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <TrashIcon className="mr-1 h-3 w-3" /> Delete
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* History — completed / failed / terminated workflow runs */}
-      {tab === "history" && (
-        <div className="flex flex-col gap-4">
-          {((canViewPlatformRuns && runsLoading) || definitionRuns.loading) &&
-            historyRuns.length === 0 &&
-            historicalDefinitionRuns.length === 0 && (
-              <div className="flex items-center justify-center p-12">
-                <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-              </div>
+            {canCreate && w.kind === "template" && (
+              <DropdownMenuItem disabled={busy} onSelect={() => void onClone(w)}>
+                <CopyIcon className="size-4" />
+                Clone to edit
+              </DropdownMenuItem>
             )}
-          {(!canViewPlatformRuns || !runsLoading) &&
-            !definitionRuns.loading &&
-            historyRuns.length === 0 &&
-            historicalDefinitionRuns.length === 0 && (
-              <EmptyState
-                icon={<ClockIcon className="size-5" />}
-                title="No workflow run history"
-                description="Completed, failed, and terminated workflow runs appear here."
-              />
+            {canManage && w.deletable && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={busy}
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => void onDelete(w)}
+                >
+                  <TrashIcon className="size-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
-          {historicalDefinitionRuns.length > 0 && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-semibold">Agent workflow runs</h2>
-                <p className="text-muted-foreground text-sm">
-                  Repository-defined pipeline executions, newest first.
-                </p>
-              </div>
-              <DefinitionRunList runs={historicalDefinitionRuns} />
-            </section>
-          )}
-          {canViewPlatformRuns && historyRuns.length > 0 && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-semibold">Platform workflow runs</h2>
-                <p className="text-muted-foreground text-sm">
-                  Deployment, provisioning, and other platform execution history.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                {historyRuns.map((run) => (
-                  <div
-                    key={`${run.workflowId}-${run.runId}`}
-                    className="flex items-center gap-3 rounded-md border px-4 py-3 text-sm"
-                  >
-                    <Badge
-                      variant={run.status === "completed" ? "default" : "destructive"}
-                      className="shrink-0"
-                    >
-                      {run.status}
-                    </Badge>
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium">
-                      {run.workflowKind}
-                    </span>
-                    {run.registeredAppId && (
-                      <Badge variant="outline" className="shrink-0 text-xs">
-                        {run.registeredAppId}
-                      </Badge>
-                    )}
-                    <span className="text-muted-foreground shrink-0 text-xs">
-                      {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
-    </PageShell>
+          </>
+        );
+      }}
+      loading={loading}
+      stale={stale}
+      error={error}
+      onRetry={onRetry}
+      empty={empty}
+      totalCount={totalCount}
+      notice={notices}
+    />
   );
 }

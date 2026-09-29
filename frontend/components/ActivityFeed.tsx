@@ -29,7 +29,7 @@ export interface ActivityFeedProps {
 }
 
 /**
- * Dashboard "Activity" card (#435 scope A).
+ * Home's "Activity" panel feed (#435 scope A).
  *
  * Replaces the placeholder card that previously read "Cluster-wide
  * event stream (coming soon)". Streams the live lifecycle event log
@@ -109,19 +109,18 @@ function ActivityRow({ item }: ActivityRowProps) {
     </div>
   );
 
+  // Feed puts each item in its own <li>.
   if (item.targetHref) {
     return (
-      <li>
-        <Link
-          href={item.targetHref}
-          className="hover:bg-accent/40 -mx-2 block rounded px-2 transition-colors"
-        >
-          {body}
-        </Link>
-      </li>
+      <Link
+        href={item.targetHref}
+        className="hover:bg-accent/40 -mx-2 block rounded px-2 transition-colors"
+      >
+        {body}
+      </Link>
     );
   }
-  return <li>{body}</li>;
+  return body;
 }
 
 /**

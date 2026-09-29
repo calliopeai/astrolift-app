@@ -64,16 +64,24 @@ export function GateReviewView({
   );
 }
 
+/**
+ * One pending gate: what the stage before it produced, then the decision.
+ * With `canDecide` false (the viewer is not one of its approvers) the
+ * decision is replaced by who it waits on; the run page sets it from the
+ * gates the server says the viewer may decide.
+ */
 export function GateCardView({
   gate,
   upstream,
   loading,
   onDecide,
+  canDecide = true,
 }: {
   gate: WorkflowStageExecution;
   upstream: string;
   loading: boolean;
   onDecide: (decision: GateDecision, note: string) => Promise<boolean>;
+  canDecide?: boolean;
 }) {
   const [note, setNote] = React.useState("");
   const [done, setDone] = React.useState("");
@@ -102,6 +110,14 @@ export function GateCardView({
       {done ? (
         <p className="text-muted-foreground text-sm">
           Decision sent: {done}. The run continues shortly.
+        </p>
+      ) : !canDecide ? (
+        <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+          Waiting on{" "}
+          {gate.stageApprovers && gate.stageApprovers.length > 0
+            ? gate.stageApprovers.join(", ")
+            : "this gate's approvers"}
+          . You are not one of them.
         </p>
       ) : (
         <div className="grid gap-2">

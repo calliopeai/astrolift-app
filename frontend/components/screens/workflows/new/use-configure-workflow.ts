@@ -24,6 +24,56 @@ export interface ConfigureWorkflowValues {
   scheduleCron: string;
 }
 
+export interface ConfigureErrors {
+  name?: string;
+  scheduleCron?: string;
+  inputs?: string;
+  /** Stage order -> why it cannot run as bound. */
+  stages?: Record<number, string>;
+  /** The submit failed for a reason no field owns. */
+  form?: string;
+}
+
+/** Workflow-level inputs as typed: empty is none; anything else must be a JSON object. */
+export function parseInputs(text: string): { inputs?: Record<string, unknown>; error?: string } {
+  if (!text.trim()) return {};
+  try {
+    const value: unknown = JSON.parse(text);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return { error: "Inputs must be a JSON object." };
+    return { inputs: value as Record<string, unknown> };
+  } catch {
+    return { error: "Inputs must be valid JSON." };
+  }
+}
+
+/**
+ * The errors for one step of the Configure page (spec 44 §5.4), beside their
+ * fields: Source holds the name, trigger and inputs; Stages the bindings.
+ * Empty when the step may continue.
+ */
+export function validateConfigure(
+  step: "source" | "stages",
+  values: ConfigureWorkflowValues,
+  stages: WorkflowStage[]
+): ConfigureErrors {
+  const errors: ConfigureErrors = {};
+  if (step === "source") {
+    if (!values.name.trim()) errors.name = "Give the workflow a name.";
+    if (values.triggerKind === "schedule" && !values.scheduleCron.trim())
+      errors.scheduleCron = "A schedule needs a cron expression.";
+    const parsed = parseInputs(values.inputsText);
+    if (parsed.error) errors.inputs = parsed.error;
+    return errors;
+  }
+  const unbound = findUnboundStages(stages, values.bindings);
+  if (unbound.length > 0)
+    errors.stages = Object.fromEntries(
+      unbound.map((s) => [s.order, "Bind an agent: this stage has no default."])
+    );
+  return errors;
+}
+
 /**
  * Agent stages with no agent: an agent_dispatch stage is bound when the
  * operator picked a workload here or the definition's stage carries its own
@@ -41,7 +91,8 @@ export function findUnboundStages(
 /**
  * The definition (template) behind `/workflows/new?definition=<slug>`, its
  * stages, the org's agent workloads, and the create mutation that turns it
- * into a configured workflow. The data half of ConfigureWorkflowScreen.
+ * into a configured workflow. A refusal comes back as field errors; the
+ * toast is only the outcome. The data half of ConfigureWorkflowScreen.
  */
 export function useConfigureWorkflow(definitionSlug: string) {
   const router = useRouter();
@@ -56,23 +107,13 @@ export function useConfigureWorkflow(definitionSlug: string) {
   const loading = definitionLoading || stagesLoading;
   const orderedStages = [...stages].sort((a, b) => a.order - b.order);
 
-  async function onSubmit(values: ConfigureWorkflowValues): Promise<void> {
+  async function onSubmit(values: ConfigureWorkflowValues): Promise<ConfigureErrors> {
     const { name, bindings, inputsText, triggerKind, scheduleCron } = values;
-    if (!name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    if (findUnboundStages(orderedStages, bindings).length > 0) return;
-
-    let inputs: Record<string, unknown> | undefined;
-    if (inputsText.trim()) {
-      try {
-        inputs = JSON.parse(inputsText);
-      } catch {
-        toast.error("Inputs must be valid JSON");
-        return;
-      }
-    }
+    const found = {
+      ...validateConfigure("source", values, orderedStages),
+      ...validateConfigure("stages", values, orderedStages),
+    };
+    if (Object.keys(found).length > 0) return found;
 
     const stageBindings: Record<string, { agent_workload_id: string }> = {};
     for (const [order, workloadId] of Object.entries(bindings)) {
@@ -84,7 +125,7 @@ export function useConfigureWorkflow(definitionSlug: string) {
         name: name.trim(),
         definitionSlug,
         stageBindings,
-        inputs,
+        inputs: parseInputs(inputsText).inputs,
         triggerKind,
         scheduleCron: triggerKind === "schedule" ? scheduleCron : undefined,
       },
@@ -95,17 +136,23 @@ export function useConfigureWorkflow(definitionSlug: string) {
       toast.success("Workflow created", {
         description: `${result.workflow.name} is configured and ready to run.`,
       });
-      router.push(`/workflows/${result.workflow.slug}`);
-    } else {
-      const errors = result?.errors ?? [];
-      if (errors.length > 0) {
-        for (const err of errors) {
-          toast.error(`${err.field}: ${err.messages.join(", ")}`);
-        }
-      } else {
-        toast.error("Failed to create workflow");
-      }
+      router.push(`/workflows/${encodeURIComponent(result.workflow.slug)}`);
+      return {};
     }
+    toast.error("Workflow not created");
+    const errors = result?.errors ?? [];
+    const byField = (field: string) =>
+      errors.find((e) => e.field === field)?.messages.join(", ") || undefined;
+    const refused: ConfigureErrors = {
+      name: byField("name"),
+      scheduleCron: byField("scheduleCron") ?? byField("schedule_cron"),
+      inputs: byField("inputs"),
+    };
+    if (!refused.name && !refused.scheduleCron && !refused.inputs)
+      refused.form =
+        errors.map((e) => `${e.field}: ${e.messages.join(", ")}`).join("; ") ||
+        "The workflow could not be created.";
+    return refused;
   }
 
   return {

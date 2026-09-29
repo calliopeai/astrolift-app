@@ -4,22 +4,13 @@ import type {
 } from "@/graphql/workflows/tiered.types";
 import type { WorkflowInstanceDetail } from "@/graphql/workflows/workflows.types";
 
-import type { RunTimelinePanelViewProps } from "./RunTimelinePanel";
-import type { WorkflowRunState } from "./use-workflow-run";
-import type { WorkflowDetailShellViewProps } from "./WorkflowDetailShell";
-import type { WorkflowObserveViewProps } from "./WorkflowObserve";
-import type { WorkflowTabsViewProps } from "./WorkflowTabs";
-
 /**
- * Hand-typed fixtures for the workflow detail shell, pillar bar, Run pillar
- * and Observe pillar (group workflow-detail-b).
+ * Hand-typed fixtures for a configured workflow: the workflow, its runs, and
+ * its Runs tab (the former Observe pillar) with the run timeline.
  */
 
 /** The generated JSON scalar is typed Record<string, unknown>; real values can be any JSON. */
 const json = (value: unknown) => value as Record<string, unknown>;
-
-const noop = () => {};
-const noopAsync = async () => {};
 
 export const LONG =
   "platform-team-shared-production-nightly-reconciliation-workflow-with-a-deliberately-long-name-that-keeps-going";
@@ -95,45 +86,7 @@ export const LONG_WORKFLOW: ConfiguredWorkflowWithRuns = {
   runs: [{ ...RUN_RUNNING, temporalWorkflowId: `${LONG}-temporal-workflow-id` }],
 };
 
-// ─── Shell + tabs ─────────────────────────────────────────────────────────
-
-export const TABS: WorkflowTabsViewProps = {
-  workflowSlug: WORKFLOW.slug,
-  pathname: `/workflows/${WORKFLOW.slug}/run`,
-};
-
-export const SHELL: WorkflowDetailShellViewProps = {
-  workflowSlug: WORKFLOW.slug,
-  workflow: WORKFLOW,
-  loading: false,
-  error: null,
-};
-
-// ─── Run pillar ───────────────────────────────────────────────────────────
-
-export const RUN: WorkflowRunState = {
-  workflow: WORKFLOW,
-  latest: RUN_RUNNING,
-  canRun: true,
-  canManage: true,
-  running: false,
-  toggling: false,
-  onRun: noopAsync,
-  onToggle: noopAsync,
-};
-
 // ─── Observe pillar ───────────────────────────────────────────────────────
-
-const SORTED_RUNS = [RUN_RUNNING, RUN_COMPLETED, RUN_FAILED];
-
-export const OBSERVE: Omit<WorkflowObserveViewProps, "timeline"> = {
-  runs: SORTED_RUNS,
-  loading: false,
-  error: null,
-  focusGuid: RUN_RUNNING.guid,
-  onSelect: noop,
-  onRefresh: noop,
-};
 
 export const INSTANCE_DETAIL: WorkflowInstanceDetail = {
   instance: {
@@ -198,12 +151,4 @@ export const LONG_INSTANCE_DETAIL: WorkflowInstanceDetail = {
       decision: "timed_out",
     },
   ],
-};
-
-export const TIMELINE: RunTimelinePanelViewProps = {
-  run: RUN_RUNNING,
-  detail: INSTANCE_DETAIL,
-  loading: false,
-  error: null,
-  onClose: noop,
 };

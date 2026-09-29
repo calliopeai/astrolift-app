@@ -1,6 +1,3 @@
-import type { CursorTableController } from "@/components/data-table";
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
 import type {
   ConfiguredWorkflowWithRuns,
   WorkflowDefinitionRun,
@@ -14,10 +11,10 @@ import type {
   InstanceDetailViewProps,
   WorkflowInstancesPanelViewProps,
 } from "./WorkflowInstancesPanel";
+import { joinWorkflows, type WorkflowRow } from "./workflows-list";
 import type { WorkflowsListScreenProps } from "./WorkflowsListScreen";
-import type { WorkflowTemplatesScreenProps } from "./WorkflowTemplatesScreen";
 
-/** Hand-typed fixtures for /workflows, its instances panel, and /workflows/templates. */
+/** Hand-typed fixtures for /workflows and the platform instances page. */
 
 const noop = () => {};
 const asyncNoop = async () => {};
@@ -26,6 +23,16 @@ const json = (value: unknown) => value as Record<string, unknown>;
 
 export const LONG =
   "platform-team-shared-production-emr-triage-intake-and-decision-pipeline-with-a-deliberately-long-name-that-keeps-going";
+
+/** A 64-char SHA, a 200-char ARN and an unbroken URL, for the long-strings stories. */
+export const SHA64 = "f1f9f11a0c2e4b7d9a3e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4";
+export const ARN200 =
+  `arn:aws:states:us-west-2:718519534729:stateMachine:${"platform-shared-production-".repeat(6)}pipeline`.slice(
+    0,
+    200
+  );
+export const UNBROKEN_URL =
+  "https://github.com/calliopeai/astrolift-agents-with-a-very-long-organisation-name/blob/main/workflows/nightly/production/emr-triage-intake-and-decision-pipeline.toml";
 
 export const loadError = (message = "upstream timed out") => new globalThis.Error(message);
 
@@ -106,6 +113,10 @@ export const TEMPLATES: WorkflowDefinitionSummary[] = [
     sourceRepo: "",
     sourcePath: "",
     stageCount: 2,
+    stages: [
+      stage({ guid: "g1-s0", role: "draft", onFailure: "retry" }),
+      stage({ guid: "g1-s1", order: 1, kind: "human_gate", role: "review", agentSlug: "" }),
+    ],
   }),
   definition({
     guid: "def-g2",
@@ -121,6 +132,11 @@ export const TEMPLATES: WorkflowDefinitionSummary[] = [
     sourceRepo: "",
     sourcePath: "",
     stageCount: 3,
+    stages: [
+      stage({ guid: "g2-s0", role: "plan" }),
+      stage({ guid: "g2-s1", order: 1, role: "research", fanOutCount: 4 }),
+      stage({ guid: "g2-s2", order: 2, kind: "aggregation", role: "merge", agentSlug: "" }),
+    ],
   }),
   definition({
     guid: "def-g3",
@@ -136,6 +152,7 @@ export const TEMPLATES: WorkflowDefinitionSummary[] = [
     sourceRepo: "",
     sourcePath: "",
     stageCount: 1,
+    stages: [stage({ guid: "g3-s0", role: "dispatch" })],
   }),
 ];
 
@@ -144,19 +161,41 @@ export const ORG_DEFINITION = definition({
   name: "Nightly drift report",
   slug: "nightly-drift-report",
   description: "",
-  patternKind: "single",
+  patternKind: "chained",
   isEnabled: false,
   projectGuid: null,
   projectSlug: "",
   projectTeamSlug: "",
   sourceRepo: "",
   sourcePath: "",
-  stageCount: 1,
+  stageCount: 2,
+  stages: [
+    stage({ guid: "o1-s0", role: "collect" }),
+    stage({ guid: "o1-s1", order: 1, kind: "workflow", role: "", workflowRef: "emr-triage" }),
+  ],
+});
+
+export const SUPERVISOR_DEFINITION = definition({
+  guid: "def-o2",
+  name: "Incident responder",
+  slug: "incident-responder",
+  description: "A supervisor splits an incident into checks and hands them to workers.",
+  patternKind: "supervisor_worker",
+  projectSlug: "incident-ops",
+  sourceRepo: "",
+  sourcePath: "",
+  stageCount: 3,
+  stages: [
+    stage({ guid: "o2-s0", role: "triage" }),
+    stage({ guid: "o2-s1", order: 1, role: "route", fanOutCount: 3 }),
+    stage({ guid: "o2-s2", order: 2, kind: "aggregation", role: "report", agentSlug: "" }),
+  ],
 });
 
 export const DEFINITIONS: WorkflowDefinitionSummary[] = [
   REPO_WORKFLOW,
   ORG_DEFINITION,
+  SUPERVISOR_DEFINITION,
   ...TEMPLATES,
 ];
 
@@ -164,11 +203,16 @@ export const LONG_DEFINITION = definition({
   guid: "def-long",
   name: LONG,
   slug: LONG,
-  description: `${LONG} ${LONG}`,
+  description: `${LONG} ${SHA64} ${UNBROKEN_URL}`,
   patternKind: "supervisor_worker",
-  projectSlug: LONG,
+  projectSlug: ARN200,
+  sourceRepo: UNBROKEN_URL,
   projectTeamSlug: "platform-engineering-and-reliability",
   sourcePath: `workflows/${LONG}.toml`,
+  stageCount: 9,
+  stages: Array.from({ length: 9 }, (_, i) =>
+    stage({ guid: `long-s${i}`, order: i, role: `step-${i}`, fanOutCount: i === 2 ? 3 : null })
+  ),
 });
 
 // ─── Configured workflows ────────────────────────────────────────────────────
@@ -288,6 +332,7 @@ export const RUNNING_RUNS: WorkflowDefinitionRun[] = [
 export const HISTORICAL_RUNS: WorkflowDefinitionRun[] = [
   definitionRun({
     guid: "drun-h1",
+    startedAt: "2026-09-27T12:00:00Z",
     status: "completed",
     temporalWorkflowId: "WorkflowDefinitionRunWorkflow-80",
     currentStageOrder: 1,
@@ -296,12 +341,14 @@ export const HISTORICAL_RUNS: WorkflowDefinitionRun[] = [
   }),
   definitionRun({
     guid: "drun-h2",
+    startedAt: "2026-09-27T12:30:00Z",
     status: "timed_out",
     temporalWorkflowId: "WorkflowDefinitionRunWorkflow-81",
     endedAt: "2026-09-27T13:00:00Z",
   }),
   definitionRun({
     guid: "drun-h3",
+    startedAt: "2026-09-27T13:30:00Z",
     status: "cancelled",
     temporalWorkflowId: "WorkflowDefinitionRunWorkflow-82",
     currentStageRole: "",
@@ -318,68 +365,52 @@ export const LONG_RUN = definitionRun({
   currentStageRole: LONG,
 });
 
-export const PLATFORM_RUNS: AstroliftWorkflowRun[] = [
-  {
-    id: "prun-1",
-    workflowId: "deploy-app-billing-api-7f3c",
-    runId: "7f3c2a91",
-    workflowKind: "DeployAppWorkflow",
-    status: "completed",
-    registeredAppId: "billing-api",
-    organizationId: "org-1",
-    startedAt: "2026-09-27T10:00:00Z",
-    endedAt: "2026-09-27T10:03:00Z",
-    failure: json(null),
-  },
-  {
-    id: "prun-2",
-    workflowId: "provision-cluster-prod-west-1a2b",
-    runId: "1a2b3c4d",
-    workflowKind: "ProvisionClusterWorkflow",
-    status: "failed",
-    registeredAppId: null,
-    organizationId: "org-1",
-    startedAt: null,
-    endedAt: null,
-    failure: json({ message: "quota exceeded" }),
-  },
-];
-
 // ─── /workflows screen ───────────────────────────────────────────────────────
 
+/** Every row the list joins from the fixtures: configured workflows, definitions, templates. */
+export const WORKFLOW_ROWS: WorkflowRow[] = joinWorkflows(
+  CONFIGURED,
+  DEFINITIONS,
+  [...RUNNING_RUNS, ...HISTORICAL_RUNS],
+  { runsComplete: true }
+);
+
+export const LONG_ROWS: WorkflowRow[] = joinWorkflows(
+  [LONG_CONFIGURED],
+  [LONG_DEFINITION],
+  [LONG_RUN],
+  { runsComplete: true }
+);
+
+/** Enough rows for three pages at 25. */
+export const MANY_ROWS: WorkflowRow[] = Array.from({ length: 60 }, (_, i) => ({
+  ...WORKFLOW_ROWS[i % 3],
+  id: `many-${i}`,
+  slug: `workflow-${String(i).padStart(2, "0")}`,
+  name: `Workflow ${String(i).padStart(2, "0")}`,
+}));
+
+/** The screen's props without the list controller, which a story makes. */
 export function listProps(
-  overrides: Partial<WorkflowsListScreenProps> = {},
-  controller: Partial<CursorTableController<ConfiguredWorkflowWithRuns>> = {}
-): WorkflowsListScreenProps {
+  overrides: Partial<Omit<WorkflowsListScreenProps, "list">> = {}
+): Omit<WorkflowsListScreenProps, "list"> {
   return {
-    tab: "workflows",
-    setTab: noop,
-    entitlement: { canCreate: true, canManage: true, canRun: true },
+    rows: WORKFLOW_ROWS,
+    totalCount: WORKFLOW_ROWS.length,
+    loading: false,
+    stale: false,
+    error: null,
+    onRetry: noop,
+    truncatedAt: null,
+    canCreate: true,
+    canManage: true,
+    canRun: true,
     canViewPlatformRuns: true,
-    definitions: DEFINITIONS,
-    defsLoading: false,
-    defsError: undefined,
-    repositoryWorkflows: [REPO_WORKFLOW],
-    table: fakeController<ConfiguredWorkflowWithRuns>({
-      rows: CONFIGURED,
-      totalCount: CONFIGURED.length,
-      sortEnabled: false,
-      ...controller,
-    }),
     busySlug: null,
-    definitionRuns: {
-      loading: false,
-      error: undefined,
-      running: RUNNING_RUNS,
-      historical: HISTORICAL_RUNS,
-    },
-    historyRuns: PLATFORM_RUNS,
-    runsLoading: false,
-    onRunConfigured: asyncNoop,
-    onToggleConfigured: asyncNoop,
-    onDeleteConfigured: asyncNoop,
-    onRunDefinition: asyncNoop,
-    onDeleteDefinition: asyncNoop,
+    onRun: asyncNoop,
+    onToggle: asyncNoop,
+    onDelete: asyncNoop,
+    onClone: asyncNoop,
     ...overrides,
   };
 }
@@ -494,22 +525,6 @@ export function adminProps(
     onTerminate: asyncNoop,
     cancelLoading: false,
     terminateLoading: false,
-    ...overrides,
-  };
-}
-
-// ─── /workflows/templates screen ─────────────────────────────────────────────
-
-export function templatesProps(
-  overrides: Partial<WorkflowTemplatesScreenProps> = {}
-): WorkflowTemplatesScreenProps {
-  return {
-    templates: TEMPLATES,
-    loading: false,
-    error: undefined,
-    canCreate: true,
-    cloningSlugs: [],
-    onClone: asyncNoop,
     ...overrides,
   };
 }

@@ -229,7 +229,7 @@ export function fromWorkflowRun(r: WorkflowDefinitionRun): RunRow {
     durationSeconds: seconds(r.startedAt, r.endedAt),
     status: r.status,
     outcome,
-    href: `/workflows/${encodeURIComponent(r.definitionSlug)}/observe`,
+    href: `/workflows/${encodeURIComponent(r.definitionSlug)}/runs/${encodeURIComponent(r.guid)}`,
     cancel:
       live(outcome) && r.temporalWorkflowId
         ? { kind: "workflow", workflowId: r.temporalWorkflowId }

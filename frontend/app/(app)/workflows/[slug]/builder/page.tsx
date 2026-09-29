@@ -1,10 +1,4 @@
-"use client";
+import { formerWorkflowRoute } from "../components/former-route";
 
-import { useParams } from "next/navigation";
-
-import { StageBuilderContainer } from "../../_components/stage-builder";
-
-export default function WorkflowBuilderPage() {
-  const { slug } = useParams<{ slug: string }>();
-  return <StageBuilderContainer slug={slug} />;
-}
+/** Absorbed by the workflow's tab row; redirects to where it lives now (WORKFLOW_FORMER_ROUTES). */
+export default formerWorkflowRoute("builder");

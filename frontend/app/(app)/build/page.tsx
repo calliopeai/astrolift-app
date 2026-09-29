@@ -1,18 +1,10 @@
-import { BuildScreen } from "@/components/screens/dashboard/BuildScreen";
-
-export const metadata = { title: "Build · Astrolift" };
+import { redirect } from "next/navigation";
 
 /**
- * Build — CI pipelines, image building, and artifact management gateway.
- *
- * BUILD is the first pillar of the Calliope BROCS stack
- * (Build / Run / Observe / Control / Secure). It provides native CI
- * pipelines, Docker image building, and artifact registry integration
- * so teams can go from source to deployment without leaving Astrolift.
- *
- * This page is the onboarding gateway — shown before the module is
- * enabled, following the same pattern as the Zentinelle / Secure gateway.
+ * The old Build pillar gateway (a "coming soon" page, linked from nowhere
+ * since navigation went by function, spec 44 §4.1). Home is where an old
+ * link lands.
  */
 export default function BuildPage() {
-  return <BuildScreen />;
+  redirect("/dashboard");
 }
