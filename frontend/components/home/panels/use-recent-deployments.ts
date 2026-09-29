@@ -1,31 +1,13 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-
-import type { CursorPage } from "@/components/data-table";
-import { LIST_DEPLOYMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { deployShort } from "./apps-agents-model";
-import { HOME_POLL_MS, readState } from "./home-reads";
+import { useHomeDeployments } from "./home-reads";
 import type { RecentDeployItem, RecentDeploymentsPanelViewProps } from "./RecentDeploymentsPanel";
 
-interface DeploymentsPageResp {
-  astroliftDeploymentsPage: CursorPage<AstroliftDeployment>;
-}
-
-/**
- * Five newest with the total. The variables are the Builder layout's
- * Deployments panel's, so the two read one cache entry.
- */
-export const RECENT_DEPLOYMENTS_VARIABLES = {
-  appSlug: null,
-  environmentName: null,
-  statuses: null,
-  search: null,
-  limit: 5,
-  after: null,
-};
+/** The deploys the panel shows. */
+export const RECENT_DEPLOYMENTS_SHOWN = 5;
 
 export function recentDeployItem(d: AstroliftDeployment): RecentDeployItem {
   return {
@@ -38,17 +20,28 @@ export function recentDeployItem(d: AstroliftDeployment): RecentDeployItem {
   };
 }
 
-/** Recent deployments' data: one cursor page of five, newest first. */
+/**
+ * The count Recent deployments shows: exact while the shared read holds
+ * every deploy, none once it is full, since the read cannot say how many
+ * lie past it.
+ */
+export function recentDeploymentsCount(read: {
+  deployments: readonly unknown[];
+  capped: boolean;
+}): number | null {
+  return read.capped ? null : read.deployments.length;
+}
+
+/**
+ * Recent deployments' data: the five newest of Home's shared deployments
+ * read (home-reads.ts), the one Waiting on you and Failing make, so the
+ * three panels fetch deployments once between them.
+ */
 export function useRecentDeployments(): Omit<RecentDeploymentsPanelViewProps, "panel"> {
-  const q = useQuery<DeploymentsPageResp>(LIST_DEPLOYMENTS_PAGE, {
-    variables: RECENT_DEPLOYMENTS_VARIABLES,
-    fetchPolicy: "cache-and-network",
-    pollInterval: HOME_POLL_MS,
-  });
-  const page = (q.data ?? q.previousData)?.astroliftDeploymentsPage;
+  const { deployments, capped, ...read } = useHomeDeployments();
   return {
-    items: (page?.items ?? []).map(recentDeployItem),
-    count: page?.totalCount ?? null,
-    ...readState(q, Boolean(page)),
+    items: deployments.slice(0, RECENT_DEPLOYMENTS_SHOWN).map(recentDeployItem),
+    count: recentDeploymentsCount({ deployments, capped }),
+    ...read,
   };
 }

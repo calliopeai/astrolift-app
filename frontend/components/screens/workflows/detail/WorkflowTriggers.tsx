@@ -2,91 +2,120 @@
 
 import { Loader2Icon, PlayIcon, PowerIcon, PowerOffIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
-import type { ConfiguredWorkflow } from "@/graphql/workflows/tiered.types";
 
 import { formatTriggerKind } from "./workflow-run-state";
+import type { TriggerRow } from "./workflow-triggers-list";
 
 export interface WorkflowTriggersViewProps {
-  /** A configured workflow's trigger; null for a definition opened directly, which runs on demand. */
-  trigger: Pick<ConfiguredWorkflow, "triggerKind" | "scheduleCron" | "isEnabled"> | null;
-  /** `workflow.update`: the enable toggle. */
+  /** List state in the URL: views, search, chips, page (WORKFLOW_TRIGGERS_LIST). */
+  list: ListStateController;
+  /** The page on screen, already filtered, searched, sorted and sliced. */
+  rows: TriggerRow[];
+  /** Triggers matching the view, chips and search, across all pages. */
+  totalCount: number;
+  /** `workflow.update`: the enable toggle on each row. */
   canManage: boolean;
-  toggling: boolean;
-  onToggle: () => void;
+  /** The row whose toggle is in flight. */
+  togglingId: string | null;
+  onToggle: (row: TriggerRow) => void;
 }
 
 /**
- * The Triggers tab (spec 44 §5.2): how this workflow starts, its schedule,
- * and whether it is enabled, with the enable toggle (gated `canManage`). The
- * trigger section the Run pillar carried, moved here as it was; Run itself
- * is the frame's primary action. A definition has no trigger of its own.
+ * The Triggers tab (spec 44 §5.1, §5.2): the workflow's triggers as an
+ * embedded list under the workflow's tabs, each row its kind, schedule and
+ * status, with the enable toggle (gated `canManage`). Run itself is the
+ * frame's primary action. A definition has no trigger of its own, so its
+ * list is the empty state. Pure; the data half is useWorkflowTriggers.
  */
 export function WorkflowTriggersView({
-  trigger,
+  list,
+  rows,
+  totalCount,
   canManage,
-  toggling,
+  togglingId,
   onToggle,
 }: WorkflowTriggersViewProps) {
-  if (!trigger) {
-    return (
-      <EmptyState
-        icon={<PlayIcon className="size-5" />}
-        title="Runs on demand"
-        description="A workflow definition has no trigger of its own. Start it with Run, or configure a workflow over it to run on a schedule or a webhook."
-        actionHref="/workflows/new"
-        actionLabel="Configure a workflow"
-      />
-    );
+  const columns: Column<TriggerRow>[] = [
+    {
+      id: "kind",
+      header: "Trigger",
+      sortKey: "kind",
+      cellClassName: "max-w-80",
+      cell: (t) => (
+        <Badge variant="outline" className="max-w-full [overflow-wrap:anywhere] whitespace-normal">
+          {formatTriggerKind(t.kind)}
+        </Badge>
+      ),
+    },
+    {
+      id: "schedule",
+      header: "Schedule",
+      cellClassName: "max-w-80",
+      cell: (t) =>
+        t.schedule ? (
+          <span className="block font-mono text-xs [overflow-wrap:anywhere]">{t.schedule}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">none</span>
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      sortKey: "status",
+      cell: (t) => (
+        <Badge variant={t.isEnabled ? "default" : "secondary"}>
+          {t.isEnabled ? "Enabled" : "Disabled"}
+        </Badge>
+      ),
+    },
+  ];
+
+  if (canManage) {
+    columns.push({
+      id: "toggle",
+      header: <span className="sr-only">Enable or disable</span>,
+      label: "Enable toggle",
+      align: "right",
+      cell: (t) => {
+        const busy = togglingId === t.id;
+        return (
+          <Button size="sm" variant="outline" onClick={() => onToggle(t)} disabled={busy}>
+            {busy ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : t.isEnabled ? (
+              <PowerOffIcon className="size-4" />
+            ) : (
+              <PowerIcon className="size-4" />
+            )}
+            {t.isEnabled ? "Disable" : "Enable"}
+          </Button>
+        );
+      },
+    });
   }
 
   return (
-    <Section
-      title="Trigger"
-      description="How this workflow starts."
-      action={
-        canManage ? (
-          <Button variant="outline" onClick={onToggle} disabled={toggling}>
-            {toggling ? (
-              <Loader2Icon className="mr-1 size-4 animate-spin" />
-            ) : trigger.isEnabled ? (
-              <PowerOffIcon className="mr-1 size-4" />
-            ) : (
-              <PowerIcon className="mr-1 size-4" />
-            )}
-            {trigger.isEnabled ? "Disable" : "Enable"}
-          </Button>
-        ) : null
-      }
-    >
-      <dl className="grid min-w-0 gap-x-8 gap-y-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">Trigger kind</dt>
-        <dd className="min-w-0">
-          <Badge
-            variant="outline"
-            className="max-w-full [overflow-wrap:anywhere] whitespace-normal"
-          >
-            {formatTriggerKind(trigger.triggerKind)}
-          </Badge>
-        </dd>
-        {trigger.scheduleCron && (
-          <>
-            <dt className="text-muted-foreground">Schedule</dt>
-            <dd className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
-              {trigger.scheduleCron}
-            </dd>
-          </>
-        )}
-        <dt className="text-muted-foreground">Status</dt>
-        <dd>
-          <Badge variant={trigger.isEnabled ? "default" : "secondary"}>
-            {trigger.isEnabled ? "Enabled" : "Disabled"}
-          </Badge>
-        </dd>
-      </dl>
-    </Section>
+    <ListPage<TriggerRow>
+      embedded
+      list={list}
+      label="Triggers"
+      columns={columns}
+      rows={rows}
+      getRowId={(t) => t.id}
+      totalCount={totalCount}
+      empty={{
+        icon: <PlayIcon className="size-5" />,
+        title: "Runs on demand",
+        description:
+          "A workflow definition has no trigger of its own. Start it with Run, or configure a workflow over it to run on a schedule or a webhook.",
+        actionHref: "/workflows/new",
+        actionLabel: "Configure a workflow",
+      }}
+    />
   );
 }

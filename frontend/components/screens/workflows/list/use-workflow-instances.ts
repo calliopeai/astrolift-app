@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
+import { useListState } from "@/components/list/use-list-state";
 import { useConfirm } from "@/hooks/use-confirm";
 import {
   useCancelWorkflowInstance,
@@ -10,44 +11,61 @@ import {
   useWorkflowInstanceDetail,
   useWorkflowInstances,
 } from "@/graphql/workflows/workflows.hooks";
+import type { WorkflowInstance } from "@/graphql/workflows/workflows.types";
+
+import {
+  instancesVariables,
+  selectInstances,
+  WORKFLOW_INSTANCES_LIST,
+} from "./workflow-instances-list";
+
+/** The URL param holding the open instance, beside the list's own. */
+export const INSTANCE_PARAM = "instance";
 
 /**
- * The Temporal instance list behind WorkflowInstancesPanelView (#437):
- * the controlled filters and the status-filtered instance query.
+ * The Platform instances list's data half (#437, spec 44 §5.1): list state
+ * in the URL, Type and Status sent to `astroliftWorkflowInstances`, one page
+ * at the backend's cap, then search, sort and numbered pages in the browser
+ * (see workflow-instances-list.ts). The open instance is `?instance=`, so a
+ * row is a link and the detail survives a reload.
  */
-export function useWorkflowInstancesPanel({
-  workflowType,
-  initialStatus = "ALL",
-  isAdmin = true,
-}: {
-  workflowType?: string;
-  initialStatus?: string;
-  isAdmin?: boolean;
-}) {
-  const [typeFilter, setTypeFilter] = useState(workflowType ?? "");
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+export function useWorkflowInstancesList() {
+  const list = useListState(WORKFLOW_INSTANCES_LIST);
+  const { state } = list;
+  const params = useSearchParams();
+  const pathname = usePathname() ?? "";
+  const router = useRouter();
 
-  const { instances, loading, error, refetch } = useWorkflowInstances({
-    workflowType: typeFilter.trim() || null,
-    status: statusFilter === "ALL" ? null : statusFilter,
-    limit: 50,
+  const { instances, loading, error, refetch } = useWorkflowInstances(
+    instancesVariables(list.filters)
+  );
+  const { rows, totalCount } = selectInstances(instances, {
+    filters: list.filters,
+    q: state.q,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
   });
 
+  const withInstance = (workflowId: string | null) => {
+    const next = new URLSearchParams(params?.toString() ?? "");
+    if (workflowId) next.set(INSTANCE_PARAM, workflowId);
+    else next.delete(INSTANCE_PARAM);
+    const qs = next.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+
   return {
-    typeFilter,
-    setTypeFilter,
-    statusFilter,
-    setStatusFilter,
-    selectedWorkflowId,
-    setSelectedWorkflowId,
-    instances,
-    loading,
-    error,
-    refetch: () => {
-      refetch();
-    },
-    isAdmin,
+    list,
+    rows,
+    totalCount,
+    loading: loading && instances.length === 0,
+    stale: loading && instances.length > 0,
+    error: error && instances.length === 0 ? { message: error.message } : null,
+    onRetry: () => void refetch(),
+    instanceHref: (i: WorkflowInstance) => withInstance(i.workflowId),
+    selectedWorkflowId: params?.get(INSTANCE_PARAM) || null,
+    onCloseInstance: () => router.replace(withInstance(null), { scroll: false }),
   };
 }
 
