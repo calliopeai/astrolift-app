@@ -109,12 +109,12 @@ export const Error: Story = {
   ),
 };
 
-/** Mine is applied per page, and says so under the bar. */
+/** Mine: the deployments the viewer triggered, counted by the server. */
 export const Mine: Story = {
   render: () => (
     <Deployments
       rows={DEPLOYMENTS.slice(0, 2).map((d) => ({ ...d, triggeredByMe: true }))}
-      totalCount={null}
+      totalCount={2}
       initial={{ view: "mine" }}
     />
   ),

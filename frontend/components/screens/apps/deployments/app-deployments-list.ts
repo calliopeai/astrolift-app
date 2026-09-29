@@ -7,38 +7,30 @@
  * shape, so it has its own declaration that shares these views: the view
  * picker reads the same on both, and `?view=previews` picks the screen.
  *
- * What the server answers and what this file answers: `astroliftDeploymentsPage`
- * takes `appSlug`, `environmentName`, `statuses`, `search` and a cursor, so
- * the status and environment chips, Waiting approval, Failed and search are
- * server side. It has no initiator or time argument and no sort, so Mine and
- * Today are applied to each page here (`selectPage`), and the list keeps the
- * server's order (newest first) with no sortable columns.
+ * Every view and chip is answered by `astroliftDeploymentsPage`: status,
+ * environment and search as its own arguments, Mine (who triggered it) and
+ * Today (started since local midnight) through its `filter`, and the list's
+ * order (newest start first) as `sort` (#2155).
  */
 import type { SortState } from "@/components/data-table";
 import {
+  formatSort,
   type ListDefinition,
   type ListFieldOption,
   type ListView,
   standardViews,
 } from "@/components/list/list-state";
-import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
+import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 
 export const PREVIEWS_VIEW = "previews";
 
 /** Shared by the deployments list and the previews list, so the picker is one menu. */
-export const APP_DEPLOYMENT_VIEWS: ListView[] = standardViews(
-  { startedBy: "me" },
-  [
-    { key: "waiting", label: "Waiting approval", filters: { status: "pending_approval" } },
-    { key: "failed", label: "Failed", filters: { status: "failed" } },
-    { key: "today", label: "Today", filters: { since: "today" } },
-    { key: PREVIEWS_VIEW, label: "Previews", filters: {} },
-  ],
-  {
-    mineNote:
-      "Mine shows the deployments you triggered on each page the server returns; the server cannot filter by who triggered yet.",
-  }
-);
+export const APP_DEPLOYMENT_VIEWS: ListView[] = standardViews({ startedBy: "me" }, [
+  { key: "waiting", label: "Waiting approval", filters: { status: "pending_approval" } },
+  { key: "failed", label: "Failed", filters: { status: "failed" } },
+  { key: "today", label: "Today", filters: { since: "today" } },
+  { key: PREVIEWS_VIEW, label: "Previews", filters: {} },
+]);
 
 export const DEPLOYMENT_STATUS_LABEL: Record<DeploymentStatus, string> = {
   pending_approval: "Pending approval",
@@ -98,62 +90,41 @@ export const APP_PREVIEWS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
-/** The page query's variables for the effective filters (view plus chips). */
+function startOfDay(now: number): string {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+/**
+ * The page query's variables for the effective filters (view plus chips).
+ * `now` places Today's midnight; the hook fixes it per visit. The route
+ * preloads the All view's first page with these exact values.
+ */
 export function pageVariables(
   appSlug: string,
   filters: Record<string, string>,
-  q: string,
-  pageSize: number,
-  after: string | null
+  {
+    q,
+    sort,
+    pageSize,
+    after,
+  }: { q: string; sort: SortState[]; pageSize: number; after: string | null },
+  now: number
 ) {
+  const filter: { triggeredBy?: string[]; startedAfter?: string } = {};
+  if (filters.startedBy) filter.triggeredBy = [filters.startedBy];
+  if (filters.since === "today") filter.startedAfter = startOfDay(now);
   return {
     appSlug,
     environmentName: filters.env || null,
     statuses: filters.status ? [filters.status] : null,
     search: q.trim() || null,
+    filter: Object.keys(filter).length > 0 ? filter : null,
+    sort: formatSort(sort),
     limit: pageSize,
     after,
   };
-}
-
-function startOfDay(now: number): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function when(d: Pick<AstroliftDeployment, "startedAt" | "createdAt">): number {
-  return Date.parse(d.startedAt ?? d.createdAt);
-}
-
-/**
- * What the server cannot answer yet, applied to one page.
- *
- * Today: the page is newest first, so today's deployments are a prefix of
- * the whole walk. Once a row older than today shows up there is nothing
- * further to fetch, and the next cursor is dropped. Exact, not a sample.
- *
- * Mine (`startedBy: me`): the viewer's rows on this page. Not a prefix, so
- * the cursor stays and older pages can still hold some; the view's note
- * says so.
- */
-export function selectPage<
-  T extends Pick<AstroliftDeployment, "startedAt" | "createdAt" | "triggeredByMe">,
->(
-  rows: T[],
-  nextCursor: string | null,
-  filters: Record<string, string>,
-  now: number
-): { rows: T[]; nextCursor: string | null } {
-  let out = rows;
-  let cursor = nextCursor;
-  if (filters.since === "today") {
-    const from = startOfDay(now);
-    out = out.filter((d) => when(d) >= from);
-    if (out.length < rows.length) cursor = null;
-  }
-  if (filters.startedBy === "me") out = out.filter((d) => d.triggeredByMe);
-  return { rows: out, nextCursor: cursor };
 }
 
 /** The deployment's run page (spec 44 §5.5), moving onto RunPage. */

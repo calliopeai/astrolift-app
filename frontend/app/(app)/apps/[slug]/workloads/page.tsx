@@ -1,7 +1,7 @@
 import { activeSection, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 import { AppTabSections } from "@/components/screens/apps/detail/AppTabSections";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import { LIST_MANAGED_SERVICES_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
@@ -21,8 +21,9 @@ export const metadata = {
  * (`?section=managed-services`, where `/managed-services` redirects). A
  * workload's own page stays a detail route under the tab.
  *
- * The list reads the app's whole workload set (see workloads-list.ts), which
- * is preloaded so it paints with rows.
+ * The list's default page (no chips, no search, by name, 25 rows) is
+ * preloaded so it paints with rows; these variables have to be exactly the
+ * ones `appWorkloadsVariables` sends for it, or the preload is a cache miss.
  */
 export default async function AppWorkloadsPage({
   params,
@@ -52,7 +53,18 @@ export default async function AppWorkloadsPage({
           </PreloadQuery>
         </PreloadQuery>
       ) : (
-        <PreloadQuery query={LIST_WORKLOADS} variables={{ appSlug: slug }}>
+        <PreloadQuery
+          query={LIST_WORKLOADS_PAGE}
+          variables={{
+            appSlug: slug,
+            kinds: ["deployment", "statefulset", "job", "cronjob"],
+            search: null,
+            filter: null,
+            sort: "name",
+            page: 1,
+            pageSize: 25,
+          }}
+        >
           <WorkloadsListClient slug={slug} />
         </PreloadQuery>
       )}

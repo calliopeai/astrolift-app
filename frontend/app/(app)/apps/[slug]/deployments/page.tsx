@@ -26,8 +26,9 @@ export const metadata = {
  * Each view preloads its first page so it paints with rows. The variables
  * have to be exactly the ones the hook sends on first render or the preload
  * is a cache miss: see `pageVariables` and `previewPageVariables` (default
- * page size 25, no search, no cursor). A link that already carries chips,
- * a search or a cursor simply fetches on the client.
+ * page size 25, no search, no filter, newest start first, no cursor). A
+ * link that already carries chips, a search or a cursor simply fetches on
+ * the client.
  */
 export default async function AppDeploymentsPage({
   params,
@@ -58,6 +59,8 @@ export default async function AppDeploymentsPage({
           environmentName: null,
           statuses: null,
           search: null,
+          filter: null,
+          sort: "-started",
           limit: 25,
           after: null,
         }}

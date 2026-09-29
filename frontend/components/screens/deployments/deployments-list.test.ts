@@ -15,8 +15,6 @@ import {
   deploymentFailure,
   deploymentSteps,
   deploymentsVariables,
-  narrowDeployments,
-  NARROW_LIMIT,
 } from "./deployments-list";
 
 const at = (m: number) => new Date(Date.UTC(2026, 8, 28, 12, m)).toISOString();
@@ -32,9 +30,11 @@ function entry(status: string, minute: number, message = ""): AstroliftDeploymen
   };
 }
 
+const NOW = Date.parse(at(30));
+
 function varsFor(qs: string) {
   const state = parseListState(DEPLOYMENTS_LIST, qs);
-  return deploymentsVariables(effectiveFilters(DEPLOYMENTS_LIST, state), state);
+  return deploymentsVariables(effectiveFilters(DEPLOYMENTS_LIST, state), state, NOW);
 }
 
 describe("DEPLOYMENTS_LIST", () => {
@@ -51,12 +51,14 @@ describe("DEPLOYMENTS_LIST", () => {
 });
 
 describe("deploymentsVariables", () => {
-  it("sends app, environment, status and search to the server", () => {
+  it("sends app, environment, status, search and the list's order to the server", () => {
     expect(varsFor("app=storefront&environment=prod&status=failed&q=4f2a")).toEqual({
       appSlug: "storefront",
       environmentName: "prod",
       statuses: ["failed"],
       search: "4f2a",
+      filter: null,
+      sort: "-started",
       limit: 25,
       after: null,
     });
@@ -66,33 +68,21 @@ describe("deploymentsVariables", () => {
     expect(varsFor("view=waiting").statuses).toEqual(["pending_approval"]);
   });
 
-  it("walks a wider page when a filter narrows client-side", () => {
-    expect(varsFor("view=mine").limit).toBe(NARROW_LIMIT);
-    expect(varsFor("trigger=push").limit).toBe(NARROW_LIMIT);
-    expect(varsFor("").limit).toBe(25);
-  });
-});
-
-describe("narrowDeployments", () => {
-  const now = Date.parse(at(30));
-  const rows = [
-    { ...DEPLOY_RUNNING, id: "a", triggeredByMe: true, triggerKind: "manual" as const },
-    { ...DEPLOY_RUNNING, id: "b", startedAt: "2026-09-20T00:00:00Z" },
-  ];
-
-  it("Mine keeps only the viewer's", () => {
-    expect(narrowDeployments(rows, { triggeredBy: "me" }, now).map((d) => d.id)).toEqual(["a"]);
+  it("Mine is triggeredBy me, trigger is the trigger kind", () => {
+    expect(varsFor("view=mine").filter).toEqual({ triggeredBy: ["me"] });
+    expect(varsFor("trigger=push").filter).toEqual({ triggerKind: ["push"] });
   });
 
-  it("trigger matches the trigger kind", () => {
-    expect(narrowDeployments(rows, { trigger: "push" }, now).map((d) => d.id)).toEqual(["b"]);
+  it("Today starts at the viewer's local midnight; since windows count back from now", () => {
+    expect(varsFor("view=today").filter).toEqual({ startedAfter: sinceIso("today", NOW) });
+    expect(varsFor("since=24h").filter).toEqual({
+      startedAfter: new Date(NOW - 24 * 3600_000).toISOString(),
+    });
   });
 
-  it("since drops what started before the window", () => {
-    const today = sinceIso("today", now);
-    expect(today).not.toBeNull();
-    const fresh = [{ ...rows[0], startedAt: at(29) }, rows[1]];
-    expect(narrowDeployments(fresh, { since: "today" }, now).map((d) => d.id)).toEqual(["a"]);
+  it("asks for one page of the chosen size, never a wider one", () => {
+    expect(varsFor("view=mine&pageSize=50").limit).toBe(50);
+    expect(varsFor("trigger=push").limit).toBe(25);
   });
 });
 

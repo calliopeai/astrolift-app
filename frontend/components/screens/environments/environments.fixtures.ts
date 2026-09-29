@@ -22,6 +22,7 @@ export const ENV_PREVIEW: AstroliftAppEnvironment = {
   ...ENV_PROD,
   id: "e0000000-0000-4000-8000-000000000005",
   name: "preview-pr-412",
+  kind: "preview",
   url: "https://pr-412-storefront.pr.acme.example",
   requiredApprovals: 0,
   settings: [],

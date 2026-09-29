@@ -9,7 +9,7 @@ import {
   ROWS,
   TRIGGERED_BY_OTHER,
 } from "./deployments.fixtures";
-import { DEPLOYMENTS_LIST, narrowDeployments, narrows } from "./deployments-list";
+import { DEPLOYMENTS_LIST, deploymentsVariables } from "./deployments-list";
 import { DeploymentsScreen, type DeploymentsScreenProps } from "./DeploymentsScreen";
 
 /** Fixed for the story: the fixtures are minutes old relative to module load. */
@@ -26,14 +26,22 @@ type Story = StoryObj;
 type Props = Partial<Omit<DeploymentsScreenProps, "list">> & { initial?: Partial<ListState> };
 
 /**
- * The screen over fixture rows, filtered the way the hook does it: status by
- * the "server" (here, in memory), trigger, since and Mine by narrowDeployments.
+ * The screen over fixture rows, as the server answers the list state: here
+ * the story stands in for `astroliftDeploymentsPage`, applying the variables
+ * the hook sends (status, and the filter's trigger, who triggered it and the
+ * start time).
  */
 function Deployments({ initial, rows = ROWS, ...patch }: Props) {
   const list = useLocalListState(DEPLOYMENTS_LIST, initial);
-  const f = list.filters;
-  const served = rows.filter((d) => !f.status || d.status === f.status);
-  const shown = narrows(f) ? narrowDeployments(served, f, NOW) : served;
+  const v = deploymentsVariables(list.filters, list.state, NOW);
+  const after = v.filter?.startedAfter ? Date.parse(v.filter.startedAfter) : null;
+  const shown = rows.filter(
+    (d) =>
+      (!v.statuses || v.statuses.includes(d.status)) &&
+      (!v.filter?.triggerKind || v.filter.triggerKind.includes(d.triggerKind)) &&
+      (!v.filter?.triggeredBy || d.triggeredByMe) &&
+      (after === null || Date.parse(d.startedAt ?? d.createdAt) >= after)
+  );
   return <DeploymentsScreen {...listProps({ rows: shown, ...patch })} list={list} />;
 }
 
@@ -58,7 +66,7 @@ export const ErrorState: Story = {
   render: () => <Deployments rows={[]} error={{ message: "Network error: failed to fetch" }} />,
 };
 
-/** Mine: the deployments the viewer triggered, with the view's note. */
+/** Mine: the deployments the viewer triggered. */
 export const Mine: Story = { render: () => <Deployments initial={{ view: "mine" }} /> };
 
 export const WaitingApproval: Story = {

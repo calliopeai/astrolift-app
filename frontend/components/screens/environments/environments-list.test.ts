@@ -2,60 +2,59 @@ import { describe, expect, it } from "vitest";
 
 import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
-import { ALL_ENVIRONMENTS } from "./environments.fixtures";
-import { environmentKind, ENVIRONMENTS_LIST, selectEnvironments } from "./environments-list";
+import { ENVIRONMENTS_LIST, environmentsVariables } from "./environments-list";
 
-function namesFor(qs: string) {
+function varsFor(qs: string, appSlug: string | null = null) {
   const state = parseListState(ENVIRONMENTS_LIST, qs);
-  return selectEnvironments(ALL_ENVIRONMENTS, {
-    filters: effectiveFilters(ENVIRONMENTS_LIST, state),
+  return environmentsVariables(appSlug, {
     q: state.q,
+    filters: effectiveFilters(ENVIRONMENTS_LIST, state),
     sort: state.sort,
     page: state.page,
     pageSize: state.pageSize,
-  }).rows.map((e) => `${e.registeredAppSlug}/${e.name}`);
+  });
 }
 
-describe("environmentKind", () => {
-  it("reads production and previews from the name", () => {
-    expect(environmentKind("prod")).toBe("production");
-    expect(environmentKind("Production")).toBe("production");
-    expect(environmentKind("preview-pr-412")).toBe("preview");
-    expect(environmentKind("pr-88")).toBe("preview");
-    expect(environmentKind("staging")).toBe("other");
-    expect(environmentKind("product-demo")).toBe("other");
-  });
-});
-
-describe("selectEnvironments", () => {
-  it("leads with All and Mine, then Production and Previews", () => {
+describe("ENVIRONMENTS_LIST", () => {
+  it("leads with All and Mine, then Production and Previews, with no stand-in notes", () => {
     expect(ENVIRONMENTS_LIST.views.map((v) => v.label)).toEqual([
       "All",
       "Mine",
       "Production",
       "Previews",
     ]);
+    expect(ENVIRONMENTS_LIST.views.every((v) => !v.note)).toBe(true);
+  });
+});
+
+describe("environmentsVariables", () => {
+  it("asks for the first numbered page, by app then name, with no filter", () => {
+    expect(varsFor("")).toEqual({
+      appSlug: null,
+      search: null,
+      filter: null,
+      sort: "app,name",
+      page: 1,
+      pageSize: 25,
+    });
   });
 
-  it("sorts by app, then name", () => {
-    expect(namesFor("")).toEqual([
-      "billing-api/dev",
-      "storefront/preview-pr-412",
-      "storefront/prod",
-      "storefront/staging",
-    ]);
+  it("Production and Previews filter on the recorded kind, Mine on the owner", () => {
+    expect(varsFor("view=production").filter).toEqual({ kind: ["production"] });
+    expect(varsFor("view=previews").filter).toEqual({ kind: ["preview"] });
+    expect(varsFor("view=mine").filter).toEqual({ owner: ["me"] });
   });
 
-  it("Production and Previews go by the name", () => {
-    expect(namesFor("view=production")).toEqual(["storefront/prod"]);
-    expect(namesFor("view=previews")).toEqual(["storefront/preview-pr-412"]);
-  });
-
-  it("Mine holds nothing rather than everything", () => {
-    expect(namesFor("view=mine")).toEqual([]);
-  });
-
-  it("the deploys chip keeps paused or active", () => {
-    expect(namesFor("deploys=paused")).toEqual(["storefront/staging"]);
+  it("sends the app and cluster chips, search, sort and page", () => {
+    expect(
+      varsFor("app=storefront&cluster=prod-west&q=%20stag%20&sort=-cluster&page=2", "storefront")
+    ).toEqual({
+      appSlug: "storefront",
+      search: "stag",
+      filter: { app: ["storefront"], cluster: ["prod-west"] },
+      sort: "-cluster",
+      page: 2,
+      pageSize: 25,
+    });
   });
 });

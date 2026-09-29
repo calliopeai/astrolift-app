@@ -5,11 +5,11 @@ import { toast } from "sonner";
 
 import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import { PAUSE_ENVIRONMENT, RESUME_ENVIRONMENT } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { ENVIRONMENTS_LIST, selectEnvironments } from "./environments-list";
+import { ENVIRONMENTS_LIST, environmentsVariables } from "./environments-list";
 
 interface MutationResultLite<T> {
   ok: boolean;
@@ -18,7 +18,7 @@ interface MutationResultLite<T> {
 }
 
 interface Resp {
-  astroliftEnvironments: AstroliftAppEnvironment[];
+  astroliftEnvironmentsPage: { items: AstroliftAppEnvironment[]; totalCount: number | null };
 }
 
 function reportResult(
@@ -36,8 +36,9 @@ function reportResult(
 /**
  * Environments across the org (URL list state), or one app's when appSlug
  * is set (in-memory list state: the host tab's own query must survive a
- * filter change), plus pause / resume deploys. Polls every 30s. The data
- * half of EnvironmentsScreen.
+ * filter change): one numbered page of `astroliftEnvironmentsPage`, the
+ * server filtering, sorting and counting, plus pause / resume deploys.
+ * Polls every 30s. The data half of EnvironmentsScreen.
  */
 export function useEnvironments(appSlug?: string) {
   const routed = useListState(ENVIRONMENTS_LIST);
@@ -45,19 +46,24 @@ export function useEnvironments(appSlug?: string) {
   const list = appSlug ? local : routed;
   const { state } = list;
   const { can } = useMyPermissions();
-  const variables = { appSlug: appSlug ?? null };
-
-  const query = useQuery<Resp>(LIST_ENVIRONMENTS, { variables, pollInterval: 30000 });
-  const data = query.data ?? query.previousData;
-  const { rows, totalCount } = selectEnvironments(data?.astroliftEnvironments ?? [], {
-    filters: list.filters,
+  const variables = environmentsVariables(appSlug ?? null, {
     q: state.q,
+    filters: list.filters,
     sort: state.sort,
     page: state.page,
     pageSize: state.pageSize,
   });
 
-  const refetch = [{ query: LIST_ENVIRONMENTS, variables }];
+  const query = useQuery<Resp>(LIST_ENVIRONMENTS_PAGE, {
+    variables,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 30000,
+  });
+  const data = query.data ?? query.previousData;
+  const rows = data?.astroliftEnvironmentsPage.items ?? [];
+  const totalCount = data?.astroliftEnvironmentsPage.totalCount ?? rows.length;
+
+  const refetch = [{ query: LIST_ENVIRONMENTS_PAGE, variables }];
   const [pause, pauseState] = useMutation<{
     pauseEnvironment: MutationResultLite<AstroliftAppEnvironment>;
   }>(PAUSE_ENVIRONMENT, { refetchQueries: refetch });

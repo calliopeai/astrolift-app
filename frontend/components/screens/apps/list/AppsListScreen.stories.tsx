@@ -3,9 +3,15 @@ import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { APPS_LIST, type AppRow, selectApps } from "./apps-list";
+import { APPS_LIST, type AppRow, pinFirst } from "./apps-list";
 import { AppsListScreen, type AppsListScreenProps, PushSecretsDialog } from "./AppsListScreen";
 import { APPS, LONG_APP, MANY, PUSH_SECRETS, listProps } from "./fixtures";
+
+// What each view's page holds, as the server answers it.
+const ACTIVE = APPS.filter((a) => !a.isArchived);
+const FAILING = ACTIVE.filter(
+  (a) => a.provisioningStatus === "failed" || a.healthPulse?.status === "DEGRADED"
+);
 
 // List or cards is a per-person preference in localStorage; pin it per story
 // so one story's mode never leaks into the next.
@@ -35,18 +41,22 @@ type Props = Partial<Omit<AppsListScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture apps, filtered and paged the way the hook does it. */
-function Apps({ apps = APPS, initial, ...patch }: Props) {
+/**
+ * The screen over fixture apps. The server filters, sorts and pages, so a
+ * story passes the rows its page would return; this only slices them into
+ * numbered pages and lifts the pins, as the hook does with a page.
+ */
+function Apps({ apps = ACTIVE, initial, ...patch }: Props) {
   const list = useLocalListState(APPS_LIST, initial);
   const pinned = patch.pinned ?? new Set(["billing-worker"]);
-  const { rows, totalCount } = selectApps(apps, {
-    filters: list.filters,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-    pinned,
-  });
-  return <AppsListScreen {...listProps({ rows, totalCount, pinned, ...patch })} list={list} />;
+  const { page, pageSize } = list.state;
+  const rows = pinFirst(apps.slice((page - 1) * pageSize, page * pageSize), pinned);
+  return (
+    <AppsListScreen
+      {...listProps({ rows, totalCount: apps.length, pinned, ...patch })}
+      list={list}
+    />
+  );
 }
 
 /** Newest first, one app pinned to the top of the page. */
@@ -59,12 +69,12 @@ export const Empty: Story = { render: () => <Apps apps={[]} /> };
 
 /** A chip that matches nothing: "No apps match" and Clear. */
 export const EmptyFiltered: Story = {
-  render: () => <Apps initial={{ filters: { cluster: "gke-eu-west-4" } }} />,
+  render: () => <Apps apps={[]} initial={{ filters: { cluster: "gke-eu-west-4" } }} />,
 };
 
 /** The Failing view with nothing failing. */
 export const EmptyView: Story = {
-  render: () => <Apps apps={APPS.slice(0, 1)} initial={{ view: "failing" }} />,
+  render: () => <Apps apps={[]} initial={{ view: "failing" }} />,
 };
 
 export const ErrorState: Story = {
@@ -78,14 +88,24 @@ export const Refetching: Story = { render: () => <Apps stale /> };
 export const Mine: Story = { render: () => <Apps initial={{ view: "mine" }} /> };
 
 /** Failing: provisioning failed, or the latest deploy did. */
-export const Failing: Story = { render: () => <Apps initial={{ view: "failing" }} /> };
+export const Failing: Story = {
+  render: () => <Apps apps={FAILING} initial={{ view: "failing" }} />,
+};
 
-export const Archived: Story = { render: () => <Apps initial={{ view: "archived" }} /> };
+export const Archived: Story = {
+  render: () => <Apps apps={APPS.filter((a) => a.isArchived)} initial={{ view: "archived" }} />,
+};
 
 /** Project, kind and cluster chips. */
 export const Filtered: Story = {
   render: () => (
     <Apps
+      apps={ACTIVE.filter(
+        (a) =>
+          a.projectSlug === "core" &&
+          a.topology === "service-worker" &&
+          a.clusters.includes("prd-us-west-2")
+      )}
       initial={{ filters: { project: "core", kind: "service-worker", cluster: "prd-us-west-2" } }}
     />
   ),
@@ -112,11 +132,11 @@ export const CardsError: Story = {
 };
 
 /** A 64-char SHA image tag, a 200-char ARN description and an unbroken repo URL. */
-export const LongStrings: Story = { render: () => <Apps apps={[LONG_APP, ...APPS]} /> };
+export const LongStrings: Story = { render: () => <Apps apps={[LONG_APP, ...ACTIVE]} /> };
 
 export const LongStringsCards: Story = {
   parameters: { mode: "card" },
-  render: () => <Apps apps={[LONG_APP, ...APPS]} />,
+  render: () => <Apps apps={[LONG_APP, ...ACTIVE]} />,
 };
 
 /** The narrowest supported width: the table scrolls in its own frame, the page does not. */
@@ -132,7 +152,7 @@ export const Width768Cards: Story = {
   parameters: { mode: "card" },
   render: () => (
     <div style={{ width: 768 }}>
-      <Apps apps={[LONG_APP, ...APPS]} />
+      <Apps apps={[LONG_APP, ...ACTIVE]} />
     </div>
   ),
 };

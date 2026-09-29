@@ -3,16 +3,14 @@
  * query variables it sends, and the pure run view of one deployment.
  *
  * The list: views All · Mine · Waiting approval · Failed · Today, cursor
- * paged, live. `astroliftDeploymentsPage` takes `appSlug`,
- * `environmentName`, `statuses`, `search`, `limit` and `after`, so app,
- * environment, status and search go to the server. Trigger, since and Mine
- * (who triggered it) have no argument yet: `narrowDeployments` keeps the
- * matching rows of a wider page (`NARROW_LIMIT`), and the views that lean
- * on it say so in their note. When the query grows those arguments the
- * hook sends them and this step goes away; the screen does not change.
+ * paged, live. Everything goes to `astroliftDeploymentsPage`: app,
+ * environment, status and search as its own arguments, and trigger, Mine
+ * (who triggered it) and since (Today) through its `filter`, with the
+ * list's order as `sort` (#2155).
  */
+import type { SortState } from "@/components/data-table";
 import type { ListDefinition } from "@/components/list/list-state";
-import { standardViews } from "@/components/list/list-state";
+import { formatSort, standardViews } from "@/components/list/list-state";
 import type { TimelineStep } from "@/components/run/Timeline";
 import type { LogLine } from "@/components/run/LogView";
 import type { PanelFailure } from "@/components/panel/Panel";
@@ -56,33 +54,20 @@ export const DEPLOYMENTS_LIST: ListDefinition = {
   // The server matches app, environment, branch, image tag and commit.
   searchPlaceholder: "Search apps, branches, tags, commits…",
   defaultSort: [{ key: "started", dir: "desc" }],
-  views: standardViews(
-    { triggeredBy: "me" },
-    [
-      { key: "waiting", label: "Waiting approval", filters: { status: "pending_approval" } },
-      { key: "failed", label: "Failed", filters: { status: "failed" } },
-      {
-        key: "today",
-        label: "Today",
-        filters: { since: "today" },
-        note: "Today keeps the deployments started since midnight among the newest 100, until the deployments query takes a start time.",
-      },
-    ],
-    {
-      mineNote:
-        "Mine keeps the deployments you triggered among the newest 100, until the deployments query takes who triggered them.",
-    }
-  ),
+  views: standardViews({ triggeredBy: "me" }, [
+    { key: "waiting", label: "Waiting approval", filters: { status: "pending_approval" } },
+    { key: "failed", label: "Failed", filters: { status: "failed" } },
+    { key: "today", label: "Today", filters: { since: "today" } },
+  ]),
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };
 
-/** The page walked when trigger, since or Mine narrows it client-side. */
-export const NARROW_LIMIT = 100;
-
-/** True when a filter the server cannot answer is on. */
-export function narrows(filters: Record<string, string>): boolean {
-  return Boolean(filters.trigger || filters.since || filters.triggeredBy);
+/** The filter input's shape on `astroliftDeploymentsPage` (AstroliftDeploymentsFilter). */
+export interface DeploymentsFilter {
+  triggeredBy?: string[];
+  triggerKind?: string[];
+  startedAfter?: string;
 }
 
 export interface DeploymentsVariables {
@@ -90,39 +75,41 @@ export interface DeploymentsVariables {
   environmentName: string | null;
   statuses: string[] | null;
   search: string | null;
+  filter: DeploymentsFilter | null;
+  sort: string;
   limit: number;
   after: string | null;
 }
 
-/** What `astroliftDeploymentsPage` is sent for a list state. */
+/**
+ * What `astroliftDeploymentsPage` is sent for a list state. `now` places
+ * Today's midnight and the since windows; the hook fixes it per visit.
+ */
 export function deploymentsVariables(
   filters: Record<string, string>,
-  { q, pageSize, after }: { q: string; pageSize: number; after: string | null }
+  {
+    q,
+    sort,
+    pageSize,
+    after,
+  }: { q: string; sort: SortState[]; pageSize: number; after: string | null },
+  now: number
 ): DeploymentsVariables {
+  const filter: DeploymentsFilter = {};
+  if (filters.triggeredBy) filter.triggeredBy = [filters.triggeredBy];
+  if (filters.trigger) filter.triggerKind = [filters.trigger];
+  const since = sinceIso(filters.since, now);
+  if (since) filter.startedAfter = since;
   return {
     appSlug: filters.app || null,
     environmentName: filters.environment || null,
     statuses: filters.status ? [filters.status] : null,
     search: q.trim() || null,
-    limit: narrows(filters) ? Math.max(pageSize, NARROW_LIMIT) : pageSize,
+    filter: Object.keys(filter).length > 0 ? filter : null,
+    sort: formatSort(sort),
+    limit: pageSize,
     after,
   };
-}
-
-/** Trigger, since and Mine over the rows in hand. */
-export function narrowDeployments(
-  rows: AstroliftDeployment[],
-  filters: Record<string, string>,
-  now: number
-): AstroliftDeployment[] {
-  const since = sinceIso(filters.since, now);
-  const sinceTs = since ? Date.parse(since) : null;
-  return rows.filter((d) => {
-    if (filters.trigger && d.triggerKind !== filters.trigger) return false;
-    if (filters.triggeredBy === "me" && !d.triggeredByMe) return false;
-    if (sinceTs !== null && Date.parse(d.startedAt ?? d.createdAt) < sinceTs) return false;
-    return true;
-  });
 }
 
 // ---------------------------------------------------------------------------

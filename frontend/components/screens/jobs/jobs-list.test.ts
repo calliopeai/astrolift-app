@@ -2,69 +2,133 @@ import { describe, expect, it } from "vitest";
 
 import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
-import { CRON_WORKLOADS, RECENT } from "./jobs-tasks.fixtures";
 import {
   COMMAND_RUNS_LIST,
+  commandRunsVariables,
+  JOB_RUNS_LIST,
+  jobRunsVariables,
   JOBS_LIST,
-  narrowCommandRuns,
+  type JobRow,
+  jobsVariables,
+  narrowJobs,
   outputLines,
   runFailure,
   runSteps,
-  selectJobs,
-  withLastRuns,
 } from "./jobs-list";
-import { COMMAND_RUNS } from "./jobs-tasks.fixtures";
+import { CRON_WORKLOADS } from "./jobs-tasks.fixtures";
 
-function jobsFor(qs: string) {
+function jobsVarsFor(qs: string, appSlug: string | null = null) {
   const state = parseListState(JOBS_LIST, qs);
-  return selectJobs(withLastRuns(CRON_WORKLOADS, RECENT), {
-    filters: effectiveFilters(JOBS_LIST, state),
-    q: state.q,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-  });
+  return jobsVariables(appSlug, { ...state, filters: effectiveFilters(JOBS_LIST, state) });
 }
+
+const ROWS: JobRow[] = CRON_WORKLOADS.map((j, i) => ({
+  ...j,
+  lastRun:
+    i === 2
+      ? null
+      : {
+          id: `run-${i}`,
+          status: i === 1 ? "failed" : "succeeded",
+          startedAt: null,
+          createdAt: "2026-09-28T02:00:00Z",
+        },
+}));
 
 describe("JOBS_LIST", () => {
   it("leads with All and Mine, then Failing and Paused", () => {
     expect(JOBS_LIST.views.map((v) => v.label)).toEqual(["All", "Mine", "Failing", "Paused"]);
   });
+
+  it("keeps a note only on the views the server cannot answer", () => {
+    expect(JOBS_LIST.views.filter((v) => v.note).map((v) => v.key)).toEqual(["failing", "paused"]);
+  });
 });
 
-describe("selectJobs", () => {
-  it("sorts by name by default", () => {
-    expect(jobsFor("").rows.map((j) => j.slug)).toEqual([
-      "nightly-report",
+describe("jobsVariables", () => {
+  it("asks for one numbered page of cron workloads, by name", () => {
+    expect(jobsVarsFor("")).toEqual({
+      appSlug: null,
+      kinds: ["cronjob"],
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
+    });
+  });
+
+  it("Mine is the owner, the app chip the app, both on the server", () => {
+    expect(jobsVarsFor("view=mine").filter).toEqual({ owner: ["me"] });
+    expect(jobsVarsFor("app=billing&q=%20nightly%20&page=2", "billing")).toMatchObject({
+      appSlug: "billing",
+      search: "nightly",
+      filter: { app: ["billing"] },
+      page: 2,
+    });
+  });
+
+  it("Failing and Paused send no filter the server would refuse", () => {
+    expect(jobsVarsFor("view=failing").filter).toBeNull();
+    expect(jobsVarsFor("view=paused").filter).toBeNull();
+  });
+});
+
+describe("narrowJobs", () => {
+  const filtersFor = (qs: string) => effectiveFilters(JOBS_LIST, parseListState(JOBS_LIST, qs));
+
+  it("Failing keeps the jobs on the page whose latest run failed", () => {
+    expect(narrowJobs(ROWS, filtersFor("view=failing")).map((j) => j.slug)).toEqual([
       "sync-invoices",
-      "weekly-digest",
     ]);
   });
 
-  it("Failing keeps jobs whose latest run failed", () => {
-    expect(jobsFor("view=failing").rows.map((j) => j.slug)).toEqual(["sync-invoices"]);
-  });
-
-  it("Mine and Paused hold nothing rather than everything", () => {
-    expect(jobsFor("view=mine").totalCount).toBe(0);
-    expect(jobsFor("view=paused").totalCount).toBe(0);
-  });
-
-  it("a job with no recent run matches Last run: never", () => {
-    expect(jobsFor("lastRun=never").rows.map((j) => j.slug)).toEqual(["weekly-digest"]);
-  });
-
-  it("searches slug, app and schedule", () => {
-    expect(jobsFor("q=*%2F15").rows.map((j) => j.slug)).toEqual(["sync-invoices"]);
+  it("Paused holds nothing rather than everything; All keeps the page as served", () => {
+    expect(narrowJobs(ROWS, filtersFor("view=paused"))).toEqual([]);
+    expect(narrowJobs(ROWS, filtersFor(""))).toEqual(ROWS);
   });
 });
 
-describe("narrowCommandRuns", () => {
-  it("Mine keeps the viewer's commands, and none when the viewer is unknown", () => {
+describe("jobRunsVariables", () => {
+  const varsFor = (qs: string) => {
+    const state = parseListState(JOB_RUNS_LIST, qs);
+    return jobRunsVariables(effectiveFilters(JOB_RUNS_LIST, state), state);
+  };
+
+  it("sends one page with no filter by default", () => {
+    expect(varsFor("app=billing&workload=nightly-report")).toEqual({
+      appSlug: "billing",
+      workloadSlug: "nightly-report",
+      environmentName: null,
+      search: null,
+      filter: null,
+      limit: 25,
+      after: null,
+    });
+  });
+
+  it("Failed is the status filter, Mine who ran it now", () => {
+    expect(varsFor("view=failed").filter).toEqual({ status: ["failed"] });
+    expect(varsFor("view=mine").filter).toEqual({ triggeredBy: ["me"] });
+    expect(varsFor("view=failed").limit).toBe(25);
+  });
+
+  it("has no stand-in notes left", () => {
+    expect(JOB_RUNS_LIST.views.every((v) => !v.note)).toBe(true);
+  });
+});
+
+describe("commandRunsVariables", () => {
+  it("Mine is who invoked it, on the server, one page wide", () => {
     const state = parseListState(COMMAND_RUNS_LIST, "view=mine");
-    const filters = effectiveFilters(COMMAND_RUNS_LIST, state);
-    expect(narrowCommandRuns(COMMAND_RUNS, filters, "leo")).toHaveLength(2);
-    expect(narrowCommandRuns(COMMAND_RUNS, filters, null)).toEqual([]);
+    expect(commandRunsVariables(effectiveFilters(COMMAND_RUNS_LIST, state), state)).toEqual({
+      appSlug: null,
+      search: null,
+      filter: { invokedBy: ["me"] },
+      limit: 25,
+      after: null,
+    });
+    expect(COMMAND_RUNS_LIST.views.every((v) => !v.note)).toBe(true);
   });
 });
 

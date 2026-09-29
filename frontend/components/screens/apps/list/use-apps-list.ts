@@ -12,21 +12,13 @@ import {
   BULK_RESYNC_MANIFEST,
   BULK_ROLLING_RESTART,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import type {
-  AstroliftAppEnvironment,
-  BulkOperationResult,
-} from "@/graphql/lifecycle/lifecycle.types";
-import {
-  LIST_APPS_PAGE,
-  LIST_MY_APPS_PAGE,
-  LIST_WORKLOADS_PAGE,
-} from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import type { BulkOperationResult } from "@/graphql/lifecycle/lifecycle.types";
+import { LIST_APPS_PAGE, LIST_MY_APPS_PAGE } from "@/graphql/registry/registry.queries";
+import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
-import { classifyTopology } from "@/lib/topology";
+import type { TopologyKind } from "@/lib/topology";
 
-import { APPS_LIST, type AppRow, selectApps } from "./apps-list";
+import { APPS_LIST, type AppRow, appsPageVariables, pinFirst } from "./apps-list";
 
 /** The walk's page size: the backend's page cap, so up to 200 apps is one request. */
 const WALK_LIMIT = 200;
@@ -36,7 +28,8 @@ type Page<T> = Record<string, CursorPage<T> | undefined>;
 /**
  * Every row a cursor-paged field returns for `variables`: the first page
  * through `useQuery`, the rest walked by cursor, so nothing past the first
- * page is dropped (the Clusters list's walk, #1230).
+ * page is dropped (the Clusters list's walk, #1230). The Apps list no longer
+ * walks; Agents › Workloads and Functions (`useAreaWorkloads`) still do.
  */
 export function useWalk<T>(
   query: DocumentNode,
@@ -101,69 +94,54 @@ export function useWalk<T>(
   };
 }
 
+interface AppsPageResp {
+  items: AstroliftRegisteredApp[];
+  totalCount: number;
+}
+
 /**
- * The Apps list: URL list state, the registry walk joined with the org's
- * environments (clusters) and workloads (topology), the per-browser pin set,
- * and the three bulk mutations. The data half of AppsListScreen.
+ * The Apps list: URL list state in, one numbered page of `astroliftAppsPage`
+ * out (Mine: `astroliftMyAppsPage`), each row's topology and clusters as the
+ * server classifies them, the per-browser pin set, and the three bulk
+ * mutations. The server filters, sorts and counts; the data half of
+ * AppsListScreen.
  */
 export function useAppsList() {
   const list = useListState(APPS_LIST);
   const { state } = list;
   const { can } = useMyPermissions();
   const mine = state.view === "mine";
+  const field = mine ? "astroliftMyAppsPage" : "astroliftAppsPage";
 
-  const walk = useWalk<AstroliftRegisteredApp>(
+  const query = useQuery<Record<string, AppsPageResp | undefined>>(
     mine ? LIST_MY_APPS_PAGE : LIST_APPS_PAGE,
-    mine ? "astroliftMyAppsPage" : "astroliftAppsPage",
-    "cursor",
     {
-      includeFreshness: true,
-      search: state.q.trim() || null,
-      includeArchived: state.view === "archived",
+      variables: appsPageVariables({
+        q: state.q,
+        filters: list.filters,
+        sort: state.sort,
+        page: state.page,
+        pageSize: state.pageSize,
+      }),
+      fetchPolicy: "cache-and-network",
     }
   );
-  const workloads = useWalk<AstroliftWorkload>(
-    LIST_WORKLOADS_PAGE,
-    "astroliftWorkloadsPage",
-    "after",
-    {}
-  );
-  const envs = useQuery<{ astroliftEnvironments: AstroliftAppEnvironment[] }>(LIST_ENVIRONMENTS, {
-    variables: { appSlug: null },
-  });
-
-  // Kind and cluster are best effort: when either side query fails the list
-  // still renders, and those two columns read "unknown".
-  const apps: AppRow[] = React.useMemo(() => {
-    const byApp = new Map<string, AstroliftWorkload[]>();
-    for (const w of workloads.items) {
-      byApp.set(w.registeredAppSlug, [...(byApp.get(w.registeredAppSlug) ?? []), w]);
-    }
-    const clusters = new Map<string, string[]>();
-    for (const e of envs.data?.astroliftEnvironments ?? []) {
-      if (!e.clusterSlug) continue;
-      const seen = clusters.get(e.registeredAppSlug) ?? [];
-      if (!seen.includes(e.clusterSlug))
-        clusters.set(e.registeredAppSlug, [...seen, e.clusterSlug]);
-    }
-    return walk.items.map((a) => {
-      const ws = byApp.get(a.slug) ?? [];
-      return {
-        ...a,
-        topology: ws.length > 0 ? classifyTopology({ workloads: ws }) : null,
-        clusters: clusters.get(a.slug) ?? [],
-      };
-    });
-  }, [walk.items, workloads.items, envs.data]);
+  const data = query.data ?? query.previousData;
+  const page = data?.[field];
 
   const { pinned, toggle: togglePin } = usePinnedApps();
-  const { rows, totalCount } = selectApps(apps, {
-    filters: list.filters,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-    pinned,
-  });
+  const rows: AppRow[] = React.useMemo(
+    () =>
+      pinFirst(
+        (page?.items ?? []).map((a) => ({
+          ...a,
+          topology: (a.topologyKind as TopologyKind | null | undefined) ?? null,
+          clusters: a.clusterSlugs ?? [],
+        })),
+        pinned
+      ),
+    [page?.items, pinned]
+  );
 
   const [bulkRollingRestart, rollingRestartState] = useMutation<{
     bulkRollingRestart: BulkOperationResult;
@@ -194,11 +172,12 @@ export function useAppsList() {
   return {
     list,
     rows,
-    totalCount,
-    loading: walk.loading,
-    stale: walk.stale,
-    error: walk.error ? { message: walk.error.message } : null,
-    onRetry: () => void walk.refetch(),
+    totalCount: page?.totalCount ?? rows.length,
+    loading: query.loading && !data,
+    // Rows on screen answer the previous list state while the next loads.
+    stale: query.loading && !query.data && Boolean(data),
+    error: query.error ? { message: query.error.message } : null,
+    onRetry: () => void query.refetch(),
     canDeploy: can("app.deploy"),
     pinned: pinned as ReadonlySet<string>,
     togglePin,

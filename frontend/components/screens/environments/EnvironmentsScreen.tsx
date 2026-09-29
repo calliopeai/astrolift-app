@@ -114,7 +114,6 @@ export function EnvironmentsScreen({
     {
       id: "approvals",
       header: t("columns.approvals"),
-      sortKey: "approvals",
       cell: (e) => <span className="font-mono text-xs">{e.requiredApprovals}</span>,
     },
     {

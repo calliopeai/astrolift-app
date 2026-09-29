@@ -4,7 +4,7 @@ import { type ListState, useLocalListState } from "@/components/list/use-list-st
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { LONG_PREVIEW, PREVIEWS, previewsProps } from "./previews.fixtures";
-import { narrowPreviews, PREVIEWS_LIST } from "./previews-list";
+import { PREVIEWS_LIST, previewsVariables } from "./previews-list";
 import { PreviewsScreen, type PreviewsScreenProps } from "./PreviewsScreen";
 
 const meta: Meta = {
@@ -20,14 +20,21 @@ type Props = Partial<Omit<PreviewsScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture previews, narrowed the way the hook does it. */
+/**
+ * The screen over fixture previews, as the server answers the list state:
+ * the story stands in for `astroliftPreviewEnvironmentsPage`, applying the
+ * app, status and opened-by variables the hook sends.
+ */
 function Previews({ all = PREVIEWS, initial, ...patch }: Props) {
   const list = useLocalListState(PREVIEWS_LIST, initial);
-  const f = list.filters;
-  const served = all.filter((p) => !f.app || p.registeredAppSlug === f.app);
-  return (
-    <PreviewsScreen {...previewsProps({ rows: narrowPreviews(served, f), ...patch })} list={list} />
+  const v = previewsVariables(list.filters, list.state);
+  const rows = all.filter(
+    (p) =>
+      (!v.appSlug || p.registeredAppSlug === v.appSlug) &&
+      (!v.filter?.status || v.filter.status.includes(p.status)) &&
+      (!v.filter?.openedBy || p.openedByMe)
   );
+  return <PreviewsScreen {...previewsProps({ rows, ...patch })} list={list} />;
 }
 
 export const Full: Story = { render: () => <Previews /> };
@@ -44,8 +51,15 @@ export const ErrorState: Story = {
   render: () => <Previews all={[]} error={{ message: "upstream timed out" }} />,
 };
 
-/** Mine: empty, with the note saying why. */
-export const Mine: Story = { render: () => <Previews initial={{ view: "mine" }} /> };
+/** Mine: the previews the viewer opened. */
+export const Mine: Story = {
+  render: () => (
+    <Previews
+      all={PREVIEWS.map((p, i) => ({ ...p, openedByMe: i === 0 }))}
+      initial={{ view: "mine" }}
+    />
+  ),
+};
 
 /** The status chip: only the running previews. */
 export const Running: Story = {

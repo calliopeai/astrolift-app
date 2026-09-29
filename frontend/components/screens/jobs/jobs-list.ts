@@ -7,23 +7,22 @@
  *   /jobs/runs      every job run, or one job's (`?app=&workload=`): All · Mine · Failed
  *   /jobs/commands  one-off command runs: All · Mine
  *
- * The jobs list is small and stable, so the hook walks every cron workload
- * and `selectJobs` filters, sorts and pages it here (numbered). Failing
- * reads each job's latest run from the recent-runs window. The run lists
- * are cursor paged on the server; status (job runs) and Mine (commands)
- * have no argument yet, so they narrow a wider page, as Deployments does.
+ * The jobs list is one numbered page of `astroliftWorkloadsPage` held to
+ * the cronjob kind: app, Mine (the owner), search, sort and the page go to
+ * the server, and each row carries its latest run. Failing is the one view
+ * the server cannot answer yet (the workloads filter has no last-run
+ * status), so it keeps the failing jobs of each page and says so. The run
+ * lists are cursor paged on the server, their status, trigger and Mine
+ * through each query's `filter` (#2155).
  */
 import type { SortState } from "@/components/data-table";
 import { commandRunStatus, type RunStatus } from "@/components/jobs/RunStatusBadge";
 import type { PanelFailure } from "@/components/panel/Panel";
 import type { LogLine } from "@/components/run/LogView";
 import type { TimelineStep } from "@/components/run/Timeline";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { formatSort, type ListDefinition, standardViews } from "@/components/list/list-state";
 import { spanMs } from "@/components/screens/deployments/run-support";
-import type {
-  AstroliftCommandRun,
-  AstroliftScheduledJobRun,
-} from "@/graphql/lifecycle/lifecycle.types";
+import type { AstroliftCommandRun } from "@/graphql/lifecycle/lifecycle.types";
 
 // ---------------------------------------------------------------------------
 // Scheduled jobs
@@ -39,138 +38,84 @@ export interface CronWorkload {
   registeredAppSlug: string;
 }
 
-/** A recent run, enough to say how a job last went. */
+/** A job's latest run, enough to say how it last went (the workload's `lastRun`). */
 export interface JobRunPulse {
   id: string;
   status: string;
-  registeredAppSlug: string;
-  workloadSlug: string;
-  environmentName: string;
   startedAt: string | null;
   createdAt: string;
 }
 
 export interface JobRow extends CronWorkload {
-  /** The job's newest run in the recent window; null when none ran in it. */
+  /** The job's latest run; null when it never ran. */
   lastRun: JobRunPulse | null;
 }
 
-/** How many recent runs Failing and Last run read. */
-export const RECENT_RUNS = 100;
-
-const LAST_RUN = ["succeeded", "failed", "running", "never"];
-const CONCURRENCY = ["forbid", "queue", "replace"];
-
 export const JOBS_LIST: ListDefinition = {
   id: "apps.jobs",
-  fields: [
-    { key: "app", label: "App" },
-    { key: "lastRun", label: "Last run", options: LAST_RUN.map((v) => ({ value: v, label: v })) },
-    {
-      key: "concurrency",
-      label: "Concurrency",
-      options: CONCURRENCY.map((v) => ({ value: v, label: v })),
-    },
-  ],
-  searchPlaceholder: "Search jobs, apps, schedules…",
+  fields: [{ key: "app", label: "App" }],
+  searchPlaceholder: "Search jobs, apps…",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews(
-    { owner: "me" },
-    [
-      {
-        key: "failing",
-        label: "Failing",
-        filters: { lastRun: "failed" },
-        note: `Failing means the job's latest run failed, among the last ${RECENT_RUNS} runs.`,
-      },
-      {
-        key: "paused",
-        label: "Paused",
-        filters: { paused: "yes" },
-        note: "Astrolift does not record a paused schedule yet, so no job shows here.",
-      },
-    ],
-    { mineNote: "Scheduled jobs do not record who declared them yet, so Mine is empty." }
-  ),
+  views: standardViews({ owner: "me" }, [
+    {
+      key: "failing",
+      label: "Failing",
+      filters: { lastRun: "failed" },
+      note: "Failing keeps the jobs on each page whose latest run failed, until the jobs query can filter on the last run.",
+    },
+    {
+      key: "paused",
+      label: "Paused",
+      filters: { paused: "yes" },
+      note: "Astrolift does not record a paused schedule yet, so no job shows here.",
+    },
+  ]),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
 
-function jobKey(app: string, workload: string) {
-  return `${app}/${workload}`;
-}
+const CRON_KINDS = ["cronjob"];
 
-/** Each job's newest run in `runs` (which arrive newest first). */
-export function withLastRuns(jobs: CronWorkload[], runs: JobRunPulse[]): JobRow[] {
-  const latest = new Map<string, JobRunPulse>();
-  for (const r of runs) {
-    const key = jobKey(r.registeredAppSlug, r.workloadSlug);
-    const seen = latest.get(key);
-    if (!seen || runTime(r) > runTime(seen)) latest.set(key, r);
-  }
-  return jobs.map((j) => ({
-    ...j,
-    lastRun: latest.get(jobKey(j.registeredAppSlug, j.slug)) ?? null,
-  }));
-}
-
-function runTime(r: Pick<JobRunPulse, "startedAt" | "createdAt">): number {
-  return Date.parse(r.startedAt ?? r.createdAt) || 0;
-}
-
-const JOB_SORT: Record<string, (j: JobRow) => string | number> = {
-  name: (j) => j.slug.toLowerCase(),
-  app: (j) => j.registeredAppSlug.toLowerCase(),
-  schedule: (j) => j.schedule,
-  lastRun: (j) => (j.lastRun ? runTime(j.lastRun) : 0),
-};
-
-function matchesJob(j: JobRow, filters: Record<string, string>, q: string): boolean {
-  // Mine and Paused have no data behind them yet: they hold nothing, never everything.
-  if (filters.owner || filters.paused) return false;
-  if (filters.app && j.registeredAppSlug !== filters.app) return false;
-  if (filters.lastRun && (j.lastRun?.status ?? "never") !== filters.lastRun) return false;
-  if (filters.concurrency && j.concurrencyPolicy.toLowerCase() !== filters.concurrency)
-    return false;
-  const needle = q.trim().toLowerCase();
-  if (!needle) return true;
-  return [j.slug, j.name, j.registeredAppSlug, j.schedule].some((f) =>
-    f.toLowerCase().includes(needle)
-  );
-}
-
-/** One numbered page of jobs: filtered, sorted, sliced; `totalCount` is the filtered count. */
-export function selectJobs(
-  jobs: JobRow[],
+/** What the jobs page query is sent for a list state, fleet-wide or one app's. */
+export function jobsVariables(
+  appSlug: string | null,
   {
-    filters,
     q,
+    filters,
     sort,
     page,
     pageSize,
   }: {
-    filters: Record<string, string>;
     q: string;
+    filters: Record<string, string>;
     sort: SortState[];
     page: number;
     pageSize: number;
   }
-): { rows: JobRow[]; totalCount: number } {
-  const kept = jobs
-    .filter((j) => matchesJob(j, filters, q))
-    .sort((a, b) => {
-      for (const s of sort) {
-        const value = JOB_SORT[s.key];
-        if (!value) continue;
-        const x = value(a);
-        const y = value(b);
-        if (x < y) return s.dir === "asc" ? -1 : 1;
-        if (x > y) return s.dir === "asc" ? 1 : -1;
-      }
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-    });
-  const start = (Math.max(1, page) - 1) * pageSize;
-  return { rows: kept.slice(start, start + pageSize), totalCount: kept.length };
+) {
+  const filter: { app?: string[]; owner?: string[] } = {};
+  if (filters.app) filter.app = [filters.app];
+  if (filters.owner) filter.owner = [filters.owner];
+  return {
+    appSlug,
+    kinds: CRON_KINDS,
+    search: q.trim() || null,
+    filter: Object.keys(filter).length > 0 ? filter : null,
+    sort: formatSort(sort),
+    page: Math.max(1, page),
+    pageSize,
+  };
+}
+
+/**
+ * What the server cannot answer, over the page in hand: Failing keeps the
+ * jobs whose latest run failed; Paused has no data behind it yet, so it
+ * holds nothing, never everything.
+ */
+export function narrowJobs(rows: JobRow[], filters: Record<string, string>): JobRow[] {
+  if (filters.paused) return [];
+  if (filters.lastRun) return rows.filter((j) => j.lastRun?.status === filters.lastRun);
+  return rows;
 }
 
 /** The job's runs list. */
@@ -186,9 +131,6 @@ export function jobRunsHref(app: string, workload?: string): string {
 
 const RUN_STATUSES = ["running", "succeeded", "failed", "superseded"];
 
-/** The page walked when the status chip narrows it client-side. */
-export const NARROW_LIMIT = 100;
-
 export const JOB_RUNS_LIST: ListDefinition = {
   id: "apps.jobs.runs",
   fields: [
@@ -200,21 +142,10 @@ export const JOB_RUNS_LIST: ListDefinition = {
   // The server matches app, workload, environment, status and the batch/v1 Job name.
   searchPlaceholder: "Search runs, jobs, Job names…",
   defaultSort: [{ key: "started", dir: "desc" }],
-  views: standardViews(
-    { startedBy: "me" },
-    [
-      {
-        key: "failed",
-        label: "Failed",
-        filters: { status: "failed" },
-        note: `Failed keeps the failed runs among the newest ${NARROW_LIMIT}, until the runs query takes a status.`,
-      },
-    ],
-    {
-      mineNote:
-        "Job runs are started by their schedule and do not record a person, so Mine is empty.",
-    }
-  ),
+  // Mine: the runs you started with Run now; the schedule starts the rest.
+  views: standardViews({ startedBy: "me" }, [
+    { key: "failed", label: "Failed", filters: { status: "failed" } },
+  ]),
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };
@@ -224,6 +155,7 @@ export interface JobRunsVariables {
   workloadSlug: string | null;
   environmentName: string | null;
   search: string | null;
+  filter: { status?: string[]; triggeredBy?: string[] } | null;
   limit: number;
   after: string | null;
 }
@@ -232,22 +164,18 @@ export function jobRunsVariables(
   filters: Record<string, string>,
   { q, pageSize, after }: { q: string; pageSize: number; after: string | null }
 ): JobRunsVariables {
+  const filter: { status?: string[]; triggeredBy?: string[] } = {};
+  if (filters.status) filter.status = [filters.status];
+  if (filters.startedBy) filter.triggeredBy = [filters.startedBy];
   return {
     appSlug: filters.app || null,
     workloadSlug: filters.workload || null,
     environmentName: filters.environment || null,
     search: q.trim() || null,
-    limit: filters.status ? Math.max(pageSize, NARROW_LIMIT) : pageSize,
+    filter: Object.keys(filter).length > 0 ? filter : null,
+    limit: pageSize,
     after,
   };
-}
-
-export function narrowJobRuns(
-  rows: AstroliftScheduledJobRun[],
-  filters: Record<string, string>
-): AstroliftScheduledJobRun[] {
-  if (filters.startedBy) return [];
-  return filters.status ? rows.filter((r) => r.status === filters.status) : rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,16 +184,11 @@ export function narrowJobRuns(
 
 export const COMMAND_RUNS_LIST: ListDefinition = {
   id: "apps.jobs.commands",
-  fields: [
-    { key: "app", label: "App" },
-    { key: "invokedBy", label: "Invoked by" },
-  ],
+  fields: [{ key: "app", label: "App" }],
   // The server matches app, workload, the operator who invoked it and the Job name.
   searchPlaceholder: "Search commands, apps, operators…",
   defaultSort: [{ key: "started", dir: "desc" }],
-  views: standardViews({ invokedBy: "me" }, [], {
-    mineNote: `Mine keeps the commands you invoked among the newest ${NARROW_LIMIT}, until the commands query takes who invoked them.`,
-  }),
+  views: standardViews({ invokedBy: "me" }),
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };
@@ -277,21 +200,10 @@ export function commandRunsVariables(
   return {
     appSlug: filters.app || null,
     search: q.trim() || null,
-    limit: filters.invokedBy ? Math.max(pageSize, NARROW_LIMIT) : pageSize,
+    filter: filters.invokedBy ? { invokedBy: [filters.invokedBy] } : null,
+    limit: pageSize,
     after,
   };
-}
-
-/** `invokedBy: me` keeps the viewer's own; any other value matches the username. */
-export function narrowCommandRuns(
-  rows: AstroliftCommandRun[],
-  filters: Record<string, string>,
-  me: string | null
-): AstroliftCommandRun[] {
-  const by = filters.invokedBy;
-  if (!by) return rows;
-  if (by === "me") return me ? rows.filter((r) => r.invokedByUsername === me) : [];
-  return rows.filter((r) => (r.invokedByUsername ?? "").toLowerCase().includes(by.toLowerCase()));
 }
 
 export function commandText(command: unknown): string {

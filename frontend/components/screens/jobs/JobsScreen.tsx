@@ -99,7 +99,6 @@ export function JobsScreen({
     {
       id: "schedule",
       header: "Schedule",
-      sortKey: "schedule",
       cell: (j) => <CronSchedulePreview schedule={j.schedule} />,
     },
     {
@@ -110,7 +109,6 @@ export function JobsScreen({
     {
       id: "lastRun",
       header: "Last run",
-      sortKey: "lastRun",
       cell: (j) =>
         j.lastRun ? (
           <span className="flex min-w-0 flex-col gap-1">
@@ -120,7 +118,7 @@ export function JobsScreen({
             </span>
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">No recent run</span>
+          <span className="text-muted-foreground text-xs">Never run</span>
         ),
     },
   ];

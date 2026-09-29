@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { CRON_WORKLOADS, jobsProps, LONG_CRON_WORKLOADS, RECENT } from "./jobs-tasks.fixtures";
-import { type CronWorkload, JOBS_LIST, selectJobs, withLastRuns } from "./jobs-list";
+import { CRON_WORKLOADS, JOB_RUNS, jobsProps, LONG_CRON_WORKLOADS } from "./jobs-tasks.fixtures";
+import { type CronWorkload, JOBS_LIST, type JobRow, jobsVariables, narrowJobs } from "./jobs-list";
 import { JobsScreen, type JobsScreenProps } from "./JobsScreen";
 
 const meta: Meta = {
@@ -19,17 +19,39 @@ type Props = Partial<Omit<JobsScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture jobs, filtered and paged the way the hook does it. */
+/** Each job with its latest run from the fixture runs, as the page returns it. */
+function withLatestRun(jobs: CronWorkload[]): JobRow[] {
+  return jobs.map((j) => {
+    const run = JOB_RUNS.find(
+      (r) => r.registeredAppSlug === j.registeredAppSlug && r.workloadSlug === j.slug
+    );
+    return {
+      ...j,
+      lastRun: run
+        ? {
+            id: run.id,
+            status: run.status,
+            startedAt: run.startedAt ?? null,
+            createdAt: run.createdAt,
+          }
+        : null,
+    };
+  });
+}
+
+/**
+ * The screen over fixture jobs. The story stands in for the server (app and
+ * Mine from the variables the hook sends; nobody owns a fixture job), then
+ * narrows the page the way the hook does for Failing and Paused.
+ */
 function Jobs({ jobs = CRON_WORKLOADS, initial, ...patch }: Props) {
   const list = useLocalListState(JOBS_LIST, initial);
-  const { rows, totalCount } = selectJobs(withLastRuns(jobs, RECENT), {
-    filters: list.filters,
-    q: list.state.q,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-  });
-  return <JobsScreen {...jobsProps({ rows, totalCount, ...patch })} list={list} />;
+  const v = jobsVariables(null, { ...list.state, filters: list.filters });
+  const served = withLatestRun(jobs).filter(
+    (j) => !v.filter?.owner && (!v.filter?.app || v.filter.app.includes(j.registeredAppSlug))
+  );
+  const rows = narrowJobs(served, list.filters);
+  return <JobsScreen {...jobsProps({ rows, totalCount: served.length, ...patch })} list={list} />;
 }
 
 /** All: every cron job with its schedule, concurrency and last run. */
@@ -41,7 +63,7 @@ export const Loading: Story = { render: () => <Jobs jobs={[]} loading /> };
 export const Empty: Story = { render: () => <Jobs jobs={[]} /> };
 
 export const EmptyFiltered: Story = {
-  render: () => <Jobs initial={{ filters: { concurrency: "queue" } }} />,
+  render: () => <Jobs initial={{ filters: { app: "no-such-app" } }} />,
 };
 
 export const ErrorState: Story = {
@@ -54,7 +76,7 @@ export const Failing: Story = { render: () => <Jobs initial={{ view: "failing" }
 /** Paused: no data behind it yet, so empty, with the note saying why. */
 export const Paused: Story = { render: () => <Jobs initial={{ view: "paused" }} /> };
 
-/** Mine: empty, with the note saying why. */
+/** Mine: the jobs the viewer owns; none among the fixtures. */
 export const Mine: Story = { render: () => <Jobs initial={{ view: "mine" }} /> };
 
 /** Embedded on an app's Workloads tab: no header, the views in the filter bar. */

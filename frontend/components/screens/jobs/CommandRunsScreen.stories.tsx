@@ -9,7 +9,7 @@ import {
   LONG_COMMAND_RUNS,
   runListProps,
 } from "./jobs-tasks.fixtures";
-import { COMMAND_RUNS_LIST, narrowCommandRuns } from "./jobs-list";
+import { COMMAND_RUNS_LIST, commandRunsVariables } from "./jobs-list";
 import { CommandRunsScreen } from "./CommandRunsScreen";
 
 const meta: Meta = {
@@ -26,13 +26,13 @@ function Commands({
   ...patch
 }: Partial<CommandRunsFixture> & { runs?: AstroliftCommandRun[]; initial?: Partial<ListState> }) {
   const list = useLocalListState(COMMAND_RUNS_LIST, initial);
-  return (
-    <CommandRunsScreen
-      {...runListProps(narrowCommandRuns(runs, list.filters, "leo"))}
-      {...patch}
-      list={list}
-    />
+  // Stands in for `astroliftCommandRunsPage`, applying what the hook sends.
+  const v = commandRunsVariables(list.filters, list.state);
+  const served = runs.filter(
+    (r) =>
+      (!v.appSlug || r.registeredAppSlug === v.appSlug) && (!v.filter?.invokedBy || r.invokedByMe)
   );
+  return <CommandRunsScreen {...runListProps(served)} {...patch} list={list} />;
 }
 
 export const Full: Story = { render: () => <Commands /> };
@@ -46,7 +46,14 @@ export const ErrorState: Story = {
 };
 
 /** Mine: the commands the viewer invoked. */
-export const Mine: Story = { render: () => <Commands initial={{ view: "mine" }} /> };
+export const Mine: Story = {
+  render: () => (
+    <Commands
+      runs={COMMAND_RUNS.map((r) => ({ ...r, invokedByMe: r.invokedByUsername === "leo" }))}
+      initial={{ view: "mine" }}
+    />
+  ),
+};
 
 export const LongStrings: Story = {
   render: () => <Commands runs={[...LONG_COMMAND_RUNS, ...COMMAND_RUNS]} />,
