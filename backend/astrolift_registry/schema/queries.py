@@ -61,6 +61,13 @@ from astrolift_registry.schema.types import (
     container_to_type,
     workload_to_type,
 )
+from astrolift_registry.schema.workload_list import (
+    WORKLOADS_DEFAULT_SORT,
+    WORKLOADS_FILTERS,
+    WORKLOADS_SORT_KEYS,
+    WorkloadsListFilterInput,
+    cron_last_runs,
+)
 from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_slug
 from astrolift_registry.topology import classify_topology
 from core.decorators import tenant_scoped
@@ -1651,6 +1658,10 @@ class RegistryQuery:
         kinds: list[str] | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: WorkloadsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[WorkloadType]:
         """Cursor-paginated workload list (#1235).
 
@@ -1677,13 +1688,27 @@ class RegistryQuery:
         ``search`` is not a substitute. It ORs ``icontains`` across name, slug,
         kind and the owning app's slug, so ``search="function"`` also matches a
         service named ``function-gateway``.
+
+        The list contract (#2155): ``filter`` takes kind, isPublic, app and
+        owner (``"me"`` is the viewer), and ANDs with ``kinds``. Any of
+        ``sort``, ``page`` or ``pageSize`` selects numbered paging: ``sort``
+        a multi-key spec over name, slug, kind, app, public and created
+        (default ``name``), an exact filtered ``totalCount``, ``page`` and
+        ``pageSize`` echoed, ``nextCursor`` null. Otherwise the cursor walk
+        runs unchanged, with ``filter`` applied first. Cron jobs carry their
+        latest run either way.
         """
-        page = keyset_page(
-            _workloads_qs(app_slug=app_slug, search=search, kinds=kinds),
-            cursor=after,
-            limit=limit,
+        tenant = get_current_tenant()
+        qs = _workloads_qs(app_slug=app_slug, search=search, kinds=kinds).filter(
+            filter_q(filter, WORKLOADS_FILTERS, me=tenant.actor_user_id if tenant else None)
         )
-        return page.map(workload_to_type)
+        if page is not None or page_size is not None or sort is not None:
+            order_by = resolve_list_sort(sort, WORKLOADS_SORT_KEYS, default=WORKLOADS_DEFAULT_SORT)
+            result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        else:
+            result = keyset_page(qs, cursor=after, limit=limit)
+        last_runs = cron_last_runs(result.rows)
+        return result.map(lambda w: workload_to_type(w, last_run=last_runs.get(w.pk)))
 
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
@@ -1701,7 +1726,7 @@ class RegistryQuery:
             .filter(registered_app__slug=app_slug, registered_app__organization_id=org_id, slug=slug)
             .first()
         )
-        return workload_to_type(w) if w else None
+        return workload_to_type(w, last_run=cron_last_runs([w]).get(w.pk)) if w else None
 
     # ----------------------------------------------------------------
     # Live workload scaling status (#430)

@@ -404,11 +404,14 @@ class PreviewMutations:
             resolve_previewed_environment,
         )
 
+        actor = _actor_from_request(info)
+        opener_id = actor.user_id if actor.kind == "user" else None
         with transaction.atomic():
             env = AppEnvironment.objects.create(
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=environment_name,
+                created_by_id=opener_id,
                 k8s_namespace=namespace,
                 url=f"https://{hostname}",
                 managed_domain=_managed_domain,
@@ -428,9 +431,11 @@ class PreviewMutations:
                 hostname=hostname,
                 namespace=namespace,
                 app_environment=env,
+                # Who opened it (#2155); a manual preview has no PR author.
+                created_by_id=opener_id,
+                opened_by_login=(actor.display if actor.kind == "user" else "")[:255],
             )
 
-        actor = _actor_from_request(info)
         handle = start_workflow(
             "BuildPreviewWorkflow",
             args=[

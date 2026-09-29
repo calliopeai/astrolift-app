@@ -1992,7 +1992,8 @@ def _mark_preview_building_sync(preview_environment_id: int) -> None:
         PreviewEnvironment.Status.FAILED,
     ):
         p.status = PreviewEnvironment.Status.BUILDING
-        p.save(update_fields=["status", "updated_at", "version"])
+        p.failure_reason = ""
+        p.save(update_fields=["status", "failure_reason", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.preview.mark_building")
@@ -2034,7 +2035,9 @@ def _mark_preview_failed_sync(preview_environment_id: int, reason: str) -> None:
 
     p = PreviewEnvironment.objects.get(pk=preview_environment_id)
     p.status = PreviewEnvironment.Status.FAILED
-    p.save(update_fields=["status", "updated_at", "version"])
+    # Kept on the row so the Previews list can say why (#2155).
+    p.failure_reason = reason or ""
+    p.save(update_fields=["status", "failure_reason", "updated_at", "version"])
     log.warning(
         "mark_preview_failed preview_environment_id=%s reason=%s",
         preview_environment_id,

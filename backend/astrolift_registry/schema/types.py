@@ -777,6 +777,33 @@ def app_team_access_to_type(access, *, home_team_id: int) -> AppTeamAccessType:
     )
 
 
+@strawberry.type(name="AstroliftCronJobLastRun")
+class CronJobLastRunType:
+    """The latest ``ScheduledJobRun`` of a cron job, for the jobs list (#2155)."""
+
+    id: GUID
+    status: str
+    trigger_kind: str
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    duration_seconds: int | None
+    exit_code: int | None
+    created_at: dt.datetime
+
+
+def cron_last_run_to_type(run) -> CronJobLastRunType:
+    return CronJobLastRunType(
+        id=GUID(str(run.guid)),
+        status=run.status,
+        trigger_kind=run.trigger_kind,
+        started_at=run.started_at,
+        ended_at=run.ended_at,
+        duration_seconds=run.duration_seconds,
+        exit_code=run.exit_code,
+        created_at=run.created_at,
+    )
+
+
 @strawberry.type(name="AstroliftWorkload")
 class WorkloadType:
     id: GUID
@@ -816,6 +843,18 @@ class WorkloadType:
     # the TOML ``[[workloads.<name>.volumes]]`` shape as parsed and
     # stored on the row. Empty list when no volumes are declared.
     volumes: JSON
+    # The owner (#2155): the workload's creator, else the app's; null when
+    # neither was recorded. Workloads come from the app's manifest, so the
+    # app's creator is usually the answer.
+    owner_user_id: str | None = None
+    owned_by_me: bool = False
+    last_run: CronJobLastRunType | None = strawberry.field(
+        default=None,
+        description=(
+            "A cron job's most recent run. Null for other kinds, for a job that never ran, "
+            "and on reads that do not load it (astroliftWorkloads)."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftContainer")
@@ -1691,7 +1730,14 @@ class WorkloadScalingStatus:
     sourced_at: dt.datetime
 
 
-def workload_to_type(workload) -> WorkloadType:
+def workload_to_type(workload, *, last_run=None) -> WorkloadType:
+    """``last_run`` is the job's latest ``ScheduledJobRun``, loaded in bulk by the caller."""
+    from core.tenancy import get_current_tenant
+
+    owner_id = getattr(workload, "created_by_id", None) or getattr(
+        workload.registered_app, "created_by_id", None
+    )
+    tenant = get_current_tenant()
     return WorkloadType(
         id=GUID(str(workload.guid)),
         slug=workload.slug,
@@ -1713,6 +1759,9 @@ def workload_to_type(workload) -> WorkloadType:
         registered_app_slug=workload.registered_app.slug,
         in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
         volumes=list(workload.volumes or []),
+        owner_user_id=str(owner_id) if owner_id else None,
+        owned_by_me=owner_id is not None and tenant is not None and tenant.actor_user_id == owner_id,
+        last_run=cron_last_run_to_type(last_run) if last_run is not None else None,
     )
 
 
