@@ -160,6 +160,7 @@ def test_knative_config_preserves_install_security_policy(monkeypatch) -> None:
             knative_default_port=9090,
             knative_default_timeout_seconds=600,
             knative_default_container_concurrency=50,
+            knative_allowed_service_accounts=["functions-runner"],
         ),
         kind="faas",
         variant="knative_service",
@@ -167,6 +168,7 @@ def test_knative_config_preserves_install_security_policy(monkeypatch) -> None:
 
     assert config.cluster_driver is cluster_driver
     assert config.namespace == "functions-system"
+    assert config.allowed_service_accounts == ("functions-runner",)
     assert config.allow_public is True
     assert config.allow_tagged_images is True
     assert config.allow_unsafe_pod_spec is True

@@ -34,6 +34,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp._service_accounts import unlisted_service_account
 
 KIND = "observability"
 _LOGGING_ROOT = "https://logging.googleapis.com"
@@ -93,6 +94,9 @@ class CloudOperationsConfig:
     request_timeout_seconds: float = 30
     operation_timeout_seconds: float = 900
     operation_poll_interval_seconds: float = 2
+    # Service accounts a log sink may write to its destination as, through
+    # custom_writer_identity. Empty refuses every one (#2087).
+    allowed_writer_identities: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -412,7 +416,9 @@ class CloudOperationsDriver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cfg = spec.config or {}
-        error = _validate_config(cfg) or ("" if spec.managed_service_id else _MISSING_IDENTITY)
+        error = _validate_config(cfg, allowed_writer_identities=self._config.allowed_writer_identities) or (
+            "" if spec.managed_service_id else _MISSING_IDENTITY
+        )
         if error:
             return ProvisionResult(False, "", error, ["invalid_cloud_operations_config"])
         name = str(cfg.get("name") or spec.service_handle_hint or spec.app_slug)
@@ -459,7 +465,7 @@ class CloudOperationsDriver(ManagedServiceDriver):
         except CloudOperationsError as exc:
             return UpdateResult(False, spec.handle, str(exc), ["invalid_handle"])
         cfg = spec.config or {}
-        error = _validate_config(cfg)
+        error = _validate_config(cfg, allowed_writer_identities=self._config.allowed_writer_identities)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_cloud_operations_config"])
         refusal = _bundle_refusal(bundle_id, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
@@ -1886,7 +1892,7 @@ def _secret_reference(reference: Any) -> tuple[str, str]:
     raise CloudOperationsError("notification channel secret reference must be a string or object")
 
 
-def _validate_config(cfg: Mapping[str, Any]) -> str:
+def _validate_config(cfg: Mapping[str, Any], *, allowed_writer_identities: Iterable[str] = ()) -> str:
     unknown = sorted(set(cfg) - _CONFIG_KEYS)
     if unknown:
         return "unsupported Cloud Operations config keys: " + ", ".join(unknown)
@@ -1979,6 +1985,12 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                     return f"config.{key}[{index}].custom_writer_identity cannot be empty"
                 if custom_writer is not None and unique_writer:
                     return f"config.{key}[{index}] custom_writer_identity requires unique_writer_identity=false"
+                writer = unlisted_service_account(custom_writer, allowed_writer_identities)
+                if writer:
+                    return (
+                        f"config.{key}[{index}].custom_writer_identity {writer!r} is not allowed by the cluster "
+                        "install policy cloud_operations_allowed_writer_identities"
+                    )
             if "[astrolift-observability bundle=" in str(body.get("description") or ""):
                 return f"config.{key}[{index}].body.description cannot contain ownership markers"
             if key == _GROUP.key and "[astrolift:" in str(body.get("displayName") or ""):

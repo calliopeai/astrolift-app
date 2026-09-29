@@ -374,6 +374,16 @@ PLUGIN = ProviderPlugin(
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
             },
+            "pubsub_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails a Pub/Sub topic config may have Pub/Sub act as: push OIDC "
+                    "tokens, BigQuery, Bigtable and Cloud Storage exports, AI inference transforms and "
+                    "ingestion sources. List only accounts that can read or write nothing another tenant "
+                    "owns. Empty refuses every config-supplied account."
+                ),
+            },
             "cloud_functions_region": {
                 "type": "string",
                 "description": "Cloud Run functions region; falls back to the cluster region.",
@@ -443,6 +453,15 @@ PLUGIN = ProviderPlugin(
                 "exclusiveMinimum": 0,
                 "default": 5,
             },
+            "api_gateway_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails an API Gateway config may have the gateway authenticate to "
+                    "backends as. List only accounts that can reach nothing another tenant owns. Empty "
+                    "refuses every config-supplied account."
+                ),
+            },
             "managed_kafka_location": {
                 "type": "string",
                 "description": "Managed Kafka location; falls back to the cluster region.",
@@ -505,6 +524,16 @@ PLUGIN = ProviderPlugin(
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "default": 5,
+            },
+            "eventarc_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails an Eventarc pipeline may mint destination OIDC or OAuth tokens "
+                    "for, or a trigger may invoke its destination as. A token for the account reaches the "
+                    "destination, so list only accounts that can read nothing another tenant owns. Empty "
+                    "refuses every config-supplied account."
+                ),
             },
             "smtp_host": {
                 "type": "string",
@@ -574,6 +603,16 @@ PLUGIN = ProviderPlugin(
             "bigquery_reservation_api_endpoint": {
                 "type": "string",
                 "default": "https://bigqueryreservation.googleapis.com/v1",
+            },
+            "bigquery_allowed_connections": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "BigQuery connection resource names (projects/<p>/locations/<l>/connections/<c>) an "
+                    "external dataset may federate through. A connection carries the credentials that read "
+                    "the external source, so list only connections that reach nothing another tenant owns. "
+                    "Empty refuses every external dataset reference."
+                ),
             },
             "firestore_location": {
                 "type": "string",
@@ -704,6 +743,15 @@ PLUGIN = ProviderPlugin(
                 "exclusiveMinimum": 0,
                 "default": 2,
             },
+            "workflows_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails a Google Workflows config may run the workflow as. Its steps "
+                    "call Google APIs with that identity, so list only accounts that can read nothing "
+                    "another tenant owns. Empty refuses every config-supplied account."
+                ),
+            },
             "cloud_operations_location": {
                 "type": "string",
                 "description": "Default Cloud Logging location; falls back to global.",
@@ -744,6 +792,15 @@ PLUGIN = ProviderPlugin(
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "default": 2,
+            },
+            "cloud_operations_allowed_writer_identities": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Service account emails a Cloud Logging sink may write to its destination as "
+                    "(custom_writer_identity). List only accounts that can write nothing another tenant "
+                    "owns. Empty refuses every config-supplied writer."
+                ),
             },
             "cloudsql_private_network": {
                 "type": "string",

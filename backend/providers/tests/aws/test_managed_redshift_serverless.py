@@ -442,3 +442,24 @@ def test_an_existing_namespace_of_another_org_is_not_adopted():
     assert not result.ok and "refusing to adopt" in result.message
     client.update_namespace.assert_not_called()
     client.update_workgroup.assert_not_called()
+
+
+def test_owner_account_no_longer_restores_another_accounts_snapshot():
+    # ownerAccount restored a snapshot another AWS account owns; a restore takes
+    # only the snapshot the platform retained for this app (#2087).
+    client = _client(namespace=_namespace(), workgroup=_workgroup())
+    driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
+    retained = "arn:aws:redshift-serverless:us-west-2:123456789012:snapshot/retained"
+
+    refused = driver.provision(_spec(config={"owner_account": "210987654321"}))
+    restored = driver.restore(
+        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        _spec(config={"owner_account": "210987654321"}),
+    )
+
+    assert not refused.ok and "owner_account is no longer supported" in refused.message
+    assert restored.ok
+    request = client.restore_from_snapshot.call_args.kwargs
+    assert request["snapshotArn"] == retained
+    assert "ownerAccount" not in request
+    assert "owner_account" not in driver.config_schema()["properties"]

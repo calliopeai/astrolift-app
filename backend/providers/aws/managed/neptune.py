@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -29,6 +29,18 @@ from aws.session import aws_client
 
 KIND = "graph_db"
 _PORT = 8182
+# Config keys that would copy another cluster's data into this one: a snapshot,
+# a global database to join, a cluster to replicate. A restore takes only the
+# snapshot the platform retained for this service's own app (#2087).
+_SOURCE_KEYS = frozenset(
+    {
+        "snapshot_identifier",
+        "global_cluster_identifier",
+        "replication_source_identifier",
+        "source_region",
+        "pre_signed_url",
+    }
+)
 _SIZE_TO_INSTANCE_CLASS = {
     "small": "db.t4g.medium",
     "medium": "db.r6g.large",
@@ -80,10 +92,22 @@ class NeptuneDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, snapshot_identifier: str = "") -> ProvisionResult:
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_neptune_config"])
+        named = sorted(_SOURCE_KEYS.intersection(cfg))
+        if named:
+            return ProvisionResult(
+                False,
+                "",
+                f"Neptune config cannot name a cluster or snapshot to copy data from ({', '.join(named)}); "
+                "restore from a snapshot Astrolift retained for this app instead",
+                ["invalid_neptune_config"],
+            )
         cluster_id = self._cluster_id(spec)
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
@@ -95,8 +119,8 @@ class NeptuneDriver(ManagedServiceDriver):
                 return ProvisionResult(False, "", refusal, [refusal])
         try:
             if cluster is None:
-                if cfg.get("snapshot_identifier"):
-                    self._restore_cluster(cluster_id, spec, cfg)
+                if snapshot_identifier:
+                    self._restore_cluster(cluster_id, spec, cfg, snapshot_identifier)
                 else:
                     self._create_cluster(cluster_id, spec, cfg)
                 tags = tags_for(spec)
@@ -365,9 +389,7 @@ class NeptuneDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="neptune")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
-        cfg = dict(target.config or {})
-        cfg["snapshot_identifier"] = snapshot.snapshot_id
-        return self.provision(replace(target, config=cfg))
+        return self._provision(target, snapshot_identifier=snapshot.snapshot_id)
 
     @driver_op(cloud="aws", driver="neptune", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
@@ -411,10 +433,6 @@ class NeptuneDriver(ManagedServiceDriver):
                     "maxItems": 16,
                 },
                 "copy_tags_to_snapshot": {"type": "boolean"},
-                "global_cluster_identifier": {"type": "string"},
-                "replication_source_identifier": {"type": "string"},
-                "source_region": {"type": "string"},
-                "pre_signed_url": {"type": "string"},
                 "apply_immediately": {"type": "boolean"},
             },
         }
@@ -497,10 +515,6 @@ class NeptuneDriver(ManagedServiceDriver):
             ("maintenance_window", "PreferredMaintenanceWindow"),
             ("storage_type", "StorageType"),
             ("network_type", "NetworkType"),
-            ("global_cluster_identifier", "GlobalClusterIdentifier"),
-            ("replication_source_identifier", "ReplicationSourceIdentifier"),
-            ("source_region", "SourceRegion"),
-            ("pre_signed_url", "PreSignedUrl"),
         ):
             if cfg.get(key):
                 kwargs[aws_key] = cfg[key]
@@ -512,10 +526,16 @@ class NeptuneDriver(ManagedServiceDriver):
             kwargs["ServerlessV2ScalingConfiguration"] = self._scaling(cfg)
         self._neptune.create_db_cluster(**kwargs)
 
-    def _restore_cluster(self, cluster_id: str, spec: ProvisionSpec, cfg: dict[str, Any]) -> None:
+    def _restore_cluster(
+        self,
+        cluster_id: str,
+        spec: ProvisionSpec,
+        cfg: dict[str, Any],
+        snapshot_identifier: str,
+    ) -> None:
         kwargs: dict[str, Any] = {
             "DBClusterIdentifier": cluster_id,
-            "SnapshotIdentifier": str(cfg["snapshot_identifier"]),
+            "SnapshotIdentifier": snapshot_identifier,
             "Engine": "neptune",
             "DBSubnetGroupName": self._config.db_subnet_group,
             "VpcSecurityGroupIds": list(self._config.security_group_ids),

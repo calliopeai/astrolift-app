@@ -365,3 +365,50 @@ def test_an_existing_cluster_of_another_org_is_not_adopted():
 
     assert not result.ok and "refusing to adopt" in result.message
     client.modify_cluster.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        {"snapshot_arn": "arn:aws:redshift:us-west-2:123456789012:snapshot:other-tenant/final"},
+        {"snapshot_identifier": "other-tenant-final"},
+        {"snapshot_cluster_identifier": "other-tenant"},
+        {"owner_account": "210987654321"},
+    ],
+)
+def test_config_cannot_name_a_snapshot_to_copy_data_from(source):
+    # restore() takes only the snapshot the platform retained for this app; a
+    # config naming one itself, or another account's, skipped that check (#2087).
+    client = _client()
+    client.describe_clusters.return_value = {"Clusters": []}
+    driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
+
+    result = driver.provision(_spec(config=source))
+
+    assert not result.ok
+    assert "cannot name a snapshot to copy data from" in result.message
+    client.create_cluster.assert_not_called()
+    client.restore_from_cluster_snapshot.assert_not_called()
+
+
+def test_restore_uses_only_the_retained_snapshot_even_beside_a_typed_one():
+    client = _client()
+    client.describe_clusters.return_value = {"Clusters": []}
+    driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
+    retained = "arn:aws:redshift:us-west-2:123456789012:snapshot:cluster/retained"
+
+    widened = driver.restore(
+        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        _spec(config={"snapshot_arn": "arn:aws:redshift:us-west-2:123456789012:snapshot:other/final"}),
+    )
+    restored = driver.restore(
+        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        _spec(service_handle_hint="restored"),
+    )
+
+    assert not widened.ok
+    assert restored.ok
+    request = client.restore_from_cluster_snapshot.call_args.kwargs
+    assert request["SnapshotArn"] == retained
+    assert "OwnerAccount" not in request and "SnapshotClusterIdentifier" not in request
+    assert client.restore_from_cluster_snapshot.call_count == 1

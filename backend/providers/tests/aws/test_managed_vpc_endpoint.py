@@ -333,23 +333,22 @@ def test_all_privatelink_endpoint_types_are_supported(endpoint_type: str, target
     assert expected_key in request
 
 
-def test_binding_exposes_only_explicit_service_iam_grants() -> None:
-    driver, _ = _driver()
+def test_config_iam_grants_never_reach_a_workload_role() -> None:
+    # iam_grants became statements on the IAM role of every workload the
+    # endpoint binds to, with whatever actions and resources the config named;
+    # a stored config from before the refusal must not grant through the
+    # binding either (#2087).
+    driver, client = _driver()
     result = driver.provision(_spec())
-    plain = driver.binding(ServiceHandle(result.handle))
-    assert plain.iam_grants == []
-    bound = driver.binding(
-        ServiceHandle(result.handle),
-        {
-            "iam_grants": [
-                {
-                    "resource": "arn:aws:execute-api:us-east-1:123:api/*",
-                    "actions": ["execute-api:Invoke", "execute-api:Invoke"],
-                },
-            ],
-        },
-    )
-    assert bound.iam_grants[0].actions == ["execute-api:Invoke"]
+    creates = client.names().count("create_vpc_endpoint")
+    grants = [{"resource": "*", "actions": ["s3:*"]}]
+
+    refused = driver.provision(_spec({"endpoint_type": "Interface", "service": "s3", "iam_grants": grants}))
+    stored = driver.binding(ServiceHandle(result.handle), {"iam_grants": grants})
+
+    assert not refused.ok and "iam_grants is no longer supported" in refused.message
+    assert client.names().count("create_vpc_endpoint") == creates
+    assert stored.iam_grants == []
 
 
 @pytest.mark.parametrize(
@@ -452,14 +451,6 @@ def test_update_rejects_immutable_identity_changes() -> None:
         ({"endpoint_type": "Interface", "service": "s3", "policy": {}, "reset_policy": True}, "mutually"),
         ({"endpoint_type": "Interface", "service": "s3", "create": {"VpcId": "escape"}}, "Astrolift-owned"),
         ({"endpoint_type": "Interface", "service": "s3", "modify": {"VpcEndpointId": "escape"}}, "Astrolift-owned"),
-        (
-            {
-                "endpoint_type": "Interface",
-                "service": "s3",
-                "iam_grants": [{"resource": "*", "actions": []}],
-            },
-            "non-empty",
-        ),
     ],
 )
 def test_invalid_config_is_rejected_before_mutation(config: dict, message: str) -> None:

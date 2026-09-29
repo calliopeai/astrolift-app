@@ -257,6 +257,16 @@ def _spec(**overrides: Any) -> ProvisionSpec:
     return ProvisionSpec(**values)
 
 
+COSMOS_UAMI_ID = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-data/"
+    "providers/Microsoft.ManagedIdentity/userAssignedIdentities/cosmos"
+)
+FOREIGN_UAMI_ID = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-other-tenant/"
+    "providers/Microsoft.ManagedIdentity/userAssignedIdentities/their-identity"
+)
+
+
 def _driver(
     variant: str,
     *,
@@ -278,7 +288,7 @@ def _driver(
             mgmt_client=mgmt,
             locks_client=locks,
             secret_client=secrets,
-            **config,
+            **{"allowed_identity_resource_ids": (COSMOS_UAMI_ID,), **config},
         ),
     )
     return driver, mgmt, locks, secrets
@@ -800,6 +810,24 @@ def test_delete_and_secret_cleanup_failures_are_independently_retryable() -> Non
     retried = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
     assert retried.ok
     assert not secrets.values
+
+
+@pytest.mark.parametrize(("identity", "allowed"), [(FOREIGN_UAMI_ID, (COSMOS_UAMI_ID,)), (COSMOS_UAMI_ID, ())])
+def test_an_account_cannot_unwrap_its_key_as_an_unlisted_identity(identity: str, allowed: tuple[str, ...]) -> None:
+    driver, mgmt, _, _ = _driver("cosmos_nosql", allowed_identity_resource_ids=allowed)
+
+    result = driver.provision(
+        _spec(
+            config={
+                "customer_managed_key_uri": "https://key.vault.azure.net/keys/cosmos/version",
+                "customer_managed_identity_resource_id": identity,
+            },
+        ),
+    )
+
+    assert not result.ok
+    assert "cosmos_api_allowed_identity_resource_ids" in result.message
+    assert mgmt.database_accounts.create_calls == []
 
 
 def test_account_payload_exposes_ha_network_backup_cmk_and_capacity_controls() -> None:

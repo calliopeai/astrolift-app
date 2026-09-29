@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from azure.plugin import PLUGIN
 
 
@@ -363,3 +365,20 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                 type(client).__name__,
                 group_name,
             )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "eventgrid_allowed_identity_resource_ids",
+        "eventgrid_namespace_allowed_identity_resource_ids",
+        "eventhubs_allowed_identity_resource_ids",
+        "cosmos_api_allowed_identity_resource_ids",
+        "managed_redis_allowed_identity_resource_ids",
+    ],
+)
+def test_identity_allowlists_are_operator_controls(field: str) -> None:
+    schema = PLUGIN.config_schema["properties"][field]
+    assert schema["type"] == "array"
+    assert schema["items"] == {"type": "string"}
+    assert "Empty refuses every" in schema["description"]

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
+from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from aws.managed._base import ManagedServiceError
 from aws.managed.elasticache_serverless import (
     ElastiCacheServerlessConfig,
@@ -295,3 +295,31 @@ def test_provision_does_not_adopt_another_services_cache():
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
     assert [name for name, _ in ec.calls].count("ModifyServerlessCache") == 0
+
+
+def test_config_cannot_name_a_snapshot_to_copy_data_from():
+    # restore() takes only the snapshot the platform retained for this app; a
+    # config naming one itself skipped that check (#2087).
+    subject, ec, _ = driver()
+    foreign = {"snapshot_arns_to_restore": ["arn:aws:elasticache:us-west-2:123456789012:serverlesscachesnapshot:x"]}
+
+    provisioned = subject.provision(spec(**foreign))
+    widened = subject.restore(
+        SnapshotHandle("redis/retained", "arn:aws:elasticache:us-west-2:123456789012:serverlesscachesnapshot:r", ""),
+        spec(**foreign),
+    )
+
+    assert not provisioned.ok and "cannot name a snapshot to copy data from" in provisioned.message
+    assert not widened.ok and "cannot name a snapshot to copy data from" in widened.message
+    assert not [operation for operation, _ in ec.calls if operation == "CreateServerlessCache"]
+
+
+def test_restore_seeds_the_cache_from_the_retained_snapshot_only():
+    subject, ec, _ = driver()
+    retained = "arn:aws:elasticache:us-west-2:123456789012:serverlesscachesnapshot:retained"
+
+    restored = subject.restore(SnapshotHandle("redis/retained", retained, ""), spec())
+
+    assert restored.ok, restored.message
+    create = next(payload for operation, payload in ec.calls if operation == "CreateServerlessCache")
+    assert create["SnapshotArnsToRestore"] == [retained]

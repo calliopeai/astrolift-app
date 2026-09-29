@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp._service_accounts import unlisted_service_account
 from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "topic"
@@ -57,6 +58,13 @@ _IMMUTABLE_SUBSCRIPTION_FIELDS = {
     "filter",
     "enable_message_ordering",
 }
+# Every field naming a service account Pub/Sub acts as: a push endpoint's OIDC
+# token, a BigQuery, Bigtable or Cloud Storage export, an AI inference
+# transform, an ingestion source's federation. Matched by name at any depth
+# and in either spelling, so a field added later is checked too (#2087).
+# Label and push-attribute maps hold free-form keys, not fields.
+_SERVICE_ACCOUNT_KEYS = frozenset({"serviceaccountemail", "gcpserviceaccount"})
+_STRING_MAP_KEYS = frozenset({"labels", "attributes"})
 
 
 class PubSubTopicError(Exception):
@@ -69,6 +77,9 @@ class PubSubTopicConfig:
     topic_prefix: str = "astrolift"
     publisher_client: Any | None = None
     subscriber_client: Any | None = None
+    # Service accounts a topic or subscription config may have Pub/Sub act as.
+    # Empty refuses every one (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class PubSubTopicDriver(ManagedServiceDriver):
@@ -779,6 +790,12 @@ class PubSubTopicDriver(ManagedServiceDriver):
 
     def _validate_config(self, cfg: dict[str, Any], *, partial: bool = False) -> str | None:
         del partial
+        for path, value in _service_account_fields(cfg):
+            account = unlisted_service_account(value, self._config.allowed_service_accounts)
+            if account:
+                return (
+                    f"{path} {account!r} is not allowed by the cluster install policy pubsub_allowed_service_accounts"
+                )
         access_mode = str(cfg.get("access_mode") or "publish")
         if access_mode not in {"publish", "subscribe", "publish_subscribe", "manage"}:
             return f"access_mode {access_mode!r} is invalid"
@@ -921,6 +938,21 @@ def _resource_id(value: str, *, max_length: int) -> str:
     if not clean[0].isalpha():
         clean = f"a-{clean}"
     return clean[:max_length].rstrip("-._")
+
+
+def _service_account_fields(value: Any, path: str = "") -> list[tuple[str, Any]]:
+    found: list[tuple[str, Any]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            here = f"{path}.{key}" if path else str(key)
+            if str(key).replace("_", "").casefold() in _SERVICE_ACCOUNT_KEYS:
+                found.append((here, item))
+            elif key not in _STRING_MAP_KEYS:
+                found.extend(_service_account_fields(item, here))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found.extend(_service_account_fields(item, f"{path}[{index}]"))
+    return found
 
 
 def _parse_handle(handle: str) -> str:

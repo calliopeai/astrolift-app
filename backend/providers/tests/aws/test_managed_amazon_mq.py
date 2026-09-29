@@ -821,3 +821,26 @@ def test_a_plaintext_ldap_password_is_refused_in_broker_update():
 
     assert not result.ok and "ServiceAccountPassword" in result.message
     client.update_broker.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "replication",
+    [
+        {
+            "DataReplicationMode": "CRDR",
+            "DataReplicationPrimaryBrokerArn": "arn:aws:mq:us-east-1:123456789012:broker:other-tenant:b-1",
+        },
+        {"DataReplicationPrimaryBrokerArn": "arn:aws:mq:us-east-1:123456789012:broker:other-tenant:b-1"},
+        {"DataReplicationMode": "CRDR"},
+    ],
+)
+def test_a_broker_replicates_no_other_brokers_data_from_config(replication):
+    # A replica broker takes the named primary's data, whoever owns it (#2087).
+    client = _client()
+    driver = AmazonMQRabbitMQDriver(config=_config(), client=client, secrets_client=_secrets())
+
+    result = driver.provision(_spec(config={"broker": replication}))
+
+    assert not result.ok
+    assert "replicates no other broker's data" in result.message
+    client.create_broker.assert_not_called()

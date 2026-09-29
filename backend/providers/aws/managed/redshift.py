@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,6 +28,10 @@ from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for,
 from aws.session import aws_client
 
 KIND = "warehouse"
+# Config keys that would restore another snapshot, or one another account owns,
+# into this cluster. A restore takes only the snapshot the platform retained for
+# this service's own app (#2087).
+_SOURCE_KEYS = frozenset({"snapshot_arn", "snapshot_identifier", "snapshot_cluster_identifier", "owner_account"})
 _SIZE_TO_NODE = {
     "small": ("ra3.xlplus", 1),
     "medium": ("ra3.xlplus", 2),
@@ -87,10 +91,22 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        return self._provision(spec)
+
+    def _provision(self, spec: ProvisionSpec, *, snapshot_id: str = "") -> ProvisionResult:
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_redshift_config"])
+        named = sorted(_SOURCE_KEYS.intersection(cfg))
+        if named:
+            return ProvisionResult(
+                False,
+                "",
+                f"Redshift config cannot name a snapshot to copy data from ({', '.join(named)}); "
+                "restore from a snapshot Astrolift retained for this app instead",
+                ["invalid_redshift_config"],
+            )
         _, requested_nodes = self._capacity(spec.size, cfg)
         if cfg.get("multi_az") and requested_nodes < 2:
             return ProvisionResult(
@@ -108,8 +124,8 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
                 return ProvisionResult(False, "", refusal, [refusal])
         try:
             if cluster is None:
-                if cfg.get("snapshot_identifier") or cfg.get("snapshot_arn"):
-                    self._restore_cluster(cluster_id, spec, cfg)
+                if snapshot_id:
+                    self._restore_cluster(cluster_id, spec, cfg, snapshot_id)
                 else:
                     self._create_cluster(cluster_id, spec, cfg)
             else:
@@ -357,12 +373,7 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="redshift")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
-        cfg = dict(target.config or {})
-        if snapshot.snapshot_id.startswith("arn:"):
-            cfg["snapshot_arn"] = snapshot.snapshot_id
-        else:
-            cfg["snapshot_identifier"] = snapshot.snapshot_id
-        return self.provision(replace(target, config=cfg))
+        return self._provision(target, snapshot_id=snapshot.snapshot_id)
 
     @driver_op(cloud="aws", driver="redshift", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
@@ -523,7 +534,7 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
                 kwargs[aws_key] = bool(cfg[key])
         self._redshift.create_cluster(**kwargs)
 
-    def _restore_cluster(self, cluster_id: str, spec: ProvisionSpec, cfg: dict[str, Any]) -> None:
+    def _restore_cluster(self, cluster_id: str, spec: ProvisionSpec, cfg: dict[str, Any], snapshot_id: str) -> None:
         node_type, nodes = self._capacity(spec.size, cfg)
         kwargs: dict[str, Any] = {
             "ClusterIdentifier": cluster_id,
@@ -539,13 +550,11 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
         }
         if nodes > 1:
             kwargs["NumberOfNodes"] = nodes
-        if cfg.get("snapshot_arn"):
-            kwargs["SnapshotArn"] = str(cfg["snapshot_arn"])
+        if snapshot_id.startswith("arn:"):
+            kwargs["SnapshotArn"] = snapshot_id
         else:
-            kwargs["SnapshotIdentifier"] = str(cfg["snapshot_identifier"])
+            kwargs["SnapshotIdentifier"] = snapshot_id
         for key, aws_key in (
-            ("snapshot_cluster_identifier", "SnapshotClusterIdentifier"),
-            ("owner_account", "OwnerAccount"),
             ("admin_password_secret_kms_key_id", "MasterPasswordSecretKmsKeyId"),
             ("kms_key_id", "KmsKeyId"),
             ("availability_zone", "AvailabilityZone"),

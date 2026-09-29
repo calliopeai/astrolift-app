@@ -31,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeManagedKafka:
@@ -351,7 +352,7 @@ def test_binding_emits_portable_kafka_and_schema_registry_contract(
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
     binding = driver.binding(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         {
             "schema_registry_id": "events_registry",
             "schema_registry_access": "write",
@@ -381,7 +382,7 @@ def test_binding_emits_only_the_mtls_secrets_the_config_supplies(driver: Managed
     absent slot has to stay absent rather than pick up a sibling's value.
     """
     result = driver.provision(replace(SPEC, config=_full_config()))
-    handle = ServiceHandle(result.handle)
+    handle = ServiceHandle(result.handle, managed_service_id=MSID)
 
     none_supplied = driver.binding(handle, {})
     assert not {"EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY", "EVENT_STREAM_CA_CERT"} & set(
@@ -405,6 +406,7 @@ def test_update_scales_cluster_and_increases_topic_partitions(
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "vcpu_count": 12,
                 "memory_gib": 48,
@@ -436,12 +438,14 @@ def test_immutable_kms_and_replication_changes_are_rejected(driver: ManagedKafka
     kms = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={"kms_key": "projects/p/locations/us-central1/keyRings/r/cryptoKeys/other"},
         ),
     )
     replication = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "topics": [
                     {
@@ -472,6 +476,7 @@ def test_consumer_group_rewind_requires_explicit_consent(
     denied = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "consumer_group_offsets": [
                     {
@@ -486,6 +491,7 @@ def test_consumer_group_rewind_requires_explicit_consent(
     accepted = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "consumer_group_offsets": [
                     {
@@ -508,11 +514,11 @@ def test_connector_state_and_restart_controls_are_explicit(
     result = driver.provision(replace(SPEC, config=_full_config()))
     connect = _full_config()["connect_clusters"][0]
     connect["connectors"][0]["desired_state"] = "PAUSED"
-    assert driver.update(UpdateSpec(result.handle, config={"connect_clusters": [connect]})).ok
+    assert driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"connect_clusters": [connect]})).ok
     connector_name = "projects/project-1/locations/us-central1/connectClusters/events-connect/connectors/warehouse-sink"
     assert client.resources[connector_name]["state"] == "PAUSED"
     restart = driver.restart_connector(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         connect_cluster_id="events-connect",
         connector_id="warehouse-sink",
     )
@@ -522,13 +528,13 @@ def test_connector_state_and_restart_controls_are_explicit(
 
     with pytest.raises(ManagedKafkaError, match="Connect cluster ID"):
         driver.restart_connector(
-            ServiceHandle(result.handle),
+            ServiceHandle(result.handle, managed_service_id=MSID),
             connect_cluster_id="../other",
             connector_id="warehouse-sink",
         )
     with pytest.raises(ManagedKafkaError, match="connector ID"):
         driver.restart_connector(
-            ServiceHandle(result.handle),
+            ServiceHandle(result.handle, managed_service_id=MSID),
             connect_cluster_id="events-connect",
             connector_id="../other",
         )
@@ -629,10 +635,10 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
     client: FakeManagedKafka,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    protected = driver.deprovision(DeprovisionSpec(result.handle, _full_config()))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     retained = driver.deprovision(
-        DeprovisionSpec(result.handle, {**_full_config(), "deletion_protection": False}),
+        DeprovisionSpec(result.handle, {**_full_config(), "deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not retained.ok and retained.errors == ["kafka_data_requires_delete_data"]
@@ -646,7 +652,7 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
         "labels": {"owner": "customer"},
     }
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -655,6 +661,7 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_external_dependents": True},
+            managed_service_id=MSID,
         ),
         delete_data=True,
         force_destroy=True,
@@ -667,7 +674,7 @@ def test_status_surfaces_failed_connector(driver: ManagedKafkaDriver, client: Fa
     result = driver.provision(replace(SPEC, config=_full_config()))
     connector = next(value for name, value in client.resources.items() if "/connectors/" in name)
     connector["state"] = "FAILED"
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
     assert status.state == "error" and "FAILED" in status.message
 
 
@@ -985,7 +992,7 @@ def test_a_cluster_adopted_before_2074_keeps_its_marker_through_reprovision(
     assert client.resources[cluster]["labels"]["astrolift-io-adopted"] == "true"
     assert client.resources[connect]["labels"]["astrolift-io-adopted"] == "true"
     denied = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -1001,7 +1008,11 @@ def test_connect_clusters_do_not_inherit_an_adopted_clusters_marker(
     parent = "projects/project-1/locations/us-central1"
     client.resources[f"{parent}/clusters/shared-events"]["labels"]["astrolift-io-adopted"] = "true"
 
-    updated = driver.update(UpdateSpec(result.handle, config={"connect_clusters": _full_config()["connect_clusters"]}))
+    updated = driver.update(
+        UpdateSpec(
+            result.handle, managed_service_id=MSID, config={"connect_clusters": _full_config()["connect_clusters"]}
+        )
+    )
 
     assert updated.ok
     assert "astrolift-io-adopted" not in client.resources[f"{parent}/connectClusters/events-connect"]["labels"]

@@ -163,6 +163,9 @@ class Harness:
     driver: BigQueryWarehouseDriver
 
 
+_LISTED_CONNECTION = "projects/acme-prod/locations/us/connections/lakehouse"
+
+
 @pytest.fixture
 def harness() -> Harness:
     state = CloudState()
@@ -173,6 +176,7 @@ def harness() -> Harness:
             location="US",
             dataset_prefix="astrolift",
             deletion_protection_default=True,
+            allowed_connections=(_LISTED_CONNECTION,),
         ),
         client=client,
     )
@@ -501,6 +505,34 @@ def test_external_dataset_fields_and_principal_assignment_are_native(harness: Ha
     assignment = next(iter(harness.state.assignments.values()))
     assert assignment["principal"].startswith("principal://iam.googleapis.com/")
     assert assignment["jobType"] == "AUTOMATIC_MATERIALIZED_VIEW_REFRESH"
+
+
+@pytest.mark.parametrize(
+    "connection",
+    [
+        "projects/acme-prod/locations/us/connections/other-tenant-cloudsql",
+        "projects/platform/locations/us/connections/lakehouse",
+        "",
+    ],
+)
+def test_an_external_dataset_cannot_federate_through_an_unlisted_connection(
+    harness: Harness,
+    connection: str,
+) -> None:
+    denied = harness.driver.provision(
+        _spec(
+            {
+                "external_dataset_reference": {
+                    "connection": connection,
+                    "external_source": "google-cloudspanner:/projects/p/instances/i/databases/d",
+                },
+            },
+        ),
+    )
+
+    assert not denied.ok
+    assert "bigquery_allowed_connections" in denied.message
+    assert harness.state.datasets == {}
 
 
 def test_status_reports_pending_and_failed_capacity(harness: Harness) -> None:

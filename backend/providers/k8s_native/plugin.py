@@ -189,6 +189,16 @@ PLUGIN = ProviderPlugin(
             "knative_allow_public": {"type": "boolean", "default": False},
             "knative_allow_tagged_images": {"type": "boolean", "default": False},
             "knative_allow_unsafe_pod_spec": {"type": "boolean", "default": False},
+            "knative_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+                "description": (
+                    "ServiceAccounts a Knative Service config may run as when knative_namespace is shared "
+                    "between tenants. List only accounts that can reach nothing another tenant owns; with "
+                    "the default per-app namespace a config can only name the app's own."
+                ),
+            },
             "knative_default_port": {
                 "type": "integer",
                 "minimum": 1,

@@ -29,6 +29,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp._raw_fields import raw_field_conflicts
+from gcp._service_accounts import unlisted_service_account
 
 KIND = "workflow_engine"
 VARIANT = "workflows"
@@ -114,6 +116,9 @@ class WorkflowsConfig:
     executions_api_endpoint: str = _EXECUTIONS_API_ROOT
     operation_timeout_seconds: float = 900.0
     poll_interval_seconds: float = 2.0
+    # Service accounts a workflow config may run as. Tenant-authored steps call
+    # Google APIs with that identity, so an empty list refuses every one (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class WorkflowsRestClient:
@@ -530,31 +535,36 @@ class WorkflowsDriver(ManagedServiceDriver):
         except ValueError as exc:
             return ProvisionResult(False, "", str(exc), ["invalid_snapshot"])
         target_cfg = dict(target.config or {})
-        if source_project != self._config.project_id and not target_cfg.get("allow_cross_project_snapshot"):
+        # The source is a snapshot the platform recorded for this service's own
+        # app (#2087); it lives where that service lived, in this project. No
+        # tenant setting reaches a revision in another project, or one
+        # Astrolift did not create.
+        if source_project != self._config.project_id:
             return ProvisionResult(
                 False,
                 "",
-                "cross-project workflow restore requires allow_cross_project_snapshot=true",
-                ["cross_project_snapshot_requires_opt_in"],
+                "workflow restore reads only a revision in the configured project",
+                ["cross_project_snapshot_refused"],
             )
         try:
             revision = self._workflows.get_workflow(source_name, revision_id=revision_id)
         except Exception as exc:
             return ProvisionResult(False, "", f"read Google workflow revision: {exc}", [str(exc)])
-        if not _owned_by_platform(revision) and not target_cfg.get("allow_unowned_snapshot"):
+        if not _owned_by_platform(revision):
             return ProvisionResult(
                 False,
                 "",
-                "restoring an unowned workflow revision requires allow_unowned_snapshot=true",
-                ["unowned_snapshot_requires_opt_in"],
+                "refusing to restore a workflow revision not owned by Astrolift",
+                ["unowned_snapshot_refused"],
             )
         source_contents = revision.get("sourceContents")
         if not isinstance(source_contents, str) or not source_contents:
             return ProvisionResult(False, "", "workflow revision has no source contents", ["invalid_snapshot"])
         target_cfg.pop("definition", None)
         target_cfg["source_contents"] = source_contents
+        # The identity the restored workflow runs as is the target's own
+        # (validated) service_account, never one carried over from the revision.
         for config_key, provider_key in (
-            ("service_account", "serviceAccount"),
             ("description", "description"),
             ("call_log_level", "callLogLevel"),
             ("execution_history_level", "executionHistoryLevel"),
@@ -580,7 +590,13 @@ class WorkflowsDriver(ManagedServiceDriver):
                 "definition": {
                     "description": "Portable alias for source_contents; objects serialize as JSON.",
                 },
-                "service_account": {"type": "string"},
+                "service_account": {
+                    "type": "string",
+                    "description": (
+                        "Service account the workflow runs as. Must be listed in the cluster's "
+                        "workflows_allowed_service_accounts."
+                    ),
+                },
                 "description": {"type": "string", "maxLength": 1000},
                 "call_log_level": {
                     "type": "string",
@@ -618,8 +634,6 @@ class WorkflowsDriver(ManagedServiceDriver):
                 },
                 "deletion_protection": {"type": "boolean", "default": True},
                 "delete_adopted_workflow": {"type": "boolean", "default": False},
-                "allow_cross_project_snapshot": {"type": "boolean", "default": False},
-                "allow_unowned_snapshot": {"type": "boolean", "default": False},
             },
             "oneOf": [{"required": ["source_contents"]}, {"required": ["definition"]}],
             "additionalProperties": False,
@@ -811,10 +825,19 @@ class WorkflowsDriver(ManagedServiceDriver):
             isinstance(key, str) and isinstance(value, str) for key, value in cfg["resource_tags"].items()
         ):
             return "resource_tags keys and values must be strings"
-        raw = cfg.get("workflow") or {}
-        reserved = sorted(set(raw).intersection(_OUTPUT_FIELDS | _TYPED_FIELDS))
+        # Google's JSON parser takes a field's proto name as well as its JSON
+        # name, so an exact camelCase match let service_account through (#2087).
+        proto_names, reserved = raw_field_conflicts(cfg.get("workflow") or {}, _OUTPUT_FIELDS | _TYPED_FIELDS)
+        if proto_names:
+            return f"workflow fields must use the API's lowerCamelCase JSON names, not {', '.join(proto_names)}"
         if reserved:
             return f"workflow cannot override Astrolift-owned fields: {', '.join(reserved)}"
+        account = unlisted_service_account(cfg.get("service_account"), self._config.allowed_service_accounts)
+        if account:
+            return (
+                f"service_account {account!r} is not allowed by the cluster install policy "
+                "workflows_allowed_service_accounts"
+            )
         access_mode = str(cfg.get("access_mode") or "invoke")
         if access_mode not in {"invoke", "observe", "manage"}:
             return "access_mode must be invoke, observe, or manage"

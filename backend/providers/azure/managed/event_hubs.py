@@ -31,6 +31,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
 
@@ -78,6 +79,9 @@ class AzureEventHubsConfig:
     public_network_access_default: str = "Enabled"
     mgmt_client: Any | None = None
     locks_client: Any | None = None
+    # User-assigned identities a namespace may attach for Capture or
+    # customer-managed keys. Empty refuses every one (#2087).
+    allowed_identity_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.variant not in PROFILES:
@@ -673,6 +677,16 @@ class AzureEventHubsDriver(ManagedServiceDriver):
             return "Event Hubs customer-managed_key_vault_uri must be HTTPS"
         if cmk_fields[2] and not cmk_fields[2].startswith("/subscriptions/"):
             return "Event Hubs customer-managed identity must be an ARM resource ID"
+        # Both identities land on the namespace whenever they are set, whatever
+        # capture_enabled or capture_identity_type say, so both are judged
+        # whenever they are set.
+        for field in ("capture_user_assigned_identity_resource_id", "customer_managed_identity_resource_id"):
+            unlisted = unlisted_identity(cfg.get(field), self._config.allowed_identity_resource_ids)
+            if unlisted:
+                return (
+                    f"Event Hubs {field} {unlisted!r} is not allowed by the cluster install policy "
+                    "eventhubs_allowed_identity_resource_ids"
+                )
         return ""
 
     def _namespace_create_parameters(self, spec: ProvisionSpec) -> Any:

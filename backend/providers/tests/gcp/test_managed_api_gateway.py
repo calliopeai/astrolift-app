@@ -31,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeGatewayAPI:
@@ -115,6 +116,10 @@ class FakeGatewayAPI:
         return operation
 
 
+_ALLOWED_ACCOUNT = "gateway@project-1.iam.gserviceaccount.com"
+_FOREIGN_ACCOUNT = "platform-admin@project-1.iam.gserviceaccount.com"
+
+
 @pytest.fixture
 def config() -> APIGatewayConfig:
     return APIGatewayConfig(
@@ -122,6 +127,7 @@ def config() -> APIGatewayConfig:
         region="us-central1",
         operation_timeout_seconds=1,
         poll_interval_seconds=0,
+        allowed_service_accounts=(_ALLOWED_ACCOUNT,),
     )
 
 
@@ -200,7 +206,7 @@ def test_update_creates_revision_and_atomically_retargets_gateway(
     updated_cfg.pop("gateway_id")
     updated_cfg["api_display_name"] = "Billing API v2"
     updated_cfg["labels"] = {"team": "platform"}
-    updated = driver.update(UpdateSpec(result.handle, config=updated_cfg))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config=updated_cfg))
     assert updated.ok
     new_config = str(client.resources[gateway]["apiConfig"])
     assert new_config != old_config
@@ -256,11 +262,11 @@ def test_pruning_requires_consent_and_retains_active_revision(
         "prune_config_revisions": True,
     }
     denied_cfg.pop("gateway_id")
-    denied = driver.update(UpdateSpec(result.handle, config=denied_cfg))
+    denied = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config=denied_cfg))
     assert not denied.ok and "allow_config_revision_delete" in denied.message
     denied_cfg["allow_config_revision_delete"] = True
     denied_cfg["retain_config_revisions"] = 1
-    assert driver.update(UpdateSpec(result.handle, config=denied_cfg)).ok
+    assert driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config=denied_cfg)).ok
     api, gateway = _names()
     configs = client.list_resources(api, "configs", "apiConfigs")
     assert [item["name"] for item in configs] == [client.resources[gateway]["apiConfig"]]
@@ -300,17 +306,81 @@ def test_binding_status_snapshot_and_restore_use_active_revision(
     client: FakeGatewayAPI,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_openapi_config()))
-    binding = driver.binding(ServiceHandle(result.handle))
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID))
     assert binding.env_vars["API_GATEWAY_URL"].literal == "https://billing-gateway-hash.uc.gateway.dev"
     assert binding.iam_grants == []
-    assert driver.status(ServiceHandle(result.handle)).state == "available"
-    snapshot = driver.snapshot(ServiceHandle(result.handle))
+    assert driver.status(ServiceHandle(result.handle, managed_service_id=MSID)).state == "available"
+    snapshot = driver.snapshot(ServiceHandle(result.handle, managed_service_id=MSID))
     assert "/configs/" in snapshot.snapshot_id
     target_cfg = {"api_id": "billing-api", "gateway_id": "restored-gateway"}
     restored = driver.restore(snapshot, replace(SPEC, service_handle_hint="restored", config=target_cfg))
     assert restored.ok
     restored_name = "projects/project-1/locations/us-central1/gateways/restored-gateway"
     assert client.resources[restored_name]["apiConfig"] == snapshot.snapshot_id
+
+
+@pytest.mark.parametrize(
+    "account",
+    [_FOREIGN_ACCOUNT, f"projects/-/serviceAccounts/{_FOREIGN_ACCOUNT}", "projects/project-1/accounts/1234567890"],
+)
+def test_a_gateway_cannot_call_backends_as_an_unlisted_account(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+    account: str,
+) -> None:
+    denied = driver.provision(replace(SPEC, config={**_openapi_config(), "gateway_service_account": account}))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+def test_update_cannot_move_a_gateway_to_an_unlisted_account(driver: APIGatewayDriver, client: FakeGatewayAPI) -> None:
+    created = driver.provision(replace(SPEC, config=_openapi_config()))
+    assert created.ok, created.message
+    creates = len([call for call in client.calls if call[0] == "create"])
+
+    moved = _openapi_config("openapi: 3.0.0\ninfo:\n  title: Billing v2\n  version: 2.0.0\n")
+    moved.pop("gateway_id")
+    moved["gateway_service_account"] = _FOREIGN_ACCOUNT
+
+    denied = driver.update(UpdateSpec(created.handle, config=moved))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert len([call for call in client.calls if call[0] == "create"]) == creates
+
+
+def test_a_reused_config_keeps_no_identity_the_policy_does_not_list(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    created = driver.provision(replace(SPEC, config=_openapi_config()))
+    snapshot = driver.snapshot(ServiceHandle(created.handle, managed_service_id=MSID))
+    # A revision created before the policy, still running as an account the
+    # operator never listed.
+    client.resources[snapshot.snapshot_id]["gatewayServiceAccount"] = _FOREIGN_ACCOUNT
+
+    restored = driver.restore(
+        snapshot,
+        replace(SPEC, service_handle_hint="restored", config={"api_id": "billing-api", "gateway_id": "restored"}),
+    )
+
+    assert not restored.ok and "api_gateway_allowed_service_accounts" in restored.message
+    assert "projects/project-1/locations/us-central1/gateways/restored" not in client.resources
+
+
+def test_no_allowlist_refuses_every_config_supplied_account(client: FakeGatewayAPI) -> None:
+    driver = APIGatewayDriver(
+        config=APIGatewayConfig(project_id="project-1", region="us-central1", poll_interval_seconds=0),
+        client=client,
+        sleep=lambda _: None,
+    )
+    without_account = {key: value for key, value in _openapi_config().items() if key != "gateway_service_account"}
+
+    denied = driver.provision(replace(SPEC, config=_openapi_config()))
+    default_identity = driver.provision(replace(SPEC, config=without_account))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert default_identity.ok, default_identity.message
 
 
 def test_collision_is_refused_without_operator_adoption(
@@ -373,10 +443,10 @@ def test_deprovision_blocks_external_gateway_and_config_before_mutating(
         "state": "ACTIVE",
         "labels": {"owner": "customer"},
     }
-    protected = driver.deprovision(DeprovisionSpec(result.handle, cfg))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, cfg, managed_service_id=MSID))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, {**cfg, "deletion_protection": False}),
+        DeprovisionSpec(result.handle, {**cfg, "deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not blocked.ok and blocked.errors == ["external_gateways_present"]
@@ -389,6 +459,7 @@ def test_deprovision_blocks_external_gateway_and_config_before_mutating(
                 "deletion_protection": False,
                 "delete_external_gateways": True,
             },
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -403,6 +474,7 @@ def test_deprovision_blocks_external_gateway_and_config_before_mutating(
                 "delete_external_gateways": True,
                 "delete_external_configs": True,
             },
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -644,3 +716,85 @@ def test_operation_error_is_not_success(
     }
     with pytest.raises(APIGatewayError, match="rejected"):
         driver._wait({"name": "operations/wait", "done": False})
+
+
+# Two-org cases (#2098): tenant labels in the platform namespace are refused,
+# and ownership comes from the spec, never from a label read back.
+
+
+def _update_config() -> dict[str, Any]:
+    cfg = _openapi_config()
+    cfg.pop("gateway_id")
+    return cfg
+
+
+OTHER_ORG = replace(
+    SPEC,
+    organization_id="org-b",
+    organization_slug="beta",
+    managed_service_id="managed-b",
+)
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "astrolift_io_managed_service_id",
+        "astrolift-io-managed-service-id",
+        "astrolift-managed-by",
+        "Astrolift.IO.Organization",
+        "x-astrolift-managed-service-id",
+    ],
+)
+def test_tenant_labels_in_the_platform_namespace_are_refused(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+    key: str,
+) -> None:
+    cfg = {**_openapi_config(), "labels": {key: "managed-id"}}
+    refused = driver.provision(replace(OTHER_ORG, config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.resources == {}
+
+
+def test_another_services_update_and_teardown_leave_its_gateway_untouched(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    cfg = _openapi_config()
+    result = driver.provision(replace(SPEC, config=cfg))
+    before = deepcopy(client.resources)
+    client.calls.clear()
+
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id="managed-b", config=_update_config()))
+    assert not updated.ok and "another managed service" in updated.message
+    removed = driver.deprovision(
+        DeprovisionSpec(result.handle, {**cfg, "deletion_protection": False}, managed_service_id="managed-b"),
+        force_destroy=True,
+    )
+    assert not removed.ok and removed.errors == ["ownership_guard"]
+    with pytest.raises(APIGatewayError, match="another managed service"):
+        driver.binding(ServiceHandle(result.handle, managed_service_id="managed-b"))
+
+    assert client.resources == before
+    assert not [call for call in client.calls if call[0] in {"create", "patch", "delete"}]
+
+
+def test_an_unmarked_gateway_needs_the_exclusive_record_and_is_then_marked(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    result = driver.provision(replace(SPEC, config=_openapi_config()))
+    _, gateway = _names()
+    # An unmarked gateway (as a tenant label could leave one before #2098) is
+    # this service's only with the platform's exclusive record (#2086).
+    for key in ("astrolift-io-managed-service-id", "astrolift_io_managed_service_id"):
+        client.resources[gateway]["labels"].pop(key, None)
+    unproven = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config=_update_config()))
+    assert not unproven.ok and "no managed-service id" in unproven.message
+    proven = driver.update(
+        UpdateSpec(result.handle, managed_service_id=MSID, config=_update_config(), recorded_handle_exclusive=True),
+    )
+    assert proven.ok, proven.message
+    labels = client.resources[gateway]["labels"]
+    assert labels["astrolift-io-managed-service-id"] == "managed-id"

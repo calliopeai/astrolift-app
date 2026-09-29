@@ -303,6 +303,22 @@ def test_snapshot_restore_copies_credentials_and_preserves_snapshot_username():
     assert binding.env_vars["DOCDB_USER"].literal == "snapshot-user"
 
 
+def test_config_cannot_name_a_snapshot_to_copy_data_from():
+    # restore() takes only the snapshot the platform retained for this app; a
+    # config naming one itself skipped that check (#2087).
+    subject, docdb, _ = driver()
+
+    result = subject.provision(
+        spec(snapshot_identifier="arn:aws:rds:us-east-1:123456789012:cluster-snapshot:other-tenant-final"),
+    )
+
+    assert not result.ok
+    assert "cannot name a snapshot to copy data from" in result.message
+    assert not [
+        operation for operation, _ in docdb.calls if operation in {"CreateDBCluster", "RestoreDBClusterFromSnapshot"}
+    ]
+
+
 def test_current_botocore_accepts_all_documentdb_request_shapes():
     from botocore.session import Session
     from botocore.validate import validate_parameters

@@ -83,3 +83,26 @@ def test_ecr_config_has_no_boundary_on_an_admin_provisioned_cluster() -> None:
     config = _config_for_capability("aws", _cluster(), "registry")
 
     assert config.permissions_boundary_arn == ""
+
+
+def test_sql_server_config_carries_the_install_option_group_allowlist(monkeypatch) -> None:
+    """The driver refuses an option group outside this list (#2087): one can
+    carry the IAM role SQL Server's native backup and restore reads S3 with.
+    An install that sets none refuses every config-supplied group."""
+    from core.cluster_observability import managed_config_for
+
+    monkeypatch.setattr(
+        "aws.managed._networking.ensure_db_networking",
+        lambda cluster, **kwargs: ("subnet-group", ["sg-1"]),
+    )
+
+    listed = managed_config_for(
+        "aws",
+        _cluster(mssql_allowed_option_groups=["platform-native-backup"]),
+        kind="mssql",
+        variant="rds_sqlserver_standard",
+    )
+    unset = managed_config_for("aws", _cluster(), kind="mssql", variant="rds_sqlserver_standard")
+
+    assert listed.allowed_option_groups == ("platform-native-backup",)
+    assert unset.allowed_option_groups == ()

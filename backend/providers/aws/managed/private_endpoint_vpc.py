@@ -14,7 +14,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -240,7 +239,6 @@ class VpcEndpointDriver(ManagedServiceDriver):
         dns_entries = endpoint.get("DnsEntries") or []
         dns_names = [str(item.get("DnsName") or "") for item in dns_entries if item.get("DnsName")]
         ip_addresses = self._ip_addresses(endpoint)
-        grants = _iam_grants(config or {})
         return Binding(
             env_vars={
                 "PRIVATE_ENDPOINT_ID": ValueRef(literal=endpoint_id),
@@ -260,11 +258,7 @@ class VpcEndpointDriver(ManagedServiceDriver):
                 "VPC_ID": ValueRef(literal=str(endpoint.get("VpcId") or "")),
                 "AWS_REGION": ValueRef(literal=self._config.region),
             },
-            iam_grants=grants,
-            notes=(
-                "Private network path only; service authorization remains enforced. "
-                "Declare iam_grants when the attached workload also needs service IAM."
-            ),
+            notes="Private network path only; service authorization remains enforced.",
         )
 
     @driver_op(cloud="aws", driver="vpc_endpoint")
@@ -313,17 +307,6 @@ class VpcEndpointDriver(ManagedServiceDriver):
                     "type": "object",
                     "description": "Additional native boto3 modify_vpc_endpoint fields not owned by Astrolift.",
                 },
-                "iam_grants": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "required": ["resource", "actions"],
-                        "properties": {
-                            "resource": {"type": "string"},
-                            "actions": {"type": "array", "items": {"type": "string"}},
-                        },
-                    },
-                },
                 "deletion_protection": {"type": "boolean", "default": True},
             },
         }
@@ -366,7 +349,6 @@ class VpcEndpointDriver(ManagedServiceDriver):
             "subnet_configurations",
             "security_group_ids",
             "route_table_ids",
-            "iam_grants",
         ):
             if name in cfg and not isinstance(cfg[name], list):
                 return f"config.{name} must be an array"
@@ -426,14 +408,14 @@ class VpcEndpointDriver(ManagedServiceDriver):
             return "policy and reset_policy are mutually exclusive"
         if cfg.get("reset_policy") and endpoint_type != "Gateway":
             return "reset_policy is supported only for Gateway endpoints"
-        for index, declaration in enumerate(cfg.get("iam_grants") or []):
-            if not isinstance(declaration, dict):
-                return f"config.iam_grants[{index}] must be an object"
-            if not str(declaration.get("resource") or ""):
-                return f"config.iam_grants[{index}] requires resource"
-            actions = declaration.get("actions")
-            if not isinstance(actions, list) or not actions or not all(isinstance(item, str) for item in actions):
-                return f"config.iam_grants[{index}].actions must be a non-empty string array"
+        # iam_grants became statements on the IAM role of every workload the
+        # endpoint binds to, with whatever actions and resources the config
+        # named: any identity at all in the shared account (#2087).
+        if cfg.get("iam_grants"):
+            return (
+                "config.iam_grants is no longer supported: an endpoint is a network path, and a "
+                "workload reaches a service through that service's own binding"
+            )
         return ""
 
     def _create_request(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, Any]:
@@ -661,16 +643,6 @@ def _add_remove(request: dict[str, Any], field: str, current: list[Any], desired
         request[f"Add{field}"] = added
     if removed:
         request[f"Remove{field}"] = removed
-
-
-def _iam_grants(cfg: dict[str, Any]) -> list[Grant]:
-    return [
-        Grant(
-            resource=str(declaration["resource"]),
-            actions=sorted({str(action) for action in declaration["actions"]}),
-        )
-        for declaration in cfg.get("iam_grants") or []
-    ]
 
 
 def _not_found(exc: Exception) -> bool:

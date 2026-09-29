@@ -202,6 +202,15 @@ _MANAGED_CONFIG_PROPERTIES = {
         "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
         "default": "Enabled",
     },
+    "eventhubs_allowed_identity_resource_ids": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": (
+            "User-assigned managed identity resource IDs an Event Hubs namespace may attach for Capture "
+            "or a customer-managed key. The resource acts as the identity, so list only identities that "
+            "can reach nothing another tenant owns. Empty refuses every config-supplied identity."
+        ),
+    },
     "eventgrid_topic_name_prefix": {"type": "string", "default": "astrolift-eg"},
     "eventgrid_default_input_schema": {
         "type": "string",
@@ -213,6 +222,15 @@ _MANAGED_CONFIG_PROPERTIES = {
         "enum": ["Enabled", "Disabled"],
         "default": "Enabled",
     },
+    "eventgrid_allowed_identity_resource_ids": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": (
+            "User-assigned managed identity resource IDs an Event Grid topic may attach and deliver or "
+            "dead-letter with. The resource acts as the identity, so list only identities that can reach "
+            "nothing another tenant owns. Empty refuses every config-supplied identity."
+        ),
+    },
     "eventgrid_namespace_name_prefix": {"type": "string", "default": "astrolift-egns"},
     "eventgrid_namespace_topic_name_prefix": {"type": "string", "default": "events"},
     "eventgrid_namespace_secret_name_prefix": {"type": "string", "default": "event-grid-namespace"},
@@ -221,6 +239,15 @@ _MANAGED_CONFIG_PROPERTIES = {
         "minimum": 1,
         "maximum": 40,
         "default": 1,
+    },
+    "eventgrid_namespace_allowed_identity_resource_ids": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": (
+            "User-assigned managed identity resource IDs an Event Grid namespace may attach and deliver "
+            "or dead-letter with. The resource acts as the identity, so list only identities that can "
+            "reach nothing another tenant owns. Empty refuses every config-supplied identity."
+        ),
     },
     "files_name_prefix": {"type": "string", "default": "astrolift-files"},
     "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
@@ -384,6 +411,15 @@ _MANAGED_CONFIG_PROPERTIES = {
     },
     "managed_redis_eviction_policy_default": {"type": "string", "default": "AllKeysLRU"},
     "managed_redis_secret_name_prefix": {"type": "string", "default": "astrolift-amr"},
+    "managed_redis_allowed_identity_resource_ids": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": (
+            "User-assigned managed identity resource IDs an Azure Managed Redis cluster may unwrap its "
+            "customer-managed key with. The resource acts as the identity, so list only identities that "
+            "can reach nothing another tenant owns. Empty refuses every config-supplied identity."
+        ),
+    },
     "cosmos_account_name_prefix": {"type": "string", "default": "astrolift"},
     "cosmos_database_name_default": {"type": "string", "default": "astrolift"},
     "cosmos_default_api_kind": {
@@ -420,6 +456,15 @@ _MANAGED_CONFIG_PROPERTIES = {
         "default": "Session",
     },
     "cosmos_api_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos-api"},
+    "cosmos_api_allowed_identity_resource_ids": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": (
+            "User-assigned managed identity resource IDs a Cosmos DB account may unwrap its "
+            "customer-managed key with. The resource acts as the identity, so list only identities that "
+            "can reach nothing another tenant owns. Empty refuses every config-supplied identity."
+        ),
+    },
     "ai_search_service_name_prefix": {"type": "string", "default": "astrolift"},
     "ai_search_default_sku": {"type": "string", "default": "basic"},
     "ai_search_replica_count_default": {"type": "integer", "minimum": 1, "default": 1},

@@ -38,6 +38,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
 
@@ -163,6 +164,9 @@ class AzureCosmosApiConfig:
     mgmt_client: Any | None = None
     locks_client: Any | None = None
     secret_client: Any | None = None
+    # User-assigned identities an account may unwrap its customer-managed key
+    # with. Empty refuses every one (#2087).
+    allowed_identity_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.variant not in PROFILES:
@@ -744,6 +748,12 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
             return "Cosmos customer_managed_key_uri must be HTTPS"
         if identity_id and not identity_id.startswith("/subscriptions/"):
             return "Cosmos customer_managed_identity_resource_id must be an ARM resource ID"
+        unlisted = unlisted_identity(identity_id, self._config.allowed_identity_resource_ids)
+        if unlisted:
+            return (
+                f"Cosmos customer_managed_identity_resource_id {unlisted!r} is not allowed by the cluster "
+                "install policy cosmos_api_allowed_identity_resource_ids"
+            )
         for field in ("virtual_network_rule_ids", "network_acl_bypass_resource_ids"):
             for resource_id in cfg.get(field, []) or []:
                 if not isinstance(resource_id, str) or not resource_id.startswith("/subscriptions/"):
