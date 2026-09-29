@@ -11,7 +11,7 @@ import type { CommandRunDetailProps } from "./CommandRunDetail";
 import type { CommandRunsScreenProps } from "./CommandRunsScreen";
 import type { JobRunDetailProps } from "./JobRunDetail";
 import type { JobRunsScreenProps } from "./JobRunsScreen";
-import type { CronWorkload, JobRunPulse } from "./jobs-list";
+import type { CronWorkload } from "./jobs-list";
 import type { JobsScreenProps } from "./JobsScreen";
 
 /** Hand-typed fixtures for the jobs and tasks screens. */
@@ -37,6 +37,8 @@ export function jobRun(
     workloadSlug: "nightly-report",
     k8sJobName: `nightly-report-${id.slice(0, 5)}`,
     status: "succeeded",
+    triggerKind: "scheduled",
+    triggeredByMe: false,
     exitCode: 0,
     durationSeconds: 184,
     output:
@@ -82,6 +84,7 @@ export function commandRun(
     workloadSlug: "web",
     command: json(["python", "manage.py", "migrate"]),
     invokedByUsername: "leo",
+    invokedByMe: false,
     exitCode: 0,
     output:
       "Operations to perform:\n  Apply all migrations: billing\nRunning migrations:\n  No migrations to apply.",
@@ -128,6 +131,9 @@ function environment(name: string, app = "billing"): AstroliftAppEnvironment {
     id: `env-${app}-${name}`,
     name,
     registeredAppSlug: app,
+    kind: name === "production" ? "production" : name.startsWith("preview") ? "preview" : "other",
+    region: "us-west-2",
+    ownedByMe: false,
     createdAt: "2026-09-01T12:00:00Z",
     deploysPaused: false,
     ingressPaused: false,
@@ -145,17 +151,6 @@ export const ENVIRONMENTS: AstroliftAppEnvironment[] = [
   environment("production"),
   environment("staging"),
 ];
-
-/** Recent runs, newest first: nightly-report last succeeded, sync-invoices last failed. */
-export const RECENT: JobRunPulse[] = JOB_RUNS.map((r) => ({
-  id: r.id,
-  status: r.status,
-  registeredAppSlug: r.registeredAppSlug,
-  workloadSlug: r.workloadSlug,
-  environmentName: r.environmentName,
-  startedAt: r.startedAt ?? null,
-  createdAt: r.createdAt,
-}));
 
 /** Everything JobsScreen takes except the list state, which a story makes. */
 export function jobsProps(

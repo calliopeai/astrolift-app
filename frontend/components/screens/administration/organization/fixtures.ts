@@ -30,6 +30,7 @@ export const ORG: AstroliftOrganization = {
   allowUserProfileEdit: true,
   appearanceDefault: { ground: "emerald", accent: "green" },
   appearanceLocked: false,
+  restrictedSettingsDefault: "show",
   auditLogRetentionDays: 365,
   previewMaxActiveDefault: 5,
   logRetentionDaysDefault: 30,
@@ -55,6 +56,12 @@ export const ORG_LOCKED: AstroliftOrganization = {
   ...ORG,
   appearanceDefault: { ground: "paper", accent: "copper" },
   appearanceLocked: true,
+};
+
+/** Members who haven't chosen don't see settings they can't change. */
+export const ORG_HIDES_RESTRICTED: AstroliftOrganization = {
+  ...ORG,
+  restrictedSettingsDefault: "hide",
 };
 
 export const ORG_LONG: AstroliftOrganization = {

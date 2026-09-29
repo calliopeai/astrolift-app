@@ -263,6 +263,9 @@ const PREVIEW_BASE: AstroliftPreviewEnvironment = {
   estimatedDailyCostUsd: 1.84,
   estimatedCostApproximate: false,
   estimatedCostNotes: [],
+  openedByLogin: "barbara",
+  openedByMe: false,
+  failureReason: "",
 };
 
 export const PREVIEW_ROWS: AstroliftPreviewEnvironment[] = [

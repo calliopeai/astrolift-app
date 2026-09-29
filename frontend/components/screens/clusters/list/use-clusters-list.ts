@@ -11,11 +11,9 @@ import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 import { CLUSTERS_LIST, clustersPageVariables } from "./clusters-list";
 import { useClusterActions } from "./use-cluster-actions";
 
-// The committed codegen output lags the live backend, so the generated
-// AstroliftTenantCluster doesn't yet carry the heartbeat fields or who
-// registered the cluster (#2150). Intersect them in locally.
-export type ClusterRow = AstroliftTenantCluster &
-  Partial<ClusterHeartbeatFields> & { createdByUsername?: string | null };
+// The schema types heartbeatStatus as a plain String; narrow it to the four
+// values the backend emits (#808).
+export type ClusterRow = AstroliftTenantCluster & Pick<ClusterHeartbeatFields, "heartbeatStatus">;
 
 interface ClustersPageResp {
   astroliftClustersPage: {
