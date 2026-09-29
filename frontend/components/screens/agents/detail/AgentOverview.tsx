@@ -1,289 +1,233 @@
 "use client";
 
-import {
-  ActivityIcon,
-  BookOpenIcon,
-  ChevronRightIcon,
-  Loader2Icon,
-  WrenchIcon,
-  ZapIcon,
-} from "lucide-react";
+import { ActivityIcon, CpuIcon, HistoryIcon, Loader2Icon, PlayIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
-import {
-  AgentActivityGraph,
-  type AgentActivityTool,
-} from "@/components/observability/AgentActivityGraph";
+import { ListSummary } from "@/components/list/ListSummary";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { FleetView } from "@/components/viz/FleetView";
 import { formatRelativeAge } from "@/lib/format";
 
-import type { AgentOverviewProps } from "./use-agent-overview";
+import { runModeLabel } from "./AgentFrame";
+import { runDot, runDuration, titleCase } from "./agent-runs-list";
+import { agentSectionHref, agentTabHref } from "./agent-tabs-model";
+import type { AgentOverviewProps, AgentOverviewTask } from "./use-agent-overview";
 
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
-const RUN_STATUS_DOT: Record<string, Dot> = {
-  running: "pending",
-  queued: "warn",
-  pending: "warn",
-  completed: "ok",
-  succeeded: "ok",
-  failed: "error",
-  timed_out: "error",
-  cancelled: "muted",
-  canceled: "muted",
-};
+const runHref = (t: AgentOverviewTask) => `/agents/runs/${encodeURIComponent(t.id)}`;
 
-function titleCase(value: string): string {
-  if (!value) return "";
-  return value
-    .replace(/[_-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
+function RunLine({ task }: { task: AgentOverviewTask }) {
+  const took = runDuration(task.startedAt, task.finishedAt);
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <StatusDot status={runDot(task.status)} />
+      <span className="min-w-0 flex-1 truncate font-mono text-xs" title={task.id}>
+        {task.id}
+      </span>
+      <span className="text-muted-foreground shrink-0 text-xs">{titleCase(task.status)}</span>
+      <span className="text-muted-foreground w-12 shrink-0 text-right font-mono text-xs tabular-nums">
+        {took ?? ""}
+      </span>
+      <span
+        className="text-muted-foreground w-20 shrink-0 text-right font-mono text-xs"
+        title={task.createdAt}
+      >
+        {formatRelativeAge(task.createdAt)}
+      </span>
+    </span>
+  );
 }
 
 /**
- * Agent-native Overview — the landing pillar for `/agents/[agentSlug]`.
- *
- * Unlike the app-cloned pillars, this is designed around what an agent *is*:
- * a live activity graph of the agent and its tools (#1091 viz), a one-click
- * dispatch, a recent-runs rollup, and a compact capability summary. It
- * deliberately drops app chrome (URLs, domains, public endpoints) — an agent
- * has none. The deeper Build / Run / Observe / Control / Secure tabs remain
- * for the full detail.
+ * The agent's Overview (spec 44 §5.2; Leo's page rules 1 to 3), about two
+ * screens at 1440x900: what it is doing first (the latest run, with the
+ * overseer input while it runs, beside what it runs on), then the recent
+ * runs as a summary that links to Runs, and the agent in the fleet view.
+ * When the last run failed, the frame puts its reason above every tab, so
+ * the page does not repeat it. Run now is the frame's primary action. Pure.
  */
 export function AgentOverviewView({
   agent,
   detail,
   detailLoading,
-  tasks,
-  dispatching,
+  detailError,
+  onRetryDetail,
+  runs,
+  fleet,
+  onSelectAgent,
   sendingInput,
-  onDispatch,
   onSendInput,
 }: AgentOverviewProps) {
-  const skills = React.useMemo(() => detail?.skills ?? [], [detail]);
-
-  // Flatten the agent's bound skills into a de-duped tool list for the graph.
-  const tools = React.useMemo<AgentActivityTool[]>(() => {
-    const seen = new Set<string>();
-    const out: AgentActivityTool[] = [];
-    for (const binding of skills) {
-      for (const tool of binding.toolDefs) {
-        if (seen.has(tool.id)) continue;
-        seen.add(tool.id);
-        out.push({ id: tool.id, name: tool.name });
-      }
-    }
-    return out;
-  }, [skills]);
-
-  const rows = React.useMemo(
-    () => [...tasks].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
-    [tasks]
-  );
-
-  const counts = React.useMemo(() => {
-    const c = { completed: 0, failed: 0, active: 0 };
-    for (const t of rows) {
-      const s = t.status.toLowerCase();
-      if (s === "completed" || s === "succeeded") c.completed += 1;
-      else if (s === "failed" || s === "timed_out") c.failed += 1;
-      else if (s === "running" || s === "queued") c.active += 1;
-    }
-    return c;
-  }, [rows]);
-
-  const liveRunning = Math.max(agent.runningCount, counts.active);
-  const active = liveRunning > 0;
-  const runningTask = rows.find((task) => task.status === "running") ?? null;
+  const latest = runs.rows[0] ?? null;
+  const running = runs.rows.find((t) => t.status === "running") ?? null;
+  const skills = detail?.skills ?? [];
+  const tools = new Set(skills.flatMap((b) => b.toolDefs.map((t) => t.id))).size;
+  const slug = agent.slug;
 
   return (
-    <div className="space-y-6">
-      {/* Live activity — the agent + its tools, animated while running. */}
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <ActivityIcon className="size-4" />
-            Live activity
-            <Badge variant={active ? "default" : "outline"} className="gap-1.5">
-              <StatusDot status={active ? "pending" : "muted"} />
-              {active ? `${liveRunning} running` : "Idle"}
-            </Badge>
-            <span className="text-muted-foreground text-xs font-normal">
-              {tools.length} {tools.length === 1 ? "tool" : "tools"}
-            </span>
-            <div className="ml-auto">
-              <Button size="sm" onClick={onDispatch} disabled={dispatching}>
-                {dispatching ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <ZapIcon className="size-4" />
-                )}
-                Run once
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          {detailLoading && tools.length === 0 ? (
-            <div className="p-4">
-              <Skeleton className="h-[288px] w-full rounded-lg" />
-            </div>
-          ) : (
-            <AgentActivityGraph
-              agentName={agent.name}
-              tools={tools}
-              active={active}
-              runningCount={liveRunning}
-              className="rounded-none"
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Runtime health
-            <Badge variant={detail?.imageRef ? "default" : "outline"} className="ml-auto gap-1.5">
-              <StatusDot status={detail?.imageRef ? "ok" : "muted"} />
-              {detail?.imageRef ? "Configured" : "Not configured"}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
-          <SummaryTile
-            icon={<WrenchIcon className="size-4" />}
-            label="Image"
-            value={detail?.imageRef || "No image selected"}
-            muted={!detail?.imageRef}
-          />
-          <SummaryTile
-            icon={<ActivityIcon className="size-4" />}
-            label="Run mode"
-            value={`${titleCase(agent.runFamily)} · ${titleCase(agent.runMode)}`}
-          />
-          <SummaryTile
-            icon={<StatusDot status={active ? "pending" : "muted"} />}
-            label="Liveness"
-            value={active ? `${liveRunning} task${liveRunning === 1 ? "" : "s"} running` : "Idle"}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Recent runs rollup + latest executions. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            Recent runs
-            {rows.length > 0 && (
-              <span className="flex flex-wrap items-center gap-3 text-xs font-normal tabular-nums">
-                <span className="text-success-fg">{counts.completed} completed</span>
-                <span className="text-danger-fg">{counts.failed} failed</span>
-                <span className="text-info-fg">{counts.active} active</span>
-              </span>
-            )}
+    <PanelGrid>
+      <Panel
+        title="Latest run"
+        icon={<PlayIcon className="size-4" />}
+        span={6}
+        loading={runs.loading}
+        error={runs.error}
+        onRetry={runs.onRetry}
+        empty={
+          latest
+            ? null
+            : {
+                icon: <PlayIcon className="size-5" />,
+                title: "Not run yet",
+                description: "Use Run now above. The run shows here with a live status.",
+              }
+        }
+        actions={
+          latest && (
             <Link
-              href={`/agents/${encodeURIComponent(agent.slug)}/run`}
-              className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center text-xs font-normal"
+              href={runHref(latest)}
+              className="text-primary text-xs font-medium hover:underline"
             >
-              All executions <ChevronRightIcon className="size-3.5" />
+              Open run
             </Link>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {rows.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              This agent hasn&rsquo;t run yet. Use <span className="font-medium">Run once</span> to
-              dispatch it — the run appears here with a live status.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {rows.slice(0, 5).map((t) => {
-                const dot = RUN_STATUS_DOT[t.status.toLowerCase()] ?? "muted";
-                return (
-                  <li key={t.id}>
-                    <Link
-                      href={`/agents/runs/${encodeURIComponent(t.id)}`}
-                      className="hover:bg-muted/40 -mx-2 flex items-center gap-3 rounded-md px-2 py-2"
-                    >
-                      <StatusDot status={dot} />
-                      <span className="font-mono text-xs">{t.id.slice(0, 8)}</span>
-                      <Badge
-                        variant={dot === "error" ? "destructive" : "secondary"}
-                        className="text-xs"
-                      >
-                        {titleCase(t.status)}
-                      </Badge>
-                      <span className="text-muted-foreground ml-auto text-xs">
-                        {t.startedAt ? formatRelativeAge(t.startedAt) : "—"}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          )
+        }
+      >
+        {latest && (
+          <div className="flex min-w-0 flex-col gap-4">
+            <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <Fact label="Status">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <StatusDot status={runDot(latest.status)} />
+                  <span className="truncate" title={latest.status}>
+                    {titleCase(latest.status)}
+                  </span>
+                </span>
+              </Fact>
+              <Fact label="Run" mono title={latest.id}>
+                <span className="block truncate">{latest.id}</span>
+              </Fact>
+              <Fact label="Started" mono title={latest.startedAt ?? undefined}>
+                {latest.startedAt ? formatRelativeAge(latest.startedAt) : "Not yet"}
+              </Fact>
+              <Fact label="Took" mono>
+                {runDuration(latest.startedAt, latest.finishedAt) ??
+                  (latest.status === "running" ? "Running" : "Not finished")}
+              </Fact>
+            </dl>
+            {running && (
+              <OverseerInput taskId={running.id} onSendInput={onSendInput} sending={sendingInput} />
+            )}
+          </div>
+        )}
+      </Panel>
 
-      <OverseerChat
-        taskId={runningTask?.id ?? null}
-        onSendInput={onSendInput}
-        sending={sendingInput}
+      <Panel
+        title="Runtime"
+        icon={<CpuIcon className="size-4" />}
+        span={6}
+        loading={detailLoading}
+        error={detailError}
+        onRetry={onRetryDetail}
+        actions={
+          <Link
+            href={agentTabHref(slug, "configuration")}
+            className="text-primary text-xs font-medium hover:underline"
+          >
+            Configuration
+          </Link>
+        }
+      >
+        <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+          <Fact label="Image" mono title={detail?.imageRef || undefined} wide>
+            <span className="[overflow-wrap:anywhere]">{detail?.imageRef || "Not set"}</span>
+          </Fact>
+          <Fact label="Run mode">{runModeLabel(agent.runFamily, agent.runMode)}</Fact>
+          <Fact label="Brief">{detail?.brief ? "Assembled" : "None yet"}</Fact>
+          <Fact label="Skills" mono>
+            <Link
+              href={agentSectionHref(slug, "skills", "skills")}
+              className="hover:text-primary hover:underline"
+            >
+              {skills.length}
+            </Link>
+          </Fact>
+          <Fact label="Tools" mono>
+            <Link
+              href={agentSectionHref(slug, "skills", "tools")}
+              className="hover:text-primary hover:underline"
+            >
+              {tools}
+            </Link>
+          </Fact>
+        </dl>
+      </Panel>
+
+      <ListSummary<AgentOverviewTask>
+        title="Recent runs"
+        icon={<HistoryIcon className="size-4" />}
+        span={6}
+        count={runs.count}
+        rows={runs.rows}
+        keyOf={(t) => t.id}
+        renderRow={(t) => <RunLine task={t} />}
+        rowHref={runHref}
+        viewAllHref={agentTabHref(slug, "runs")}
+        loading={runs.loading}
+        error={runs.error}
+        onRetry={runs.onRetry}
       />
 
-      {/* Capability summary — brief + skills/tools at a glance, deep detail on Build. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            Capabilities
-            <Link
-              href={`/agents/${encodeURIComponent(agent.slug)}/build`}
-              className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center text-xs font-normal"
-            >
-              Build detail <ChevronRightIcon className="size-3.5" />
-            </Link>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <SummaryTile
-            icon={<BookOpenIcon className="size-4" />}
-            label="Brief"
-            value={detail?.brief ? "Assembled" : "None yet"}
-            muted={!detail?.brief}
+      <div className="col-span-12 min-w-0 xl:col-span-6">
+        {fleet ? (
+          <FleetView
+            snapshot={fleet}
+            selectedAgentId={agent.id}
+            onSelectAgent={onSelectAgent}
+            title="In the fleet"
+            description={`${agent.name} among ${fleet.agents.length} agents, grouped by project`}
           />
-          <SummaryTile
-            icon={<WrenchIcon className="size-4" />}
-            label="Skills"
-            value={String(skills.length)}
-            muted={skills.length === 0}
-          />
-          <SummaryTile
-            icon={<WrenchIcon className="size-4" />}
-            label="Tools"
-            value={String(tools.length)}
-            muted={tools.length === 0}
-          />
-        </CardContent>
-      </Card>
+        ) : (
+          <Panel title="In the fleet" icon={<ActivityIcon className="size-4" />} loading />
+        )}
+      </div>
+    </PanelGrid>
+  );
+}
+
+function Fact({
+  label,
+  mono,
+  title,
+  wide,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  title?: string;
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={wide ? "col-span-2 min-w-0 sm:col-span-3" : "min-w-0"}>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className={mono ? "min-w-0 font-mono text-xs" : "min-w-0"} title={title}>
+        {children}
+      </dd>
     </div>
   );
 }
 
-function OverseerChat({
+/** A follow-up to the running run, delivered at its next turn boundary. */
+function OverseerInput({
   taskId,
   onSendInput,
   sending,
 }: {
-  taskId: string | null;
+  taskId: string;
   onSendInput: AgentOverviewProps["onSendInput"];
   sending: boolean;
 }) {
@@ -293,7 +237,7 @@ function OverseerChat({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const value = message.trim();
-    if (!taskId || !value || sending) return;
+    if (!value || sending) return;
     if (await onSendInput(taskId, value)) {
       setSent((prior) => [...prior, value]);
       setMessage("");
@@ -301,70 +245,36 @@ function OverseerChat({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ActivityIcon className="size-4" /> Overseer chat
-          <Badge variant={taskId ? "default" : "outline"} className="ml-auto">
-            {taskId ? "Connected to running task" : "Available when running"}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {sent.length > 0 && (
-          <div className="mb-3 space-y-2">
-            {sent.map((entry, index) => (
-              <div key={`${entry}-${index}`} className="bg-muted/40 rounded-md px-3 py-2 text-sm">
-                {entry}
-              </div>
-            ))}
-          </div>
-        )}
-        <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <Textarea
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder={
-              taskId
-                ? "Send a follow-up to the running agent…"
-                : "Start a run to enable overseer chat"
-            }
-            disabled={!taskId || sending}
-            rows={2}
-            aria-label="Overseer message"
-          />
-          <Button type="submit" disabled={!taskId || !message.trim() || sending}>
-            {sending ? <Loader2Icon className="size-4 animate-spin" /> : "Send"}
-          </Button>
-        </form>
-        <p className="text-muted-foreground mt-2 text-xs">
-          Messages are queued and delivered at the agent’s next turn boundary.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryTile({
-  icon,
-  label,
-  value,
-  muted,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3">
-      <span className="text-muted-foreground">{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-muted-foreground text-xs tracking-wide uppercase">{label}</span>
-        <span className={muted ? "text-muted-foreground text-sm" : "text-sm font-medium"}>
-          {value}
-        </span>
+    <form onSubmit={submit} className="flex min-w-0 flex-col gap-2 border-t pt-4">
+      <p className="text-xs font-medium">Message the running agent</p>
+      {sent.length > 0 && (
+        <ul className="flex max-h-24 min-w-0 flex-col gap-1 overflow-y-auto">
+          {sent.map((entry, index) => (
+            <li
+              key={`${entry}-${index}`}
+              className="bg-muted/40 rounded-sm px-2 py-1 text-xs [overflow-wrap:anywhere]"
+            >
+              {entry}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+        <Textarea
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="Send a follow-up to the running agent…"
+          disabled={sending}
+          rows={2}
+          aria-label="Overseer message"
+        />
+        <Button type="submit" size="sm" disabled={!message.trim() || sending}>
+          {sending ? <Loader2Icon className="size-4 animate-spin" /> : "Send"}
+        </Button>
       </div>
-    </div>
+      <p className="text-muted-foreground text-xs">
+        Queued and delivered at the agent&rsquo;s next turn boundary.
+      </p>
+    </form>
   );
 }

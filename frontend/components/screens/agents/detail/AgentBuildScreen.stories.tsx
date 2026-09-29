@@ -30,3 +30,12 @@ export const LoadFailed: Story = { render: () => <AgentBuildScreen {...BUILD_ERR
 
 /** Long slugs, refs and descriptions, a non-primary container, an unknown adapter. */
 export const LongStrings: Story = { render: () => <AgentBuildScreen {...BUILD_LONG} /> };
+
+/** Inside the agent frame: skills are a summary with View all to the Skills & tools tab. */
+export const SkillsSummary: Story = {
+  render: () => <AgentBuildScreen {...BUILD} skillsHref="/agents/support-bot/skills" />,
+};
+
+export const SkillsSummaryEmpty: Story = {
+  render: () => <AgentBuildScreen {...BUILD_EMPTY} skillsHref="/agents/support-bot/skills" />,
+};

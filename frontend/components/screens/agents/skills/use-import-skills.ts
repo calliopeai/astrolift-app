@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { IMPORT_SKILLS_FROM_REPO } from "@/graphql/agents/agents.mutations";
+
+import { type FieldErrors, hasErrors, splitErrors } from "./catalog";
 
 type MutError = { field: string; message: string; code: string };
 
@@ -23,34 +24,41 @@ type ImportSkillsData = {
   };
 };
 
-/** Imports skills and tools from a repo's astrolift.toml. The data half of ImportSkillsScreen. */
+export type ImportField = "repoUrl" | "branch";
+
+/** Why an import was refused: beside its field where the server named one (spec 44 §5.4). */
+export type ImportErrors = FieldErrors<ImportField>;
+
+/**
+ * Imports skills and tools from a repo's astrolift.toml and keeps what it
+ * imported. Refusals come back as errors for the sheet to show in place; the
+ * only toast is the outcome. The data half of ImportSkillsSheet.
+ */
 export function useImportSkills() {
-  const router = useRouter();
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const [importMutation, { loading }] = useMutation<ImportSkillsData>(IMPORT_SKILLS_FROM_REPO, {
     refetchQueries: ["ListSkills"],
   });
 
-  async function importSkills(repoUrl: string, branch: string) {
-    if (!repoUrl.trim()) {
-      toast.error("Repository URL is required");
-      return;
-    }
+  /** Resolves the errors to show; empty when the import went through. */
+  async function importSkills(repoUrl: string, branch: string): Promise<ImportErrors> {
+    if (!repoUrl.trim()) return { repoUrl: "Enter the repository URL." };
     setResult(null);
-    const { data } = await importMutation({
-      variables: {
-        repoUrl: repoUrl.trim(),
-        branch: branch.trim() || "main",
-      },
-    });
-    if (data?.importSkillsFromRepo?.ok && data.importSkillsFromRepo.data) {
-      setResult(data.importSkillsFromRepo.data);
-      toast.success(`Imported from ${data.importSkillsFromRepo.data.sourceRef}`);
-    } else {
-      for (const err of data?.importSkillsFromRepo?.errors ?? []) {
-        toast.error(`${err.field}: ${err.message}`);
+    try {
+      const { data } = await importMutation({
+        variables: { repoUrl: repoUrl.trim(), branch: branch.trim() || "main" },
+      });
+      const payload = data?.importSkillsFromRepo;
+      if (payload?.ok && payload.data) {
+        setResult(payload.data);
+        toast.success(`Imported from ${payload.data.sourceRef}`);
+        return {};
       }
+      const errors = splitErrors(payload?.errors ?? [], ["repoUrl", "branch"] as const);
+      return hasErrors(errors) ? errors : { form: "The import was refused." };
+    } catch (err) {
+      return { form: err instanceof Error ? err.message : String(err) };
     }
   }
 
@@ -59,7 +67,6 @@ export function useImportSkills() {
     result,
     importSkills,
     clearResult: () => setResult(null),
-    viewSkills: () => router.push("/agents/skills"),
   };
 }
 

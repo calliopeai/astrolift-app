@@ -2,16 +2,17 @@ import type { AstroliftProviderPlugin } from "@/graphql/clusters/clusters.types"
 
 import type { CloudProvidersPanelViewProps } from "../providers/CloudProvidersPanel";
 
-import type { DeployModelSheetViewProps } from "./DeployModelSheet";
+import { ARN200, LONG_URL, SHA64 } from "../agents/skills/agent-skills.fixtures";
+
+import type { DeployModelScreenProps } from "./DeployModelScreen";
 import type { ModelReplicasViewProps } from "./ModelReplicas";
-import type { ModelEndpoint, ModelsScreenProps } from "./ModelsScreen";
+import type { ModelEndpoint } from "./models-list";
 import type { ModelTestDialogViewProps } from "./ModelTestDialog";
 import type { ModelTestOutcome } from "./use-model-test";
 
 /** Hand-typed fixtures for the Models and Providers screens. */
 
 const noop = () => {};
-const yes = async () => true;
 
 /** The JSON scalar is typed as an object but carries any JSON. */
 const json = (value: unknown) => value as Record<string, unknown>;
@@ -95,15 +96,35 @@ export const LONG_MODELS: ModelEndpoint[] = [
   },
 ];
 
-export const MODELS_SCREEN: Omit<
-  ModelsScreenProps,
-  "renderReplicas" | "renderTest" | "renderDeploySheet"
-> = {
-  models: MODELS,
-  loading: false,
-  error: undefined,
-  refetch: noop,
-};
+/** A 64-char SHA model id, a 200-char ARN failure and an unbroken URL. */
+export const SHA_MODELS: ModelEndpoint[] = [
+  {
+    ...MODELS[0],
+    id: "s1",
+    name: SHA64,
+    config: json({ model: `acme/${SHA64}`, gpu: 2 }),
+  },
+  {
+    ...MODELS[3],
+    id: "s2",
+    name: "claude-arn",
+    config: json({ model_id: ARN200 }),
+    statusError: ARN200,
+  },
+  {
+    ...MODELS[2],
+    id: "s3",
+    name: "embeddings-url",
+    config: json({ storage_uri: LONG_URL, gpu: 1 }),
+  },
+];
+
+/** Forty models across the variants: numbered pages. */
+export const MANY_MODELS: ModelEndpoint[] = Array.from({ length: 40 }, (_, i) => ({
+  ...MODELS[i % 4],
+  id: `m-many-${i}`,
+  name: `model-${String(i + 1).padStart(2, "0")}`,
+}));
 
 export const REPLICAS: ModelReplicasViewProps = {
   name: "qwen",
@@ -141,10 +162,9 @@ const GPU_CAPS = json({
   },
 });
 
-export const DEPLOY: DeployModelSheetViewProps = {
-  open: true,
-  onOpenChange: noop,
-  onDeployed: noop,
+export const DEPLOY: DeployModelScreenProps = {
+  envsLoading: false,
+  envsError: null,
   envs: [
     {
       id: "e1",
@@ -167,7 +187,7 @@ export const DEPLOY: DeployModelSheetViewProps = {
     { id: "c2", capabilities: json({}) },
   ],
   loading: false,
-  deploy: yes,
+  deploy: async () => null,
 };
 
 // ---- Providers ------------------------------------------------------------

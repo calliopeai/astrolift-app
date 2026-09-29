@@ -1,22 +1,13 @@
 "use client";
 
-import {
-  ExternalLinkIcon,
-  ListChecksIcon,
-  Loader2Icon,
-  MonitorPlayIcon,
-  TerminalIcon,
-  ZapIcon,
-} from "lucide-react";
+import { ExternalLinkIcon, ListChecksIcon, MonitorPlayIcon, TerminalIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -24,302 +15,155 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { formatRelativeAge } from "@/lib/format";
 
+import { canWatchLive, canWatchLogs, runDot, runDuration, titleCase } from "./agent-runs-list";
 import type { AgentRunState, AgentTask } from "./use-agent-run";
 
 export interface AgentRunScreenProps extends AgentRunState {
   /**
-   * The live log tail for a headless run, shown in the Watch-logs dialog.
-   * A slot rather than a component so its polling hook only runs while the
-   * dialog is open; `running` tracks the live poll so the tail stops once
-   * the run ends.
+   * The live log tail for a headless run, shown in the Watch logs dialog.
+   * A slot, so its polling hook runs only while the dialog is open;
+   * `running` tracks the poll so the tail stops once the run ends.
    */
   renderLogs: (taskId: string, running: boolean) => React.ReactNode;
 }
 
-// Agent run vocabulary (spec 33 §6): running / queued / completed / failed /
-// timed_out / cancelled. Reuses the dot+badge convention shared with the
-// registry list (`agents-client.tsx`) — "completed" is the success state, not
-// "succeeded". Unknown states degrade to a muted dot + outline badge.
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
-const RUN_STATUS_DOT: Record<string, Dot> = {
-  running: "pending",
-  queued: "warn",
-  pending: "warn",
-  completed: "ok",
-  succeeded: "ok",
-  failed: "error",
-  timed_out: "error",
-  cancelled: "muted",
-  canceled: "muted",
-};
+const runHref = (t: AgentTask) => `/agents/runs/${encodeURIComponent(t.id)}`;
 
-function titleCase(value: string): string {
-  if (!value) return "";
-  return value
-    .replace(/[_-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function isRunning(t: AgentTask): boolean {
-  return t.status === "running";
-}
-
-// A task is watchable only while RUNNING on a VNC-capable pod that has
-// published its relay path — mirrors the fleet table + the relay gate.
-function canWatch(t: AgentTask): boolean {
-  return t.status === "running" && t.vncEnabled && Boolean(t.vncUrl);
-}
-
-// Headless (terminal) agents have no VNC surface — a RUNNING non-VNC run is
-// watched live through its log tail instead. VNC-capable runs keep the VNC path
-// (even while their relay is still coming up), so the two are mutually exclusive.
-function canWatchLogs(t: AgentTask): boolean {
-  return isRunning(t) && !t.vncEnabled;
-}
-
-// Status cell: a live "running now" badge (animated pending dot) for in-flight
-// runs, otherwise the dot+badge for its terminal/queued state.
-function StatusCell({ task }: { task: AgentTask }) {
-  if (isRunning(task)) {
-    return (
-      <Badge variant="default" className="gap-1.5">
-        <StatusDot status="pending" />
-        Running now
-      </Badge>
-    );
-  }
-  const key = task.status.toLowerCase();
-  const dot = RUN_STATUS_DOT[key] ?? "muted";
+function Time({ at }: { at: string | null }) {
+  if (!at) return <span className="text-muted-foreground">Not yet</span>;
   return (
-    <Badge variant={dot === "error" ? "destructive" : "secondary"} className="gap-1.5 capitalize">
-      <StatusDot status={dot} />
-      {titleCase(task.status)}
-    </Badge>
+    <span className="font-mono text-xs" title={at}>
+      {formatRelativeAge(at)}
+    </span>
   );
 }
+
+const COLUMNS: Column<AgentTask>[] = [
+  {
+    id: "run",
+    header: "Run",
+    cell: (t) => (
+      <span className="block max-w-72 truncate font-mono text-xs" title={t.id}>
+        {t.id}
+      </span>
+    ),
+  },
+  {
+    id: "status",
+    header: "Status",
+    width: "w-40",
+    cell: (t) => (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
+        <StatusDot status={runDot(t.status)} />
+        <span className="truncate" title={t.status}>
+          {t.status === "running" ? "Running now" : titleCase(t.status)}
+        </span>
+      </span>
+    ),
+  },
+  { id: "started", header: "Started", width: "w-28", cell: (t) => <Time at={t.startedAt} /> },
+  { id: "finished", header: "Finished", width: "w-28", cell: (t) => <Time at={t.finishedAt} /> },
+  {
+    id: "took",
+    header: "Took",
+    width: "w-20",
+    align: "right",
+    cellClassName: "font-mono text-xs tabular-nums",
+    cell: (t) => runDuration(t.startedAt, t.finishedAt) ?? "",
+  },
+];
 
 /**
- * Run tab content for an agent (spec 33 PR-10).
- *
- * Two surfaces:
- *   - **Dispatch now** — the working "Run once" control. Once-mode only — the
- *     run-spec editor (Schedule / Service / Loop / Trigger) is PR-11/12.
- *   - **Executions** — the per-agent runs list with the status→variant
- *     mapping and the VNC "Watch live" dialog from the fleet surface,
- *     narrowed to THIS agent.
+ * The agent's Runs tab (spec 44 §5.1, §5.2): this agent's executions on the
+ * embedded list, newest first, by cursor, with new runs held behind the
+ * pill. The whole row opens the run; `⋯` watches a running one live (its
+ * VNC session, or the log tail for a headless agent). Run now is the
+ * frame's primary action, so the tab has none of its own. Pure.
  */
 export function AgentRunScreen({
+  list,
   rows,
+  newRows,
   loading,
-  dispatching,
-  onDispatch,
-  onOpenRun,
+  stale,
+  error,
+  onRetry,
+  nextCursor,
+  totalCount,
   renderLogs,
 }: AgentRunScreenProps) {
-  // The task whose live VNC session is open in the Watch-live dialog.
   const [watching, setWatching] = React.useState<AgentTask | null>(null);
-  // The (headless) task whose live log tail is open in the Watch-logs dialog.
   const [watchingLogs, setWatchingLogs] = React.useState<AgentTask | null>(null);
 
-  // Keep the open log dialog's task fresh against the poll so it flips from
-  // live-tail to a single final fetch the moment the run finishes (mirrors the
-  // theatre's `watchingLive`). Falls back to the click-time snapshot if the run
-  // drops out of the list.
-  const watchingLogsLive = React.useMemo(
-    () => (watchingLogs ? (rows.find((r) => r.id === watchingLogs.id) ?? null) : null),
-    [watchingLogs, rows]
-  );
-
-  // Terminal-outcome rollup for the at-a-glance summary above the table.
-  const statusCounts = React.useMemo(() => {
-    const c = { completed: 0, failed: 0, active: 0, other: 0 };
-    for (const t of rows) {
-      const s = t.status.toLowerCase();
-      if (s === "completed" || s === "succeeded") c.completed += 1;
-      else if (s === "failed" || s === "timed_out") c.failed += 1;
-      else if (s === "running" || s === "queued") c.active += 1;
-      else c.other += 1;
-    }
-    return c;
-  }, [rows]);
+  // The open log dialog follows the poll, so its tail stops the moment the run ends.
+  const logsLive = watchingLogs ? (rows.find((r) => r.id === watchingLogs.id) ?? null) : null;
 
   return (
-    <div className="space-y-6">
-      {/* Dispatch now — the working Once-mode control (#896 unstub). */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ZapIcon className="size-4" />
-            Dispatch now
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground text-sm">
-            Run this agent once, on demand. A new execution is created and picked up by the dispatch
-            pipeline — it appears below with a live status. Scheduling, looping, and always-on
-            Service modes are configured on the Control tab.
-          </p>
-          <Button onClick={() => void onDispatch()} disabled={dispatching}>
-            {dispatching ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <ZapIcon className="size-4" />
+    <>
+      <ListPage<AgentTask>
+        embedded
+        list={list}
+        label="Runs"
+        columns={COLUMNS}
+        rows={rows}
+        getRowId={(t) => t.id}
+        rowHref={runHref}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        nextCursor={nextCursor}
+        totalCount={totalCount}
+        newRows={newRows}
+        empty={{
+          icon: <ListChecksIcon className="size-5" />,
+          title: "No runs yet",
+          description: "Use Run now above to start one. It shows here with a live status.",
+        }}
+        rowActions={(t) => (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href={runHref(t)}>Open run</Link>
+            </DropdownMenuItem>
+            {canWatchLive(t) && (
+              <>
+                <DropdownMenuItem onSelect={() => setWatching(t)}>
+                  <MonitorPlayIcon className="size-4" />
+                  Watch live
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`${runHref(t)}/vnc`} target="_blank" rel="noreferrer">
+                    <ExternalLinkIcon className="size-4" />
+                    Open live session in a new tab
+                  </Link>
+                </DropdownMenuItem>
+              </>
             )}
-            Run once
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Executions — per-agent runs list (scoped via workloadId). */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <ListChecksIcon className="text-muted-foreground size-4" />
-          <h2 className="text-base font-semibold">Executions</h2>
-          <span className="text-muted-foreground text-xs">
-            Runs of this agent · running / queued / completed / failed / timed&nbsp;out
-          </span>
-        </div>
-
-        {rows.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 text-xs tabular-nums">
-            <span className="text-success-fg font-medium">{statusCounts.completed} completed</span>
-            <span className="text-danger-fg font-medium">{statusCounts.failed} failed</span>
-            <span className="text-info-fg font-medium">{statusCounts.active} active</span>
-            {statusCounts.other > 0 && (
-              <span className="text-muted-foreground">{statusCounts.other} other</span>
+            {canWatchLogs(t) && (
+              <DropdownMenuItem onSelect={() => setWatchingLogs(t)}>
+                <TerminalIcon className="size-4" />
+                Watch logs
+              </DropdownMenuItem>
             )}
-          </div>
+          </>
         )}
+      />
 
-        {loading && rows.length === 0 ? (
-          <Card>
-            <CardContent className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </CardContent>
-          </Card>
-        ) : rows.length === 0 ? (
-          <Card>
-            <CardContent className="p-6">
-              <EmptyState
-                icon={<ListChecksIcon className="size-5" />}
-                title="No executions yet"
-                description="This agent hasn't run yet. Use Dispatch now to trigger a run — it will appear here with a live status."
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Finished</TableHead>
-                    <TableHead className="text-right">Live</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((t) => (
-                    <TableRow
-                      key={t.id}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Open run ${t.id.slice(0, 8)}`}
-                      onClick={() => onOpenRun(t.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onOpenRun(t.id);
-                        }
-                      }}
-                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                    >
-                      <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                      <TableCell>
-                        <StatusCell task={t} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {t.startedAt ? (
-                          <span title={t.startedAt}>{formatRelativeAge(t.startedAt)}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {t.finishedAt ? (
-                          <span title={t.finishedAt}>{formatRelativeAge(t.finishedAt)}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      {/* Actions cell — stopPropagation so the live-session
-                          controls don't also trigger the row's navigation to
-                          the run detail. */}
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {canWatch(t) ? (
-                          <div className="inline-flex items-center gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setWatching(t)}>
-                              <MonitorPlayIcon className="size-4" />
-                              Watch live
-                            </Button>
-                            <Button asChild size="sm" variant="ghost">
-                              <Link
-                                href={`/agents/runs/${encodeURIComponent(t.id)}/vnc`}
-                                target="_blank"
-                                rel="noreferrer"
-                                aria-label="Open live session in a new tab"
-                              >
-                                <ExternalLinkIcon className="size-4" />
-                              </Link>
-                            </Button>
-                          </div>
-                        ) : canWatchLogs(t) ? (
-                          <Button size="sm" variant="outline" onClick={() => setWatchingLogs(t)}>
-                            <TerminalIcon className="size-4" />
-                            Watch logs
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {/* Watch-live VNC dialog — reuses VncViewer, the same surface the fleet
-          Active tab and the relocated agents/runs/[task]/vnc/ popout use. */}
       <Dialog open={watching !== null} onOpenChange={(open) => !open && setWatching(null)}>
         <DialogContent className="max-w-4xl sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Live agent session</DialogTitle>
-            <DialogDescription className="font-mono text-xs">{watching?.id}</DialogDescription>
+            <DialogDescription className="font-mono text-xs break-all">
+              {watching?.id}
+            </DialogDescription>
           </DialogHeader>
           {watching && <VncViewer vncPath={watching.vncUrl} />}
         </DialogContent>
       </Dialog>
 
-      {/* Watch-logs dialog — the headless-agent counterpart to the VNC dialog:
-          a near-fullscreen live-tailing terminal (mirrors AgentTheatre sizing). */}
       <Dialog open={watchingLogs !== null} onOpenChange={(open) => !open && setWatchingLogs(null)}>
         <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-3 sm:max-w-[96vw]">
           <DialogHeader>
@@ -327,12 +171,13 @@ export function AgentRunScreen({
               <TerminalIcon className="size-4" />
               Live agent logs
             </DialogTitle>
-            <DialogDescription className="font-mono text-xs">{watchingLogs?.id}</DialogDescription>
+            <DialogDescription className="font-mono text-xs break-all">
+              {watchingLogs?.id}
+            </DialogDescription>
           </DialogHeader>
-          {watchingLogs &&
-            renderLogs(watchingLogs.id, watchingLogsLive ? isRunning(watchingLogsLive) : false)}
+          {watchingLogs && renderLogs(watchingLogs.id, logsLive?.status === "running")}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

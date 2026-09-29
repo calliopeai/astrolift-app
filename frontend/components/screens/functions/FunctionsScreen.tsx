@@ -1,100 +1,114 @@
 "use client";
 
-import { AlertCircleIcon, BarChart3Icon, GaugeIcon, LayersIcon, ScrollIcon } from "lucide-react";
-import type * as React from "react";
+import { BoltIcon } from "lucide-react";
+import Link from "next/link";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
+import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { FUNCTION_TABS, type FunctionTab, type useFunctionsTab } from "./use-functions";
+import type { FunctionsState } from "./use-functions";
 
-export type FunctionsScreenProps = ReturnType<typeof useFunctionsTab> & {
-  /** The Fleet tab body (FunctionWorkloadsTable with its data); rendered only on that tab. */
-  fleet: React.ReactNode;
-};
+export type FunctionsScreenProps = FunctionsState;
 
-const TAB_LABELS: Record<FunctionTab, string> = {
-  fleet: "Fleet",
-  throughput: "Throughput",
-  errors: "Errors",
-  latency: "Latency",
-  logs: "Logs",
-};
+// The row's link is an ::after overlay stretched across the whole row; a
+// link in a cell has to sit above it to be reachable.
+const ABOVE_ROW_LINK = "relative z-10";
 
-const TAB_ICONS: Record<FunctionTab, React.ReactNode> = {
-  fleet: <LayersIcon className="size-4" />,
-  throughput: <BarChart3Icon className="size-4" />,
-  errors: <AlertCircleIcon className="size-4" />,
-  latency: <GaugeIcon className="size-4" />,
-  logs: <ScrollIcon className="size-4" />,
-};
-
-/** /functions: event-driven container invocations, with gateway signal tabs. */
-export function FunctionsScreen({ tab, setTab, fleet }: FunctionsScreenProps) {
-  return (
-    <PageShell
-      title="Functions"
-      description="Event-driven container invocations — scale to zero, trigger on HTTP, queues, or webhooks. The runtime layer hasn't shipped yet; these signal surfaces activate once it does."
-    >
-      {/* Tab strip — URL-synced via ?tab= param. "fleet" is the default
-          and omitted from the URL to keep the canonical /functions link clean. */}
-      <div
-        role="tablist"
-        aria-label="Function signal tabs"
-        className="bg-muted/40 inline-flex flex-wrap rounded-md border p-1"
+const columns: Column<AstroliftWorkload>[] = [
+  {
+    id: "name",
+    header: "Function",
+    sortKey: "name",
+    cellClassName: "max-w-80",
+    cell: (w) => (
+      <span className="block min-w-0">
+        <span className="block truncate font-medium" title={w.name}>
+          {w.name}
+        </span>
+        <span className="text-muted-foreground block truncate font-mono text-xs" title={w.slug}>
+          {w.slug}
+        </span>
+      </span>
+    ),
+  },
+  {
+    id: "app",
+    header: "App",
+    sortKey: "app",
+    cellClassName: `${ABOVE_ROW_LINK} max-w-64`,
+    cell: (w) => (
+      <Link
+        href={`/apps/${w.registeredAppSlug}`}
+        className="block truncate font-mono text-xs hover:underline"
+        title={w.registeredAppSlug}
       >
-        {FUNCTION_TABS.map((tabKey) => {
-          const active = tab === tabKey;
-          return (
-            <button
-              key={tabKey}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(tabKey)}
-              className={
-                "inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm font-medium transition " +
-                (active
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground")
-              }
-            >
-              {TAB_ICONS[tabKey]}
-              {TAB_LABELS[tabKey]}
-            </button>
-          );
-        })}
-      </div>
+        {w.registeredAppSlug}
+      </Link>
+    ),
+  },
+  {
+    id: "minScale",
+    header: "Min scale",
+    align: "right",
+    cell: (w) => <span className="font-mono text-xs">{w.hpaMinReplicas ?? 0}</span>,
+  },
+  {
+    id: "maxScale",
+    header: "Max scale",
+    align: "right",
+    cell: (w) =>
+      w.hpaMaxReplicas != null ? (
+        <span className="font-mono text-xs">{w.hpaMaxReplicas}</span>
+      ) : (
+        <span className="text-muted-foreground text-xs">none</span>
+      ),
+  },
+];
 
-      {tab === "fleet" && fleet}
-      {tab === "throughput" && (
-        <EmptyState
-          icon={<BarChart3Icon className="size-5" />}
-          title="Function Throughput"
-          description="Requests per second and invocation count across all function workloads — by trigger source and app."
-        />
-      )}
-      {tab === "errors" && (
-        <EmptyState
-          icon={<AlertCircleIcon className="size-5" />}
-          title="Function Errors"
-          description="Failed invocations with HTTP status code, error type, and trigger context."
-        />
-      )}
-      {tab === "latency" && (
-        <EmptyState
-          icon={<GaugeIcon className="size-5" />}
-          title="Function Latency"
-          description="Cold start frequency, warm invocation latency (p50/p95/p99), and end-to-end duration."
-        />
-      )}
-      {tab === "logs" && (
-        <EmptyState
-          icon={<ScrollIcon className="size-5" />}
-          title="Function Logs"
-          description="Invocation logs from function containers including request context and response code."
-        />
-      )}
-    </PageShell>
+/**
+ * Agents › Functions (spec 44 §4.4, §5.1): event-driven container
+ * invocations that scale to zero and trigger on HTTP, queues or webhooks,
+ * on the shared list, views All · Mine. Each row opens the workload on its
+ * app. Throughput, errors, latency and logs arrive with the function
+ * runtime; until then there is nothing to chart. Pure view; the data half
+ * is useFunctions.
+ */
+export function FunctionsScreen({
+  list,
+  rows,
+  totalCount,
+  loading,
+  stale,
+  error,
+  onRetry,
+}: FunctionsScreenProps) {
+  return (
+    <ListPage<AstroliftWorkload>
+      header={{
+        crumbs: agentsCrumbs("functions"),
+        title: "Functions",
+        context:
+          "Scale to zero and trigger on HTTP, queues or webhooks. Throughput, errors, latency and logs arrive with the function runtime.",
+      }}
+      list={list}
+      label="Functions"
+      columns={columns}
+      rows={rows}
+      getRowId={(w) => w.id}
+      rowHref={(w) => `/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
+      loading={loading}
+      stale={stale}
+      error={error}
+      onRetry={onRetry}
+      empty={{
+        icon: <BoltIcon className="size-5" />,
+        title: "No function workloads",
+        description:
+          "Apps with kind: function in their manifest will appear here. Functions scale to zero and trigger on HTTP, queues, or events.",
+      }}
+      totalCount={totalCount}
+    />
   );
 }

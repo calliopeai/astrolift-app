@@ -1,28 +1,57 @@
 "use client";
 
+import {
+  AlertTriangleIcon,
+  BracesIcon,
+  FileTextIcon,
+  Loader2Icon,
+  MoreHorizontalIcon,
+  PlugIcon,
+  ServerCrashIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ChevronRightIcon, Loader2Icon, TrashIcon, WrenchIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
+import {
+  ADAPTER_LABEL,
+  ADAPTERS,
+  HANDLER_PLACEHOLDER,
+} from "@/components/screens/agents/skills/tool-adapters";
+import { ShellHeader } from "@/components/shell/ShellHeader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { PageShell } from "@/components/PageShell";
-import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
-import type { ToolAdapter, useToolDetail } from "./use-tool-detail";
+import type { ToolAdapter, ToolErrors, useToolDetail } from "./use-tool-detail";
 
-export type ToolDetailScreenProps = ReturnType<typeof useToolDetail>;
+export type ToolDetailScreenProps = ReturnType<typeof useToolDetail> & {
+  /** Errors to open with; stories use it. */
+  initialErrors?: ToolErrors;
+};
 
-const ADAPTERS: { value: ToolAdapter; label: string }[] = [
-  { value: "python_fn", label: "Python function" },
-  { value: "http_endpoint", label: "HTTP endpoint" },
-  { value: "mcp_server", label: "MCP server" },
-];
+type ToolField = Exclude<keyof ToolErrors, "form">;
+
+const FORM_ID = "tool-detail-form";
 
 function prettyJson(v: unknown): string {
   try {
@@ -32,17 +61,23 @@ function prettyJson(v: unknown): string {
   }
 }
 
-/** Agents › Tools › one tool: edit its identity, adapter, handler and schemas. */
+/**
+ * Agents › Tools › one tool (spec 44 §5.2): its identity, adapter and
+ * handler, and schemas on Panels, saved from the title row, with Delete in
+ * `⋯`. Errors stand beside their fields. Holds the form values;
+ * useToolDetail owns the query and mutations.
+ */
 export function ToolDetailScreen({
   tool,
   loading,
   error,
+  onRetry,
   saving,
   deleting,
   save,
   remove,
+  initialErrors = {},
 }: ToolDetailScreenProps) {
-  // ── form state ──────────────────────────────────────────────────────────────
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -50,13 +85,14 @@ export function ToolDetailScreen({
   const [handlerRef, setHandlerRef] = useState("");
   const [inputSchemaText, setInputSchemaText] = useState("{}");
   const [outputSchemaText, setOutputSchemaText] = useState("{}");
-  const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<ToolErrors>(initialErrors);
   const [dirty, setDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Seed form when tool loads
+  // Seed the form when the tool loads, and again after a save.
   useEffect(() => {
     if (tool && !dirty) {
+      /* eslint-disable react-hooks/set-state-in-effect -- the fields copy the loaded tool until the person edits them */
       setName(tool.name);
       setSlug(tool.slug);
       setDescription(tool.description);
@@ -64,12 +100,21 @@ export function ToolDetailScreen({
       setHandlerRef(tool.handlerRef);
       setInputSchemaText(prettyJson(tool.inputSchema));
       setOutputSchemaText(prettyJson(tool.outputSchema));
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [tool, dirty]);
 
+  function edit<T>(set: (v: T) => void, field: ToolField) {
+    return (v: T) => {
+      set(v);
+      setDirty(true);
+      setErrors((e) => ({ ...e, [field]: undefined, form: undefined }));
+    };
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const result = await save({
+    const found = await save({
       name,
       slug,
       description,
@@ -78,192 +123,239 @@ export function ToolDetailScreen({
       inputSchemaText,
       outputSchemaText,
     });
-    if (result.schemaError !== undefined) setSchemaError(result.schemaError);
-    if (result.ok) setDirty(false);
+    setErrors(found);
+    if (Object.values(found).every((v) => !v)) setDirty(false);
   }
 
-  // ── loading / error states ───────────────────────────────────────────────────
-
-  if (loading && !tool) {
+  if (!tool) {
+    const pending = loading && !error;
     return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <ShellHeader
+          crumbs={agentsCrumbs("tools", { label: pending ? "Loading" : "Not found" })}
+          title={pending ? <Skeleton className="h-6 w-48" /> : "Tool not found"}
+        />
+        {pending ? (
+          <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
+            <Skeleton className="col-span-12 h-40 w-full xl:col-span-6" />
+            <Skeleton className="col-span-12 h-40 w-full xl:col-span-6" />
+            <Skeleton className="col-span-12 h-56 w-full" />
+          </div>
+        ) : error ? (
+          <div
+            role="alert"
+            className="flex flex-col items-center gap-3 rounded-md border py-10 text-center"
+          >
+            <ServerCrashIcon className="text-danger size-5" aria-hidden />
+            <div className="min-w-0 px-6">
+              <p className="font-medium">Couldn&apos;t load this tool</p>
+              <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
+                {error.message}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <EmptyState
+            icon={<AlertTriangleIcon className="size-5" />}
+            title="Tool not found"
+            description="This tool may have been deleted, or you may not have access to it."
+            actionHref="/agents/tools"
+            actionLabel="Back to tools"
+          />
+        )}
       </div>
     );
   }
 
-  if (error || !tool) {
-    return (
-      <PageShell title="Tool not found">
-        <EmptyState
-          icon={<WrenchIcon className="size-5" />}
-          title={error ? "Couldn't load this tool" : "Tool not found"}
-          description={
-            error
-              ? error.message
-              : "This tool may have been deleted, or you may not have access to it."
-          }
-          actionHref="/agents/tools"
-          actionLabel="Back to tools"
-        />
-      </PageShell>
-    );
-  }
+  const invalid = (k: ToolField) => Boolean(errors[k]) || undefined;
+  const fieldError = (k: ToolField) => (
+    <FieldError className="[overflow-wrap:anywhere]">{errors[k]}</FieldError>
+  );
 
   return (
-    <PageShell
-      title={
-        <span className="flex items-center gap-2">
-          <Link href="/agents/tools" className="text-muted-foreground hover:text-foreground">
-            Tools
-          </Link>
-          <ChevronRightIcon className="text-muted-foreground h-4 w-4" />
-          {tool.name}
-        </span>
-      }
-      description={
-        <span className="flex items-center gap-2">
-          <span className="font-mono text-xs">{tool.slug}</span>
-          <Badge variant="secondary" className="text-xs">
-            {ADAPTERS.find((a) => a.value === tool.adapter)?.label ?? tool.adapter}
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <ShellHeader
+        crumbs={agentsCrumbs("tools", { label: tool.name })}
+        title={<span title={tool.name}>{tool.name}</span>}
+        status={
+          <Badge variant="secondary" className="shrink-0">
+            {ADAPTER_LABEL[tool.adapter] ?? (tool.adapter || "unknown")}
           </Badge>
-        </span>
-      }
-      actions={
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setConfirmDelete(true)}
-          disabled={deleting}
-          className="text-destructive hover:text-destructive"
-        >
-          {deleting ? (
-            <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <TrashIcon className="mr-1 h-3.5 w-3.5" />
-          )}
-          Delete
-        </Button>
-      }
-    >
-      <form onSubmit={handleSave} className="flex flex-col gap-6">
-        {/* Identity */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setDirty(true);
-              }}
-            />
+        }
+        context={
+          <span className="font-mono text-xs" title={tool.slug}>
+            {tool.slug}
+          </span>
+        }
+        primaryAction={
+          <>
+            {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
+            <Button type="submit" form={FORM_ID} size="sm" disabled={saving || !dirty}>
+              {saving && <Loader2Icon className="size-4 animate-spin" />}
+              Save tool
+            </Button>
+          </>
+        }
+        menu={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+                <MoreHorizontalIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleting}
+                onSelect={() => setConfirmDelete(true)}
+              >
+                <TrashIcon className="size-4" />
+                Delete tool
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
+
+      <form id={FORM_ID} onSubmit={handleSave} noValidate className="flex min-w-0 flex-col gap-4">
+        {errors.form && (
+          <div
+            role="alert"
+            className="border-destructive/40 bg-destructive/5 text-destructive flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm"
+          >
+            <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{errors.form}</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Slug</Label>
-            <Input
-              value={slug}
-              className="font-mono"
-              onChange={(e) => {
-                setSlug(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-        </div>
+        )}
+        <PanelGrid>
+          <Panel title="Identity" icon={<FileTextIcon className="size-4" />} span={6}>
+            <div className="flex min-w-0 flex-col gap-4">
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <Field data-invalid={invalid("name")} className="min-w-0">
+                  <FieldLabel htmlFor="tool-name">Name</FieldLabel>
+                  <Input
+                    id="tool-name"
+                    value={name}
+                    aria-invalid={invalid("name")}
+                    onChange={(e) => edit(setName, "name")(e.target.value)}
+                  />
+                  {fieldError("name")}
+                </Field>
+                <Field data-invalid={invalid("slug")} className="min-w-0">
+                  <FieldLabel htmlFor="tool-slug">Slug</FieldLabel>
+                  <Input
+                    id="tool-slug"
+                    value={slug}
+                    className="font-mono"
+                    spellCheck={false}
+                    aria-invalid={invalid("slug")}
+                    onChange={(e) => edit(setSlug, "slug")(e.target.value)}
+                  />
+                  {fieldError("slug")}
+                </Field>
+              </div>
+              <Field data-invalid={invalid("description")} className="min-w-0">
+                <FieldLabel htmlFor="tool-description">Description</FieldLabel>
+                <Input
+                  id="tool-description"
+                  value={description}
+                  placeholder="What this tool does"
+                  aria-invalid={invalid("description")}
+                  onChange={(e) => edit(setDescription, "description")(e.target.value)}
+                />
+                {fieldError("description")}
+              </Field>
+            </div>
+          </Panel>
 
-        <div className="flex flex-col gap-1.5">
-          <Label>Description</Label>
-          <Input
-            value={description}
-            placeholder="What this tool does"
-            onChange={(e) => {
-              setDescription(e.target.value);
-              setDirty(true);
-            }}
-          />
-        </div>
+          <Panel title="Handler" icon={<PlugIcon className="size-4" />} span={6}>
+            <div className="flex min-w-0 flex-col gap-4">
+              <Field data-invalid={invalid("adapter")} className="min-w-0">
+                <FieldLabel htmlFor="tool-adapter">Adapter</FieldLabel>
+                <Select
+                  value={adapter}
+                  onValueChange={(v) => edit(setAdapter, "adapter")(v as ToolAdapter)}
+                >
+                  <SelectTrigger
+                    id="tool-adapter"
+                    className="w-full min-w-0"
+                    aria-invalid={invalid("adapter")}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ADAPTERS.map((a) => (
+                      <SelectItem key={a.value} value={a.value}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldError("adapter")}
+              </Field>
+              <Field data-invalid={invalid("handlerRef")} className="min-w-0">
+                <FieldLabel htmlFor="tool-handler">Handler ref</FieldLabel>
+                <Input
+                  id="tool-handler"
+                  value={handlerRef}
+                  placeholder={HANDLER_PLACEHOLDER[adapter]}
+                  className="font-mono"
+                  spellCheck={false}
+                  aria-invalid={invalid("handlerRef")}
+                  onChange={(e) => edit(setHandlerRef, "handlerRef")(e.target.value)}
+                />
+                {fieldError("handlerRef")}
+              </Field>
+            </div>
+          </Panel>
 
-        <Separator />
+          <Panel
+            title="Input schema"
+            icon={<BracesIcon className="size-4" />}
+            description="JSON Schema for what the agent passes in."
+            span={6}
+          >
+            <Field data-invalid={invalid("inputSchema")} className="min-w-0">
+              <FieldLabel htmlFor="tool-input" className="sr-only">
+                Input schema (JSON Schema)
+              </FieldLabel>
+              <Textarea
+                id="tool-input"
+                value={inputSchemaText}
+                rows={10}
+                className="max-h-96 font-mono text-xs"
+                aria-invalid={invalid("inputSchema")}
+                onChange={(e) => edit(setInputSchemaText, "inputSchema")(e.target.value)}
+              />
+              {fieldError("inputSchema")}
+            </Field>
+          </Panel>
 
-        {/* Adapter + handler */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Adapter</Label>
-            <select
-              value={adapter}
-              onChange={(e) => {
-                setAdapter(e.target.value as ToolAdapter);
-                setDirty(true);
-              }}
-              className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-            >
-              {ADAPTERS.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Handler ref</Label>
-            <Input
-              value={handlerRef}
-              placeholder={
-                adapter === "python_fn"
-                  ? "module.function"
-                  : adapter === "http_endpoint"
-                    ? "https://example.com/tool"
-                    : "mcp://server-address"
-              }
-              className="font-mono"
-              onChange={(e) => {
-                setHandlerRef(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* JSON schema editors */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Input schema (JSON Schema)</Label>
-            <Textarea
-              value={inputSchemaText}
-              rows={8}
-              className="font-mono text-xs"
-              onChange={(e) => {
-                setInputSchemaText(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Output schema (JSON Schema)</Label>
-            <Textarea
-              value={outputSchemaText}
-              rows={8}
-              className="font-mono text-xs"
-              onChange={(e) => {
-                setOutputSchemaText(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-        </div>
-
-        {schemaError && <p className="text-destructive text-sm">{schemaError}</p>}
-
-        <div className="flex items-center gap-2">
-          <Button type="submit" size="sm" disabled={saving || !dirty}>
-            {saving ? <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-            Save tool
-          </Button>
-          {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
-        </div>
+          <Panel
+            title="Output schema"
+            icon={<BracesIcon className="size-4" />}
+            description="JSON Schema for what the tool returns."
+            span={6}
+          >
+            <Field data-invalid={invalid("outputSchema")} className="min-w-0">
+              <FieldLabel htmlFor="tool-output" className="sr-only">
+                Output schema (JSON Schema)
+              </FieldLabel>
+              <Textarea
+                id="tool-output"
+                value={outputSchemaText}
+                rows={10}
+                className="max-h-96 font-mono text-xs"
+                aria-invalid={invalid("outputSchema")}
+                onChange={(e) => edit(setOutputSchemaText, "outputSchema")(e.target.value)}
+              />
+              {fieldError("outputSchema")}
+            </Field>
+          </Panel>
+        </PanelGrid>
       </form>
 
       <ConfirmDialog
@@ -275,6 +367,6 @@ export function ToolDetailScreen({
         destructive
         onConfirm={remove}
       />
-    </PageShell>
+    </div>
   );
 }

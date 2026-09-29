@@ -1,17 +1,25 @@
-import type { AddToolFormProps } from "./AddToolForm";
+import type { AddToolState } from "./use-add-tool";
 import type { ImportResult, ImportSkillsState } from "./use-import-skills";
 import type { NewSkillState } from "./use-new-skill";
-import type { Skill, SkillBuilderState, ToolDef } from "./use-skill-builder";
-import type { SkillListItem, SkillsListState } from "./use-skills-list";
+import type { SkillListItem } from "./skills-list";
+import type { SkillBuilderState } from "./use-skill-builder";
+import type { Skill } from "./use-skill";
+import type { ToolDef } from "./use-skill-tool-defs";
 
 /** Hand-typed fixtures for the agent skills screens (group agent-skills). */
 
 const noop = () => {};
 const noopAsync = async () => {};
-const yes = async () => true;
+const none = async () => ({});
 
 export const LONG =
   "customer-support-escalation-triage-and-knowledge-base-summarisation-for-the-emea-region";
+
+/** The long strings every list story carries: a 64-char SHA, a 200-char ARN, an unbroken URL. */
+export const SHA64 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+export const ARN200 =
+  `arn:aws:iam::123456789012:role/${"astrolift-agent-skill-runtime-".repeat(6)}`.slice(0, 200);
+export const LONG_URL = `https://github.com/example-org/${"agent-config-".repeat(8)}repo/blob/main/astrolift.toml`;
 
 // ─── Skills list ──────────────────────────────────────────────────────────────
 
@@ -24,7 +32,7 @@ export const SKILL_ITEMS: SkillListItem[] = [
     skillVersion: 3,
     isGlobal: false,
     isActive: true,
-    agentType: "claude_code",
+    updatedAt: "2026-09-27T10:12:00Z",
   },
   {
     id: "sk-2",
@@ -34,6 +42,7 @@ export const SKILL_ITEMS: SkillListItem[] = [
     skillVersion: 1,
     isGlobal: false,
     isActive: false,
+    updatedAt: "2026-09-20T08:00:00Z",
   },
   {
     id: "sk-3",
@@ -43,35 +52,32 @@ export const SKILL_ITEMS: SkillListItem[] = [
     skillVersion: 7,
     isGlobal: true,
     isActive: true,
+    updatedAt: "2026-09-25T16:40:00Z",
   },
 ];
 
-function listState(skills: SkillListItem[]): SkillsListState {
-  return {
-    loading: false,
-    errorMessage: null,
-    skills,
-    ownSkills: skills.filter((s) => !s.isGlobal),
-    globalSkills: skills.filter((s) => s.isGlobal),
-  };
-}
+/** Sixty skills: numbered pages. */
+export const MANY_SKILLS: SkillListItem[] = Array.from({ length: 60 }, (_, i) => ({
+  id: `sk-many-${i}`,
+  name: `Skill ${String(i + 1).padStart(2, "0")}`,
+  slug: `skill-${i + 1}`,
+  description: i % 3 === 0 ? "" : `What skill ${i + 1} teaches the agent.`,
+  skillVersion: (i % 9) + 1,
+  isGlobal: i % 5 === 0,
+  isActive: i % 4 !== 0,
+  updatedAt: new Date(Date.UTC(2026, 8, 28, 12) - i * 3_600_000).toISOString(),
+}));
 
-export const SKILLS_LIST_FULL: SkillsListState = listState(SKILL_ITEMS);
-export const SKILLS_LIST_EMPTY: SkillsListState = listState([]);
-export const SKILLS_LIST_LOADING: SkillsListState = { ...listState([]), loading: true };
-export const SKILLS_LIST_ERROR: SkillsListState = {
-  ...listState([]),
-  errorMessage: "Response not successful: Received status code 500",
+export const LONG_SKILL: SkillListItem = {
+  id: "sk-long",
+  name: `Document Summariser ${LONG}`,
+  slug: `${SHA64}`,
+  description: `${ARN200} ${LONG_URL}`,
+  skillVersion: 128,
+  isGlobal: true,
+  isActive: true,
+  updatedAt: "2026-09-28T09:00:00Z",
 };
-export const SKILLS_LIST_LONG: SkillsListState = listState(
-  SKILL_ITEMS.map((s) => ({
-    ...s,
-    name: `${s.name} ${LONG}`,
-    slug: `${s.slug}-${LONG}`,
-    description: `${LONG} `.repeat(4),
-    agentType: s.agentType ? `${s.agentType}_${LONG}` : undefined,
-  }))
-);
 
 // ─── Skill builder ────────────────────────────────────────────────────────────
 
@@ -123,21 +129,35 @@ export const TOOLS: ToolDef[] = [
   },
 ];
 
+export const LONG_TOOLS: ToolDef[] = TOOLS.map((t) => ({
+  ...t,
+  name: `${t.name}_${LONG}`,
+  description: `${ARN200} `,
+  handlerRef: t.adapter === "http_endpoint" ? LONG_URL : `${t.handlerRef || "handler"}.${SHA64}`,
+}));
+
+export const MANY_TOOLS: ToolDef[] = Array.from({ length: 40 }, (_, i) => ({
+  ...TOOLS[i % 3],
+  id: `td-many-${i}`,
+  name: `tool_${String(i + 1).padStart(2, "0")}`,
+  slug: `tool_${i + 1}`,
+}));
+
 export const SKILL_BUILDER: SkillBuilderState = {
+  id: "sk-1",
   skill: SKILL,
-  tools: TOOLS,
   skillLoading: false,
-  toolsLoading: false,
   errorMessage: null,
+  onRetry: noop,
+  tools: TOOLS,
+  toolsLoading: false,
+  toolsError: null,
+  onToolsRetry: noop,
   saving: false,
   deleting: false,
-  deletingTool: false,
-  creatingTool: false,
   aiAssisting: false,
-  saveSkill: yes,
+  saveSkill: none,
   deleteSkill: noopAsync,
-  deleteTool: noopAsync,
-  createTool: yes,
   aiAssist: async () => null,
 };
 
@@ -146,25 +166,23 @@ export const SKILL_BUILDER_LONG: SkillBuilderState = {
   skill: {
     ...SKILL,
     name: `Document Summariser ${LONG}`,
-    slug: `document-summariser-${LONG}`,
-    description: `${LONG} `.repeat(3),
-    content: `${LONG}\n`.repeat(20),
+    slug: `document-summariser-${SHA64}`,
+    description: `${ARN200}`,
+    content: `${LONG_URL}\n${`${LONG}\n`.repeat(20)}`,
     isGlobal: true,
   },
-  tools: TOOLS.map((t) => ({
-    ...t,
-    name: `${t.name}_${LONG}`,
-    description: `${LONG} `.repeat(3),
-    handlerRef: `${t.handlerRef || "handler"}.${LONG}`,
-  })),
+  tools: LONG_TOOLS,
 };
 
-// ─── Add tool form ────────────────────────────────────────────────────────────
+// ─── Register tool ───────────────────────────────────────────────────────────
 
-export const ADD_TOOL_FORM: AddToolFormProps = {
-  onSubmit: yes,
-  loading: false,
-  onDone: noop,
+export const ADD_TOOL: AddToolState = {
+  skillId: "sk-1",
+  skill: SKILL,
+  skillLoading: false,
+  skillError: null,
+  creating: false,
+  createTool: none,
 };
 
 // ─── Import ───────────────────────────────────────────────────────────────────
@@ -178,9 +196,8 @@ export const IMPORT_RESULT: ImportResult = {
 export const IMPORT_SKILLS: ImportSkillsState = {
   loading: false,
   result: null,
-  importSkills: noopAsync,
+  importSkills: none,
   clearResult: noop,
-  viewSkills: noop,
 };
 
 // ─── New skill ────────────────────────────────────────────────────────────────
@@ -188,5 +205,5 @@ export const IMPORT_SKILLS: ImportSkillsState = {
 export const NEW_SKILL: NewSkillState = {
   orgReady: true,
   loading: false,
-  createSkill: noopAsync,
+  createSkill: none,
 };

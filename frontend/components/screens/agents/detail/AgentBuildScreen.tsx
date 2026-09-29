@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListSummary } from "@/components/list/ListSummary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +48,11 @@ export interface AgentBuildScreenProps {
   brief: AstroliftBrief | null;
   /** Skill bindings, already ordered by `position`. */
   skills: AstroliftAgentSkill[];
+  /**
+   * The Skills & tools tab. Set inside the agent frame, where that tab holds
+   * the full list: the skills here become a summary of the first few.
+   */
+  skillsHref?: string;
 }
 
 // Tool-adapter display labels, kept in sync with the skill/tool registry
@@ -97,6 +103,7 @@ export function AgentBuildScreen({
   detailError,
   brief,
   skills,
+  skillsHref,
 }: AgentBuildScreenProps) {
   return (
     <div className="space-y-5">
@@ -255,56 +262,83 @@ export function AgentBuildScreen({
         </CardContent>
       </Card>
 
-      {/* Skills & tools — the agent's ordered skill bindings and each skill's
-          tool definitions, from `agent(slug)`. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <WrenchIcon className="size-4" />
-            Skills &amp; tools
-            {skills.length > 0 && (
-              <Badge variant="outline" className="text-muted-foreground ml-1 text-xs">
-                {skills.length}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {detailLoading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : detailError ? (
-            <p className="text-muted-foreground text-sm">Skills could not be loaded right now.</p>
-          ) : skills.length > 0 ? (
-            <div className="divide-y">
-              {skills.map((binding) => (
-                <SkillBlock key={binding.skill.id} binding={binding} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<WrenchIcon className="size-5" />}
-              title="No skills attached"
-              description="This agent has no skills bound to it yet. Skills and their tool definitions are managed in the org-wide registries."
-              secondary={
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Link
-                    href="/agents/skills"
-                    className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
-                  >
-                    Skill registry
-                  </Link>
-                  <Link
-                    href="/agents/tools"
-                    className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
-                  >
-                    Tool registry
-                  </Link>
-                </div>
-              }
-            />
+      {skillsHref ? (
+        <ListSummary
+          title="Skills & tools"
+          icon={<WrenchIcon className="size-4" />}
+          count={detailLoading || detailError ? null : skills.length}
+          rows={skills}
+          keyOf={(b) => b.skill.id}
+          renderRow={(b) => (
+            <span className="flex min-w-0 items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate font-medium">{b.skill.name}</span>
+              <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                {b.toolDefs.length} {b.toolDefs.length === 1 ? "tool" : "tools"}
+              </span>
+            </span>
           )}
-        </CardContent>
-      </Card>
+          rowHref={(b) => `/agents/skills/${b.skill.id}`}
+          viewAllHref={skillsHref}
+          loading={detailLoading}
+          error={detailError ? "Skills could not be loaded right now." : null}
+          empty={{
+            icon: <WrenchIcon className="size-5" />,
+            title: "No skills attached",
+            description: "Skills and their tools are managed in the org-wide registries.",
+            actionHref: "/agents/skills",
+            actionLabel: "Skill registry",
+          }}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <WrenchIcon className="size-4" />
+              Skills &amp; tools
+              {skills.length > 0 && (
+                <Badge variant="outline" className="text-muted-foreground ml-1 text-xs">
+                  {skills.length}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {detailLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : detailError ? (
+              <p className="text-muted-foreground text-sm">Skills could not be loaded right now.</p>
+            ) : skills.length > 0 ? (
+              <div className="divide-y">
+                {skills.map((binding) => (
+                  <SkillBlock key={binding.skill.id} binding={binding} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<WrenchIcon className="size-5" />}
+                title="No skills attached"
+                description="This agent has no skills bound to it yet. Skills and their tool definitions are managed in the org-wide registries."
+                secondary={
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <Link
+                      href="/agents/skills"
+                      className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
+                    >
+                      Skill registry
+                    </Link>
+                    <Link
+                      href="/agents/tools"
+                      className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
+                    >
+                      Tool registry
+                    </Link>
+                  </div>
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

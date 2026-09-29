@@ -5,6 +5,13 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { hasErrors, splitErrors } from "@/components/screens/agents/skills/catalog";
+import {
+  TOOL_FIELDS,
+  type ToolDefFields,
+  type ToolErrors,
+  validateTool,
+} from "@/components/screens/agents/skills/use-add-tool";
 import { DELETE_TOOL_DEF, UPDATE_TOOL_DEF } from "@/graphql/agents/agents.mutations";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
@@ -35,7 +42,8 @@ const GET_TOOL_DEF = gql`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ToolAdapter = "python_fn" | "http_endpoint" | "mcp_server";
+export type { Adapter as ToolAdapter } from "@/components/screens/agents/skills/tool-adapters";
+export type { ToolErrors } from "@/components/screens/agents/skills/use-add-tool";
 
 export type ToolDetailTool = {
   id: string;
@@ -50,22 +58,7 @@ export type ToolDetailTool = {
 };
 
 /** What the form hands the hook on submit, schemas still as raw text. */
-export type ToolDetailFormValues = {
-  name: string;
-  slug: string;
-  description: string;
-  adapter: ToolAdapter;
-  handlerRef: string;
-  inputSchemaText: string;
-  outputSchemaText: string;
-};
-
-/**
- * ok: the save went through. schemaError: set when a schema failed to parse
- * (a string) or parsed cleanly (null); absent when the save stopped before
- * the schemas were checked.
- */
-export type ToolDetailSaveResult = { ok: boolean; schemaError?: string | null };
+export type ToolDetailFormValues = ToolDefFields;
 
 type OrgToolDefsData = { orgToolDefs: ToolDetailTool[] };
 
@@ -94,7 +87,7 @@ export function useToolDetail(id: string) {
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
 
-  const { data, loading, error } = useQuery<OrgToolDefsData>(GET_TOOL_DEF, {
+  const { data, loading, error, refetch } = useQuery<OrgToolDefsData>(GET_TOOL_DEF, {
     variables: { orgId, id },
     fetchPolicy: "cache-and-network",
     skip: !orgId,
@@ -110,47 +103,36 @@ export function useToolDetail(id: string) {
     refetchQueries: ["ListOrgToolDefs", "ListToolDefs"],
   });
 
-  async function save(values: ToolDetailFormValues): Promise<ToolDetailSaveResult> {
+  /** Resolves the errors to show beside their fields; empty when it saved. */
+  async function save(values: ToolDetailFormValues): Promise<ToolErrors> {
+    const invalid = validateTool(values);
+    if (hasErrors(invalid)) return invalid;
     const { name, slug, description, adapter, handlerRef } = values;
-    if (!name.trim() || !slug.trim()) {
-      toast.error("Name and slug are required");
-      return { ok: false };
-    }
-    let parsedInput: unknown = {};
-    let parsedOutput: unknown = {};
     try {
-      parsedInput = JSON.parse(values.inputSchemaText);
-    } catch {
-      return { ok: false, schemaError: "Input schema is not valid JSON" };
-    }
-    try {
-      parsedOutput = JSON.parse(values.outputSchemaText);
-    } catch {
-      return { ok: false, schemaError: "Output schema is not valid JSON" };
-    }
-    const { data: mutData } = await updateToolDef({
-      variables: {
-        id,
-        input: {
-          name: name.trim(),
-          slug: slug.trim(),
-          description: description.trim(),
-          adapter,
-          handlerRef: handlerRef.trim(),
-          inputSchema: parsedInput,
-          outputSchema: parsedOutput,
-          implementationConfig: null,
+      const { data: mutData } = await updateToolDef({
+        variables: {
+          id,
+          input: {
+            name: name.trim(),
+            slug: slug.trim(),
+            description: description.trim(),
+            adapter,
+            handlerRef: handlerRef.trim(),
+            inputSchema: JSON.parse(values.inputSchemaText.trim() || "{}"),
+            outputSchema: JSON.parse(values.outputSchemaText.trim() || "{}"),
+            implementationConfig: null,
+          },
         },
-      },
-    });
-    if (mutData?.updateToolDef?.ok) {
-      toast.success("Tool saved");
-      return { ok: true, schemaError: null };
+      });
+      if (mutData?.updateToolDef?.ok) {
+        toast.success("Tool saved");
+        return {};
+      }
+      const errors = splitErrors(mutData?.updateToolDef?.errors ?? [], TOOL_FIELDS);
+      return hasErrors(errors) ? errors : { form: "The tool was not saved." };
+    } catch (err) {
+      return { form: err instanceof Error ? err.message : String(err) };
     }
-    for (const err of mutData?.updateToolDef?.errors ?? []) {
-      toast.error(`${err.field}: ${err.message}`);
-    }
-    return { ok: false, schemaError: null };
   }
 
   // Throws on failure so ConfirmDialog holds the dialog open and toasts
@@ -167,8 +149,11 @@ export function useToolDetail(id: string) {
 
   return {
     tool,
-    loading,
+    loading: loading && !data,
     error: error ? { message: error.message } : null,
+    onRetry: () => {
+      void refetch();
+    },
     saving,
     deleting,
     save,

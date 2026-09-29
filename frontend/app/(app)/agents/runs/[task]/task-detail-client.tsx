@@ -1,35 +1,16 @@
 "use client";
 
 import { AgentRunDetail } from "@/components/screens/agents/runs/AgentRunDetail";
+import { useAgentInteractionMap } from "@/components/screens/agents/runs/use-agent-interaction-map";
 import { useAgentRunDetail } from "@/components/screens/agents/runs/use-agent-run-detail";
 
-import { LiveLogTerminalContainer } from "../../_components/live-log-terminal";
-
-import { AgentInteractionMap } from "./agent-interaction-map";
-
 /**
- * Agent run detail (#1105) — one AgentTask by id. The screen owns the markup;
- * the interaction map and log tail are containers that poll only while shown.
+ * Agent run detail (#1105): one AgentTask on the run page. The interactions
+ * are read once here and feed both the Timeline and the interaction map;
+ * the log pane reads the detail hook's own log query.
  */
 export function AgentTaskDetail({ taskId }: { taskId: string }) {
   const detail = useAgentRunDetail(taskId);
-  const task = detail.task;
-  const running = task?.status === "running";
-
-  return (
-    <AgentRunDetail
-      {...detail}
-      interactionMap={
-        task ? <AgentInteractionMap taskId={task.id} taskStatus={task.status} /> : undefined
-      }
-      logTerminal={
-        <LiveLogTerminalContainer
-          taskId={taskId}
-          running={running}
-          tail={200}
-          className="h-[28rem]"
-        />
-      }
-    />
-  );
+  const interactions = useAgentInteractionMap(taskId, detail.task?.status ?? "");
+  return <AgentRunDetail {...detail} interactions={interactions} />;
 }

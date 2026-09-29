@@ -1,44 +1,27 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { LiveLogTerminal } from "@/components/observability/LiveLogTerminal";
-
-import { AgentInteractionMapView } from "./AgentInteractionMap";
 import { AgentRunDetail } from "./AgentRunDetail";
 import {
   COMPLETED_TASK,
   FAILED_TASK,
   INTERACTION_MAP,
-  LOG_LINES,
   LONG_INTERACTIONS,
   LONG_TASK,
+  MANY_INTERACTIONS,
   RUN_DETAIL,
-  TASK_ID,
 } from "./agent-runs.fixtures";
 
+/** One agent run on the run page: Timeline, Log, then Details and Result (spec 44 §5.5). */
 const meta: Meta = {
   title: "Screens/Agents/Runs/AgentRunDetail",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-const map = <AgentInteractionMapView {...INTERACTION_MAP} />;
-const terminal = (running: boolean) => (
-  <LiveLogTerminal
-    taskId={TASK_ID}
-    running={running}
-    lines={LOG_LINES}
-    loading={false}
-    error={null}
-    className="h-[28rem]"
-  />
-);
-
 export const Running: Story = {
-  render: () => (
-    <AgentRunDetail {...RUN_DETAIL} interactionMap={map} logTerminal={terminal(true)} />
-  ),
+  render: () => <AgentRunDetail {...RUN_DETAIL} />,
 };
 
 export const Completed: Story = {
@@ -47,15 +30,12 @@ export const Completed: Story = {
       {...RUN_DETAIL}
       task={COMPLETED_TASK}
       terminal
-      interactionMap={
-        <AgentInteractionMapView {...INTERACTION_MAP} taskStatus="completed" isTerminal />
-      }
-      logTerminal={terminal(false)}
+      interactions={{ ...INTERACTION_MAP, taskStatus: "completed", isTerminal: true }}
     />
   ),
 };
 
-/** A spawn-failed run: no pod, no logs, the failure callout on top. */
+/** A spawn-failed run: no pod, no logs, the reason first in the Timeline. */
 export const SpawnFailed: Story = {
   render: () => (
     <AgentRunDetail
@@ -63,20 +43,39 @@ export const SpawnFailed: Story = {
       task={FAILED_TASK}
       terminal
       logs={[]}
-      interactionMap={
-        <AgentInteractionMapView
-          {...INTERACTION_MAP}
-          taskStatus="failed"
-          isTerminal
-          interactions={[]}
-        />
-      }
+      interactions={{
+        ...INTERACTION_MAP,
+        taskStatus: "failed",
+        isTerminal: true,
+        interactions: [],
+      }}
+    />
+  ),
+};
+
+/** Sixty tool calls: the Timeline keeps the newest and folds the rest into one line. */
+export const ManyToolCalls: Story = {
+  render: () => (
+    <AgentRunDetail
+      {...RUN_DETAIL}
+      interactions={{ ...INTERACTION_MAP, interactions: MANY_INTERACTIONS }}
     />
   ),
 };
 
 export const Loading: Story = {
   render: () => <AgentRunDetail {...RUN_DETAIL} task={null} loading />,
+};
+
+/** The log is still loading while the run itself is known. */
+export const LogLoading: Story = {
+  render: () => <AgentRunDetail {...RUN_DETAIL} logs={[]} logsLoading />,
+};
+
+export const LogError: Story = {
+  render: () => (
+    <AgentRunDetail {...RUN_DETAIL} logs={[]} logsError="agentTaskLogs: upstream timed out" />
+  ),
 };
 
 /** No run with this id, or no access to it (the closest thing to empty). */
@@ -99,10 +98,19 @@ export const LongStrings: Story = {
     <AgentRunDetail
       {...RUN_DETAIL}
       task={LONG_TASK}
-      interactionMap={
-        <AgentInteractionMapView {...INTERACTION_MAP} interactions={LONG_INTERACTIONS} />
-      }
-      logTerminal={terminal(true)}
+      interactions={{ ...INTERACTION_MAP, interactions: LONG_INTERACTIONS }}
     />
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <AgentRunDetail
+        {...RUN_DETAIL}
+        task={LONG_TASK}
+        interactions={{ ...INTERACTION_MAP, interactions: LONG_INTERACTIONS }}
+      />
+    </div>
   ),
 };

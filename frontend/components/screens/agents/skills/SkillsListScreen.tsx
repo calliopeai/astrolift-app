@@ -1,134 +1,179 @@
 "use client";
 
-import {
-  BookOpenIcon,
-  GitBranchIcon,
-  GlobeIcon,
-  Loader2Icon,
-  PlusIcon,
-  WrenchIcon,
-} from "lucide-react";
+import { BookOpenIcon, GitBranchIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import type { Column, EmptyStateSpec } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useFormatters } from "@/lib/i18n/formatters";
 
-import type { SkillListItem, SkillsListState } from "./use-skills-list";
+import { agentsCrumbs } from "./catalog";
+import type { SkillListItem } from "./skills-list";
 
-export type SkillsListScreenProps = SkillsListState;
-
-/** The skill registry: the org's own skills, then the global ones. Data comes from useSkillsList. */
-export function SkillsListScreen({
-  loading,
-  errorMessage,
-  skills,
-  ownSkills,
-  globalSkills,
-}: SkillsListScreenProps) {
-  return (
-    <PageShell
-      title="Skill registry"
-      description="Versioned instructions and tool bindings your agents draw on at dispatch time."
-      actions={
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/agents/skills/import">
-              <GitBranchIcon className="mr-1 h-4 w-4" /> Import from repo
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/agents/skills/new">
-              <PlusIcon className="mr-1 h-4 w-4" /> New skill
-            </Link>
-          </Button>
-        </div>
-      }
-    >
-      {loading && skills.length === 0 && (
-        <div className="flex items-center justify-center p-12">
-          <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-        </div>
-      )}
-
-      {errorMessage !== null && (
-        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          Error: {errorMessage}
-        </div>
-      )}
-
-      {!loading && errorMessage === null && skills.length === 0 && (
-        <EmptyState
-          icon={<BookOpenIcon className="size-5" />}
-          title="No skills defined"
-          description="Skills package instructions and tools that agents draw on when running tasks."
-          actionHref="/agents/skills/new"
-          actionLabel="New skill"
-        />
-      )}
-
-      {ownSkills.length > 0 && (
-        <section className="flex flex-col gap-2">
-          {ownSkills.map((skill) => (
-            <SkillRow key={skill.id} skill={skill} />
-          ))}
-        </section>
-      )}
-
-      {globalSkills.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-            <GlobeIcon className="text-muted-foreground h-3.5 w-3.5" />
-            Global skills
-          </h2>
-          <div className="flex flex-col gap-2">
-            {globalSkills.map((skill) => (
-              <SkillRow key={skill.id} skill={skill} />
-            ))}
-          </div>
-        </section>
-      )}
-    </PageShell>
-  );
+export interface SkillsListScreenProps {
+  list: ListStateController;
+  /** The page on screen, already filtered, sorted and sliced. */
+  rows: SkillListItem[];
+  /** Skills matching the view, filters and search, across all pages. */
+  totalCount: number;
+  loading: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+  /** Opens the Import from repo sheet (`?import=1`). */
+  onImportOpenChange: (open: boolean) => void;
+  /** The Import from repo sheet, rendered by the route with its own hook. */
+  importSheet?: React.ReactNode;
 }
 
-function SkillRow({ skill }: { skill: SkillListItem }) {
-  return (
-    <Link
-      href={`/agents/skills/${skill.id}`}
-      className="hover:bg-muted/50 flex items-center gap-4 rounded-lg border px-4 py-3 transition-colors"
-    >
-      <div className="bg-muted rounded-md p-1.5">
-        <WrenchIcon className="text-muted-foreground h-4 w-4" />
-      </div>
+/**
+ * Agents › Skills (spec 44 §4.4, §5.1): the skill registry on the shared
+ * list, views All · Mine · Imported, status and scope filters, numbered
+ * pages. New skill is a stepped page; Import from repo is a sheet in `⋯`.
+ * Pure view; the data half is useSkillsList.
+ */
+export function SkillsListScreen({
+  list,
+  rows,
+  totalCount,
+  loading,
+  error,
+  onRetry,
+  onImportOpenChange,
+  importSheet,
+}: SkillsListScreenProps) {
+  const fmt = useFormatters();
 
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{skill.name}</span>
-          <Badge variant={skill.isActive ? "default" : "secondary"} className="text-xs">
-            {skill.isActive ? "Active" : "Inactive"}
-          </Badge>
-          {skill.isGlobal && (
-            <Badge variant="outline" className="text-xs">
-              Global
-            </Badge>
-          )}
-          {skill.agentType && (
-            <Badge variant="outline" className="text-muted-foreground text-xs">
-              {skill.agentType}
-            </Badge>
-          )}
-        </div>
-        <span className="text-muted-foreground truncate text-sm">
-          {skill.description || <span className="italic">No description</span>}
+  const empty: EmptyStateSpec = {
+    icon: <BookOpenIcon className="size-5" />,
+    title: "No skills defined",
+    description: "Skills package instructions and tools that agents draw on when running tasks.",
+    actionHref: "/agents/skills/new",
+    actionLabel: "New skill",
+  };
+
+  const columns: Column<SkillListItem>[] = [
+    {
+      id: "skill",
+      header: "Skill",
+      sortKey: "name",
+      cellClassName: "max-w-96",
+      cell: (s) => (
+        <span className="block min-w-0">
+          <span className="block truncate font-medium" title={s.name}>
+            {s.name}
+          </span>
+          <span className="text-muted-foreground block truncate font-mono text-xs" title={s.slug}>
+            {s.slug}
+          </span>
         </span>
-      </div>
+      ),
+    },
+    {
+      id: "description",
+      header: "Description",
+      cellClassName: "max-w-80",
+      cell: (s) =>
+        s.description ? (
+          <span className="text-muted-foreground line-clamp-2 text-sm [overflow-wrap:anywhere]">
+            {s.description}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-sm italic">No description</span>
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (s) => (
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <StatusDot status={s.isActive ? "ok" : "muted"} />
+          {s.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      cell: (s) =>
+        s.isGlobal ? (
+          <Badge variant="outline">Global</Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">Organization</span>
+        ),
+    },
+    {
+      id: "version",
+      header: "Version",
+      sortKey: "version",
+      cell: (s) => <span className="font-mono text-xs">v{s.skillVersion}</span>,
+    },
+    {
+      id: "updated",
+      header: "Updated",
+      sortKey: "updated",
+      cell: (s) => (
+        <span className="text-muted-foreground font-mono text-xs">
+          {s.updatedAt ? fmt.formatDateTime(s.updatedAt) : "unknown"}
+        </span>
+      ),
+    },
+  ];
 
-      <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="text-muted-foreground font-mono text-xs">{skill.slug}</span>
-        <span className="text-muted-foreground text-xs">v{skill.skillVersion}</span>
-      </div>
-    </Link>
+  return (
+    <>
+      <ListPage<SkillListItem>
+        header={{
+          crumbs: agentsCrumbs("skills"),
+          title: "Skills",
+          context: "Versioned instructions and tool bindings your agents draw on at dispatch time.",
+          primaryAction: (
+            <Button size="sm" asChild>
+              <Link href="/agents/skills/new">
+                <PlusIcon className="size-4" />
+                New skill
+              </Link>
+            </Button>
+          ),
+          menu: (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+                  <MoreHorizontalIcon className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem onSelect={() => onImportOpenChange(true)}>
+                  <GitBranchIcon className="size-4" />
+                  Import from repo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ),
+        }}
+        list={list}
+        label="Skills"
+        columns={columns}
+        rows={rows}
+        getRowId={(s) => s.id}
+        rowHref={(s) => `/agents/skills/${s.id}`}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        empty={empty}
+        totalCount={totalCount}
+      />
+      {importSheet}
+    </>
   );
 }

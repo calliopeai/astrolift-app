@@ -3,44 +3,18 @@ import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identit
 
 import type { AgentDiscoveryStepViewProps } from "./AgentDiscoveryStep";
 import type { AgentProjectStepViewProps } from "./AgentProjectStep";
-import type { WizardShellProps, WizardStep } from "./AgentWizardShell";
 import type { AgentDiscoveryFields } from "./use-agent-discovery-step";
 import type { AgentProjectFields } from "./use-agent-project-step";
 
 /**
- * Hand-typed fixtures for the register-agent-repo wizard shell, discovery
- * step, and project step (components/screens/agents/new/, group
- * agents-wizard-a).
+ * Hand-typed fixtures for New agent's discovery and project parts
+ * (components/screens/agents/new/, group agents-wizard-a).
  */
 
 const noop = () => {};
 
 export const LONG =
   "platform-team-shared-production-agents-us-west-2-with-a-deliberately-long-name-that-keeps-going";
-
-// ---------------------------------------------------------------- shell
-
-export const AGENT_WIZARD_STEPS: WizardStep[] = [
-  { key: "repo", label: "Repository", description: "Pick the Git repository holding your agents." },
-  { key: "discover", label: "Discover", description: "Scan the repo for agent manifests." },
-  { key: "project", label: "Project", description: "Choose where the agents are registered." },
-  { key: "review", label: "Review", description: "Check everything, then register." },
-];
-
-export const AGENT_WIZARD: Omit<WizardShellProps, "children"> = {
-  step: 2,
-  steps: AGENT_WIZARD_STEPS,
-  onStepClick: noop,
-  onBack: noop,
-  onNext: noop,
-  onCancel: noop,
-};
-
-export const LONG_AGENT_WIZARD_STEPS: WizardStep[] = AGENT_WIZARD_STEPS.map((s) => ({
-  ...s,
-  label: `${s.label} ${LONG}`,
-  description: `${s.description} ${LONG} ${LONG}`,
-}));
 
 // ---------------------------------------------------------------- discovery
 

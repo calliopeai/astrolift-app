@@ -43,9 +43,8 @@ export interface AgentReviewSubmitStepViewProps {
   // Human label for the picked project (`team/project`), resolved by the
   // wizard from the project list — agents have no name/slug of their own here.
   projectLabel: string;
-  /** Step labels, in wizard order; the summary cards title themselves from 0-2. */
-  steps: Array<{ label: string }>;
-  onJumpToStep: (idx: number) => void;
+  /** Back to a step to edit it: 1 Source (repo and agents found), 2 Configure (project). */
+  onJumpToStep: (step: 1 | 2) => void;
   submitting: boolean;
   submitError: string | null;
   sideEffects: SideEffectStep[];
@@ -53,11 +52,10 @@ export interface AgentReviewSubmitStepViewProps {
   registeredAgents: AstroliftRegisteredAgent[];
 }
 
-/** Agent wizard step 4: summary, per-agent outcome and the submit side effects. */
+/** New agent, Review: summary, per-agent outcome and the submit side effects. */
 export function AgentReviewSubmitStepView({
   state,
   projectLabel,
-  steps,
   onJumpToStep,
   submitting,
   submitError,
@@ -71,8 +69,8 @@ export function AgentReviewSubmitStepView({
     <div className="flex flex-col gap-5">
       <section className="grid gap-3 sm:grid-cols-2">
         <SummaryCard
-          stepIdx={1}
-          title={steps[0].label}
+          step={1}
+          title="Repository"
           onJump={onJumpToStep}
           rows={[
             { label: "Repository", value: state.sourceRepo, mono: true },
@@ -81,8 +79,8 @@ export function AgentReviewSubmitStepView({
           ]}
         />
         <SummaryCard
-          stepIdx={2}
-          title={steps[1].label}
+          step={1}
+          title="Agents found"
           onJump={onJumpToStep}
           rows={[
             { label: "Discovered", value: `${state.discoveredAgents.length} agent(s)` },
@@ -91,8 +89,8 @@ export function AgentReviewSubmitStepView({
           ]}
         />
         <SummaryCard
-          stepIdx={3}
-          title={steps[2].label}
+          step={2}
+          title="Project"
           onJump={onJumpToStep}
           rows={[{ label: "Project", value: projectLabel || state.projectId, mono: !projectLabel }]}
         />
@@ -210,14 +208,14 @@ export function AgentReviewSubmitStepView({
 }
 
 function SummaryCard({
-  stepIdx,
+  step,
   title,
   onJump,
   rows,
 }: {
-  stepIdx: number;
+  step: 1 | 2;
   title: string;
-  onJump: (idx: number) => void;
+  onJump: (step: 1 | 2) => void;
   rows: Array<{ label: string; value: string; mono?: boolean }>;
 }) {
   return (
@@ -231,7 +229,7 @@ function SummaryCard({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => onJump(stepIdx)}
+            onClick={() => onJump(step)}
             className="text-muted-foreground hover:text-foreground -mt-1 -mr-2 h-7 gap-1 px-2 text-xs"
             aria-label={`Edit ${title}`}
           >

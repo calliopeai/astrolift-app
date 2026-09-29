@@ -271,24 +271,35 @@ export const RUN_ROWS: AgentTask[] = [
   },
 ];
 
-type RunData = Omit<AgentRunScreenProps, "renderLogs">;
+/** The Runs screen's data, less the list controller a story makes with useLocalListState. */
+export type RunData = Omit<AgentRunScreenProps, "renderLogs" | "list">;
 
 export const RUN: RunData = {
   rows: RUN_ROWS,
+  newRows: { count: 0, onReveal: () => {} },
   loading: false,
-  dispatching: false,
-  onDispatch: async () => true,
-  onOpenRun: () => {},
+  stale: false,
+  error: null,
+  onRetry: () => {},
+  nextCursor: "cursor-2",
+  totalCount: 42,
 };
 
-export const RUN_LOADING: RunData = { ...RUN, rows: [], loading: true };
+export const RUN_LOADING: RunData = { ...RUN, rows: [], loading: true, totalCount: null };
 
-export const RUN_EMPTY: RunData = { ...RUN, rows: [] };
+export const RUN_EMPTY: RunData = { ...RUN, rows: [], nextCursor: null, totalCount: 0 };
 
-export const RUN_DISPATCHING: RunData = { ...RUN, dispatching: true };
+/** The page query failed with nothing cached: the error sits in the list's frame. */
+export const RUN_ERROR: RunData = {
+  ...RUN,
+  rows: [],
+  nextCursor: null,
+  totalCount: null,
+  error: { message: "Network error: failed to fetch agentTasksPage" },
+};
 
-/** Dispatch rejected by the server: the hook toasts the error and returns false. */
-export const RUN_DISPATCH_FAILS: RunData = { ...RUN, rows: [], onDispatch: async () => false };
+/** Two runs arrived while the reader was on the list: they wait behind the pill. */
+export const RUN_NEW_ROWS: RunData = { ...RUN, newRows: { count: 2, onReveal: () => {} } };
 
 export const RUN_LONG: RunData = {
   ...RUN,

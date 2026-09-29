@@ -1,10 +1,21 @@
 "use client";
 
+import { agentTabHref } from "@/components/screens/agents/detail/agent-tabs-model";
 import { AgentBuildScreen } from "@/components/screens/agents/detail/AgentBuildScreen";
 import { useAgentBuild } from "@/components/screens/agents/detail/use-agent-build";
-import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 
-/** Build tab: fetches the agent's image, manifest, brief and skills, renders the screen. */
-export function BuildContent({ agent, orgId }: { agent: AstroliftAgentListItem; orgId: string }) {
-  return <AgentBuildScreen {...useAgentBuild(agent, orgId)} />;
+import { useFramedAgent } from "./framed-agent";
+
+/**
+ * Configuration › Build: the agent's source, image, manifest and brief. Its
+ * skills are a summary here; the full list is the Skills & tools tab.
+ */
+export function BuildContent() {
+  const { agent, orgId } = useFramedAgent();
+  return (
+    <AgentBuildScreen
+      {...useAgentBuild(agent, orgId)}
+      skillsHref={agentTabHref(agent.slug, "skills")}
+    />
+  );
 }

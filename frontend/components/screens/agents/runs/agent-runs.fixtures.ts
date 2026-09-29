@@ -96,15 +96,35 @@ export const INTERACTION_MAP: AgentInteractionMapProps = {
   error: null,
 };
 
+const noop = () => {};
+
 export const RUN_DETAIL: AgentRunDetailProps = {
   taskId: TASK_ID,
   task: RUNNING_TASK,
   loading: false,
   error: null,
+  onRetry: noop,
   terminal: false,
+  now: Date.now(),
   logs: LOG_LINES,
+  logsLoading: false,
+  logsError: null,
+  onRetryLogs: noop,
+  onDownloadLogs: noop,
   onHardStop: async () => {},
+  interactions: INTERACTION_MAP,
 };
+
+/** Enough tool calls that the Timeline folds the oldest into one line. */
+export const MANY_INTERACTIONS: AstroliftAgentInteraction[] = Array.from({ length: 60 }, (_, i) =>
+  interaction(
+    `m${i}`,
+    "tool_call",
+    `crm.lookup_account_${i}`,
+    i % 7 === 0 ? "error" : "ok",
+    600 - i * 9
+  )
+);
 
 export const VNC_POPOUT: AgentVncPopoutProps = {
   taskId: TASK_ID,

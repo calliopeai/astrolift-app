@@ -1,5 +1,6 @@
+import { ARN200, LONG_URL, SHA64 } from "@/components/screens/agents/skills/agent-skills.fixtures";
+
 import type { ToolDetailScreenProps } from "./ToolDetailScreen";
-import type { ToolRegistryScreenProps } from "./ToolRegistryScreen";
 import type { ToolDetailTool } from "./use-tool-detail";
 import type { ToolRegistryTool } from "./use-tool-registry";
 
@@ -56,11 +57,14 @@ export const TOOLS: ToolRegistryTool[] = [
   },
 ];
 
-export const REGISTRY: ToolRegistryScreenProps = {
-  tools: TOOLS,
-  loading: false,
-  error: null,
-};
+/** Sixty tools across the adapters: numbered pages. */
+export const MANY_TOOLS: ToolRegistryTool[] = Array.from({ length: 60 }, (_, i) => ({
+  ...TOOLS[i % 4],
+  id: `tool-many-${i}`,
+  name: `Tool ${String(i + 1).padStart(2, "0")}`,
+  slug: `tool-${i + 1}`,
+  createdAt: new Date(Date.UTC(2026, 8, 28, 12) - i * 3_600_000).toISOString(),
+}));
 
 export const LONG_TOOLS: ToolRegistryTool[] = [
   {
@@ -71,6 +75,15 @@ export const LONG_TOOLS: ToolRegistryTool[] = [
     adapter: "http_endpoint",
     handlerRef: `https://${LONG}.example.com/${LONG}`,
     createdAt: "2026-09-01T12:00:00Z",
+  },
+  {
+    id: "tool-sha",
+    name: SHA64,
+    slug: SHA64,
+    description: ARN200,
+    adapter: "mcp_server",
+    handlerRef: LONG_URL,
+    createdAt: "2026-09-02T12:00:00Z",
   },
 ];
 
@@ -107,8 +120,9 @@ export const DETAIL: ToolDetailScreenProps = {
   tool: TOOL,
   loading: false,
   error: null,
+  onRetry: () => {},
   saving: false,
   deleting: false,
-  save: async () => ({ ok: true, schemaError: null }),
+  save: async () => ({}),
   remove: noopAsync,
 };

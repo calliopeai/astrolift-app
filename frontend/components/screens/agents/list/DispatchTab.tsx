@@ -144,8 +144,8 @@ function parseTimeout(text: string): number | null {
  * dispatches ANY registered agent without navigating to it first. It fires a
  * Once run via `runAstroliftAgent` with the full input that mutation accepts —
  * `triggerPayload` (prompt / JSON inputs), plus the Advanced `environmentSpecId`
- * override and `timeoutSeconds`. The created AgentTask then surfaces on the
- * Active / History tabs and drills into the run detail view.
+ * override and `timeoutSeconds`. The created AgentTask then surfaces in
+ * Agents › Runs and drills into the run detail view.
  */
 export function DispatchTabView({
   agents,
@@ -157,7 +157,7 @@ export function DispatchTabView({
   defaultAgentSlug = "",
   defaultRunMode = "ONCE",
 }: DispatchTabViewProps & {
-  /** Initial picker selection (stories). */
+  /** Initial picker selection (stories, and `?agent=` on Run agent). */
   defaultAgentSlug?: string;
   /** Initial run mode (stories). */
   defaultRunMode?: AgentRunMode;
@@ -253,8 +253,8 @@ export function DispatchTabView({
       <CardHeader>
         <CardTitle className="text-base">Dispatch a run</CardTitle>
         <p className="text-muted-foreground text-sm">
-          Fire an on-demand run of any registered agent. The run appears on the Active tab and
-          drills into its own detail view.
+          Fire an on-demand run of any registered agent. The run appears in Runs and opens its own
+          detail view.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -277,8 +277,8 @@ export function DispatchTabView({
               <div className="border-success-fg/30 bg-success-fg/5 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
                 <span className="inline-flex items-center gap-2">
                   <ZapIcon className="text-success-fg size-4" />
-                  Dispatched <span className="font-medium">{lastDispatched.name}</span> — it will
-                  appear on the Active tab.
+                  Dispatched <span className="font-medium">{lastDispatched.name}</span>. It appears
+                  in Runs.
                 </span>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/agents/runs/${encodeURIComponent(lastDispatched.id)}`}>
@@ -700,8 +700,8 @@ function CadenceRedirect({ agent, mode }: { agent: AstroliftAgentListItem; mode:
       )}
 
       <Button asChild variant="outline" size="sm">
-        <Link href={`/agents/${encodeURIComponent(agent.slug)}/control`}>
-          Configure on Control
+        <Link href={`/agents/${encodeURIComponent(agent.slug)}/configuration?section=run-mode`}>
+          Configure run mode
           <ArrowRightIcon className="size-4" />
         </Link>
       </Button>

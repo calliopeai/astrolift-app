@@ -1,60 +1,54 @@
 "use client";
 
 import {
-  ChevronRightIcon,
+  BracesIcon,
+  CopyIcon,
   ExternalLinkIcon,
-  Loader2Icon,
+  InfoIcon,
   MonitorPlayIcon,
+  MoreHorizontalIcon,
   ScrollIcon,
   WaypointsIcon,
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
-import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
+import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
+import { Identifier } from "@/components/Identifier";
+import { VncViewer } from "@/components/observability/VncViewer";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
+import { RunPage } from "@/components/run/RunPage";
+import { outcomeOf } from "@/components/screens/administration/insights/combined-runs";
+import { RunMissing } from "@/components/screens/jobs/RunDetailParts";
+import { runCrumbs } from "@/components/screens/tasks/runs-list";
+import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
 import { Button } from "@/components/ui/button";
-import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { formatRelativeAge } from "@/lib/format";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
+import { agentLogLines, agentRunSteps } from "./agent-run-steps";
+import { AgentInteractionMapView } from "./AgentInteractionMap";
+import type { AgentInteractionMapState } from "./use-agent-interaction-map";
 import type { AgentRunDetailState } from "./use-agent-run-detail";
 
 export interface AgentRunDetailProps extends AgentRunDetailState {
-  /** The interaction map card body (a container that polls interactions). */
-  interactionMap?: React.ReactNode;
-  /** The live log tail (a container that polls logs); shown only when there are logs. */
-  logTerminal?: React.ReactNode;
-}
-
-// Agent run vocabulary → {dot, badge-variant}. Same convention the fleet
-// Registry / Run surfaces use; unknown states degrade to a muted dot.
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
-const RUN_STATUS_DOT: Record<string, Dot> = {
-  running: "pending",
-  queued: "warn",
-  pending: "warn",
-  provisioning: "warn",
-  completed: "ok",
-  succeeded: "ok",
-  failed: "error",
-  timed_out: "error",
-  cancelled: "muted",
-  canceled: "muted",
-};
-
-function titleCase(value: string): string {
-  if (!value) return "";
-  return value
-    .replace(/[_-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
+  /** The run's interactions, read once: the Timeline's calls and the map's nodes. */
+  interactions: AgentInteractionMapState;
 }
 
 function prettyJson(v: unknown): string {
@@ -65,201 +59,214 @@ function prettyJson(v: unknown): string {
   }
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const dot = RUN_STATUS_DOT[status.toLowerCase()] ?? "muted";
-  return (
-    <Badge variant={dot === "error" ? "destructive" : "secondary"} className="gap-1.5">
-      <StatusDot status={dot} />
-      {titleCase(status)}
-    </Badge>
-  );
+function span(
+  from: string | null | undefined,
+  to: string | number | null | undefined
+): number | null {
+  if (!from || to == null) return null;
+  const d = (typeof to === "number" ? to : Date.parse(to)) - Date.parse(from);
+  return Number.isFinite(d) && d >= 0 ? d : null;
 }
 
-function Timestamp({ iso }: { iso: string | null | undefined }) {
-  if (!iso) return <span className="text-muted-foreground">—</span>;
-  return <span title={iso}>{formatRelativeAge(iso)}</span>;
-}
+type Open = "map" | "live" | null;
 
 /**
- * Agent run detail (#1105) — one AgentTask. The AgentTask read type carries
- * status / timestamps / callback / result / VNC coordinates — but NOT run-mode
- * or trigger-payload (those live on the agent Workload), so this surface shows
- * exactly what the task exposes.
+ * One agent run on the run archetype (spec 44 §5.5, #1105): its lifecycle
+ * and the tool calls, gates and signals it made on the Timeline, the log
+ * tail in the LogView, a spawn failure's reason first. Details and the
+ * result sit in two panels under it; the interaction map and the live VNC
+ * session open in a sheet from the Details panel or the `⋯` menu instead
+ * of stacking the page. Pure view; the data half is useAgentRunDetail and
+ * useAgentInteractionMap.
  */
 export function AgentRunDetail({
   taskId,
   task,
   loading,
   error,
+  onRetry,
   terminal,
+  now,
   logs,
+  logsLoading,
+  logsError,
+  onRetryLogs,
+  onDownloadLogs,
   onHardStop,
-  interactionMap,
-  logTerminal,
+  interactions,
 }: AgentRunDetailProps) {
   const [killOpen, setKillOpen] = React.useState(false);
+  const [open, setOpen] = React.useState<Open>(null);
+  const title = `run ${taskId.slice(0, 8)}`;
+  const crumbs = runCrumbs({ label: title });
 
-  if (loading && !task) {
+  if (!task && loading) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-      </div>
+      <RunPage
+        crumbs={crumbs}
+        title={title}
+        steps={[]}
+        stepsLoading
+        log={{ lines: [], loading: true }}
+      />
     );
   }
-
-  if (error || !task) {
+  if (!task) {
     return (
-      <PageShell title="Run not found">
-        <EmptyState
-          icon={<ScrollIcon className="size-5" />}
-          title={error ? "Couldn't load this run" : "Run not found"}
-          description={
-            error ? error : "This agent run may not exist, or you may not have access to it."
-          }
-          actionHref="/agents"
-          actionLabel="Back to agents"
-        />
-      </PageShell>
+      <RunMissing
+        crumbs={crumbs}
+        title="Agent run"
+        icon={<ScrollIcon className="size-4" />}
+        error={error ? { message: error } : null}
+        onRetry={onRetry}
+        empty={{
+          icon: <ScrollIcon className="size-5" />,
+          title: "Run not found",
+          description: "This agent run may not exist, or you may not have access to it.",
+          actionHref: "/tasks?kind=agent",
+          actionLabel: "Open agent runs",
+        }}
+      />
     );
   }
 
   const canWatch = task.status === "running" && task.vncEnabled && Boolean(task.vncUrl);
-  const running = task.status === "running";
-  // The human-readable spawn/dispatch failure reason (null unless the run
-  // failed). A spawn-failed run never starts a pod, so its `agentTaskLogs` is
-  // empty and this is the only debug signal — surface it prominently.
+  const vncPopout = `/agents/runs/${encodeURIComponent(taskId)}/vnc`;
+  // The spawn/dispatch failure reason (null unless the run failed). A
+  // spawn-failed run never starts a pod, so its log is empty and this is the
+  // only debug signal: it leads the Timeline panel.
   const failureMessage = task.failureMessage?.trim() ? task.failureMessage : null;
+  const outcome = outcomeOf("agent", task.status);
+  const calls = interactions.interactions.filter((i) => i.kind !== "control_api").length;
+
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        <DropdownMenuItem onSelect={() => setOpen("map")}>
+          <WaypointsIcon className="size-4" />
+          Interaction map
+        </DropdownMenuItem>
+        {canWatch && (
+          <DropdownMenuItem onSelect={() => setOpen("live")}>
+            <MonitorPlayIcon className="size-4" />
+            Watch live
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onSelect={() => {
+            navigator.clipboard
+              .writeText(task.id)
+              .then(() => toast.success("Run ID copied."))
+              .catch(() => toast.error("Couldn't copy to clipboard."));
+          }}
+        >
+          <CopyIcon className="size-4" />
+          Copy run ID
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <PageShell
-      collapsibleHeader
-      headerStorageKey="agent-run-detail"
-      title={
-        <span className="flex items-center gap-2">
-          <Link href="/agents?tab=history" className="text-muted-foreground hover:text-foreground">
-            Agents
-          </Link>
-          <ChevronRightIcon className="text-muted-foreground size-4" />
-          <span>Run {taskId.slice(0, 8)}</span>
-        </span>
-      }
-      description={
-        <span className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={task.status} />
-          <span className="text-muted-foreground text-xs">
-            created <Timestamp iso={task.createdAt} />
-          </span>
-        </span>
-      }
-      actions={
-        canWatch || !terminal ? (
-          <div className="flex items-center gap-2">
-            {canWatch && (
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <MonitorPlayIcon className="size-4" />
-                  Watch live
-                  <ExternalLinkIcon className="size-3.5" />
-                </Link>
-              </Button>
-            )}
-            {!terminal && (
-              <Button size="sm" variant="destructive" onClick={() => setKillOpen(true)}>
-                <XCircleIcon className="size-4" />
-                Kill agent
-              </Button>
-            )}
-          </div>
-        ) : undefined
-      }
-    >
-      <ConfirmDialog
-        open={killOpen}
-        onOpenChange={setKillOpen}
-        title="Kill this agent task?"
-        description={
-          <span>
-            Astrolift will delete the Kubernetes Job and its per-task Secret. The run is marked
-            cancelled only after the cluster confirms deletion; a failed deletion leaves the run
-            active and reports the error.
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <RunPage
+        crumbs={crumbs}
+        title={title}
+        status={<RunOutcomeCell run={{ outcome, status: task.status }} />}
+        durationMs={span(task.startedAt, task.finishedAt ?? (terminal ? null : now))}
+        context={
+          <span className="font-mono">
+            created <DetailTimestamp iso={task.createdAt} />
           </span>
         }
-        confirmLabel="Kill agent"
-        destructive
-        onConfirm={onHardStop}
-      />
-      <div className="space-y-6">
-        {/* Spawn/dispatch failure callout — the debug payload for a run that
-            failed before (or while) starting a pod. Rendered above everything
-            so it's the first thing an operator sees on a failed run. */}
-        {failureMessage && (
-          <div className="border-danger-border bg-danger/10 rounded-md border p-4">
-            <div className="text-danger-fg flex items-center gap-2 text-sm font-medium">
+        primaryAction={
+          !terminal ? (
+            <Button size="sm" variant="destructive" onClick={() => setKillOpen(true)}>
               <XCircleIcon className="size-4" />
-              Run failed
-            </div>
-            <p className="text-muted-foreground mt-1 text-sm">
-              The dispatch pipeline reported an error for this run. Full reason below.
-            </p>
-            <pre className="text-danger-fg border-danger-border bg-danger/5 mt-3 max-h-60 overflow-auto rounded border p-3 font-mono text-xs break-words whitespace-pre-wrap">
-              {failureMessage}
-            </pre>
-          </div>
-        )}
+              Kill agent
+            </Button>
+          ) : undefined
+        }
+        menu={menu}
+        steps={agentRunSteps(task, interactions.interactions, now)}
+        stepsError={interactions.error}
+        failure={failureMessage ? { title: "Run failed", reason: failureMessage } : null}
+        log={{
+          title: "Log",
+          lines: agentLogLines(logs, task.startedAt ?? task.createdAt),
+          loading: logsLoading,
+          error: logsError,
+          onRetry: onRetryLogs,
+          onDownload: logs.length > 0 ? onDownloadLogs : undefined,
+          emptyHint: failureMessage
+            ? "No pod logs: the run failed before a pod started. The reason is on the left."
+            : terminal
+              ? "This run wrote no log output."
+              : "No output yet. Lines appear here once the run's pod writes them.",
+          actions: canWatch ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setOpen("live")}>
+              <MonitorPlayIcon className="size-4" />
+              Watch live
+            </Button>
+          ) : undefined,
+        }}
+      />
 
-        <CollapsibleCard title="Overview" storageKey="agent-run-overview">
+      <PanelGrid>
+        <Panel
+          title="Details"
+          icon={<InfoIcon className="size-4" />}
+          span={6}
+          actions={
+            <Button type="button" size="sm" variant="outline" onClick={() => setOpen("map")}>
+              <WaypointsIcon className="size-4" />
+              Interaction map
+              <span className="text-muted-foreground font-mono tabular-nums">{calls}</span>
+            </Button>
+          }
+        >
           <DefinitionList
             items={[
-              { term: "Status", description: <StatusBadge status={task.status} /> },
-              {
-                term: "Run ID",
-                description: <span className="font-mono text-xs break-all">{task.id}</span>,
-              },
-              { term: "Created", description: <Timestamp iso={task.createdAt} /> },
-              { term: "Started", description: <Timestamp iso={task.startedAt} /> },
-              { term: "Finished", description: <Timestamp iso={task.finishedAt} /> },
+              { term: "Run ID", description: <Identifier value={task.id} form="full" /> },
+              { term: "Created", description: <DetailTimestamp iso={task.createdAt} /> },
+              { term: "Started", description: <DetailTimestamp iso={task.startedAt} /> },
+              { term: "Finished", description: <DetailTimestamp iso={task.finishedAt} /> },
               {
                 term: "Pod",
-                description: task.podName ? (
-                  <span className="font-mono text-xs break-all">{task.podName}</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
+                description: (
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                    {task.podName || "—"}
+                  </span>
                 ),
               },
               {
                 term: "Namespace",
-                description: task.namespace ? (
-                  <span className="font-mono text-xs break-all">{task.namespace}</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
+                description: (
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                    {task.namespace || "—"}
+                  </span>
                 ),
               },
               {
                 term: "Callback URL",
-                description: task.callbackUrl ? (
-                  <span className="font-mono text-xs break-all">{task.callbackUrl}</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
+                description: (
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                    {task.callbackUrl || "—"}
+                  </span>
                 ),
               },
               {
                 term: "Live session",
                 description: task.vncEnabled ? (
                   canWatch ? (
-                    <Link
-                      href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[var(--brand-primary)] hover:underline"
-                    >
-                      Watch live <ExternalLinkIcon className="size-3.5" />
-                    </Link>
+                    "live now"
                   ) : (
-                    <Badge variant="outline">VNC-capable</Badge>
+                    "VNC-capable"
                   )
                 ) : (
                   <span className="text-muted-foreground">—</span>
@@ -267,58 +274,65 @@ export function AgentRunDetail({
               },
             ]}
           />
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          storageKey="agent-run-interactions"
-          title={
-            <span className="flex items-center gap-2">
-              <WaypointsIcon className="size-4" />
-              Interaction map
-              <span className="text-muted-foreground text-xs font-normal">
-                control-plane activity
-              </span>
-            </span>
+        </Panel>
+        <Panel
+          title="Result"
+          icon={<BracesIcon className="size-4" />}
+          span={6}
+          empty={
+            task.result == null
+              ? {
+                  icon: <BracesIcon className="size-5" />,
+                  title: "No result yet",
+                  description: "A finished run records its output payload here.",
+                }
+              : null
           }
         >
-          {interactionMap}
-        </CollapsibleCard>
-
-        <CollapsibleCard title="Result" storageKey="agent-run-result">
-          {task.result != null ? (
-            <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs">
+          {task.result != null && (
+            <pre className="bg-muted/40 max-h-80 overflow-auto rounded-sm border p-3 font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
               {prettyJson(task.result)}
             </pre>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              No result yet. A terminal run records its output payload here.
-            </p>
           )}
-        </CollapsibleCard>
+        </Panel>
+      </PanelGrid>
 
-        <CollapsibleCard
-          storageKey="agent-run-logs"
-          title={
-            <span className="flex items-center gap-2">
-              <ScrollIcon className="size-4" />
-              Logs
-              <span className="text-muted-foreground text-xs font-normal">last 200 lines</span>
-            </span>
-          }
-        >
-          {running || logs.length > 0 ? (
-            logTerminal
-          ) : failureMessage ? (
-            <p className="text-muted-foreground text-sm">
-              No pod logs — the run failed before a pod started. See the failure above.
-            </p>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              No logs to show. Output appears here once the run&rsquo;s pod emits it.
-            </p>
-          )}
-        </CollapsibleCard>
-      </div>
-    </PageShell>
+      <Sheet open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
+        <SheetContent side="right" className="flex w-full flex-col gap-4 sm:max-w-3xl">
+          <SheetHeader>
+            <SheetTitle>{open === "live" ? "Live agent session" : "Interaction map"}</SheetTitle>
+            <SheetDescription className="font-mono text-xs [overflow-wrap:anywhere]">
+              {open === "live"
+                ? task.id
+                : "Control-plane activity: the API, tool calls, gates and signals."}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
+            {open === "map" && <AgentInteractionMapView {...interactions} />}
+            {open === "live" && canWatch && (
+              <div className="flex h-full min-h-0 flex-col gap-3">
+                <Button asChild size="sm" variant="outline" className="self-start">
+                  <Link href={vncPopout} target="_blank" rel="noreferrer">
+                    Pop out
+                    <ExternalLinkIcon className="size-3.5" />
+                  </Link>
+                </Button>
+                <VncViewer vncPath={task.vncUrl} className="min-h-0 flex-1" />
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={killOpen}
+        onOpenChange={setKillOpen}
+        title="Kill this agent task?"
+        description="Astrolift will delete the Kubernetes Job and its per-task Secret. The run is marked cancelled only after the cluster confirms deletion; a failed deletion leaves the run active and reports the error."
+        confirmLabel="Kill agent"
+        destructive
+        onConfirm={onHardStop}
+      />
+    </div>
   );
 }

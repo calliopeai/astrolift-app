@@ -7,6 +7,14 @@ import { toast } from "sonner";
 import { CREATE_SKILL } from "@/graphql/agents/agents.mutations";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
+import { hasErrors, splitErrors } from "./catalog";
+import {
+  SKILL_FIELDS,
+  type SkillErrors,
+  type SkillFields,
+  validateSkill,
+} from "./use-skill-builder";
+
 type MutError = { field: string; message: string; code: string };
 
 type CreateSkillData = {
@@ -17,14 +25,13 @@ type CreateSkillData = {
   };
 };
 
-export type NewSkillFields = {
-  name: string;
-  slug: string;
-  description: string;
-  content: string;
-};
+export type NewSkillFields = SkillFields;
 
-/** Creates a skill in the active org and opens it. The data half of NewSkillScreen. */
+/**
+ * Creates a skill in the active org and opens it. Refusals come back as
+ * errors for the page to show beside their fields; the only toast is the
+ * outcome. The data half of NewSkillScreen.
+ */
 export function useNewSkill() {
   const router = useRouter();
   // Reactive org id (#1022): the synchronous cookie read races the
@@ -36,30 +43,31 @@ export function useNewSkill() {
     refetchQueries: ["ListSkills"],
   });
 
-  async function createSkill(fields: NewSkillFields) {
-    if (!fields.name.trim() || !fields.slug.trim()) {
-      toast.error("Name and slug are required");
-      return;
-    }
-    const { data } = await createSkillMutation({
-      variables: {
-        orgId,
-        input: {
-          name: fields.name.trim(),
-          slug: fields.slug.trim(),
-          description: fields.description.trim(),
-          content: fields.content.trim(),
-          dependencies: null,
+  async function createSkill(fields: NewSkillFields): Promise<SkillErrors> {
+    const invalid = validateSkill(fields);
+    if (hasErrors(invalid)) return invalid;
+    try {
+      const { data } = await createSkillMutation({
+        variables: {
+          orgId,
+          input: {
+            name: fields.name.trim(),
+            slug: fields.slug.trim(),
+            description: fields.description.trim(),
+            content: fields.content.trim(),
+            dependencies: null,
+          },
         },
-      },
-    });
-    if (data?.createSkill?.ok && data.createSkill.data?.id) {
-      toast.success("Skill created");
-      router.push(`/agents/skills/${data.createSkill.data.id}`);
-    } else {
-      for (const err of data?.createSkill?.errors ?? []) {
-        toast.error(`${err.field}: ${err.message}`);
+      });
+      if (data?.createSkill?.ok && data.createSkill.data?.id) {
+        toast.success("Skill created");
+        router.push(`/agents/skills/${data.createSkill.data.id}`);
+        return {};
       }
+      const errors = splitErrors(data?.createSkill?.errors ?? [], SKILL_FIELDS);
+      return hasErrors(errors) ? errors : { form: "The skill was not created." };
+    } catch (err) {
+      return { form: err instanceof Error ? err.message : String(err) };
     }
   }
 

@@ -1,40 +1,56 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
-import { RUN_AGENT, SEND_AGENT_TASK_INPUT } from "@/graphql/agents/agents.mutations";
-import { GET_AGENT_DETAIL, LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
+import { LIST_SUMMARY_MAX } from "@/components/list/ListSummary";
+import { useNow } from "@/components/screens/deployments/run-support";
+import { SEND_AGENT_TASK_INPUT } from "@/graphql/agents/agents.mutations";
+import {
+  GET_AGENT_DETAIL,
+  LIST_AGENT_FLEET,
+  LIST_AGENT_TASKS_PAGE,
+} from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentDetail, AstroliftAgentListItem } from "@/graphql/agents/agents.types";
+
+import { agentFleetSnapshot } from "./agent-fleet-snapshot";
 
 export interface AgentOverviewTask {
   id: string;
   status: string;
+  failureMessage?: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
 }
-interface AgentTasksResp {
-  agentTasks: AgentOverviewTask[];
+interface TasksPageResp {
+  agentTasksPage: { items: AgentOverviewTask[]; totalCount: number | null };
 }
 interface AgentDetailResp {
   agent: AstroliftAgentDetail | null;
 }
-interface RunAgentResp {
-  runAstroliftAgent: {
-    ok: boolean;
-    errors: { code: string; message: string; field: string | null }[];
-    data: { id: string; status: string; createdAt: string } | null;
-  };
+interface FleetResp {
+  agentFleet: AstroliftAgentListItem[];
 }
 interface SendInputResp {
   sendAgentTaskInput?: { ok: boolean; errors?: { message: string }[] };
 }
 
+const POLL_MS = 5000;
+
 /**
- * Data for the agent Overview pillar: the agent detail join (skills/tools,
- * image, brief), a 5s poll of its tasks, one-click dispatch, and overseer chat
- * input to the running task.
+ * Data for the agent Overview (spec 44 §5.2; Leo's page rules 1 and 2).
+ * Three reads, each for what the tab shows:
+ *
+ *   - the latest runs: one page of `agentTasksPage`, five rows and the
+ *     count, polled; the Latest run panel and the Recent runs summary share it,
+ *   - the detail join (image, brief, skills and tools), the same query and
+ *     variables Skills & tools and Build read, so Apollo serves it once,
+ *   - the fleet, read from the cache the frame filled (`agentFleet`).
+ *
+ * Plus the overseer input to the running run. Run now is the frame's.
  */
 export function useAgentOverview({
   agent,
@@ -43,39 +59,43 @@ export function useAgentOverview({
   agent: AstroliftAgentListItem;
   orgId: string;
 }) {
-  const { data: detailData, loading: detailLoading } = useQuery<AgentDetailResp>(GET_AGENT_DETAIL, {
+  const router = useRouter();
+  const detailQ = useQuery<AgentDetailResp>(GET_AGENT_DETAIL, {
     variables: { orgId, slug: agent.slug },
     skip: !orgId,
     fetchPolicy: "cache-and-network",
   });
-  const { data: tasksData, refetch } = useQuery<AgentTasksResp>(LIST_AGENT_TASKS, {
-    variables: { orgId, status: null, workloadId: agent.id },
+  const tasksQ = useQuery<TasksPageResp>(LIST_AGENT_TASKS_PAGE, {
+    variables: {
+      orgId,
+      workloadId: agent.id,
+      status: null,
+      search: null,
+      limit: LIST_SUMMARY_MAX,
+      after: null,
+    },
     skip: !orgId,
-    pollInterval: 5000,
+    pollInterval: POLL_MS,
     fetchPolicy: "cache-and-network",
   });
+  const fleetQ = useQuery<FleetResp>(LIST_AGENT_FLEET, {
+    variables: { orgId },
+    skip: !orgId,
+    fetchPolicy: "cache-first",
+  });
 
-  const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
   const [sendInput, { loading: sendingInput }] = useMutation<SendInputResp>(SEND_AGENT_TASK_INPUT);
 
-  async function onDispatch() {
-    try {
-      const { data: res } = await runAgent({
-        variables: { input: { agentSlug: agent.slug } },
-      });
-      const result = res?.runAstroliftAgent;
-      if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
-      }
-      toast.success(`Dispatched ${agent.name}`);
-      await refetch();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${agent.name}`, { description: message });
-    }
-  }
+  const tasks = React.useMemo(() => tasksQ.data?.agentTasksPage.items ?? [], [tasksQ.data]);
+  const fleetAgents = fleetQ.data?.agentFleet;
+  // The clock the viz ages runs against, read again at the poll's pace.
+  const now = useNow(true, POLL_MS);
+  const fleet = React.useMemo(
+    () => (fleetAgents ? agentFleetSnapshot(fleetAgents, agent.id, tasks, now) : null),
+    [fleetAgents, agent.id, tasks, now]
+  );
 
-  /** Queue a message for the running task; resolves true once it is queued. */
+  /** Queue a message for the running run; resolves true once it is queued. */
   async function onSendInput(taskId: string, message: string): Promise<boolean> {
     try {
       const response = await sendInput({ variables: { taskId, message } });
@@ -93,12 +113,23 @@ export function useAgentOverview({
 
   return {
     agent,
-    detail: detailData?.agent ?? null,
-    detailLoading,
-    tasks: tasksData?.agentTasks ?? [],
-    dispatching,
+    detail: detailQ.data?.agent ?? null,
+    detailLoading: detailQ.loading && !detailQ.data,
+    detailError: detailQ.error && !detailQ.data ? detailQ.error.message : null,
+    onRetryDetail: () => void detailQ.refetch(),
+    runs: {
+      rows: tasks,
+      count: tasksQ.data?.agentTasksPage.totalCount ?? null,
+      loading: !orgId || (tasksQ.loading && !tasksQ.data),
+      error: tasksQ.error && !tasksQ.data ? tasksQ.error.message : null,
+      onRetry: () => void tasksQ.refetch(),
+    },
+    fleet,
+    onSelectAgent: (agentId: string) => {
+      const slug = fleetAgents?.find((a) => a.id === agentId)?.slug;
+      if (slug && slug !== agent.slug) router.push(`/agents/${encodeURIComponent(slug)}`);
+    },
     sendingInput,
-    onDispatch,
     onSendInput,
   };
 }

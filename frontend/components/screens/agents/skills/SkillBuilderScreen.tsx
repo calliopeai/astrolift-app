@@ -1,82 +1,101 @@
 "use client";
 
 import {
-  ChevronRightIcon,
+  AlertTriangleIcon,
   CodeIcon,
+  FileTextIcon,
   Loader2Icon,
-  PlusIcon,
+  MoreHorizontalIcon,
   SparklesIcon,
   TrashIcon,
   WrenchIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { ListSummary } from "@/components/list/ListSummary";
+import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
-import { AddToolForm } from "./AddToolForm";
-import { ADAPTERS } from "./tool-adapters";
-import type { SkillBuilderState, ToolDef } from "./use-skill-builder";
+import { ADAPTER_LABEL } from "./tool-adapters";
+import { SkillFrame, skillTabHref } from "./SkillFrame";
+import type { SkillBuilderState, SkillErrors } from "./use-skill-builder";
 
-export type SkillBuilderScreenProps = SkillBuilderState;
+export type SkillBuilderScreenProps = SkillBuilderState & {
+  /** Errors to open with; stories use it. */
+  initialErrors?: SkillErrors;
+};
+
+const FORM_ID = "skill-builder-form";
 
 /**
- * The skill builder: edit a skill's name, slug, description and content,
- * and register or remove its tool definitions. Holds the form values and
- * which dialog is open; useSkillBuilder owns every query and mutation.
+ * A skill's Builder tab (spec 44 §5.2): its details and instructions on
+ * Panels, saved from the title row, and a summary of its tools that links to
+ * the Tools tab, where they are listed and registered (Leo's list rule 3).
+ * Errors stand beside their fields. Holds the form values; useSkillBuilder
+ * owns every query and mutation.
  */
 export function SkillBuilderScreen({
+  id,
   skill,
-  tools,
   skillLoading,
-  toolsLoading,
   errorMessage,
+  onRetry,
+  tools,
+  toolsLoading,
+  toolsError,
+  onToolsRetry,
   saving,
   deleting,
-  deletingTool,
-  creatingTool,
   aiAssisting,
   saveSkill,
   deleteSkill,
-  deleteTool,
-  createTool,
   aiAssist,
+  initialErrors = {},
 }: SkillBuilderScreenProps) {
-  // ── form state ──────────────────────────────────────────────────────────────
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
-  const [showAddTool, setShowAddTool] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [confirmDeleteSkill, setConfirmDeleteSkill] = useState(false);
-  const [toolToRemove, setToolToRemove] = useState<ToolDef | null>(null);
+  const [errors, setErrors] = useState<SkillErrors>(initialErrors);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Seed form when skill loads
+  // Seed the form when the skill loads, and again after a save.
   useEffect(() => {
     if (skill && !dirty) {
+      /* eslint-disable react-hooks/set-state-in-effect -- the fields copy the loaded skill until the person edits them */
       setName(skill.name);
       setSlug(skill.slug);
       setDescription(skill.description);
       setContent(skill.content);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [skill, dirty]);
 
-  // ── handlers ────────────────────────────────────────────────────────────────
+  function edit<T>(set: (v: T) => void, field: keyof SkillErrors) {
+    return (v: T) => {
+      set(v);
+      setDirty(true);
+      setErrors((e) => ({ ...e, [field]: undefined, form: undefined }));
+    };
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (await saveSkill({ name, slug, description, content })) {
-      setDirty(false);
-    }
+    const found = await saveSkill({ name, slug, description, content });
+    setErrors(found);
+    if (Object.values(found).every((v) => !v)) setDirty(false);
   }
 
   async function handleAiAssist() {
@@ -87,265 +106,185 @@ export function SkillBuilderScreen({
     }
   }
 
-  // ── loading / error states ───────────────────────────────────────────────────
+  const primaryAction = (
+    <>
+      {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
+      <Button type="submit" form={FORM_ID} size="sm" disabled={saving || !dirty}>
+        {saving && <Loader2Icon className="size-4 animate-spin" />}
+        Save skill
+      </Button>
+    </>
+  );
 
-  if (skillLoading && !skill) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-      </div>
-    );
-  }
-
-  if (errorMessage !== null || !skill) {
-    return (
-      <PageShell title="Skill not found">
-        <EmptyState
-          icon={<SparklesIcon className="size-5" />}
-          title={errorMessage !== null ? "Couldn't load this skill" : "Skill not found"}
-          description={
-            errorMessage !== null
-              ? errorMessage
-              : "This skill may have been deleted, or you may not have access to it."
-          }
-          actionHref="/agents/skills"
-          actionLabel="Back to skills"
-        />
-      </PageShell>
-    );
-  }
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+          <MoreHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={deleting}
+          onSelect={() => setConfirmDelete(true)}
+        >
+          <TrashIcon className="size-4" />
+          Delete skill
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <PageShell
-      title={
-        <span className="flex items-center gap-2">
-          <Link href="/agents/skills" className="text-muted-foreground hover:text-foreground">
-            Skills
-          </Link>
-          <ChevronRightIcon className="text-muted-foreground h-4 w-4" />
-          {skill.name}
-        </span>
-      }
-      description={
-        <span className="flex items-center gap-2">
-          <span className="font-mono text-xs">{skill.slug}</span>
-          <Badge variant={skill.isActive ? "default" : "secondary"} className="text-xs">
-            {skill.isActive ? "Active" : "Inactive"}
-          </Badge>
-          {skill.isGlobal && (
-            <Badge variant="outline" className="text-xs">
-              Global
-            </Badge>
-          )}
-          <span className="text-muted-foreground text-xs">v{skill.skillVersion}</span>
-        </span>
-      }
-      actions={
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setConfirmDeleteSkill(true)}
-          disabled={deleting}
-          className="text-destructive hover:text-destructive"
-        >
-          {deleting ? (
-            <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <TrashIcon className="mr-1 h-3.5 w-3.5" />
-          )}
-          Delete
-        </Button>
-      }
+    <SkillFrame
+      id={id}
+      active="builder"
+      skill={skill}
+      loading={skillLoading}
+      error={errorMessage}
+      onRetry={onRetry}
+      primaryAction={primaryAction}
+      menu={menu}
     >
-      {/* ── Skill form ──────────────────────────────────────────────────────── */}
-      <form onSubmit={handleSave} className="flex flex-col gap-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setDirty(true);
-              }}
-            />
+      <form id={FORM_ID} onSubmit={handleSave} noValidate className="flex min-w-0 flex-col gap-4">
+        {errors.form && (
+          <div
+            role="alert"
+            className="border-destructive/40 bg-destructive/5 text-destructive flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm"
+          >
+            <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{errors.form}</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Slug</Label>
-            <Input
-              value={slug}
-              className="font-mono"
-              onChange={(e) => {
-                setSlug(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label>Description</Label>
-          <Input
-            value={description}
-            placeholder="Short description shown in search and picker"
-            onChange={(e) => {
-              setDescription(e.target.value);
-              setDirty(true);
-            }}
-          />
-        </div>
-
-        <Separator />
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <Label>Instructions / content</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAiAssist}
-              disabled={aiAssisting}
-            >
-              {aiAssisting ? (
-                <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <SparklesIcon className="mr-1 h-3.5 w-3.5" />
-              )}
-              AI assist
-            </Button>
-          </div>
-          <Textarea
-            value={content}
-            placeholder="System prompt / instructions injected into the agent brief when this skill is active"
-            rows={10}
-            className="font-mono text-sm"
-            onChange={(e) => {
-              setContent(e.target.value);
-              setDirty(true);
-            }}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={saving || !dirty} size="sm">
-            {saving ? <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-            Save skill
-          </Button>
-          {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
-        </div>
-      </form>
-
-      <Separator />
-
-      {/* ── Tool definitions ────────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">
-            Tool definitions
-            <Badge variant="outline" className="ml-2 text-xs">
-              {tools.length}
-            </Badge>
-          </h2>
-          <Button variant="outline" size="sm" onClick={() => setShowAddTool((v) => !v)}>
-            <PlusIcon className="mr-1 h-3.5 w-3.5" />
-            {showAddTool ? "Cancel" : "Register tool"}
-          </Button>
-        </div>
-
-        {showAddTool && (
-          <AddToolForm
-            onSubmit={createTool}
-            loading={creatingTool}
-            onDone={() => setShowAddTool(false)}
-          />
         )}
+        <PanelGrid>
+          <Panel title="Details" icon={<FileTextIcon className="size-4" />} span={8}>
+            <div className="flex min-w-0 flex-col gap-4">
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <Field data-invalid={Boolean(errors.name) || undefined} className="min-w-0">
+                  <FieldLabel htmlFor="skill-name">Name</FieldLabel>
+                  <Input
+                    id="skill-name"
+                    value={name}
+                    aria-invalid={Boolean(errors.name) || undefined}
+                    onChange={(e) => edit(setName, "name")(e.target.value)}
+                  />
+                  <FieldError className="[overflow-wrap:anywhere]">{errors.name}</FieldError>
+                </Field>
+                <Field data-invalid={Boolean(errors.slug) || undefined} className="min-w-0">
+                  <FieldLabel htmlFor="skill-slug">Slug</FieldLabel>
+                  <Input
+                    id="skill-slug"
+                    value={slug}
+                    className="font-mono"
+                    spellCheck={false}
+                    aria-invalid={Boolean(errors.slug) || undefined}
+                    onChange={(e) => edit(setSlug, "slug")(e.target.value)}
+                  />
+                  <FieldError className="[overflow-wrap:anywhere]">{errors.slug}</FieldError>
+                </Field>
+              </div>
+              <Field data-invalid={Boolean(errors.description) || undefined} className="min-w-0">
+                <FieldLabel htmlFor="skill-description">Description</FieldLabel>
+                <Input
+                  id="skill-description"
+                  value={description}
+                  placeholder="Short description shown in search and picker"
+                  aria-invalid={Boolean(errors.description) || undefined}
+                  onChange={(e) => edit(setDescription, "description")(e.target.value)}
+                />
+                <FieldError className="[overflow-wrap:anywhere]">{errors.description}</FieldError>
+              </Field>
+            </div>
+          </Panel>
 
-        {toolsLoading && tools.length === 0 && (
-          <Loader2Icon className="text-muted-foreground h-4 w-4 animate-spin" />
-        )}
-
-        {!toolsLoading && tools.length === 0 && !showAddTool && (
-          <EmptyState
-            icon={<CodeIcon className="size-5" />}
-            title="No tool definitions"
-            description="Register tool definitions to give this skill executable capabilities."
-            secondary={
-              <Button size="sm" onClick={() => setShowAddTool(true)}>
-                <PlusIcon className="mr-1 h-3.5 w-3.5" /> Register first tool
-              </Button>
+          <ListSummary
+            title="Tools"
+            icon={<WrenchIcon className="size-4" />}
+            span={4}
+            count={toolsLoading || toolsError ? null : tools.length}
+            rows={tools}
+            keyOf={(t) => t.id}
+            renderRow={(t) => (
+              <span className="flex min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 truncate font-mono text-xs" title={t.name}>
+                  {t.name}
+                </span>
+                <Badge variant="secondary" className="shrink-0 text-xs">
+                  {ADAPTER_LABEL[t.adapter] ?? t.adapter}
+                </Badge>
+              </span>
+            )}
+            rowHref={(t) => `/agents/tools/${t.id}`}
+            viewAllHref={skillTabHref(id, "tools")}
+            loading={toolsLoading}
+            error={toolsError}
+            onRetry={onToolsRetry}
+            empty={
+              tools.length === 0
+                ? {
+                    icon: <CodeIcon className="size-5" />,
+                    title: "No tool definitions",
+                    description:
+                      "Register tool definitions to give this skill executable capabilities.",
+                    actionHref: `${skillTabHref(id, "tools")}/new`,
+                    actionLabel: "Register first tool",
+                  }
+                : null
             }
           />
-        )}
 
-        {tools.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {tools.map((tool) => (
-              <div
-                key={tool.id}
-                className="flex items-center gap-4 rounded-md border px-4 py-3 text-sm"
+          <Panel
+            title="Instructions"
+            icon={<SparklesIcon className="size-4" />}
+            description="Injected into the agent brief when this skill is active."
+            actions={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAiAssist}
+                disabled={aiAssisting}
               >
-                <WrenchIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="font-medium">{tool.name}</span>
-                  {tool.description && (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {tool.description}
-                    </span>
-                  )}
-                </div>
-                <Badge variant="secondary" className="shrink-0 text-xs">
-                  {ADAPTERS.find((a) => a.value === tool.adapter)?.label ?? tool.adapter}
-                </Badge>
-                {tool.handlerRef && (
-                  <span className="text-muted-foreground max-w-[180px] truncate font-mono text-xs">
-                    {tool.handlerRef}
-                  </span>
+                {aiAssisting ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <SparklesIcon className="size-3.5" />
                 )}
-                <Link
-                  href={`/agents/tools/${tool.id}`}
-                  className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline-offset-2 hover:underline"
-                >
-                  Edit
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setToolToRemove(tool)}
-                  disabled={deletingTool}
-                  className="text-muted-foreground hover:text-destructive ml-1 shrink-0"
-                  aria-label={`Remove ${tool.name}`}
-                >
-                  <TrashIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+                AI assist
+              </Button>
+            }
+          >
+            <Field data-invalid={Boolean(errors.content) || undefined} className="min-w-0">
+              <FieldLabel htmlFor="skill-content" className="sr-only">
+                Instructions / content
+              </FieldLabel>
+              <Textarea
+                id="skill-content"
+                value={content}
+                placeholder="System prompt / instructions injected into the agent brief when this skill is active"
+                rows={12}
+                className="max-h-96 font-mono text-sm"
+                aria-invalid={Boolean(errors.content) || undefined}
+                onChange={(e) => edit(setContent, "content")(e.target.value)}
+              />
+              <FieldError className="[overflow-wrap:anywhere]">{errors.content}</FieldError>
+            </Field>
+          </Panel>
+        </PanelGrid>
+      </form>
 
-      <ConfirmDialog
-        open={confirmDeleteSkill}
-        onOpenChange={setConfirmDeleteSkill}
-        title={`Delete skill "${skill.name}"?`}
-        description="This cannot be undone. Agents that reference this skill lose it on their next run, and its tool definitions go with it."
-        confirmLabel="Delete skill"
-        destructive
-        onConfirm={deleteSkill}
-      />
-
-      <ConfirmDialog
-        open={toolToRemove !== null}
-        onOpenChange={(next) => {
-          if (!next) setToolToRemove(null);
-        }}
-        title={toolToRemove ? `Remove tool "${toolToRemove.name}"?` : "Remove tool?"}
-        description="The tool definition is deleted from this skill. Agents lose the capability on their next run."
-        confirmLabel="Remove tool"
-        destructive
-        onConfirm={async () => {
-          if (toolToRemove) await deleteTool(toolToRemove.id);
-        }}
-      />
-    </PageShell>
+      {skill && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title={`Delete skill "${skill.name}"?`}
+          description="This cannot be undone. Agents that reference this skill lose it on their next run, and its tool definitions go with it."
+          confirmLabel="Delete skill"
+          destructive
+          onConfirm={deleteSkill}
+        />
+      )}
+    </SkillFrame>
   );
 }

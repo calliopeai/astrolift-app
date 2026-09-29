@@ -1,22 +1,22 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
-import * as React from "react";
-import { toast } from "sonner";
+import { NetworkStatus } from "@apollo/client";
+import { useQuery } from "@apollo/client/react";
 
-import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
-import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
+import { useHeldRows } from "@/components/list/use-held-rows";
+import { useListState } from "@/components/list/use-list-state";
+import { LIST_AGENT_TASKS_PAGE } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 
-// One agent execution. Mirrors the AgentTask row shape used by the fleet
-// Active/History tables in `agents-client.tsx`; LIST_AGENT_TASKS is the same
-// operation, here scoped to a single agent via `workloadId`.
+import { AGENT_RUNS_LIST, runsPageVariables } from "./agent-runs-list";
+
+/** One agent execution, as the page query returns it. */
 export interface AgentTask {
   id: string;
   status: string;
   callbackUrl: string;
   result: unknown;
+  failureMessage?: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -24,78 +24,47 @@ export interface AgentTask {
   vncUrl: string;
   snapshotUrl: string | null;
 }
-interface AgentTasksResp {
-  agentTasks: AgentTask[];
+interface TasksPageResp {
+  agentTasksPage: { items: AgentTask[]; nextCursor: string | null; totalCount: number | null };
 }
 
-interface RunAgentResp {
-  runAstroliftAgent: {
-    ok: boolean;
-    errors: { code: string; message: string; field: string | null }[];
-    data: { id: string; status: string; createdAt: string } | null;
-  };
-}
+const POLL_MS = 5000;
 
 /**
- * Data for an agent's Run tab (spec 33 PR-10).
- *
- *   - **Dispatch now** fires `runAstroliftAgent` (PR-1) for this agent's
- *     `slug`, then refetches the executions list so the new run appears.
- *   - **Executions** is the per-agent runs list, scoped via
- *     `agentTasks(workloadId:)` (PR-2) and polled every 5s so a freshly
- *     dispatched run (and its state transitions) shows without a reload.
- *
- * `agent.id` is the agent's Workload id — the same key `agentLiveStatus` is
- * merged on in the registry list — so it is what scopes `agentTasks`.
+ * The data half of the agent's Runs tab (spec 44 §5.1): list state in the
+ * URL, one cursor page of `agentTasksPage` scoped to this agent
+ * (`workloadId` is the agent's Workload id), polled on the first page so a
+ * new run and its state changes show without a reload, with new rows held
+ * behind the pill. Run now is the frame's; this tab only lists.
  */
-export function useAgentRun(agent: AstroliftAgentListItem, orgId: string) {
-  const { data, loading, refetch } = useQuery<AgentTasksResp>(LIST_AGENT_TASKS, {
-    variables: { orgId, status: null, workloadId: agent.id },
+export function useAgentRun(agent: Pick<AstroliftAgentListItem, "id">, orgId: string) {
+  const list = useListState(AGENT_RUNS_LIST);
+  const { state, filters } = list;
+  const firstPage = state.after === null;
+
+  const page = useQuery<TasksPageResp>(LIST_AGENT_TASKS_PAGE, {
+    variables: runsPageVariables(orgId, agent.id, filters, state.q, state.pageSize, state.after),
     skip: !orgId,
-    pollInterval: 5000,
     fetchPolicy: "cache-and-network",
+    pollInterval: firstPage ? POLL_MS : 0,
   });
-  const router = useRouter();
+  const data = page.data?.agentTasksPage;
 
-  const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
-
-  async function onDispatch(): Promise<boolean> {
-    try {
-      const { data: res } = await runAgent({
-        variables: { input: { agentSlug: agent.slug } },
-      });
-      const result = res?.runAstroliftAgent;
-      if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
-      }
-      toast.success(`Dispatched ${agent.name}`);
-      // Pull the new run into the list immediately; the 5s poll then tracks
-      // its state. awaitRefetchQueries-style: we await so the row is present
-      // before the success toast settles.
-      await refetch();
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${agent.name}`, { description: message });
-      return false;
-    }
-  }
-
-  // Sort newest-first by createdAt so a just-dispatched run lands at the top.
-  const rows = React.useMemo(
-    () =>
-      [...(data?.agentTasks ?? [])].sort((a, b) =>
-        (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
-      ),
-    [data?.agentTasks]
-  );
+  const held = useHeldRows(data?.items ?? [], (t) => t.id, {
+    live: firstPage,
+    resetKey: JSON.stringify(filters) + state.q + state.pageSize,
+  });
 
   return {
-    rows,
-    loading,
-    dispatching,
-    onDispatch,
-    onOpenRun: (taskId: string) => router.push(`/agents/runs/${encodeURIComponent(taskId)}`),
+    list,
+    rows: held.rows,
+    newRows: { count: held.newCount, onReveal: held.reveal },
+    loading: !orgId || (page.loading && !data),
+    stale: page.networkStatus === NetworkStatus.setVariables && Boolean(data),
+    error: page.error && !data ? { message: page.error.message } : null,
+    onRetry: () => void page.refetch(),
+    nextCursor: data?.nextCursor ?? null,
+    totalCount: data?.totalCount ?? null,
   };
 }
 

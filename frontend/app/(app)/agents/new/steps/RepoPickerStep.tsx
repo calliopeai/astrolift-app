@@ -5,7 +5,7 @@ import type * as React from "react";
 import { AgentRepoPickerStepView } from "@/components/screens/agents/new/AgentRepoPickerStep";
 import { useAgentRepoPicker } from "@/components/screens/agents/new/use-agent-repo-picker";
 
-import type { WizardState } from "../wizard-client";
+import type { WizardState } from "@/components/screens/agents/new/use-new-agent";
 
 interface Props {
   state: WizardState;
@@ -13,7 +13,7 @@ interface Props {
   setValid: (valid: boolean) => void;
 }
 
-/** Wizard step 1. The view lives in components/screens/agents/new; this wires the hook. */
+/** New agent, Source: the repository. The view lives in components/screens/agents/new; this wires the hook. */
 export function RepoPickerStep({ state, setState, setValid }: Props) {
   return <AgentRepoPickerStepView {...useAgentRepoPicker({ state, setState, setValid })} />;
 }

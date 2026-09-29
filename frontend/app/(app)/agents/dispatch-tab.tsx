@@ -5,13 +5,22 @@ import { DispatchTabView } from "@/components/screens/agents/list/DispatchTab";
 import { useDispatchTab } from "@/components/screens/agents/list/use-dispatch-tab";
 
 /**
- * The fleet-level Dispatch tab (#1105). The view owns the markup; the secrets
- * dialog stays a container so its status query runs only for a pinned spec.
+ * The Run agent form (#1105, the old fleet Dispatch tab). The view owns the
+ * markup; the secrets dialog stays a container so its status query runs only
+ * for a pinned spec.
  */
-export function DispatchTab({ orgId }: { orgId: string }) {
+export function DispatchTab({
+  orgId,
+  defaultAgentSlug = "",
+}: {
+  orgId: string;
+  /** The agent picked on arrival (`?agent=` on Run agent). */
+  defaultAgentSlug?: string;
+}) {
   return (
     <DispatchTabView
       {...useDispatchTab(orgId)}
+      defaultAgentSlug={defaultAgentSlug}
       renderSecretsDialog={({ spec, open, onOpenChange }) => (
         <AgentSecretsDialog
           envSpecSlug={spec.slug}

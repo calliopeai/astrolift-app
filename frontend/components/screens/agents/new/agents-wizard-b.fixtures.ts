@@ -7,7 +7,7 @@ import type { AstroliftRemoteRepo, AstroliftSourceConnection } from "@/graphql/s
 import type { AgentRepoPickerStepViewProps } from "./AgentRepoPickerStep";
 import type { AgentReviewSubmitStepViewProps } from "./AgentReviewSubmitStep";
 
-/** Hand-typed fixtures for agent wizard steps 1 (repo picker) and 4 (review + submit). */
+/** Hand-typed fixtures for New agent: the repo picker (Source) and Review. */
 
 const noop = () => {};
 
@@ -193,14 +193,7 @@ export const AGENT_REPO_PICKER_LONG: AgentRepoPickerStepViewProps = {
   repoToAgentCount: new Map([[`conflict-hq/${LONG_NAME}`, 12]]),
 };
 
-// ----- Step 4: review + submit --------------------------------------------
-
-export const STEPS = [
-  { label: "Repo" },
-  { label: "Discover" },
-  { label: "Project" },
-  { label: "Review" },
-];
+// ----- Review + submit ---------------------------------------------------
 
 function manifest(
   slug: string,
@@ -235,7 +228,6 @@ export const AGENT_REVIEW: AgentReviewSubmitStepViewProps = {
     projectId: "c0ffee00-0000-4000-8000-0000000000p1",
   },
   projectLabel: "sales/outbound",
-  steps: STEPS,
   onJumpToStep: noop,
   submitting: false,
   submitError: null,

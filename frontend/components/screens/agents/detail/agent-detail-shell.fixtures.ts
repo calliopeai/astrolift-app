@@ -6,23 +6,18 @@ import type {
   AstroliftToolDef,
 } from "@/graphql/agents/agents.types";
 
-import type { AgentDetailShellViewProps } from "./AgentDetailShell";
+import { agentFleetSnapshot } from "./agent-fleet-snapshot";
 import type { AgentModelAccessViewProps } from "./AgentModelAccess";
-import type { AgentTabsViewProps } from "./AgentTabs";
-import type { AppPlatformLinksViewProps } from "./AppPlatformLinks";
 import type { AgentOverviewProps, AgentOverviewTask } from "./use-agent-overview";
 
 /**
- * Hand-typed fixtures for the agent detail shell group: the shell header, the
- * pillar bar, the platform sub-page row, the Overview pillar and the settings
- * Model access card. Records carry only the fields these views read (plus the
- * required facade fields).
+ * Hand-typed fixtures for the agent detail group: the agent row the frame
+ * and tabs read, the Overview tab and the Model access section. Records
+ * carry only the fields these views read (plus the required facade fields).
  */
 
 /** The generated JSON scalar is typed Record<string, unknown>; real values can be any JSON. */
 const json = (value: unknown) => value as Record<string, unknown>;
-
-const noop = async () => {};
 
 export const LONG =
   "platform-team-shared-production-research-agent-with-a-deliberately-long-name-that-keeps-going";
@@ -64,27 +59,6 @@ export const LONG_AGENT: AstroliftAgentListItem = {
   sourceRepo: `acme/${LONG}`,
   runFamily: "long_running_custom_family",
   runMode: "event_driven_custom_mode",
-};
-
-// ── Shell ───────────────────────────────────────────────────────────────────
-
-export const SHELL: AgentDetailShellViewProps = {
-  agentSlug: AGENT.slug,
-  agent: AGENT,
-  loading: false,
-  notFound: false,
-};
-
-// ── Pillar bar + platform row ───────────────────────────────────────────────
-
-export const TABS: AgentTabsViewProps = {
-  agentSlug: AGENT.slug,
-  pathname: `/agents/${AGENT.slug}/overview`,
-};
-
-export const PLATFORM_LINKS: AppPlatformLinksViewProps = {
-  agentSlug: AGENT.slug,
-  pathname: `/agents/${AGENT.slug}/build`,
 };
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -178,14 +152,28 @@ export const RUNNING_TASKS: AgentOverviewTask[] = [
   ...TASKS,
 ];
 
+/** The org's fleet around the agent: two projects, one agent failing, one running. */
+export const FLEET_AGENTS: AstroliftAgentListItem[] = [
+  AGENT,
+  { ...AGENT, id: "wl-2", name: "BDR Outreach", slug: "bdr-outreach", runningCount: 1 },
+  { ...AGENT, id: "wl-3", name: "Cost Watch", slug: "cost-watch", lastRunStatus: "failed" },
+  { ...AGENT, id: "wl-4", name: "Docs Sync", slug: "docs-sync", projectSlug: "platform" },
+  { ...AGENT, id: "wl-5", name: "K8s Janitor", slug: "k8s-janitor", projectSlug: "" },
+];
+
+/** A fixed clock, so the fleet reads the same whenever the story runs. */
+const FLEET_NOW = Date.UTC(2026, 8, 28, 14, 0, 0);
+
 export const OVERVIEW: AgentOverviewProps = {
   agent: AGENT,
   detail: DETAIL,
   detailLoading: false,
-  tasks: TASKS,
-  dispatching: false,
+  detailError: null,
+  onRetryDetail: () => {},
+  runs: { rows: TASKS.slice(0, 5), count: 48, loading: false, error: null, onRetry: () => {} },
+  fleet: agentFleetSnapshot(FLEET_AGENTS, AGENT.id, TASKS.slice(0, 5), FLEET_NOW),
+  onSelectAgent: () => {},
   sendingInput: false,
-  onDispatch: noop,
   onSendInput: async () => true,
 };
 

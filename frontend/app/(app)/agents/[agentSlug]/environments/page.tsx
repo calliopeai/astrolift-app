@@ -1,26 +1,4 @@
-import { AppTabs } from "@/app/(app)/apps/[slug]/components/app-tabs";
-import { EnvironmentsClient } from "@/app/(app)/environments/environments-client";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { formerAgentRoute } from "../components/former-route";
 
-import { AgentAppSurface } from "../components/agent-app-surface";
-
-export const metadata = { title: "Environments · Agent · Astrolift" };
-
-export default async function AgentEnvironmentsPage({
-  params,
-}: {
-  params: Promise<{ agentSlug: string }>;
-}) {
-  const { agentSlug } = await params;
-  return (
-    <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: agentSlug }}>
-      <AgentAppSurface agentSlug={agentSlug}>
-        <EnvironmentsClient
-          appSlug={agentSlug}
-          tabs={<AppTabs slug={agentSlug} active="deployments" />}
-        />
-      </AgentAppSurface>
-    </PreloadQuery>
-  );
-}
+/** Absorbed by the agent's tab row; redirects to where it lives now (AGENT_FORMER_ROUTES). */
+export default formerAgentRoute("environments");

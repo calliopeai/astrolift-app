@@ -1,12 +1,4 @@
-import { AgentPillarPage } from "../components/agent-pillar-page";
+import { formerAgentRoute } from "../components/former-route";
 
-export const metadata = { title: "Run · Agent · Astrolift" };
-
-export default async function AgentRunPage({
-  params,
-}: {
-  params: Promise<{ agentSlug: string }>;
-}) {
-  const { agentSlug } = await params;
-  return <AgentPillarPage agentSlug={agentSlug} pillar="run" />;
-}
+/** Absorbed by the agent's tab row; redirects to where it lives now (AGENT_FORMER_ROUTES). */
+export default formerAgentRoute("run");

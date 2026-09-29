@@ -1,6 +1,6 @@
 "use client";
 
-/** Wizard step 4. The view lives in components/screens/agents/new; it takes wizard props directly. */
+/** New agent, Review. The view lives in components/screens/agents/new; it takes the flow's props directly. */
 export {
   AgentReviewSubmitStepView as ReviewSubmitStep,
   type SideEffectStep,

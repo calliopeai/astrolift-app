@@ -6,17 +6,13 @@ import type {
   AstroliftAgentLiveStatus,
 } from "@/graphql/agents/agents.types";
 
-import type { ActiveTasksPanelProps } from "./ActiveTasksPanel";
-import type { AgentRegistryPanelProps } from "./AgentRegistryPanel";
-import { AGENT_TABS, ZENTINELLE_TABS } from "./agents-list-tabs";
-import type { AgentsScreenProps } from "./AgentsScreen";
+import { type AgentRow, joinAgents } from "./agents-list";
+import type { AgentsListScreenProps } from "./AgentsListScreen";
 import type { BoxesTabViewProps } from "./BoxesTabView";
 import type { ManagedModelSectionViewProps } from "./ManagedModelSectionView";
-import type { TaskHistoryPanelProps } from "./TaskHistoryPanel";
-import type { AgentTask } from "./use-agent-tasks";
 import type { VncSessionSectionViewProps } from "./VncSessionSectionView";
 
-/** Hand-typed fixtures for the Agents fleet page (group agents-list). */
+/** Hand-typed fixtures for the Agents list and the parts it handed on (group agents-list). */
 
 const noop = () => {};
 const resolvedTrue = async () => true;
@@ -25,75 +21,11 @@ const resolved = async () => {};
 /** The JSON scalar is typed Record<string, unknown>; real values are any JSON. */
 const json = (value: unknown) => value as Record<string, unknown>;
 
-const LONG_ID = "task-7f3c2a91-0b4e-4c55-9d2e-" + "a".repeat(64);
 const LONG_NAME =
   "An extremely long agent name that keeps going to check wrapping in the registry table cell";
 
 // ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
-export function screenProps(patch: Partial<AgentsScreenProps> = {}): AgentsScreenProps {
-  return {
-    visibleTabs: AGENT_TABS.filter((t) => !ZENTINELLE_TABS.has(t)),
-    tab: "active",
-    onTabChange: noop,
-    orgId: "org-1",
-    panels: {},
-    ...patch,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Tasks (Active / History)
-// ---------------------------------------------------------------------------
-
-export function task(id: string, patch: Partial<AgentTask> = {}): AgentTask {
-  return {
-    id,
-    status: "running",
-    callbackUrl: "",
-    result: null,
-    createdAt: "2026-09-28T09:58:00Z",
-    startedAt: "2026-09-28T09:58:04Z",
-    finishedAt: null,
-    vncEnabled: false,
-    vncUrl: "",
-    ...patch,
-  };
-}
-
-export const ACTIVE_TASKS: AgentTask[] = [
-  task("7f3c2a91", { vncEnabled: true, vncUrl: "/vnc/7f3c2a91" }),
-  task("0b4e4c55"),
-  task("9d2ea1f0", { vncEnabled: true, vncUrl: "" }),
-];
-
-export const HISTORY_TASKS: AgentTask[] = [
-  task("1a2b3c4d", { status: "completed", finishedAt: "2026-09-28T09:40:00Z" }),
-  task("5e6f7a8b", { status: "failed", finishedAt: "2026-09-28T08:12:00Z" }),
-  task("9c0d1e2f", { status: "timed_out", finishedAt: "2026-09-27T22:01:00Z" }),
-  task("3a4b5c6d", { status: "cancelled", finishedAt: null }),
-];
-
-export const LONG_TASKS: AgentTask[] = [
-  task(LONG_ID, { vncEnabled: true, vncUrl: "/vnc/long", status: "running" }),
-];
-
-export const LONG_HISTORY_TASKS: AgentTask[] = [
-  task(LONG_ID, { status: "completed", finishedAt: "2026-09-28T09:40:00Z" }),
-];
-
-export function activeProps(patch: Partial<ActiveTasksPanelProps> = {}): ActiveTasksPanelProps {
-  return { tasks: ACTIVE_TASKS, loading: false, ...patch };
-}
-
-export function historyProps(patch: Partial<TaskHistoryPanelProps> = {}): TaskHistoryPanelProps {
-  return { tasks: HISTORY_TASKS, loading: false, ...patch };
-}
-
-// ---------------------------------------------------------------------------
-// Registry
+// Fleet rows
 // ---------------------------------------------------------------------------
 
 export function agent(
@@ -119,12 +51,14 @@ export function agent(
   };
 }
 
-export const AGENTS: AstroliftAgentListItem[] = [
+export const FLEET: AstroliftAgentListItem[] = [
   agent("triage-bot", { name: "Triage bot", runningCount: 2, lastRunStatus: "running" }),
-  agent("nightly-report", { name: "Nightly report", lastRunStatus: "failed" }),
+  agent("nightly-report", { name: "Nightly report", lastRunStatus: "failed", appSlug: "reports" }),
   agent("paused-sync", { name: "Paused sync", runPaused: true, runMode: "loop" }),
   agent("docs-service", {
     name: "Docs service",
+    projectSlug: "docs",
+    appSlug: "docs",
     runFamily: "service",
     runMode: "service",
     sourceUrl: "",
@@ -154,37 +88,82 @@ function live(
   };
 }
 
-export const LIVE_BY_WORKLOAD = new Map<string, AstroliftAgentLiveStatus>([
-  ["wl-triage-bot", live("wl-triage-bot", { runningCount: 2, isIdle: false })],
-  ["wl-nightly-report", live("wl-nightly-report", { nextScheduledAt: "2026-09-28T23:00:00Z" })],
-]);
-
-export const LONG_AGENTS: AstroliftAgentListItem[] = [
-  agent("a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping", {
-    name: LONG_NAME,
-    projectSlug: "a-very-long-project-slug-for-the-coordinates-line",
-    appSlug: "a-very-long-app-slug-for-the-coordinates-line",
-    sourceRepo: "calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout",
-  }),
+export const LIVE: AstroliftAgentLiveStatus[] = [
+  live("wl-triage-bot", { runningCount: 2, isIdle: false }),
+  live("wl-docs-service", { nextScheduledAt: "2026-09-28T23:00:00Z" }),
 ];
 
-export const PROJECTS = [
-  { id: "p1", slug: "platform", name: "Platform" },
-  { id: "p2", slug: "support", name: "Support" },
+/** Spec slug is the agent slug: triage-bot runs claude on the managed model. */
+const AGENT_SPECS = [
+  { slug: "triage-bot", runtime: "claude", managedModel: true },
+  { slug: "nightly-report", runtime: "codex", managedModel: false },
+  { slug: "paused-sync", runtime: "claude", managedModel: false },
 ];
 
-export function registryProps(
-  patch: Partial<AgentRegistryPanelProps> = {}
-): AgentRegistryPanelProps {
+const ENVIRONMENTS = [
+  { registeredAppSlug: "support", clusterSlug: "conflict-astrolift" },
+  { registeredAppSlug: "support", clusterSlug: "eks-us-west-2" },
+  { registeredAppSlug: "reports", clusterSlug: "gke-eu-west-4" },
+];
+
+/** The fleet joined the way the hook joins it; the viewer holds a role on `support`. */
+export const AGENT_ROWS: AgentRow[] = joinAgents(FLEET, {
+  live: LIVE,
+  specs: AGENT_SPECS,
+  environments: ENVIRONMENTS,
+  myAppSlugs: new Set(["support"]),
+});
+
+export const LONG_AGENT_ROW: AgentRow = joinAgents(
+  [
+    agent("a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping-0123456789abcdef", {
+      name: LONG_NAME,
+      projectSlug: "a-very-long-project-slug-for-the-coordinates-line",
+      appSlug:
+        "arn:aws:ecs:us-west-2:123456789012:service/astrolift-agents/a-very-long-app-slug-for-the-coordinates-line-and-then-some-more-characters-to-pass-two-hundred",
+      sourceRepo: "calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout",
+      sourceUrl:
+        "https://github.com/calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout/tree/main/agents/triage",
+      lastRunStatus: "timed_out",
+    }),
+  ],
+  {
+    live: [],
+    specs: [
+      {
+        slug: "a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping-0123456789abcdef",
+        runtime: "a-custom-runtime-with-a-long-name",
+        managedModel: false,
+      },
+    ],
+    environments: [],
+    myAppSlugs: new Set(),
+  }
+)[0];
+
+/** 60 agents, for numbered pages. */
+export const MANY_AGENT_ROWS: AgentRow[] = Array.from({ length: 60 }, (_, i) => ({
+  ...AGENT_ROWS[i % AGENT_ROWS.length],
+  id: `wl-agent-${i}`,
+  slug: `agent-${String(i).padStart(2, "0")}`,
+  name: `Agent ${String(i).padStart(2, "0")}`,
+}));
+
+/** Everything the screen takes except `list`, which each story builds. */
+export function listProps(
+  patch: Partial<Omit<AgentsListScreenProps, "list">> = {}
+): Omit<AgentsListScreenProps, "list"> {
   return {
-    canCreateAgent: true,
-    projectSlug: "",
-    fleet: true,
-    setProjectScope: noop,
-    projects: PROJECTS,
-    agents: AGENTS,
+    rows: AGENT_ROWS,
+    totalCount: AGENT_ROWS.length,
     loading: false,
-    liveByWorkloadId: LIVE_BY_WORKLOAD,
+    stale: false,
+    error: null,
+    onRetry: noop,
+    canCreate: true,
+    canRun: true,
+    dispatching: false,
+    onRun: resolvedTrue,
     ...patch,
   };
 }

@@ -1,72 +1,102 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
-import { DeployModelSheetView } from "./DeployModelSheet";
-import { ModelReplicasView } from "./ModelReplicas";
-import { type ModelEndpoint, ModelsScreen } from "./ModelsScreen";
-import { ModelTestDialogView } from "./ModelTestDialog";
-import {
-  DEPLOY,
-  LONG_MODELS,
-  MODELS_SCREEN,
-  REPLICAS,
-  TEST_DIALOG,
-} from "./models-providers.fixtures";
-import { replicasOf } from "./use-model-replicas";
+import { type ListState, useLocalListState } from "@/components/list/use-list-state";
+
+import { type ModelEndpoint, MODELS_LIST, selectModels } from "./models-list";
+import { LONG_MODELS, MANY_MODELS, MODELS, SHA_MODELS } from "./models-providers.fixtures";
+import { ModelsScreen, type ModelsScreenProps } from "./ModelsScreen";
 
 const meta: Meta = {
   title: "Screens/Models/ModelsScreen",
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "padded" },
 };
 export default meta;
 
 type Story = StoryObj;
 
-const slots = {
-  renderReplicas: (m: ModelEndpoint) => (
-    <ModelReplicasView {...REPLICAS} name={m.name} replicas={replicasOf(m.config)} />
-  ),
-  renderTest: (m: ModelEndpoint) => <ModelTestDialogView {...TEST_DIALOG} name={m.name} />,
-  renderDeploySheet: ({
-    open,
-    onOpenChange,
-  }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-  }) => <DeployModelSheetView {...DEPLOY} open={open} onOpenChange={onOpenChange} />,
+type Props = Partial<Omit<ModelsScreenProps, "list">> & {
+  models?: ModelEndpoint[];
+  initial?: Partial<ListState>;
 };
 
+/** The screen over fixture models, filtered and paged the way the hook does it. */
+function Models({ models = MODELS, initial, ...patch }: Props) {
+  const list = useLocalListState(MODELS_LIST, initial);
+  const { rows, totalCount } = selectModels(models, {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  });
+  return (
+    <ModelsScreen
+      list={list}
+      rows={rows}
+      totalCount={totalCount}
+      loading={false}
+      error={null}
+      onRetry={() => {}}
+      {...patch}
+    />
+  );
+}
+
 export const Full: Story = {
-  render: () => <ModelsScreen {...MODELS_SCREEN} {...slots} />,
+  render: () => <Models />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Qwen/Qwen3-8B")).toBeInTheDocument();
     await expect(canvas.getByText("cloud")).toBeInTheDocument();
+    for (const view of ["All", "Mine", "Endpoints", "Hosted (GPU)"]) {
+      await expect(canvas.getByRole("link", { name: view })).toBeInTheDocument();
+    }
+    await expect(canvas.getByRole("link", { name: "Deploy model" })).toHaveAttribute(
+      "href",
+      "/models/deploy"
+    );
   },
 };
 
-export const Loading: Story = {
-  render: () => <ModelsScreen {...MODELS_SCREEN} {...slots} models={[]} loading />,
-};
+export const Loading: Story = { render: () => <Models models={[]} loading /> };
 
 export const Empty: Story = {
-  render: () => <ModelsScreen {...MODELS_SCREEN} {...slots} models={[]} />,
+  render: () => <Models models={[]} />,
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByText("No models yet")).toBeInTheDocument();
   },
 };
 
 export const LoadError: Story = {
-  render: () => (
-    <ModelsScreen
-      {...MODELS_SCREEN}
-      {...slots}
-      models={[]}
-      error={new globalThis.Error("Network error: failed to fetch")}
-    />
-  ),
+  render: () => <Models models={[]} error={{ message: "Network error: failed to fetch" }} />,
 };
 
+/** Cloud-served endpoints only. */
+export const Endpoints: Story = { render: () => <Models initial={{ view: "endpoints" }} /> };
+
+/** vLLM and KServe on the org's own GPUs. */
+export const Hosted: Story = { render: () => <Models initial={{ view: "hosted" }} /> };
+
+/** Mine lists every model for now; its note says so. */
+export const Mine: Story = { render: () => <Models initial={{ view: "mine" }} /> };
+
+export const EmptyFiltered: Story = {
+  render: () => <Models initial={{ filters: { cluster: "gke-eu-west-4" } }} />,
+};
+
+/** Forty models: numbered pages. */
+export const Paged: Story = { render: () => <Models models={MANY_MODELS} initial={{ page: 2 }} /> };
+
+/** A 64-char SHA, a 200-char ARN, an unbroken URL, and long owner names. */
 export const LongStrings: Story = {
-  render: () => <ModelsScreen {...MODELS_SCREEN} {...slots} models={LONG_MODELS} />,
+  render: () => <Models models={[...SHA_MODELS, ...LONG_MODELS, ...MODELS]} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Models models={[...SHA_MODELS, ...LONG_MODELS, ...MANY_MODELS]} />
+    </div>
+  ),
 };
