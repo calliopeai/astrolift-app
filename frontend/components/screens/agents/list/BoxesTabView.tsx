@@ -3,7 +3,9 @@
 import { BoxIcon, CopyIcon, Loader2Icon, PlusIcon, TerminalIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,9 +85,20 @@ function AttachCell({ box, onCopy }: { box: AstroliftAgentBox; onCopy: (line: st
   );
 }
 
-/** Boxes tab — long-lived attachable agent containers, and the new-box dialog. */
+/**
+ * Agent boxes: long-lived attachable agent containers on the shared list
+ * (views All · Mine, a status filter, numbered pages over the org's boxes;
+ * see agent-boxes-list.ts), and the new-box dialog. Pure view; the data half
+ * is useAgentBoxes.
+ */
 export function BoxesTabView({
-  controller,
+  list,
+  rows,
+  totalCount,
+  loading,
+  stale,
+  error,
+  onRetry,
   specs,
   starting,
   includeEnded,
@@ -110,6 +123,7 @@ export function BoxesTabView({
     {
       id: "box",
       header: "Box",
+      sortKey: "name",
       cell: (box) => (
         <div>
           <div className="font-medium">{box.name}</div>
@@ -120,6 +134,7 @@ export function BoxesTabView({
     {
       id: "status",
       header: "Status",
+      sortKey: "status",
       width: "w-40",
       cell: (box) => (
         <div>
@@ -140,6 +155,7 @@ export function BoxesTabView({
     {
       id: "idle",
       header: "Idle timeout",
+      sortKey: "idle",
       width: "w-28",
       cell: (box) => <span className="text-sm">{formatIdle(box.idleTimeoutSeconds)}</span>,
     },
@@ -151,6 +167,7 @@ export function BoxesTabView({
     {
       id: "started",
       header: "Started",
+      sortKey: "started",
       width: "w-28",
       cell: (box) => (
         <span className="text-muted-foreground text-sm">
@@ -174,29 +191,39 @@ export function BoxesTabView({
   ];
 
   return (
-    <div className="space-y-4">
-      <DataTable<AstroliftAgentBox>
+    <>
+      <ListPage<AstroliftAgentBox>
+        header={{
+          crumbs: agentsCrumbs("workloads", { label: "Agent boxes" }),
+          title: "Agent boxes",
+          primaryAction: (
+            <Button size="sm" onClick={() => setDialogOpen(true)}>
+              <PlusIcon className="size-4" />
+              New agent box
+            </Button>
+          ),
+          menu: (
+            <Button size="sm" variant="ghost" onClick={toggleIncludeEnded}>
+              {includeEnded ? "Live only" : "Show ended"}
+            </Button>
+          ),
+        }}
+        list={list}
         label="Agent boxes"
-        controller={controller}
         columns={columns}
+        rows={rows}
         getRowId={(box) => box.id}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
         empty={{
           icon: <BoxIcon className="size-5" />,
           title: "No agent boxes",
           description:
             "Start one to get a container running Claude Code, Codex, or the Calliope CLI that you can attach a terminal to. tmux holds the session open, so a dropped connection does not kill the agent.",
         }}
-        toolbar={
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={toggleIncludeEnded}>
-              {includeEnded ? "Live only" : "Show ended"}
-            </Button>
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <PlusIcon className="size-4" />
-              New agent box
-            </Button>
-          </div>
-        }
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -279,6 +306,6 @@ export function BoxesTabView({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

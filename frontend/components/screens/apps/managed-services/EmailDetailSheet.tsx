@@ -12,6 +12,12 @@
  *   4. DKIM / SPF / DMARC DNS auth status (#632)
  *   5. Suppression list view + manage (#631)
  *
+ * The sheet is sectioned so one list shows at a time: Health and
+ * Identity & sending hold the panels, and each list (suppressions, alert
+ * rules, messages, templates) has a section of its own. Each list is an
+ * embedded ListPage over rows nested in one payload, with its list state
+ * kept in the panel.
+ *
  * Backends that don't expose any of these (GCP, Azure) populate
  * `unsupportedNotes`; the UI shades the corresponding panel and shows
  * the upstream's hint instead of the data.
@@ -53,6 +59,15 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
+import {
+  type ListDefinition,
+  type ListStateController,
+  standardViews,
+  useLocalListState,
+} from "@/components/list/use-list-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,18 +99,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   AstroliftEmailDnsAuthCheck,
+  AstroliftEmailMessage,
   AstroliftEmailServiceDetail,
   AstroliftEmailSuppressionEntry,
   AstroliftEmailTemplate,
@@ -158,6 +166,37 @@ function formatMoney(cents: number, currency: string): string {
   }).format(cents / 100);
 }
 
+/** The client-side step's input, from a panel's own list state. */
+function pageOf(list: ListStateController) {
+  return {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  };
+}
+
+const NOT_PERSONAL = "These belong to the email service, not a person, so Mine is empty.";
+
+/** An embedded list's declaration over one payload's rows. */
+function emailList(
+  id: string,
+  fields: ListDefinition["fields"],
+  searchPlaceholder: string,
+  defaultSort: ListDefinition["defaultSort"]
+): ListDefinition {
+  return {
+    id: `managed-services.email.${id}`,
+    fields,
+    searchPlaceholder,
+    defaultSort,
+    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    paging: "numbered",
+    pageSizes: [25, 50, 100],
+  };
+}
+
 /** The panels that carry data of their own, rendered by the route's containers. */
 export interface EmailDetailPanels {
   cost?: React.ReactNode;
@@ -169,6 +208,15 @@ export interface EmailDetailPanels {
   templates?: React.ReactNode;
 }
 
+/** The sheet's sections; one shows at a time. */
+export type EmailDetailSection =
+  | "health"
+  | "sending"
+  | "suppressions"
+  | "alerts"
+  | "messages"
+  | "templates";
+
 export interface EmailDetailSheetViewProps {
   serviceName: string;
   serviceConfig: Record<string, unknown>;
@@ -177,6 +225,8 @@ export interface EmailDetailSheetViewProps {
   detail: AstroliftEmailServiceDetail | null;
   loading: boolean;
   panels?: EmailDetailPanels;
+  /** The section shown first (stories). */
+  defaultSection?: EmailDetailSection;
 }
 
 export function EmailDetailSheetView({
@@ -187,7 +237,19 @@ export function EmailDetailSheetView({
   detail,
   loading,
   panels,
+  defaultSection = "health",
 }: EmailDetailSheetViewProps) {
+  const [section, setSection] = React.useState<EmailDetailSection>(defaultSection);
+  const sections: { id: EmailDetailSection; label: string; shown: boolean }[] = [
+    { id: "health", label: "Health", shown: true },
+    { id: "sending", label: "Identity & sending", shown: true },
+    { id: "suppressions", label: "Suppressions", shown: Boolean(panels?.suppression) },
+    { id: "alerts", label: "Alert rules", shown: Boolean(panels?.alertRules) },
+    { id: "messages", label: "Messages", shown: Boolean(panels?.messageLog) },
+    { id: "templates", label: "Templates", shown: Boolean(panels?.templates) },
+  ];
+  const tabs = sections.filter((s) => s.shown);
+  const active = tabs.some((s) => s.id === section) ? section : "health";
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
@@ -207,32 +269,65 @@ export function EmailDetailSheetView({
           </div>
         ) : detail ? (
           <div className="space-y-6 p-1">
-            <ReputationPanel detail={detail} />
-            <QuotaPanel detail={detail} />
-            {panels?.cost}
-            <IdentityPanel detail={detail} />
-            <DnsAuthPanel detail={detail} />
-            {panels?.suppression}
-            {panels?.senderConfig}
-            <SnsEventPublishingPanel serviceConfig={serviceConfig} />
-            {panels?.alertRules}
-            {panels?.engagement}
-            {panels?.messageLog}
-            {panels?.templates}
-            {detail.unsupportedNotes.length > 0 ? (
-              <Card className="bg-muted/40 p-3">
-                <p className="text-muted-foreground text-2xs mb-1 font-semibold uppercase">
-                  Notes from {detail.pluginSlug.toUpperCase()}
-                </p>
-                <ul className="text-muted-foreground space-y-0.5 text-xs">
-                  {detail.unsupportedNotes.map((note) => (
-                    <li key={note} className="font-mono">
-                      • {note}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ) : null}
+            <div
+              role="tablist"
+              aria-label="Email service sections"
+              className="bg-muted/40 flex max-w-full flex-wrap gap-1 rounded-md border p-1"
+            >
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active === t.id}
+                  onClick={() => setSection(t.id)}
+                  className={`rounded px-3 py-1 text-sm font-medium transition ${
+                    active === t.id
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {active === "health" ? (
+              <>
+                <ReputationPanel detail={detail} />
+                <QuotaPanel detail={detail} />
+                {panels?.cost}
+                {panels?.engagement}
+                {detail.unsupportedNotes.length > 0 ? (
+                  <Card className="bg-muted/40 p-3">
+                    <p className="text-muted-foreground text-2xs mb-1 font-semibold uppercase">
+                      Notes from {detail.pluginSlug.toUpperCase()}
+                    </p>
+                    <ul className="text-muted-foreground space-y-0.5 text-xs">
+                      {detail.unsupportedNotes.map((note) => (
+                        <li key={note} className="font-mono">
+                          • {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                ) : null}
+              </>
+            ) : active === "sending" ? (
+              <>
+                <IdentityPanel detail={detail} />
+                <DnsAuthPanel detail={detail} />
+                {panels?.senderConfig}
+                <SnsEventPublishingPanel serviceConfig={serviceConfig} />
+              </>
+            ) : active === "suppressions" ? (
+              panels?.suppression
+            ) : active === "alerts" ? (
+              panels?.alertRules
+            ) : active === "messages" ? (
+              panels?.messageLog
+            ) : (
+              panels?.templates
+            )}
           </div>
         ) : (
           <p className="text-muted-foreground p-3 text-sm">
@@ -587,6 +682,29 @@ function DnsCheckRow({ check }: { check: AstroliftEmailDnsAuthCheck }) {
 
 // ── Suppression list (#631) ────────────────────────────────────────
 
+const suppressionKey = (e: AstroliftEmailSuppressionEntry) => e.address;
+
+const SUPPRESSION_SELECT: SelectRowsSpec<AstroliftEmailSuppressionEntry> = {
+  filter: { owner: () => false, reason: (e, value) => e.reason === value },
+  text: (e) => [e.address, e.reason],
+  sort: {
+    address: (e) => e.address.toLowerCase(),
+    reason: (e) => e.reason,
+    date: (e) => e.suppressedAt,
+  },
+  id: suppressionKey,
+};
+
+function suppressionList(entries: AstroliftEmailSuppressionEntry[]): ListDefinition {
+  const reasons = [...new Set(entries.map((e) => e.reason).filter(Boolean))].sort();
+  return emailList(
+    "suppressions",
+    [{ key: "reason", label: "Reason", options: reasons.map((r) => ({ value: r, label: r })) }],
+    "Search addresses…",
+    [{ key: "date", dir: "desc" }]
+  );
+}
+
 export type SuppressionPanelViewProps = ReturnType<typeof useSuppressionList> & {
   detail: AstroliftEmailServiceDetail;
 };
@@ -603,6 +721,61 @@ export function SuppressionPanelView({
   const [removalTarget, setRemovalTarget] = React.useState<AstroliftEmailSuppressionEntry | null>(
     null
   );
+  const [def] = React.useState(() => suppressionList(detail.suppressionEntries));
+  const list = useLocalListState(def);
+  const page = selectRows(detail.suppressionEntries, pageOf(list), SUPPRESSION_SELECT);
+  const columns: Column<AstroliftEmailSuppressionEntry>[] = [
+    {
+      id: "address",
+      header: "Address",
+      sortKey: "address",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (entry) => entry.address,
+    },
+    {
+      id: "reason",
+      header: "Reason",
+      sortKey: "reason",
+      cell: (entry) => (
+        <Badge variant="outline" className="text-2xs">
+          {entry.reason}
+        </Badge>
+      ),
+    },
+    {
+      id: "date",
+      header: "Date",
+      sortKey: "date",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (entry) => new Date(entry.suppressedAt).toLocaleDateString(),
+    },
+    {
+      id: "remove",
+      header: <span className="sr-only">Remove</span>,
+      label: "Remove",
+      width: "w-12",
+      align: "right",
+      cell: (entry) => (
+        <Can permission="managed_service.update">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setRemovalTarget(entry)}
+                disabled={removing}
+              >
+                <TrashIcon className="size-3.5" />
+                <span className="sr-only">Remove from suppression</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Un-suppress (allow sends again)</TooltipContent>
+          </Tooltip>
+        </Can>
+      ),
+    },
+  ];
 
   async function handleAdd() {
     const address = addAddress.trim();
@@ -684,50 +857,16 @@ export function SuppressionPanelView({
       {detail.suppressionEntries.length === 0 ? (
         <p className="text-muted-foreground py-4 text-center text-xs">No suppressed addresses.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Address</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="w-12 text-right"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.suppressionEntries.map((entry) => (
-              <TableRow key={entry.address}>
-                <TableCell className="font-mono text-xs">{entry.address}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-2xs">
-                    {entry.reason}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
-                  {new Date(entry.suppressedAt).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Can permission="managed_service.update">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          onClick={() => setRemovalTarget(entry)}
-                          disabled={removing}
-                        >
-                          <TrashIcon className="size-3.5" />
-                          <span className="sr-only">Remove from suppression</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Un-suppress (allow sends again)</TooltipContent>
-                    </Tooltip>
-                  </Can>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <ListPage<AstroliftEmailSuppressionEntry>
+          embedded
+          list={list}
+          label="Suppressed addresses"
+          columns={columns}
+          rows={page.rows}
+          getRowId={suppressionKey}
+          totalCount={page.totalCount}
+          empty={{ icon: <TrashIcon className="size-5" />, title: "No suppressed addresses." }}
+        />
       )}
 
       <AlertDialog
@@ -1031,6 +1170,40 @@ function severityBadge(severity: string): string {
   }
 }
 
+const ALERT_RULES_LIST = emailList(
+  "alert-rules",
+  [
+    { key: "severity", label: "Severity", options: SEVERITY_OPTIONS.map((o) => ({ ...o })) },
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+      ],
+    },
+  ],
+  "Search rules, conditions…",
+  [{ key: "name", dir: "asc" }]
+);
+
+const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+
+const ALERT_RULES_SELECT: SelectRowsSpec<AlertRuleRow> = {
+  filter: {
+    owner: () => false,
+    severity: (r, value) => r.severity === value,
+    status: (r, value) => r.isActive === (value === "active"),
+  },
+  text: (r) => [r.name, predicateLabel(r.predicate), r.severity],
+  sort: {
+    name: (r) => r.name.toLowerCase(),
+    severity: (r) => SEVERITY_RANK[r.severity] ?? 9,
+    status: (r) => (r.isActive ? 0 : 1),
+  },
+  id: (r) => r.id,
+};
+
 export function AlertRulesPanelView({
   rules,
   loading,
@@ -1043,6 +1216,61 @@ export function AlertRulesPanelView({
   const [threshold, setThreshold] = React.useState<string>("5");
   const [severity, setSeverity] = React.useState<string>("warning");
   const [name, setName] = React.useState("");
+  const list = useLocalListState(ALERT_RULES_LIST);
+  const page = selectRows(rules, pageOf(list), ALERT_RULES_SELECT);
+  const columns: Column<AlertRuleRow>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortKey: "name",
+      cellClassName: "text-xs [overflow-wrap:anywhere]",
+      cell: (r) => r.name,
+    },
+    {
+      id: "condition",
+      header: "Condition",
+      cellClassName: "text-muted-foreground text-2xs font-mono [overflow-wrap:anywhere]",
+      cell: (r) => predicateLabel(r.predicate),
+    },
+    {
+      id: "severity",
+      header: "Severity",
+      sortKey: "severity",
+      cell: (r) => (
+        <Badge variant="outline" className={`capitalize ${severityBadge(r.severity)}`}>
+          {r.severity}
+        </Badge>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      sortKey: "status",
+      cellClassName: "text-xs",
+      cell: (r) => (r.isActive ? "Active" : "Inactive"),
+    },
+    {
+      id: "delete",
+      header: <span className="sr-only">Delete</span>,
+      label: "Delete",
+      width: "w-10",
+      align: "right",
+      cell: (r) => (
+        <Can permission="managed_service.update">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            disabled={deleting}
+            onClick={() => void onDelete(r)}
+          >
+            <TrashIcon className="size-3.5" />
+            <span className="sr-only">Delete alert rule</span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   React.useEffect(() => {
     const preset = SES_ALERT_KINDS.find((k) => k.value === kind);
@@ -1072,47 +1300,16 @@ export function AlertRulesPanelView({
           hear before the throttle.
         </p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Condition</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-10 text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rules.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs">{r.name}</TableCell>
-                <TableCell className="text-muted-foreground text-2xs font-mono">
-                  {predicateLabel(r.predicate)}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={`capitalize ${severityBadge(r.severity)}`}>
-                    {r.severity}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-xs">{r.isActive ? "Active" : "Inactive"}</TableCell>
-                <TableCell className="text-right">
-                  <Can permission="managed_service.update">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={deleting}
-                      onClick={() => void onDelete(r)}
-                    >
-                      <TrashIcon className="size-3.5" />
-                      <span className="sr-only">Delete alert rule</span>
-                    </Button>
-                  </Can>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <ListPage<AlertRuleRow>
+          embedded
+          list={list}
+          label="Alert rules"
+          columns={columns}
+          rows={page.rows}
+          getRowId={(r) => r.id}
+          totalCount={page.totalCount}
+          empty={{ icon: <BellIcon className="size-5" />, title: "No alert rules" }}
+        />
       )}
 
       <Can permission="managed_service.update">
@@ -1359,16 +1556,58 @@ function eventKindBadge(kind: string): string {
   }
 }
 
+/**
+ * Event and recipient are the query's filters (the hook sends them); search,
+ * sort and numbered pages run over the page of messages it returns.
+ */
+const MESSAGES_LIST = emailList(
+  "messages",
+  [
+    {
+      key: "event",
+      label: "Event",
+      options: EVENT_KIND_OPTIONS.filter((o) => o.value !== "").map((o) => ({ ...o })),
+    },
+    { key: "recipient", label: "Recipient" },
+  ],
+  "Search recipients, subjects…",
+  [{ key: "when", dir: "desc" }]
+);
+
+const MESSAGES_SELECT: SelectRowsSpec<AstroliftEmailMessage> = {
+  filter: { owner: () => false },
+  text: (m) => [m.recipient, m.subject, m.eventKind],
+  sort: {
+    recipient: (m) => m.recipient.toLowerCase(),
+    subject: (m) => m.subject.toLowerCase(),
+    event: (m) => m.eventKind,
+    when: (m) => m.occurredAt,
+  },
+  id: (m) => m.id,
+};
+
 export function MessageLogPanelView({
   messages,
   loading,
   onRefresh,
   eventKind,
-  onEventKindChange: setEventKind,
-  onApplyRecipient: setAppliedRecipient,
+  onEventKindChange,
+  onApplyRecipient,
 }: ReturnType<typeof useMessageLog>) {
-  const [recipient, setRecipient] = React.useState<string>("");
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set<string>());
+  const list = useLocalListState(MESSAGES_LIST, {
+    filters: eventKind ? { event: eventKind } : {},
+  });
+  const event = list.filters.event ?? "";
+  const recipient = (list.filters.recipient ?? "").trim();
+  // The event and recipient chips are the query's filters: hand them to the hook.
+  React.useEffect(() => {
+    onEventKindChange(event);
+  }, [event, onEventKindChange]);
+  React.useEffect(() => {
+    onApplyRecipient(recipient);
+  }, [recipient, onApplyRecipient]);
+  const page = selectRows(messages, pageOf(list), MESSAGES_SELECT);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -1378,6 +1617,77 @@ export function MessageLogPanelView({
       return next;
     });
   }
+
+  const columns: Column<AstroliftEmailMessage>[] = [
+    {
+      id: "recipient",
+      header: "Recipient",
+      sortKey: "recipient",
+      cellClassName: "min-w-0",
+      cell: (m) => {
+        const isOpen = expanded.has(m.id);
+        const hasMetadata = m.metadata && Object.keys(m.metadata).length > 0;
+        if (!hasMetadata) {
+          return (
+            <span className="text-2xs pl-5 font-mono [overflow-wrap:anywhere]">{m.recipient}</span>
+          );
+        }
+        const Chevron = isOpen ? ChevronDownIcon : ChevronRightIcon;
+        return (
+          <div className="flex min-w-0 flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => toggleExpanded(m.id)}
+              aria-expanded={isOpen}
+              className="flex min-w-0 items-center gap-1.5 text-left"
+            >
+              <Chevron className="size-3.5 shrink-0" />
+              <span className="text-2xs font-mono [overflow-wrap:anywhere]">{m.recipient}</span>
+            </button>
+            {isOpen ? (
+              <div className="bg-muted/30 rounded-md">
+                <MessageMetadata
+                  eventKind={m.eventKind}
+                  messageId={m.messageId}
+                  metadata={m.metadata}
+                />
+              </div>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      id: "subject",
+      header: "Subject",
+      sortKey: "subject",
+      cellClassName: "max-w-[14rem] truncate align-top text-xs",
+      cell: (m) =>
+        m.subject ? (
+          <span title={m.subject}>{m.subject}</span>
+        ) : (
+          <span className="text-muted-foreground italic">(no subject)</span>
+        ),
+    },
+    {
+      id: "event",
+      header: "Event",
+      sortKey: "event",
+      cellClassName: "align-top",
+      cell: (m) => (
+        <Badge variant="outline" className={`text-2xs ${eventKindBadge(m.eventKind)}`}>
+          {m.eventKind}
+        </Badge>
+      ),
+    },
+    {
+      id: "when",
+      header: "When",
+      sortKey: "when",
+      cellClassName: "text-muted-foreground text-2xs align-top",
+      cell: (m) => new Date(m.occurredAt).toLocaleString(),
+    },
+  ];
 
   return (
     <Card className="p-4">
@@ -1394,120 +1704,23 @@ export function MessageLogPanelView({
           Refresh
         </Button>
       </div>
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <Label className="text-xs">Event</Label>
-          <Select
-            value={eventKind === "" ? "__all__" : eventKind}
-            onValueChange={(v) => setEventKind(v === "__all__" ? "" : v)}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EVENT_KIND_OPTIONS.map((o) => (
-                <SelectItem key={o.value || "__all__"} value={o.value || "__all__"}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Recipient</Label>
-          <Input
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setAppliedRecipient(recipient.trim());
-            }}
-            onBlur={() => setAppliedRecipient(recipient.trim())}
-            placeholder="user@example.com"
-            className="h-8 font-mono text-xs"
-          />
-        </div>
-      </div>
-      {loading && messages.length === 0 ? (
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
-      ) : messages.length === 0 ? (
-        <p className="text-muted-foreground py-4 text-center text-xs">
-          No messages match the current filter. Either nothing has been sent in the retention window
-          or SNS event publishing isn&apos;t configured.
-        </p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead>Recipient</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>When</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {messages.map((m) => {
-              const isOpen = expanded.has(m.id);
-              const hasMetadata = m.metadata && Object.keys(m.metadata).length > 0;
-              return (
-                <React.Fragment key={m.id}>
-                  <TableRow
-                    className={hasMetadata ? "cursor-pointer" : undefined}
-                    onClick={() => {
-                      if (hasMetadata) toggleExpanded(m.id);
-                    }}
-                  >
-                    <TableCell className="w-8">
-                      {hasMetadata ? (
-                        isOpen ? (
-                          <ChevronDownIcon className="size-3.5" />
-                        ) : (
-                          <ChevronRightIcon className="size-3.5" />
-                        )
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-2xs font-mono">{m.recipient}</TableCell>
-                    <TableCell className="max-w-[14rem] truncate text-xs" title={m.subject}>
-                      {m.subject || (
-                        <span className="text-muted-foreground italic">(no subject)</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`text-2xs ${eventKindBadge(m.eventKind)}`}
-                      >
-                        {m.eventKind}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className="text-muted-foreground text-2xs"
-                      title={new Date(m.occurredAt).toLocaleString()}
-                    >
-                      {new Date(m.occurredAt).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                  {isOpen && hasMetadata ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={5} className="bg-muted/30">
-                        <MessageMetadata
-                          eventKind={m.eventKind}
-                          messageId={m.messageId}
-                          metadata={m.metadata}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
+      <ListPage<AstroliftEmailMessage>
+        embedded
+        list={list}
+        label="Messages"
+        columns={columns}
+        rows={page.rows}
+        getRowId={(m) => m.id}
+        totalCount={page.totalCount}
+        loading={loading && messages.length === 0}
+        stale={loading && messages.length > 0}
+        empty={{
+          icon: <InboxIcon className="size-5" />,
+          title: "No messages",
+          description:
+            "Either nothing has been sent in the retention window or SNS event publishing isn't configured.",
+        }}
+      />
     </Card>
   );
 }
@@ -1587,6 +1800,21 @@ function MessageMetadata({
 
 // ── Template management (#635, #628) ───────────────────────────────
 
+const TEMPLATES_LIST = emailList("templates", [], "Search templates, subjects…", [
+  { key: "name", dir: "asc" },
+]);
+
+const TEMPLATES_SELECT: SelectRowsSpec<AstroliftEmailTemplate> = {
+  filter: { owner: () => false },
+  text: (t) => [t.name, t.subject],
+  sort: {
+    name: (t) => t.name.toLowerCase(),
+    subject: (t) => t.subject.toLowerCase(),
+    created: (t) => t.createdAt ?? "",
+  },
+  id: (t) => t.name,
+};
+
 export type TemplatesPanelViewProps = ReturnType<typeof useEmailTemplates> & {
   /** One template's 14d send stats, mounted only while its row is expanded. */
   renderStats: (name: string) => React.ReactNode;
@@ -1605,6 +1833,8 @@ export function TemplatesPanelView({
   const [editingName, setEditingName] = React.useState<string | null>(null);
   const [statsOpen, setStatsOpen] = React.useState<Set<string>>(() => new Set<string>());
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftEmailTemplate | null>(null);
+  const list = useLocalListState(TEMPLATES_LIST);
+  const page = selectRows(templates, pageOf(list), TEMPLATES_SELECT);
 
   const [draft, setDraft] = React.useState({
     name: "",
@@ -1659,6 +1889,78 @@ export function TemplatesPanelView({
   }
 
   const formOpen = creatingNew || editingName !== null;
+
+  const columns: Column<AstroliftEmailTemplate>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortKey: "name",
+      cellClassName: "min-w-0",
+      cell: (t) => (
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className="font-mono text-xs [overflow-wrap:anywhere]">{t.name}</span>
+          {statsOpen.has(t.name) ? (
+            <div className="bg-muted/30 rounded-md p-3">{renderStats(t.name)}</div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "subject",
+      header: "Subject",
+      sortKey: "subject",
+      cellClassName: "max-w-[14rem] truncate align-top text-xs",
+      cell: (t) => <span title={t.subject}>{t.subject}</span>,
+    },
+    {
+      id: "created",
+      header: "Created",
+      sortKey: "created",
+      cellClassName: "text-muted-foreground text-2xs align-top",
+      cell: (t) => (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "unknown"),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">Actions</span>,
+      label: "Actions",
+      width: "w-28",
+      align: "right",
+      cellClassName: "align-top",
+      cell: (t) => (
+        <div className="inline-flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={() => toggleStats(t.name)}
+            title="Toggle 14d send stats"
+            aria-expanded={statsOpen.has(t.name)}
+          >
+            <BarChart3Icon className="size-3.5" />
+            <span className="sr-only">Stats</span>
+          </Button>
+          <Can permission="managed_service.update">
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => beginEdit(t)}>
+              <PencilIcon className="size-3.5" />
+              <span className="sr-only">Edit</span>
+            </Button>
+          </Can>
+          <Can permission="managed_service.update">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={() => setDeleteTarget(t)}
+              disabled={deleting}
+            >
+              <TrashIcon className="size-3.5" />
+              <span className="sr-only">Delete</span>
+            </Button>
+          </Can>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <Card className="p-4">
@@ -1754,78 +2056,16 @@ export function TemplatesPanelView({
           No templates yet. Create one above to start sending templated email.
         </p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-28 text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {templates.map((t) => {
-              const isStatsOpen = statsOpen.has(t.name);
-              return (
-                <React.Fragment key={t.name}>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">{t.name}</TableCell>
-                    <TableCell className="max-w-[14rem] truncate text-xs" title={t.subject}>
-                      {t.subject}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-2xs">
-                      {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          onClick={() => toggleStats(t.name)}
-                          title="Toggle 14d send stats"
-                        >
-                          <BarChart3Icon className="size-3.5" />
-                          <span className="sr-only">Stats</span>
-                        </Button>
-                        <Can permission="managed_service.update">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            onClick={() => beginEdit(t)}
-                          >
-                            <PencilIcon className="size-3.5" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                        </Can>
-                        <Can permission="managed_service.update">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            onClick={() => setDeleteTarget(t)}
-                            disabled={deleting}
-                          >
-                            <TrashIcon className="size-3.5" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </Can>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {isStatsOpen ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={4} className="bg-muted/30 p-3">
-                        {renderStats(t.name)}
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <ListPage<AstroliftEmailTemplate>
+          embedded
+          list={list}
+          label="Templates"
+          columns={columns}
+          rows={page.rows}
+          getRowId={(t) => t.name}
+          totalCount={page.totalCount}
+          empty={{ icon: <FileTextIcon className="size-5" />, title: "No templates" }}
+        />
       )}
 
       <AlertDialog

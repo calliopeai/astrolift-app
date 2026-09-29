@@ -5,7 +5,6 @@ import {
   AlertTriangleIcon,
   BoxIcon,
   CalendarClockIcon,
-  ChevronRightIcon,
   CopyIcon,
   DatabaseIcon,
   GitBranchIcon,
@@ -22,19 +21,20 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
+import {
+  type ListDefinition,
+  type ListStateController,
+  standardViews,
+  useLocalListState,
+} from "@/components/list/use-list-state";
 import { Panel, PanelGrid, SkeletonRows } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   AstroliftAppPod,
@@ -136,6 +136,74 @@ function emptyOrValue(s: string | null | undefined): string {
   return s && s.trim() ? s : "—";
 }
 
+/**
+ * The detail page's sections, one at a time, so the page stays about two
+ * screens and shows one list: the overview (the workload, its usage and
+ * scaling, the pod-status breakdown), then pods, containers with their
+ * probes, volumes and the rendered manifest.
+ */
+type WorkloadSection = "overview" | "pods" | "containers" | "volumes" | "manifest";
+
+const NOT_PERSONAL = "Pods and volumes are the workload's, not a person's, so Mine is empty.";
+
+/** The client-side step's input, from a list's own state. */
+function pageOf(list: ListStateController) {
+  return {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+  };
+}
+
+function optionsOf(values: string[]) {
+  return [...new Set(values.filter(Boolean))].sort().map((v) => ({ value: v, label: v }));
+}
+
+/**
+ * Pods as an embedded list: the live pod list arrives whole, so search,
+ * filters, sort and numbered pages run in the client.
+ */
+function podsList(pods: AstroliftAppPod[], flappingLabel: string): ListDefinition {
+  return {
+    id: "apps.workload.pods",
+    fields: [
+      { key: "status", label: "Status", options: optionsOf(pods.map((p) => p.status)) },
+      { key: "node", label: "Node", options: optionsOf(pods.map((p) => p.node ?? "")) },
+      { key: "flapping", label: "Flapping", options: [{ value: "yes", label: flappingLabel }] },
+    ],
+    searchPlaceholder: "Search pods, nodes…",
+    defaultSort: [{ key: "order", dir: "asc" }],
+    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    paging: "numbered",
+    pageSizes: [25, 50, 100],
+  };
+}
+
+function podsSelect(pods: AstroliftAppPod[]): SelectRowsSpec<AstroliftAppPod> {
+  // The query's own order is the default.
+  const order = new Map(pods.map((p, i) => [p.name, i]));
+  return {
+    filter: {
+      owner: () => false,
+      status: (p, value) => p.status === value,
+      node: (p, value) => p.node === value,
+      flapping: (p) => podIsFlapping(p),
+    },
+    text: (p) => [p.name, p.node, p.status],
+    sort: {
+      order: (p) => order.get(p.name) ?? 0,
+      name: (p) => p.name,
+      status: (p) => p.status,
+      restarts: (p) => p.restarts,
+      node: (p) => p.node ?? "",
+      age: (p) => -(Date.parse(p.age ?? "") || 0),
+    },
+    id: (p) => p.name,
+  };
+}
+
 export function WorkloadDetailScreen({
   workload: w,
   workloadLoading: wlLoading,
@@ -156,6 +224,8 @@ export function WorkloadDetailScreen({
   manifest,
 }: WorkloadDetailScreenProps) {
   const t = useTranslations("apps.workloadDetail");
+  const [section, setSection] = React.useState<WorkloadSection>("overview");
+  const pods = useLocalListState(podsList(podRows, t("pods.flapping")));
 
   if (wlLoading && !w) {
     return (
@@ -185,224 +255,269 @@ export function WorkloadDetailScreen({
     );
   }
 
+  const volumeRows: VolumeDeclDict[] = Array.isArray(w.volumes)
+    ? (w.volumes as VolumeDeclDict[]).filter((v) => v && typeof v === "object")
+    : [];
+  const sections: { id: WorkloadSection; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "pods", label: t("pods.title") },
+    { id: "containers", label: "Containers" },
+    ...(volumeRows.length > 0 ? [{ id: "volumes" as const, label: t("volumes.title") }] : []),
+    ...(manifest ? [{ id: "manifest" as const, label: "Manifest" }] : []),
+  ];
+  const active = sections.some((x) => x.id === section) ? section : "overview";
+  const showPods = (status: string) => {
+    pods.setFilter("status", status);
+    setSection("pods");
+  };
+
   return (
     <PanelGrid>
-      <Panel
-        title={w.slug}
-        icon={<BoxIcon className="size-4" />}
-        description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
-        actions={
-          <>
-            <Badge variant="secondary" className="capitalize">
-              {w.kind}
-            </Badge>
-            {w.isPublic && (
-              <Badge variant="outline" className="gap-1">
-                <GlobeIcon className="size-3" /> public
-              </Badge>
-            )}
-            {w.schedule && (
-              <Badge variant="outline" className="font-mono">
-                cron {w.schedule}
-              </Badge>
-            )}
-            <Button variant="outline" size="sm" asChild>
-              <a href={appHref(basePath, appSlug, "manifest")}>
-                <GitBranchIcon className="size-4" />
-                Manifest preview
-              </a>
-            </Button>
-          </>
-        }
+      <div
+        role="tablist"
+        aria-label="Workload sections"
+        className="bg-muted/40 col-span-12 flex w-fit max-w-full flex-wrap gap-1 rounded-md border p-1"
       >
-        <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-          <Field label="Replicas" mono value={w.replicas} />
-          <Field
-            label="HPA"
-            mono
-            value={
-              w.hpaMinReplicas && w.hpaMaxReplicas
-                ? `${w.hpaMinReplicas} - ${w.hpaMaxReplicas} @ ${w.hpaTargetCpuPct}% cpu`
-                : "off"
+        {sections.map((x) => (
+          <button
+            key={x.id}
+            type="button"
+            role="tab"
+            aria-selected={active === x.id}
+            onClick={() => setSection(x.id)}
+            className={cn(
+              "rounded px-3 py-1 text-sm font-medium transition",
+              active === x.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+
+      {active === "overview" ? (
+        <>
+          <Panel
+            title={w.slug}
+            icon={<BoxIcon className="size-4" />}
+            description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
+            actions={
+              <>
+                <Badge variant="secondary" className="capitalize">
+                  {w.kind}
+                </Badge>
+                {w.isPublic && (
+                  <Badge variant="outline" className="gap-1">
+                    <GlobeIcon className="size-3" /> public
+                  </Badge>
+                )}
+                {w.schedule && (
+                  <Badge variant="outline" className="font-mono">
+                    cron {w.schedule}
+                  </Badge>
+                )}
+                <Button variant="outline" size="sm" asChild>
+                  <a href={appHref(basePath, appSlug, "manifest")}>
+                    <GitBranchIcon className="size-4" />
+                    Manifest preview
+                  </a>
+                </Button>
+              </>
             }
-          />
-          <Field
-            label="CPU req/limit"
-            mono
-            value={`${w.cpuRequest || "—"} / ${w.cpuLimit || "—"}`}
-          />
-          <Field
-            label="Memory req/limit"
-            mono
-            value={`${w.memoryRequest || "—"} / ${w.memoryLimit || "—"}`}
-          />
-          <Field
-            label="Storage"
-            mono
-            value={
-              w.storageClass || w.storageSize
-                ? `${w.storageClass || "default"} / ${w.storageSize || "—"}`
-                : "—"
-            }
-          />
-          <ServiceFqdnField
-            fqdn={w.inClusterServiceFqdn}
+          >
+            <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+              <Field label="Replicas" mono value={w.replicas} />
+              <Field
+                label="HPA"
+                mono
+                value={
+                  w.hpaMinReplicas && w.hpaMaxReplicas
+                    ? `${w.hpaMinReplicas} - ${w.hpaMaxReplicas} @ ${w.hpaTargetCpuPct}% cpu`
+                    : "off"
+                }
+              />
+              <Field
+                label="CPU req/limit"
+                mono
+                value={`${w.cpuRequest || "—"} / ${w.cpuLimit || "—"}`}
+              />
+              <Field
+                label="Memory req/limit"
+                mono
+                value={`${w.memoryRequest || "—"} / ${w.memoryLimit || "—"}`}
+              />
+              <Field
+                label="Storage"
+                mono
+                value={
+                  w.storageClass || w.storageSize
+                    ? `${w.storageClass || "default"} / ${w.storageSize || "—"}`
+                    : "—"
+                }
+              />
+              <ServiceFqdnField
+                fqdn={w.inClusterServiceFqdn}
+                labels={{
+                  label: t("fqdn.label"),
+                  copyTitle: t("fqdn.copyTitle"),
+                  copyToast: t("fqdn.copyToast"),
+                  copyError: t("fqdn.copyError"),
+                  unavailable: t("fqdn.unavailable"),
+                }}
+              />
+            </div>
+          </Panel>
+
+          {resourceUsage}
+
+          {w.kind !== "cronjob" && scaling}
+
+          <PodStatusGridCard
+            buckets={buckets}
+            loading={brLoading && buckets.length === 0}
+            onShowPods={showPods}
             labels={{
-              label: t("fqdn.label"),
-              copyTitle: t("fqdn.copyTitle"),
-              copyToast: t("fqdn.copyToast"),
-              copyError: t("fqdn.copyError"),
-              unavailable: t("fqdn.unavailable"),
+              title: t("podStatus.title"),
+              headerCount: t("podStatus.headerCount"),
+              headerPercent: t("podStatus.headerPercent"),
+              empty: t("podStatus.empty"),
+              podsCount: t("podStatus.podsCount", {
+                count: buckets.reduce((a, b) => a + b.count, 0),
+              }),
             }}
           />
-        </div>
-      </Panel>
 
-      {resourceUsage}
-
-      {w.kind !== "cronjob" && scaling}
-
-      <PodStatusGridCard
-        appSlug={appSlug}
-        basePath={basePath}
-        buckets={buckets}
-        loading={brLoading && buckets.length === 0}
-        labels={{
-          title: t("podStatus.title"),
-          headerStatus: t("podStatus.headerStatus"),
-          headerCount: t("podStatus.headerCount"),
-          headerPercent: t("podStatus.headerPercent"),
-          empty: t("podStatus.empty"),
-          podsCount: t("podStatus.podsCount", {
-            count: buckets.reduce((a, b) => a + b.count, 0),
-          }),
-          bucketEmpty: t("podStatus.bucketEmpty"),
-          notReady: t("podStatus.notReady"),
-        }}
-      />
-
-      <PodHealthTableCard
-        appSlug={appSlug}
-        basePath={basePath}
-        pods={podRows}
-        loading={pdLoading && podRows.length === 0}
-        labels={{
-          title: t("pods.title"),
-          empty: t("pods.empty"),
-          columnName: t("pods.columnName"),
-          columnStatus: t("pods.columnStatus"),
-          columnRestarts: t("pods.columnRestarts"),
-          columnNode: t("pods.columnNode"),
-          columnAge: t("pods.columnAge"),
-          flapping: t("pods.flapping"),
-          restartReasonsHeading: t("pods.restartReasonsHeading"),
-        }}
-      />
-
-      <ContainerSplitCard
-        manifestContainers={containers}
-        liveContainers={liveContainers}
-        loading={cLoading && containers.length === 0}
-        labels={{
-          initTitle: t("containers.init.title"),
-          initDescription: t("containers.init.description"),
-          initEmpty: t("containers.init.empty"),
-          primaryTitle: t("containers.primary.title"),
-          primaryDescription: t("containers.primary.description"),
-          primaryEmpty: t("containers.primary.empty"),
-          sidecarsTitle: t("containers.sidecars.title"),
-          sidecarsDescription: t("containers.sidecars.description"),
-          sidecarsEmpty: t("containers.sidecars.empty"),
-          image: t("containers.image"),
-          cpuReqLimit: t("containers.cpuReqLimit"),
-          memReqLimit: t("containers.memReqLimit"),
-          restarts: t("containers.restarts"),
-          empty: t("containers.empty"),
-        }}
-      />
-
-      <ProbesCard
-        containers={containers}
-        labels={{
-          title: t("probes.title"),
-          description: t("probes.description"),
-          startup: t("probes.startup"),
-          readiness: t("probes.readiness"),
-          liveness: t("probes.liveness"),
-          notConfigured: t("probes.notConfigured"),
-          container: t("probes.container"),
-          empty: t("probes.empty"),
-        }}
-      />
-
-      <VolumesCard
-        volumes={w.volumes}
-        labels={{
-          title: t("volumes.title"),
-          description: t("volumes.description"),
-          columnName: t("volumes.columnName"),
-          columnKind: t("volumes.columnKind"),
-          columnMount: t("volumes.columnMount"),
-          columnDetail: t("volumes.columnDetail"),
-        }}
-      />
-
-      {manifest}
-
-      {isCronjob && (
-        <Panel
-          title="Recent runs"
-          icon={<CalendarClockIcon className="size-4" />}
-          actions={
-            <Badge variant="outline" className="font-mono">
-              {runs.length}
-            </Badge>
-          }
-          loading={rLoading && runs.length === 0}
-          skeleton={<SkeletonRows count={2} />}
-          flush={runs.length > 0}
-        >
-          {runs.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No scheduled runs recorded yet.</p>
-          ) : (
-            <ul className="divide-y">
-              {runs.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="capitalize">
-                        {r.status}
-                      </Badge>
-                      <span className="font-mono text-xs">{r.k8sJobName || r.id.slice(0, 12)}</span>
-                    </div>
-                    <div className="text-muted-foreground mt-0.5 text-xs">
-                      env <span className="font-mono">{r.environmentName}</span>
-                      {r.startedAt && (
-                        <>
-                          {" · "}started {new Date(r.startedAt).toLocaleString()}
-                        </>
-                      )}
-                      {r.durationSeconds != null && (
-                        <>
-                          {" · "}
-                          {r.durationSeconds < 60
-                            ? `${r.durationSeconds}s`
-                            : `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s`}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <code className="text-muted-foreground font-mono text-xs">
-                    exit {r.exitCode ?? "—"}
-                  </code>
-                </li>
-              ))}
-            </ul>
+          {isCronjob && (
+            <Panel
+              title="Recent runs"
+              icon={<CalendarClockIcon className="size-4" />}
+              actions={
+                <Badge variant="outline" className="font-mono">
+                  {runs.length}
+                </Badge>
+              }
+              loading={rLoading && runs.length === 0}
+              skeleton={<SkeletonRows count={2} />}
+              flush={runs.length > 0}
+            >
+              {runs.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No scheduled runs recorded yet.</p>
+              ) : (
+                <ul className="divide-y">
+                  {runs.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="capitalize">
+                            {r.status}
+                          </Badge>
+                          <span className="font-mono text-xs">
+                            {r.k8sJobName || r.id.slice(0, 12)}
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground mt-0.5 text-xs">
+                          env <span className="font-mono">{r.environmentName}</span>
+                          {r.startedAt && (
+                            <>
+                              {" · "}started {new Date(r.startedAt).toLocaleString()}
+                            </>
+                          )}
+                          {r.durationSeconds != null && (
+                            <>
+                              {" · "}
+                              {r.durationSeconds < 60
+                                ? `${r.durationSeconds}s`
+                                : `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s`}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <code className="text-muted-foreground font-mono text-xs">
+                        exit {r.exitCode ?? "—"}
+                      </code>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
           )}
-        </Panel>
+        </>
+      ) : active === "pods" ? (
+        <PodHealthTableCard
+          appSlug={appSlug}
+          basePath={basePath}
+          list={pods}
+          pods={podRows}
+          loading={pdLoading && podRows.length === 0}
+          labels={{
+            title: t("pods.title"),
+            empty: t("pods.empty"),
+            columnName: t("pods.columnName"),
+            columnStatus: t("pods.columnStatus"),
+            columnRestarts: t("pods.columnRestarts"),
+            columnNode: t("pods.columnNode"),
+            columnAge: t("pods.columnAge"),
+            flapping: t("pods.flapping"),
+            restartReasonsHeading: t("pods.restartReasonsHeading"),
+          }}
+        />
+      ) : active === "containers" ? (
+        <>
+          <ContainerSplitCard
+            manifestContainers={containers}
+            liveContainers={liveContainers}
+            loading={cLoading && containers.length === 0}
+            labels={{
+              initTitle: t("containers.init.title"),
+              initDescription: t("containers.init.description"),
+              initEmpty: t("containers.init.empty"),
+              primaryTitle: t("containers.primary.title"),
+              primaryDescription: t("containers.primary.description"),
+              primaryEmpty: t("containers.primary.empty"),
+              sidecarsTitle: t("containers.sidecars.title"),
+              sidecarsDescription: t("containers.sidecars.description"),
+              sidecarsEmpty: t("containers.sidecars.empty"),
+              image: t("containers.image"),
+              cpuReqLimit: t("containers.cpuReqLimit"),
+              memReqLimit: t("containers.memReqLimit"),
+              restarts: t("containers.restarts"),
+              empty: t("containers.empty"),
+            }}
+          />
+
+          <ProbesCard
+            containers={containers}
+            labels={{
+              title: t("probes.title"),
+              description: t("probes.description"),
+              startup: t("probes.startup"),
+              readiness: t("probes.readiness"),
+              liveness: t("probes.liveness"),
+              notConfigured: t("probes.notConfigured"),
+              container: t("probes.container"),
+              empty: t("probes.empty"),
+            }}
+          />
+        </>
+      ) : active === "volumes" ? (
+        <VolumesCard
+          rows={volumeRows}
+          labels={{
+            title: t("volumes.title"),
+            description: t("volumes.description"),
+            columnName: t("volumes.columnName"),
+            columnKind: t("volumes.columnKind"),
+            columnMount: t("volumes.columnMount"),
+            columnDetail: t("volumes.columnDetail"),
+          }}
+        />
+      ) : (
+        manifest
       )}
     </PanelGrid>
   );
@@ -414,26 +529,25 @@ export function WorkloadDetailScreen({
 
 interface PodStatusGridLabels {
   title: string;
-  headerStatus: string;
   headerCount: string;
   headerPercent: string;
   empty: string;
   podsCount: string;
-  bucketEmpty: string;
-  notReady: string;
 }
 
+/**
+ * The pod-status breakdown: a count per status, not a list. Each status
+ * opens the Pods section filtered to it.
+ */
 function PodStatusGridCard({
-  appSlug,
-  basePath,
   buckets,
   loading,
+  onShowPods,
   labels,
 }: {
-  appSlug: string;
-  basePath: string;
   buckets: AstroliftWorkloadPodStatusBucket[];
   loading: boolean;
+  onShowPods: (status: string) => void;
   labels: PodStatusGridLabels;
 }) {
   return (
@@ -448,110 +562,39 @@ function PodStatusGridCard({
       }
       loading={loading}
       skeleton={<SkeletonRows count={2} />}
-      flush={buckets.length > 0}
     >
       {buckets.length === 0 ? (
         <p className="text-muted-foreground text-sm">{labels.empty}</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead>{labels.headerStatus}</TableHead>
-              <TableHead className="text-right">{labels.headerCount}</TableHead>
-              <TableHead className="text-right">{labels.headerPercent}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {buckets.map((b) => (
-              <PodStatusGridRow
-                key={b.status}
-                appSlug={appSlug}
-                basePath={basePath}
-                bucket={b}
-                bucketEmptyLabel={labels.bucketEmpty}
-                notReadyLabel={labels.notReady}
-              />
-            ))}
-          </TableBody>
-        </Table>
+        <ul className="flex min-w-0 flex-wrap gap-2">
+          {buckets.map((b) => (
+            <li key={b.status} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => onShowPods(b.status)}
+                className="hover:bg-accent/30 flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors"
+              >
+                <Badge className={cn("font-medium", statusClass(b.status))}>{b.status}</Badge>
+                <span className="font-mono tabular-nums" title={labels.headerCount}>
+                  {b.count}
+                </span>
+                <span
+                  className="text-muted-foreground font-mono text-xs tabular-nums"
+                  title={labels.headerPercent}
+                >
+                  {b.percent.toFixed(1)}%
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </Panel>
   );
 }
 
-function PodStatusGridRow({
-  appSlug,
-  basePath,
-  bucket,
-  bucketEmptyLabel,
-  notReadyLabel,
-}: {
-  appSlug: string;
-  basePath: string;
-  bucket: AstroliftWorkloadPodStatusBucket;
-  bucketEmptyLabel: string;
-  notReadyLabel: string;
-}) {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <>
-      <TableRow
-        className="hover:bg-accent/30 cursor-pointer"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <TableCell>
-          <ChevronRightIcon
-            className={cn("text-muted-foreground size-4 transition-transform", open && "rotate-90")}
-          />
-        </TableCell>
-        <TableCell>
-          <Badge className={cn("font-medium", statusClass(bucket.status))}>{bucket.status}</Badge>
-        </TableCell>
-        <TableCell className="text-right font-mono tabular-nums">{bucket.count}</TableCell>
-        <TableCell className="text-right font-mono tabular-nums">
-          {bucket.percent.toFixed(1)}%
-        </TableCell>
-      </TableRow>
-      {open && (
-        <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableCell />
-          <TableCell colSpan={3} className="py-3">
-            {bucket.pods.length === 0 ? (
-              <span className="text-muted-foreground text-xs">{bucketEmptyLabel}</span>
-            ) : (
-              <ul className="space-y-1.5">
-                {bucket.pods.map((p) => (
-                  <li key={p.name} className="flex items-center justify-between gap-3 text-xs">
-                    <Link
-                      href={`${appHref(basePath, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
-                      className="font-mono hover:underline"
-                    >
-                      {p.name}
-                    </Link>
-                    <span
-                      className={cn(
-                        "text-muted-foreground font-mono",
-                        !p.ready && "text-danger-fg"
-                      )}
-                    >
-                      {formatAge(p.age)}
-                      {!p.ready && ` · ${notReadyLabel}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Scope B — Pod table with restart column + reason tooltip
+// Scope B: pod list with restart column + reason tooltip
 // ---------------------------------------------------------------------------
 
 interface PodHealthLabels {
@@ -569,90 +612,99 @@ interface PodHealthLabels {
 function PodHealthTableCard({
   appSlug,
   basePath,
+  list,
   pods,
   loading,
   labels,
 }: {
   appSlug: string;
   basePath: string;
+  list: ListStateController;
   pods: AstroliftAppPod[];
   loading: boolean;
   labels: PodHealthLabels;
 }) {
+  const page = selectRows(pods, pageOf(list), podsSelect(pods));
+  const columns: Column<AstroliftAppPod>[] = [
+    {
+      id: "name",
+      header: labels.columnName,
+      sortKey: "name",
+      cell: (p) => (
+        <Link
+          href={`${appHref(basePath, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
+          className="font-mono text-xs [overflow-wrap:anywhere] hover:underline"
+        >
+          {p.name}
+        </Link>
+      ),
+    },
+    {
+      id: "status",
+      header: labels.columnStatus,
+      sortKey: "status",
+      cell: (p) => <Badge className={cn(statusClass(p.status))}>{p.status}</Badge>,
+    },
+    {
+      id: "restarts",
+      header: labels.columnRestarts,
+      sortKey: "restarts",
+      align: "right",
+      cellClassName: "font-mono tabular-nums",
+      cell: (p) => (
+        <div className="flex items-center justify-end gap-2">
+          <RestartCell
+            restarts={p.restarts}
+            reasons={p.containerStatuses.flatMap((c) => c.lastRestartReasons).slice(0, 3)}
+            heading={labels.restartReasonsHeading}
+          />
+          {podIsFlapping(p) && (
+            <Badge className="bg-danger/15 text-danger-fg">
+              <RotateCwIcon className="size-3" /> {labels.flapping}
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "node",
+      header: labels.columnNode,
+      sortKey: "node",
+      cellClassName: "text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (p) => emptyOrValue(p.node),
+    },
+    {
+      id: "age",
+      header: labels.columnAge,
+      sortKey: "age",
+      align: "right",
+      cellClassName: "font-mono text-xs",
+      cell: (p) => formatAge(p.age),
+    },
+  ];
   return (
     <Panel
       title={labels.title}
       icon={<ActivityIcon className="size-4" />}
-      span={6}
       actions={
         <Badge variant="outline" className="font-mono">
           {pods.length}
         </Badge>
       }
-      loading={loading}
-      skeleton={<SkeletonRows count={2} />}
-      flush={pods.length > 0}
     >
-      {pods.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{labels.empty}</p>
-      ) : (
-        <TooltipProvider delayDuration={200}>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{labels.columnName}</TableHead>
-                <TableHead>{labels.columnStatus}</TableHead>
-                <TableHead className="text-right">{labels.columnRestarts}</TableHead>
-                <TableHead>{labels.columnNode}</TableHead>
-                <TableHead className="text-right">{labels.columnAge}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pods.map((p) => {
-                const flapping = podIsFlapping(p);
-                const reasons = p.containerStatuses
-                  .flatMap((c) => c.lastRestartReasons)
-                  .slice(0, 3);
-                return (
-                  <TableRow key={p.name}>
-                    <TableCell>
-                      <Link
-                        href={`${appHref(basePath, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
-                        className="font-mono text-xs hover:underline"
-                      >
-                        {p.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn(statusClass(p.status))}>{p.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      <div className="flex items-center justify-end gap-2">
-                        <RestartCell
-                          restarts={p.restarts}
-                          reasons={reasons}
-                          heading={labels.restartReasonsHeading}
-                        />
-                        {flapping && (
-                          <Badge className="bg-danger/15 text-danger-fg">
-                            <RotateCwIcon className="size-3" /> {labels.flapping}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
-                      {p.node || "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatAge(p.age)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TooltipProvider>
-      )}
+      <TooltipProvider delayDuration={200}>
+        <ListPage<AstroliftAppPod>
+          embedded
+          list={list}
+          label={labels.title}
+          columns={columns}
+          rows={page.rows}
+          getRowId={(p) => p.name}
+          totalCount={page.totalCount}
+          loading={loading}
+          empty={{ icon: <ActivityIcon className="size-5" />, title: labels.empty }}
+        />
+      </TooltipProvider>
     </Panel>
   );
 }
@@ -1067,54 +1119,99 @@ function volumeDetail(v: VolumeDeclDict): string {
   return "—";
 }
 
-function VolumesCard({ volumes, labels }: { volumes: unknown; labels: VolumesLabels }) {
-  const rows: VolumeDeclDict[] = Array.isArray(volumes)
-    ? (volumes as VolumeDeclDict[]).filter((v) => v && typeof v === "object")
-    : [];
-  if (rows.length === 0) return null;
+const volumeKey = (v: VolumeDeclDict, i: number) => `${v.name || "vol"}-${i}`;
+
+const VOLUMES_LIST: ListDefinition = {
+  id: "apps.workload.volumes",
+  fields: [
+    {
+      key: "kind",
+      label: "Kind",
+      options: Object.entries(VOLUME_KIND_LABEL).map(([value, label]) => ({ value, label })),
+    },
+  ],
+  searchPlaceholder: "Search volumes, mount paths…",
+  defaultSort: [{ key: "name", dir: "asc" }],
+  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+  paging: "numbered",
+  pageSizes: [25, 50, 100],
+};
+
+type VolumeRow = VolumeDeclDict & { key: string };
+
+const VOLUMES_SELECT: SelectRowsSpec<VolumeRow> = {
+  filter: { owner: () => false, kind: (v, value) => (v.kind || "").toLowerCase() === value },
+  text: (v) => [v.name, v.kind, v.mount_path, v.source_name, v.storage_class],
+  sort: {
+    name: (v) => (v.name || "").toLowerCase(),
+    kind: (v) => (v.kind || "").toLowerCase(),
+    mount: (v) => v.mount_path || "",
+  },
+  id: (v) => v.key,
+};
+
+/** The manifest's volumes (nested in the workload payload), as an embedded list. */
+function VolumesCard({ rows, labels }: { rows: VolumeDeclDict[]; labels: VolumesLabels }) {
+  const list = useLocalListState(VOLUMES_LIST);
+  const keyed: VolumeRow[] = rows.map((v, i) => ({ ...v, key: volumeKey(v, i) }));
+  const page = selectRows(keyed, pageOf(list), VOLUMES_SELECT);
+  const columns: Column<VolumeRow>[] = [
+    {
+      id: "name",
+      header: labels.columnName,
+      sortKey: "name",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (v) => emptyOrValue(v.name),
+    },
+    {
+      id: "kind",
+      header: labels.columnKind,
+      sortKey: "kind",
+      cell: (v) => {
+        const kindKey = (v.kind || "").toLowerCase();
+        return (
+          <Badge className={cn("font-mono text-xs", VOLUME_KIND_VARIANT[kindKey] ?? "")}>
+            <DatabaseIcon className="size-3" />
+            {VOLUME_KIND_LABEL[kindKey] ?? emptyOrValue(kindKey)}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "mount",
+      header: labels.columnMount,
+      sortKey: "mount",
+      cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (v) => emptyOrValue(v.mount_path),
+    },
+    {
+      id: "detail",
+      header: labels.columnDetail,
+      cellClassName: "text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]",
+      cell: (v) => volumeDetail(v),
+    },
+  ];
   return (
     <Panel
       title={labels.title}
       icon={<HardDriveIcon className="size-4" />}
       description={labels.description}
-      span={6}
       actions={
         <Badge variant="outline" className="font-mono">
           {rows.length}
         </Badge>
       }
-      flush
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{labels.columnName}</TableHead>
-            <TableHead>{labels.columnKind}</TableHead>
-            <TableHead>{labels.columnMount}</TableHead>
-            <TableHead>{labels.columnDetail}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((v, i) => {
-            const kindKey = (v.kind || "").toLowerCase();
-            return (
-              <TableRow key={`${v.name || "vol"}-${i}`}>
-                <TableCell className="font-mono text-xs">{emptyOrValue(v.name)}</TableCell>
-                <TableCell>
-                  <Badge className={cn("font-mono text-xs", VOLUME_KIND_VARIANT[kindKey] ?? "")}>
-                    <DatabaseIcon className="size-3" />
-                    {VOLUME_KIND_LABEL[kindKey] ?? (kindKey || "—")}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{emptyOrValue(v.mount_path)}</TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">
-                  {volumeDetail(v)}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <ListPage<VolumeRow>
+        embedded
+        list={list}
+        label={labels.title}
+        columns={columns}
+        rows={page.rows}
+        getRowId={(v) => v.key}
+        totalCount={page.totalCount}
+        empty={{ icon: <HardDriveIcon className="size-5" />, title: labels.title }}
+      />
     </Panel>
   );
 }
@@ -1181,7 +1278,7 @@ function probeTimings(probe: KubeProbe | null | undefined): string {
   return parts.join(" · ");
 }
 
-function ProbeRow({
+function ProbeItem({
   label,
   probe,
   notConfigured,
@@ -1190,26 +1287,26 @@ function ProbeRow({
   probe: KubeProbe | null | undefined;
   notConfigured: string;
 }) {
-  if (!probe) {
-    return (
-      <TableRow>
-        <TableCell className="font-medium">{label}</TableCell>
-        <TableCell colSpan={2} className="text-muted-foreground text-xs">
+  return (
+    <div className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-0.5 py-2 sm:grid-cols-[8rem_1fr]">
+      <dt className="text-sm font-medium">{label}</dt>
+      <dd className="min-w-0">
+        {probe ? (
+          <span className="flex min-w-0 flex-wrap gap-x-4 gap-y-0.5">
+            <span className="font-mono text-xs [overflow-wrap:anywhere]">
+              {describeProbe(probe)}
+            </span>
+            <span className="text-muted-foreground font-mono text-xs">
+              {emptyOrValue(probeTimings(probe))}
+            </span>
+          </span>
+        ) : (
           <Badge variant="outline" className="text-muted-foreground">
             {notConfigured}
           </Badge>
-        </TableCell>
-      </TableRow>
-    );
-  }
-  return (
-    <TableRow>
-      <TableCell className="font-medium">{label}</TableCell>
-      <TableCell className="font-mono text-xs">{describeProbe(probe)}</TableCell>
-      <TableCell className="text-muted-foreground font-mono text-xs">
-        {probeTimings(probe) || "—"}
-      </TableCell>
-    </TableRow>
+        )}
+      </dd>
+    </div>
   );
 }
 
@@ -1262,25 +1359,23 @@ function ProbesCard({
                 </Badge>
               )}
             </div>
-            <Table>
-              <TableBody>
-                <ProbeRow
-                  label={labels.startup}
-                  probe={c.startupProbe as KubeProbe | null}
-                  notConfigured={labels.notConfigured}
-                />
-                <ProbeRow
-                  label={labels.readiness}
-                  probe={c.readinessProbe as KubeProbe | null}
-                  notConfigured={labels.notConfigured}
-                />
-                <ProbeRow
-                  label={labels.liveness}
-                  probe={c.livenessProbe as KubeProbe | null}
-                  notConfigured={labels.notConfigured}
-                />
-              </TableBody>
-            </Table>
+            <dl className="divide-y">
+              <ProbeItem
+                label={labels.startup}
+                probe={c.startupProbe as KubeProbe | null}
+                notConfigured={labels.notConfigured}
+              />
+              <ProbeItem
+                label={labels.readiness}
+                probe={c.readinessProbe as KubeProbe | null}
+                notConfigured={labels.notConfigured}
+              />
+              <ProbeItem
+                label={labels.liveness}
+                probe={c.livenessProbe as KubeProbe | null}
+                notConfigured={labels.notConfigured}
+              />
+            </dl>
           </div>
         ))}
       </div>

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   DETAIL,
@@ -32,6 +33,34 @@ type Story = StoryObj<typeof WorkloadDetailScreen>;
 
 /** A deployment with init, primary and sidecar containers, a crash-looping pod, probes and volumes. */
 export const Full: Story = {};
+
+/** The pod-status breakdown opens the Pods section filtered to that status. */
+export const PodsByStatus: Story = {
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: /CrashLoopBackOff/ }));
+    await expect(c.getByRole("tab", { name: "Pods" })).toHaveAttribute("aria-selected", "true");
+    await expect(c.getByRole("link", { name: "api-7d9f8c6b5-q8vwn" })).toBeInTheDocument();
+    await expect(c.queryByRole("link", { name: "api-7d9f8c6b5-m4ltz" })).toBeNull();
+  },
+};
+
+/** Init, primary and sidecar containers with their health probes. */
+export const Containers: Story = {
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("tab", { name: "Containers" }));
+    await expect(c.getAllByText("Liveness").length).toBeGreaterThan(0);
+  },
+};
+
+export const Volumes: Story = {
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("tab", { name: "Volumes" }));
+    await expect(c.getByRole("cell", { name: "ledger" })).toBeInTheDocument();
+  },
+};
 
 export const Loading: Story = { args: { workload: null, workloadLoading: true } };
 

@@ -71,7 +71,8 @@ Every environment variable Astrolift reads at runtime. Source = operator means t
 - Boolean values accept true / false / 1 / 0 / yes / no / on / off (case-insensitive).
 - Vars marked required either have no default or have a default that's only safe for local development (e.g. not-a-secret ).
 - Anything not listed here is not read by Astrolift — silently ignored if set.
-## On this page
+## Groups
+## Variables
 ## How to inspect what's set
 The Django management command features prints the current feature-flag state, and python manage.py diffsettings shows every Django setting against its default. The control plane never echoes secret values — settings marked sensitive print as *** .
 ## Related

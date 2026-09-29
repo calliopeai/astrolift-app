@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   ALERT_RULES,
@@ -49,6 +50,41 @@ const panels = {
 
 export const Full: Story = {
   render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} />,
+};
+
+/** Identity, DNS auth and sender settings: the second section. */
+export const IdentityAndSending: Story = {
+  render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="sending" />,
+};
+
+/** Each list has a section of its own, so one shows at a time. */
+export const Suppressions: Story = {
+  render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} />,
+  play: async () => {
+    // The sheet portals to the document body.
+    const c = within(document.body);
+    await userEvent.click(c.getByRole("tab", { name: "Suppressions" }));
+    await expect(c.getByRole("tab", { name: "Suppressions" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await expect(c.getByText("Suppression list")).toBeInTheDocument();
+    await expect(c.queryByText("Recent messages")).toBeNull();
+  },
+};
+
+export const AlertRules: Story = {
+  render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="alerts" />,
+};
+
+export const Messages: Story = {
+  render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="messages" />,
+};
+
+export const Templates: Story = {
+  render: () => (
+    <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="templates" />
+  ),
 };
 
 export const Loading: Story = {
@@ -122,6 +158,37 @@ export const LongStrings: Story = {
         ...panels,
         suppression: <SuppressionPanelView {...SUPPRESSION} detail={EMAIL_DETAIL_LONG} />,
         messageLog: <MessageLogPanelView {...MESSAGE_LOG} messages={MESSAGES_LONG} />,
+      }}
+    />
+  ),
+};
+
+export const LongMessages: Story = {
+  render: () => (
+    <EmailDetailSheetView
+      {...EMAIL_SHEET}
+      serviceName="transactional-mail-for-the-storefront-with-a-deliberately-long-service-name"
+      detail={EMAIL_DETAIL_LONG}
+      defaultSection="messages"
+      panels={{
+        ...panels,
+        messageLog: <MessageLogPanelView {...MESSAGE_LOG} messages={MESSAGES_LONG} />,
+      }}
+    />
+  ),
+};
+
+/** The unsupported backend's suppression section: the shaded panel, not a list. */
+export const UnsupportedSuppressions: Story = {
+  render: () => (
+    <EmailDetailSheetView
+      {...EMAIL_SHEET}
+      serviceConfig={{}}
+      detail={EMAIL_DETAIL_UNSUPPORTED}
+      defaultSection="suppressions"
+      panels={{
+        ...panels,
+        suppression: <SuppressionPanelView {...SUPPRESSION} detail={EMAIL_DETAIL_UNSUPPORTED} />,
       }}
     />
   ),

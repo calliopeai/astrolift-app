@@ -1,19 +1,25 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
-import { fakeController } from "@/components/data-table/fixtures";
-import type { AstroliftAgentBox } from "@/graphql/agents/agents.types";
+import { useLocalListState } from "@/components/list/use-list-state";
 
+import { AGENT_BOXES_LIST } from "./agent-boxes-list";
 import { boxesProps, LONG_BOXES } from "./agents-list.fixtures";
-import { BoxesTabView } from "./BoxesTabView";
+import { BoxesTabView, type BoxesTabViewProps } from "./BoxesTabView";
 
 const meta: Meta = { title: "Screens/Agents/List/BoxesTabView" };
 export default meta;
 
 type Story = StoryObj;
 
+/** The view with its list state in memory, as the hook's URL state would give it. */
+function Boxes(props: Omit<BoxesTabViewProps, "list">) {
+  const list = useLocalListState(AGENT_BOXES_LIST);
+  return <BoxesTabView list={list} {...props} />;
+}
+
 export const Full: Story = {
-  render: () => <BoxesTabView {...boxesProps()} />,
+  render: () => <Boxes {...boxesProps()} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
@@ -26,34 +32,21 @@ export const Full: Story = {
 };
 
 export const Loading: Story = {
-  render: () => (
-    <BoxesTabView
-      {...boxesProps([], { controller: fakeController<AstroliftAgentBox>({ state: "loading" }) })}
-    />
-  ),
+  render: () => <Boxes {...boxesProps([], { loading: true })} />,
 };
 
-export const Empty: Story = { render: () => <BoxesTabView {...boxesProps([])} /> };
+export const Empty: Story = { render: () => <Boxes {...boxesProps([])} /> };
 
 export const Failed: Story = {
-  render: () => (
-    <BoxesTabView
-      {...boxesProps([], {
-        controller: fakeController<AstroliftAgentBox>({
-          state: "error",
-          error: new globalThis.Error("upstream timed out"),
-        }),
-      })}
-    />
-  ),
+  render: () => <Boxes {...boxesProps([], { error: { message: "upstream timed out" } })} />,
 };
 
 export const ShowingEnded: Story = {
-  render: () => <BoxesTabView {...boxesProps(undefined, { includeEnded: true })} />,
+  render: () => <Boxes {...boxesProps(undefined, { includeEnded: true })} />,
 };
 
 export const NewBoxDialog: Story = {
-  render: () => <BoxesTabView {...boxesProps()} />,
+  render: () => <Boxes {...boxesProps()} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /New agent box/i }));
@@ -64,7 +57,7 @@ export const NewBoxDialog: Story = {
 
 /** No environment specs yet: the dialog says to create one first. */
 export const NewBoxDialogNoSpecs: Story = {
-  render: () => <BoxesTabView {...boxesProps(undefined, { specs: [] })} />,
+  render: () => <Boxes {...boxesProps(undefined, { specs: [] })} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /New agent box/i }));
@@ -73,4 +66,4 @@ export const NewBoxDialogNoSpecs: Story = {
   },
 };
 
-export const LongStrings: Story = { render: () => <BoxesTabView {...boxesProps(LONG_BOXES)} /> };
+export const LongStrings: Story = { render: () => <Boxes {...boxesProps(LONG_BOXES)} /> };

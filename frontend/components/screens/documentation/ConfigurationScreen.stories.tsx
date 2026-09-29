@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { CONFIGURATION_GROUPS } from "./configuration-groups";
 import { ConfigurationScreen } from "./ConfigurationScreen";
@@ -29,3 +30,14 @@ export const Empty: Story = { args: { groups: DOCS_B_GROUPS_EMPTY } };
 export const GroupWithoutVariables: Story = { args: { groups: DOCS_B_GROUPS_NO_VARS } };
 
 export const LongStrings: Story = { args: { groups: DOCS_B_GROUPS_LONG } };
+
+/** A group's title filters the one list to that group's variables. */
+export const OneGroup: Story = {
+  args: { groups: DOCS_B_GROUPS_FULL },
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Cache & queue" }));
+    await expect(c.getByText("REDIS_URL")).toBeInTheDocument();
+    await expect(c.queryByText("DJANGO_SECRET_KEY")).toBeNull();
+  },
+};
