@@ -81,8 +81,23 @@ class RoleMutations:
                 field="slug",
             )
 
+        source = None
+        if input.duplicated_from_id is not None:
+            from django.db.models import Q
+
+            source = (
+                Role.objects.filter(guid=str(input.duplicated_from_id))
+                .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+                .first()
+            )
+            if source is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value, "role to duplicate not found", field="duplicatedFromId"
+                )
+
         role = Role(
             organization_id=org_id,
+            duplicated_from=source,
             slug=slug,
             name=input.name.strip(),
             description=input.description or "",

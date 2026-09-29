@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,14 +8,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClustersClient } from "./clusters-client";
 
 /**
- * /clusters is the one migrated surface with a live ViewToggle: the card
- * grid and the table are two renderings of the SAME `useCursorTable` walk
- * (#1233). A card view that fetched its own rows — or sliced a fetched
- * page in the browser, which is what this surface used to do through
- * `useListControls` — would put the two modes on different data and hide
- * the fleet past the first page in one of them. These tests pin that both
- * modes read one controller, and that the card grid carries the four
- * states DataTable gives the table for free.
+ * /clusters on the shared list (spec 44 §5.1). The card grid and the table
+ * are two renderings of the SAME page (#1233), and the server answers the
+ * list state (#2150): search, filters, views, sort and the numbered page go
+ * out as `astroliftClustersPage` variables and the rows and `totalCount`
+ * come back. Nothing is filtered or sliced in the browser. These tests pin
+ * the variables, that both modes read one page, and that the list's states
+ * (loading, empty, filtered-empty) show in both.
  */
 
 // Mutable state the hoisted mocks read at call time — `vi.hoisted` runs
@@ -23,24 +22,52 @@ import { ClustersClient } from "./clusters-client";
 const state = vi.hoisted(() => ({
   page: null as null | {
     items: Record<string, unknown>[];
-    nextCursor: string | null;
     totalCount: number | null;
   },
   loading: false,
+  variables: [] as Record<string, unknown>[],
+  qs: "",
+  listeners: new Set<() => void>(),
 }));
 
-// Feed the real controller a mocked transport: the hook under test is
-// `useCursorTable`, not Apollo, and both views have to run for real.
+// Feed the real hook a mocked transport: the code under test is the list
+// state as variables and both views, not Apollo.
 vi.mock("@apollo/client/react", () => ({
-  useQuery: () => ({
-    data: state.page ? { astroliftClustersPage: state.page } : undefined,
-    previousData: undefined,
-    loading: state.loading,
-    error: undefined,
-    refetch: vi.fn().mockResolvedValue({}),
-  }),
+  useQuery: (_q: unknown, opts?: { variables?: Record<string, unknown> }) => {
+    if (opts?.variables) state.variables.push(opts.variables);
+    return {
+      data: state.page ? { astroliftClustersPage: state.page } : undefined,
+      previousData: undefined,
+      loading: state.loading,
+      error: undefined,
+      refetch: vi.fn().mockResolvedValue({}),
+    };
+  },
   useMutation: () => [vi.fn().mockResolvedValue({ data: {} }), { loading: false }],
 }));
+
+// The list state lives in the URL; a tiny store stands in for the router.
+vi.mock("next/navigation", async () => {
+  const React = await import("react");
+  const subscribe = (fn: () => void) => {
+    state.listeners.add(fn);
+    return () => state.listeners.delete(fn);
+  };
+  return {
+    usePathname: () => "/clusters",
+    useSearchParams: () => {
+      const qs = React.useSyncExternalStore(subscribe, () => state.qs);
+      return new URLSearchParams(qs);
+    },
+    useRouter: () => ({
+      replace: (href: string) => {
+        state.qs = href.split("?")[1] ?? "";
+        state.listeners.forEach((fn) => fn());
+      },
+      push: () => {},
+    }),
+  };
+});
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => (
@@ -70,17 +97,6 @@ vi.mock("@/lib/i18n/formatters", () => ({
   }),
 }));
 
-// PageShell reads the app-chrome context; render a thin shell so the test
-// targets this client rather than page chrome.
-vi.mock("@/components/PageShell", () => ({
-  PageShell: ({ actions, children }: { actions?: ReactNode; children?: ReactNode }) => (
-    <div>
-      <div>{actions}</div>
-      {children}
-    </div>
-  ),
-}));
-
 function cluster(slug: string, over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: `id-${slug}`,
@@ -88,8 +104,8 @@ function cluster(slug: string, over: Record<string, unknown> = {}): Record<strin
     name: slug.toUpperCase(),
     isActive: true,
     lifecycle: "managed",
-    lastManagementError: null,
-    providerPluginSlug: "aws",
+    lastManagementError: "",
+    providerPluginSlug: "eks",
     region: "us-west-2",
     ingressClass: "nginx",
     heartbeatStatus: "connected",
@@ -99,8 +115,8 @@ function cluster(slug: string, over: Record<string, unknown> = {}): Record<strin
   };
 }
 
-// The lifecycle and heartbeat badges are tooltip triggers; the provider
-// lives in the root layout, so the test supplies it.
+// The status and heartbeat badges are tooltip triggers; the provider lives
+// in the root layout, so the test supplies it.
 const renderClusters = () =>
   render(
     <TooltipProvider>
@@ -108,80 +124,125 @@ const renderClusters = () =>
     </TooltipProvider>
   );
 
-const showList = () => fireEvent.click(screen.getByRole("button", { name: "List view" }));
+/** What a cold load asks for; `page.tsx` preloads exactly this. */
+const COLD = { search: null, filter: null, sort: "name", page: 1, pageSize: 25 };
+
+const showCards = () => fireEvent.click(screen.getByRole("button", { name: "Card view" }));
 
 describe("ClustersClient", () => {
   beforeEach(() => {
-    // useViewToggle persists the mode, so a click in one test would pick
-    // the starting view for the next one.
+    // The list|cards choice persists per person, so a click in one test
+    // would pick the starting view for the next one.
     localStorage.clear();
     state.loading = false;
-    state.page = {
-      items: [cluster("prod"), cluster("staging")],
-      nextCursor: null,
-      totalCount: 2,
-    };
+    state.variables = [];
+    state.qs = "";
+    state.page = { items: [cluster("prod"), cluster("staging")], totalCount: 2 };
   });
 
-  it("renders one card per row of the page the controller fetched", () => {
+  it("renders the fleet in the table, each row linking to its cluster", () => {
     renderClusters();
-    expect(screen.getByText("PROD")).toBeInTheDocument();
-    expect(screen.getByText("STAGING")).toBeInTheDocument();
-    // Card mode is not a table: the rows are links to the detail page.
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  });
-
-  it("shows the same rows in the table without a second fetch", () => {
-    renderClusters();
-    showList();
     const table = screen.getByRole("table", { name: "Clusters" });
-    expect(within(table).getByText("PROD")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: /PROD/ })).toHaveAttribute(
+      "href",
+      "/clusters/prod"
+    );
     expect(within(table).getByText("STAGING")).toBeInTheDocument();
   });
 
-  it("offers server-side search in both modes", () => {
+  it("says who registered each cluster", () => {
+    state.page = {
+      items: [cluster("prod", { createdByUsername: "dana" }), cluster("staging")],
+      totalCount: 2,
+    };
     renderClusters();
-    expect(screen.getByRole("textbox", { name: "Search clusters..." })).toBeInTheDocument();
-    showList();
-    expect(screen.getByRole("textbox", { name: "Search clusters..." })).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Clusters" });
+    expect(within(table).getByRole("columnheader", { name: "Registered by" })).toBeInTheDocument();
+    expect(within(table).getByText("dana")).toBeInTheDocument();
   });
 
-  it("pages the card grid from the controller's cursor walk", () => {
-    state.page = { items: [cluster("prod")], nextCursor: "cursor-2", totalCount: 40 };
+  it("shows the same rows as cards without a second fetch", () => {
     renderClusters();
-    // The grid gets DataTable's pagination, so a fleet longer than one
-    // page is reachable in card mode too — it was not before (#1233).
+    const fetches = state.variables.length;
+    showCards();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("PROD")).toBeInTheDocument();
+    expect(screen.getByText("STAGING")).toBeInTheDocument();
+    // Re-renders re-read the same query; none asks for a different page.
+    expect(new Set(state.variables.slice(fetches).map((v) => JSON.stringify(v)))).toEqual(
+      new Set([JSON.stringify(COLD)])
+    );
+  });
+
+  it("sends the search to the server in both modes", async () => {
+    renderClusters();
+    expect(screen.getByRole("searchbox", { name: "Search clusters..." })).toBeInTheDocument();
+    showCards();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search clusters..." }), {
+      target: { value: "prod" },
+    });
+    // The bar debounces; wait for the term to reach the query.
+    await waitFor(() => expect(state.variables.at(-1)).toEqual({ ...COLD, search: "prod" }));
+  });
+
+  it("numbers pages from the server's totalCount and asks for the page", () => {
+    state.page = {
+      items: Array.from({ length: 25 }, (_, i) => cluster(`c-${String(i).padStart(2, "0")}`)),
+      totalCount: 30,
+    };
+    renderClusters();
+    expect(screen.getByRole("button", { name: "Page 2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /next page/i })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: /previous page/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+    expect(state.qs).toBe("page=2");
+    expect(state.variables.at(-1)).toEqual({ ...COLD, page: 2 });
+  });
+
+  it("sends the Offline view, Mine and the chips as the server filter", () => {
+    state.qs = "view=offline&provider=eks";
+    renderClusters();
+    expect(state.variables.at(-1)).toEqual({
+      ...COLD,
+      filter: { provider: ["eks"], live: ["offline"] },
+    });
+    act(() => {
+      state.qs = "view=mine";
+      state.listeners.forEach((fn) => fn());
+    });
+    expect(state.variables.at(-1)).toEqual({ ...COLD, filter: { registeredBy: ["me"] } });
+  });
+
+  it("sends a multi-key sort", () => {
+    state.qs = "sort=-lastProbe,name";
+    renderClusters();
+    expect(state.variables.at(-1)).toEqual({ ...COLD, sort: "-lastProbe,name" });
   });
 
   it("renders the shared empty state in the card grid, not nothing", () => {
-    state.page = { items: [], nextCursor: null, totalCount: 0 };
+    state.page = { items: [], totalCount: 0 };
     renderClusters();
+    showCards();
     expect(screen.getByText("No clusters registered")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Cluster prerequisites" })).toBeInTheDocument();
   });
 
   it("distinguishes a filtered-empty grid from an empty one", () => {
-    state.page = { items: [], nextCursor: null, totalCount: 0 };
+    state.page = { items: [], totalCount: 0 };
+    state.qs = "q=nope";
     renderClusters();
-    fireEvent.change(screen.getByRole("textbox", { name: "Search clusters..." }), {
-      target: { value: "nope" },
-    });
-    // The controller debounces, so the term reaches `isFiltered` only after
-    // the debounce window; drive it explicitly rather than waiting on a timer.
-    return vi.waitFor(() => {
-      expect(screen.getByText("No matching clusters")).toBeInTheDocument();
-      expect(screen.queryByText("No clusters registered")).not.toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /clear search/i }).length).toBeGreaterThan(0);
-    });
+    showCards();
+    expect(screen.getByText("No clusters match")).toBeInTheDocument();
+    expect(screen.queryByText("No clusters registered")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /clear/i }).length).toBeGreaterThan(0);
   });
 
   it("keeps the grid's geometry while the first page is loading", () => {
     state.page = null;
     state.loading = true;
-    const { container } = renderClusters();
-    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+    renderClusters();
+    showCards();
+    expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
     expect(screen.queryByText("No clusters registered")).not.toBeInTheDocument();
   });
 });

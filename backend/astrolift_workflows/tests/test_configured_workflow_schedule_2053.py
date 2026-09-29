@@ -169,6 +169,7 @@ def test_two_fires_create_two_distinct_runs(scheduled):
         assert run.workflow_id == fire.workflow_id == f"WorkflowDefinitionRunWorkflow-{run.pk}"
         assert run.organization_id == scheduled.organization_id
         assert run.workflow_definition_id == scheduled.definition_id
+        assert run.trigger_kind == "schedule"  # (#2152)
         assert fire.run_input.workflow_definition_id == str(scheduled.definition_id)
         assert fire.run_input.trigger_payload == scheduled.inputs
         assert fire.run_input.stage_bindings == scheduled.stage_bindings

@@ -318,9 +318,7 @@ describe("useCursorTable", () => {
 
   it("skips the query when told to", () => {
     apollo.respond = pagedSource(5, 5);
-    const { result } = renderHook(() =>
-      useCursorTable<Row>({ query: QUERY, extract, skip: true })
-    );
+    const { result } = renderHook(() => useCursorTable<Row>({ query: QUERY, extract, skip: true }));
     expect(result.current.rows).toEqual([]);
   });
 });

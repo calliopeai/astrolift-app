@@ -486,7 +486,7 @@ export default async function InvoicesPage() {
         title: "Guard a client component section",
         body: "Use PermissionGuard to conditionally render JSX, or withPermissionAuthenticationRequired as an HOC. Import PermissionSlug from the types file to avoid server-only imports in the client bundle.",
         code: `// Wrapper approach
-import { PermissionGuard } from "@/components/PermissionGuard";
+import { PermissionGuard } from "@/providers/PermissionGuard";
 import { PermissionSlug } from "@/graphql/permissions/permissions.types";
 
 <PermissionGuard permission={PermissionSlug.Invoicing}>
@@ -494,7 +494,7 @@ import { PermissionSlug } from "@/graphql/permissions/permissions.types";
 </PermissionGuard>
 
 // HOC approach
-import { withPermissionAuthenticationRequired } from "@/components/PermissionGuard";
+import { withPermissionAuthenticationRequired } from "@/providers/PermissionGuard";
 
 function InvoiceDashboard() { /* ... */ }
 export default withPermissionAuthenticationRequired(

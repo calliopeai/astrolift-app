@@ -197,6 +197,7 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     from astrolift_operations.models import WorkflowRun  # noqa: PLC0415
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, DeployAppInput
+    from core.run_trigger import RunTrigger  # noqa: PLC0415
 
     token, err = _resolve_deploy_token(request, app_slug)
     if err is not None:
@@ -417,6 +418,7 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
                 trigger_actor_user_id=None,
                 trigger_actor_token_kind="deploy_token",
                 trigger_actor_token_id=token.pk,
+                trigger_kind=RunTrigger.API,
             )
             deployment.workflow_run = run
             deployment.save(update_fields=["workflow_run", "updated_at", "version"])

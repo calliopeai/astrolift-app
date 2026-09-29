@@ -13,6 +13,7 @@ from django.conf import settings
 from django.db import models
 
 from core.models.base import BaseCoreModel
+from core.run_trigger import RunTrigger
 
 
 class WorkflowRun(BaseCoreModel):
@@ -86,6 +87,14 @@ class WorkflowRun(BaseCoreModel):
     )
     trigger_actor_token_kind = models.CharField(max_length=32, blank=True, default="")
     trigger_actor_token_id = models.BigIntegerField(null=True, blank=True)
+    # What started the run, in the shared vocabulary of ``core.run_trigger``
+    # (#2152); the person, when there is one, is ``trigger_actor_user``.
+    # Every creation path sets it; ``unknown`` marks rows from before.
+    trigger_kind = models.CharField(
+        max_length=16,
+        choices=RunTrigger.choices,
+        default=RunTrigger.UNKNOWN,
+    )
 
     # Quick-access pointer for operator polling: which stage is running right now.
     # Null for workflows that have not yet started stage execution or for

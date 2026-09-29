@@ -36,6 +36,16 @@ class Role(NamedBaseCoreModel):
     scope_level = models.CharField(max_length=16, choices=ScopeLevel.choices)
     permissions = models.JSONField(default=list, blank=True)
     is_system = models.BooleanField(default=False)
+    # The role this one was duplicated from (#2126 role lineage), so the
+    # role page can show what a custom role added and removed. Set once at
+    # creation. A soft-deleted source is still named (and read as deleted).
+    duplicated_from = models.ForeignKey(
+        "self",
+        related_name="duplicates",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
 
     class Meta:
         constraints = [

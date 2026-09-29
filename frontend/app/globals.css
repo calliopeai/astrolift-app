@@ -9,8 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
   --font-mono:
-    var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
-    monospace;
+    var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-head: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -445,6 +444,102 @@
     70%,
     100% {
       box-shadow: 0 0 0 4px transparent;
+    }
+  }
+}
+
+/* Viz motion (spec 44 viz addendum). Every class encodes state, see
+ * components/viz/core/semantics.ts. The frame sets data-motion from the
+ * user's motion setting and the OS, so reduced motion is one switch here. */
+@layer utilities {
+  .viz-flicker {
+    animation: viz-flicker 1.7s steps(1) infinite;
+  }
+  .viz-rise {
+    animation: viz-rise 1.4s var(--ease-standard) forwards;
+  }
+  .viz-ripple {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: viz-ripple 1.2s ease-out forwards;
+  }
+  .viz-phosphor {
+    animation: viz-phosphor 12s linear forwards;
+  }
+  .viz-flow {
+    stroke-dasharray: 2 10;
+    animation: viz-flow var(--viz-flow-duration, 1.6s) linear infinite;
+  }
+  .viz-breathe {
+    animation: viz-breathe 2.4s var(--ease-standard) infinite;
+  }
+  .viz-flash {
+    animation: viz-phosphor 1.2s ease-out forwards;
+  }
+
+  [data-motion="reduced"]
+    :is(.viz-flicker, .viz-rise, .viz-ripple, .viz-phosphor, .viz-flow, .viz-breathe, .viz-flash) {
+    animation: none;
+  }
+
+  @keyframes viz-flicker {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    8% {
+      opacity: 0.35;
+    }
+    12% {
+      opacity: 1;
+    }
+    47% {
+      opacity: 0.6;
+    }
+    51% {
+      opacity: 1;
+    }
+  }
+  @keyframes viz-rise {
+    from {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateY(-36px);
+      opacity: 0;
+    }
+  }
+  @keyframes viz-ripple {
+    from {
+      transform: scale(0.4);
+      opacity: 0.9;
+    }
+    to {
+      transform: scale(3);
+      opacity: 0;
+    }
+  }
+  @keyframes viz-phosphor {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes viz-flow {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
+  @keyframes viz-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
     }
   }
 }

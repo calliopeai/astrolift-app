@@ -57,6 +57,55 @@ class AstroliftAppSourceKindFilter(enum.Enum):
     GIT_URL = "git_url"
 
 
+@strawberry.enum(name="AstroliftAppListState")
+class AppListState(enum.Enum):
+    """The status an app's own header shows, as a list filter (#2149).
+
+    ``live`` is ``ready`` with a platform-managed hostname; ``archived``
+    wins over everything. The rest are the raw ``provisioning_status``.
+    Same rule as ``appStatusKey`` in the frontend Apps list.
+    """
+
+    LIVE = "live"
+    READY = "ready"
+    PENDING = "pending"
+    PROVISIONING = "provisioning"
+    FAILED = "failed"
+    TEARING_DOWN = "tearing_down"
+    DEREGISTERED = "deregistered"
+    ARCHIVED = "archived"
+
+
+@strawberry.input(name="AstroliftAppsListFilter")
+class AppsListFilterInput:
+    """The Apps list's declared filters (spec 44 §5.1, #2149).
+
+    Unset fields do not filter; set fields combine with AND, and the
+    values of one list field with OR.
+    """
+
+    archived: bool | None = strawberry.field(
+        default=None,
+        description="true: archived apps only. false: active only. null: includeArchived decides.",
+    )
+    failing: bool | None = strawberry.field(
+        default=None,
+        description="true: provisioning failed or the latest deploy failed. false: neither.",
+    )
+    status: list[AppListState] | None = strawberry.field(default=None, description="The header status.")
+    deploy: list[AstroliftAppHealthPulseStatus] | None = strawberry.field(
+        default=None, description="The last-deploy health pulse (the row's healthPulse.status)."
+    )
+    kind: list[str] | None = strawberry.field(default=None, description="Topology kinds, as topologyKind.")
+    cluster: list[str] | None = strawberry.field(
+        default=None, description="Cluster slugs, case-insensitive; any environment on one matches."
+    )
+    project: list[str] | None = strawberry.field(
+        default=None, description="Project slug or name, case-insensitive."
+    )
+    team: list[str] | None = strawberry.field(default=None, description="Team slugs.")
+
+
 @strawberry.enum
 class AppsListSortKey(enum.Enum):
     """Sort axis for ``astroliftAppsPage`` / ``astroliftMyAppsPage`` (#729).
@@ -627,6 +676,21 @@ class RegisteredAppType:
     # Retention policy overrides per signal (#742). Populated lazily by
     # the single-app detail resolver; empty list on list resolvers.
     retention_policies: list[RetentionPolicyType] = strawberry.field(default_factory=list)
+    topology_kind: str | None = strawberry.field(
+        default=None,
+        description=(
+            "The app's shape (service, service-data, service-worker, microservices, service-agent, "
+            "agent, functions, scheduled, task, workflow, mixed), classified from its workloads; "
+            "null when it has none. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149)."
+        ),
+    )
+    cluster_slugs: list[str] = strawberry.field(
+        default_factory=list,
+        description=(
+            "Clusters the app's environments deploy to, in environment-name order. "
+            "Filled on astroliftAppsPage and astroliftMyAppsPage (#2149)."
+        ),
+    )
 
     @strawberry.field
     def provisioning_progress(self) -> ProvisioningProgressType | None:
@@ -713,6 +777,33 @@ def app_team_access_to_type(access, *, home_team_id: int) -> AppTeamAccessType:
     )
 
 
+@strawberry.type(name="AstroliftCronJobLastRun")
+class CronJobLastRunType:
+    """The latest ``ScheduledJobRun`` of a cron job, for the jobs list (#2155)."""
+
+    id: GUID
+    status: str
+    trigger_kind: str
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    duration_seconds: int | None
+    exit_code: int | None
+    created_at: dt.datetime
+
+
+def cron_last_run_to_type(run) -> CronJobLastRunType:
+    return CronJobLastRunType(
+        id=GUID(str(run.guid)),
+        status=run.status,
+        trigger_kind=run.trigger_kind,
+        started_at=run.started_at,
+        ended_at=run.ended_at,
+        duration_seconds=run.duration_seconds,
+        exit_code=run.exit_code,
+        created_at=run.created_at,
+    )
+
+
 @strawberry.type(name="AstroliftWorkload")
 class WorkloadType:
     id: GUID
@@ -752,6 +843,18 @@ class WorkloadType:
     # the TOML ``[[workloads.<name>.volumes]]`` shape as parsed and
     # stored on the row. Empty list when no volumes are declared.
     volumes: JSON
+    # The owner (#2155): the workload's creator, else the app's; null when
+    # neither was recorded. Workloads come from the app's manifest, so the
+    # app's creator is usually the answer.
+    owner_user_id: str | None = None
+    owned_by_me: bool = False
+    last_run: CronJobLastRunType | None = strawberry.field(
+        default=None,
+        description=(
+            "A cron job's most recent run. Null for other kinds, for a job that never ran, "
+            "and on reads that do not load it (astroliftWorkloads)."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftContainer")
@@ -965,6 +1068,8 @@ def app_to_type(
     active_preview_count: int | None = None,
     managed_hostname: str | None = None,
     include_retention_policies: bool = False,
+    topology_kind: str | None = None,
+    cluster_slugs: list[str] | None = None,
 ) -> RegisteredAppType:
     from astrolift_manifest.env_diff import changed_env_key_names
     from astrolift_manifest.sync_state import (
@@ -1095,6 +1200,8 @@ def app_to_type(
             if include_retention_policies
             else []
         ),
+        topology_kind=topology_kind,
+        cluster_slugs=list(cluster_slugs or []),
     )
 
 
@@ -1623,7 +1730,14 @@ class WorkloadScalingStatus:
     sourced_at: dt.datetime
 
 
-def workload_to_type(workload) -> WorkloadType:
+def workload_to_type(workload, *, last_run=None) -> WorkloadType:
+    """``last_run`` is the job's latest ``ScheduledJobRun``, loaded in bulk by the caller."""
+    from core.tenancy import get_current_tenant
+
+    owner_id = getattr(workload, "created_by_id", None) or getattr(
+        workload.registered_app, "created_by_id", None
+    )
+    tenant = get_current_tenant()
     return WorkloadType(
         id=GUID(str(workload.guid)),
         slug=workload.slug,
@@ -1645,6 +1759,9 @@ def workload_to_type(workload) -> WorkloadType:
         registered_app_slug=workload.registered_app.slug,
         in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
         volumes=list(workload.volumes or []),
+        owner_user_id=str(owner_id) if owner_id else None,
+        owned_by_me=owner_id is not None and tenant is not None and tenant.actor_user_id == owner_id,
+        last_run=cron_last_run_to_type(last_run) if last_run is not None else None,
     )
 
 
@@ -1743,6 +1860,12 @@ class RegisteredAppPageType:
     items: list[RegisteredAppType]
     next_cursor: str | None
     total_count: int
+    page: int | None = strawberry.field(
+        default=None, description="The 1-based page number on a numbered page (#2149); null on a cursor page."
+    )
+    page_size: int | None = strawberry.field(
+        default=None, description="Rows per page on a numbered page (#2149); null on a cursor page."
+    )
 
 
 def container_to_type(container, *, env_revealed: bool) -> ContainerType:

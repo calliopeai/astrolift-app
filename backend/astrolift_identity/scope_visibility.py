@@ -11,7 +11,8 @@ actually cover, so the gate and the result agree.
 Coverage follows the same downward inheritance the resolver walks:
 ORG covers everything, TEAM covers that team's projects and apps,
 PROJECT covers that project's apps. It never runs upward -- holding
-``team.read`` on one project does not reveal its parent team.
+``team.read`` on one project does not reveal its parent team. A
+non-inheriting grant (``exact_*``) covers its own row only (#2157).
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ def visible_teams(qs, permission: Permission):
     scopes = _scopes(permission)
     if scopes.org:
         return qs
-    return qs.filter(pk__in=scopes.team_ids)
+    return qs.filter(pk__in=scopes.team_ids | scopes.exact_team_ids)
 
 
 def visible_projects(qs, permission: Permission):
@@ -37,7 +38,7 @@ def visible_projects(qs, permission: Permission):
     scopes = _scopes(permission)
     if scopes.org:
         return qs
-    return qs.filter(Q(pk__in=scopes.project_ids) | Q(team_id__in=scopes.team_ids))
+    return qs.filter(Q(pk__in=scopes.project_ids | scopes.exact_project_ids) | Q(team_id__in=scopes.team_ids))
 
 
 def visible_apps(qs, permission: Permission):

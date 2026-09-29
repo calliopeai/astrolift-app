@@ -309,6 +309,10 @@ class RawManifest:
     # Optional ``[edge]`` block (#1733). App-level, not per workload: the
     # managed-subdomain render puts every hostname on one Ingress.
     edge: EdgeIdentityConfig | None = None
+    # Optional ``[ingress.access]`` (#2132): who may enter the app behind
+    # central auth, as ``{"groups": [...], "users": [...]}``. ``None`` when
+    # the manifest does not declare it.
+    ingress_access: dict[str, list[str]] | None = None
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 

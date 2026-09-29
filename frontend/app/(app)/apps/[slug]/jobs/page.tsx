@@ -1,15 +1,19 @@
-import { JobsClient } from "@/app/(app)/jobs/jobs-client";
+import { redirect } from "next/navigation";
 
-import { AppTabs } from "../components/app-tabs";
-
-export const metadata = { title: "Jobs · App · Astrolift" };
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
 /**
- * No `PreloadQuery`: the tables here walk cursors whose variables the
- * controller owns (limit, search, per-tab filter), so a preload of the
- * deprecated flat list fed nothing. See `app/(app)/jobs/page.tsx`.
+ * Scheduled jobs are the cronjob kind on Workloads now (`?kind=cronjob`)
+ * (spec 44 §5.2). The old URL keeps resolving, with whatever query it
+ * carried.
  */
-export default async function AppJobsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function AppJobsRedirect({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
   const { slug } = await params;
-  return <JobsClient appSlug={slug} tabs={<AppTabs slug={slug} active="deployments" />} />;
+  redirect(redirectTarget(slug, "workloads", "jobs", await searchParams));
 }

@@ -1,25 +1,11 @@
-import { PreloadQuery } from "@/lib/apollo";
-import { LIST_MEMBERS, LIST_ROLE_BINDINGS } from "@/graphql/identity/identity.queries";
+import { redirect } from "next/navigation";
 
-import { MemberDetailClient } from "./member-detail-client";
+import { PEOPLE_HREF } from "@/components/screens/administration/access/access-nav";
 
 export const metadata = { title: "Member · Astrolift" };
 
-/**
- * Member detail (#1106) — drill-in target for an /administration/members row.
- * Reuses LIST_MEMBERS + LIST_ROLE_BINDINGS (no singular query exists).
- */
-export default async function MemberDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+/** A member's page moved to Admin › Access › People (access UX design 5). */
+export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return (
-    <PreloadQuery query={LIST_MEMBERS}>
-      <PreloadQuery query={LIST_ROLE_BINDINGS}>
-        <MemberDetailClient id={id} />
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(`${PEOPLE_HREF}/${id}`);
 }

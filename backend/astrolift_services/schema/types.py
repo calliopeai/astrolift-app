@@ -254,6 +254,33 @@ class ManagedServiceType:
         default_factory=list,
     )
 
+    deployed_by_email: str = ""
+    """Who created it through the API (#2155); empty for a service a
+    manifest declared or one from before this was recorded."""
+
+    deployed_by_me: bool = False
+
+
+@strawberry.input(name="AstroliftModelEndpointsFilter")
+class ModelEndpointsFilterInput:
+    """Declared filters on ``astroliftModelEndpointsPage`` (#2155).
+
+    Unset fields do not filter; set fields combine with AND, and the values
+    of one list field with OR. Slugs match case-insensitively.
+    """
+
+    status: list[str] | None = strawberry.field(default=None, description="Service statuses, any of.")
+    variant: list[str] | None = strawberry.field(
+        default=None, description="Engines and providers: vllm, kserve, bedrock, azure_openai..."
+    )
+    project: list[str] | None = strawberry.field(
+        default=None, description="Project slugs: the owning project, or the owning app's project."
+    )
+    app: list[str] | None = strawberry.field(default=None, description="Owning app slugs.")
+    cluster: list[str] | None = strawberry.field(default=None, description="Cluster slugs it runs on.")
+    owner_scope: list[str] | None = strawberry.field(default=None, description="app or project.")
+    deployed_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
+
 
 @strawberry.type(name="AstroliftManagedServiceCostPreview")
 class ManagedServiceCostPreviewType:
@@ -1123,7 +1150,16 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = True) -> Man
             WorkloadIdentityGrant.State.FAILED.value,
         },
         workload_identity_grants=[workload_identity_grant_to_type(row) for row in grants],
+        deployed_by_email=(getattr(svc.created_by, "email", "") or "") if svc.created_by_id else "",
+        deployed_by_me=_is_viewer(svc.created_by_id),
     )
+
+
+def _is_viewer(user_id: int | None) -> bool:
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
 
 
 def workload_identity_grant_to_type(row) -> WorkloadIdentityGrantType:

@@ -38,6 +38,15 @@ PLAINTEXT_PREFIX = "alft_at_"
 SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
+# The cluster surface, narrow enough for a script to set a cluster's config or
+# run its recipe without minting ``admin`` (#2120). Registering and removing a
+# cluster stay admin-only: those change what the platform runs on.
+SCOPE_WRITE_CLUSTERS = "write:clusters"
+SCOPE_MANAGE_CLUSTERS = "manage:clusters"
+# Logins of a cluster's edge identity provider (#2131), and who may enter an
+# app behind it (#2132).
+SCOPE_MANAGE_AUTH_USERS = "manage:auth-users"
+SCOPE_WRITE_APP_ACCESS = "write:app-access"
 SCOPE_AGENT_ENV_SPEC_WRITE = "agent-env-spec:write"
 SCOPE_PROJECT_WRITE = "project:write"
 SCOPE_SECRET_READ = "secret:read"
@@ -56,6 +65,10 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_READ_APPS,
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
+        SCOPE_WRITE_CLUSTERS,
+        SCOPE_MANAGE_CLUSTERS,
+        SCOPE_MANAGE_AUTH_USERS,
+        SCOPE_WRITE_APP_ACCESS,
         SCOPE_AGENT_ENV_SPEC_WRITE,
         SCOPE_PROJECT_WRITE,
         SCOPE_SECRET_READ,
@@ -99,6 +112,17 @@ CLI_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_WORKFLOW_WRITE,
     SCOPE_WORKFLOW_TRIGGER,
     SCOPE_APP_ONBOARD,
+)
+
+# ``astro auth login --scope clusters`` (#2120): the CLI's set plus the cluster
+# surface, for an operator who would otherwise mint an admin token by hand.
+# Still a ceiling: RBAC decides what the approving user may actually do.
+CLI_OPERATOR_DEVICE_SCOPES: tuple[str, ...] = (
+    *CLI_DEVICE_SCOPES,
+    SCOPE_WRITE_CLUSTERS,
+    SCOPE_MANAGE_CLUSTERS,
+    SCOPE_MANAGE_AUTH_USERS,
+    SCOPE_WRITE_APP_ACCESS,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
@@ -161,6 +185,14 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
         return True
+    if SCOPE_WRITE_CLUSTERS in scopes and permission == "cluster.update":
+        return True
+    if SCOPE_MANAGE_CLUSTERS in scopes and permission == "cluster.manage":
+        return True
+    if SCOPE_MANAGE_AUTH_USERS in scopes and permission == "cluster.users":
+        return True
+    if SCOPE_WRITE_APP_ACCESS in scopes and permission == "app.access":
+        return True
     if SCOPE_AGENT_ENV_SPEC_WRITE in scopes and permission in {
         "agent_env_spec.create",
         "agent_env_spec.update",
@@ -200,6 +232,123 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     if SCOPE_APP_ONBOARD in scopes and permission in {"app.create", "app.update"}:
         return True
     return False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class ScopeInfo:
+    """One scope as the token picker explains it (#2120)."""
+
+    value: str
+    label: str
+    surface: str
+    description: str
+    sensitive: bool = False
+
+
+# The picker's single source: the frontend reads it over GraphQL instead of
+# keeping its own copy, which is how the two lists drifted. Grouped by surface
+# in this order.
+SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
+    ScopeInfo(SCOPE_READ_APPS, "Read apps", "apps", "List apps, deployments, environments and secret names."),
+    ScopeInfo(
+        SCOPE_WRITE_APPS, "Write apps", "apps", "Deploy, edit environment variables and manage app config."
+    ),
+    ScopeInfo(
+        SCOPE_APP_ONBOARD,
+        "Onboard apps",
+        "apps",
+        "Register apps and run CI setup (webhook, secrets, workflow), without deploy or delete.",
+    ),
+    ScopeInfo(SCOPE_READ_CLUSTERS, "Read clusters", "clusters", "List clusters and read provider state."),
+    ScopeInfo(
+        SCOPE_WRITE_CLUSTERS,
+        "Update clusters",
+        "clusters",
+        "Change a cluster's settings: ingress class, auth gate, region, endpoint.",
+    ),
+    ScopeInfo(
+        SCOPE_MANAGE_CLUSTERS,
+        "Operate clusters",
+        "clusters",
+        "Run a cluster's recipe install, refresh its management state, reconcile its ingresses.",
+    ),
+    ScopeInfo(
+        SCOPE_MANAGE_AUTH_USERS,
+        "Manage sign-in users",
+        "clusters",
+        "Create, disable, delete and reset the users of a cluster's central auth, and their groups.",
+        sensitive=True,
+    ),
+    ScopeInfo(
+        SCOPE_WRITE_APP_ACCESS,
+        "Set app access",
+        "apps",
+        "Choose which users and groups may enter an app behind central auth.",
+    ),
+    ScopeInfo(
+        SCOPE_SECRET_READ,
+        "Reveal secrets",
+        "secrets",
+        "Reveal stored secret values. Grant only when required.",
+        sensitive=True,
+    ),
+    ScopeInfo(
+        SCOPE_SECRET_WRITE,
+        "Write secrets",
+        "secrets",
+        "Set, rotate and delete secrets without revealing them.",
+    ),
+    ScopeInfo(
+        SCOPE_MCP_READ, "MCP read", "agents", "List agent packages and inspect runs through remote MCP."
+    ),
+    ScopeInfo(SCOPE_MCP_DISPATCH, "MCP dispatch", "agents", "Run and hard-stop agents through remote MCP."),
+    ScopeInfo(SCOPE_MCP_WRITE, "MCP write", "agents", "Sync agent repositories and package definitions."),
+    ScopeInfo(
+        SCOPE_AGENT_ENV_SPEC_WRITE,
+        "Write agent environments",
+        "agents",
+        "Create, update and delete agent environment specs.",
+    ),
+    ScopeInfo(SCOPE_WORKFLOW_WRITE, "Write workflows", "workflows", "Create, update and delete workflows."),
+    ScopeInfo(
+        SCOPE_WORKFLOW_TRIGGER, "Run workflows", "workflows", "Start workflow runs, without editing them."
+    ),
+    ScopeInfo(SCOPE_PROJECT_WRITE, "Write projects", "administration", "Create, update and delete projects."),
+    ScopeInfo(SCOPE_TEAM_WRITE, "Write teams", "administration", "Create, update and delete teams."),
+    ScopeInfo(
+        SCOPE_ADMIN,
+        "Admin",
+        "administration",
+        "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes.",
+        sensitive=True,
+    ),
+)
+
+SCOPE_PRESETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("read_only", "Read-only", DEFAULT_SCOPES),
+    ("cli", "CLI default", CLI_DEVICE_SCOPES),
+    ("ci_deploy", "CI deploy", (SCOPE_READ_APPS, SCOPE_WRITE_APPS)),
+    (
+        "cluster_operator",
+        "Cluster operator",
+        (SCOPE_READ_CLUSTERS, SCOPE_WRITE_CLUSTERS, SCOPE_MANAGE_CLUSTERS, SCOPE_MANAGE_AUTH_USERS),
+    ),
+)
+"""(key, label, scopes). Starting points in the picker, never extra power."""
+
+
+def permissions_for_scopes(scopes: Iterable[str]) -> frozenset[str]:
+    """Every RBAC permission slug these scopes let a token exercise.
+
+    Derived from :func:`token_scope_allows_permission` itself, so what the
+    picker shows is what enforcement does. ``admin`` returns every permission.
+    """
+    from types import SimpleNamespace
+
+    from core.permissions import Permission
+
+    probe = SimpleNamespace(scopes=list(scopes))
+    return frozenset(p.value for p in Permission if token_scope_allows_permission(probe, p.value))
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

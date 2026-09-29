@@ -120,6 +120,7 @@ def _build_pr_context(payload: dict) -> github_pr_dispatch.PrEventContext | None
         head_branch=head_branch,
         is_merge=bool(pull_request.get("merged", False)) is True,
         is_bot_author=(user.get("type") or "") == "Bot",
+        author_login=str(user.get("login") or ""),
     )
 
 
@@ -224,6 +225,7 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
             hostname=hostname,
             namespace=namespace,
             app_environment=env,
+            opened_by_login=pr_ctx.author_login[:255],
         )
     return preview, True
 

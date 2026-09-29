@@ -9,8 +9,10 @@ import type { SortState } from "./types";
 
 type SortableColumnHeaderProps = {
   sortKey: string;
-  sort: SortState | undefined;
-  onToggle: (key: string) => void;
+  /** One key, or the ordered keys of a multi-key sort (spec 44 §5.1). */
+  sort: SortState | SortState[] | undefined;
+  /** `additive` is true on shift-click: add this column as the next key. */
+  onToggle: (key: string, additive: boolean) => void;
   children: React.ReactNode;
   className?: string;
 };
@@ -31,13 +33,15 @@ export function SortableColumnHeader({
   children,
   className,
 }: SortableColumnHeaderProps) {
-  const active = sort?.key === sortKey;
-  const dir = active ? sort?.dir : undefined;
+  const keys = Array.isArray(sort) ? sort : sort ? [sort] : [];
+  const index = keys.findIndex((s) => s.key === sortKey);
+  const active = index !== -1;
+  const dir = active ? keys[index].dir : undefined;
 
   return (
     <button
       type="button"
-      onClick={() => onToggle(sortKey)}
+      onClick={(e) => onToggle(sortKey, e.shiftKey)}
       className={cn(
         "hover:text-foreground flex items-center gap-1 text-sm font-medium transition-colors",
         active ? "text-foreground" : "text-muted-foreground",
@@ -51,6 +55,12 @@ export function SortableColumnHeader({
         <ArrowDownIcon className="size-3.5" />
       ) : (
         <ChevronsUpDownIcon className="size-3.5 opacity-40" />
+      )}
+      {active && keys.length > 1 && (
+        <span className="text-muted-foreground text-2xs font-mono tabular-nums">
+          <span className="sr-only">sort key </span>
+          {index + 1}
+        </span>
       )}
     </button>
   );

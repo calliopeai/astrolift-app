@@ -8,18 +8,33 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useFormDefinition, useSubmitForm } from "@/graphql/forms/forms.hooks";
+import type { FormDefinition, MutationError } from "@/graphql/forms/forms.types";
 import { DynamicField } from "./field-registry";
 import { evaluateLogicRules, type LogicRule, type LogicState } from "./logic-engine";
 
+export type DynamicFormSubmitResult = {
+  ok: boolean;
+  submissionId: string | null;
+  errors: MutationError[];
+};
+
 type DynamicFormProps = {
   slug: string;
+  formDef: FormDefinition | null;
+  loading: boolean;
+  error: string | null;
+  onSubmit: (payload: Record<string, unknown>) => Promise<DynamicFormSubmitResult>;
   onSuccess?: (submissionId: string) => void;
 };
 
-export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
-  const { form: formDef, loading, error } = useFormDefinition(slug);
-  const [submitForm] = useSubmitForm();
+export function DynamicForm({
+  slug,
+  formDef,
+  loading,
+  error,
+  onSubmit: submit,
+  onSuccess,
+}: DynamicFormProps) {
   const [submitted, setSubmitted] = useState(false);
 
   const {
@@ -44,12 +59,20 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
   const fieldNames = Object.keys(properties);
 
   const logicRules = ((formDef as Record<string, unknown> | null)?.logicRules ?? []) as LogicRule[];
-  const fieldConfig = ((formDef as Record<string, unknown> | null)?.fieldConfig ?? {}) as Record<string, Record<string, unknown>>;
+  const fieldConfig = ((formDef as Record<string, unknown> | null)?.fieldConfig ?? {}) as Record<
+    string,
+    Record<string, unknown>
+  >;
 
   const logicState: LogicState = useMemo(
     () => evaluateLogicRules(logicRules, fieldConfig, watchedValues ?? {}, fieldNames),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(watchedValues), JSON.stringify(logicRules), JSON.stringify(fieldConfig), fieldNames.join(",")],
+    [
+      JSON.stringify(watchedValues),
+      JSON.stringify(logicRules),
+      JSON.stringify(fieldConfig),
+      fieldNames.join(","),
+    ]
   );
 
   useEffect(() => {
@@ -72,7 +95,9 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
   if (error || !formDef) {
     return (
       <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-        {error ? `Error loading form: ${error.message}` : `Form "${slug}" not found or not published.`}
+        {error
+          ? `Error loading form: ${error}`
+          : `Form "${slug}" not found or not published.`}
       </div>
     );
   }
@@ -80,9 +105,11 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
   if (submitted) {
     return (
       <Card className="flex flex-col items-center gap-4 p-8 text-center">
-        <CheckCircle2Icon className="h-12 w-12 text-success-fg" />
+        <CheckCircle2Icon className="text-success-fg h-12 w-12" />
         <h2 className="text-xl font-semibold">Submitted!</h2>
-        <p className="text-muted-foreground">Your response to &quot;{formDef.name}&quot; has been recorded.</p>
+        <p className="text-muted-foreground">
+          Your response to &quot;{formDef.name}&quot; has been recorded.
+        </p>
       </Card>
     );
   }
@@ -108,18 +135,16 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
       }
     }
 
-    const { data: result } = await submitForm({
-      variables: { slug, payload },
-    });
+    const result = await submit(payload);
 
-    if (result?.submitForm.ok) {
+    if (result.ok) {
       setSubmitted(true);
       toast.success("Form submitted", { description: formDef.name });
-      if (result.submitForm.data?.id && onSuccess) {
-        onSuccess(result.submitForm.data.id);
+      if (result.submissionId && onSuccess) {
+        onSuccess(result.submissionId);
       }
-    } else if (result?.submitForm.errors?.length) {
-      for (const err of result.submitForm.errors) {
+    } else if (result.errors.length) {
+      for (const err of result.errors) {
         setError(err.field || "root", {
           type: "server",
           message: err.message,
@@ -152,7 +177,10 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
             fieldSchema.title = title + " *";
           }
 
-          if (fieldName in logicState.calculated && logicState.calculated[fieldName] !== undefined) {
+          if (
+            fieldName in logicState.calculated &&
+            logicState.calculated[fieldName] !== undefined
+          ) {
             return (
               <div key={fieldName} className={`flex flex-col gap-1.5 ${isHidden ? "hidden" : ""}`}>
                 <label className="text-sm font-medium">

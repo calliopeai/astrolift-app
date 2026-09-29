@@ -32,6 +32,7 @@ def _create_sync(action: dict[str, Any]) -> ScheduledWorkflowFire:
     from django.db import transaction
 
     from astrolift_workflows.inputs import Actor
+    from core.run_trigger import RunTrigger
     from workflows.models import Workflow, WorkflowInstance
     from workflows.run_service import build_workflow_definition_run_input
     from workflows.schedule_sync import schedule_inactive_reason
@@ -58,6 +59,7 @@ def _create_sync(action: dict[str, Any]) -> ScheduledWorkflowFire:
             organization_id=wf.organization_id,
             actor=Actor(kind="system", user_id=None, display="scheduled"),
             stage_bindings=wf.stage_bindings,
+            trigger_kind=RunTrigger.SCHEDULE,
         )
         # `runCount` and the Workflow's run history count these records; the
         # manual `runWorkflow` path writes one per run too.

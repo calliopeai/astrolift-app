@@ -71,17 +71,22 @@ M = TypeVar("M")
 __all__ = [
     "DEFAULT_PAGE_LIMIT",
     "MAX_PAGE_LIMIT",
+    "DEFAULT_PAGE_SIZE",
     "KeysetPage",
+    "NumberedPage",
     "PageType",
     "clamp_limit",
     "decode_cursor",
     "encode_cursor",
     "keyset_page",
+    "numbered_page",
     "search_q",
 ]
 
 DEFAULT_PAGE_LIMIT = 50
 MAX_PAGE_LIMIT = 200
+#: The first page size a numbered list shows (spec 44 §5.1: 25 / 50 / 100).
+DEFAULT_PAGE_SIZE = 25
 
 
 # ---------------------------------------------------------------------------
@@ -164,17 +169,24 @@ def clamp_limit(
 # ---------------------------------------------------------------------------
 
 
-def search_q(term: str, *fields: str) -> Q:
+def search_q(term: str, *fields: str, prefix: Sequence[str] = ()) -> Q:
     """OR of ``icontains`` over ``fields`` for a free-text search box.
 
     Deliberately un-tokenised, matching the app-list filter this
     generalises: operators type a fragment of one identifier ("prod-api",
     "ana@"), not a multi-word phrase, and splitting on whitespace would
     make a trailing space change the result set.
+
+    ``prefix`` fields match by ``istartswith`` instead: ids and SHAs,
+    where "7e11" means "the one that starts 7e11" and a substring hit in
+    the middle of an unrelated hash is noise. A UUID column works here;
+    Postgres compares its text form.
     """
     query = Q()
     for field in fields:
         query |= Q(**{f"{field}__icontains": term})
+    for field in prefix:
+        query |= Q(**{f"{field}__istartswith": term})
     return query
 
 
@@ -237,7 +249,7 @@ class KeysetPage[M]:
         return cls(rows=[], next_cursor=None, total_count=0 if with_total else None)
 
 
-@strawberry.type(name="Page", description="One page of a cursor-paginated list.")
+@strawberry.type(name="Page", description="One page of a cursor-paginated or numbered list.")
 class PageType[T]:
     items: list[T]
     next_cursor: str | None = strawberry.field(
@@ -247,6 +259,14 @@ class PageType[T]:
     total_count: int | None = strawberry.field(
         default=None,
         description="Total rows matching the filters, across all pages.",
+    )
+    page: int | None = strawberry.field(
+        default=None,
+        description="The 1-based page number on a numbered page; null on a cursor page.",
+    )
+    page_size: int | None = strawberry.field(
+        default=None,
+        description="Rows per page on a numbered page; null on a cursor page.",
     )
 
 
@@ -327,3 +347,65 @@ def keyset_page[M](
             )
 
     return KeysetPage(rows=rows, next_cursor=next_cursor, total_count=total)
+
+
+# ---------------------------------------------------------------------------
+# Numbered pages
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NumberedPage[M]:
+    """One numbered page of model rows (spec 44 §5.1, #2149).
+
+    The other paging mode: ``1-25 of 140  < 1 2 3 ... 6 >``, for lists
+    whose set is small and stable enough that an exact count and an
+    OFFSET are cheap (apps, agents, members). A page past the end is
+    empty rather than clamped, so the page number the client asked for
+    is the one it gets back and the count tells it where the end is.
+    """
+
+    rows: list[M]
+    page: int
+    page_size: int
+    total_count: int
+
+    @property
+    def page_count(self) -> int:
+        return max(1, -(-self.total_count // self.page_size))
+
+    def map[T](self, to_type: Callable[[M], T]) -> PageType[T]:
+        """Project the rows through their GraphQL type mapper."""
+        return PageType(
+            items=[to_type(row) for row in self.rows],
+            next_cursor=None,
+            total_count=self.total_count,
+            page=self.page,
+            page_size=self.page_size,
+        )
+
+
+def numbered_page[M](
+    qs: QuerySet[M],
+    *,
+    order_by: Sequence[Any],
+    page: int | None = None,
+    page_size: int | None = None,
+    default_page_size: int = DEFAULT_PAGE_SIZE,
+    max_page_size: int = MAX_PAGE_LIMIT,
+) -> NumberedPage[M]:
+    """Slice ``qs`` as page ``page`` of ``page_size`` rows.
+
+    ``qs`` arrives filtered and unordered, as it does for
+    :func:`keyset_page`; ``order_by`` is imposed here and must end in a
+    unique column (``resolve_list_sort`` appends the pk), or rows that
+    tie on every sort key straddle a page boundary and OFFSET serves
+    them twice or never. ``page`` below 1 reads as 1, and ``page_size``
+    is clamped like a cursor limit.
+    """
+    size = clamp_limit(page_size, default=default_page_size, maximum=max_page_size)
+    number = page if page is not None and page > 0 else 1
+    total = qs.count()
+    start = (number - 1) * size
+    rows = list(qs.order_by(*order_by)[start : start + size]) if start < total else []
+    return NumberedPage(rows=rows, page=number, page_size=size, total_count=total)

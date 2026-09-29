@@ -128,6 +128,16 @@ class AppEnvironmentType:
     domain_zone: str | None
     created_at: dt.datetime
     settings: list[EnvironmentSettingType] = strawberry.field(default_factory=list)
+    # The Environments list's columns (#2155). ``kind`` is derived from the
+    # name (see ``environment_kind``); ``region`` is the bound cluster's; the
+    # owner is whoever created the environment, else the app's creator, and
+    # null when neither was recorded.
+    kind: str = strawberry.field(default="other", description="production, preview or other.")
+    region: str = strawberry.field(default="", description="The bound cluster's region; empty when unset.")
+    owner_user_id: str | None = strawberry.field(
+        default=None, description="The owner's user pk: the environment's creator, else the app's."
+    )
+    owned_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftDeploymentApprover")
@@ -255,6 +265,12 @@ class DeploymentType:
     """Convenience: True when the current request's authenticated user
     is the row's ``triggered_by_user``. The approval CTA hides on this
     so a deployer can't approve their own deploy from the UI."""
+
+    status_reason: str = ""
+    """One line saying why the row is where it is (#2123): what a failed
+    deploy died of, or what a pending one is waiting on. Empty for a deploy
+    that is running or has succeeded. The full text stays in
+    ``abortedReason``, ``buildError`` and ``manifestResyncError``."""
 
 
 @strawberry.type(name="AstroliftDeploymentLogEntry")
@@ -405,6 +421,54 @@ class PreviewEnvironmentType:
     capability, doesn't recognise compute pricing, or the pricing API
     is unreachable — workspace rule forbids hard-coded fallbacks."""
 
+    # Who opened it and why it failed (#2155). ``opened_by_login`` is the
+    # pull request author's SCM login on a PR preview and the platform
+    # username on a manual one; ``opened_by_user_id`` is set only when a
+    # platform user created it. Empty on rows from before either was kept.
+    opened_by_login: str = ""
+    opened_by_user_id: str | None = None
+    opened_by_me: bool = False
+    failure_reason: str = strawberry.field(
+        default="",
+        description=(
+            "Why a failed preview failed, in one line: the build's recorded reason, else its "
+            "latest deployment's. Empty unless status is failed."
+        ),
+    )
+
+
+@strawberry.type(name="AstroliftPreviewEnvironmentCounts")
+class PreviewEnvironmentCountsType:
+    """Preview totals per status over the same app and search as the page (#2155)."""
+
+    total: int
+    building: int
+    running: int
+    failed: int
+    torn_down: int
+
+
+#: Environment names read as production, compared case-insensitively.
+PRODUCTION_ENVIRONMENT_NAMES = ("production", "prod")
+
+
+def environment_kind(name: str) -> str:
+    """``production``, ``preview`` or ``other``, from an environment's name.
+
+    Previews are named ``preview-...`` by both creation paths
+    (``PREVIEW_ENV_PREFIX``). There is no production flag on the model, so
+    production is the name the platform bootstraps (``production``) and its
+    short form. ``list_contract.environment_kind_expr`` is the same rule in SQL.
+    """
+    from astrolift_lifecycle.services.preview_lineage import PREVIEW_ENV_PREFIX
+
+    name = name or ""
+    if name.startswith(PREVIEW_ENV_PREFIX):
+        return "preview"
+    if name.lower() in PRODUCTION_ENVIRONMENT_NAMES:
+        return "production"
+    return "other"
+
 
 def _env_url(env) -> str:
     """Compute the public URL for an AppEnvironment.
@@ -426,6 +490,7 @@ def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType
     raw = list(env.settings.filter(deleted_at__isnull=True))
     if keys is not None:
         raw = [s for s in raw if s.key in keys]
+    owner_id = getattr(env, "created_by_id", None) or getattr(env.registered_app, "created_by_id", None)
     return AppEnvironmentType(
         id=GUID(str(env.guid)),
         name=env.name,
@@ -446,6 +511,10 @@ def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType
         domain_zone=env.managed_domain.zone if env.managed_domain_id else None,
         created_at=env.created_at,
         settings=[env_setting_to_type(s) for s in raw],
+        kind=environment_kind(env.name),
+        region=(env.tenant_cluster.region or "") if env.tenant_cluster_id else "",
+        owner_user_id=str(owner_id) if owner_id else None,
+        owned_by_me=_viewer_started(owner_id),
     )
 
 
@@ -515,7 +584,57 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         aborted_reason=getattr(d, "aborted_reason", "") or "",
         triggered_by_user_id=(str(triggered_by_user_id) if triggered_by_user_id is not None else None),
         triggered_by_me=triggered_by_me,
+        status_reason=deployment_status_reason(d),
     )
+
+
+# A pending deploy that has not started this long after it was created has
+# probably lost its worker, not merely queued.
+_STUCK_AFTER_SECONDS = 10 * 60
+
+
+def _first_line(text: str, limit: int = 240) -> str:
+    line = next((ln.strip() for ln in (text or "").splitlines() if ln.strip()), "")
+    return line if len(line) <= limit else line[: limit - 1] + "…"
+
+
+def deployment_status_reason(d) -> str:
+    """Why a deploy is failed or still pending, in one line (#2123)."""
+    from django.utils import timezone
+
+    from astrolift_lifecycle.models import Deployment
+
+    status = d.status
+    if status == Deployment.Status.FAILED:
+        for text in (d.aborted_reason, d.build_error, d.manifest_resync_error):
+            if text:
+                return _first_line(text)
+        return "Failed with no recorded reason. Check the deployment log."
+    if status == Deployment.Status.PENDING_APPROVAL:
+        return f"Waiting for approval: {d.approvals_received} of {d.approvals_required}."
+    if status != Deployment.Status.PENDING:
+        return ""
+    ahead = (
+        Deployment.objects.filter(
+            registered_app_id=d.registered_app_id,
+            app_environment_id=d.app_environment_id,
+            status__in=(Deployment.Status.DEPLOYING, Deployment.Status.REDEPLOYING),
+            created_at__lt=d.created_at,
+            deleted_at__isnull=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if ahead is not None:
+        label = ahead.image_tag or str(ahead.guid)[:8]
+        return f"Queued behind deploy {label}, still {ahead.status}."
+    waited = (timezone.now() - d.created_at).total_seconds()
+    if waited > _STUCK_AFTER_SECONDS:
+        return (
+            f"Not started after {int(waited // 60)} minutes and nothing ahead of it. The deploy "
+            "workflow may not be running: check the worker, then redeploy."
+        )
+    return "Waiting for the deploy workflow to start."
 
 
 # ---------------------------------------------------------------------------
@@ -823,6 +942,12 @@ class ScheduledJobRunType:
     run worked without leaving the page. The full tail lives behind
     the per-app logs surface; the UI footer flags truncation."""
     created_at: dt.datetime
+    # Who and what started the run (#2152): the job's own trigger word
+    # (``scheduled`` or ``manual``) and the initiator's user pk, null for a
+    # scheduled fire.
+    trigger_kind: str = "scheduled"
+    triggered_by_user_id: str | None = None
+    triggered_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftCommandRun")
@@ -841,6 +966,9 @@ class CommandRunType:
     ``ScheduledJobRun.output`` surface so the FE's shared row-expand
     component works against both run kinds."""
     created_at: dt.datetime
+    # Who ran it (#2155), as the job run and deployment types spell it.
+    invoked_by_user_id: str | None = None
+    invoked_by_me: bool = False
 
 
 def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
@@ -859,7 +987,18 @@ def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
         log_excerpt=log_excerpt,
         output=_last_n_lines(log_excerpt),
         created_at=r.created_at,
+        trigger_kind=r.trigger_kind,
+        triggered_by_user_id=str(r.triggered_by_id) if r.triggered_by_id else None,
+        triggered_by_me=_viewer_started(r.triggered_by_id),
     )
+
+
+def _viewer_started(user_id: int | None) -> bool:
+    """Whether ``user_id`` is the caller, for a run's ``triggeredByMe``."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
 
 
 def command_run_to_type(r) -> CommandRunType:
@@ -876,6 +1015,8 @@ def command_run_to_type(r) -> CommandRunType:
         log_excerpt=log_excerpt,
         output=_last_n_lines(log_excerpt),
         created_at=r.created_at,
+        invoked_by_user_id=str(r.invoked_by_id) if r.invoked_by_id else None,
+        invoked_by_me=_viewer_started(r.invoked_by_id),
     )
 
 
@@ -1008,8 +1149,13 @@ def preview_to_type(
     estimated_daily_cost_usd: float | None = None,
     estimated_cost_notes: list[str] | None = None,
     estimated_cost_approximate: bool = False,
+    failure_reason: str | None = None,
 ) -> PreviewEnvironmentType:
     """Serialize a ``PreviewEnvironment`` row into the GraphQL type.
+
+    ``failure_reason`` overrides the row's own recorded reason; the list
+    resolver passes the latest deployment's reason for failed rows that
+    recorded none.
 
     ``aggregate_resources`` + ``estimated_daily_cost_usd`` are injected
     by the resolver (rather than computed here) so the cluster + cost
@@ -1032,6 +1178,7 @@ def preview_to_type(
             memory_bytes=0.0,
             pod_count=0,
         )
+    opener_id = getattr(p, "created_by_id", None)
     # Manual previews (#751) have ``pr_number=NULL``; the GraphQL type
     # surfaces a non-nullable ``int`` (no contract change), so coerce
     # to 0 here. The FE renders 0 as "—" (the same fallback used for
@@ -1059,6 +1206,14 @@ def preview_to_type(
         estimated_daily_cost_usd=estimated_daily_cost_usd,
         estimated_cost_notes=list(estimated_cost_notes or []),
         estimated_cost_approximate=estimated_cost_approximate,
+        opened_by_login=getattr(p, "opened_by_login", "") or "",
+        opened_by_user_id=str(opener_id) if opener_id else None,
+        opened_by_me=_viewer_started(opener_id),
+        failure_reason=(
+            _first_line(failure_reason if failure_reason is not None else getattr(p, "failure_reason", ""))
+            if p.status == "failed"
+            else ""
+        ),
     )
 
 

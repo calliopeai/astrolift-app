@@ -175,6 +175,8 @@ def test_dispatch_creates_task_with_agent_definition_and_enqueues(
     # Created DRAFT then advanced through the sanctioned transition.
     assert task.status == AgentTask.Status.QUEUED
     assert task.queued_at is not None
+    # A session call is a manual run (#2152).
+    assert task.trigger_kind == "manual"
 
     # Exactly one DispatchAgentTaskWorkflow enqueued, keyed to the task guid,
     # carrying the task pk in its input.
@@ -488,6 +490,9 @@ def test_client_request_id_from_a_different_requester_dispatches_an_independent_
     assert len(temporal_recorder) == 2
     assert AgentTask.objects.get(guid=str(first.data.id)).created_by_id == user.id
     assert AgentTask.objects.get(guid=str(second.data.id)).created_by_id == other_user.id
+    # The requester is the run's initiator (#2152).
+    assert AgentTask.objects.get(guid=str(first.data.id)).triggered_by_user_id == user.id
+    assert AgentTask.objects.get(guid=str(second.data.id)).triggered_by_user_id == other_user.id
 
 
 def test_client_request_id_malformed_is_a_validation_error(

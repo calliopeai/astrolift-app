@@ -35,6 +35,11 @@ export type Column<TRow> = {
   /** Stable identity; also the React key. */
   id: string;
   header: React.ReactNode;
+  /**
+   * Plain-text name, for where a node will not do: the column chooser, the
+   * card view's sort menu. Defaults to `header` when that is a string.
+   */
+  label?: string;
   cell: (row: TRow) => React.ReactNode;
   /**
    * Tailwind width class (e.g. `"w-32"`). Drives both the real column and

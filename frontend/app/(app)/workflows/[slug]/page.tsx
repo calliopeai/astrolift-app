@@ -1,12 +1,8 @@
-import { redirect } from "next/navigation";
+import { BuilderContent } from "./components/builder-content";
 
-export default async function WorkflowDetailIndexPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  // /workflows/[slug] is the detail shell, not a destination — land on
-  // Build, the default BROCS pillar.
-  const { slug } = await params;
-  redirect(`/workflows/${encodeURIComponent(slug)}/build`);
+export const metadata = { title: "Builder · Workflow · Astrolift" };
+
+/** The Builder tab, at the workflow's root (spec 44 §5.2); `/build` and `/builder` redirect here. */
+export default function WorkflowBuilderPage() {
+  return <BuilderContent />;
 }

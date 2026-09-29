@@ -1,28 +1,11 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import * as React from "react";
+import type * as React from "react";
 
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
-import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
+import { AgentProjectStepView } from "@/components/screens/agents/new/AgentProjectStep";
+import { useAgentProjectStep } from "@/components/screens/agents/new/use-agent-project-step";
 
-import type { WizardState } from "../wizard-client";
-
-interface TeamsResp {
-  astroliftTeams: AstroliftTeam[];
-}
-
-interface ProjectsResp {
-  astroliftProjects: AstroliftProject[];
-}
+import type { WizardState } from "@/components/screens/agents/new/use-new-agent";
 
 interface Props {
   state: WizardState;
@@ -30,108 +13,8 @@ interface Props {
   setValid: (valid: boolean) => void;
 }
 
-/**
- * Minimal project selector — the only field `registerAgentRepo` needs beyond
- * the repo handle (`projectId`). Cloned down from the register-app wizard's
- * AppDetailsStep with the name / slug / description fields dropped: agents
- * derive those from their discovered manifests, so the operator only chooses
- * where the agents' apps live. Reuses the same `LIST_PROJECTS` query PR-7 uses.
- */
+/** New agent, Configure: the project. The view owns the markup; the hook owns teams, projects, and validity. */
 export function ProjectStep({ state, setState, setValid }: Props) {
-  const teams = useQuery<TeamsResp>(LIST_TEAMS, { fetchPolicy: "cache-and-network" });
-  const projects = useQuery<ProjectsResp>(LIST_PROJECTS, { fetchPolicy: "cache-and-network" });
-
-  const allProjects = React.useMemo(() => projects.data?.astroliftProjects ?? [], [projects.data]);
-  const allTeams = teams.data?.astroliftTeams ?? [];
-
-  // Team selection is informational — it filters the project list. The
-  // mutation takes a `projectId`, not a `teamId`.
-  const [teamOverride, setTeamOverride] = React.useState<string | null>(null);
-  const pickedProject = allProjects.find((p) => p.id === state.projectId);
-  const teamId = teamOverride !== null ? teamOverride : (pickedProject?.team.id ?? "");
-
-  // Auto-pick first project once data lands.
-  React.useEffect(() => {
-    if (!state.projectId && allProjects.length > 0) {
-      setState((s) => (s.projectId ? s : { ...s, projectId: allProjects[0].id }));
-    }
-  }, [allProjects, state.projectId, setState]);
-
-  const filteredProjects = teamId ? allProjects.filter((p) => p.team.id === teamId) : allProjects;
-
-  React.useEffect(() => {
-    setValid(state.projectId !== "");
-  }, [state.projectId, setValid]);
-
-  return (
-    <div className="flex flex-col gap-5">
-      <p className="text-muted-foreground text-sm">
-        Choose the project the discovered agents will be registered under. Each agent becomes a
-        workload on its own app within this project (which belongs to a team).
-      </p>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="team">Team (filter)</Label>
-          <Select
-            value={teamId || "__all__"}
-            onValueChange={(v) => {
-              const next = v === "__all__" ? "" : v;
-              setTeamOverride(next);
-              // If the current project doesn't belong to the new team, clear
-              // it so the operator picks an in-scope one.
-              if (next) {
-                const picked = allProjects.find((p) => p.id === state.projectId);
-                if (picked && picked.team.id !== next) {
-                  setState((s) => ({ ...s, projectId: "" }));
-                }
-              }
-            }}
-          >
-            <SelectTrigger id="team">
-              <SelectValue placeholder="All teams" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All teams</SelectItem>
-              {allTeams.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.slug} <span className="text-muted-foreground">— {t.name}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-muted-foreground text-xs">
-            Optional filter to narrow the project list.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="project">
-            Project <span className="text-destructive">*</span>
-          </Label>
-          <Select
-            value={state.projectId}
-            onValueChange={(v) => setState((s) => ({ ...s, projectId: v }))}
-          >
-            <SelectTrigger id="project">
-              <SelectValue
-                placeholder={
-                  filteredProjects.length === 0 ? "No projects in this scope" : "Select a project"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredProjects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  <span className="font-mono text-xs">
-                    {p.team.slug}/{p.slug}
-                  </span>{" "}
-                  <span className="text-muted-foreground">— {p.name}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  );
+  const project = useAgentProjectStep(state, setState, setValid);
+  return <AgentProjectStepView {...project} state={state} setState={setState} />;
 }

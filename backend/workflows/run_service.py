@@ -20,6 +20,7 @@ def build_workflow_definition_run_input(
     organization_id: int | None = None,
     actor: Any = None,
     stage_bindings: dict | None = None,
+    trigger_kind: str,
 ):
     """Create the ``WorkflowRun`` mirror row and build the executor input.
 
@@ -30,6 +31,10 @@ def build_workflow_definition_run_input(
     deserializes, never a plain dict (#1036). The ``WorkflowRun`` is the
     executor's source of truth (stage executions key on its pk); the Temporal
     workflow id is derived from that pk.
+
+    ``trigger_kind`` (#2152) is what started the run, in the shared
+    vocabulary of ``core.run_trigger``. Required, so no caller can forget
+    it; the person is ``actor.user_id``.
     """
     from django.utils import timezone
 
@@ -50,6 +55,7 @@ def build_workflow_definition_run_input(
         started_at=timezone.now(),
         organization_id=organization_id,
         trigger_actor_user_id=getattr(actor, "user_id", None),
+        trigger_kind=trigger_kind,
     )
     workflow_id = f"WorkflowDefinitionRunWorkflow-{run.pk}"
     run.workflow_id = workflow_id
@@ -73,6 +79,7 @@ def start_workflow_definition_run(
     organization_id: int | None = None,
     actor: Any = None,
     stage_bindings: dict | None = None,
+    trigger_kind: str,
 ):
     """Create the ``WorkflowRun`` mirror and start the stage executor.
 
@@ -90,6 +97,7 @@ def start_workflow_definition_run(
         organization_id=organization_id,
         actor=actor,
         stage_bindings=stage_bindings,
+        trigger_kind=trigger_kind,
     )
 
     handle = start_workflow(

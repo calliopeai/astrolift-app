@@ -11,10 +11,8 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
-from astrolift_operations.models import (
-    AuditEvent,
-    AuditExport,
-)
+from astrolift_operations.models import AuditExport
+from astrolift_operations.schema.audit_list import audit_events_qs
 from astrolift_operations.schema.mutations.helpers import (
     _build_app_log_export_url,
     _build_audit_export_url,
@@ -35,6 +33,16 @@ from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _filter_snapshot(filter_input) -> dict:
+    """The export's ``filter`` input as JSON for ``filters_snapshot``."""
+    from astrolift_graphql import filter_values
+
+    return {
+        key: value.isoformat() if isinstance(value, dt.datetime) else value
+        for key, value in filter_values(filter_input).items()
+    }
 
 
 @strawberry.type
@@ -88,17 +96,20 @@ class ExportMutations:
         # contained every tenant's audit trail (bulk cross-org PII
         # exfil). org_id is non-None here (guarded above). Mirrors the
         # org scope on astroliftAuditEventsPage.
-        qs = AuditEvent.objects.filter(organization_id=org_id).order_by("occurred_at", "guid")
-        if input.action:
-            qs = qs.filter(action=input.action)
-        if input.decision:
-            qs = qs.filter(decision=input.decision.upper())
-        if input.actor_id:
-            qs = qs.filter(actor_id=input.actor_id)
-        if input.created_at_gte is not None:
-            qs = qs.filter(occurred_at__gte=input.created_at_gte)
-        if input.created_at_lte is not None:
-            qs = qs.filter(occurred_at__lte=input.created_at_lte)
+        qs = audit_events_qs(
+            org_id,
+            action=input.action,
+            decision=input.decision,
+            actor_id=input.actor_id,
+            created_at_gte=input.created_at_gte,
+            created_at_lte=input.created_at_lte,
+            search=input.search,
+            target_kind=input.target_kind,
+            target_id=input.target_id,
+            subject_user_id=input.subject_user_id,
+            filter=input.filter,
+            viewer_id=tenant.actor_user_id if tenant else None,
+        ).order_by("occurred_at", "guid")
 
         max_rows = max(1, int(getattr(constance_config, "AUDIT_EXPORT_MAX_ROWS", 100000)))
         candidate_count = qs.count()
@@ -155,6 +166,11 @@ class ExportMutations:
                 "actor_id": input.actor_id or "",
                 "created_at_gte": (input.created_at_gte.isoformat() if input.created_at_gte else ""),
                 "created_at_lte": (input.created_at_lte.isoformat() if input.created_at_lte else ""),
+                "search": input.search or "",
+                "target_kind": input.target_kind or "",
+                "target_id": input.target_id or "",
+                "subject_user_id": input.subject_user_id or "",
+                "filter": _filter_snapshot(input.filter),
             },
             expires_at=expires_at,
         )

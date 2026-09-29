@@ -147,12 +147,15 @@ export function EntityDetailShell({
   return (
     <PageShell
       title={
-        <span className="flex items-center gap-2">
-          <Link href={breadcrumb.href} className="text-muted-foreground hover:text-foreground">
+        <span className="flex min-w-0 items-center gap-2">
+          <Link
+            href={breadcrumb.href}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
             {breadcrumb.label}
           </Link>
-          <ChevronRightIcon className="text-muted-foreground size-4" />
-          <span>{heading}</span>
+          <ChevronRightIcon className="text-muted-foreground size-4 shrink-0" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{heading}</span>
         </span>
       }
       description={

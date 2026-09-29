@@ -11,19 +11,9 @@
  * config-repo audit happens in the page that mounts them.
  */
 
-export type WorkflowStatus =
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "terminated";
+export type WorkflowStatus = "running" | "completed" | "failed" | "cancelled" | "terminated";
 
-export type ActivityStatus =
-  | "pending"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled";
+export type ActivityStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
 
 export interface ActivityAttempt {
   attemptNumber: number;

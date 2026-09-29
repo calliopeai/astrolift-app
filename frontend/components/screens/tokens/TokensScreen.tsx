@@ -1,0 +1,435 @@
+"use client";
+
+import {
+  AlertTriangleIcon,
+  CableIcon,
+  CheckCircle2Icon,
+  CopyIcon,
+  KeyIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
+import * as React from "react";
+
+import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { adminCrumbs } from "@/components/screens/administration/insights/header";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { AstroliftApiToken } from "@/graphql/identity/identity.types";
+
+import type { useTokens } from "./use-tokens";
+
+export type TokensScreenProps = ReturnType<typeof useTokens> & {
+  /** The scope picker in the create sheet; it loads the scope catalog, so the
+   *  route supplies it and it only fetches while the sheet is open. */
+  renderScopePicker: (props: {
+    value: string[];
+    onChange: (next: string[]) => void;
+  }) => React.ReactNode;
+};
+
+/** An admin token with no expiry, or one more than 90 days out (#2120). */
+function isLongLivedAdmin(t: AstroliftApiToken): boolean {
+  if (!t.scopes.includes("admin") || t.isRevoked) return false;
+  if (!t.expiresAt) return true;
+  return new Date(t.expiresAt).getTime() - Date.now() > 90 * 24 * 60 * 60 * 1000;
+}
+
+const DEFAULT_SELECTED_SCOPES: string[] = ["read:apps", "read:clusters", "mcp:read"];
+
+/**
+ * Admin › API keys (spec 44 §5.1): the org's tokens on the shared list,
+ * views All · Mine · Active · Revoked, cursor paged, revoke in each row's
+ * `⋯`. The MCP endpoint and the one-time plaintext reveal sit above the
+ * filters. Holds only UI state (the create form, the revoke confirm);
+ * everything that talks to the server comes in from useTokens.
+ */
+export function TokensScreen({
+  list,
+  rows,
+  totalCount,
+  nextCursor,
+  loading,
+  stale,
+  error,
+  onRetry,
+  creating,
+  revoking,
+  createdToken,
+  onDismissCreated,
+  mcpEndpoint,
+  onCreate,
+  onRevoke,
+  onCopyPlaintext,
+  onCopyMcpEndpoint,
+  renderScopePicker,
+}: TokensScreenProps) {
+  const [open, setOpen] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [expiresInDays, setExpiresInDays] = React.useState("90");
+  const [selectedScopes, setSelectedScopes] = React.useState<string[]>(DEFAULT_SELECTED_SCOPES);
+  const [revokeTarget, setRevokeTarget] = React.useState<AstroliftApiToken | null>(null);
+
+  function resetForm() {
+    setName("");
+    setExpiresInDays("90");
+    setSelectedScopes(DEFAULT_SELECTED_SCOPES);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const ok = await onCreate({ name, expiresInDays, scopes: selectedScopes });
+    if (ok) {
+      resetForm();
+      setOpen(false);
+    }
+  }
+
+  const columns: Column<AstroliftApiToken>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cellClassName: "max-w-64 font-medium",
+      cell: (t) => (
+        <span className="block truncate" title={t.name}>
+          {t.name}
+        </span>
+      ),
+    },
+    {
+      id: "suffix",
+      header: "Suffix",
+      width: "w-28",
+      cellClassName: "font-mono text-xs",
+      cell: (t) => `…${t.tokenLast4}`,
+    },
+    {
+      id: "scopes",
+      header: "Scopes",
+      cell: (t) => (
+        <div className="flex flex-wrap gap-1">
+          {t.scopes.length === 0 ? (
+            <span className="text-muted-foreground text-xs">none</span>
+          ) : (
+            t.scopes.map((s) => (
+              <Badge key={s} variant="outline" className="text-2xs font-mono">
+                {s}
+              </Badge>
+            ))
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "canDo",
+      header: "Can do",
+      width: "w-36",
+      cell: (t) => (
+        <Tooltip>
+          {/* Above the row's stretched link, or the overlay eats the hover. */}
+          <TooltipTrigger asChild>
+            <span className="relative z-10 inline-flex cursor-help items-center gap-1 text-xs">
+              {isLongLivedAdmin(t) && (
+                <AlertTriangleIcon
+                  className="text-warning-fg size-3.5"
+                  aria-label="Long-lived admin token"
+                />
+              )}
+              {t.effectivePermissions.length} permission
+              {t.effectivePermissions.length === 1 ? "" : "s"}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-sm">
+            {isLongLivedAdmin(t) && (
+              <p className="mb-1 font-medium">
+                Admin with no near expiry. Replace it with a narrower token.
+              </p>
+            )}
+            <p className="opacity-75">What its scopes allow and its owner&apos;s roles grant:</p>
+            <p className="text-2xs font-mono [overflow-wrap:anywhere]">
+              {t.effectivePermissions.join(", ") || "nothing"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ),
+    },
+    {
+      id: "lastUsed",
+      header: "Last used",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (t) => <LastUsedCell token={t} />,
+    },
+    {
+      id: "created",
+      header: "Created",
+      width: "w-28",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (t) => new Date(t.createdAt).toLocaleDateString(),
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      width: "w-28",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (t) => (t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"),
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: "w-28",
+      cell: (t) =>
+        t.isRevoked ? (
+          <Badge variant="destructive" className="gap-1">
+            <AlertTriangleIcon className="size-3" />
+            revoked
+          </Badge>
+        ) : (
+          <Badge variant="secondary">active</Badge>
+        ),
+    },
+  ];
+
+  const notice = (
+    <>
+      {createdToken && (
+        <Card className="border-success-border bg-success/5">
+          <CardContent className="flex flex-col gap-3 p-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
+              <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+                Token <span className="font-mono">{createdToken.apiToken.name}</span> created
+              </p>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Copy the value below now — it&apos;s never shown again. We store only the SHA-256 hash
+              and the last 4 characters.
+            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="bg-background min-w-0 flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
+                {createdToken.plaintext}
+              </code>
+              <Button size="sm" variant="outline" onClick={onCopyPlaintext}>
+                <CopyIcon className="size-4" />
+                Copy
+              </Button>
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" variant="ghost" onClick={onDismissCreated}>
+                I&apos;ve saved it — dismiss
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 font-medium">
+                <CableIcon className="size-4" /> Remote agent MCP
+              </div>
+              <p className="text-muted-foreground max-w-3xl text-xs">
+                Connect CI or coding clients over authenticated Streamable HTTP. Send an API token
+                as <code>Authorization: Bearer alft_at_…</code>. MCP scopes still require the token
+                owner&apos;s matching agent permissions; secret values are not exposed.
+              </p>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="bg-muted min-w-0 rounded px-2 py-1.5 font-mono text-xs [overflow-wrap:anywhere]">
+                {mcpEndpoint}
+              </code>
+              <Button size="sm" variant="outline" onClick={onCopyMcpEndpoint}>
+                <CopyIcon className="size-4" /> Copy URL
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline">mcp:read · inspect packages/tasks</Badge>
+            <Badge variant="outline">mcp:dispatch · run/kill</Badge>
+            <Badge variant="outline">mcp:write · sync repos</Badge>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+
+  return (
+    <TooltipProvider>
+      <ListPage<AstroliftApiToken>
+        header={{
+          crumbs: adminCrumbs("tokens", "API keys"),
+          title: "API keys",
+          context:
+            "Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation.",
+          primaryAction: (
+            <Can permission="api_token.create">
+              <Button onClick={() => setOpen(true)}>
+                <PlusIcon className="size-4" />
+                New token
+              </Button>
+            </Can>
+          ),
+        }}
+        notice={notice}
+        list={list}
+        label="API keys"
+        columns={columns}
+        rows={rows}
+        getRowId={(t) => t.id}
+        rowHref={(t) => `/tokens/${t.id}`}
+        rowActions={(t) => (
+          <Can permission="api_token.revoke">
+            <DropdownMenuItem
+              disabled={revoking || t.isRevoked}
+              onSelect={() => setRevokeTarget(t)}
+            >
+              <Trash2Icon className="size-4" />
+              Revoke
+            </DropdownMenuItem>
+          </Can>
+        )}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
+        empty={{
+          icon: <KeyIcon className="size-5" />,
+          title: "No API keys",
+          description:
+            "Create one to authenticate the CLI, CI runs, or your own scripts against the platform.",
+        }}
+      />
+
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) resetForm();
+        }}
+      >
+        <SheetContent className="flex flex-col">
+          <SheetHeader>
+            <SheetTitle>New API token</SheetTitle>
+            <SheetDescription>
+              The plaintext is shown exactly once after creation. Save it somewhere secure —
+              there&apos;s no way to retrieve it later.
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div className="space-y-2">
+              <Label htmlFor="token-name">Name</Label>
+              <Input
+                id="token-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ci-runner-prod"
+                autoFocus
+                required
+              />
+              <p className="text-muted-foreground text-xs">
+                Descriptive — appears in the audit log next to every action this token takes.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Scopes</Label>
+              <p className="text-muted-foreground text-xs">
+                A token can only narrow what you can do: it gets the permissions below that your
+                roles also grant.
+              </p>
+              {renderScopePicker({ value: selectedScopes, onChange: setSelectedScopes })}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="token-expires">Expires in (days)</Label>
+              <Input
+                id="token-expires"
+                type="number"
+                min={1}
+                max={365}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(e.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Leave 0 or empty for no expiry. Default 90 days, max 365.
+              </p>
+            </div>
+            <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating || !name || selectedScopes.length === 0}>
+                {creating ? "Creating…" : "Create token"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={revokeTarget ? `Revoke token ${revokeTarget.name}?` : "Revoke token?"}
+        description="Existing CLIs and bots using this token stop working immediately. There's no way to un-revoke — mint a new token if you need to restore access."
+        confirmLabel="Revoke token"
+        destructive
+        onConfirm={async () => {
+          if (revokeTarget) await onRevoke(revokeTarget);
+        }}
+      />
+    </TooltipProvider>
+  );
+}
+
+function LastUsedCell({ token }: { token: AstroliftApiToken }) {
+  if (!token.lastUsedAt) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const ts = new Date(token.lastUsedAt).toLocaleString();
+  const hasMeta = Boolean(token.lastUsedIp || token.lastUsedAgent);
+  if (!hasMeta) {
+    return <span>{ts}</span>;
+  }
+  return (
+    <Tooltip>
+      {/* Above the row's stretched link, or the overlay eats the hover and
+          the IP / user-agent forensics never open. */}
+      <TooltipTrigger asChild>
+        <span className="relative z-10 cursor-help underline decoration-dotted underline-offset-2">
+          {ts}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm">
+        <p className="text-2xs font-mono">IP: {token.lastUsedIp ?? "—"}</p>
+        {token.lastUsedAgent && (
+          <p className="text-2xs font-mono break-all opacity-75">UA: {token.lastUsedAgent}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}

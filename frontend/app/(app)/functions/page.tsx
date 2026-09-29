@@ -14,9 +14,11 @@ export const metadata = { title: "Functions · Astrolift" };
  * - Scale: horizontal to zero between invocations (Knative Serving)
  * - Billing model: per-invocation, not per-pod-hour
  *
- * The runtime layer hasn't shipped: the signal tabs (throughput / errors /
- * latency / logs, folded in from /observe/functions — #892) are gateway
- * placeholders until a query backs them, and the copy says so.
+ * The runtime layer hasn't shipped, so the page is the function list
+ * (spec 44 §5.1). The four signal placeholders folded in from
+ * /observe/functions (#892) had no query behind them and a second row of
+ * tabs; they return as the function's own Logs & metrics once the runtime
+ * reports them.
  */
 export default function FunctionsPage() {
   return <FunctionsClient />;

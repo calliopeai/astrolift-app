@@ -4,12 +4,11 @@ from django.db.models import Q
 
 from astrolift_identity.api_tokens import get_current_api_token, token_scope_allows_permission
 from astrolift_identity.models import Project, Team
+from astrolift_identity.permission_resolver import share_levels
 from astrolift_identity.scope_visibility import visible_apps, visible_projects, visible_teams
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
 from core.permissions import Permission, PermissionScope, ScopeKind, granted_scopes
 from core.tenancy import get_current_tenant
-
-_READ_PERMISSIONS = {Permission.AGENT_READ, Permission.APP_READ, Permission.AGENT_TASK_WATCH}
 
 
 def _shares(team_ids, permission):
@@ -21,8 +20,8 @@ def _shares(team_ids, permission):
 
 
 def _share_levels(permission):
-    levels = [AppTeamAccess.AccessLevel.DEPLOYER, AppTeamAccess.AccessLevel.OWNER]
-    return [AppTeamAccess.AccessLevel.VIEWER, *levels] if permission in _READ_PERMISSIONS else levels
+    # One rule for the lists here and the permission resolver (#2157).
+    return share_levels(permission)
 
 
 def _permitted_apps(qs, permission):

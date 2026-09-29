@@ -692,9 +692,12 @@ def probe_cluster_capabilities(
     )
     service_mesh = _classify_service_mesh(crds)
 
+    # kube-system too: an external-dns installed there by hand (as the AWS
+    # guides do) read as absent, so the recipe offered to install a second
+    # one that would fight it over the zone (#2119).
     external_dns_pods = pods_by_namespace.get("external-dns", []) + [
         p
-        for p in platform_pods
+        for p in platform_pods + pods_by_namespace.get("kube-system", [])
         if "external-dns" in str(p.get("name", ""))
         or p.get("labels", {}).get("app.kubernetes.io/name", "") == "external-dns"
     ]

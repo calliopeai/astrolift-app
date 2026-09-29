@@ -146,6 +146,9 @@ _BLESSED_BASE_HELPERS: frozenset[str] = frozenset(
         "_scoped_qs",
         "for_org",
         "scoped_to_org",
+        # astrolift_clusters: the caller's org plus shared clusters, and
+        # nothing when there is no org (fail closed).
+        "_clusters_qs",
     }
 )
 

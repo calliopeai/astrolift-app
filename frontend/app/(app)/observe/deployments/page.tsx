@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-// The per-primitive OBSERVE mirror was folded into the primitive's own page
-// (#892) — signal tabs live at /deployments now. Redirect so old links land.
+// The per-primitive OBSERVE mirror duplicated the deployments list (#892);
+// Apps › Deployments is the one list now. Redirect so old links land.
 export default function ObserveDeploymentsPage() {
   redirect("/deployments");
 }

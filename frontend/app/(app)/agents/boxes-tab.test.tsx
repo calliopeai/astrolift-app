@@ -28,7 +28,13 @@ vi.mock("@apollo/client/react", () => ({
       return {
         data: {
           agentEnvironmentSpecs: [
-            { id: "s1", slug: "claude-dev", name: "Claude Dev", runtime: "claude", agentType: "claude" },
+            {
+              id: "s1",
+              slug: "claude-dev",
+              name: "Claude Dev",
+              runtime: "claude",
+              agentType: "claude",
+            },
           ],
         },
         previousData: undefined,
@@ -52,6 +58,12 @@ vi.mock("@apollo/client/react", () => ({
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+// The list keeps its state in the URL; there is no app router under test.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
 
 function box(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -82,7 +94,9 @@ describe("BoxesTab", () => {
       data: { ensureAgentBox: { ok: true, errors: [], data: { slug: "box-claude-dev-abcd1234" } } },
     });
     state.destroy = vi.fn().mockResolvedValue({
-      data: { destroyAgentBox: { ok: true, errors: [], data: { slug: "box-claude-dev-abcd1234" } } },
+      data: {
+        destroyAgentBox: { ok: true, errors: [], data: { slug: "box-claude-dev-abcd1234" } },
+      },
     });
   });
 
@@ -113,7 +127,9 @@ describe("BoxesTab", () => {
     render(<BoxesTab orgId="org-1" />);
 
     expect(
-      screen.getByText("astro exec --app box-claude-dev-abcd1234 -- tmux new-session -A -s astrolift"),
+      screen.getByText(
+        "astro exec --app box-claude-dev-abcd1234 -- tmux new-session -A -s astrolift"
+      )
     ).toBeInTheDocument();
   });
 

@@ -1,19 +1,18 @@
-import { LIST_APP_DEPLOY_TOKENS } from "@/graphql/lifecycle/lifecycle.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { AppDeployTokensClient } from "./tokens-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = { title: "Deploy tokens · App · Astrolift" };
-
-export default async function AppDeployTokensPage({
+/**
+ * Deploy tokens are Access › Deploy tokens now (spec 44 §5.2). The old URL
+ * keeps resolving, with whatever query it carried.
+ */
+export default async function AppTokensRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={LIST_APP_DEPLOY_TOKENS} variables={{ appSlug: slug }}>
-      <AppDeployTokensClient slug={slug} />
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "access", "tokens", await searchParams));
 }

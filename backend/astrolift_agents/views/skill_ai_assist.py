@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -65,10 +64,13 @@ def skill_ai_assist(request: HttpRequest) -> JsonResponse:
     if not request.user.is_authenticated:
         return JsonResponse({"error": "authentication required"}, status=401)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        log.warning("skill_ai_assist: ANTHROPIC_API_KEY not set")
-        return JsonResponse({"error": "AI assist not configured"}, status=503)
+    from astrolift_agents.services.platform_model import PlatformModelError, complete, resolve
+
+    # The install's own cloud model by default, no key needed.
+    model, reason = resolve()
+    if model is None:
+        log.warning("skill_ai_assist: no platform model: %s", reason)
+        return JsonResponse({"error": "AI assist not configured", "reason": reason}, status=503)
 
     try:
         body = json.loads(request.body)
@@ -80,18 +82,9 @@ def skill_ai_assist(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "description is required"}, status=400)
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=_SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": description},
-            ],
-        )
-        output = message.content[0].text
-    except Exception as exc:
-        log.exception("skill_ai_assist: Anthropic call failed: %s", exc)
+        output = complete(model, system=_SYSTEM_PROMPT, prompt=description, max_tokens=1024)
+    except PlatformModelError as exc:
+        log.exception("skill_ai_assist: model call failed: %s", exc)
         return JsonResponse({"error": "AI assist request failed"}, status=502)
 
     return JsonResponse({"output": output})

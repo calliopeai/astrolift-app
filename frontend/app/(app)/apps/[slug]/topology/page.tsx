@@ -1,23 +1,18 @@
-import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { TopologyClient } from "./topology-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = {
-  title: "Topology · Astrolift",
-};
-
-export default async function AppTopologyPage({
+/**
+ * Topology is a panel on Overview now (spec 44 §5.2). The old URL keeps
+ * resolving, with whatever query it carried.
+ */
+export default async function AppTopologyRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery query={LIST_WORKLOADS} variables={{ appSlug: slug }}>
-        <TopologyClient slug={slug} />
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "overview", null, await searchParams));
 }

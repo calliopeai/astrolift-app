@@ -48,6 +48,7 @@ from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
     CLI_DEVICE_SCOPES,
+    CLI_OPERATOR_DEVICE_SCOPES,
     DEFAULT_SCOPES,
     with_active_org_member,
 )
@@ -173,7 +174,7 @@ def normalize_client_kind(kind: str | None) -> str:
     if not kind:
         return "cli"
     k = kind.strip().lower()
-    if k in {"cli", "mobile", "browser", "ide"}:
+    if k in {"cli", "cli-operator", "mobile", "browser", "ide"}:
         return k
     return "cli"
 
@@ -186,7 +187,12 @@ def token_scopes_for_client_kind(client_kind: str | None) -> list[str]:
     receives those narrow capabilities. Mobile, IDE, and browser enrollment
     retain the read-only baseline. RBAC remains the second gate in every case.
     """
-    if normalize_client_kind(client_kind) == "cli":
+    kind = normalize_client_kind(client_kind)
+    if kind == "cli-operator":
+        # ``astro auth login --scope clusters`` (#2120). The approval page
+        # lists these scopes, so the approver sees the cluster surface asked for.
+        return list(CLI_OPERATOR_DEVICE_SCOPES)
+    if kind == "cli":
         return list(CLI_DEVICE_SCOPES)
     return list(DEFAULT_SCOPES)
 

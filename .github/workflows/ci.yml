@@ -622,8 +622,31 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      # Despite the job's name, it also typechecks and runs vitest (#2128).
+      - name: Typecheck
+        run: npm run typecheck
       - name: Test
         run: npm test
+      # The design-system catalog (spec 44 §8). `npm test` renders every story;
+      # this proves the catalog itself still builds.
+      - name: Build the component catalog
+        run: npm run build-storybook
+      # Spec 44 §6 and §8: every long-string and 768px story, and every
+      # dialog and sheet, rendered in Chromium from that build and checked for
+      # a horizontal page scroll, text past its dialog, sheet or table frame,
+      # anything past the story's own 768px frame, and page errors
+      # (e2e/layout.spec.ts). About 735 stories, under 3 minutes on 4 workers.
+      - name: Install Chromium for the layout test
+        run: npx playwright install --with-deps chromium
+      - name: Layout at 768px
+        run: npm run test:layout
+      # The production build is the only check that sees the server/client
+      # boundary: a server page calling into a "use client" module passes
+      # lint, typecheck and vitest and then fails the image build on main.
+      - name: Build the app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen
