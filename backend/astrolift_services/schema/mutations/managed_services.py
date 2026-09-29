@@ -18,6 +18,11 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
+from astrolift_identity.operation_context import (
+    managed_service_operation,
+    named_environment,
+    project_service_creation_operation,
+)
 from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
@@ -259,7 +264,11 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.provision")
-    @require_permission(Permission.PROJECT_UPDATE, scope=project_scope_by_guid("input.project_id"))
+    @require_permission(
+        Permission.PROJECT_UPDATE,
+        scope=project_scope_by_guid("input.project_id"),
+        operation=project_service_creation_operation,
+    )
     @tenant_scoped()
     def provision_project_managed_service(
         self,
@@ -423,7 +432,9 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="project.managed_service.attach")
     @require_permission(
-        Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+        Permission.PROJECT_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def attach_project_managed_service(
@@ -527,7 +538,11 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.update")
-    @require_permission(Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.PROJECT_UPDATE,
+        scope=managed_service_scope_by_guid("input.id"),
+        operation=managed_service_operation("input.id"),
+    )
     @tenant_scoped()
     def update_project_managed_service(
         self,
@@ -609,7 +624,9 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="project.managed_service.reprovision")
     @require_permission(
-        Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+        Permission.PROJECT_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def reprovision_project_managed_service(
@@ -636,7 +653,11 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="project.managed_service.deprovision")
     @requires_elevation(action_label="project.managed_service.deprovision")
-    @require_permission(Permission.PROJECT_UPDATE, scope=managed_service_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.PROJECT_UPDATE,
+        scope=managed_service_scope_by_guid("input.id"),
+        operation=managed_service_operation("input.id"),
+    )
     @tenant_scoped()
     def deprovision_project_managed_service(
         self,
@@ -658,7 +679,9 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.provision")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+    )
     @tenant_scoped()
     def provision_managed_service(
         self,
@@ -776,7 +799,11 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.update")
-    @require_permission(Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=managed_service_scope_by_guid("input.id"),
+        operation=managed_service_operation("input.id"),
+    )
     @tenant_scoped()
     def update_managed_service(
         self,
@@ -873,7 +900,9 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="managed_service.reprovision")
     @require_permission(
-        Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+        Permission.APP_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def reprovision_managed_service(
@@ -956,7 +985,11 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="managed_service.deprovision")
-    @require_permission(Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=managed_service_scope_by_guid("input.id"),
+        operation=managed_service_operation("input.id"),
+    )
     @tenant_scoped()
     def deprovision_managed_service(
         self,
@@ -1036,7 +1069,11 @@ class ManagedServiceMutations:
         ),
     )
     @requires_elevation(action_label="managed_service.resource.adopt")
-    @require_permission(Permission.MANAGED_SERVICE_ADOPT, scope=managed_service_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.MANAGED_SERVICE_ADOPT,
+        scope=managed_service_scope_by_guid("input.id"),
+        operation=managed_service_operation("input.id"),
+    )
     @tenant_scoped()
     def adopt_managed_resource(
         self,
@@ -1156,6 +1193,7 @@ class ManagedServiceMutations:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("input.managed_service_id"),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def reveal_managed_service_connection(
@@ -1299,7 +1337,9 @@ class ManagedServiceMutations:
         ),
     )
     @require_permission(
-        Permission.APP_UPDATE, scope=managed_service_scope_by_guid("input.managed_service_id")
+        Permission.APP_UPDATE,
+        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def test_model_endpoint(

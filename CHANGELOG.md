@@ -95,6 +95,11 @@
   the remaining gaps outside the agent surfaces are tracked per area there.
   Still open (#2102): agent secret refs are confined per org only, so a spec
   writer can bind another team's secret location.
+- Deployment, run and secret permission gates now carry the resolved environment,
+  cluster region and durable approval total (#2164). Environment-specific policies
+  leave other environments usable; app-wide writes check all affected environments,
+  and exact workflow controls cannot borrow approvals from another execution.
+
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
   `restore.snapshot_id` and `restore.source_handle` came from the manifest

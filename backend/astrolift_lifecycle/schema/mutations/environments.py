@@ -8,6 +8,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import environment_operation
 from astrolift_lifecycle.models import (
     AppEnvironment,
 )
@@ -29,7 +30,11 @@ from core.tenancy import get_current_tenant
 class EnvironmentMutations:
     @strawberry.field
     @mutation_audit(action="environment.pause")
-    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=environment_app_scope("input.id"),
+        operation=environment_operation("input.id"),
+    )
     @tenant_scoped()
     def pause_environment(
         self, info: Info, input: EnvironmentByIdInput
@@ -60,7 +65,11 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.resume")
-    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=environment_app_scope("input.id"),
+        operation=environment_operation("input.id"),
+    )
     @tenant_scoped()
     def resume_environment(
         self, info: Info, input: EnvironmentByIdInput
@@ -86,7 +95,11 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.pause_ingress")
-    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=environment_app_scope("input.id"),
+        operation=environment_operation("input.id"),
+    )
     @tenant_scoped()
     def pause_app_ingress(
         self, info: Info, input: EnvironmentByIdInput
@@ -121,7 +134,11 @@ class EnvironmentMutations:
 
     @strawberry.field
     @mutation_audit(action="environment.resume_ingress")
-    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=environment_app_scope("input.id"),
+        operation=environment_operation("input.id"),
+    )
     @tenant_scoped()
     def resume_app_ingress(
         self, info: Info, input: EnvironmentByIdInput

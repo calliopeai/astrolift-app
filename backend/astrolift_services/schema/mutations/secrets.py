@@ -10,6 +10,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import reveal_secret_operation, secret_write_operation
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import (
@@ -68,7 +69,9 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.set", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.set")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def set_app_secret(
         self,
@@ -155,7 +158,9 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.rotate", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.rotate")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def rotate_app_secret(
         self,
@@ -238,7 +243,9 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.delete", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.delete")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def delete_app_secret(
         self,
@@ -306,7 +313,9 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.metadata.set", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.metadata.set")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def set_app_secret_metadata(
         self,
@@ -431,7 +440,9 @@ class SecretMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.bulk_import")
     @requires_elevation(action_label="app.secret.bulk_import")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def bulk_import_app_secrets(
         self,
@@ -512,7 +523,10 @@ class SecretMutations:
     )
     @requires_elevation(action_label="app.secret.reveal")
     @require_permission(
-        Permission.APP_READ, Permission.SECRET_READ, scope=app_scope_by_slug("input.app_slug")
+        Permission.APP_READ,
+        Permission.SECRET_READ,
+        scope=app_scope_by_slug("input.app_slug"),
+        operation=reveal_secret_operation,
     )
     @tenant_scoped()
     def reveal_app_secret(

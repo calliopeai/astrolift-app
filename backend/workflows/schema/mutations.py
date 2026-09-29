@@ -9,6 +9,7 @@ from django.db.models import Q
 from graphql import GraphQLError
 from strawberry.types import Info
 
+from astrolift_identity.operation_context import agent_region_operation, instance_operation
 from core.decorators import tenant_scoped
 from core.permissions import (
     Permission,
@@ -263,7 +264,9 @@ class Mutation:
     # skips a disabled definition of the org's for an enabled template, so
     # the scope resolves the same row it runs (#1965).
     @require_permission(
-        Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug", enabled_only=True)
+        Permission.WORKFLOW_TRIGGER,
+        scope=definition_scope_by_slug("workflow_slug", enabled_only=True),
+        operation=agent_region_operation,
     )
     @tenant_scoped()
     def run_workflow_definition(
@@ -359,7 +362,11 @@ class Mutation:
         )
 
     @strawberry.mutation(description="Transition a workflow instance to a new state.")
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=instance_scope_by_id("instance_id"))
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=instance_scope_by_id("instance_id"),
+        operation=instance_operation("instance_id"),
+    )
     @tenant_scoped()
     def transition_workflow(
         self,

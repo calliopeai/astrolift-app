@@ -9,6 +9,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import preview_creation_operation, row_operation
 from astrolift_lifecycle.models import (
     AppEnvironment,
     Deployment,
@@ -94,7 +95,11 @@ def _pinning_user(info: Info):
 class PreviewMutations:
     @strawberry.field
     @mutation_audit(action="preview.tear_down")
-    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=preview_environment_app_scope("input.id"),
+        operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
+    )
     @tenant_scoped()
     def tear_down_preview(
         self, info: Info, input: TearDownPreviewInputGql
@@ -156,7 +161,11 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.extend_ttl")
-    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=preview_environment_app_scope("input.id"),
+        operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
+    )
     @tenant_scoped()
     def extend_preview_ttl(
         self, info: Info, input: ExtendPreviewTtlInputGql
@@ -216,7 +225,11 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.set_pinned", target=_set_preview_pinned_target)
-    @require_permission(Permission.APP_DEPLOY, scope=preview_environment_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=preview_environment_app_scope("input.id"),
+        operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
+    )
     @tenant_scoped()
     def set_preview_pinned(
         self, info: Info, input: SetPreviewPinnedInput
@@ -280,7 +293,9 @@ class PreviewMutations:
 
     @strawberry.field
     @mutation_audit(action="preview.create_manual")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=preview_creation_operation
+    )
     @tenant_scoped()
     def create_preview_environment(
         self,

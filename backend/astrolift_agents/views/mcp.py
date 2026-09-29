@@ -92,6 +92,16 @@ TOOL_SCOPES: dict[str, Any] = {
 }
 
 
+def _operation_for_tool(name: str, args: dict[str, Any]):
+    from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
+
+    if name in {"astrolift_get_task", "astrolift_cancel_task"}:
+        return agent_task_operation("task_id")(args)[0]
+    if name in {"astrolift_get_agent", "astrolift_run_agent"}:
+        return agent_region_operation(args)[0]
+    return None
+
+
 def _token(request: HttpRequest):
     token = getattr(request, "_api_token", None)
     if token is None:
@@ -1010,15 +1020,19 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
         _validate_tool_arguments(meta, args)
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
         scopes = (meta["scope"], *meta.get("additional_scopes", ()))
-        declared = TOOL_SCOPES.get(name)
-        _authorize(
-            request,
-            scopes,
-            *(p for p in permissions if p is not None),
-            permission_scope=declared(args) if callable(declared) else None,
-            any_scope=declared == ANY_SCOPE,
-        )
-        payload = handler(request, args)
+        from astrolift_identity.abac import operation_attributes
+
+        operation = _operation_for_tool(name, args)
+        with operation_attributes(**(operation.attributes() if operation is not None else {})):
+            declared = TOOL_SCOPES.get(name)
+            _authorize(
+                request,
+                scopes,
+                *(p for p in permissions if p is not None),
+                permission_scope=declared(args) if callable(declared) else None,
+                any_scope=declared == ANY_SCOPE,
+            )
+            payload = handler(request, args)
     except Exception as exc:
         decision = "DENY" if isinstance(exc, McpCallError) else "UNKNOWN"
         _audit(

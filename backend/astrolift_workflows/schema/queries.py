@@ -22,6 +22,7 @@ from astrolift_graphql import (
     parse_sort_spec,
     search_q,
 )
+from astrolift_identity.operation_context import execution_operation, workflow_id_operation
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -243,7 +244,11 @@ def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None, org
     if org_wide:
         return True
     try:
-        check_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope(workflow_id, caller))
+        from astrolift_identity.abac import operation_attributes
+        from astrolift_identity.operation_context import workflow_operation
+
+        with operation_attributes(**workflow_operation(workflow_id).attributes()):
+            check_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope(workflow_id, caller))
     except PermissionDenied:
         return False
     return True
@@ -353,7 +358,11 @@ class TemporalWorkflowsQuery:
         return WorkflowInstancePageType(items=items, next_cursor=next_cursor)
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
+    @require_permission(
+        Permission.AUDIT_LOG_READ,
+        scope=workflow_run_scope_by_id("workflow_id"),
+        operation=workflow_id_operation("workflow_id"),
+    )
     @tenant_scoped()
     def astrolift_workflow_instance_detail(
         self,
@@ -385,7 +394,11 @@ class TemporalWorkflowsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
+    @require_permission(
+        Permission.AUDIT_LOG_READ,
+        scope=workflow_run_scope_by_id("workflow_id"),
+        operation=workflow_id_operation("workflow_id"),
+    )
     @tenant_scoped()
     def astrolift_workflow_instance(
         self,
@@ -512,7 +525,9 @@ class WorkflowsQuery:
     exists; the org match is the actual scoping)."""
 
     @strawberry.field(description="Recorded stage history of an exact owned execution, newest first.")
-    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=execution_scope_by_id(), operation=execution_operation
+    )
     @tenant_scoped()
     def workflow_execution_stages(
         self,
@@ -529,7 +544,9 @@ class WorkflowsQuery:
     @strawberry.field(
         description="One owned execution by the WorkflowRun ID returned on dispatch or its GUID."
     )
-    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=execution_scope_by_id(), operation=execution_operation
+    )
     @tenant_scoped()
     def workflow_execution(self, info: Info, execution_id: strawberry.ID) -> WorkflowExecutionType | None:
         from astrolift_workflows.execution_controls import execution_state, find_execution

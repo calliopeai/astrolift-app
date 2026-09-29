@@ -12,6 +12,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import secret_proposal_operation, secret_write_operation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
@@ -56,7 +57,9 @@ class SecretChangeMutations:
 
     @strawberry.field
     @mutation_audit(action="app.secret.proposal.create")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+    )
     @tenant_scoped()
     def propose_secret_change(
         self,
@@ -216,7 +219,9 @@ class SecretChangeMutations:
         extras=_overrides_at_apply_extra,
     )
     @require_permission(
-        Permission.SECRET_APPROVE, scope=secret_change_proposal_app_scope("input.proposal_id")
+        Permission.SECRET_APPROVE,
+        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        operation=secret_proposal_operation(),
     )
     @tenant_scoped()
     def approve_secret_change(
@@ -314,7 +319,9 @@ class SecretChangeMutations:
         target=_proposal_target_from_input,
     )
     @require_permission(
-        Permission.SECRET_APPROVE, scope=secret_change_proposal_app_scope("input.proposal_id")
+        Permission.SECRET_APPROVE,
+        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        operation=secret_proposal_operation(),
     )
     @tenant_scoped()
     def reject_secret_change(
@@ -413,7 +420,11 @@ class SecretChangeMutations:
         action="app.secret.proposal.withdraw",
         target=_proposal_target_from_input,
     )
-    @require_permission(Permission.APP_UPDATE, scope=secret_change_proposal_app_scope("input.proposal_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        operation=secret_proposal_operation(),
+    )
     @tenant_scoped()
     def withdraw_secret_change(
         self,

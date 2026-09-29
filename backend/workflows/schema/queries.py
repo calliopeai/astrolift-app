@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from django.db.models import Q
 from strawberry.types import Info
 
+from astrolift_identity.operation_context import instance_operation, workflow_id_operation
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -52,9 +51,11 @@ class Query:
     # .WorkflowsQuery`` (spec 40 §6, #968).
 
     @strawberry.field(description="Get a workflow instance by ID.")
-    @require_permission(Permission.WORKFLOW_READ, scope=instance_scope_by_id("id"))
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=instance_scope_by_id("id"), operation=instance_operation("id")
+    )
     @tenant_scoped()
-    def workflow_instance(self, info: Info, id: strawberry.ID) -> Optional[WorkflowInstanceType]:
+    def workflow_instance(self, info: Info, id: strawberry.ID) -> WorkflowInstanceType | None:
         # The caller's own org only: a foreign org's instance, and a legacy
         # org-less one, resolve to nothing. Unlike a definition, an instance
         # is not shared platform content (#1965).
@@ -67,7 +68,7 @@ class Query:
         self,
         info: Info,
         object_id: int,
-        model_label: Optional[str] = None,
+        model_label: str | None = None,
     ) -> list[WorkflowInstanceType]:
         org_pk = _caller_org_pk()
         qs = WorkflowInstance.objects.filter(object_id=object_id, organization_id=org_pk)
@@ -107,7 +108,9 @@ class Query:
 
     @strawberry.field(description="List stage executions for a WorkflowRun (by workflow_id + run_id).")
     @require_permission(
-        Permission.WORKFLOW_READ, scope=workflow_run_scope_by_id("workflow_id", run_field="run_id")
+        Permission.WORKFLOW_READ,
+        scope=workflow_run_scope_by_id("workflow_id", run_field="run_id"),
+        operation=workflow_id_operation("workflow_id"),
     )
     @tenant_scoped()
     def workflow_stage_executions(

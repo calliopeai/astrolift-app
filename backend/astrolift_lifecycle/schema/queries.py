@@ -20,6 +20,7 @@ from astrolift_graphql import (
     search_q,
 )
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
+from astrolift_identity.operation_context import deployment_operation, row_operation
 from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import (
     AgentRun,
@@ -974,7 +975,9 @@ class LifecycleQuery:
         return page.map(lambda d: deployment_to_type(d, viewer_user_id=viewer))
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ, scope=deployment_app_scope("id"), operation=deployment_operation("id")
+    )
     @tenant_scoped()
     def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
         """Single deployment by guid, scoped to the caller's org (#1118).
@@ -1001,7 +1004,11 @@ class LifecycleQuery:
         return deployment_to_type(d, viewer_user_id=_viewer_user_id(info)) if d else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_approval_history(
         self,
@@ -1087,7 +1094,11 @@ class LifecycleQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_release_notes(self, info: Info, deployment_id: str) -> ReleaseNotesType | None:
         """Merged-PR descriptions + non-merge commit subjects between the
@@ -1229,7 +1240,11 @@ class LifecycleQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
         # Look up the deployment by guid, scoped to the caller's org (the
@@ -1312,7 +1327,13 @@ class LifecycleQuery:
         return page.map(scheduled_job_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=scheduled_job_run_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=scheduled_job_run_app_scope("id"),
+        operation=row_operation(
+            "astrolift_lifecycle.ScheduledJobRun", "id", app_path="app_environment__registered_app"
+        ),
+    )
     @tenant_scoped()
     def astrolift_scheduled_job_run(self, info: Info, id: str) -> ScheduledJobRunType | None:
         """Single scheduled-job run by guid, for cold detail deep-links (#1118).
@@ -2461,7 +2482,13 @@ class LifecycleQuery:
         return page.map(task_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=task_run_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=task_run_app_scope("id"),
+        operation=row_operation(
+            "astrolift_lifecycle.TaskRun", "id", app_path="app_environment__registered_app"
+        ),
+    )
     @tenant_scoped()
     def astrolift_task_run(self, info: Info, id: str) -> TaskRunType | None:
         """Single task run by guid, for cold detail deep-links (#1118).

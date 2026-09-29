@@ -22,6 +22,11 @@ from astrolift_graphql import (
     search_q,
 )
 from astrolift_identity.models import Project
+from astrolift_identity.operation_context import (
+    managed_service_operation,
+    named_environment,
+    secret_proposal_operation,
+)
 from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -570,12 +575,15 @@ _MODEL_ENDPOINT_FILTERS: dict[str, FilterField] = {
     ),
     "app": FilterField(q=lambda v: _iexact_any("registered_app__slug", v)),
     "cluster": FilterField(
-        q=lambda v: _iexact_any("tenant_cluster__slug", v)
-        | _iexact_any("app_environment__tenant_cluster__slug", v)
+        q=lambda v: (
+            _iexact_any("tenant_cluster__slug", v) | _iexact_any("app_environment__tenant_cluster__slug", v)
+        )
     ),
     "owner_scope": FilterField(
-        q=lambda v: (Q(project__isnull=False) if "project" in v else Q(pk__in=[]))
-        | (Q(project__isnull=True) if "app" in v else Q(pk__in=[]))
+        q=lambda v: (
+            (Q(project__isnull=False) if "project" in v else Q(pk__in=[]))
+            | (Q(project__isnull=True) if "app" in v else Q(pk__in=[]))
+        )
     ),
     # ``deployed_by`` needs the viewer; the resolver applies it.
 }
@@ -857,7 +865,11 @@ class ServicesQuery:
         return [secret_bundle_to_type(row) for row in rows]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_app_secrets(
         self,
@@ -891,7 +903,11 @@ class ServicesQuery:
         return _list_app_secrets(app=app, env_names=env_names)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_app_secret_history(
         self,
@@ -1015,7 +1031,11 @@ class ServicesQuery:
         return [secret_bundle_to_type(b) for b in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_app_secret_bundle_attachments(
         self,
@@ -1069,7 +1089,11 @@ class ServicesQuery:
             "Postgres returns. Use astroliftManagedServicesPage."
         )
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_managed_services(
         self,
@@ -1083,7 +1107,11 @@ class ServicesQuery:
         return [managed_service_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_managed_services_page(
         self,
@@ -1117,7 +1145,11 @@ class ServicesQuery:
         return page.map(managed_service_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
+    )
     @tenant_scoped()
     def astrolift_managed_service_cost_preview(
         self,
@@ -1146,7 +1178,11 @@ class ServicesQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_workload_identity_grants(
         self,
@@ -1188,7 +1224,11 @@ class ServicesQuery:
         return [workload_identity_grant_to_type(row) for row in qs.order_by("scope", "role_name")]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
+    )
     @tenant_scoped()
     def astrolift_managed_service_objects(
         self,
@@ -1294,7 +1334,11 @@ class ServicesQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
+    )
     @tenant_scoped()
     def astrolift_managed_service_queue_depth(
         self,
@@ -1365,6 +1409,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_service_detail(
@@ -1436,6 +1481,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_templates(
@@ -1478,6 +1524,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_template(
@@ -1513,6 +1560,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_template_stats(
@@ -1558,6 +1606,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_messages(
@@ -1629,6 +1678,7 @@ class ServicesQuery:
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
         scope=managed_service_scope_by_guid("managed_service_id"),
+        operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
     def astrolift_email_engagement_metrics(
@@ -1712,7 +1762,11 @@ class ServicesQuery:
     # ---- Secret-change proposals (#488) ------------------------------
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def astrolift_secret_change_proposals(
         self,
@@ -1749,7 +1803,11 @@ class ServicesQuery:
         return [secret_change_proposal_to_type(p, info=info) for p in qs[:200]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=secret_change_proposal_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=secret_change_proposal_app_scope("id"),
+        operation=secret_proposal_operation("id"),
+    )
     @tenant_scoped()
     def astrolift_secret_change_proposal(
         self,
