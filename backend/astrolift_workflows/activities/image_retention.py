@@ -17,32 +17,45 @@ def _containers(value):
             yield from _containers(child)
 
 
-def retain_deployment_images(deployment, resources):
-    """Fail the rollout before apply if its ECR images cannot be protected."""
+def retain_deployment_image_refs(deployment, refs: list[str]) -> dict[str, str]:
+    """Protect image refs before any service or cluster write; persist owned pins."""
+    from django.db import transaction
+
+    from astrolift_lifecycle.models import Deployment
     from core.app_deploy import driver_for_capability
 
     cluster = deployment.app_environment.tenant_cluster
     if cluster.provider_plugin.slug != "aws":
-        return
-    containers = list(_containers(resources))
+        return {}
     pins = []
-    if containers:
+    if refs:
         driver = driver_for_capability(cluster, "registry")
         pins = driver.retain_deployment_images(
-            [container["image"] for container in containers],
+            refs,
             environment=str(deployment.app_environment.guid),
             deployment=str(deployment.guid),
         )
-    snapshot = dict(deployment.config_snapshot or {})
-    # Preserve earlier pins on a retry whose rendered image set changed.
-    prefix = f"retain-astrolift-{deployment.app_environment.guid.hex}-{deployment.guid.hex}-"
-    existing = [pin for pin in snapshot.get("ecr_retention_pins", []) if pin["tag"].startswith(prefix)]
-    by_tag = {(pin["repository"], pin["tag"]): pin for pin in [*existing, *pins]}
-    if by_tag or "ecr_retention_pins" in snapshot:
-        snapshot["ecr_retention_pins"] = list(by_tag.values())
-        deployment.config_snapshot = snapshot
-        deployment.save(update_fields=["config_snapshot", "updated_at", "version"])
-    resolved = {pin["source_ref"]: pin["pinned_ref"] for pin in pins}
+    # Different rollout stages may hold stale Deployment instances. Merge into
+    # the current locked snapshot so FaaS, build jobs, and workload pins survive.
+    with transaction.atomic():
+        current = Deployment.all_objects.select_for_update().get(pk=deployment.pk)
+        snapshot = dict(current.config_snapshot or {})
+        prefix = f"retain-astrolift-{deployment.app_environment.guid.hex}-{deployment.guid.hex}-"
+        existing = [pin for pin in snapshot.get("ecr_retention_pins", []) if pin["tag"].startswith(prefix)]
+        by_tag = {(pin["repository"], pin["tag"]): pin for pin in [*existing, *pins]}
+        if by_tag or "ecr_retention_pins" in snapshot:
+            snapshot["ecr_retention_pins"] = list(by_tag.values())
+            current.config_snapshot = snapshot
+            current.save(update_fields=["config_snapshot", "updated_at", "version"])
+        deployment.config_snapshot = current.config_snapshot
+        deployment.version = current.version
+    return {pin["source_ref"]: pin["pinned_ref"] for pin in pins}
+
+
+def retain_deployment_images(deployment, resources):
+    """Fail the rollout before apply if its ECR images cannot be protected."""
+    containers = list(_containers(resources))
+    resolved = retain_deployment_image_refs(deployment, [container["image"] for container in containers])
     for container in containers:
         container["image"] = resolved.get(container["image"], container["image"])
 

@@ -165,7 +165,7 @@ class ECRDriver(ImageRegistryDriver):
                     raise ProviderError(f"cannot retain deployment image {ref}: image unavailable")
                 image = images[0]
                 digest = image["imageId"]["imageDigest"]
-                tag = prefix + digest.removeprefix("sha256:")[:12]
+                tag = prefix + digest.removeprefix("sha256:")
                 kwargs = {
                     "repositoryName": repo,
                     "imageManifest": image["imageManifest"],

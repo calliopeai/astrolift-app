@@ -204,3 +204,37 @@ def test_running_snapshot_keeps_retention_evidence(app, env, registry):
     assert current.status == Deployment.Status.RUNNING
     assert current.config_snapshot["ecr_retention_pins"] == pins
     assert current.config_snapshot["image_tag"] == current.image_tag
+
+
+@pytest.mark.parametrize("fail", [True, False])
+def test_retention_gate_precedes_secret_deletion_and_writes(app, env, registry, monkeypatch, fail):
+    from astrolift_workflows.activities.app_lifecycle import _update_secrets_sync
+
+    current = deployment(app, env)
+    registry.fail = fail
+    calls = []
+
+    class ClusterDriver:
+        def apply_manifests(self, cluster_slug, namespace, manifests, *, dry_run=False):
+            current.refresh_from_db()
+            assert current.config_snapshot["ecr_retention_pins"]
+            assert dry_run
+            assert manifests[0]["spec"]["template"]["spec"]["containers"][0]["image"].endswith("@" + DIGEST)
+            calls.append("dry_run")
+            return SimpleNamespace(ok=True)
+
+        def delete_manifests(self, *args, **kwargs):
+            calls.append("delete")
+
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda d: (ClusterDriver(), SimpleNamespace(slug="test"), "acme"),
+    )
+    monkeypatch.setattr("core.app_deploy.render_resources_for_deployment", lambda d: resources())
+    if fail:
+        with pytest.raises(RuntimeError, match="retention unavailable"):
+            _update_secrets_sync(current.pk)
+        assert calls == []
+    else:
+        assert _update_secrets_sync(current.pk) == 0
+        assert calls == ["dry_run", "delete"]

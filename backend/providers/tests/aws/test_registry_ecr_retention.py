@@ -109,3 +109,33 @@ def test_tag_and_digest_ref_retains_canonical_digest(registry):
         [f"{repo.uri}:sha-abc@{digest}"], environment=str(uuid4()), deployment=str(uuid4())
     )
     assert pins[0]["pinned_ref"] == f"{repo.uri}@{digest}"
+
+
+def test_mutable_repository_pins_distinguish_full_digest(ecr_client):
+    from botocore.stub import Stubber
+
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012", image_tag_mutability="MUTABLE"),
+        client=ecr_client,
+    )
+    environment, deployment = str(uuid4()), str(uuid4())
+    digests = ["sha256:" + "a" * 12 + suffix * 52 for suffix in ("b", "c")]
+    prefix = f"retain-astrolift-{environment.replace('-', '')}-{deployment.replace('-', '')}-"
+    refs = ["123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api:" + tag for tag in ("v1", "v2")]
+    with Stubber(ecr_client) as stubber:
+        for ref, digest in zip(refs, digests, strict=True):
+            image = {"imageId": {"imageDigest": digest}, "imageManifest": "{}"}
+            stubber.add_response(
+                "batch_get_image",
+                {"images": [image]},
+                {"repositoryName": "acme/api", "imageIds": [{"imageTag": ref.rsplit(":", 1)[1]}]},
+            )
+            stubber.add_response(
+                "put_image",
+                {"image": image},
+                {"repositoryName": "acme/api", "imageManifest": "{}", "imageTag": prefix + digest[7:]},
+            )
+        pins = driver.retain_deployment_images(refs, environment=environment, deployment=deployment)
+        stubber.assert_no_pending_responses()
+    assert len({pin["tag"] for pin in pins}) == 2
+    assert {pin["digest"] for pin in pins} == set(digests)

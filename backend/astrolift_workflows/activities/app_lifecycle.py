@@ -1211,7 +1211,10 @@ def _dry_run_deploy_set(
     """
     from core.app_deploy import AppDeployError, render_resources_for_deployment
 
+    from astrolift_workflows.activities.image_retention import retain_deployment_images
+
     workloads = render_resources_for_deployment(d)
+    retain_deployment_images(d, workloads)
     dry = cluster_driver.apply_manifests(cluster_slug, namespace, [*secrets, *workloads], dry_run=True)
     if not dry.ok:
         raise AppDeployError(

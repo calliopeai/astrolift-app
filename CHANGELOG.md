@@ -6,8 +6,10 @@
   by the API, and reports server or network failures in a toast (#2173).
 
 - AWS deployments and rollbacks protect ECR images with immutable per-environment,
-  per-deployment tags before applying workloads, and pin container references to
-  the protected digest. Successful rollout history retains ten deployments per
+  per-deployment tags before writing Secrets or applying workloads, and pin
+  container references to the protected digest. Tags include the full digest to
+  prevent collisions in adopted mutable repositories. Each rollout stage merges
+  into the current snapshot so previously protected images keep their pins. Successful rollout history retains ten deployments per
   workload; live, failed and in-flight deployments remain protected. Repositories
   enroll in the preview-first age/count cleanup job on creation or adoption
   (calliopeai/astrolift-opscode#69).
