@@ -16,13 +16,18 @@ STARTUP = Path(__file__).resolve().parents[2] / "startup.py"
 
 @pytest.fixture
 def startup(monkeypatch, tmp_path):
-    commands = []
-    system_calls = []
-    results = {}
+    commands: list[str] = []
+    system_calls: list[str] = []
+    results: dict[str, int] = {}
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("DJANGO_CONFIGURATION", "prd")
     monkeypatch.setitem(sys.modules, "uvicorn", SimpleNamespace())
-    monkeypatch.setattr("os.system", lambda command: system_calls.append(command) or 0)
+
+    def system(command):
+        system_calls.append(command)
+        return 0
+
+    monkeypatch.setattr("os.system", system)
 
     def run_command(command, *, shell, text, capture_output):
         assert shell and text and capture_output
