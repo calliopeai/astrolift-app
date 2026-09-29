@@ -55,9 +55,7 @@ class AppearanceError(ValueError):
 def _luminance(hex_colour: str) -> float:
     n = int(hex_colour[1:], 16)
     channels = [((n >> shift) & 255) / 255 for shift in (16, 8, 0)]
-    r, g, b = [
-        c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels
-    ]
+    r, g, b = (c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels)
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
@@ -82,9 +80,7 @@ def validate_appearance(raw: Any) -> dict[str, Any]:
     for key, value in raw.items():
         allowed = _ALLOWED.get(key)
         if allowed is None:
-            raise AppearanceError(
-                f"unknown appearance key {key!r}; allowed: {', '.join(sorted(_ALLOWED))}"
-            )
+            raise AppearanceError(f"unknown appearance key {key!r}; allowed: {', '.join(sorted(_ALLOWED))}")
         # bool is an int subclass, and True would otherwise sneak past the
         # corners check as 1 — reject it explicitly.
         if key == "corners" and isinstance(value, bool):
