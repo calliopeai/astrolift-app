@@ -57,6 +57,10 @@ class TenantContextMiddleware(MiddlewareMixin):
     def process_request(self, request):
         from astrolift_identity.api_tokens import token_matches_organization
 
+        # Never inherit a previous request's ABAC attributes or policy cache
+        # on a reused worker thread, even on the early-return paths below.
+        _clear_request_attributes()
+
         api_token = getattr(request, "_api_token", None)
         if api_token is not None and not token_matches_organization(
             api_token, request.META.get(ORG_HEADER, "")
