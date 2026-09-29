@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.permissions import PermissionScope, ScopeKind
-from core.scope_args import read_guid
+from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
 
@@ -102,3 +102,33 @@ def task_run_app_scope(field: str = "id"):
         field,
         app_path="app_environment__registered_app",
     )
+
+
+def live_app_scope(field: str = "app_slug"):
+    """Scope on the live app named by slug, for the WebSocket surfaces
+    that stream from or shell into one: the log subscriptions and the exec
+    relay (#1866).
+
+    Resolves the same row those handlers act on: the live app with this
+    slug in the caller's org. A miss is an explicit org scope, not
+    ``None``: ``None`` runs the targetless check, where a selected team
+    stands in for the target (#1745), and a stream must never be
+    authorized by a team the app does not belong to.
+    """
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        org_id = _org_id()
+        slug = read_arg(args, field)
+        if org_id is not None and slug:
+            from astrolift_registry.models import RegisteredApp
+
+            app_id = (
+                RegisteredApp.objects.filter(organization_id=org_id, slug=str(slug), deleted_at__isnull=True)
+                .values_list("pk", flat=True)
+                .first()
+            )
+            if app_id is not None:
+                return PermissionScope(kind=ScopeKind.APP, id=app_id)
+        return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
+
+    return _scope

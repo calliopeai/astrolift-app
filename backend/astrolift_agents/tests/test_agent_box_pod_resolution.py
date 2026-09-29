@@ -231,9 +231,9 @@ def test_device_credentials_preserve_box_rbac_and_tenant_boundaries(
 
             # The relay's permission gate uses the same token ceiling and
             # real account grants. Its target check rejects foreign boxes.
-            assert _check_box_attach_permission.func(tenant_org_id=box_org.pk, actor_user_id=user.pk) == (
-                client_kind == "cli" and access == "allowed"
-            )
+            assert _check_box_attach_permission.func(
+                box_slug=box.slug, tenant_org_id=org.pk, actor_user_id=user.pk, api_token=token
+            ) == (client_kind == "cli" and access == "allowed")
     finally:
         reset_current_api_token(bound)
 

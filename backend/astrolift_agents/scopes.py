@@ -3,21 +3,24 @@
 Agent *workloads* are workloads like any other -- they belong to an app,
 so a gate that names one checks against that app.
 
-Agent tasks retain their recorded project/team scope. Without either,
-a live registered-agent definition supplies the app scope; tasks with
-no usable owner require an explicit org grant.
+Agent tasks and boxes retain their recorded project/team scope. Without
+either, a live registered-agent definition supplies the app scope; rows
+with no usable owner require an explicit org grant.
 
-Skills, tool definitions, environment specs and their secrets are
-org-level objects with no team, project or app of their own. There is no
-scope to resolve for those, and inventing one would be worse than the
-org check they already run: they are deliberately not covered here.
+Environment specs are owned by a project or a team, or shared by the org
+(#1866): a spec's writes check at its owner, and an org-shared spec's at
+the org.
+
+Skills, tool definitions, briefs and org skill repos are the org's
+catalog, with no team, project or app of their own, so their gates take
+the explicit org scope (``agent_org_scope``), never the selected team.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from core.permissions import Permission, PermissionScope, ScopeKind
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
 from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
@@ -30,6 +33,16 @@ def _org_id() -> int | None:
 def _org_scope():
     # A factory miss must not inherit the selected team/project (#1745).
     return PermissionScope(kind=ScopeKind.ORG, id=_org_id() or 0)
+
+
+def _token_owner_scope(scope, *, team_id, permission):
+    """A new owned resource must fit inside its credential's team ceiling."""
+    from astrolift_identity.api_tokens import get_current_api_token
+
+    token = get_current_api_token()
+    if token is not None and token.team_id is not None and token.team_id != team_id:
+        raise PermissionDenied(permission, scope, "owner is outside the credential's team")
+    return scope
 
 
 def agent_org_scope(_args):
@@ -76,6 +89,31 @@ def agent_trigger_scope(field: str = "slug"):
     return _scope
 
 
+def _owner_scope(row, org_id: int, permission) -> PermissionScope:
+    """A task's or box's scope: recorded project, else recorded team, else
+    its live agent definition's app, else explicit org. A stale recorded
+    owner never falls through to the next one."""
+    from astrolift_agents.visibility import app_permission_scope
+    from astrolift_registry.models import Workload
+
+    if row.project_id:
+        project = row.project
+        if project.organization_id == org_id and project.deleted_at is None:
+            return PermissionScope(kind=ScopeKind.PROJECT, id=project.pk)
+        return _org_scope()
+    if row.team_id:
+        team = row.team
+        if team.organization_id == org_id and team.deleted_at is None:
+            return PermissionScope(kind=ScopeKind.TEAM, id=team.pk)
+        return _org_scope()
+    definition = row.agent_definition
+    if definition is not None and definition.deleted_at is None and definition.kind == Workload.Kind.AGENT:
+        app = definition.registered_app
+        if app.organization_id == org_id and app.deleted_at is None:
+            return app_permission_scope(app, permission) or _org_scope()
+    return _org_scope()
+
+
 def agent_task_scope(field: str = "id", permission=Permission.AGENT_READ):
     """Recorded project/team, else live definition's app, else explicit org."""
 
@@ -86,31 +124,161 @@ def agent_task_scope(field: str = "id", permission=Permission.AGENT_READ):
         org_id = _org_id()
         if org_id is None:
             return _org_scope()
-        from astrolift_agents.visibility import agent_tasks, app_permission_scope
-        from astrolift_registry.models import Workload
+        from astrolift_agents.visibility import agent_tasks
 
         task = agent_tasks(org_id, permission).filter(guid=str(guid)).first()
         if task is None:
             return _org_scope()
-        if task.project_id:
-            project = task.project
-            if project.organization_id == org_id and project.deleted_at is None:
-                return PermissionScope(kind=ScopeKind.PROJECT, id=project.pk)
+        return _owner_scope(task, org_id, permission)
+
+    return _scope
+
+
+def agent_box_scope(field: str = "slug", permission=Permission.AGENT_READ):
+    """The box's scope, resolved through the rows ``permission`` reaches (#1866).
+
+    Same priority as a task. A box the caller cannot reach, and a miss,
+    take the explicit org scope.
+    """
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        slug = read_arg(args, field)
+        org_id = _org_id()
+        if not slug or org_id is None:
             return _org_scope()
-        if task.team_id:
-            team = task.team
-            if team.organization_id == org_id and team.deleted_at is None:
-                return PermissionScope(kind=ScopeKind.TEAM, id=team.pk)
+        from astrolift_agents.visibility import agent_boxes
+
+        box = agent_boxes(org_id, permission).filter(slug=str(slug)).first()
+        if box is None:
             return _org_scope()
-        definition = task.agent_definition
-        if (
-            definition is not None
-            and definition.deleted_at is None
-            and definition.kind == Workload.Kind.AGENT
-        ):
-            app = definition.registered_app
-            if app.organization_id == org_id and app.deleted_at is None:
-                return app_permission_scope(app, permission) or _org_scope()
+        return _owner_scope(box, org_id, permission)
+
+    return _scope
+
+
+def agent_box_ensure_scope(field: str = "input"):
+    """Where ``ensureAgentBox`` dispatches (#1866): the named agent's app,
+    else the named spec's owner, else the org.
+
+    A box runs in the scope of what launched it, so an image-only box and
+    a box on an org-shared spec are org-level boxes and need an org grant.
+    Everything resolves through the rows ``agent.dispatch`` reaches; the
+    service re-resolves the same rows and checks the spec against the agent.
+    """
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        org_id = _org_id()
+        if org_id is None:
+            return _org_scope()
+        from astrolift_agents.visibility import (
+            agent_by_slug,
+            app_permission_scope,
+            environment_specs,
+            spec_owner_scope,
+        )
+
+        agent_slug = read_arg(args, f"{field}.agent_slug")
+        if agent_slug:
+            workload = agent_by_slug(org_id, str(agent_slug).strip(), Permission.AGENT_DISPATCH)
+            if workload is None:
+                return _org_scope()
+            return app_permission_scope(workload.registered_app, Permission.AGENT_DISPATCH) or _org_scope()
+        spec_slug = read_arg(args, f"{field}.environment_spec_slug")
+        if spec_slug:
+            spec = (
+                environment_specs(org_id, Permission.AGENT_DISPATCH)
+                .filter(slug=str(spec_slug).strip())
+                .first()
+            )
+            if spec is not None:
+                scope = spec_owner_scope(spec)
+                if scope.kind == ScopeKind.ORG:
+                    return _token_owner_scope(scope, team_id=None, permission=Permission.AGENT_DISPATCH)
+                return scope
+            return _org_scope()
+        if read_arg(args, field) is not None:
+            return _token_owner_scope(_org_scope(), team_id=None, permission=Permission.AGENT_DISPATCH)
         return _org_scope()
+
+    return _scope
+
+
+def agent_env_spec_scope(field: str = "slug", permission=Permission.AGENT_ENV_SPEC_UPDATE):
+    """The spec's owner scope, resolved through the rows ``permission``
+    reaches (#1866). An org-shared spec, one the caller cannot reach, and a
+    miss take the explicit org scope."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        slug = read_arg(args, field)
+        org_id = _org_id()
+        if not slug or org_id is None:
+            return _org_scope()
+        from astrolift_agents.visibility import (
+            check_org_shared_spec_write,
+            environment_specs,
+            spec_owner_scope,
+        )
+
+        spec = environment_specs(org_id, permission).filter(slug=str(slug)).first()
+        if spec is not None and spec.team_id is None and spec.project_id is None:
+            return check_org_shared_spec_write(org_id, permission)
+        return spec_owner_scope(spec) if spec is not None else _org_scope()
+
+    return _scope
+
+
+def agent_env_spec_owner_scope(field: str = "input"):
+    """Where a new spec will be owned (#1866): the named project, else the
+    named team, else the org (an org-shared spec). An owner that is not a
+    live row of the caller's org takes the explicit org scope."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        org_id = _org_id()
+        if org_id is None:
+            return _org_scope()
+        from astrolift_identity.models import Project, Team
+
+        project_guid = read_guid(args, f"{field}.project_id")
+        if project_guid:
+            project = Project.objects.filter(guid=project_guid, organization_id=org_id).first()
+            if project is not None:
+                return _token_owner_scope(
+                    PermissionScope(kind=ScopeKind.PROJECT, id=project.pk),
+                    team_id=project.team_id,
+                    permission=Permission.AGENT_ENV_SPEC_CREATE,
+                )
+            return _org_scope()
+        team_guid = read_guid(args, f"{field}.team_id")
+        if team_guid:
+            team = Team.objects.filter(guid=team_guid, organization_id=org_id).first()
+            if team is not None:
+                return _token_owner_scope(
+                    PermissionScope(kind=ScopeKind.TEAM, id=team.pk),
+                    team_id=team.pk,
+                    permission=Permission.AGENT_ENV_SPEC_CREATE,
+                )
+            return _org_scope()
+        if read_arg(args, field) is not None:
+            from astrolift_agents.visibility import check_org_shared_spec_write
+
+            return check_org_shared_spec_write(org_id, Permission.AGENT_ENV_SPEC_CREATE)
+        return _org_scope()
+
+    return _scope
+
+
+def agent_project_scope(field: str = "project_id"):
+    """The live project a request names, in the caller's org, else the
+    explicit org scope."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        guid = read_guid(args, field)
+        org_id = _org_id()
+        if not guid or org_id is None:
+            return _org_scope()
+        from astrolift_identity.models import Project
+
+        project = Project.objects.filter(guid=guid, organization_id=org_id).first()
+        return PermissionScope(kind=ScopeKind.PROJECT, id=project.pk) if project else _org_scope()
 
     return _scope

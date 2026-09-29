@@ -83,6 +83,10 @@ calliopeai/calliope-installer#304).
 
 ## Conventions
 
+- **Request context cleanup**: request-ID and trace middleware consume their
+  context tokens once. Django can run both exception and response hooks for
+  the same request; error responses keep their original status and echoed
+  request ID while restoring the enclosing request context.
 - **Models**: Inherit from `Tracking` (audit) or `BaseCoreModel` (named entities with guid/slug)
 - **Soft deletes**: Set `deleted_at`, never call `.delete()` on business objects
 - **GraphQL**: Per-app `schema/types.py`, `queries.py`, `mutations.py`. Merged in `config/schema.py`
@@ -100,3 +104,26 @@ calliopeai/calliope-installer#304).
 python manage.py startapp myapp
 # Then: add to INSTALLED_APPS, create schema/, wire into config/schema.py, make migrations
 ```
+
+## ECR deployment retention
+
+AWS deploy and rollback activities protect their ECR images before workload
+apply with immutable `retain-astrolift-<environment>-<deployment>-<digest>` tags.
+The pins are recorded in `Deployment.config_snapshot.ecr_retention_pins`;
+container and init-container references are resolved to the protected digests.
+A pin failure blocks apply. After a successful rollout, pins belonging to
+superseded/rolled-back deployments outside the newest ten successful rollouts
+per environment/workload are retired. Live, failed and in-flight pins survive;
+a failed rollout can still have live pods. Retirement errors only log warnings.
+
+This complements the daily job in `astrolift-opscode/aws/modules/ecr-retention`:
+build images expire only when older than 14 days AND outside the newest ten
+tagged digests; untagged images expire after one day. The job starts in preview
+mode. The ECR provider enrolls repositories for cleanup on creation/adoption
+using `astrolift.io/ecr-retention=enabled`; the job discovers these automatically.
+Older repositories that skip provisioning can be enrolled by tag or explicit
+repository prefix. Existing
+pre-upgrade deployments and externally managed images need explicit retention
+pins before enabling deletion. Deploy-role IAM requires ECR BatchGetImage,
+DescribeImages, TagResource, PutImage and BatchDeleteImage; update separately managed roles
+before shipping this app change. The opscode environment ECS roles include them.

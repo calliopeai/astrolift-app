@@ -32,6 +32,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core.permissions import route_auth
 from core.utils.browser_guard import require_ui_header_for_session
 
 try:
@@ -69,6 +70,10 @@ _SYSTEM_PROMPT = (
 @csrf_exempt
 @require_ui_header_for_session
 @require_http_methods(["POST"])
+@route_auth(
+    credential="authenticated session (with the UI header) or API bearer",
+    scope="the caller's own entitlements in the active org; it reads no tenant rows",
+)
 def wayfinding_ask(request: HttpRequest) -> JsonResponse:
     """Answer a "where do I…" question over the routes this viewer can reach.
 

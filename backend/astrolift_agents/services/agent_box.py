@@ -1027,8 +1027,8 @@ def box_slug_for(*, environment_spec, agent, owner_id: int | None, image: str = 
 def ensure_agent_box(
     *,
     organization,
-    environment_spec_slug: str = "",
-    agent_slug: str = "",
+    environment_spec=None,
+    agent=None,
     image: str = "",
     name: str = "",
     idle_timeout_seconds: int | None = None,
@@ -1043,24 +1043,29 @@ def ensure_agent_box(
     A settled box (reaped, stopped, failed) is restarted *under its existing
     slug*, so idle-reaping never invalidates the address a client stored.
 
+    ``agent`` and ``environment_spec`` are rows the caller already resolved
+    through what it may dispatch (#1866): the resolver's gate checked the
+    scope of exactly these rows, so this never looks them up again by slug,
+    where another app's agent of the same slug could answer. A spec named
+    beside an agent must be one that agent may run with.
+
     Raises :class:`AgentBoxEnsureError` for anything the caller did wrong and
     :class:`AgentBoxError` for anything the cluster did; both become a
     MutationResult failure rather than a 500.
     """
-    from astrolift_agents.models import AgentEnvironmentSpec
+    from astrolift_agents.visibility import spec_usable_by_app
     from astrolift_registry.models import Workload
 
-    spec_slug = (environment_spec_slug or "").strip()
-    agent_ref = (agent_slug or "").strip()
+    spec = environment_spec
     image_ref = (image or "").strip()
-    if not spec_slug and not agent_ref and not image_ref:
+    if spec is None and agent is None and not image_ref:
         raise AgentBoxEnsureError(
             "validation",
             "a box needs an agent, an environment spec, or an image to know what to run",
             "environmentSpecSlug",
         )
 
-    if image_ref and spec_slug:
+    if image_ref and spec is not None:
         # Mutually exclusive by construction, not by preference: a spec names
         # an image and so does this, and silently preferring one would make
         # the box's contents depend on which the caller happened to send
@@ -1078,32 +1083,25 @@ def ensure_agent_box(
             "idleTimeoutSeconds",
         )
 
-    spec = None
-    if spec_slug:
-        # Org-filtered explicitly: @tenant_scoped asserts a tenant, it does
-        # not filter. A foreign spec slug would otherwise pull that org's
-        # secret refs into a pod running in this one.
-        spec = AgentEnvironmentSpec.objects.filter(
-            organization=organization, slug=spec_slug, deleted_at__isnull=True
-        ).first()
-        if spec is None:
-            raise AgentBoxEnsureError("not_found", "environment spec not found", "environmentSpecSlug")
+    if spec is not None and spec.organization_id != organization.pk:
+        # A foreign spec would pull another org's secret refs into a pod
+        # running in this one.
+        raise AgentBoxEnsureError("not_found", "environment spec not found", "environmentSpecSlug")
 
-    agent = None
-    if agent_ref:
-        agent = (
-            Workload.objects.filter(
-                slug=agent_ref,
-                kind=Workload.Kind.AGENT,
-                registered_app__organization=organization,
-                registered_app__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app")
-            .first()
-        )
-        if agent is None:
+    if agent is not None:
+        if (
+            agent.kind != Workload.Kind.AGENT
+            or agent.deleted_at is not None
+            or agent.registered_app.organization_id != organization.pk
+            or agent.registered_app.deleted_at is not None
+        ):
             raise AgentBoxEnsureError("not_found", "agent not found", "agentSlug")
+        if spec is not None and not spec_usable_by_app(spec, agent.registered_app):
+            raise AgentBoxEnsureError(
+                "validation",
+                f"environment spec {spec.slug} belongs to another project or team than agent {agent.slug}",
+                "environmentSpecSlug",
+            )
         if agent.run_mode != Workload.RunMode.PERSISTENT:
             # Boxing a batch agent behind the operator's back would turn what
             # they configured into something that holds a node.
@@ -1136,6 +1134,29 @@ def ensure_agent_box(
     return box
 
 
+def _box_launch_owner(*, spec, agent) -> tuple[int | None, int | None]:
+    """``(team_id, project_id)`` a new box records (#1866).
+
+    A box ensured from an agent records nothing: it belongs to the agent's
+    app through ``agent_definition``. One ensured from a spec alone takes the
+    spec's owner; an org-shared spec or a bare image makes an org-level box.
+    """
+    if agent is not None or spec is None:
+        return None, None
+    return spec.team_id, spec.project_id
+
+
+def _box_scope_key(*, team_id, project_id, agent_app_id) -> tuple:
+    """The scope a box answers to, in the order its gates resolve it."""
+    if project_id is not None:
+        return ("project", project_id)
+    if team_id is not None:
+        return ("team", team_id)
+    if agent_app_id is not None:
+        return ("app", agent_app_id)
+    return ("org",)
+
+
 def _get_or_create_box(
     *,
     organization,
@@ -1160,6 +1181,7 @@ def _get_or_create_box(
     # ``AgentBox.objects`` is the soft-delete manager, so a retired box of the
     # same name is not resurrected here — it is history, and the constraint it
     # was released from lets a fresh one take the slug.
+    team_id, project_id = _box_launch_owner(spec=spec, agent=agent)
     box = AgentBox.objects.filter(organization=organization, slug=slug).first()
     created = False
     if box is None:
@@ -1170,6 +1192,8 @@ def _get_or_create_box(
             "owner": owner,
             "environment_spec": spec,
             "agent_definition": agent,
+            "team_id": team_id,
+            "project_id": project_id,
             "status": AgentBox.Status.PENDING,
         }
         if image:
@@ -1192,6 +1216,29 @@ def _get_or_create_box(
     if created:
         return box, True
 
+    # The slug is derived from the agent or spec slug and the owner, and
+    # agent slugs are unique per app, not per org: a live box launched in
+    # another scope can answer to the same address. It is never handed to
+    # this caller, whose gate checked the scope it asked for (#1866).
+    requested = _box_scope_key(
+        team_id=team_id,
+        project_id=project_id,
+        agent_app_id=agent.registered_app_id if agent is not None else None,
+    )
+    existing = _box_scope_key(
+        team_id=box.team_id,
+        project_id=box.project_id,
+        agent_app_id=(
+            box.agent_definition.registered_app_id if box.agent_definition_id is not None else None
+        ),
+    )
+    if box.is_live and existing != requested:
+        raise AgentBoxEnsureError(
+            "conflict",
+            f"box {slug} is running for another agent or spec; destroy it before ensuring this one",
+            "agentSlug" if agent is not None else "environmentSpecSlug",
+        )
+
     # An existing settled box is re-pointed at what the caller asked for
     # before it is restarted, so re-ensuring after editing an env spec picks
     # up the edit instead of silently restarting the old shape.
@@ -1207,6 +1254,8 @@ def _get_or_create_box(
     if not box.is_live:
         box.environment_spec = spec
         box.agent_definition = agent
+        box.team_id = team_id
+        box.project_id = project_id
         # The frozen image is also the input for image-only boxes. Clear a
         # prior spawn's value when ensure instead asks to resolve a recipe.
         box.image = image
@@ -1218,6 +1267,8 @@ def _get_or_create_box(
             update_fields=[
                 "environment_spec",
                 "agent_definition",
+                "team",
+                "project",
                 "image",
                 "name",
                 "idle_timeout_seconds",

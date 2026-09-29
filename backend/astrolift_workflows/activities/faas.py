@@ -154,6 +154,7 @@ def _lambda_config(w, *, repo_uri: str, digest: str, image_tag: str) -> dict[str
 
 def _ensure_faas_services_sync(deployment_id: int) -> dict[str, Any]:
     from astrolift_lifecycle.models import Deployment
+    from astrolift_workflows.activities.image_retention import retain_deployment_image_refs
 
     deployment = Deployment.objects.select_related(
         "registered_app__organization",
@@ -178,14 +179,23 @@ def _ensure_faas_services_sync(deployment_id: int) -> dict[str, Any]:
     repo_uri = (app.registry_repo_uri or "").strip()
     digest = (deployment.image_digest or "").strip()
     image_tag = (deployment.image_tag or "").strip()
+    configs = [(w, _lambda_config(w, repo_uri=repo_uri, digest=digest, image_tag=image_tag)) for w in faas]
+    image_refs = []
+    for workload, config in configs:
+        if config["package_type"] == "image":
+            if not config["image_uri"]:
+                raise RuntimeError(f"faas {workload.name}: no deployment image reference is available")
+            image_refs.append(config["image_uri"])
+    protected = retain_deployment_image_refs(deployment, image_refs)
 
     ensured: list[dict[str, str]] = []
-    for w in faas:
+    for w, fn_config in configs:
         fn_name, api_name = _service_names(w.name, env)
 
         # 1. Lambda first -- the api_gateway integration's target. Provision
         #    fully to ACTIVE so its function ARN exists before the API wires it.
-        fn_config = _lambda_config(w, repo_uri=repo_uri, digest=digest, image_tag=image_tag)
+        if fn_config.get("image_uri") in protected:
+            fn_config["image_uri"] = protected[fn_config["image_uri"]]
         fn_row = _ensure_service_row(
             app=app, env=env, kind="faas", name=fn_name, variant="lambda", config=fn_config
         )

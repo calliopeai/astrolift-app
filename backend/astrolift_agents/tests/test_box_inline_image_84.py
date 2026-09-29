@@ -94,13 +94,15 @@ def test_a_spec_and_an_image_together_are_refused(db):
     """Mutually exclusive by construction, not preference: a spec already
     names an image, and silently preferring one would make the box's contents
     depend on which field the caller happened to send."""
+    from astrolift_agents.models import AgentEnvironmentSpec
     from astrolift_agents.services.agent_box import ensure_agent_box
     from astrolift_identity.models import Organization
 
     org = Organization.objects.create(name="Acme", slug="acme")
+    spec = AgentEnvironmentSpec.objects.create(organization=org, name="Dev", slug="dev", agent_type="claude")
 
     with pytest.raises(AgentBoxEnsureError) as exc:
-        ensure_agent_box(organization=org, environment_spec_slug="dev", image=IMG_A)
+        ensure_agent_box(organization=org, environment_spec=spec, image=IMG_A)
 
     assert exc.value.field == "image"
     assert "not both" in exc.value.message
