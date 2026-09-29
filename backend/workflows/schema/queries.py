@@ -15,9 +15,9 @@ from workflows.schema.types import (
     WorkflowStageType,
 )
 from workflows.scopes import (
-    covered_project_ids,
     definition_scope_by_slug,
     instance_scope_by_id,
+    visible_project_owned,
     workflow_run_scope_by_id,
 )
 
@@ -72,9 +72,7 @@ class Query:
     ) -> list[WorkflowInstanceType]:
         org_pk = _caller_org_pk()
         qs = WorkflowInstance.objects.filter(object_id=object_id, organization_id=org_pk)
-        projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
-        if projects is not None:
-            qs = qs.filter(workflow__project_id__in=projects)
+        qs = visible_project_owned(qs, org_pk, Permission.WORKFLOW_READ, "workflow__project")
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 

@@ -61,10 +61,10 @@ from core.permissions import (
 )
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
-    covered_project_ids,
     definition_scope_by_slug,
     execution_scope_by_id,
     may_decide_human_gate,
+    visible_project_owned,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
@@ -290,12 +290,10 @@ def _visible_workflow_ids(
     visible = set(visible_runs(runs, caller, Permission.AUDIT_LOG_READ).values_list("workflow_id", flat=True))
     instance_only = owned - with_run
     if instance_only:
-        projects = covered_project_ids(caller, Permission.AUDIT_LOG_READ)
         instances = WorkflowInstance.objects.filter(
             temporal_workflow_id__in=instance_only, organization_id=caller, deleted_at__isnull=True
         )
-        if projects is not None:
-            instances = instances.filter(workflow__project_id__in=projects)
+        instances = visible_project_owned(instances, caller, Permission.AUDIT_LOG_READ, "workflow__project")
         visible |= set(instances.values_list("temporal_workflow_id", flat=True))
     return visible
 
@@ -443,9 +441,7 @@ def _workflows_qs(*, org_pk: int | None, search: str | None = None):
     qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
         "definition", "organization"
     )
-    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
-    if projects is not None:
-        qs = qs.filter(definition__project_id__in=projects)
+    qs = visible_project_owned(qs, org_pk, Permission.WORKFLOW_READ, "definition__project")
     if search:
         qs = qs.filter(
             search_q(
@@ -500,9 +496,7 @@ def _workflow_definitions_qs(
             )
         )
     )
-    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
-    if projects is not None:
-        qs = qs.filter(project_id__in=projects)
+    qs = visible_project_owned(qs, org_pk, Permission.WORKFLOW_READ, "project")
     if project_id is not None:
         try:
             qs = qs.filter(

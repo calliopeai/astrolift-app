@@ -99,6 +99,9 @@
   cluster region and durable approval total (#2164). Environment-specific policies
   leave other environments usable; app-wide writes check all affected environments,
   and exact workflow controls cannot borrow approvals from another execution.
+- Scoped policies now reduce collection rows and capabilities, including a grant
+  whose only app is denied; an allowed parent cannot restore a denied child (#2164).
+  Policy writes reject malformed conditions and selector shapes before saving.
 
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).

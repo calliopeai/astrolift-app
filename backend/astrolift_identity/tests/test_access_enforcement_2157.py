@@ -349,11 +349,13 @@ def test_derived_permission_sets_drop_what_a_policy_denies(world, deployer):
 
 
 def test_a_narrow_policy_does_not_empty_the_any_scope_answer(world, deployer):
-    """Only a policy covering the whole org can deny "anywhere"; a narrow
-    one still denies at the object gate."""
+    """A narrow policy removes its own target, while other targets remain usable."""
     _policy(world.org, resource={"app_slug": world.medops_app.slug})
     tenant = _tenant(world, deployer)
-    assert granted_scopes(tenant, DEPLOY).org is True
+    scopes = granted_scopes(tenant, DEPLOY)
+    assert scopes.org is False
+    assert world.medops_app.pk not in scopes.app_ids
+    assert world.platform_app.pk in scopes.app_ids
     assert resolve(tenant, DEPLOY, _app_scope(world.medops_app))[0] is False
 
 

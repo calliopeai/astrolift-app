@@ -39,3 +39,15 @@ operation cannot lend its facts to the next request.
 These facts are bound at user/API permission entry points, including MCP calls.
 Temporal activities execute the already authorized operation using its persisted
 target; they do not acquire a new user grant by trusting workflow inputs.
+
+Collection filters evaluate narrower app/project/team policies against concrete
+tenant-owned scopes. An allowed parent row does not restore a denied descendant.
+App navigation remains available when an app has an allowed environment; its
+operation controls still check their actual environment. A capability held only
+at denied scopes disappears from the capability manifest. Scope trees and policy
+facts are loaded in batches and cached only for the current request.
+
+Policy create and update validate condition JSON using the evaluator's catalog:
+known kinds and fields, nonempty string lists, valid IP ranges and time windows,
+IANA time zones, and positive integer approval/freshness limits. Invalid updates
+return a validation error before modifying any field or the policy version.

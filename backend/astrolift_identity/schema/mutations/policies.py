@@ -18,6 +18,7 @@ from astrolift_identity.models import (
     Organization,
     Policy,
 )
+from astrolift_identity.policy_validation import validate_policy_shape
 from astrolift_identity.schema.mutations.helpers import (
     _actor,
 )
@@ -74,6 +75,16 @@ class PolicyMutations:
                 field="slug",
             )
 
+        invalid = validate_policy_shape(
+            effect=input.effect,
+            conditions=input.conditions if input.conditions is not None else [],
+            resource_pattern=input.resource_pattern if input.resource_pattern is not None else {},
+            actor_pattern=input.actor_pattern if input.actor_pattern is not None else {},
+        )
+        if invalid:
+            field, message = invalid
+            return gql_failure(ErrorCode.VALIDATION.value, message, field=field)
+
         # Stamp the creator / updater off the active tenant context so
         # the policies table (#415) can render a Created-by column
         # without a follow-up audit-log join. Both columns are set to
@@ -113,6 +124,16 @@ class PolicyMutations:
         mismatch = _check_version_match(policy, if_match_version=input.if_match_version, kind="Policy")
         if mismatch is not None:
             return mismatch
+
+        invalid = validate_policy_shape(
+            **{
+                field: getattr(input, field) if getattr(input, field) is not None else getattr(policy, field)
+                for field in ("effect", "conditions", "resource_pattern", "actor_pattern")
+            }
+        )
+        if invalid:
+            field, message = invalid
+            return gql_failure(ErrorCode.VALIDATION.value, message, field=field)
 
         for field in (
             "name",

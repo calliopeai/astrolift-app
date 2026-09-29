@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import fnmatch
 import functools
 from collections.abc import Iterable
 from typing import Any
@@ -494,6 +495,89 @@ def _org_confined_bindings(tenant: TenantContext) -> list[Grant]:
     return [g for g in live if g.scope_id in allowed.get(g.scope_kind, set())]
 
 
+def _target_policies(tenant: TenantContext, slugs: Iterable[str]) -> bool:
+    from astrolift_identity import abac
+
+    attrs = abac.attributes_for(tenant.actor_user_id)
+    return any(
+        not abac.applies_everywhere(policy)
+        and any(fnmatch.fnmatchcase(slug, policy.action_pattern or "*") for slug in slugs)
+        for policy in abac.org_policies(tenant.organization_id, attrs)
+    )
+
+
+def _policy_scope_permissions(tenant: TenantContext, slugs: set[str]) -> dict[str, dict[int, set[str]]]:
+    """Concrete permitted scopes; a denied parent never lends inheritance.
+
+    Load the live scope tree and operation facts once per request. App
+    navigation is usable if at least one of its environments allows the
+    permission; individual operations still check their exact environment.
+    """
+    from astrolift_identity import abac
+    from astrolift_identity.models import Project, Team
+    from astrolift_identity.operation_context import OperationContext, environment_context
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+
+    attrs = abac.attributes_for(tenant.actor_user_id)
+    key = ("policy_scope_tree", tenant.organization_id)
+    if key not in attrs.cache:
+        org = ("ORG", tenant.organization_id)
+        points = [(org, [org], (OperationContext(),))]
+        teams = set(Team.objects.filter(organization_id=tenant.organization_id).values_list("pk", flat=True))
+        points.extend((("TEAM", ident), [("TEAM", ident), org], (OperationContext(),)) for ident in teams)
+        for ident, team_id, slug in Project.objects.filter(
+            organization_id=tenant.organization_id
+        ).values_list("pk", "team_id", "slug"):
+            attrs.cache[("slug", "PROJECT", ident)] = slug
+            chain = [("PROJECT", ident)]
+            if team_id in teams:
+                chain.append(("TEAM", team_id))
+            points.append((("PROJECT", ident), [*chain, org], (OperationContext(),)))
+        app_ids = []
+        for ident, slug in RegisteredApp.objects.filter(organization_id=tenant.organization_id).values_list(
+            "pk", "slug"
+        ):
+            app_ids.append(ident)
+            attrs.cache[("slug", "APP", ident)] = slug
+        environments = {}
+        for env in AppEnvironment.objects.filter(registered_app_id__in=app_ids).select_related(
+            "tenant_cluster"
+        ):
+            environments.setdefault(env.registered_app_id, []).append(environment_context(env))
+        for ident, chain in _app_scope_chains(tenant, app_ids).items():
+            points.append((("APP", ident), chain, tuple(environments.get(ident) or (OperationContext(),))))
+        attrs.cache[key] = (points, app_ids)
+    points, app_ids = attrs.cache[key]
+    grants = _org_confined_bindings(tenant)
+    shares = _share_grants(tenant, app_ids)
+    allowed = {kind: {} for kind in ("ORG", "TEAM", "PROJECT", "APP")}
+    for (kind, ident), chain, contexts in points:
+        covering = [grant for grant in grants if grant.covers(chain)]
+        candidates = {slug for grant in covering for slug in slugs if grant.carries(slug)}
+        # Team shares have a permission ceiling and must be evaluated with
+        # their real role at the shared app, as the object resolver does.
+        extra = shares.get(ident, ()) if kind == "APP" else ()
+        candidates.update(
+            slug
+            for share in extra
+            for slug in slugs
+            if share.grant.carries(slug) and share.access_level in share_levels(slug)
+        )
+        kept = set()
+        for context in contexts:
+            with abac.operation_attributes(**context.attributes()):
+                for slug in candidates:
+                    roles = [
+                        *covering,
+                        *(share.grant for share in extra if share.access_level in share_levels(slug)),
+                    ]
+                    kept.update(_abac_filter(tenant, {slug}, chain, roles))
+        if kept:
+            allowed[kind][ident] = kept
+    return allowed
+
+
 @_memoized
 def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScopes:
     """RoleBinding-backed :data:`core.permissions.GrantedScopesProvider`.
@@ -514,6 +598,17 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
         return NO_SCOPES
     if _denied_everywhere(tenant, [permission.value]):
         return NO_SCOPES
+    if _target_policies(tenant, [permission.value]):
+        allowed = _policy_scope_permissions(tenant, {permission.value})
+        return GrantedScopes(
+            org=False,
+            team_ids=frozenset(),
+            project_ids=frozenset(),
+            app_ids=frozenset(allowed["APP"]),
+            exact_team_ids=frozenset(allowed["TEAM"]),
+            exact_project_ids=frozenset(allowed["PROJECT"]),
+            org_only=bool(allowed["ORG"]),
+        )
 
     by_kind: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set(), "APP": set()}
     exact: dict[str, set[int]] = {"TEAM": set(), "PROJECT": set()}
@@ -564,7 +659,11 @@ def resolve_effective_permissions_anywhere(tenant: TenantContext) -> set[str]:
     effective: set[str] = set()
     for grant in _org_confined_bindings(tenant):
         effective.update(grant.role.permissions or ())
-    return effective - _denied_everywhere(tenant, effective)
+    effective -= _denied_everywhere(tenant, effective)
+    if _target_policies(tenant, effective):
+        allowed = _policy_scope_permissions(tenant, effective)
+        return {slug for scopes in allowed.values() for slugs in scopes.values() for slug in slugs}
+    return effective
 
 
 def _scope_ancestry(tenant: TenantContext, scope: PermissionScope) -> list[tuple[str, int]]:

@@ -389,11 +389,17 @@ def applies_everywhere(policy) -> bool:
 
     scope_ok = policy.scope_level == "ORG" or policy.scope_id is None
     actor = policy.actor_pattern if isinstance(policy.actor_pattern, dict) else None
+    operation_kinds = {kind.kind for kind in CONDITION_KINDS if kind.needs == "operation"}
+    operation_dependent = isinstance(policy.conditions, list) and any(
+        isinstance(condition, dict) and condition.get("kind") in operation_kinds
+        for condition in policy.conditions
+    )
     return (
         scope_ok
         and _pattern_is_empty(policy.resource_pattern)
         and actor is not None
         and not _values(actor.get("user_role_at_scope"))
+        and not operation_dependent
     )
 
 

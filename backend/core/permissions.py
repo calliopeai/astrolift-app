@@ -515,10 +515,14 @@ class GrantedScopes:
     # A reader that ignores these under-grants, which is the safe side.
     exact_team_ids: frozenset[int] = frozenset()
     exact_project_ids: frozenset[int] = frozenset()
+    # Policies may allow the org row while excluding descendants. This
+    # flag covers only org-owned rows, never teams/projects/apps.
+    org_only: bool = False
 
     def __bool__(self) -> bool:
         return (
             self.org
+            or self.org_only
             or bool(self.team_ids)
             or bool(self.project_ids)
             or bool(self.app_ids)
