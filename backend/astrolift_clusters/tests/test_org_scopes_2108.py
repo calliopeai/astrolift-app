@@ -288,9 +288,9 @@ def test_organization_grant_reaches_own_resources_with_selected_sibling_team(wor
     # Unavailable drivers can report a precondition; the scoped gate must
     # admit the org owner regardless of the request's selected team.
     if hasattr(result, "ok") and not result.ok:
-        assert all(error.code in {"PRECONDITION", "VALIDATION", "NOT_FOUND"} for error in result.errors), (
-            result
-        )
+        assert all(
+            error.code in {"PRECONDITION", "VALIDATION", "NOT_FOUND"} for error in result.errors
+        ), result
 
 
 @contextmanager
