@@ -11,17 +11,19 @@ export const metadata = { title: "Audit · Astrolift" };
 export default function AuditPage() {
   return (
     <>
-      {/* These variables have to be exactly the ones `useCursorTable`
-          asks for on its first page — Apollo keys the cache entry on
-          the variable set, so a stale `after`/`actorId` here would warm
-          an entry the client never reads and the table would still
-          paint its loading skeleton. */}
+      {/* These variables have to be exactly the ones `useAuditLog` sends
+          for the default list state (All, no chips, the feed's newest
+          page; see `auditVariables` and useCursorFeed, which leaves the
+          cursor off the newest page). Apollo keys the cache entry on the variable
+          set, so any difference warms an entry the client never reads
+          and the list would still paint its loading skeleton. */}
       <PreloadQuery
         query={LIST_AUDIT_EVENTS_PAGE}
         variables={{
           limit: 100,
           action: null,
           decision: null,
+          actorId: null,
           createdAtGte: null,
           createdAtLte: null,
           includeTotal: true,

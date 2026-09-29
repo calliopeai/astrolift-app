@@ -3,9 +3,7 @@
 import { useEffect } from "react";
 import { captureException } from "@/lib/sentry";
 import { maybeReloadOnChunkError } from "@/lib/chunk-reload";
-import { AlertCircleIcon } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { AppErrorScreen } from "@/components/screens/shell/AppErrorScreen";
 
 export default function Error({
   error,
@@ -22,31 +20,5 @@ export default function Error({
     captureException(error);
   }, [error]);
 
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-      <div className="bg-destructive/10 text-destructive rounded-full p-4">
-        <AlertCircleIcon className="h-8 w-8" />
-      </div>
-      <div>
-        <h2 className="text-lg font-semibold">Something went wrong</h2>
-        <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-          {error.message || "An unexpected error occurred. Please try again."}
-        </p>
-        {error.digest && (
-          <p className="text-muted-foreground mt-2 font-mono text-xs">Error ID: {error.digest}</p>
-        )}
-      </div>
-      {/* A deterministic error (bad param, persistent GraphQL failure) makes
-          reset() loop on the same failing subtree — always offer an escape to
-          a known-good page. */}
-      <div className="flex items-center gap-2">
-        <Button onClick={reset} variant="outline" size="sm">
-          Try again
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/dashboard">Go to dashboard</Link>
-        </Button>
-      </div>
-    </div>
-  );
+  return <AppErrorScreen message={error.message} digest={error.digest} onReset={reset} />;
 }

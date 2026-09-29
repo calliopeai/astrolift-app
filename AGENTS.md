@@ -19,6 +19,11 @@ conventions.
 7. **Tests against real Postgres + real Temporal**, not mocks.
 8. **Schema is the contract.** Backend change → `make schema` → `make codegen`.
 9. **No N+1 queries.** Prefetch / dataloader fan-out resolvers.
+10. **Storybook first.** No component reaches the app unless it is in
+   Storybook; screens are pure and built there against typed fixtures, and
+   `app/` routes only fetch data and render a screen. Enforced by a story-per-
+   component test and the `no-markup-in-app` lint rule. See
+   `frontend/bootstrap.md` › Storybook first.
 
 ## Pre-commit checklist
 

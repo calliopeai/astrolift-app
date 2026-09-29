@@ -1,22 +1,4 @@
-import { ConfigEditorClient } from "@/app/(app)/apps/[slug]/config/config-editor-client";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { formerAgentRoute } from "../components/former-route";
 
-import { AgentAppSurface } from "../components/agent-app-surface";
-
-export const metadata = { title: "Config · Agent · Astrolift" };
-
-export default async function AgentConfigPage({
-  params,
-}: {
-  params: Promise<{ agentSlug: string }>;
-}) {
-  const { agentSlug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug: agentSlug }}>
-      <AgentAppSurface agentSlug={agentSlug}>
-        <ConfigEditorClient slug={agentSlug} />
-      </AgentAppSurface>
-    </PreloadQuery>
-  );
-}
+/** Absorbed by the agent's tab row; redirects to where it lives now (AGENT_FORMER_ROUTES). */
+export default formerAgentRoute("config");

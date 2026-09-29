@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { preselected } from "./cluster-settings-client";
+import { preselected } from "@/components/screens/clusters/settings/types";
 
 // An install deletes every recipe release it is not given, and installs a
 // second copy of any controller it is given that already runs (#2119).

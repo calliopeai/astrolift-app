@@ -1,6 +1,5 @@
 "use client";
 
-import { useLazyQuery, useQuery } from "@apollo/client/react";
 import { ChevronDownIcon, ChevronRightIcon, GitBranchIcon } from "lucide-react";
 import * as React from "react";
 
@@ -22,56 +21,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { GET_APP_TRACES, GET_TRACE_SPANS } from "@/graphql/observability/observability.queries";
 import type { AstroliftAppTrace, AstroliftTraceSpan } from "@/graphql/__generated__/schema";
 
-interface TracesResp {
-  astroliftAppTraces: AstroliftAppTrace[];
+/** One trace's spans, loaded on first expand. */
+export interface TraceSpans {
+  loading: boolean;
+  spans: AstroliftTraceSpan[];
 }
 
-interface SpansResp {
-  astroliftTraceSpans: AstroliftTraceSpan[];
-}
+export type TraceStatusFilter = "ALL" | "OK" | "ERROR";
 
 export interface TraceExplorerPanelProps {
-  appSlug: string;
-  environmentName?: string | null;
+  traces: AstroliftAppTrace[];
+  loading: boolean;
+  statusFilter: TraceStatusFilter;
+  onStatusFilterChange: (filter: TraceStatusFilter) => void;
+  spans: Record<string, TraceSpans>;
+  onExpand: (traceId: string) => void;
 }
 
-type StatusFilter = "ALL" | "OK" | "ERROR";
+type StatusFilter = TraceStatusFilter;
 
-const TRACE_LOOKBACK_SECONDS = 3600;
-const TRACE_LIMIT = 50;
-
-export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPanelProps) {
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("ALL");
-
-  // Snapshot the range on mount via lazy state init so the query
-  // variables stay stable across re-renders (Date.now is impure and
-  // can't be called during render).
-  const [{ since, until }] = React.useState(() => {
-    const nowSec = Math.floor(Date.now() / 1000);
-    return {
-      since: String(nowSec - TRACE_LOOKBACK_SECONDS),
-      until: String(nowSec),
-    };
-  });
-
-  const { data, loading } = useQuery<TracesResp>(GET_APP_TRACES, {
-    variables: {
-      appSlug,
-      since,
-      until,
-      environmentName: environmentName ?? null,
-      status: statusFilter === "ALL" ? null : statusFilter,
-      limit: TRACE_LIMIT,
-    },
-    fetchPolicy: "cache-and-network",
-  });
-
-  const traces = data?.astroliftAppTraces ?? [];
-  const isInitialLoading = loading && !data;
-
+/** Pure (Storybook first): traces, filter and spans come from useTraceExplorer. */
+export function TraceExplorerPanel({
+  traces,
+  loading: isInitialLoading,
+  statusFilter,
+  onStatusFilterChange: setStatusFilter,
+  spans,
+  onExpand,
+}: TraceExplorerPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -86,10 +65,7 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">Status</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-            >
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
               <SelectTrigger size="sm" className="h-8 w-28">
                 <SelectValue />
               </SelectTrigger>
@@ -103,57 +79,61 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead>Root Service</TableHead>
-              <TableHead>Root Operation</TableHead>
-              <TableHead className="text-right">Spans</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isInitialLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={`skeleton-${i}`}>
-                  <TableCell />
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-48" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-8" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-12" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-12" />
+        {/* A bounded trace window, but expanded span trees grow it: the
+            table scrolls inside the card, never the page (list rule 1). */}
+        <div className="max-h-128 min-w-0 overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8" />
+                <TableHead>Root Service</TableHead>
+                <TableHead>Root Operation</TableHead>
+                <TableHead className="text-right">Spans</TableHead>
+                <TableHead className="text-right">Duration</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isInitialLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell />
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-48" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="ml-auto h-4 w-8" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="ml-auto h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : traces.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
+                    No traces — tracing backend not configured
                   </TableCell>
                 </TableRow>
-              ))
-            ) : traces.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
-                  No traces — tracing backend not configured
-                </TableCell>
-              </TableRow>
-            ) : (
-              traces.map((trace) => (
-                <TraceRow
-                  key={trace.traceId}
-                  trace={trace}
-                  appSlug={appSlug}
-                  environmentName={environmentName ?? null}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                traces.map((trace) => (
+                  <TraceRow
+                    key={trace.traceId}
+                    trace={trace}
+                    spans={spans[trace.traceId]}
+                    onExpand={onExpand}
+                  />
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -161,33 +141,21 @@ export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPa
 
 interface TraceRowProps {
   trace: AstroliftAppTrace;
-  appSlug: string;
-  environmentName: string | null;
+  spans: TraceSpans | undefined;
+  onExpand: (traceId: string) => void;
 }
 
-function TraceRow({ trace, appSlug, environmentName }: TraceRowProps) {
+function TraceRow({ trace, spans: loaded, onExpand }: TraceRowProps) {
   const [expanded, setExpanded] = React.useState(false);
-  const [fetchSpans, spansQuery] = useLazyQuery<SpansResp>(GET_TRACE_SPANS);
 
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && !spansQuery.called) {
-      void fetchSpans({
-        variables: {
-          appSlug,
-          traceId: trace.traceId,
-          environmentName,
-        },
-      });
-    }
+    if (next) onExpand(trace.traceId);
   };
 
   const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
-  // useLazyQuery returns DeepPartial<TData>; coerce here since the whole
-  // span shape lands or `data` is undefined (mirrors the settings panel
-  // helper).
-  const spans = (spansQuery.data?.astroliftTraceSpans as AstroliftTraceSpan[] | undefined) ?? [];
+  const spans = loaded?.spans ?? [];
 
   return (
     <>
@@ -212,7 +180,7 @@ function TraceRow({ trace, appSlug, environmentName }: TraceRowProps) {
       {expanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/20">
           <TableCell colSpan={6} className="py-3">
-            <SpanList loading={spansQuery.loading && !spansQuery.data} spans={spans} />
+            <SpanList loading={loaded?.loading ?? true} spans={spans} />
           </TableCell>
         </TableRow>
       )}
@@ -255,9 +223,7 @@ function SpanList({ loading, spans }: SpanListProps) {
         >
           <span className="font-mono">{span.operation}</span>
           <span className="text-muted-foreground font-mono">{span.service}</span>
-          <span className="text-muted-foreground font-mono">
-            {formatDuration(span.durationMs)}
-          </span>
+          <span className="text-muted-foreground font-mono">{formatDuration(span.durationMs)}</span>
           <StatusBadge code={span.statusCode} />
         </div>
       ))}

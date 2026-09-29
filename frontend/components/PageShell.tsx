@@ -65,7 +65,7 @@ export function PageShell({
   headerStorageKey,
   defaultHeaderOpen = true,
 }: PageShellProps) {
-  const { agentShell } = useAppChrome();
+  const { agentShell, framed } = useAppChrome();
   // Inside the agent shell (AgentDetailShell) the page header + BROCS pillar
   // tabs + platform-links row already frame the surface. Render this client's
   // body content-only — drop its own header and outer padding (the shell owns
@@ -73,6 +73,28 @@ export function PageShell({
   // the content column's `gap-6` rhythm.
   if (agentShell) {
     return <div className="flex flex-1 flex-col gap-6">{children}</div>;
+  }
+  // Inside the app frame (/apps/[slug]/*) the frame's header names the app
+  // and carries the tab row, so the title goes; the page's own description
+  // and actions stay, as a toolbar over the body.
+  if (framed) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        {(description || actions) && (
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {description ? (
+              <div className="text-muted-foreground min-w-0 text-sm [overflow-wrap:anywhere]">
+                {description}
+              </div>
+            ) : (
+              <span />
+            )}
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          </div>
+        )}
+        {children}
+      </div>
+    );
   }
   if (!collapsibleHeader) {
     return (

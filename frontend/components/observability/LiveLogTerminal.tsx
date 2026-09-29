@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { Loader2Icon } from "lucide-react";
@@ -8,26 +7,17 @@ import * as React from "react";
 
 import "@xterm/xterm/css/xterm.css";
 
-import { AGENT_TASK_LOGS } from "@/graphql/agents/agents.queries";
 import { cn } from "@/lib/utils";
 
-interface LogsResp {
-  agentTaskLogs: string[];
-}
-
-// Live-tail cadence. Faster than the run-detail's 5s status poll so streamed
-// output feels live, but only runs WHILE the run is active — see `pollInterval`.
-const POLL_MS = 2000;
-// Newest-N lines requested per poll when a caller doesn't narrow it.
-const DEFAULT_TAIL = 500;
-
 export interface LiveLogTerminalProps {
-  /** AgentTask id — the key `agentTaskLogs(id, tail)` is scoped by. */
+  /** AgentTask id; a new id wipes the buffer so the new run tails fresh. */
   taskId: string;
-  /** Live-tail (poll) only while the run is active; a terminal run fetches once. */
+  /** Whether the run is live; an empty terminal run reads "no output". */
   running: boolean;
-  /** Newest-N lines to request each poll (default {@link DEFAULT_TAIL}). */
-  tail?: number;
+  /** The newest lines, a sliding window; null before the first answer. */
+  lines: string[] | null;
+  error: string | null;
+  loading: boolean;
   /** Sizing lives on the caller: pass a height (`h-[28rem]`) or `flex-1 min-h-0`. */
   className?: string;
 }
@@ -36,11 +26,8 @@ export interface LiveLogTerminalProps {
  * Read-only "log theatre" for a headless (non-VNC) agent run — the terminal
  * counterpart to {@link VncViewer}, which only covers GUI agents.
  *
- * There is no log-stream subscription, so we poll `agentTaskLogs(id, tail)`
- * every {@link POLL_MS} while the run is `running`, drop to a single fetch once
- * it goes terminal (a final pull captures the full closing tail), then stop.
- *
- * The query returns the newest `tail` lines each poll — a sliding window. Rather
+ * The lines come from {@link useAgentTaskLogs}, which polls while the run is
+ * live. Each answer is the newest `tail` lines — a sliding window. Rather
  * than clear+rewrite the buffer every tick (which flickers and drops the
  * scrollback), we diff each new window against the previous one and write only
  * the new suffix into an xterm.js terminal (see {@link appendedTail}). Auto-
@@ -54,7 +41,9 @@ export interface LiveLogTerminalProps {
 export function LiveLogTerminal({
   taskId,
   running,
-  tail = DEFAULT_TAIL,
+  lines,
+  error,
+  loading,
   className,
 }: LiveLogTerminalProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -63,19 +52,11 @@ export function LiveLogTerminal({
   // The previous poll's window (its last `tail` lines). Diffed against each new
   // window so we append only genuinely-new lines rather than the whole buffer.
   const lastWindowRef = React.useRef<string[]>([]);
-  const prevRunningRef = React.useRef(running);
 
   // Latches true once the first line is painted so the placeholder overlay
   // clears and never flickers back on a transient empty poll. Set from the xterm
   // write callback (an external-system callback, not the effect body).
   const [hasOutput, setHasOutput] = React.useState(false);
-
-  const { data, error, loading, refetch } = useQuery<LogsResp>(AGENT_TASK_LOGS, {
-    variables: { id: taskId, tail },
-    fetchPolicy: "cache-and-network",
-    // Poll only while live; a terminal run keeps the single mount fetch.
-    pollInterval: running ? POLL_MS : 0,
-  });
 
   // One xterm per mount, reused for the run's lifetime.
   React.useEffect(() => {
@@ -137,18 +118,8 @@ export function LiveLogTerminal({
     termRef.current?.reset();
   }, [taskId]);
 
-  // One final fetch on the running → terminal transition so the completed run
-  // shows its full closing tail. Polling has already stopped (pollInterval → 0).
-  React.useEffect(() => {
-    if (prevRunningRef.current && !running) {
-      void refetch();
-    }
-    prevRunningRef.current = running;
-  }, [running, refetch]);
-
   // Append-only render: diff the new window against the last and write just the
   // new suffix, keeping the viewer's scroll position unless they're at bottom.
-  const lines = data?.agentTaskLogs;
   React.useEffect(() => {
     const term = termRef.current;
     if (!term || !lines || lines.length === 0) return;
@@ -159,6 +130,8 @@ export function LiveLogTerminal({
     // Scroll + reveal happen once xterm has parsed the chunk. setHasOutput is
     // idempotent — React bails out on the unchanged value after the first line.
     term.write(additions.join("\r\n") + "\r\n", () => {
+      // The chunk can finish parsing after unmount; a disposed xterm throws.
+      if (termRef.current !== term) return;
       if (atBottom) term.scrollToBottom();
       setHasOutput(true);
     });
@@ -171,7 +144,7 @@ export function LiveLogTerminal({
           className="border-danger-border bg-danger/10 text-danger-fg rounded-md border px-2.5 py-1.5 text-xs"
           role="status"
         >
-          Couldn&apos;t load logs: {error.message}
+          Couldn&apos;t load logs: {error}
         </div>
       )}
       <div className="relative min-h-0 flex-1">
@@ -187,12 +160,14 @@ export function LiveLogTerminal({
         {!hasOutput && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {running || loading ? (
-              <span className="inline-flex items-center gap-2 text-muted-foreground text-xs">
+              <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
                 <Loader2Icon className="size-3.5 animate-spin" />
                 Waiting for output…
               </span>
             ) : (
-              <span className="text-muted-foreground text-xs">No output was recorded for this run.</span>
+              <span className="text-muted-foreground text-xs">
+                No output was recorded for this run.
+              </span>
             )}
           </div>
         )}

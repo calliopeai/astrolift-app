@@ -1,25 +1,17 @@
 import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Teams · Astrolift",
-};
+import { legacyTeamsHref } from "@/components/screens/administration/access/access-nav";
+
+export const metadata = { title: "Teams · Astrolift" };
 
 /**
- * The canonical org-teams surface lives at /administration/teams. This
- * /teams list page is a thin server alias that forwards query params
- * (e.g. ?team=<slug> emitted by the workspace nav tree) so deep links
- * keep working. The /teams/[slug] detail page stays canonical here.
+ * Teams moved to Admin › Access (access UX design 5). `?team=<slug>` (the
+ * workspace nav tree's link) opens that team's page.
  */
-export default async function TeamsPage({
+export default async function TeamsAliasPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string" && value !== "") qs.append(key, value);
-  }
-  const query = qs.toString();
-  redirect(query ? `/administration/teams?${query}` : "/administration/teams");
+  redirect(legacyTeamsHref(await searchParams));
 }

@@ -1,30 +1,18 @@
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { ObservabilityClient } from "./observability-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = {
-  title: "Observability · Astrolift",
-};
-
-export default async function AppObservabilityPage({
+/**
+ * Observability is Logs & metrics › Metrics now (spec 44 §5.2). The old URL
+ * keeps resolving, with whatever query it carried.
+ */
+export default async function AppObservabilityRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery
-        query={LIST_DEPLOYMENTS}
-        variables={{ appSlug: slug, limit: 50 }}
-      >
-        <PreloadQuery query={LIST_EVENTS} variables={{ limit: 200 }}>
-          <ObservabilityClient slug={slug} />
-        </PreloadQuery>
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "logs", "metrics", await searchParams));
 }

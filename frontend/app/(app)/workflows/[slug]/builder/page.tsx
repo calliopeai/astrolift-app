@@ -2,9 +2,9 @@
 
 import { useParams } from "next/navigation";
 
-import { StageBuilder } from "@/components/workflows/StageBuilder";
+import { StageBuilderContainer } from "../../_components/stage-builder";
 
 export default function WorkflowBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
-  return <StageBuilder slug={slug} />;
+  return <StageBuilderContainer slug={slug} />;
 }

@@ -36,73 +36,6 @@
  */
 const NO_PAGE_FIELD = [
   {
-    file: "app/(app)/administration/organization/trusted-domains-card.tsx",
-    reason: "astroliftOrganizationAllowlistDomains is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/agents/[agentSlug]/components/run-content.tsx",
-    reason: "agentTasks is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/agents/agents-client.tsx",
-    reason:
-      "Two of its three tables read agentTasks, unpaginated; the third is still on the legacy useListControls.",
-  },
-  {
-    file: "app/(app)/apps/[slug]/domains/domains-client.tsx",
-    reason: "All three tables read astroliftAppDomains, an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/apps/[slug]/observability/observability-client.tsx",
-    reason:
-      "The pod table reads astroliftAppPods, unpaginated. The alert-rule and alert-event tables beside it are Page-capable and could move independently.",
-  },
-  {
-    file: "app/(app)/apps/[slug]/secrets/secrets-client.tsx",
-    reason:
-      "astroliftAppSecrets and astroliftAppSecretBundleAttachments are unpaginated list fields.",
-  },
-  {
-    file: "app/(app)/domains/domains-client.tsx",
-    reason: "astroliftManagedDomains is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/environments/environments-client.tsx",
-    reason: "astroliftEnvironments is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/metrics/metrics-client.tsx",
-    reason: "astroliftAppHealthSummary is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/pipelines/[id]/secrets-tab.tsx",
-    reason: "astroliftPipelineSecrets is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/settings/identity-provider/identity-provider-client.tsx",
-    reason: "astroliftIdentityProviders is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/settings/security/security-settings-client.tsx",
-    reason: "astroliftActiveSessions is an unpaginated list field.",
-  },
-  {
-    file: "app/(app)/teams/[slug]/team-members-panel.tsx",
-    reason: "astroliftTeamMembers is an unpaginated list field.",
-  },
-  {
-    file: "components/observability/DnsRecordsCard.tsx",
-    reason: "astroliftAppDnsRecords is an unpaginated list field.",
-  },
-  {
-    file: "components/observability/EndpointMetricsPanel.tsx",
-    reason: "astroliftAppEndpointMetrics returns a fixed per-route metric set, unpaginated.",
-  },
-  {
-    file: "components/observability/TlsCertificatesCard.tsx",
-    reason: "astroliftAppCertificates is an unpaginated list field.",
-  },
-  {
     file: "components/observability/TraceExplorerPanel.tsx",
     reason: "astroliftAppTraces returns a bounded trace window, unpaginated.",
   },
@@ -121,48 +54,37 @@ const NO_PAGE_FIELD = [
  */
 const NOT_A_SERVER_COLLECTION = [
   {
-    file: "app/(app)/apps/[slug]/managed-services/email-detail-sheet.tsx",
+    file: "components/screens/apps/managed-services/EmailDetailSheet.tsx",
     reason:
       "Four tables over arrays nested in the astroliftEmailServiceDetail payload (suppressions, messages, templates) — no collection of their own.",
   },
   {
-    file: "app/(app)/apps/[slug]/security/security-client.tsx",
+    file: "components/screens/apps/security/AppSecurityScreen.tsx",
     reason: "Findings are derived and sorted in the client from the app's event stream.",
   },
   {
-    file: "app/(app)/apps/[slug]/workloads/[workloadSlug]/workload-detail-client.tsx",
+    file: "components/screens/apps/workloads/WorkloadDetailScreen.tsx",
     reason: "Pod-status buckets, containers and probes all render off the single workload payload.",
   },
   {
-    file: "app/(app)/clusters/[slug]/settings/cluster-settings-client.tsx",
+    file: "components/screens/clusters/settings/ClusterSettings.tsx",
     reason:
       "One table iterates the static CAPABILITY_KEYS constant; another iterates installedReleases nested in a bootstrap run.",
   },
   {
-    file: "app/(app)/documentation/configuration/page.tsx",
+    file: "components/screens/documentation/ConfigurationScreen.tsx",
     reason: "A static environment-variable reference. The page issues no query.",
   },
   {
-    file: "app/(app)/documentation/drivers/drivers-client.tsx",
+    file: "components/screens/documentation/DriversScreen.tsx",
     reason: "A capability matrix computed by crossing provider plugins with registered clusters.",
-  },
-  {
-    file: "app/(app)/projects/[slug]/project-detail-client.tsx",
-    reason:
-      "The agents table is a client-side join across three queries; only the apps table beside it is a server collection.",
   },
 ];
 
 /**
  * Group 3 — a row shape DataTable does not model.
  */
-const UNSUPPORTED_ROW_SHAPE = [
-  {
-    file: "app/(app)/apps/[slug]/deployments/deployments-client.tsx",
-    reason:
-      "Rows expand into a full-width detail panel row. DataTable's column model has no row-expansion slot, so migrating means designing one first.",
-  },
-];
+const UNSUPPORTED_ROW_SHAPE = [];
 
 /**
  * Group 4 — no blocker. These were owed a migration, and are done.

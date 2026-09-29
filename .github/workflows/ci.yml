@@ -627,6 +627,10 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      # The design-system catalog (spec 44 §8). `npm test` renders every story;
+      # this proves the catalog itself still builds.
+      - name: Build the component catalog
+        run: npm run build-storybook
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen

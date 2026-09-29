@@ -2,8 +2,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   DEFAULT_APPEARANCE,
+  MIN_ACCENT_CONTRAST,
   STORAGE_KEY,
+  accentContrast,
+  applyAppearance,
   clearAppearance,
+  contrastRatio,
+  inkFor,
+  parseCustomAccent,
   normalize,
   normalizePartial,
   readAppearance,
@@ -50,7 +56,7 @@ describe("resolveAppearance precedence", () => {
   it("lets a locked org theme beat a personal choice", () => {
     const { value, locked } = resolveAppearance(
       { accent: "ice", ground: "paper" },
-      { orgDefault: orgTheme, locked: true },
+      { orgDefault: orgTheme, locked: true }
     );
     expect(value.accent).toBe("copper");
     expect(value.ground).toBe("charcoal");
@@ -132,5 +138,59 @@ describe("readAppearance", () => {
     expect(resolveAppearance(readAppearance(), policy).value.accent).toBe("ice");
     clearAppearance();
     expect(resolveAppearance(readAppearance(), policy).value.accent).toBe("copper");
+  });
+});
+
+/**
+ * Palette option A: a custom accent is any colour, stored in `accent` like a
+ * preset, and it only ever lands where it can be seen against the ground.
+ */
+describe("custom accent", () => {
+  it("parses the forms people type into one stored shape", () => {
+    expect(parseCustomAccent("#2F9E52")).toBe("#2f9e52");
+    expect(parseCustomAccent("2f9e52")).toBe("#2f9e52");
+    expect(parseCustomAccent("#abc")).toBe("#aabbcc");
+    expect(parseCustomAccent("green")).toBeNull();
+    expect(parseCustomAccent("#12345")).toBeNull();
+  });
+
+  it("measures WCAG contrast", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    expect(contrastRatio("#777777", "#777777")).toBeCloseTo(1, 5);
+  });
+
+  it("holds a custom accent to 3:1 against the ground", () => {
+    expect(accentContrast("#2f9e52", "black").ok).toBe(true);
+    expect(accentContrast("#101010", "black").ok).toBe(false);
+    expect(accentContrast("#f0e68c", "paper").ratio).toBeLessThan(MIN_ACCENT_CONTRAST);
+  });
+
+  it("keeps a custom accent through storage like a preset", () => {
+    writeAppearance({ accent: "#d94f8a" });
+    expect(readAppearance()).toEqual({ accent: "#d94f8a" });
+    expect(normalizePartial({ accent: "#D94F8A" })).toEqual({});
+  });
+
+  it("falls back to the default accent on a ground it cannot be read on", () => {
+    expect(normalize({ ground: "black", accent: "#e8e0ff" }).accent).toBe("#e8e0ff");
+    expect(normalize({ ground: "paper", accent: "#e8e0ff" }).accent).toBe(
+      DEFAULT_APPEARANCE.accent
+    );
+  });
+
+  it("picks the ink with more contrast for text on the accent", () => {
+    expect(inkFor("#f0e68c")).toBe("#000000");
+    expect(inkFor("#1a237e")).toBe("#ffffff");
+  });
+
+  it("paints only the action tokens inline, and clears them for a preset", () => {
+    const el = document.createElement("html");
+    applyAppearance({ ...DEFAULT_APPEARANCE, accent: "#d94f8a" }, el);
+    expect(el.dataset.accent).toBe("custom");
+    expect(el.style.getPropertyValue("--brand-primary")).toBe("#d94f8a");
+    expect(el.style.getPropertyValue("--success")).toBe("");
+    applyAppearance({ ...DEFAULT_APPEARANCE, accent: "ice" }, el);
+    expect(el.dataset.accent).toBe("ice");
+    expect(el.style.getPropertyValue("--brand-primary")).toBe("");
   });
 });

@@ -22,6 +22,8 @@ type Vars = Record<string, unknown>;
 const state = vi.hoisted(() => ({ calls: [] as { op: string; variables: Vars }[] }));
 
 vi.mock("@apollo/client/react", () => ({
+  // Older pages load through the client, on the reader's scroll only.
+  useApolloClient: () => ({ query: vi.fn().mockResolvedValue({ data: undefined }) }),
   useQuery: (
     doc: { definitions?: { kind: string; name?: { value: string } }[] },
     options?: { variables?: Vars }

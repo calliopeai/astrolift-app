@@ -1,8 +1,7 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
-
-import { StageBuilder } from "@/components/workflows/StageBuilder";
+import { StageBuilderContainer } from "../../_components/stage-builder";
+import { WorkflowPillarLoading } from "@/components/screens/workflows/detail/WorkflowPillarLoading";
 import { useTieredWorkflow } from "@/graphql/workflows/tiered.hooks";
 
 import { DefinitionWorkflowPillar } from "./definition-workflow-content";
@@ -28,11 +27,7 @@ export function WorkflowPillarPage({ slug, pillar }: { slug: string; pillar: Wor
   const configured = useTieredWorkflow(slug);
 
   if (configured.loading && !configured.workflow) {
-    return (
-      <div className="flex justify-center p-12">
-        <Loader2Icon className="size-5 animate-spin" />
-      </div>
-    );
+    return <WorkflowPillarLoading />;
   }
   if (!configured.workflow) {
     return <DefinitionWorkflowPillar slug={slug} pillar={pillar} />;
@@ -42,7 +37,7 @@ export function WorkflowPillarPage({ slug, pillar }: { slug: string; pillar: Wor
       {({ workflow, refetch }) => {
         switch (pillar) {
           case "build":
-            return <StageBuilder slug={workflow.definitionSlug} />;
+            return <StageBuilderContainer slug={workflow.definitionSlug} />;
           case "run":
             return <RunContent workflow={workflow} refetch={refetch} />;
           case "observe":

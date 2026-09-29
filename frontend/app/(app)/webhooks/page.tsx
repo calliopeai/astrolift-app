@@ -6,14 +6,13 @@ import { WebhooksClient } from "./webhooks-client";
 export const metadata = { title: "Webhooks · Astrolift" };
 
 /**
- * Preloads the first page so the table paints with rows instead of
- * skeletons. The variables have to be exactly the ones `useCursorTable`
- * sends on first paint or the preload is a cache miss: platform-wide
- * scope, no search, no cursor, and DataTable's `DEFAULT_PAGE_SIZE`. (The
- * constant is not imported — it lives in a `"use client"` module, whose
- * exports are client references on the server.)
+ * Preloads the first page so the list paints with rows instead of
+ * skeletons. The variables have to be exactly the ones `useWebhooks` sends
+ * on first paint (webhooksVariables for the default list state) or the
+ * preload is a cache miss: platform-wide scope, no search, the first page
+ * size, no cursor.
  */
-const FIRST_PAGE = { appSlug: null, search: null, limit: 25 };
+const FIRST_PAGE = { appSlug: null, search: null, limit: 25, after: null };
 
 export default function WebhooksPage() {
   return (

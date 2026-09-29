@@ -1,16 +1,17 @@
-import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { TeamsClient } from "@/app/(app)/teams/teams-client";
+import { legacyTeamsHref } from "@/components/screens/administration/access/access-nav";
 
-export const metadata = {
-  title: "Teams · Astrolift",
-};
+export const metadata = { title: "Teams · Astrolift" };
 
-export default function AdministrationTeamsPage() {
-  return (
-    <PreloadQuery query={LIST_TEAMS}>
-      <TeamsClient />
-    </PreloadQuery>
-  );
+/**
+ * Teams moved to Admin › Access (access UX design 5). `?team=<slug>` (the
+ * workspace nav tree's link) opens that team's page.
+ */
+export default async function AdministrationTeamsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirect(legacyTeamsHref(await searchParams));
 }

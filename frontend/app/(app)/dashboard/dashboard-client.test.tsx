@@ -87,8 +87,9 @@ vi.mock("@/components/KpiTile", () => ({
   ),
 }));
 
-vi.mock("@/components/onboarding/OnboardingHost", () => ({ OnboardingHost: () => null }));
+vi.mock("./onboarding-host", () => ({ OnboardingHost: () => null }));
 vi.mock("@/components/ActivityFeed", () => ({ ActivityFeed: () => <div>Activity feed</div> }));
+vi.mock("@/components/use-recent-activity", () => ({ useRecentActivity: () => ({}) }));
 
 vi.mock("@dnd-kit/core", () => ({
   DndContext: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -163,7 +164,7 @@ describe("DashboardClient role-scoped operational state", () => {
 
     expect(screen.getByText("Operational state")).toBeInTheDocument();
     expect(screen.getByText("Agents running now")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "EMR Triage Intake" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^EMR Triage Intake/ })).toHaveAttribute(
       "href",
       "/agents/runs/task-1"
     );
@@ -197,7 +198,7 @@ describe("DashboardClient role-scoped operational state", () => {
     render(<DashboardClient />);
 
     expect(screen.getByText("Workflows running now")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "EMR Triage" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^EMR Triage\s*emr-bug-triage/ })).toHaveAttribute(
       "href",
       "/workflows/emr-triage/builder"
     );

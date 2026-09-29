@@ -1,6 +1,11 @@
-import { GET_APP, LIST_WORKLOADS, LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
+import { activeSection, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
+import { AppTabSections } from "@/components/screens/apps/detail/AppTabSections";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { LIST_MANAGED_SERVICES_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
+import { ManagedServicesClient } from "../managed-services/managed-services-client";
 import { WorkloadsListClient } from "./workloads-list-client";
 
 export const metadata = {
@@ -8,31 +13,49 @@ export const metadata = {
 };
 
 /**
- * Preloads the table's first page so it paints with rows rather than
- * skeletons.
+ * The Workloads tab: the app's deployment, statefulset, job and cronjob
+ * workloads on the embedded list, with a kind chip (spec 44 §10.2). Its
+ * scheduled jobs are that list filtered to the cronjob kind (`?kind=cronjob`,
+ * where `/jobs` redirects), so the Jobs section and the Workloads section
+ * render the same list. Managed services are a section of the tab
+ * (`?section=managed-services`, where `/managed-services` redirects). A
+ * workload's own page stays a detail route under the tab.
  *
- * The variables have to be exactly the ones `useCursorTable` sends on
- * first render or the preload is a cache miss: this app, no cursor, no
- * search, and DataTable's `DEFAULT_PAGE_SIZE`. (The constant is not
- * imported — it lives in a `"use client"` module, whose exports are
- * client references on the server.) A saved `?wl-q=` search or a changed
- * `?wl-size=` falls through to the client fetch.
- *
- * `LIST_WORKLOADS` stays preloaded alongside it: it is what the stats
- * strip reads, which the paginated field cannot answer.
+ * The list reads the app's whole workload set (see workloads-list.ts), which
+ * is preloaded so it paints with rows.
  */
-export default async function AppWorkloadsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function AppWorkloadsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
   const { slug } = await params;
+  const section = activeSection("workloads", await searchParams);
   return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery query={LIST_WORKLOADS} variables={{ appSlug: slug }}>
-        <PreloadQuery
-          query={LIST_WORKLOADS_PAGE}
-          variables={{ appSlug: slug, search: null, limit: 25 }}
-        >
+    <AppTabSections slug={slug} tab="workloads" active={section}>
+      {section === "managed-services" ? (
+        <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
+          {/* The first page the section's list asks for (use-managed-services). */}
+          <PreloadQuery
+            query={LIST_MANAGED_SERVICES_PAGE}
+            variables={{
+              appSlug: slug,
+              environmentName: null,
+              search: null,
+              limit: 25,
+              after: null,
+            }}
+          >
+            <ManagedServicesClient slug={slug} />
+          </PreloadQuery>
+        </PreloadQuery>
+      ) : (
+        <PreloadQuery query={LIST_WORKLOADS} variables={{ appSlug: slug }}>
           <WorkloadsListClient slug={slug} />
         </PreloadQuery>
-      </PreloadQuery>
-    </PreloadQuery>
+      )}
+    </AppTabSections>
   );
 }

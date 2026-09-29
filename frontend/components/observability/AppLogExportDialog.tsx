@@ -15,11 +15,9 @@
  * date input pattern the audit page already established.
  */
 
-import { useMutation } from "@apollo/client/react";
 import { DownloadIcon, Loader2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -39,52 +37,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EXPORT_ASTROLIFT_APP_LOGS } from "@/graphql/operations/operations.mutations";
-import type {
-  AppLogExportFormat,
-  AstroliftAppLogExport,
-} from "@/graphql/operations/operations.types";
-
 type GqlFormat = "CSV" | "NDJSON" | "TXT";
 
-interface ExportResp {
-  exportAstroliftAppLogs: {
-    ok: boolean;
-    errors: Array<{ code: string; message: string; field: string | null }>;
-    data: AstroliftAppLogExport | null;
-  };
+/** What the operator asked for; datetimes are ``datetime-local`` values. */
+export interface LogExportRequest {
+  format: GqlFormat;
+  since: string;
+  until: string;
+  level: string;
+  regex: string;
 }
 
 export interface AppLogExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  appSlug: string;
+  /** The pod being exported; null until one is selected. */
   podName: string | null;
-  container: string | null;
-  environmentName?: string | null;
-  workloadSlug?: string | null;
-}
-
-/**
- * Convert a ``yyyy-mm-ddThh:mm`` datetime-local input value to an
- * ISO 8601 timestamp (UTC). Empty strings return null so the field
- * is dropped from the mutation variables.
- */
-function localToIso(value: string): string | null {
-  if (!value) return null;
-  const ts = new Date(value);
-  if (Number.isNaN(ts.getTime())) return null;
-  return ts.toISOString();
+  busy: boolean;
+  /** Resolves true once the export is ready; the dialog then closes. */
+  onExport: (request: LogExportRequest) => Promise<boolean>;
 }
 
 export function AppLogExportDialog({
   open,
   onOpenChange,
-  appSlug,
   podName,
-  container,
-  environmentName,
-  workloadSlug,
+  busy,
+  onExport,
 }: AppLogExportDialogProps) {
   const t = useTranslations("apps.observability.logExport");
   const tCommon = useTranslations("apps.common");
@@ -94,83 +73,13 @@ export function AppLogExportDialog({
   const [until, setUntil] = React.useState("");
   const [level, setLevel] = React.useState<string>("");
   const [regex, setRegex] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-
-  const [exportMutation] = useMutation<ExportResp>(EXPORT_ASTROLIFT_APP_LOGS);
 
   const podLocked = !podName;
 
-  const handleSubmit = React.useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
-      if (!podName) {
-        toast.error(t("missingPod"));
-        return;
-      }
-      setBusy(true);
-      const toastId = toast.loading(t("toastStart"));
-      try {
-        const result = await exportMutation({
-          variables: {
-            input: {
-              appSlug,
-              podName,
-              container: container ?? null,
-              environmentName: environmentName ?? null,
-              workloadSlug: workloadSlug ?? null,
-              format,
-              since: localToIso(since),
-              until: localToIso(until),
-              level: level ? level : null,
-              regex: regex ? regex : null,
-            },
-          },
-        });
-        const payload = result.data?.exportAstroliftAppLogs;
-        if (!payload?.ok || !payload.data) {
-          const msg = payload?.errors?.[0]?.message ?? t("toastFailure");
-          toast.error(msg, { id: toastId });
-          return;
-        }
-        const fmtLabel = (payload.data.format as AppLogExportFormat).toUpperCase();
-        const ready = payload.data.truncated
-          ? t("toastReadyTruncated", { rows: payload.data.rowCount, format: fmtLabel })
-          : t("toastReady", { rows: payload.data.rowCount, format: fmtLabel });
-        toast.success(ready, {
-          id: toastId,
-          action: {
-            label: t("toastDownload"),
-            onClick: () => {
-              window.open(payload.data!.downloadUrl, "_blank", "noopener,noreferrer");
-            },
-          },
-          duration: 30000,
-        });
-        onOpenChange(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("toastFailure"), {
-          id: toastId,
-        });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [
-      appSlug,
-      container,
-      environmentName,
-      exportMutation,
-      format,
-      level,
-      onOpenChange,
-      podName,
-      regex,
-      since,
-      t,
-      until,
-      workloadSlug,
-    ]
-  );
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (await onExport({ format, since, until, level, regex })) onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

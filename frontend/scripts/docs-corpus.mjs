@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 
 const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DOCS_DIR = join(FRONTEND, "app", "(app)", "documentation");
+const SCREENS_DIR = join(FRONTEND, "components", "screens", "documentation");
 const OUT_FILE = join(FRONTEND, "DOCS.md");
 const PACKAGED = join(FRONTEND, "..", "backend", "astrolift_agents", "data", "docs.md");
 
@@ -109,16 +110,44 @@ function isRedirect(src) {
 // Grouped by route, not by file: a route can be served by more than one
 // component (page.tsx plus its -client.tsx), and a per-file model both
 // splits that page's prose and lists its own route as contributing nothing.
+// Routes only render a screen (the Storybook-first rule), so a page's prose
+// lives in the documentation screen it imports. Follow those imports; a
+// module imported by more than one route is shared chrome (the docs shell,
+// a nav), not that page's content, and is skipped.
+const SCREEN_IMPORT = /from\s+"@\/components\/screens\/documentation\/([^"]+)"/g;
+function screenModules(src) {
+  return [...src.matchAll(SCREEN_IMPORT)].map((m) => m[1]);
+}
+function screenSource(mod) {
+  for (const ext of [".tsx", ".ts"]) {
+    try {
+      return readFileSync(join(SCREENS_DIR, mod + ext), "utf8");
+    } catch {
+      // Not this extension.
+    }
+  }
+  return "";
+}
+const docFiles = walk(DOCS_DIR).filter((file) => !routeFor(file).includes("["));
+const importCount = new Map();
+for (const file of docFiles) {
+  for (const mod of new Set(screenModules(readFileSync(file, "utf8")))) {
+    importCount.set(mod, (importCount.get(mod) ?? 0) + 1);
+  }
+}
+
 const byRoute = new Map();
-for (const file of walk(DOCS_DIR)) {
-  const route = routeFor(file);
+for (const file of docFiles) {
   // A dynamic segment is not a citable destination -- "/documentation/
   // tutorials/[slug]" is not somewhere anyone can be sent, and the prose
   // around it is template chrome rather than content.
-  if (route.includes("[")) continue;
+  const route = routeFor(file);
   const src = readFileSync(file, "utf8");
   const entry = byRoute.get(route) ?? { route, lines: [], redirect: true };
   entry.lines.push(...extract(src));
+  for (const mod of screenModules(src)) {
+    if (importCount.get(mod) === 1) entry.lines.push(...extract(screenSource(mod)));
+  }
   // Only a route whose every file is a bare redirect is one.
   if (!isRedirect(src)) entry.redirect = false;
   byRoute.set(route, entry);

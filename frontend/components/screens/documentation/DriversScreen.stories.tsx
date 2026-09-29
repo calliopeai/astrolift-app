@@ -1,0 +1,33 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+
+import {
+  DOCS_E_DRIVERS,
+  DOCS_E_DRIVERS_FALLBACK,
+  DOCS_E_DRIVERS_LOADING,
+  DOCS_E_DRIVERS_LONG,
+} from "./docs-e.fixtures";
+import { DriversScreen } from "./DriversScreen";
+
+const meta: Meta<typeof DriversScreen> = {
+  title: "Screens/Documentation/DriversScreen",
+  component: DriversScreen,
+  parameters: { layout: "fullscreen" },
+};
+export default meta;
+
+type Story = StoryObj<typeof DriversScreen>;
+
+export const Loading: Story = { args: DOCS_E_DRIVERS_LOADING };
+
+export const Full: Story = { args: DOCS_E_DRIVERS };
+
+/** No plugins registered: the static known-provider list with the fallback notice. */
+export const Empty: Story = { args: DOCS_E_DRIVERS_FALLBACK };
+
+/**
+ * The screen has no error branch: a failed plugins query falls through to
+ * the same static fallback as an empty install, so this mirrors Empty.
+ */
+export const QueryFailed: Story = { args: DOCS_E_DRIVERS_FALLBACK };
+
+export const LongStrings: Story = { args: DOCS_E_DRIVERS_LONG };

@@ -100,9 +100,12 @@ describe("AuthUsersCard (#2131)", () => {
     });
   });
 
-  it("disables a user in one click", async () => {
+  it("disables a user from the row's menu", async () => {
     render(<AuthUsersCard clusterId="c1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    // Row actions sit in `⋯` (spec 44 §5.1); Radix opens on pointer down.
+    const menu = screen.getByRole("button", { name: /row actions/i });
+    fireEvent.pointerDown(menu, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Disable" }));
 
     await waitFor(() => expect(state.sent).toHaveLength(1));
     expect(state.sent[0]).toEqual({ input: { clusterId: "c1", username: "u1", enabled: false } });

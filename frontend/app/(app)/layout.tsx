@@ -1,24 +1,18 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
-import { CommandPalette } from "@/components/CommandPalette";
-import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
-import { LiveRegionProvider } from "@/components/LiveRegion";
-import { PlatformIncidentBanner } from "@/components/PlatformIncidentBanner";
-import { ScmCallbackToast } from "@/components/ScmCallbackToast";
+
+import { AppShellContainer } from "./_shell/app-shell";
+import { LiveRegionProvider } from "@/providers/LiveRegion";
+import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
-import { StepUpPrompt } from "@/components/StepUpPrompt";
-import { WayfindingBubble } from "@/components/WayfindingBubble";
 import { getClient } from "@/lib/apollo";
 import { ActiveOrgProvider } from "@/graphql/identity/identity.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
 import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
-import type { CurrentUser, MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
-import { PageHeader } from "@/components/PageHeader";
+import type { MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
 
 // A caught SSR identity error is an auth failure (send to /auth/login) only
 // when it's a GraphQL UNAUTHENTICATED or an HTTP 401 — mirrors the client
@@ -43,7 +37,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/auth/login");
   }
 
-  let ssrUser: CurrentUser | null = null;
   let sessionInvalid = false;
 
   try {
@@ -55,12 +48,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // rendered. Promise.all reduces this to one round-trip time. getClient()
     // serialises all results into the Apollo SSR cache automatically, so
     // client-side useQuery hooks find data immediately (no loading flash).
-    const [meResult] = await Promise.all([
+    await Promise.all([
       client.query<MeQueryData, MeQueryVariables>({ query: GET_ME }),
       client.query({ query: GET_MY_PERMISSIONS }),
       client.query({ query: LIST_ORGANIZATIONS }),
     ]);
-    ssrUser = meResult.data?.me ?? null;
   } catch (err) {
     // A stale/expired token cookie is still *present* (so the cookie check
     // above passes), but the identity query comes back UNAUTHENTICATED. Treat
@@ -86,27 +78,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           consumer gates its org-scoped queries on it (#1022). */}
       <ActiveOrgProvider>
         <SkipToContent />
-        <div className="flex min-h-svh flex-col">
-          <PlatformIncidentBanner />
-          <SidebarProvider className="flex-1">
-            <AppSidebar ssrUser={ssrUser} />
-            <SidebarInset className="overflow-x-hidden">
-              <PageHeader />
-              <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
-                {children}
-              </main>
-            </SidebarInset>
-            <CommandPalette />
-            <KeyboardShortcuts />
-            <ScmCallbackToast />
-            <SessionExpiredModal />
-            <StepUpPrompt />
-            {/* Read-only help (#1101). Global chrome, not entitlement-gated:
-                the people who most need to ask where a thing is are the ones
-                who have seen the least of the product. */}
-            <WayfindingBubble />
-          </SidebarProvider>
-        </div>
+        <AppShellContainer>{children}</AppShellContainer>
+        <ScmCallbackToast />
+        <SessionExpiredModal />
       </ActiveOrgProvider>
     </LiveRegionProvider>
   );

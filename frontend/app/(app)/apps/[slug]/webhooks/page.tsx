@@ -1,24 +1,18 @@
-import { LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { WebhooksClient } from "@/app/(app)/webhooks/webhooks-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-import { AppTabs } from "../components/app-tabs";
-
-export const metadata = { title: "Webhooks · App · Astrolift" };
-
-export default async function AppWebhooksPage({
+/**
+ * Webhooks are Settings › Webhooks now (spec 44 §5.2). The old URL keeps
+ * resolving, with whatever query it carried.
+ */
+export default async function AppWebhooksRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={LIST_WEBHOOKS} variables={{ appSlug: slug }}>
-      <WebhooksClient
-        appSlug={slug}
-        tabs={<AppTabs slug={slug} active="settings" />}
-      />
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "settings", "webhooks", await searchParams));
 }
