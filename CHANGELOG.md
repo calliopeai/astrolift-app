@@ -102,6 +102,10 @@
 - Scoped policies now reduce collection rows and capabilities, including a grant
   whose only app is denied; an allowed parent cannot restore a denied child (#2164).
   Policy writes reject malformed conditions and selector shapes before saving.
+- SCIM Groups now supports org-confined provisioning, reads, atomic membership
+  PATCH, replacement and deletion with the existing SCIM credential (#2164).
+  Removal immediately drops group-derived roles without changing direct grants;
+  stale SSO claims cannot restore a removed, deleted or rekeyed group identifier.
 
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).

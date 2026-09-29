@@ -13,7 +13,7 @@ from __future__ import annotations
 from django.urls import path
 from django_ratelimit.decorators import ratelimit
 
-from astrolift_identity import device_flow_views, scim_views, step_up_sso
+from astrolift_identity import device_flow_views, scim_group_views, scim_views, step_up_sso
 from astrolift_identity.scim import SCIM_RATE_LIMIT_PER_MIN
 
 app_name = "astrolift_identity"
@@ -65,6 +65,12 @@ _scim_ratelimit = ratelimit(
 )
 
 scim_api_urlpatterns = [
+    path("api/scim/v2/Groups", _scim_ratelimit(scim_group_views.scim_groups), name="scim-groups"),
+    path(
+        "api/scim/v2/Groups/<str:group_guid>",
+        _scim_ratelimit(scim_group_views.scim_group_detail),
+        name="scim-group-detail",
+    ),
     path(
         "api/scim/v2/Users",
         _scim_ratelimit(scim_views.scim_users),
