@@ -37,12 +37,13 @@ export function DetailTabSections({
   return (
     <div className="flex min-w-0 flex-col gap-6 md:flex-row md:items-start">
       <nav aria-label={ariaLabel} className="min-w-0 md:w-48 md:shrink-0">
-        <ul className="flex min-w-0 flex-wrap gap-1 md:flex-col md:gap-0.5">
+        <ul className="flex min-w-0 flex-wrap gap-1 md:flex-col md:flex-nowrap md:gap-0.5">
           {sections.map((s) => (
             <li key={s.id} className="min-w-0">
               <Link
                 href={s.href}
                 aria-current={s.id === active ? "page" : undefined}
+                title={s.label}
                 className={cn(
                   "block min-w-0 truncate rounded-sm px-2 py-1.5 text-sm transition-colors",
                   s.id === active

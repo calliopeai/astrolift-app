@@ -12,7 +12,7 @@ import type {
   AstroliftDeployment,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-import { appDeploymentsList, pageVariables, selectPage } from "./app-deployments-list";
+import { appDeploymentsList, pageVariables } from "./app-deployments-list";
 import { APP_DEPLOYMENTS_PAGE } from "./app-deployments-query";
 
 interface PageResp {
@@ -48,15 +48,14 @@ export function useAppDeployments(slug: string, { previews = true }: { previews?
   const [now] = React.useState(() => Date.now());
 
   const page = useQuery<PageResp>(APP_DEPLOYMENTS_PAGE, {
-    variables: pageVariables(slug, filters, state.q, state.pageSize, state.after),
+    variables: pageVariables(slug, filters, state, now),
     fetchPolicy: "cache-and-network",
     pollInterval: firstPage ? POLL_MS : 0,
   });
 
   const data = page.data?.astroliftDeploymentsPage;
-  const selected = selectPage(data?.items ?? [], data?.nextCursor ?? null, filters, now);
 
-  const held = useHeldRows(selected.rows, (d) => d.id, {
+  const held = useHeldRows(data?.items ?? [], (d) => d.id, {
     live: firstPage,
     resetKey: JSON.stringify(filters) + state.q + state.pageSize,
   });
@@ -73,9 +72,6 @@ export function useAppDeployments(slug: string, { previews = true }: { previews?
     });
   }, [items]);
 
-  // Mine and Today narrow the page here, so the server's count is not theirs.
-  const narrowed = Boolean(filters.startedBy || filters.since);
-
   return {
     list,
     rows: held.rows,
@@ -86,8 +82,8 @@ export function useAppDeployments(slug: string, { previews = true }: { previews?
     onRetry: () => {
       void page.refetch();
     },
-    nextCursor: selected.nextCursor,
-    totalCount: narrowed ? null : (data?.totalCount ?? null),
+    nextCursor: data?.nextCursor ?? null,
+    totalCount: data?.totalCount ?? null,
     lookup: (id: string) => seen.get(id) ?? null,
   };
 }

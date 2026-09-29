@@ -2,18 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
-import { CLUSTERS_LIST, clusterCrumbs, selectClusters } from "./clusters-list";
-import { CLUSTERS, FLEET, ME } from "./fixtures";
-
-const base = { sort: CLUSTERS_LIST.defaultSort, page: 1, pageSize: 25, me: ME };
+import { CLUSTERS_LIST, clusterCrumbs, clustersPageVariables } from "./clusters-list";
 
 function forQuery(qs: string) {
   const state = parseListState(CLUSTERS_LIST, qs);
-  return selectClusters(CLUSTERS, {
-    ...base,
-    filters: effectiveFilters(CLUSTERS_LIST, state),
-    sort: state.sort,
-  });
+  return clustersPageVariables({ ...state, filters: effectiveFilters(CLUSTERS_LIST, state) });
 }
 
 describe("CLUSTERS_LIST", () => {
@@ -21,51 +14,44 @@ describe("CLUSTERS_LIST", () => {
     expect(CLUSTERS_LIST.views.map((v) => v.key)).toEqual(["all", "mine", "offline"]);
     expect(CLUSTERS_LIST.paging).toBe("numbered");
   });
+
+  it("Mine is who registered the cluster, with no stand-in note", () => {
+    const mine = CLUSTERS_LIST.views.find((v) => v.key === "mine");
+    expect(mine?.filters).toEqual({ registeredBy: "me" });
+    expect(mine?.note).toBeUndefined();
+  });
 });
 
-describe("selectClusters", () => {
-  it("sorts by name by default", () => {
-    expect(forQuery("").rows.map((c) => c.name)).toEqual([
-      "GKE Europe",
-      "On-prem lab",
-      "Production US West",
-      "Staging US East",
-    ]);
-  });
-
-  it("Offline keeps only clusters whose heartbeat is offline", () => {
-    expect(forQuery("view=offline").rows.map((c) => c.slug)).toEqual(["gke-eu-west-4"]);
-  });
-
-  it("Mine keeps clusters whose last setup run the viewer started", () => {
-    expect(forQuery("view=mine").rows.map((c) => c.slug)).toEqual(["prd-us-west-2"]);
-  });
-
-  it("Mine is empty when the viewer is unknown, never everything", () => {
-    const state = parseListState(CLUSTERS_LIST, "view=mine");
-    const out = selectClusters(CLUSTERS, {
-      ...base,
-      me: null,
-      filters: effectiveFilters(CLUSTERS_LIST, state),
+describe("clustersPageVariables", () => {
+  it("a cold load asks for page 1 by name with no filter", () => {
+    expect(forQuery("")).toEqual({
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
     });
-    expect(out.totalCount).toBe(0);
   });
 
-  it("applies provider and status chips together", () => {
-    expect(forQuery("provider=eks&status=managing").rows.map((c) => c.slug)).toEqual([
-      "stg-us-east-1",
-    ]);
+  it("the Offline view filters on the heartbeat", () => {
+    expect(forQuery("view=offline").filter).toEqual({ live: ["offline"] });
   });
 
-  it("sorts by more than one key", () => {
-    const rows = forQuery("sort=provider,-name").rows.map((c) => c.slug);
-    expect(rows).toEqual(["stg-us-east-1", "prd-us-west-2", "gke-eu-west-4", "onprem-lab"]);
+  it("Mine sends me for the server to resolve", () => {
+    expect(forQuery("view=mine").filter).toEqual({ registeredBy: ["me"] });
   });
 
-  it("slices a numbered page and counts the whole filtered set", () => {
-    const out = selectClusters(FLEET, { ...base, filters: {}, page: 3 });
-    expect(out.totalCount).toBe(60);
-    expect(out.rows).toHaveLength(10);
+  it("chips combine with the view", () => {
+    expect(forQuery("view=offline&provider=eks&status=managing").filter).toEqual({
+      provider: ["eks"],
+      status: ["managing"],
+      live: ["offline"],
+    });
+  });
+
+  it("sends the search trimmed, the multi-key sort and the page", () => {
+    const v = forQuery("q=%20prod%20&sort=provider,-name&page=3&pageSize=50");
+    expect(v).toMatchObject({ search: "prod", sort: "provider,-name", page: 3, pageSize: 50 });
   });
 });
 

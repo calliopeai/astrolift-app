@@ -22,8 +22,8 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { useListPageQuery } from "../access/use-list-page-query";
-import { ASSIGNMENTS_LIST } from "./permissions-lists";
+import { useNumberedListQuery } from "../access/use-list-page-query";
+import { ASSIGNMENTS_LIST, bindingsFilter } from "./permissions-lists";
 
 interface BindingsPageResp {
   astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
@@ -46,13 +46,14 @@ export function useAssignments() {
   const canManage = perms.can("org.manage_members");
 
   // `astroliftRoleBindingsPage` searches username, email, first / last
-  // name, group external id and role slug / name. It takes no sort
-  // argument, so no column declares a `sortKey`.
+  // name, group external id and role slug / name, and filters, sorts and
+  // numbers the pages (#2153).
   const list = useListState(ASSIGNMENTS_LIST);
-  const page = useListPageQuery<AstroliftRoleBinding>(
+  const page = useNumberedListQuery<AstroliftRoleBinding, ReturnType<typeof bindingsFilter>>(
     LIST_ROLE_BINDINGS_PAGE,
     list,
-    (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage
+    (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    { toFilter: bindingsFilter }
   );
 
   const roles = useQuery<RolesResp>(LIST_ROLES);

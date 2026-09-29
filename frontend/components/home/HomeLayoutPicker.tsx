@@ -65,7 +65,9 @@ export function HomeLayoutPicker({
             />
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold">{layout.title}</span>
+                <span className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
+                  {layout.title}
+                </span>
                 {defaultLayout === layout.key && (
                   <Badge variant="outline" className="text-2xs">
                     Suggested

@@ -104,6 +104,9 @@ class PrEventContext:
     renovate). Operators may opt out of building previews for
     bot-authored PRs."""
 
+    author_login: str = ""
+    """The PR author's login, kept on the preview it opens (#2155)."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AppPreviewContext:

@@ -71,7 +71,7 @@ export function grantHref({
   scope,
   returnTo,
 }: {
-  principal?: { kind: "user"; id: string; name: string };
+  principal?: { kind: "user" | "group" | "team"; id: string; name: string };
   scope?: { kind: string; id: string; name: string };
   returnTo?: string;
 }): string {
@@ -123,24 +123,25 @@ export function legacyTeamsHref(params: SearchParams): string {
 }
 
 const SCOPE_KINDS = ["ORG", "TEAM", "PROJECT", "APP"] as const;
+const PRINCIPAL_KINDS = ["user", "group", "team"] as const;
 
 /**
- * The grant page's preselection, read back from `grantHref`'s query: a user
- * to grant to, a scope to grant at, and where to go after. `return` must be
- * a path in this app, so the page can never send someone off-site.
+ * The grant page's preselection, read back from `grantHref`'s query: a user,
+ * an IdP group or a team to grant to, a scope to grant at, and where to go
+ * after. `return` must be a path in this app, so the page can never send
+ * someone off-site.
  */
 export function parseGrantParams(params: URLSearchParams): {
-  principal: { kind: "user"; id: string; name: string } | null;
+  principal: { kind: "user" | "group" | "team"; id: string; name: string } | null;
   scope: { kind: (typeof SCOPE_KINDS)[number]; id: string; name: string } | null;
   returnTo: string;
 } {
   const rawPrincipal = params.get("principal") ?? "";
   const [pKind, ...pRest] = rawPrincipal.split(":");
   const pId = pRest.join(":");
+  const pk = PRINCIPAL_KINDS.find((k) => k === pKind);
   const principal =
-    pKind === "user" && pId
-      ? { kind: "user" as const, id: pId, name: params.get("principalName") || pId }
-      : null;
+    pk && pId ? { kind: pk, id: pId, name: params.get("principalName") || pId } : null;
 
   const rawScope = params.get("scope") ?? "";
   const [sKind, ...sRest] = rawScope.split(":");

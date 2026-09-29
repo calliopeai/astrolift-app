@@ -2,14 +2,17 @@
 
 import * as React from "react";
 
+import { saveUiPrefs, type ServerUiPrefs } from "@/lib/ui-prefs-sync";
+
 /**
  * Visualization preferences: how a person likes fleets, workflows and app
  * dashboards drawn. Every style renders the same data model and the same
  * status semantics; only the picture changes (spec 44 viz addendum).
  *
- * Stored client-side like `lib/appearance.ts`: a per-person display choice.
- * There is no server-side UI preference store yet; `STORAGE_KEY` is the only
- * seam to move when one exists. Reads are defensive, as in appearance.
+ * The person's server preferences are the source of truth when signed in
+ * (#2154, see lib/ui-prefs-sync.ts); the browser copy under `STORAGE_KEY` is
+ * the first paint and the offline fallback. Reads are defensive, as in
+ * appearance.
  */
 
 export const FLEET_VIEWS = {
@@ -76,14 +79,27 @@ function pick<T extends string>(value: unknown, allowed: Record<T, unknown>, fal
 /** Parse whatever is stored, dropping unknown or stale values field by field. */
 export function parseVizPrefs(raw: string | null): VizPrefs {
   if (!raw) return DEFAULT_VIZ_PREFS;
-  let data: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return DEFAULT_VIZ_PREFS;
-    data = parsed as Record<string, unknown>;
+    return coerce(parsed as Record<string, unknown>);
   } catch {
     return DEFAULT_VIZ_PREFS;
   }
+}
+
+/**
+ * The server's answer as viz prefs. It replaces the browser copy outright
+ * (the server resolves an unset field to its default already); a value this
+ * build does not know reads as the product default.
+ */
+export function vizPrefsFromServer(
+  server: Pick<ServerUiPrefs, "fleetView" | "workflowView" | "appView" | "flowParticles" | "motion">
+): VizPrefs {
+  return coerce(server);
+}
+
+function coerce(data: Record<string, unknown>): VizPrefs {
   const d = DEFAULT_VIZ_PREFS;
   return {
     fleetView: pick(data.fleetView, FLEET_VIEWS, d.fleetView),
@@ -132,12 +148,17 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** Take the server's answer as this page's prefs, without sending it back. */
+export function applyServerVizPrefs(server: ServerUiPrefs): void {
+  write(vizPrefsFromServer(server));
+}
+
 export function useVizPrefs(): [VizPrefs, (patch: Partial<VizPrefs>) => void] {
   const prefs = React.useSyncExternalStore(subscribe, read, () => DEFAULT_VIZ_PREFS);
-  const update = React.useCallback(
-    (patch: Partial<VizPrefs>) => write({ ...read(), ...patch }),
-    []
-  );
+  const update = React.useCallback((patch: Partial<VizPrefs>) => {
+    write({ ...read(), ...patch });
+    saveUiPrefs(patch);
+  }, []);
   return [prefs, update];
 }
 

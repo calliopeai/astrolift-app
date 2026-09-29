@@ -11,7 +11,7 @@ export const metadata = { title: "Deployments · Astrolift" };
  *
  * These variables have to be exactly the ones `deploymentsVariables` sends
  * for that view or the preload is a cache miss: no filters, no search, no
- * cursor and the list's first page size. (It is not imported: the list
+ * cursor, the list's default order and its first page size. (It is not imported: the list
  * declaration calls a `"use client"` helper at module scope.) A deep link
  * into another view, a filter or a changed page size falls through to the
  * client fetch.
@@ -21,6 +21,8 @@ const ALL_FIRST_PAGE = {
   environmentName: null,
   statuses: null,
   search: null,
+  filter: null,
+  sort: "-started",
   limit: 25,
   after: null,
 };

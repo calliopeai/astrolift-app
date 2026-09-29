@@ -1,13 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { ENTITY_ACCESS_LIST } from "@/components/screens/administration/access/entity-access";
 import {
-  LONG_ROLE_BINDINGS,
-  ROLE_BINDINGS,
-} from "@/components/screens/administration/access/fixtures";
-import { accessProps } from "@/components/screens/administration/access/principal.fixtures";
-import { ACCESS_LIST } from "@/components/screens/administration/access/principal-access";
-import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+  entityAccessProps,
+  TEAM_ACCESS,
+} from "@/components/screens/administration/access/principal.fixtures";
+import type { AccessEntry } from "@/components/screens/administration/access/entity-access";
 
 import { TeamAccessPanel } from "./TeamAccessPanel";
 import { PROJECTS } from "./teams.fixtures";
@@ -20,52 +19,48 @@ export default meta;
 
 type Story = StoryObj;
 
-const AT_TEAM: AstroliftRoleBinding[] = ROLE_BINDINGS.map((b, i) => ({
-  ...b,
-  id: `rb-t${i}`,
-  scopeKind: "TEAM" as const,
-  scopeId: "14",
-  sourceScopeLabel: "team platform",
-  user:
-    i === 2
-      ? null
-      : { ...b.user!, id: `u-${i}`, username: ["leo", "keith", "", "eric", "ada"][i]! },
-  groupExternalId: i === 2 ? "okta:platform-oncall" : "",
-}));
+const LONG_ENTRY: AccessEntry = {
+  ...TEAM_ACCESS[2]!,
+  bindingId: "rb-long",
+  groupExternalId: "azure_ad:emea-regional-compliance-and-release-coordination-group-0001",
+  sourceScopeLabel:
+    "project emea/emea-subsidiary-quarter-end-freeze-coordination-and-release-readiness",
+};
 
 function Panel({
-  bindings = AT_TEAM,
+  entries = TEAM_ACCESS,
   projects = PROJECTS,
-  reachLoading = false,
+  loading = false,
 }: {
-  bindings?: AstroliftRoleBinding[];
+  entries?: AccessEntry[];
   projects?: typeof PROJECTS;
-  reachLoading?: boolean;
+  loading?: boolean;
 }) {
-  const list = useLocalListState(ACCESS_LIST);
+  const list = useLocalListState(ENTITY_ACCESS_LIST);
   return (
     <TeamAccessPanel
       slug="platform"
-      access={{ list, ...accessProps(list, bindings) }}
-      reach={{ projects, loading: reachLoading, error: null, onRetry: () => {} }}
+      access={{ list, ...entityAccessProps({ rows: entries, loading }) }}
+      reach={{ projects, loading, error: null, onRetry: () => {} }}
     />
   );
 }
 
+/** Who has access on the team, and why, beside what a grant here reaches. */
 export const Full: Story = { render: () => <Panel /> };
 
-export const Loading: Story = { render: () => <Panel bindings={[]} projects={[]} reachLoading /> };
+export const Loading: Story = { render: () => <Panel entries={[]} projects={[]} loading /> };
 
-export const Empty: Story = { render: () => <Panel bindings={[]} projects={[]} /> };
+export const Empty: Story = { render: () => <Panel entries={[]} projects={[]} /> };
 
 export const LongStrings: Story = {
-  render: () => <Panel bindings={[...LONG_ROLE_BINDINGS, ...AT_TEAM]} />,
+  render: () => <Panel entries={[LONG_ENTRY, ...TEAM_ACCESS]} />,
 };
 
 export const Width768: Story = {
   render: () => (
     <div style={{ width: 768 }} className="overflow-hidden border p-4">
-      <Panel bindings={[...LONG_ROLE_BINDINGS, ...AT_TEAM]} />
+      <Panel entries={[LONG_ENTRY, ...TEAM_ACCESS]} />
     </div>
   ),
 };

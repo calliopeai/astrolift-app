@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
-import { secretProviders, secretState, selectSecrets } from "./agent-secrets-list";
+import { effectiveFilters, parseListState } from "@/components/list/list-state";
+
+import { AGENT_SECRETS_LIST, agentSecretsPageVariables, secretState } from "./agent-secrets-list";
 
 const ref = (envVar: string, over: Partial<AstroliftAgentSecretStatus> = {}) =>
   ({
@@ -28,33 +30,54 @@ describe("secretState", () => {
   });
 });
 
-describe("selectSecrets", () => {
-  const asc = [{ key: "envVar", dir: "asc" as const }];
+function forQuery(qs: string) {
+  const state = parseListState(AGENT_SECRETS_LIST, qs);
+  return agentSecretsPageVariables({
+    q: state.q,
+    filters: effectiveFilters(AGENT_SECRETS_LIST, state),
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+  });
+}
 
-  it("sorts by variable name by default", () => {
-    expect(selectSecrets(ROWS, {}, "", asc, 1, 25).rows.map((r) => r.envVar)).toEqual([
-      "CRM_TOKEN",
-      "OPENAI_KEY",
-      "SLACK_TOKEN",
-    ]);
+describe("agentSecretsPageVariables", () => {
+  it("asks for page 1 by variable name with no filter on a cold load", () => {
+    expect(forQuery("")).toEqual({
+      search: null,
+      filter: null,
+      sort: "envVar",
+      page: 1,
+      pageSize: 25,
+    });
   });
 
-  it("puts errors first when sorted by status", () => {
-    const sorted = selectSecrets(ROWS, {}, "", [{ key: "status", dir: "asc" }], 1, 25);
-    expect(sorted.rows.map((r) => r.envVar)).toEqual(["SLACK_TOKEN", "CRM_TOKEN", "OPENAI_KEY"]);
+  it("sends each status as the server's exists and failing flags", () => {
+    expect(forQuery("status=set").filter).toEqual({ exists: true, failing: false });
+    expect(forQuery("status=missing").filter).toEqual({ exists: false, failing: false });
+    expect(forQuery("status=error").filter).toEqual({ failing: true });
   });
 
-  it("filters by status and provider, searches name and URI, and counts before paging", () => {
-    expect(selectSecrets(ROWS, { status: "missing" }, "", asc, 1, 25).totalCount).toBe(1);
-    expect(selectSecrets(ROWS, { provider: "vault" }, "", asc, 1, 25).rows[0]?.envVar).toBe(
-      "SLACK_TOKEN"
-    );
-    expect(selectSecrets(ROWS, {}, "openai_key", asc, 1, 25).totalCount).toBe(1);
-    const paged = selectSecrets(ROWS, {}, "", asc, 2, 2);
-    expect(paged).toMatchObject({ totalCount: 3, rows: [{ envVar: "SLACK_TOKEN" }] });
+  it("sends the provider chip, search, sort and page through", () => {
+    expect(forQuery("provider=vault&q=%20openai%20&sort=-exists&page=2")).toEqual({
+      search: "openai",
+      filter: { provider: ["vault"] },
+      sort: "-exists",
+      page: 2,
+      pageSize: 25,
+    });
   });
 
-  it("lists each provider once, sorted", () => {
-    expect(secretProviders(ROWS)).toEqual(["aws-secrets-manager", "vault"]);
+  it("matches the set, missing and error rows the status chips name", () => {
+    // Each chip's flags pick out exactly the rows secretState gives that state.
+    const pick = (f: { exists?: boolean; failing?: boolean }) =>
+      ROWS.filter(
+        (r) =>
+          (f.exists === undefined || r.exists === f.exists) &&
+          (f.failing === undefined || Boolean(r.error) === f.failing)
+      ).map(secretState);
+    expect(pick(forQuery("status=set").filter!)).toEqual(["set"]);
+    expect(pick(forQuery("status=missing").filter!)).toEqual(["missing"]);
+    expect(pick(forQuery("status=error").filter!)).toEqual(["error"]);
   });
 });

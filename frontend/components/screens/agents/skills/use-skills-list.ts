@@ -4,22 +4,30 @@ import { useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useListState } from "@/components/list/use-list-state";
-import { LIST_SKILLS } from "@/graphql/agents/agents.queries";
+import { SKILLS_LIST_PAGE } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
-import { SKILLS_LIST, type SkillListItem, selectSkills } from "./skills-list";
+import { SKILLS_LIST, type SkillListItem, skillsPageVariables } from "./skills-list";
 
 export type { SkillListItem } from "./skills-list";
 
-type SkillsData = { skills: SkillListItem[] };
+type SkillsData = {
+  skillsPage: {
+    items: SkillListItem[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+};
 
 /** `?import=1` opens the Import from repo sheet, so /agents/skills/import can land on it. */
 export const IMPORT_PARAM = "import";
 
 /**
- * The skill registry on the shared list: URL list state, the org's skills
- * and the global catalog in one read, and the page `selectSkills` cuts from
- * it. The data half of SkillsListScreen.
+ * The skill registry on the shared list: URL list state in, one numbered
+ * page of `skillsPage` out (the org's skills and the global catalog, #2155).
+ * The server filters, searches, sorts and counts. The data half of
+ * SkillsListScreen.
  */
 export function useSkillsList() {
   const list = useListState(SKILLS_LIST);
@@ -32,19 +40,23 @@ export function useSkillsList() {
   const { org, loading: orgLoading } = useActiveOrg();
   const orgId = org?.id ?? "";
 
-  const { data, previousData, loading, error, refetch } = useQuery<SkillsData>(LIST_SKILLS, {
-    variables: { orgId },
+  const { data, previousData, loading, error, refetch } = useQuery<SkillsData>(SKILLS_LIST_PAGE, {
+    variables: {
+      orgId,
+      ...skillsPageVariables({
+        q: state.q,
+        filters: list.filters,
+        sort: state.sort,
+        page: state.page,
+        pageSize: state.pageSize,
+      }),
+    },
     fetchPolicy: "cache-and-network",
     skip: !orgId,
   });
-  const skills = (data ?? previousData)?.skills ?? [];
-  const { rows, totalCount } = selectSkills(skills, {
-    filters: list.filters,
-    q: state.q,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-  });
+  const shown = data ?? previousData;
+  const rows = shown?.skillsPage.items ?? [];
+  const totalCount = shown?.skillsPage.totalCount ?? rows.length;
 
   function setImportOpen(open: boolean) {
     const p = new URLSearchParams(params?.toString() ?? "");
@@ -58,7 +70,9 @@ export function useSkillsList() {
     list,
     rows,
     totalCount,
-    loading: (loading || orgLoading) && skills.length === 0 && !error,
+    loading: (loading || orgLoading || !orgId) && !shown && !error,
+    // Rows on screen answer the previous list state while the next loads.
+    stale: loading && !data && Boolean(shown),
     error: error ? { message: error.message } : null,
     onRetry: () => {
       void refetch();

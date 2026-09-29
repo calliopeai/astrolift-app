@@ -1,6 +1,6 @@
 /**
  * Hand-typed fixtures for the Apps list (components/screens/apps/list/).
- * Data only; the screen is fed through `selectApps`, as the hook feeds it.
+ * Data only: the rows a page of `astroliftAppsPage` returns, as the hook maps them.
  */
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import type { TopologyKind } from "@/lib/topology";

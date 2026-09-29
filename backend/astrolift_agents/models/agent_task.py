@@ -19,11 +19,13 @@ the only sanctioned way to advance status.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
 from core.models.base import BaseCoreModel
+from core.run_trigger import RunTrigger
 
 
 class AgentTask(BaseCoreModel):
@@ -137,6 +139,23 @@ class AgentTask(BaseCoreModel):
     # caller's own requester identity. Null for the (still supported)
     # no-key call, and for every other dispatch path.
     client_request_id = models.UUIDField(null=True, blank=True)
+    # Who and what started the run (#2152). ``triggered_by_user`` is the
+    # person behind it (the session user, or a token's owner), null for a
+    # schedule, a webhook or a run another run started without one.
+    # ``trigger_kind`` is the shared vocabulary in ``core.run_trigger``;
+    # every creation path sets it, and ``unknown`` marks rows from before.
+    triggered_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="triggered_agent_tasks",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    trigger_kind = models.CharField(
+        max_length=16,
+        choices=RunTrigger.choices,
+        default=RunTrigger.UNKNOWN,
+    )
     # Lifecycle timestamps.
     queued_at = models.DateTimeField(null=True, blank=True)
     provisioning_at = models.DateTimeField(null=True, blank=True)

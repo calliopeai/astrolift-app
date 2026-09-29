@@ -4,7 +4,9 @@ import { useLocalListState } from "@/components/list/use-list-state";
 
 import { ROLE_BINDINGS } from "./fixtures";
 import { GroupDetail, GroupMembersPanel } from "./GroupDetail";
-import { accessProps } from "./principal.fixtures";
+import { GROUP_MAPPINGS_LIST } from "./group-mappings";
+import { GroupMappingsPanel } from "./GroupMappingsPanel";
+import { accessProps, mappingsProps } from "./principal.fixtures";
 import { ACCESS_LIST } from "./principal-access";
 import { PrincipalAccessPanel } from "./PrincipalAccessPanel";
 
@@ -26,12 +28,25 @@ const groupBindings = ROLE_BINDINGS.slice(0, 3).map((b) => ({
   groupExternalId: GROUP,
 }));
 
-const NOTE =
-  "The resolver does not match group grants yet, so these give members nothing until it does.";
-
-function Access({ bindings = groupBindings }: { bindings?: typeof groupBindings }) {
+/** The Access tab as the route mounts it: the group's grants, then its role mappings. */
+function Access({
+  bindings = groupBindings,
+  mapped = true,
+}: {
+  bindings?: typeof groupBindings;
+  mapped?: boolean;
+}) {
   const list = useLocalListState(ACCESS_LIST);
-  return <PrincipalAccessPanel list={list} {...accessProps(list, bindings, { note: NOTE })} />;
+  const mappingsList = useLocalListState(GROUP_MAPPINGS_LIST);
+  return (
+    <>
+      <PrincipalAccessPanel list={list} {...accessProps(list, bindings)} />
+      <GroupMappingsPanel
+        list={mappingsList}
+        {...mappingsProps(mapped ? { externalId: GROUP } : { externalId: GROUP, rows: [] })}
+      />
+    </>
+  );
 }
 
 export const AccessTab: Story = {
@@ -53,7 +68,7 @@ export const MembersTab: Story = {
 export const NoGrants: Story = {
   render: () => (
     <GroupDetail externalId={GROUP} tab="access">
-      <Access bindings={[]} />
+      <Access bindings={[]} mapped={false} />
     </GroupDetail>
   ),
 };

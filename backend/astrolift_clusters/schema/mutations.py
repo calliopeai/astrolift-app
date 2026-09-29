@@ -200,6 +200,14 @@ def _caller(info: Info):
     return getattr(request, "user", None) or getattr(info.context, "user", None)
 
 
+def _registering_user(info: Info):
+    """The signed-in user behind a register call, or None (anonymous, a key)."""
+    user = _caller(info)
+    if user is not None and getattr(user, "is_authenticated", False) and getattr(user, "pk", None):
+        return user
+    return None
+
+
 def canonical_zone(zone: str) -> str:
     """A DNS zone name in the one form rows store: lowercase, no trailing dot."""
     return (zone or "").strip().lower().rstrip(".")
@@ -679,6 +687,8 @@ class ClustersMutation:
             auth_config=input.auth_config or {},
             provider_config=input.provider_config or {},
             ingress_class=input.ingress_class or "nginx",
+            # Who registered it: the list's Registered by column and Mine (#2150).
+            created_by=_registering_user(info),
         )
         return gql_success(cluster_to_type(cluster))
 

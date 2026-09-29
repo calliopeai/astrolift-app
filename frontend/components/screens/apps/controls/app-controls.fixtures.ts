@@ -26,6 +26,9 @@ export const ENV_PROD: AstroliftAppEnvironment = {
   id: "env-prod",
   name: "prod",
   registeredAppSlug: "storefront",
+  kind: "production",
+  region: "us-west-2",
+  ownedByMe: false,
   clusterId: "c0ffee00-0000-4000-8000-000000000001",
   clusterSlug: "prod-west",
   clusterProviderPluginSlug: "aws",
@@ -76,6 +79,7 @@ export const WORKLOAD_WEB: AstroliftWorkload = {
   inClusterServiceFqdn: "web.storefront-prod.svc.cluster.local",
   storageClass: "",
   storageSize: "",
+  ownedByMe: false,
   volumes: [] as unknown as AstroliftWorkload["volumes"],
 };
 

@@ -12,10 +12,12 @@
  *   data-density  layout scale      compact | cards
  *   --radius      corner radius     inline style
  *
- * Stored client-side: this is a per-person display preference, not org state,
- * and it must apply before first paint (see the inline script in layout.tsx),
- * which rules out fetching it. Reads are defensive — Safari private mode and
- * embedded webviews throw on localStorage access rather than returning null.
+ * A per-person display preference, not org state. When signed in the
+ * person's server preferences hold it (#2154, lib/ui-prefs-sync.ts); the
+ * browser copy stays because it must apply before first paint (see the inline
+ * script in layout.tsx), which rules out waiting for a fetch. Reads are
+ * defensive: Safari private mode and embedded webviews throw on localStorage
+ * access rather than returning null.
  */
 
 export const GROUNDS = {
@@ -259,6 +261,16 @@ export function readAppearance(): Partial<Appearance> | null {
     // private mode, disabled storage, or malformed JSON — treat as unset
     return null;
   }
+}
+
+/**
+ * The person's appearance as the server holds it (#2154): the same partial,
+ * or `null` when they have never chosen (an empty object). It replaces the
+ * browser copy when signed in.
+ */
+export function appearanceFromServer(raw: unknown): Partial<Appearance> | null {
+  const parsed = normalizePartial(raw);
+  return Object.keys(parsed).length > 0 ? parsed : null;
 }
 
 export function writeAppearance(next: Partial<Appearance>): void {

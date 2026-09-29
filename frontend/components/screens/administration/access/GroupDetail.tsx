@@ -1,12 +1,15 @@
 "use client";
 
-import { UsersRoundIcon } from "lucide-react";
+import { ShieldPlusIcon, UsersRoundIcon } from "lucide-react";
+import Link from "next/link";
 import type * as React from "react";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
-import { accessCrumbs, PEOPLE_HREF } from "./access-nav";
+import { accessCrumbs, grantHref, PEOPLE_HREF } from "./access-nav";
 import { PrincipalPage } from "./PrincipalPage";
 import { type GroupTab, groupTabs } from "./principal-tabs";
 
@@ -19,12 +22,14 @@ export interface GroupDetailProps {
 
 /**
  * An IdP group's page (access UX design 3.2). A group is known by its
- * external id, which is all a role binding carries, so the page needs no
- * lookup of its own: its Access tab lists the grants the group holds, and
- * Members says where its members come from. No Grant access action: the
- * backend grants roles to users only (design 6.9). Pure.
+ * external id, which is all a grant or mapping carries, so the page needs no
+ * lookup of its own: its Access tab lists the grants the group holds and its
+ * role mappings, and Members says where its members come from. The resolver
+ * applies both to everyone the identity provider puts in the group (#2157),
+ * so Grant access grants to the group itself. Pure.
  */
 export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
+  const self = `${PEOPLE_HREF}/${encodeURIComponent(`group:${externalId}`)}`;
   return (
     <PrincipalPage
       crumbs={accessCrumbs("people", externalId)}
@@ -34,6 +39,21 @@ export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
         <Badge variant="secondary" className="text-2xs">
           IdP group
         </Badge>
+      }
+      primaryAction={
+        <Can permission="org.manage_members">
+          <Button size="sm" asChild>
+            <Link
+              href={grantHref({
+                principal: { kind: "group", id: externalId, name: externalId },
+                returnTo: self,
+              })}
+            >
+              <ShieldPlusIcon className="size-4" />
+              Grant access
+            </Link>
+          </Button>
+        </Can>
       }
       tabs={groupTabs(externalId, tab)}
       loading={false}
@@ -53,17 +73,17 @@ export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
 }
 
 /**
- * A group's Members tab. Its members live in the identity provider, and
- * Astrolift has no group list or member sync yet (design 6.2, 6.4), so this
- * says so and points at the provider rather than showing an empty table
- * that reads as "nobody".
+ * A group's Members tab. Its members live in the identity provider: each
+ * person's groups are recorded when they sign in, and there is no query
+ * that lists a group's members yet, so this says so and points at the
+ * provider rather than showing an empty table that reads as "nobody".
  */
 export function GroupMembersPanel({ externalId }: { externalId: string }) {
   return (
     <EmptyState
       icon={<UsersRoundIcon className="size-5" />}
       title="Members come from your identity provider"
-      description={`Astrolift does not sync who is in ${externalId} yet, so it cannot list them here. The provider's own console has the members; the grants this group holds are on the Access tab.`}
+      description={`Astrolift records who is in ${externalId} when each person signs in, and does not list them here yet. The provider's own console has the members; what the group gives them is on the Access tab.`}
       actionHref="/providers#identity"
       actionLabel="Identity provider"
     />

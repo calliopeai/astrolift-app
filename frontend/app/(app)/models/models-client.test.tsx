@@ -17,6 +17,8 @@ const models = [
     ownerScope: "app",
     clusterSlug: "c1",
     environmentName: "prod",
+    deployedByEmail: "leo@example.com",
+    deployedByMe: true,
   },
   {
     id: "m2",
@@ -30,16 +32,26 @@ const models = [
     ownerScope: "project",
     clusterSlug: "c1",
     environmentName: "",
+    deployedByEmail: "",
+    deployedByMe: false,
   },
 ];
 
+const page = (items: typeof models) => ({
+  astroliftModelEndpointsPage: { items, totalCount: items.length, page: 1, pageSize: 25 },
+});
+
 let result: { data?: unknown; loading: boolean; error?: Error } = {
-  data: { astroliftModelEndpoints: models },
+  data: page(models),
   loading: false,
 };
+let lastOptions: { variables?: unknown } | undefined;
 
 vi.mock("@apollo/client/react", () => ({
-  useQuery: () => result,
+  useQuery: (_query: unknown, options: { variables?: unknown }) => {
+    lastOptions = options;
+    return result;
+  },
   useMutation: () => [vi.fn(), { loading: false }],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -71,8 +83,19 @@ describe("ModelsClient", () => {
     );
   });
 
+  it("asks the server for the first page by name, with no filter", () => {
+    render(<ModelsClient />);
+    expect(lastOptions?.variables).toEqual({
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
+    });
+  });
+
   it("says so when there are no models", () => {
-    result = { data: { astroliftModelEndpoints: [] }, loading: false };
+    result = { data: page([]), loading: false };
     render(<ModelsClient />);
     expect(screen.getByText("No models yet")).toBeVisible();
   });

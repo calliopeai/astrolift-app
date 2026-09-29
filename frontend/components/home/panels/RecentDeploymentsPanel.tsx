@@ -2,7 +2,8 @@
 
 /**
  * Recent deployments (spec 44 §4.3): the five newest deploys the viewer
- * can see, as a ListSummary to Apps › Deployments.
+ * can see, as a ListSummary to Apps › Deployments. Its count is within
+ * Home's shared deployments read, so it is absent when that read is full.
  */
 
 import { RocketIcon } from "lucide-react";

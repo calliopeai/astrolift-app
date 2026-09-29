@@ -24,6 +24,58 @@ export const LIST_ENVIRONMENTS = gql`
   }
 `;
 
+/**
+ * ``LIST_ENVIRONMENTS`` on the §5.1 list contract (#2155): one numbered
+ * page with an exact filtered ``totalCount``. ``filter`` takes kind, app,
+ * cluster, region and owner ("me" allowed); ``sort`` takes name, app, kind,
+ * cluster, region and created, several keys at once.
+ */
+export const LIST_ENVIRONMENTS_PAGE = gql`
+  query ListEnvironmentsPage(
+    $appSlug: String
+    $search: String
+    $filter: AstroliftEnvironmentsFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftEnvironmentsPage(
+      appSlug: $appSlug
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        id
+        name
+        url
+        deploysPaused
+        ingressPaused
+        requiredApprovals
+        registeredAppSlug
+        clusterSlug
+        clusterId
+        clusterProviderPluginSlug
+        domainZone
+        createdAt
+        kind
+        region
+        ownedByMe
+        settings {
+          id
+          key
+          value
+        }
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
 export const LIST_DEPLOYMENTS = gql`
   query ListDeployments($appSlug: String, $environmentName: String, $limit: Int) {
     astroliftDeployments(appSlug: $appSlug, environmentName: $environmentName, limit: $limit) {
@@ -167,6 +219,8 @@ export const LIST_DEPLOYMENTS_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $filter: AstroliftDeploymentsFilter
+    $sort: String
   ) {
     astroliftDeploymentsPage(
       appSlug: $appSlug
@@ -176,6 +230,8 @@ export const LIST_DEPLOYMENTS_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      filter: $filter
+      sort: $sort
     ) {
       items {
         ...DeploymentFields
@@ -372,6 +428,7 @@ export const LIST_SCHEDULED_JOB_RUNS_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $filter: AstroliftScheduledJobRunsFilter
   ) {
     astroliftScheduledJobRunsPage(
       appSlug: $appSlug
@@ -380,6 +437,7 @@ export const LIST_SCHEDULED_JOB_RUNS_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      filter: $filter
     ) {
       items {
         ...ScheduledJobRunFields
@@ -454,8 +512,20 @@ const COMMAND_RUN_FIELDS = gql`
  */
 export const LIST_COMMAND_RUNS_PAGE = gql`
   ${COMMAND_RUN_FIELDS}
-  query ListCommandRunsPage($appSlug: String, $search: String, $limit: Int, $after: String) {
-    astroliftCommandRunsPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
+  query ListCommandRunsPage(
+    $appSlug: String
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftCommandRunsFilter
+  ) {
+    astroliftCommandRunsPage(
+      appSlug: $appSlug
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+    ) {
       items {
         ...CommandRunFields
       }
@@ -627,8 +697,8 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
         podCount
       }
       estimatedDailyCostUsd
-    estimatedCostNotes
-    estimatedCostApproximate
+      estimatedCostNotes
+      estimatedCostApproximate
       estimatedCostNotes
       estimatedCostApproximate
     }
@@ -666,9 +736,9 @@ const PREVIEW_ENVIRONMENT_FIELDS = gql`
  * Cursor-paginated companion to ``LIST_PREVIEW_ENVIRONMENTS`` (#1230).
  *
  * ``appSlug`` stays optional so the same document serves both the app's
- * Previews tab and the fleet-wide Previews surface. ``search`` is the only
- * other filter; there is no status filter and no sort argument on this
- * field, so a table over it declares neither.
+ * Previews tab and the fleet-wide Previews surface. ``filter`` (status,
+ * openedBy, manual) and a one-key ``sort`` (created, deployed or ttl, either
+ * direction; default ``-created``) arrived with #2155; both are optional.
  */
 export const LIST_PREVIEW_ENVIRONMENTS_PAGE = gql`
   ${PREVIEW_ENVIRONMENT_FIELDS}
@@ -677,12 +747,16 @@ export const LIST_PREVIEW_ENVIRONMENTS_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $filter: AstroliftPreviewEnvironmentsFilter
+    $sort: String
   ) {
     astroliftPreviewEnvironmentsPage(
       appSlug: $appSlug
       search: $search
       limit: $limit
       after: $after
+      filter: $filter
+      sort: $sort
     ) {
       items {
         ...PreviewEnvironmentFields

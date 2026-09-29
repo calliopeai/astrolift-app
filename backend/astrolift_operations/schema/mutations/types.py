@@ -7,6 +7,7 @@ import datetime as dt
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_operations.schema.audit_list import AuditEventsFilterInput
 from astrolift_operations.schema.types import (
     WebhookSubscriptionType,
 )
@@ -233,6 +234,13 @@ class ExportAuditEventsInput:
     action: str | None = None
     decision: str | None = None
     actor_id: str | None = None
+    # The rest of ``astroliftAuditEventsPage``'s arguments (#2151), so the
+    # file holds the rows the screen shows, target kind chip included.
+    search: str | None = None
+    target_kind: str | None = None
+    target_id: str | None = None
+    subject_user_id: str | None = None
+    filter: AuditEventsFilterInput | None = None
 
 
 @strawberry.input

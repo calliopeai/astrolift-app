@@ -16,7 +16,7 @@ export type ToolRegistryScreenProps = ToolRegistryState;
 /**
  * Agents › Tools (spec 44 §4.4, §5.1): every tool definition across every
  * skill in the org on the shared list, views All · Mine · Built-in · Custom,
- * an adapter filter, numbered pages. Tools are registered on a skill's Tools
+ * skill and adapter filters, numbered pages. Tools are registered on a skill's Tools
  * tab, so the page has no create action of its own. Pure view; the data
  * half is useToolRegistry.
  */
@@ -25,6 +25,7 @@ export function ToolRegistryScreen({
   rows,
   totalCount,
   loading,
+  stale,
   error,
   onRetry,
 }: ToolRegistryScreenProps) {
@@ -46,6 +47,25 @@ export function ToolRegistryScreen({
           </span>
         </span>
       ),
+    },
+    {
+      id: "skill",
+      header: "Skill",
+      sortKey: "skill",
+      cellClassName: "max-w-56",
+      cell: (t) =>
+        t.skillSlug ? (
+          <span className="block min-w-0">
+            <span className="block truncate text-sm" title={t.skillName || t.skillSlug}>
+              {t.skillName || t.skillSlug}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs">
+              {t.isBuiltin ? "Built-in" : t.skillIsGlobal ? "Global" : "Organization"}
+            </span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">none</span>
+        ),
     },
     {
       id: "adapter",
@@ -113,6 +133,7 @@ export function ToolRegistryScreen({
       getRowId={(t) => t.id}
       rowHref={(t) => `/agents/tools/${t.id}`}
       loading={loading}
+      stale={stale}
       error={error}
       onRetry={onRetry}
       empty={{

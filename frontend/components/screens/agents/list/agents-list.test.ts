@@ -4,18 +4,17 @@ import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
 import {
   AGENTS_LIST,
-  agentStatusKey,
+  agentFleetPageVariables,
   agentsFormerTabTarget,
   agentsCrumbs,
   formatRunMode,
-  joinAgents,
-  selectAgents,
+  toAgentRow,
 } from "./agents-list";
-import { AGENT_ROWS, FLEET, MANY_AGENT_ROWS, agent } from "./agents-list.fixtures";
+import { agent, AGENT_ROWS, NEXT_DIGEST } from "./agents-list.fixtures";
 
-function forQuery(qs: string, rows = AGENT_ROWS) {
+function forQuery(qs: string) {
   const state = parseListState(AGENTS_LIST, qs);
-  return selectAgents(rows, {
+  return agentFleetPageVariables("org-1", {
     q: state.q,
     filters: effectiveFilters(AGENTS_LIST, state),
     sort: state.sort,
@@ -24,13 +23,11 @@ function forQuery(qs: string, rows = AGENT_ROWS) {
   });
 }
 
-const slugs = (r: { rows: { slug: string }[] }) => r.rows.map((a) => a.slug);
-
 describe("AGENTS_LIST", () => {
   it("leads with All and Mine, then Paused, on numbered pages", () => {
     expect(AGENTS_LIST.views.map((v) => v.label)).toEqual(["All", "Mine", "Paused"]);
     expect(AGENTS_LIST.paging).toBe("numbered");
-    expect(AGENTS_LIST.views.find((v) => v.key === "mine")?.note).toMatch(/until agents record/);
+    expect(AGENTS_LIST.views.find((v) => v.key === "mine")?.note).toMatch(/agents you registered/);
   });
 
   it("filters on project, status, model, runtime and cluster", () => {
@@ -41,6 +38,9 @@ describe("AGENTS_LIST", () => {
       "runtime",
       "cluster",
     ]);
+    expect(AGENTS_LIST.fields.find((f) => f.key === "model")?.options?.map((o) => o.value)).toEqual(
+      ["managed", "gateway", "api-key"]
+    );
   });
 });
 
@@ -54,92 +54,65 @@ describe("agentsCrumbs", () => {
   });
 });
 
-describe("agentStatusKey", () => {
-  it("prefers running, then paused, then a failed last run, then a schedule", () => {
-    const base = agent("x");
-    expect(agentStatusKey({ ...base, runningCount: 1, runPaused: true })).toBe("running");
-    expect(agentStatusKey({ ...base, runPaused: true, lastRunStatus: "failed" })).toBe("paused");
-    expect(agentStatusKey({ ...base, lastRunStatus: "timed_out" })).toBe("failing");
-    expect(
-      agentStatusKey(base, { runningCount: 0, isPaused: false, nextScheduledAt: "2026-09-29" })
-    ).toBe("scheduled");
-    expect(agentStatusKey(base)).toBe("idle");
+describe("agentFleetPageVariables", () => {
+  it("asks for page 1 by name with no filter on a cold load", () => {
+    expect(forQuery("")).toEqual({
+      orgId: "org-1",
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
+    });
   });
 
-  it("reads live status over the fleet row once it arrives", () => {
-    const base = agent("x", { runningCount: 3 });
-    expect(agentStatusKey(base, { runningCount: 0, isPaused: false, nextScheduledAt: null })).toBe(
-      "idle"
-    );
+  it("sends Mine as owner me and Paused as paused", () => {
+    expect(forQuery("view=mine").filter).toEqual({ owner: ["me"] });
+    expect(forQuery("view=paused").filter).toEqual({ paused: true });
+  });
+
+  it("sends each chip as a one-value list", () => {
+    expect(
+      forQuery("status=failing&model=gateway&runtime=codex&project=docs&cluster=gke-eu-west-4")
+        .filter
+    ).toEqual({
+      project: ["docs"],
+      status: ["failing"],
+      model: ["gateway"],
+      runtime: ["codex"],
+      cluster: ["gke-eu-west-4"],
+    });
+  });
+
+  it("passes search, sort and page through", () => {
+    const v = forQuery("q=%20reports%20&sort=-lastRun,name&page=3&pageSize=50");
+    expect(v.search).toBe("reports");
+    expect(v.sort).toBe("-lastRun,name");
+    expect(v.page).toBe(3);
+    expect(v.pageSize).toBe(50);
   });
 });
 
-describe("joinAgents", () => {
-  it("takes model and runtime from the spec that shares the slug, clusters from the app", () => {
-    const [triage] = AGENT_ROWS;
+describe("toAgentRow", () => {
+  it("reads status, model, runtime, clusters and owner off the server row", () => {
+    const triage = AGENT_ROWS.find((a) => a.slug === "triage-bot")!;
+    expect(triage.status).toBe("running");
+    expect(triage.running).toBe(2);
     expect(triage.model).toBe("managed");
     expect(triage.runtime).toBe("claude");
     expect(triage.clusters).toEqual(["conflict-astrolift", "eks-us-west-2"]);
-    expect(triage.running).toBe(2);
     expect(triage.mine).toBe(true);
-    const docs = AGENT_ROWS.find((a) => a.slug === "docs-service")!;
-    expect(docs.model).toBeNull();
-    expect(docs.clusters).toEqual([]);
-    expect(docs.mine).toBe(false);
-    expect(docs.status).toBe("scheduled");
+    const digest = AGENT_ROWS.find((a) => a.slug === "hourly-digest")!;
+    expect(digest.model).toBe("gateway");
+    expect(digest.nextScheduledAt).toBe(NEXT_DIGEST);
   });
 
-  it("keeps every fleet row when the side queries return nothing", () => {
-    const rows = joinAgents(FLEET, {
-      live: [],
-      specs: [],
-      environments: [],
-      myAppSlugs: new Set(),
-    });
-    expect(rows).toHaveLength(FLEET.length);
-    expect(rows.every((r) => r.model === null && r.clusters.length === 0)).toBe(true);
-  });
-});
-
-describe("selectAgents", () => {
-  it("sorts by name by default", () => {
-    expect(slugs(forQuery(""))).toEqual([
-      "docs-service",
-      "nightly-report",
-      "no-repo",
-      "paused-sync",
-      "triage-bot",
-    ]);
-  });
-
-  it("answers the Mine and Paused views", () => {
-    expect(slugs(forQuery("view=mine"))).toEqual(["no-repo", "paused-sync", "triage-bot"]);
-    expect(slugs(forQuery("view=paused"))).toEqual(["paused-sync"]);
-  });
-
-  it("filters on status, model, runtime, project and cluster chips", () => {
-    expect(slugs(forQuery("status=failing"))).toEqual(["nightly-report"]);
-    expect(slugs(forQuery("model=api-key"))).toEqual(["nightly-report", "paused-sync"]);
-    expect(slugs(forQuery("runtime=service"))).toEqual(["docs-service"]);
-    expect(slugs(forQuery("runtime=codex"))).toEqual(["nightly-report"]);
-    expect(slugs(forQuery("project=docs"))).toEqual(["docs-service"]);
-    expect(slugs(forQuery("cluster=gke-eu-west-4"))).toEqual(["nightly-report"]);
-  });
-
-  it("searches name, slug, app, project and repo", () => {
-    expect(slugs(forQuery("q=reports"))).toEqual(["nightly-report"]);
-    expect(slugs(forQuery("q=TRIAGE"))).toEqual(["triage-bot"]);
-  });
-
-  it("sorts by the last run, newest first, never run last", () => {
-    const r = forQuery("sort=-lastRun,name");
-    expect(slugs(r).at(-1)).toBe("docs-service");
-  });
-
-  it("pages with the filtered count", () => {
-    const r = forQuery("page=3", MANY_AGENT_ROWS);
-    expect(r.totalCount).toBe(60);
-    expect(r.rows).toHaveLength(10);
+  it("reads no spec as no model and no runtime, and an unknown status as idle", () => {
+    const row = toAgentRow(agent("x", { status: "something-new", modelSource: null }));
+    expect(row.model).toBeNull();
+    expect(row.runtime).toBeNull();
+    expect(row.status).toBe("idle");
+    expect(row.nextScheduledAt).toBeNull();
   });
 });
 

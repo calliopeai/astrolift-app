@@ -19,15 +19,7 @@ export default function AuditPage() {
           and the list would still paint its loading skeleton. */}
       <PreloadQuery
         query={LIST_AUDIT_EVENTS_PAGE}
-        variables={{
-          limit: 100,
-          action: null,
-          decision: null,
-          actorId: null,
-          createdAtGte: null,
-          createdAtLte: null,
-          includeTotal: true,
-        }}
+        variables={{ limit: 100, search: null, filter: null, includeTotal: true }}
       >
         <PreloadQuery query={GET_AUDIT_RETENTION} variables={{}}>
           <AuditClient />

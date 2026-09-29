@@ -1,28 +1,20 @@
 /**
- * The Agents list declaration (spec 44 §5.1, §4.4) and the pure steps the
- * hook runs: the join that turns fleet rows into list rows, then views,
- * filters, sort and numbered pages.
+ * The Agents list declaration (spec 44 §5.1, §4.4), the list state spelled
+ * as `agentFleetPage` variables, and the step that makes a server row a list
+ * row.
  *
- * Why this runs here and not on the server: `agentFleet` is an unpaginated
- * list field with no filter, sort or page argument, and a fleet row carries
- * no model, runtime or cluster. The hook reads the org's fleet, live status,
- * environment specs (model and runtime; the spec slug is the agent slug) and
- * environments (cluster, by the agent's app) once each, `joinAgents` makes
- * rows of them, and `selectAgents` answers the list state. When the backend
- * grows the §5.1 contract the hook sends `list.filters`, `sort` and `page`
- * instead and this step goes away; the screen does not change.
+ * The server answers every view, chip, search, sort and page (#2155):
+ * status, model, runtime, cluster and owner are columns on the fleet row, so
+ * a numbered page's totalCount is exact. The only thing the hook adds is the
+ * next firing of the scheduled agents on the page, from `agentUpcomingRuns`.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type ListDefinition, formatSort, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
-import type {
-  AstroliftAgentEnvironmentSpec,
-  AstroliftAgentListItem,
-  AstroliftAgentLiveStatus,
-} from "@/graphql/agents/agents.types";
+import type { AstroliftAgentFleetRow, AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
-/** What the agent is doing now, from its live status and last run. */
+/** What the agent is doing now: the fleet row's server-computed status. */
 export type AgentStatusKey = "running" | "paused" | "failing" | "scheduled" | "idle";
 
 export const AGENT_STATUS_ORDER: AgentStatusKey[] = [
@@ -52,19 +44,23 @@ export const AGENT_STATUS_DOT: Record<
   idle: "ok",
 };
 
-/** How the agent reaches its model: the managed in-cluster model, or its own API key. */
-export type AgentModelKey = "managed" | "api-key";
+/**
+ * How the agent reaches its model: the managed in-cluster model, the org's
+ * model gateway, or its own API key.
+ */
+export type AgentModelKey = "managed" | "gateway" | "api-key";
 
 export const AGENT_MODEL_LABEL: Record<AgentModelKey, string> = {
   managed: "Managed model",
+  gateway: "Model gateway",
   "api-key": "API key",
 };
 
-/** One row: the fleet row, plus what the list learns from the other queries. */
+/** One row: the fleet row as the screen reads it. */
 export type AgentRow = AstroliftAgentListItem & {
   status: AgentStatusKey;
-  /** Live running count, or the fleet row's until live status arrives. */
   running: number;
+  /** The next firing of a scheduled agent, from `agentUpcomingRuns`. */
   nextScheduledAt: string | null;
   /** Null when the agent has no environment spec of its own. */
   model: AgentModelKey | null;
@@ -72,27 +68,37 @@ export type AgentRow = AstroliftAgentListItem & {
   runtime: string | null;
   /** Clusters its app's environments deploy to, in environment order. */
   clusters: string[];
-  /** On an app the viewer holds a role on (the Mine stand-in). */
+  /** The viewer registered it. */
   mine: boolean;
+  /** Who registered it; empty for agents registered before owners were recorded. */
+  ownerEmail: string;
 };
 
-const FAILED_RUN = new Set(["failed", "timed_out", "error"]);
+const isStatus = (s: string): s is AgentStatusKey => (AGENT_STATUS_ORDER as string[]).includes(s);
+const isModel = (s: string | null | undefined): s is AgentModelKey =>
+  typeof s === "string" && s in AGENT_MODEL_LABEL;
 
-export function agentStatusKey(
-  agent: Pick<AstroliftAgentListItem, "runningCount" | "runPaused" | "lastRunStatus">,
-  live?: Pick<AstroliftAgentLiveStatus, "runningCount" | "isPaused" | "nextScheduledAt"> | null
-): AgentStatusKey {
-  if ((live?.runningCount ?? agent.runningCount) > 0) return "running";
-  if (live?.isPaused ?? agent.runPaused) return "paused";
-  if (agent.lastRunStatus && FAILED_RUN.has(agent.lastRunStatus.toLowerCase())) return "failing";
-  if (live?.nextScheduledAt) return "scheduled";
-  return "idle";
+/** A server fleet row as a list row; `next` is its next firing, when scheduled. */
+export function toAgentRow(item: AstroliftAgentFleetRow, next: string | null = null): AgentRow {
+  return {
+    ...item,
+    status: isStatus(item.status) ? item.status : "idle",
+    running: item.runningCount,
+    nextScheduledAt: next,
+    model: isModel(item.modelSource) ? item.modelSource : null,
+    runtime: item.runtime || null,
+    clusters: item.clusterSlugs,
+    mine: item.ownedByMe,
+  };
 }
+
+/** The value Mine filters on: agents the viewer registered. */
+export const MINE = "me";
 
 export const AGENTS_LIST: ListDefinition = {
   id: "agents",
   fields: [
-    // Free text: matched on the project slug.
+    // Free text: a project slug.
     { key: "project", label: "Project" },
     {
       key: "status",
@@ -111,24 +117,80 @@ export const AGENTS_LIST: ListDefinition = {
         label: AGENT_MODEL_LABEL[value],
       })),
     },
-    // Free text: matched on the spec's runtime or the run family (task, service).
+    // Free text: the spec's runtime or the run family (task, service).
     { key: "runtime", label: "Runtime" },
-    // Free text: matched on a cluster slug the agent's app deploys to.
+    // Free text: a cluster slug the agent's app deploys to.
     { key: "cluster", label: "Cluster" },
   ],
+  // The server matches name, slug, app, project and source repo.
   searchPlaceholder: "Search agents, slugs, repos...",
   defaultSort: [{ key: "name", dir: "asc" }],
   views: standardViews(
-    { mine: "1" },
+    { owner: MINE },
     [{ key: "paused", label: "Paused", filters: { paused: "1" } }],
     {
       mineNote:
-        "Mine means agents on apps you hold a role on, directly or through their project, team or organization, until agents record who owns them.",
+        "Mine means agents you registered. Agents registered before Astrolift recorded who registered them have no owner and show only in All.",
     }
   ),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
+
+/** The list filter keys `AstroliftAgentFleetFilter` takes as lists. */
+const LIST_FILTER_KEYS = ["project", "status", "model", "runtime", "cluster", "owner"] as const;
+
+export interface AgentFleetFilter {
+  project?: string[];
+  status?: string[];
+  model?: string[];
+  runtime?: string[];
+  cluster?: string[];
+  owner?: string[];
+  paused?: boolean;
+}
+
+export interface AgentFleetPageVariables {
+  orgId: string;
+  search: string | null;
+  filter: AgentFleetFilter | null;
+  sort: string;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * The list state as `agentFleetPage` variables. `sort` is always sent, which
+ * selects numbered paging on the server; an empty filter is `null`.
+ */
+export function agentFleetPageVariables(
+  orgId: string,
+  {
+    q,
+    filters,
+    sort,
+    page,
+    pageSize,
+  }: {
+    q: string;
+    filters: Record<string, string>;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+): AgentFleetPageVariables {
+  const filter: AgentFleetFilter = {};
+  for (const key of LIST_FILTER_KEYS) if (filters[key]) filter[key] = [filters[key]];
+  if (filters.paused) filter.paused = true;
+  return {
+    orgId,
+    search: q.trim() || null,
+    filter: Object.keys(filter).length ? filter : null,
+    sort: formatSort(sort.length ? sort : AGENTS_LIST.defaultSort),
+    page: Math.max(1, page),
+    pageSize,
+  };
+}
 
 /** `Agents ▾` [› tail]: the first crumb switches between the Agents area's functions. */
 export function agentsCrumbs(active = "agents", tail: Crumb[] = []): Crumb[] {
@@ -180,127 +242,6 @@ export const RUN_STATUS_DOT: Record<string, "ok" | "warn" | "error" | "muted" | 
   cancelled: "muted",
   canceled: "muted",
 };
-
-// ---------------------------------------------------------------------------
-// Join
-// ---------------------------------------------------------------------------
-
-export interface AgentJoinSources {
-  live: readonly AstroliftAgentLiveStatus[];
-  specs: readonly Pick<AstroliftAgentEnvironmentSpec, "slug" | "runtime" | "managedModel">[];
-  environments: readonly { registeredAppSlug: string; clusterSlug?: string | null }[];
-  /** Slugs of the apps the viewer holds a role on; empty outside the Mine view. */
-  myAppSlugs: ReadonlySet<string>;
-}
-
-/** Fleet rows plus live status, spec and environments, into list rows. */
-export function joinAgents(
-  agents: readonly AstroliftAgentListItem[],
-  { live, specs, environments, myAppSlugs }: AgentJoinSources
-): AgentRow[] {
-  const liveById = new Map(live.map((l) => [l.workloadId, l]));
-  const specBySlug = new Map(specs.map((s) => [s.slug, s]));
-  const clustersByApp = new Map<string, string[]>();
-  for (const e of environments) {
-    if (!e.clusterSlug) continue;
-    const seen = clustersByApp.get(e.registeredAppSlug) ?? [];
-    if (!seen.includes(e.clusterSlug))
-      clustersByApp.set(e.registeredAppSlug, [...seen, e.clusterSlug]);
-  }
-  return agents.map((a) => {
-    const l = liveById.get(a.id) ?? null;
-    const spec = specBySlug.get(a.slug);
-    return {
-      ...a,
-      status: agentStatusKey(a, l),
-      running: l?.runningCount ?? a.runningCount,
-      nextScheduledAt: l?.nextScheduledAt ?? null,
-      model: spec ? (spec.managedModel ? "managed" : "api-key") : null,
-      runtime: spec?.runtime || null,
-      clusters: clustersByApp.get(a.appSlug) ?? [],
-      mine: myAppSlugs.has(a.appSlug),
-    };
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Select
-// ---------------------------------------------------------------------------
-
-type SortValue = string | number;
-
-const time = (ts: string | null | undefined) => (ts ? Date.parse(ts) : 0);
-const lower = (s: string | null | undefined) => (s ?? "").toLowerCase();
-
-const SORT_VALUE: Record<string, (a: AgentRow) => SortValue> = {
-  name: (a) => a.name.toLowerCase(),
-  status: (a) => AGENT_STATUS_ORDER.indexOf(a.status),
-  // Never run sorts before the oldest run.
-  lastRun: (a) => time(a.lastRunAt),
-  project: (a) => a.projectSlug.toLowerCase(),
-};
-
-function matches(a: AgentRow, filters: Record<string, string>): boolean {
-  if (filters.mine && !a.mine) return false;
-  if (filters.paused && a.status !== "paused") return false;
-  if (filters.status && a.status !== lower(filters.status)) return false;
-  if (filters.model && a.model !== filters.model) return false;
-  if (filters.project && lower(a.projectSlug) !== lower(filters.project)) return false;
-  if (filters.runtime) {
-    const r = lower(filters.runtime);
-    if (lower(a.runtime) !== r && lower(a.runFamily) !== r) return false;
-  }
-  if (filters.cluster && !a.clusters.some((c) => lower(c) === lower(filters.cluster))) return false;
-  return true;
-}
-
-/** Client-side search until `agentFleet` takes one: name, slug, app, project, repo. */
-function searched(a: AgentRow, q: string): boolean {
-  if (!q) return true;
-  const needle = q.toLowerCase();
-  return [a.name, a.slug, a.appSlug, a.projectSlug, a.sourceRepo].some((v) =>
-    lower(v).includes(needle)
-  );
-}
-
-function compare(a: AgentRow, b: AgentRow, sort: SortState[]): number {
-  for (const s of sort) {
-    const value = SORT_VALUE[s.key];
-    if (!value) continue;
-    const x = value(a);
-    const y = value(b);
-    if (x < y) return s.dir === "asc" ? -1 : 1;
-    if (x > y) return s.dir === "asc" ? 1 : -1;
-  }
-  return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
-}
-
-/**
- * One numbered page of the fleet: view filters and chips applied, searched,
- * sorted and sliced. `totalCount` is the filtered count, for "1–25 of 140".
- */
-export function selectAgents(
-  agents: readonly AgentRow[],
-  {
-    q = "",
-    filters,
-    sort,
-    page,
-    pageSize,
-  }: {
-    q?: string;
-    filters: Record<string, string>;
-    sort: SortState[];
-    page: number;
-    pageSize: number;
-  }
-): { rows: AgentRow[]; totalCount: number } {
-  const kept = agents
-    .filter((a) => matches(a, filters) && searched(a, q.trim()))
-    .sort((a, b) => compare(a, b, sort));
-  const start = (Math.max(1, page) - 1) * pageSize;
-  return { rows: kept.slice(start, start + pageSize), totalCount: kept.length };
-}
 
 // ---------------------------------------------------------------------------
 // Former tabs

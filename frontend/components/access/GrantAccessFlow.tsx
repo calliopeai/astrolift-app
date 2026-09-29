@@ -41,14 +41,32 @@ export interface GrantDraft {
   expiry: Expiry;
 }
 
-/** What a grant would change (design 3.4, step 5; the #2132 preview for RBAC). */
+/** What a grant would change (design 3.4, step 5), from `astroliftGrantPreview`. */
 export interface GrantPreview {
   /** People who get something new, and what. A team or group counts its members. */
   gaining: { principal: Principal; permissions: string[] }[];
   /** People who already hold all of it, and from where. */
   already: { principal: Principal; source: GrantSourceInfo }[];
-  /** Set when this is not the backend's answer: says what it leaves out. */
-  approximate?: string;
+  /** How many gain and how many already had it, when the lists are cut short. */
+  gainingCount?: number;
+  alreadyCount?: number;
+  /** IdP groups the grant reaches, and how many members each has today. */
+  groups?: { groupExternalId: string; memberCount: number }[];
+  /** Set when the caller's grant ceiling refuses it: nothing would be written. */
+  refusal?: string | null;
+  /** The server's caveats (a group's future members, an expiry), in words. */
+  notes?: string[];
+}
+
+/**
+ * An expiry as the `expiresAt` the backend takes: `days` from `now`, or the
+ * end of a picked day (local time). Never is `null`.
+ */
+export function expiryToIso(e: Expiry, now: number): string | null {
+  if (e.kind === "never") return null;
+  if (e.kind === "days") return new Date(now + e.days * 86_400_000).toISOString();
+  const end = new Date(`${e.date}T23:59:59`);
+  return Number.isNaN(end.getTime()) ? null : end.toISOString();
 }
 
 export interface GrantOutcome {
@@ -86,7 +104,7 @@ export interface GrantAccessFlowProps {
   onCancel: () => void;
   /** After a submit where every principal succeeded. */
   onDone: (outcomes: GrantOutcome[]) => void;
-  /** Whether the backend can set an expiry; without it only Never is offered. */
+  /** Whether an expiry can be set; without it only Never is offered. */
   expirySupported?: boolean;
   /** Seeds the draft: the current entity as the scope, a person from a row action. */
   initialDraft?: Partial<GrantDraft>;
@@ -324,11 +342,16 @@ export function GrantAccessFlow({
                 className="w-48 font-mono"
               />
             )}
-            {!expirySupported && (
+            {!expirySupported ? (
               <p className="text-muted-foreground text-xs">
-                Time-boxed grants need the backend to accept an expiry; until then every grant lasts
-                until it is removed.
+                This grant cannot be time-boxed here; it lasts until it is removed.
               </p>
+            ) : (
+              draft.expiry.kind !== "never" && (
+                <p className="text-muted-foreground text-xs">
+                  The grant ends by itself then; removing it earlier still works.
+                </p>
+              )
             )}
           </fieldset>
         )}
@@ -367,7 +390,7 @@ export function GrantAccessFlow({
             <Button
               type="button"
               onClick={() => void submit()}
-              disabled={submitting || previewState.loading}
+              disabled={submitting || previewState.loading || Boolean(previewState.data?.refusal)}
             >
               {submitting
                 ? "Granting…"
@@ -438,7 +461,7 @@ function WhoStep({
           <p className="text-muted-foreground p-3 text-sm">
             {search.query.trim()
               ? `No one matches "${search.query.trim()}".`
-              : "Type to search. Teams add every member at the time of the grant."}
+              : "Type to search. A group grant reaches whoever is in the group, now and later; a team adds its members at the time of the grant."}
           </p>
         ) : (
           <ul className="divide-y">
@@ -625,7 +648,26 @@ function Review({
           <p className="text-sm font-medium [overflow-wrap:anywhere]" data-testid="grant-effect">
             {effectSentence(p, role, scope)}
           </p>
-          {p.approximate && <p className="text-muted-foreground text-xs">{p.approximate}</p>}
+          {p.refusal && (
+            <p
+              role="alert"
+              className="border-danger-border bg-danger-bg text-danger-fg min-w-0 rounded-md border p-3 text-sm [overflow-wrap:anywhere]"
+            >
+              {p.refusal}
+            </p>
+          )}
+          {p.groups && p.groups.length > 0 && (
+            <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+              Reaches{" "}
+              {p.groups.map((g) => `${g.groupExternalId} (${g.memberCount} today)`).join(", ")}, and
+              whoever the identity provider adds to {p.groups.length === 1 ? "it" : "them"} later.
+            </p>
+          )}
+          {p.notes?.map((n) => (
+            <p key={n} className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+              {n}
+            </p>
+          ))}
           {p.gaining.length > 0 && (
             <section className="flex min-w-0 flex-col gap-2">
               <h3 className="text-muted-foreground text-xs font-medium uppercase">Gain access</h3>
@@ -704,13 +746,14 @@ export function effectSentence(
   role: RoleRef | null,
   scope: ScopeRef | null
 ): string {
-  const n = p.gaining.length;
+  const n = p.gainingCount ?? p.gaining.length;
+  const already = p.alreadyCount ?? p.already.length;
   const where = scope ? ` on ${SCOPE_NOUN[scope.kind]} ${scope.name}` : "";
   const what = role ? ` ${role.name}` : " access";
   const lead =
     n === 0
       ? `No one gains anything new${where}`
       : `${n} ${n === 1 ? "person gains" : "people gain"}${what}${where}`;
-  const tail = p.already.length ? `; ${p.already.length} already had it` : "";
+  const tail = already ? `; ${already} already had it` : "";
   return `${lead}${tail}.`;
 }

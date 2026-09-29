@@ -180,6 +180,9 @@ def test_dispatch_from_webhook_creates_task_with_mapped_input(agent, temporal_re
     assert task.organization_id == agent["org"].id
     assert task.status == AgentTask.Status.QUEUED
     assert task.queued_at is not None
+    # A webhook started it and no person did (#2152).
+    assert task.trigger_kind == "webhook"
+    assert task.triggered_by_user_id is None
 
     # Exactly one DispatchAgentTaskWorkflow enqueued, keyed to the task guid,
     # carrying the task pk AND the mapped trigger payload.

@@ -9,7 +9,6 @@ import type { WorkflowInstance, WorkflowInstanceDetail } from "@/graphql/workflo
 import type {
   InstanceAdminControlsViewProps,
   InstanceDetailViewProps,
-  WorkflowInstancesPanelViewProps,
 } from "./WorkflowInstancesPanel";
 import { joinWorkflows, type WorkflowRow } from "./workflows-list";
 import type { WorkflowsListScreenProps } from "./WorkflowsListScreen";
@@ -415,7 +414,7 @@ export function listProps(
   };
 }
 
-// ─── Instances panel ─────────────────────────────────────────────────────────
+// ─── Platform instances ─────────────────────────────────────────────────────────
 
 const instance = (overrides: Partial<WorkflowInstance>): WorkflowInstance => ({
   workflowId: "deploy-app-billing-api-7f3c",
@@ -481,26 +480,6 @@ export const INSTANCE_DETAIL: WorkflowInstanceDetail = {
     },
   ],
 };
-
-export function panelProps(
-  overrides: Partial<WorkflowInstancesPanelViewProps> = {}
-): WorkflowInstancesPanelViewProps {
-  return {
-    typeFilter: "",
-    setTypeFilter: noop,
-    statusFilter: "RUNNING",
-    setStatusFilter: noop,
-    selectedWorkflowId: null,
-    setSelectedWorkflowId: noop,
-    instances: INSTANCES,
-    loading: false,
-    error: undefined,
-    refetch: noop,
-    isAdmin: true,
-    detail: null,
-    ...overrides,
-  };
-}
 
 export function detailProps(
   overrides: Partial<InstanceDetailViewProps> = {}

@@ -1,3 +1,5 @@
+import type { SortState } from "@/components/data-table";
+import { selectPage } from "@/components/screens/agents/skills/catalog";
 import type {
   AstroliftAgentEnvironmentSpec,
   AstroliftAgentListItem,
@@ -250,3 +252,39 @@ export const LONG_BUNDLE: AstroliftAgentSecretBundle = {
   canReveal: false,
   readLimitation: `Cross-account role cannot read ${LONG}`,
 };
+
+/**
+ * A stand-in for `agentEnvironmentSpecSecretStatusPage` in stories: the
+ * fixture refs filtered on the server's `exists` and `failing` flags,
+ * searched, sorted and sliced the way the server answers the list state.
+ */
+export function serveSecrets(
+  rows: AstroliftAgentSecretStatus[],
+  q: {
+    filters: Record<string, string>;
+    q: string;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+) {
+  return selectPage(
+    rows,
+    {
+      matches: (r, f) =>
+        (f.status !== "error" || Boolean(r.error)) &&
+        (f.status !== "set" || (!r.error && r.exists)) &&
+        (f.status !== "missing" || (!r.error && !r.exists)) &&
+        (!f.provider || r.provider.toLowerCase() === f.provider.toLowerCase()),
+      text: (r) => [r.envVar, r.uri],
+      sortValue: {
+        envVar: (r) => r.envVar.toLowerCase(),
+        uri: (r) => r.uri.toLowerCase(),
+        exists: (r) => (r.exists ? 1 : 0),
+        provider: (r) => r.provider.toLowerCase(),
+      },
+      id: (r) => r.envVar,
+    },
+    q
+  );
+}

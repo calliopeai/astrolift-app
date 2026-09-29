@@ -3,18 +3,10 @@
  * platform metrics, features), typed against each screen's props.
  */
 import { LONG_ARN, LONG_SHA, LONG_URL } from "@/components/list/fixtures";
-import type { DeploymentStatus, ScheduledJobRunStatus } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
 
 import type { AuditEventsFeed, AuditLogScreenProps } from "./AuditLogScreen";
-import {
-  type CombinedRun,
-  fromAgentTask,
-  fromDeployment,
-  fromJobRun,
-  fromWorkflowRun,
-  mergeRuns,
-} from "./combined-runs";
+import { type CombinedRun, fromRunAuditItem, type RunAuditItem } from "./combined-runs";
 import type { CombinedRunsScreenProps } from "./CombinedRunsScreen";
 import type { AdminMetricsScreenProps } from "./AdminMetricsScreen";
 import type { PrometheusPanelProps, SystemMetricsPanelProps } from "./ClusterMetricsPanels";
@@ -126,7 +118,6 @@ export const AUDIT_FEED: AuditEventsFeed = {
 export const AUDIT: Omit<AuditLogScreenProps, "list"> = {
   events: AUDIT_FEED,
   totalCount: 1284,
-  targetFilteredLocally: false,
   retentionDays: 365,
   exporting: false,
   onExport: async () => {},
@@ -137,90 +128,124 @@ export const AUDIT: Omit<AuditLogScreenProps, "list"> = {
 
 // ─── Run audit ────────────────────────────────────────────────────────
 
-// Built through the real mappers, so the fixtures carry what each source
-// actually says (and does not say) about who started a run.
+// `astroliftRunAudit` rows, built through the real mapper, so the fixtures
+// carry what the server says (and does not say) about who started a run.
 const at = (minutesAgo: number) =>
   new Date(Date.UTC(2026, 8, 27, 14, 0, 0) - minutesAgo * 60_000).toISOString();
 
-const agentRun = (i: number, status: string) =>
-  fromAgentTask({
+function item(patch: Partial<RunAuditItem> & Pick<RunAuditItem, "kind" | "id">): RunAuditItem {
+  return {
+    subject: "",
+    scope: "",
+    agentSlug: "",
+    workflowSlug: "",
+    trigger: "manual",
+    sourceTrigger: "",
+    startedByDisplay: "",
+    startedByMe: false,
+    at: at(0),
+    durationSeconds: null,
+    status: "",
+    outcome: "unknown",
+    ...patch,
+  };
+}
+
+const agentRun = (i: number, status: string, outcome: string, mine = false) =>
+  item({
+    kind: "agent",
     id: `task-${(0x7f3c2a91 - i * 0x1b3d).toString(16)}`,
+    subject: ["support-bot", "triage-agent", "billing-reconciler"][i % 3],
     agentSlug: ["support-bot", "triage-agent", "billing-reconciler"][i % 3],
-    agentName: "Support bot",
-    projectSlug: i % 2 ? "storefront" : "internal-tools",
+    scope: i % 2 ? "storefront" : "internal-tools",
+    trigger: i % 2 ? "schedule" : "manual",
+    startedByDisplay: i % 2 ? "" : mine ? "leo" : "dana",
+    startedByMe: mine,
+    at: at(i * 11),
+    durationSeconds: status === "running" ? null : 120 + i * 7,
     status,
-    createdAt: at(i * 11 + 1),
-    startedAt: at(i * 11),
-    finishedAt: status === "running" ? null : at(i * 11 - 2),
+    outcome,
   });
 
-const workflowRun = (i: number, status: string, child = false) =>
-  fromWorkflowRun({
-    guid: `wfr-${(0x51e0a7 + i * 0x2f1).toString(16)}`,
-    definitionGuid: "wfd-1",
-    definitionSlug: "nightly-sync",
-    definitionName: "Nightly sync",
-    projectGuid: "prj-1",
-    projectSlug: "internal-tools",
+const workflowRun = (i: number, status: string, outcome: string, child = false) =>
+  item({
+    kind: "workflow",
+    id: `wfr-${(0x51e0a7 + i * 0x2f1).toString(16)}`,
+    subject: "Nightly sync",
+    workflowSlug: "nightly-sync",
+    scope: "internal-tools",
+    trigger: child ? "parent" : "schedule",
+    at: at(i * 13 + 4),
+    durationSeconds: status === "RUNNING" ? null : 180,
     status,
-    temporalWorkflowId: "tw-1",
-    temporalRunId: null,
-    currentStageOrder: null,
-    currentStageRole: "",
-    parentRunGuid: child ? "wfr-parent" : null,
-    parentStageExecutionGuid: null,
-    nestingDepth: child ? 1 : 0,
-    childRunCount: 0,
-    startedAt: at(i * 13 + 4),
-    endedAt: status === "running" ? null : at(i * 13 + 1),
+    outcome,
   });
 
-const deploymentRun = (i: number, status: string, mine = false) =>
-  fromDeployment({
+const deploymentRun = (i: number, status: string, outcome: string, mine = false) =>
+  item({
+    kind: "deployment",
     id: `dep-${(0x1112015d + i * 0x3b).toString(16)}`,
-    registeredAppSlug: ["checkout", "storefront-web"][i % 2],
-    environmentName: i % 3 ? "production" : "staging",
-    workloadSlug: "web",
-    triggerKind: (["push", "manual", "ci"] as const)[i % 3],
-    status: status as DeploymentStatus,
-    startedAt: at(i * 17 + 6),
-    createdAt: at(i * 17 + 7),
+    subject: `${["checkout", "storefront-web"][i % 2]} · ${i % 3 ? "production" : "staging"}`,
+    scope: ["checkout", "storefront-web"][i % 2],
+    trigger: (["webhook", "manual", "api"] as const)[i % 3],
+    sourceTrigger: (["push", "manual", "ci"] as const)[i % 3],
+    startedByDisplay: mine ? "leo" : "grace@example.com",
+    startedByMe: mine,
+    at: at(i * 17 + 6),
     durationSeconds: 84 + i * 9,
-    commitAuthor: mine ? "" : "grace@example.com",
-    ciProvider: i % 3 === 2 ? "github" : "",
-    triggeredByUserId: mine ? "ops@example.com" : null,
-    triggeredByMe: mine,
-  });
-
-const jobRun = (i: number, status: ScheduledJobRunStatus) =>
-  fromJobRun({
-    id: `job-${(0x9a01 + i * 0x77).toString(16)}`,
-    registeredAppSlug: "checkout",
-    environmentName: "production",
-    workloadSlug: "nightly-invoices",
     status,
-    startedAt: at(i * 29 + 9),
-    createdAt: at(i * 29 + 9),
-    durationSeconds: status === "running" ? null : 312 + i,
+    outcome,
   });
 
-export const COMBINED_RUNS: CombinedRun[] = mergeRuns(
-  [
-    agentRun(0, "running"),
-    agentRun(1, "completed"),
-    agentRun(2, "failed"),
-    agentRun(3, "timed_out"),
-  ],
-  [workflowRun(0, "running"), workflowRun(1, "completed", true), workflowRun(2, "failed")],
-  [
-    deploymentRun(0, "deploying", true),
-    deploymentRun(1, "running"),
-    deploymentRun(2, "pending_approval"),
-    deploymentRun(3, "rolled_back"),
-    deploymentRun(4, "superseded", true),
-  ],
-  [jobRun(0, "succeeded"), jobRun(1, "failed"), jobRun(2, "running")]
-);
+const jobRun = (i: number, status: string, outcome: string) =>
+  item({
+    kind: "job",
+    id: `job-${(0x9a01 + i * 0x77).toString(16)}`,
+    subject: "nightly-invoices",
+    scope: "checkout · production",
+    trigger: "schedule",
+    sourceTrigger: "scheduled",
+    at: at(i * 29 + 9),
+    durationSeconds: status === "running" ? null : 312 + i,
+    status,
+    outcome,
+  });
+
+const taskRun = (i: number, status: string, outcome: string) =>
+  item({
+    kind: "task",
+    id: `trn-${(0x44c1 + i * 0x19).toString(16)}`,
+    subject: "migrate-db",
+    scope: "checkout · production",
+    trigger: "manual",
+    startedByDisplay: "sam",
+    at: at(i * 31 + 3),
+    durationSeconds: 41,
+    status,
+    outcome,
+  });
+
+/** Newest first, as the server orders them by default. */
+export const COMBINED_RUNS: CombinedRun[] = [
+  agentRun(0, "running", "running", true),
+  agentRun(1, "completed", "succeeded"),
+  agentRun(2, "failed", "failed"),
+  agentRun(3, "timed_out", "failed"),
+  workflowRun(0, "RUNNING", "running"),
+  workflowRun(1, "COMPLETED", "succeeded", true),
+  workflowRun(2, "FAILED", "failed"),
+  deploymentRun(0, "deploying", "running", true),
+  deploymentRun(1, "running", "succeeded"),
+  deploymentRun(2, "pending_approval", "waiting"),
+  deploymentRun(3, "rolled_back", "failed"),
+  deploymentRun(4, "superseded", "succeeded", true),
+  jobRun(0, "succeeded", "succeeded"),
+  jobRun(1, "failed", "failed"),
+  jobRun(2, "running", "running"),
+  taskRun(0, "succeeded", "succeeded"),
+]
+  .map(fromRunAuditItem)
+  .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || a.key.localeCompare(b.key));
 
 /** A 64-char SHA, a 200-char ARN and an unbroken URL in the cells that hold them. */
 export const COMBINED_RUNS_LONG: CombinedRun[] = [
@@ -242,11 +267,8 @@ export const RUN_AUDIT: Omit<CombinedRunsScreenProps, "list"> = {
   stale: false,
   error: null,
   onRetry: noop,
-  nextCursor: "o:25",
+  nextCursor: "eyJhdCI6IjIwMjYtMDktMjcifQ",
   totalCount: 318,
-  approximateCount: true,
-  unavailable: [],
-  coverage: "Merged from the newest 100 of each kind; older runs are on each kind's own list.",
   onExportCsv: noop,
 };
 

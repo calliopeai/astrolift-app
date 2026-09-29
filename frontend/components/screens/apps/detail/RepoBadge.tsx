@@ -34,21 +34,25 @@ export function RepoBadge({ sourceKind, sourceUrl, sourceRepo, branch }: RepoBad
       href={sourceUrl}
       target="_blank"
       rel="noreferrer"
-      className="focus-visible:ring-ring/50 inline-flex rounded-md outline-none focus-visible:ring-2"
+      className="focus-visible:ring-ring/50 inline-flex max-w-full min-w-0 rounded-md outline-none focus-visible:ring-2"
       aria-label={`Open ${displayRepo} repository in a new tab`}
     >
       <Badge
         variant="secondary"
-        className="hover:bg-accent hover:text-foreground text-2xs gap-1.5 font-mono transition-colors"
+        className="hover:bg-accent hover:text-foreground text-2xs max-w-full shrink gap-1.5 font-mono transition-colors"
       >
         <Icon className="size-3" aria-hidden />
-        <span>{displayRepo}</span>
+        <span className="min-w-0 truncate" title={displayRepo}>
+          {displayRepo}
+        </span>
         {displayBranch ? (
           <>
             <span className="text-muted-foreground" aria-hidden>
               ·
             </span>
-            <span>{displayBranch}</span>
+            <span className="min-w-0 truncate" title={displayBranch}>
+              {displayBranch}
+            </span>
           </>
         ) : null}
       </Badge>

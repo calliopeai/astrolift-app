@@ -18,7 +18,14 @@ import type {
 import type { GrantRoleSheetProps } from "./GrantRoleDialog";
 import type { InviteSheetProps } from "./InviteDialog";
 import type { MembersScreenProps } from "./MembersScreen";
-import { buildPeopleRows, type PeopleRow, selectPeople } from "./people-model";
+import {
+  type GroupPrincipal,
+  groupRow,
+  invitationRow,
+  type PeopleRow,
+  sourceOf,
+  userRows,
+} from "./people-model";
 
 const noop = () => {};
 const resolved =
@@ -136,31 +143,69 @@ const member = (
   ...patch,
 });
 
+const PLATFORM = { id: "t-platform", slug: "platform", name: "Platform" };
+const PAYMENTS = { id: "t-payments", slug: "payments", name: "Payments" };
+
+/** ORG rows, one per person, as `astroliftMembersPage(filter: {scopeKind: ["ORG"]})` returns them. */
 export const MEMBERS: AstroliftMember[] = [
-  member("m-1", ADA),
-  member("m-2", GRACE, { lastActiveAt: fromNow(-3) }),
-  // A second, APP-scope row for grace: collapses into one People row.
-  member("m-3", GRACE, { scopeKind: "APP", scopeId: "app-42", lastActiveAt: fromNow(-3) }),
-  member("m-4", LINUS, { scopeKind: "TEAM", scopeId: "14", lastActiveAt: fromNow(-120) }),
-  // Ada is on platform too, so Mine (as ada) shows linus.
-  member("m-6", ADA, { scopeKind: "TEAM", scopeId: "14" }),
-  member("m-5", MARGARET, {
-    scopeKind: "PROJECT",
-    scopeId: "31",
-    lastActiveAt: null,
-    joinedAt: null,
-  }),
+  member("m-1", ADA, { teams: [PLATFORM] }),
+  member("m-2", GRACE, { lastActiveAt: fromNow(-3), teams: [PAYMENTS] }),
+  member("m-4", LINUS, { lastActiveAt: fromNow(-120), teams: [PLATFORM] }),
+  member("m-5", MARGARET, { lastActiveAt: null, joinedAt: null, teams: [] }),
 ];
 
 export const LONG_MEMBERS: AstroliftMember[] = [
   member("m-long", LONG_USER, {
-    scopeKind: "PROJECT",
-    scopeId: "977",
     lastActiveAt: fromNow(-400),
+    teams: [
+      {
+        id: "t-long",
+        slug: "emea-subsidiary-quarter-end-freeze-coordination",
+        name: "EMEA subsidiary quarter-end freeze coordination",
+      },
+      PLATFORM,
+      PAYMENTS,
+    ],
   }),
   member("m-anon", user("6", "anon-7c2f19ab", "7c2f19ab@anonymized.invalid"), {
     lifecycle: "anonymized",
+    teams: [],
   }),
+];
+
+/** IdP groups as `astroliftPrincipalSearch(filter: {kind: ["GROUP"]})` returns them. */
+export const GROUPS: GroupPrincipal[] = [
+  {
+    name: "okta:platform-admins",
+    groupExternalId: "okta:platform-admins",
+    memberCount: 3,
+    bindingsCount: 1,
+    mappingsCount: 0,
+  },
+  {
+    name: "okta:release-managers",
+    groupExternalId: "okta:release-managers",
+    memberCount: 12,
+    bindingsCount: 1,
+    mappingsCount: 2,
+  },
+  {
+    name: "okta:contractors",
+    groupExternalId: "okta:contractors",
+    memberCount: 7,
+    bindingsCount: 0,
+    mappingsCount: 0,
+  },
+];
+
+export const LONG_GROUPS: GroupPrincipal[] = [
+  {
+    name: "azure_ad:emea-regional-compliance-and-release-coordination-group-0001",
+    groupExternalId: "azure_ad:emea-regional-compliance-and-release-coordination-group-0001",
+    memberCount: 1_284,
+    bindingsCount: 14,
+    mappingsCount: 3,
+  },
 ];
 
 const binding = (
@@ -279,62 +324,60 @@ export const LONG_INVITATIONS: AstroliftInvitation[] = [
 
 /* ---- props ------------------------------------------------------------- */
 
-/** The walked sets a People story selects from, as the hook would. */
+/** What the server answers a People story's view with: the rows as given, before paging. */
 export interface PeopleData {
   members?: AstroliftMember[];
+  /** The page's bindings, for the roles column. */
   bindings?: AstroliftRoleBinding[];
+  groups?: GroupPrincipal[];
   invitations?: AstroliftInvitation[];
   roles?: AstroliftRole[];
-  /** The viewer, for Mine. */
-  me?: string | null;
 }
 
-/** Every row the walks would hold, before the view and filters. */
-export function peopleRows({
-  members = MEMBERS,
-  bindings = BINDINGS,
-  invitations = [...INVITATIONS, ...RESOLVED_INVITATIONS],
-  roles = ROLES,
-}: PeopleData = {}): PeopleRow[] {
-  const { users, groups } = buildPeopleRows({ members, bindings, roles });
-  return [
-    ...users,
-    ...groups,
-    ...invitations.map(
-      (invitation): PeopleRow => ({
-        kind: "invitation",
-        key: `invitation:${invitation.id}`,
-        invitation,
-      })
-    ),
-  ];
+/**
+ * A stand-in for the server in stories: the rows of the query the view
+ * reads, as given, one page of them. Filtering is the server's; a story
+ * that shows a filtered view passes the rows that view returns.
+ */
+export function peopleRows(
+  filters: Record<string, string>,
+  {
+    members = MEMBERS,
+    bindings = BINDINGS,
+    groups = GROUPS,
+    invitations = [...INVITATIONS, ...RESOLVED_INVITATIONS],
+    roles = ROLES,
+  }: PeopleData = {}
+): PeopleRow[] {
+  switch (sourceOf(filters)) {
+    case "groups":
+      return groups.map(groupRow);
+    case "invitations":
+      return invitations
+        .filter((i) => !filters.status || i.status === filters.status)
+        .map(invitationRow);
+    default:
+      return userRows(members, bindings, roles);
+  }
 }
 
-/** Everything but the list controller: the page `list` selects, and the actions. */
+/** Everything but the list controller: the page `list` asks for, and the actions. */
 export function membersProps(
   list: ListStateController,
   data: PeopleData = {},
   overrides: Partial<Omit<MembersScreenProps, "list">> = {}
 ): Omit<MembersScreenProps, "list"> {
-  const selected = selectPeople(peopleRows(data), {
-    filters: list.filters,
-    q: list.state.q,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-    me: data.me === undefined ? "ada" : data.me,
-    now: Date.now(),
-  });
+  const rows = peopleRows(list.filters, data);
+  const start = (list.state.page - 1) * list.state.pageSize;
   return {
     canManageMembers: true,
-    rows: selected.rows,
-    totalCount: selected.totalCount,
-    filtered: selected.filtered,
+    rows: rows.slice(start, start + list.state.pageSize),
+    totalCount: rows.length,
     loading: false,
     stale: false,
     error: null,
-    truncated: false,
     onRetry: noop,
+    onExportCsv: noop,
     revokingInvite: false,
     deletingInvite: false,
     resendingInvite: false,

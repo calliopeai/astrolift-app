@@ -381,7 +381,7 @@ export function SourceHostsView({
       {incompleteClientIdConnections.length > 0 && (
         <div className="text-muted-foreground bg-muted/40 flex items-start gap-3 rounded-md border p-3 text-xs">
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
-          <div className="flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-2">
             <p className="text-foreground font-medium">
               Optional: enable &quot;Connect my GitHub&quot; repo browsing
             </p>
@@ -396,8 +396,15 @@ export function SourceHostsView({
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               {incompleteClientIdConnections.map((c) => (
-                <Button key={c.id} size="sm" variant="outline" onClick={() => setClientIdTarget(c)}>
-                  Add Client ID for {c.name}
+                <Button
+                  key={c.id}
+                  size="sm"
+                  variant="outline"
+                  className="max-w-full min-w-0"
+                  title={`Add Client ID for ${c.name}`}
+                  onClick={() => setClientIdTarget(c)}
+                >
+                  <span className="min-w-0 truncate">Add Client ID for {c.name}</span>
                 </Button>
               ))}
             </div>

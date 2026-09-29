@@ -5,13 +5,13 @@ import { useQuery } from "@apollo/client/react";
 import { useListState } from "@/components/list/use-list-state";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { APP_WORKLOADS_LIST, selectWorkloads } from "./workloads-list";
+import { APP_WORKLOADS_LIST, appWorkloadsVariables } from "./workloads-list";
 
-interface WorkloadsResp {
-  astroliftWorkloads: AstroliftWorkload[];
+interface WorkloadsPageResp {
+  astroliftWorkloadsPage: { items: AstroliftWorkload[]; totalCount: number | null };
 }
 interface AppPodsResp {
   astroliftAppPods: AstroliftAppPod[];
@@ -94,20 +94,27 @@ function aggregatePodStatus(
 
 /**
  * The app's workloads as the Workloads tab's list: list state in the URL
- * (the kind chip is `?kind=`, where `/jobs` lands with `cronjob`), the whole
- * workload set filtered, sorted and paged by `selectWorkloads`, and live pod
- * state for the readiness and restart cells. The data half of
- * WorkloadsListScreen.
+ * (the kind chip is `?kind=`, where `/jobs` lands with `cronjob`), one
+ * numbered page of `astroliftWorkloadsPage` filtered, sorted and counted on
+ * the server, and live pod state for the readiness and restart cells. The
+ * data half of WorkloadsListScreen.
+ *
+ * `app/(app)/apps/[slug]/workloads/page.tsx` preloads the default page
+ * (`appWorkloadsVariables` of the default list state); keep the two in step.
  */
 export function useWorkloadsList(slug: string) {
   const list = useListState(APP_WORKLOADS_LIST);
   const { state } = list;
 
-  // The whole set: an app's workloads are the few its manifest declares.
-  // `astroliftWorkloadsPage` has no kind filter and no sort (see
-  // workloads-list.ts), so the list is answered from this.
-  const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
-    variables: { appSlug: slug },
+  const workloads = useQuery<WorkloadsPageResp>(LIST_WORKLOADS_PAGE, {
+    variables: appWorkloadsVariables(slug, {
+      q: state.q,
+      filters: list.filters,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    }),
+    fetchPolicy: "cache-and-network",
     pollInterval: 60000,
   });
   // Live pod state for the readiness + restart-count cells. Pulled on a
@@ -119,23 +126,16 @@ export function useWorkloadsList(slug: string) {
     fetchPolicy: "cache-and-network",
   });
 
-  const all = workloads.data?.astroliftWorkloads;
-  const { rows, totalCount } = selectWorkloads(
-    all ?? [],
-    list.filters,
-    state.q,
-    state.sort,
-    state.page,
-    state.pageSize
-  );
+  const page = (workloads.data ?? workloads.previousData)?.astroliftWorkloadsPage;
+  const rows = page?.items ?? [];
   const liveStatus = aggregatePodStatus(rows, pods.data?.astroliftAppPods ?? []);
 
   return {
     list,
     rows,
-    totalCount,
-    loading: workloads.loading && !all,
-    error: workloads.error && !all ? { message: workloads.error.message } : null,
+    totalCount: page?.totalCount ?? rows.length,
+    loading: workloads.loading && !page,
+    error: workloads.error && !page ? { message: workloads.error.message } : null,
     onRetry: () => {
       void workloads.refetch();
     },

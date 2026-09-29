@@ -3,7 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { LIST_CLUSTERS, UPDATE_TENANT_CLUSTER } from "@/graphql/clusters/clusters.queries";
+import { UPDATE_TENANT_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
@@ -12,7 +12,7 @@ import { type CentralAuthDraft, oidcComplete, oidcView } from "./types";
 function useUpdateCluster() {
   return useMutation<{ updateTenantCluster: MutationResult<AstroliftTenantCluster> }>(
     UPDATE_TENANT_CLUSTER,
-    { refetchQueries: [{ query: LIST_CLUSTERS }], awaitRefetchQueries: true }
+    { refetchQueries: ["GetCluster"], awaitRefetchQueries: true }
   );
 }
 

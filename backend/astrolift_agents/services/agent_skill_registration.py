@@ -145,7 +145,17 @@ def _skill_slug(name: str) -> str:
     return f"skill-{hashlib.sha256(name.encode('utf-8')).hexdigest()[:12]}"
 
 
-def _upsert_skill(*, organization, loaded: LoadedSkill) -> Skill:
+def _skill_source(ref: SkillRef) -> tuple[str, str]:
+    """``(source_kind, source_ref)`` for a manifest skill ref (#2155)."""
+    pin = f"@{ref.ref}" if ref.ref else ""
+    if ref.kind == "org_repo":
+        return Skill.SourceKind.ORG_REPO, f"{ref.repo_alias}/{ref.skill_subpath}{pin}"
+    if ref.kind == "local":
+        return Skill.SourceKind.AGENT_REPO, ref.path or ref.name
+    return Skill.SourceKind.CATALOGUE, f"{ref.name}{pin}"
+
+
+def _upsert_skill(*, organization, loaded: LoadedSkill, ref: SkillRef | None = None) -> Skill:
     """Create or update an org-scoped Skill from a resolved ``LoadedSkill``.
 
     Matched on ``(organization, slug)``; ``skill_version`` bumps only when the
@@ -170,6 +180,10 @@ def _upsert_skill(*, organization, loaded: LoadedSkill) -> Skill:
     skill.content = content
     skill.content_hash = content_hash
     skill.is_active = True
+    if ref is not None:
+        kind, source_ref = _skill_source(ref)
+        skill.source_kind = kind
+        skill.source_ref = source_ref[:512]
     skill.save()
     return skill
 
@@ -545,7 +559,9 @@ def _resolve_one_skill(
             org_repo_tree_cache=org_repo_tree_cache,
             notes=notes,
         )
-        return _upsert_skill(organization=organization, loaded=loaded) if loaded is not None else None
+        return (
+            _upsert_skill(organization=organization, loaded=loaded, ref=ref) if loaded is not None else None
+        )
 
     if ref.kind == "catalogue" and catalogue_tree is None:
         # Catalogue unavailable upstream — every catalogue skill is skipped
@@ -584,7 +600,7 @@ def _resolve_one_skill(
         notes.append(f"skill {ref.name!r}: {exc}")
         log.warning("agent skill %r failed to resolve for org %s: %s", ref.name, organization.id, exc)
         return None
-    return _upsert_skill(organization=organization, loaded=loaded)
+    return _upsert_skill(organization=organization, loaded=loaded, ref=ref)
 
 
 def _resolve_org_repo_skill(

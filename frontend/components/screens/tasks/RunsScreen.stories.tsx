@@ -3,7 +3,13 @@ import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { AGENT_RUN_ROWS, LONG_RUN_ROWS, RUN_ROWS, RUNS_SCREEN } from "./runs.fixtures";
+import {
+  AGENT_RUN_ROWS,
+  LONG_RUN_ROWS,
+  RUN_ROWS,
+  RUNS_SCREEN,
+  UPCOMING_ROWS,
+} from "./runs.fixtures";
 import { AGENT_RUNS_LIST, RUNS_LIST } from "./runs-list";
 import { RunsScreen, type RunsScreenProps } from "./RunsScreen";
 
@@ -42,8 +48,36 @@ export const BulkCancel: Story = {
   },
 };
 
-/** The Scheduled view, empty until runs record their trigger, says why. */
+/** Selecting a finished agent run offers Retry in the bulk bar. */
+export const BulkRetry: Story = {
+  render: () => <Runs />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const boxes = await canvas.findAllByRole("checkbox", { name: /select/i });
+    await userEvent.click(boxes[4]);
+    await expect(canvas.getByRole("button", { name: /^Retry 1/ })).toBeEnabled();
+  },
+};
+
+/** The Scheduled view: the next firings of scheduled agents, soonest first. */
 export const ScheduledView: Story = {
+  render: () => (
+    <Runs
+      initial={{ view: "scheduled" }}
+      rows={UPCOMING_ROWS}
+      nextCursor={null}
+      totalCount={UPCOMING_ROWS.length}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("Scheduled run").length).toBe(UPCOMING_ROWS.length);
+    await expect(canvas.getByRole("columnheader", { name: /Fires/ })).toBeInTheDocument();
+  },
+};
+
+/** No scheduled agent fires: the empty Scheduled view. */
+export const ScheduledEmpty: Story = {
   render: () => <Runs initial={{ view: "scheduled" }} rows={[]} nextCursor={null} totalCount={0} />,
 };
 
@@ -71,21 +105,6 @@ export const LoadError: Story = {
       nextCursor={null}
       totalCount={null}
       error={{ message: "Response not successful: Received status code 502" }}
-    />
-  ),
-};
-
-/** One source failed; the rest still show, with a retry. */
-export const PartlyUnavailable: Story = {
-  render: () => <Runs unavailable={["workflow runs"]} />,
-};
-
-/** A source had more than the newest page: the count is a floor. */
-export const Capped: Story = {
-  render: () => (
-    <Runs
-      approximateCount
-      coverage="Merged from the newest 100 of each kind; filters and search cover those."
     />
   ),
 };

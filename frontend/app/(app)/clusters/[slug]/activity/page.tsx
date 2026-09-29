@@ -1,4 +1,4 @@
-import { LIST_CLUSTERS } from "@/graphql/clusters/clusters.queries";
+import { GET_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
 import { ClusterActivityClient } from "./cluster-activity-client";
@@ -12,7 +12,7 @@ export default async function ClusterActivityPage({
 }) {
   const { slug } = await params;
   return (
-    <PreloadQuery query={LIST_CLUSTERS}>
+    <PreloadQuery query={GET_CLUSTER} variables={{ slug }}>
       <ClusterActivityClient slug={slug} />
     </PreloadQuery>
   );

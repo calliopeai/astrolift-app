@@ -8,7 +8,7 @@ import { useListState } from "@/components/list/use-list-state";
 import { LIST_SCHEDULED_JOB_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 
-import { JOB_RUNS_LIST, jobRunsVariables, narrowJobRuns } from "./jobs-list";
+import { JOB_RUNS_LIST, jobRunsVariables } from "./jobs-list";
 
 interface JobRunsPageResp {
   astroliftScheduledJobRunsPage: CursorPage<AstroliftScheduledJobRun>;
@@ -17,8 +17,8 @@ interface JobRunsPageResp {
 /**
  * Apps › Scheduled jobs › Runs: one cursor page of
  * `astroliftScheduledJobRunsPage`, polled, new runs held behind the pill.
- * App, job and environment go to the server; status narrows a wider page.
- * The data half of JobRunsScreen.
+ * App, job, environment, search, status and Mine (who ran it now) all go
+ * to the server. The data half of JobRunsScreen.
  */
 export function useJobRuns() {
   const list = useListState(JOB_RUNS_LIST);
@@ -31,9 +31,7 @@ export function useJobRuns() {
   });
   const data = query.data ?? query.previousData;
   const page = data?.astroliftScheduledJobRunsPage;
-  const narrowing = Boolean(list.filters.status || list.filters.startedBy);
-  const rows = narrowJobRuns(page?.items ?? [], list.filters);
-  const held = useHeldRows(rows, (r) => r.id, {
+  const held = useHeldRows(page?.items ?? [], (r) => r.id, {
     live: state.after === null,
     resetKey: JSON.stringify(list.filters) + state.q + state.pageSize,
   });
@@ -49,6 +47,6 @@ export function useJobRuns() {
       void query.refetch();
     },
     nextCursor: page?.nextCursor ?? null,
-    totalCount: narrowing ? null : (page?.totalCount ?? null),
+    totalCount: page?.totalCount ?? null,
   };
 }

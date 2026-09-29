@@ -44,6 +44,10 @@ EXEMPT: dict[str, str] = {
         "gate; no other tenant's data is reachable."
     ),
     "IdentityQuery.astrolift_my_profile": "self-service: editable profile fields",
+    "IdentityQuery.astrolift_my_ui_preferences": (
+        "self-service (#2154): the caller's own UI preferences, read by viewer pk; "
+        "the only org data is the active tenant's restricted-settings default"
+    ),
     "IdentityQuery.my_memberships": (
         "self-service: enumerates orgs the caller belongs to — needed before any tenant context can be picked"
     ),
@@ -323,6 +327,14 @@ EXEMPT: dict[str, str] = {
         "and form_field_types. tenant_scoped() would have nothing to filter. "
         "The resolver rejects anonymous callers inline so the catalog doesn't "
         "leak to unauthenticated probes; no tenant data is exposed."
+    ),
+    "OperationsQuery.astrolift_run_audit": (
+        "per-kind gate in the resolver body (#2152): the run audit merges five kinds of "
+        "run, each under its own read permission (agent.read, workflow.read, app.read, "
+        "app.read_logs), checked at any scope with its rows narrowed to the caller's "
+        "scopes. A static decorator can only AND permissions, which would hide the whole "
+        "list from anyone missing one kind. A caller who can read no kind is refused with "
+        "PermissionDenied. Still @tenant_scoped; every kind is filtered to the caller org."
     ),
     "AgentsQuery.dispatchers": (
         "platform-level routing fabric: DispatcherInstances span tenants "

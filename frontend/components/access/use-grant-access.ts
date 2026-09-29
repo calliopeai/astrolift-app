@@ -6,9 +6,8 @@ import * as React from "react";
 import type {
   ListRolesICanGrantQuery,
   ListTeamMembersQuery,
-  ListTeamsPageQuery,
-  SearchableUsersQuery,
 } from "@/graphql/__generated__/operations";
+import { GRANT_PREVIEW, PRINCIPAL_SEARCH } from "@/graphql/access/access.queries";
 import { GRANT_ROLE } from "@/graphql/identity/identity.mutations";
 import {
   LIST_MEMBERS,
@@ -16,8 +15,6 @@ import {
   LIST_ROLE_BINDINGS_PAGE,
   LIST_ROLES_I_CAN_GRANT,
   LIST_TEAM_MEMBERS,
-  LIST_TEAMS_PAGE,
-  SEARCHABLE_USERS,
 } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftRoleBinding,
@@ -26,40 +23,159 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useDebounce } from "@/hooks/use-debounce";
 
-import type { Principal, RoleRef } from "./access-model";
-import type { GrantDraft, GrantOutcome, GrantPreview } from "./GrantAccessFlow";
+import type { GrantSourceInfo, Principal, RoleRef } from "./access-model";
+import {
+  expiryToIso,
+  type GrantDraft,
+  type GrantOutcome,
+  type GrantPreview,
+} from "./GrantAccessFlow";
 import { useScopeTree } from "./use-scope-tree";
 
 const SEARCH_LIMIT = 10;
+/** How many people the preview lists on each side; the counts are exact beyond it. */
+const PREVIEW_LIMIT = 50;
+
+/** An `astroliftPrincipalSearch` row, as far as the Who step reads it. */
+export interface SearchedPrincipal {
+  kind: string;
+  name: string;
+  secondary: string;
+  userId?: string | null;
+  groupExternalId?: string | null;
+  memberCount?: number | null;
+  teamId?: string | null;
+  teamSlug?: string | null;
+}
+
+/** A searched user, group or team as a pick; anything else (an invitation) is not one. */
+export function principalOfSearch(p: SearchedPrincipal): Principal | null {
+  if (p.kind === "USER" && p.userId) {
+    return { kind: "user", id: p.userId, name: p.name, detail: p.secondary || undefined };
+  }
+  if (p.kind === "GROUP" && p.groupExternalId) {
+    const n = p.memberCount ?? 0;
+    return {
+      kind: "group",
+      id: p.groupExternalId,
+      name: p.name,
+      detail: `IdP group · ${n} ${n === 1 ? "member" : "members"}`,
+    };
+  }
+  if (p.kind === "TEAM" && p.teamId) {
+    return { kind: "team", id: p.teamId, name: p.name, detail: p.teamSlug ?? undefined };
+  }
+  return null;
+}
+
+/** A pick as `AstroliftPrincipalRef`: the user id, the group's external id, the team id. */
+export function principalRef(p: Principal): { kind: string; id: string } {
+  return { kind: p.kind.toUpperCase(), id: p.id };
+}
+
+interface PreviewSource {
+  source: string;
+  scopeKind?: string | null;
+  scopeGuid?: string | null;
+  sourceScopeLabel: string;
+  groupExternalId?: string | null;
+  teamSlug?: string | null;
+  inherited: boolean;
+}
+
+interface PreviewPerson {
+  user: { id: string; username: string; email: string };
+  gained: string[];
+  via: PreviewSource[];
+}
+
+interface PreviewResp {
+  astroliftGrantPreview: {
+    ok: boolean;
+    errors: string[];
+    gainingCount: number;
+    unchangedCount: number;
+    gaining: PreviewPerson[];
+    unchanged: PreviewPerson[];
+    groups: { groupExternalId: string; memberCount: number }[];
+    allowed: boolean;
+    refusal?: string | null;
+    notes: string[];
+  };
+}
+
+/** Where someone already has it from: the first of their other grants that carries it. */
+export function sourceOfPreview(via: PreviewSource | undefined): GrantSourceInfo {
+  if (!via) return {};
+  const source: GrantSourceInfo = {};
+  if ((via.source === "GROUP_BINDING" || via.source === "GROUP_MAPPING") && via.groupExternalId) {
+    source.via = { kind: "group", group: via.groupExternalId };
+  } else if (via.source === "TEAM_SHARE" && via.teamSlug) {
+    source.via = { kind: "team", team: via.teamSlug };
+  }
+  if (via.inherited && via.scopeKind) {
+    source.inheritedFrom = {
+      kind: via.scopeKind as ScopeKind,
+      id: via.scopeGuid ?? via.sourceScopeLabel,
+      name: via.sourceScopeLabel,
+    };
+  }
+  return source;
+}
+
+/** The server's preview as the flow's review. */
+export function previewOf(p: PreviewResp["astroliftGrantPreview"]): GrantPreview {
+  const person = (u: PreviewPerson["user"]): Principal => ({
+    kind: "user",
+    id: u.id,
+    name: u.username,
+    detail: u.email || undefined,
+  });
+  return {
+    gaining: p.gaining.map((g) => ({ principal: person(g.user), permissions: g.gained })),
+    already: p.unchanged.map((u) => ({
+      principal: person(u.user),
+      source: sourceOfPreview(u.via[0]),
+    })),
+    gainingCount: p.gainingCount,
+    alreadyCount: p.unchangedCount,
+    groups: p.groups,
+    refusal: p.allowed ? null : (p.refusal ?? "You cannot grant this role here."),
+    notes: p.notes,
+  };
+}
 
 /**
- * The data half of `GrantAccessFlow`, on today's API:
+ * The data half of `GrantAccessFlow`:
  *
- * - who: `astroliftSearchableUsers` (members only; an invitation cannot hold
- *   a binding) and `astroliftTeamsPage`, both on the debounced query;
+ * - who: `astroliftPrincipalSearch` for users, IdP groups and teams, on the
+ *   debounced query;
  * - roles: `astroliftRolesICanGrant`, so every role offered can be granted;
  * - scope: the nav tree, cache-first (`useScopeTree`);
- * - submit: one `grantRole` per person, a team expanded to its members at
- *   the time of the grant. IdP groups cannot be granted to yet (`grantRole`
- *   takes a user), and neither can an expiry, so the flow offers Never only;
- * - preview: approximate. It lists what the role carries for each person,
- *   not what is new to them: there is no grant preview query yet.
+ * - preview: `astroliftGrantPreview`, the server's answer to who gains what,
+ *   who already had it and through what, and whether the caller may grant it;
+ * - submit: one `grantRole` per user or group (a group grant reaches everyone
+ *   the identity provider puts in it), a team expanded to its members at the
+ *   time of the grant, each with the picked expiry.
  */
 export function useGrantAccess() {
   const client = useApolloClient();
   const [query, setQuery] = React.useState("");
   const term = useDebounce(query.trim(), 250);
 
-  const users = useQuery<SearchableUsersQuery>(SEARCHABLE_USERS, {
-    variables: { query: term },
-    skip: !term,
-    fetchPolicy: "cache-first",
-  });
-  const teams = useQuery<ListTeamsPageQuery>(LIST_TEAMS_PAGE, {
-    variables: { search: term, limit: SEARCH_LIMIT },
-    skip: !term,
-    fetchPolicy: "cache-first",
-  });
+  const search = useQuery<{ astroliftPrincipalSearch: { items: SearchedPrincipal[] } }>(
+    PRINCIPAL_SEARCH,
+    {
+      variables: {
+        search: term,
+        filter: { kind: ["USER", "GROUP", "TEAM"] },
+        page: 1,
+        pageSize: SEARCH_LIMIT,
+      },
+      skip: !term,
+      fetchPolicy: "cache-first",
+    }
+  );
   const roles = useQuery<ListRolesICanGrantQuery>(LIST_ROLES_I_CAN_GRANT, {
     fetchPolicy: "cache-and-network",
   });
@@ -69,22 +185,9 @@ export function useGrantAccess() {
   }>(GRANT_ROLE);
 
   const results: Principal[] = term
-    ? [
-        ...(users.data?.astroliftSearchableUsers ?? [])
-          .filter((u) => u.matchKind === "MEMBER" && u.userId)
-          .map((u) => ({
-            kind: "user" as const,
-            id: u.userId!,
-            name: u.displayLabel || u.email,
-            detail: u.email,
-          })),
-        ...(teams.data?.astroliftTeamsPage.items ?? []).map((t) => ({
-          kind: "team" as const,
-          id: t.id,
-          name: t.name,
-          detail: t.slug,
-        })),
-      ]
+    ? (search.data?.astroliftPrincipalSearch.items ?? [])
+        .map(principalOfSearch)
+        .filter((p): p is Principal => p !== null)
     : [];
 
   const roleRefs: RoleRef[] = (roles.data?.astroliftRolesICanGrant ?? []).map((r) => ({
@@ -92,7 +195,7 @@ export function useGrantAccess() {
     scopeLevel: r.scopeLevel as ScopeKind,
   }));
 
-  /** Teams become their members, now; users stay; groups are refused below. */
+  /** Teams become their members, now; users and groups stay as they are. */
   async function expand(principals: Principal[]): Promise<Principal[]> {
     const out: Principal[] = [];
     for (const p of principals) {
@@ -118,37 +221,48 @@ export function useGrantAccess() {
   }
 
   async function preview(draft: GrantDraft): Promise<GrantPreview> {
-    const role = roleRefs.find((r) => r.id === draft.roleId);
-    const people = await expand(draft.principals);
-    return {
-      gaining: people.map((principal) => ({ principal, permissions: role?.permissions ?? [] })),
-      already: [],
-      approximate:
-        "Lists what the role carries, not what is new to each person, and does not yet say who already has it: the backend has no grant preview.",
-    };
+    const { data } = await client.query<PreviewResp>({
+      query: GRANT_PREVIEW,
+      variables: {
+        input: {
+          action: "GRANT",
+          principals: draft.principals.map(principalRef),
+          roleId: draft.roleId,
+          scopeKind: draft.scope?.kind ?? null,
+          scopeId: draft.scope?.id ?? null,
+          expiresAt: expiryToIso(draft.expiry, Date.now()),
+        },
+        limit: PREVIEW_LIMIT,
+      },
+      fetchPolicy: "network-only",
+    });
+    const p = data?.astroliftGrantPreview;
+    if (!p) throw new Error("Could not preview the grant");
+    if (!p.ok) throw new Error(p.errors.join(" ") || "Could not preview the grant");
+    return previewOf(p);
   }
 
   async function onSubmit(draft: GrantDraft): Promise<GrantOutcome[]> {
     if (!draft.roleId || !draft.scope) return [];
-    const people = await expand(draft.principals);
+    const expiresAt = expiryToIso(draft.expiry, Date.now());
+    const holders = await expand(draft.principals);
     const outcomes: GrantOutcome[] = [];
-    for (const principal of people) {
-      if (principal.kind !== "user") {
-        outcomes.push({
-          principal,
-          ok: false,
-          error: `A ${principal.kind} cannot hold a role yet: the backend grants to users only.`,
-        });
+    for (const principal of holders) {
+      if (principal.kind !== "user" && principal.kind !== "group") {
+        outcomes.push({ principal, ok: false, error: `A ${principal.kind} cannot hold a role.` });
         continue;
       }
       try {
         const { data } = await grantRole({
           variables: {
             input: {
-              userId: principal.id,
+              ...(principal.kind === "user"
+                ? { userId: principal.id }
+                : { groupExternalId: principal.id }),
               roleId: draft.roleId,
               scopeKind: draft.scope.kind,
               scopeGuid: draft.scope.id,
+              expiresAt,
             },
           },
         });
@@ -168,20 +282,19 @@ export function useGrantAccess() {
     }
     if (outcomes.some((o) => o.ok)) {
       await client.refetchQueries({
-        include: [LIST_ROLE_BINDINGS, LIST_ROLE_BINDINGS_PAGE, LIST_MEMBERS],
+        include: [LIST_ROLE_BINDINGS, LIST_ROLE_BINDINGS_PAGE, LIST_MEMBERS, "AccessOn"],
       });
     }
     return outcomes;
   }
 
-  const searchError = users.error ?? teams.error;
   return {
     search: {
       query,
       setQuery,
       results,
-      loading: Boolean(term) && (users.loading || teams.loading) && results.length === 0,
-      error: searchError ? { message: searchError.message } : null,
+      loading: Boolean(term) && search.loading && results.length === 0,
+      error: search.error ? { message: search.error.message } : null,
     },
     roles: roleRefs,
     rolesLoading: roles.loading && !roles.data,
@@ -189,6 +302,6 @@ export function useGrantAccess() {
     scopeTree,
     preview,
     onSubmit,
-    expirySupported: false,
+    expirySupported: true,
   };
 }

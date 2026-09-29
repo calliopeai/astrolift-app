@@ -8,10 +8,11 @@ import {
   ALL_ENVIRONMENTS,
   ENV_LONG,
   ENV_PROD,
+  ENV_PREVIEW,
   ENV_STAGING_PAUSED,
   environmentsProps,
 } from "./environments.fixtures";
-import { ENVIRONMENTS_LIST, selectEnvironments } from "./environments-list";
+import { ENVIRONMENTS_LIST } from "./environments-list";
 import { EnvironmentsScreen, type EnvironmentsScreenProps } from "./EnvironmentsScreen";
 
 const meta: Meta = {
@@ -27,17 +28,20 @@ type Props = Partial<Omit<EnvironmentsScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture environments, filtered and paged the way the hook does it. */
+/**
+ * The screen over fixture environments. The server filters, sorts and pages,
+ * so a story passes the rows its page would return; this only slices them.
+ */
 function Environments({ all = ALL_ENVIRONMENTS, initial, ...patch }: Props) {
   const list = useLocalListState(ENVIRONMENTS_LIST, initial);
-  const { rows, totalCount } = selectEnvironments(all, {
-    filters: list.filters,
-    q: list.state.q,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-  });
-  return <EnvironmentsScreen {...environmentsProps({ rows, totalCount, ...patch })} list={list} />;
+  const { page, pageSize } = list.state;
+  const rows = all.slice((page - 1) * pageSize, page * pageSize);
+  return (
+    <EnvironmentsScreen
+      {...environmentsProps({ rows, totalCount: all.length, ...patch })}
+      list={list}
+    />
+  );
 }
 
 /** All: rows open the environment detail. */
@@ -48,7 +52,7 @@ export const Loading: Story = { render: () => <Environments all={[]} loading /> 
 export const Empty: Story = { render: () => <Environments all={[]} /> };
 
 export const EmptyFiltered: Story = {
-  render: () => <Environments initial={{ filters: { cluster: "no-such-cluster" } }} />,
+  render: () => <Environments all={[]} initial={{ filters: { cluster: "no-such-cluster" } }} />,
 };
 
 export const ErrorState: Story = {
@@ -56,13 +60,19 @@ export const ErrorState: Story = {
 };
 
 export const Production: Story = {
-  render: () => <Environments initial={{ view: "production" }} />,
+  render: () => <Environments all={[ENV_PROD]} initial={{ view: "production" }} />,
 };
 
-export const Previews: Story = { render: () => <Environments initial={{ view: "previews" }} /> };
+export const Previews: Story = {
+  render: () => <Environments all={[ENV_PREVIEW]} initial={{ view: "previews" }} />,
+};
 
-/** Mine: empty, with the note saying why. */
-export const Mine: Story = { render: () => <Environments initial={{ view: "mine" }} /> };
+/** Mine: the environments the viewer created, or whose app they created. */
+export const Mine: Story = {
+  render: () => (
+    <Environments all={[{ ...ENV_PROD, ownedByMe: true }]} initial={{ view: "mine" }} />
+  ),
+};
 
 /** Embedded on an agent's surface, with its tab bar above; rows stay put. */
 export const Embedded: Story = {

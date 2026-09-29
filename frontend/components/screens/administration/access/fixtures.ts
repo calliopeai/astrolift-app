@@ -2,6 +2,7 @@
  * Hand-typed story fixtures for the administration access screens, typed
  * against each screen's props so a story cannot drift from its hook.
  */
+import { CONDITION_CATALOG, SIMULATION } from "@/components/access/fixtures";
 import type {
   AstroliftMember,
   AstroliftPolicy,
@@ -186,7 +187,7 @@ export const LONG_POLICIES: AstroliftPolicy[] = [
 const noop = () => {};
 const noopAsync = async () => {};
 
-/** One page of a cursor-paged list, as useListPageQuery returns it. */
+/** One page of a list, as useListPageQuery and useNumberedListQuery return it. */
 export function pageData<TRow>(
   rows: TRow[],
   patch: Partial<ListPageData<TRow>> = {}
@@ -226,6 +227,8 @@ export const NEW_POLICY: PolicyEditorScreenProps = {
   error: null,
   onRetry: noop,
   canManage: true,
+  catalog: { conditions: CONDITION_CATALOG, loading: false, error: null },
+  simulate: async () => SIMULATION,
   saving: false,
   onSave: async () => null,
   onCancel: noop,

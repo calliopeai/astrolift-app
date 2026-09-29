@@ -1,183 +1,25 @@
 "use client";
 
+/**
+ * One Temporal instance (#437), opened from the Platform instances list:
+ * its header, the admin cancel and terminate controls, and its activity
+ * feed (per-event payload and retries). The list itself is
+ * WorkflowInstancesScreen, on ListPage.
+ */
+
 import type { ReactNode } from "react";
-import {
-  ChevronRightIcon,
-  CircleSlashIcon,
-  Loader2Icon,
-  OctagonXIcon,
-  RefreshCwIcon,
-  SearchIcon,
-  XIcon,
-} from "lucide-react";
+import { CircleSlashIcon, Loader2Icon, OctagonXIcon, XIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { WorkflowHistoryEvent } from "@/graphql/workflows/workflows.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type {
   useInstanceAdminControls,
   useWorkflowInstanceDetailPanel,
-  useWorkflowInstancesPanel,
 } from "./use-workflow-instances";
-
-const STATUS_OPTIONS = [
-  { value: "ALL", label: "All statuses" },
-  { value: "RUNNING", label: "Running" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "FAILED", label: "Failed" },
-  { value: "CANCELED", label: "Cancelled" },
-  { value: "TERMINATED", label: "Terminated" },
-  { value: "TIMED_OUT", label: "Timed out" },
-];
-
-export type WorkflowInstancesPanelViewProps = ReturnType<typeof useWorkflowInstancesPanel> & {
-  /** The selected instance's detail panel (InstanceDetailView behind its hook). */
-  detail: ReactNode;
-};
-
-/**
- * Drill-down panel for Temporal workflow instances (#437).
- *
- * Three layered surfaces share one mount:
- *
- *   list  → status-filtered instance rows; click to drill in
- *   row   → expand the activity feed (per-event payload + retries)
- *   admin → cancel / terminate buttons gated by the parent route
- *           since admin-only check happens on the resolver
- *
- * Filters: workflow type (substring) + status. Updates are debounced
- * to the GraphQL refetch — we keep the controlled inputs immediate.
- */
-export function WorkflowInstancesPanelView({
-  typeFilter,
-  setTypeFilter,
-  statusFilter,
-  setStatusFilter,
-  selectedWorkflowId,
-  setSelectedWorkflowId,
-  instances,
-  loading,
-  error,
-  refetch,
-  detail,
-}: WorkflowInstancesPanelViewProps) {
-  const fmt = useFormatters();
-
-  // When there are no instances and the user hasn't searched/filtered,
-  // show a single centered empty state instead of the awkward two-panel
-  // layout with empty left and "Select an instance" instruction on right.
-  const isDefaultView = !typeFilter.trim() && statusFilter === "ALL";
-  if (!loading && !error && instances.length === 0 && isDefaultView) {
-    return (
-      <div className="text-muted-foreground rounded-md border border-dashed p-12 text-center text-sm">
-        <p className="text-foreground mb-1 font-medium">No active Temporal workflows</p>
-        <p>
-          Platform workflows (deploys, provisioning, drift detection) appear here while running. The
-          engine is idle — everything is up to date.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <SearchIcon className="text-muted-foreground absolute top-1/2 left-2 size-4 -translate-y-1/2" />
-            <Input
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              placeholder="Workflow type"
-              className="pl-8"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => refetch()}
-            aria-label="Refresh instances"
-          >
-            <RefreshCwIcon className="size-4" />
-          </Button>
-        </div>
-
-        {loading && instances.length === 0 && (
-          <div className="flex items-center justify-center p-8">
-            <Loader2Icon className="text-muted-foreground size-5 animate-spin" />
-          </div>
-        )}
-
-        {error && (
-          <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-3 text-sm">
-            {error.message}
-          </div>
-        )}
-
-        {!loading && !error && instances.length === 0 && (
-          <div className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-            No workflow instances match the current filter. Temporal may be disabled, or the
-            workflow type / status combination has no history yet.
-          </div>
-        )}
-
-        <ul className="flex flex-col gap-1">
-          {instances.map((inst) => (
-            <li key={`${inst.workflowId}-${inst.runId}`}>
-              <button
-                type="button"
-                onClick={() => setSelectedWorkflowId(inst.workflowId)}
-                className={`hover:bg-accent flex w-full items-center justify-between gap-2 rounded-md border p-3 text-left transition-colors ${
-                  selectedWorkflowId === inst.workflowId ? "bg-accent" : ""
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs">{inst.workflowId}</span>
-                    <StatusBadge status={inst.status} />
-                  </div>
-                  <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <span>{inst.workflowType}</span>
-                    {inst.startedAt && <span>Started {fmt.formatDateTime(inst.startedAt)}</span>}
-                    {inst.durationSeconds != null && (
-                      <span>{formatDuration(inst.durationSeconds)}</span>
-                    )}
-                    {inst.triggeredBy && <span>by {inst.triggeredBy}</span>}
-                  </div>
-                </div>
-                <ChevronRightIcon className="text-muted-foreground size-4 shrink-0" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {detail}
-    </div>
-  );
-}
+import { formatInstanceDuration } from "./workflow-instances-list";
 
 export type InstanceDetailViewProps = Omit<
   ReturnType<typeof useWorkflowInstanceDetailPanel>,
@@ -215,7 +57,7 @@ export function InstanceDetailView({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-mono text-xs">{workflowId}</span>
-            {detail && <StatusBadge status={detail.instance.status} />}
+            {detail && <InstanceStatusBadge status={detail.instance.status} />}
           </div>
           {detail && (
             <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 text-xs">
@@ -227,7 +69,7 @@ export function InstanceDetailView({
                 <span>Started {fmt.formatDateTime(detail.instance.startedAt)}</span>
               )}
               {detail.instance.durationSeconds != null && (
-                <span>{formatDuration(detail.instance.durationSeconds)}</span>
+                <span>{formatInstanceDuration(detail.instance.durationSeconds)}</span>
               )}
               {detail.instance.triggeredBy && <span>by {detail.instance.triggeredBy}</span>}
             </div>
@@ -342,7 +184,8 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+/** A Temporal execution status, coloured by how it ended. */
+export function InstanceStatusBadge({ status }: { status: string }) {
   const variant: "default" | "secondary" | "destructive" | "outline" =
     status === "RUNNING"
       ? "default"
@@ -352,13 +195,4 @@ function StatusBadge({ status }: { status: string }) {
           ? "destructive"
           : "outline";
   return <Badge variant={variant}>{status}</Badge>;
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  if (m < 60) return `${m}m ${s}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
 }

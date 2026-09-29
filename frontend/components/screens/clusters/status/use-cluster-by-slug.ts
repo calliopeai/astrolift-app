@@ -2,16 +2,24 @@
 
 import { useQuery } from "@apollo/client/react";
 
-import { LIST_CLUSTERS } from "@/graphql/clusters/clusters.queries";
+import { GET_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
 interface Resp {
-  astroliftClusters: AstroliftTenantCluster[];
+  astroliftCluster: AstroliftTenantCluster | null;
 }
 
-/** One cluster out of the (preloaded) cluster list, by slug. */
+/**
+ * One cluster by slug, read on its own (#2150): finding it in the fleet
+ * list made every cluster past the 200th "not found".
+ */
 export function useClusterBySlug(slug: string) {
-  const { data, loading, error, refetch } = useQuery<Resp>(LIST_CLUSTERS);
-  const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug) ?? null;
+  // cache-and-network: the SSR preload runs before the org cookie is set
+  // and answers null; a cache-first read would keep that answer.
+  const { data, loading, error, refetch } = useQuery<Resp>(GET_CLUSTER, {
+    variables: { slug },
+    fetchPolicy: "cache-and-network",
+  });
+  const cluster = data?.astroliftCluster ?? null;
   return { cluster, loading, error: error?.message ?? null, refetch: () => void refetch() };
 }

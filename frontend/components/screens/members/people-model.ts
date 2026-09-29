@@ -1,28 +1,32 @@
 /**
  * Admin › Access › People (access UX design 3.1): one list of principals.
- * Users and IdP groups are rows of the same list; a pending invitation is a
- * user row in the Invited view, so invitation history is a view, not a
- * second table. Pure: the declaration, the row model, filter, sort, page.
+ * Users are the list; IdP groups are its Groups view and a pending
+ * invitation is a user in the Invited view, so invitation history is a
+ * view, not a second table. Pure and server-safe: the declaration, the row
+ * model, and the list state as each view's query variables.
  *
- * The backend's member, binding and invitation pages take `search`, `limit`
- * and `after` only, so the hook walks them (`useWalk`) and `selectPeople`
- * answers the views, the filter chips, the sort and the numbered page, as the
- * Clusters list does. What each part can know from today's API:
+ * The server answers every view (#2153, #2126):
  *
- * - Users: one row per user (a user holds several Member rows: ORG, and the
- *   TEAM / APP rows grants create). Their roles are the role bindings held
- *   by their user.
- * - Groups: only IdP groups that hold a role binding are known; the org's
- *   full group list and its members need the IdP sync (design 6.4).
- * - Teams: a TEAM-scope Member row carries the team's integer pk, which is
- *   named from the TEAM bindings' labels (`teamSlugIndex`); a team where
- *   nobody holds a binding stays unnamed, but Mine still matches on the pk.
- * - Admins: users and groups holding, at org scope, a role that can manage
- *   members (`org.manage_members`).
+ * - All, Mine, Admins and the user chips: `astroliftMembersPage` at ORG
+ *   scope (one row per person), with the role, team, lifecycle, Mine
+ *   (shares a team with the viewer), Admins (holds `org.manage_members` at
+ *   org scope) and last-active filters, the column sorts and exact counts.
+ *   Each row carries the teams the person is on.
+ * - Groups: `astroliftPrincipalSearch` for GROUP, every IdP group the org
+ *   knows (members' stored groups, group bindings and group mappings).
+ * - Invited: `astroliftInvitationsPage` with its status and role filters.
+ *
+ * A page's roles come from one bindings read for the people on it.
  */
-import type { SortState } from "@/components/data-table";
 import type { Principal } from "@/components/access/access-model";
+import type { SortState } from "@/components/data-table";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { PEOPLE_HREF } from "@/components/screens/administration/access/access-nav";
+import {
+  type NumberedVariables,
+  numberedVariables,
+  one,
+} from "@/components/screens/administration/access/identity-lists";
 import type {
   AstroliftInvitation,
   AstroliftMember,
@@ -31,23 +35,25 @@ import type {
   AstroliftUser,
 } from "@/graphql/identity/identity.types";
 
-import { PEOPLE_HREF } from "@/components/screens/administration/access/access-nav";
-import { teamSlugIndex } from "@/components/screens/administration/access/principal-access";
-
 // ---------------------------------------------------------------------------
 // Rows
 // ---------------------------------------------------------------------------
 
+export interface PersonTeam {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface UserRow {
   kind: "user";
   key: string;
-  /** The member row the detail page opens on: the ORG row where there is one. */
+  /** The ORG member row, which the detail page opens on. */
   memberId: string;
   user: AstroliftUser;
-  memberships: AstroliftMember[];
+  /** Their bindings in the org: the page's roles read. */
   bindings: AstroliftRoleBinding[];
-  /** TEAM-scope memberships: pk, and slug where a binding label names it. */
-  teams: { pk: string; slug: string | null }[];
+  teams: PersonTeam[];
   lifecycle: string;
   lastActiveAt: string | null;
   joinedAt: string;
@@ -58,8 +64,10 @@ export interface GroupRow {
   kind: "group";
   key: string;
   externalId: string;
-  bindings: AstroliftRoleBinding[];
-  admin: boolean;
+  /** Members who carry the group at their last sign-in. */
+  memberCount: number;
+  bindingsCount: number;
+  mappingsCount: number;
 }
 
 export interface InvitationRow {
@@ -73,10 +81,6 @@ export type PeopleRow = UserRow | GroupRow | InvitationRow;
 /** The permission that makes a holder an org admin, for the Admins view. */
 export const ADMIN_PERMISSION = "org.manage_members";
 
-function isAdminBinding(b: AstroliftRoleBinding, adminRoles: Set<string>): boolean {
-  return b.scopeKind === "ORG" && adminRoles.has(b.role.id);
-}
-
 /** The route param for a group's page: `group:<external id>`. */
 export function groupParam(externalId: string): string {
   return `group:${externalId}`;
@@ -87,6 +91,8 @@ export function principalHref(row: UserRow | GroupRow): string {
     ? `${PEOPLE_HREF}/${row.memberId}`
     : `${PEOPLE_HREF}/${encodeURIComponent(groupParam(row.externalId))}`;
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function principalOf(row: PeopleRow): Principal {
   switch (row.kind) {
@@ -102,7 +108,7 @@ export function principalOf(row: PeopleRow): Principal {
         kind: "group",
         id: row.externalId,
         name: row.externalId,
-        detail: `IdP group · ${row.bindings.length} ${row.bindings.length === 1 ? "grant" : "grants"}`,
+        detail: `IdP group · ${plural(row.memberCount, "member", "members")}`,
       };
     case "invitation":
       return {
@@ -116,68 +122,61 @@ export function principalOf(row: PeopleRow): Principal {
 }
 
 /**
- * Users (one row each) and the IdP groups that hold a binding, from the
- * walked member and binding rows.
+ * One row per person from their ORG member row, with their bindings (from
+ * the page's bindings read) and whether one makes them an org admin.
  */
-export function buildPeopleRows({
-  members,
-  bindings,
-  roles,
-}: {
-  members: readonly AstroliftMember[];
-  bindings: readonly AstroliftRoleBinding[];
-  roles: readonly AstroliftRole[];
-}): { users: UserRow[]; groups: GroupRow[] } {
+export function userRows(
+  members: readonly AstroliftMember[],
+  bindings: readonly AstroliftRoleBinding[],
+  roles: readonly AstroliftRole[]
+): UserRow[] {
   const adminRoles = new Set(
     roles.filter((r) => r.permissions.includes(ADMIN_PERMISSION)).map((r) => r.id)
   );
-  const teamNames = teamSlugIndex(bindings);
-
   const byUser = new Map<string, AstroliftRoleBinding[]>();
-  const byGroup = new Map<string, AstroliftRoleBinding[]>();
   for (const b of bindings) {
     if (b.user) byUser.set(b.user.id, [...(byUser.get(b.user.id) ?? []), b]);
-    else if (b.groupExternalId)
-      byGroup.set(b.groupExternalId, [...(byGroup.get(b.groupExternalId) ?? []), b]);
   }
-
-  const memberships = new Map<string, AstroliftMember[]>();
-  for (const m of members) memberships.set(m.user.id, [...(memberships.get(m.user.id) ?? []), m]);
-
-  const users: UserRow[] = [...memberships.entries()].map(([userId, rows]) => {
-    const primary = rows.find((r) => r.scopeKind === "ORG") ?? rows[0]!;
-    const held = byUser.get(userId) ?? [];
-    const lastActive = rows
-      .map((r) => r.lastActiveAt)
-      .filter((v): v is string => Boolean(v))
-      .sort()
-      .pop();
+  return members.map((m) => {
+    const held = byUser.get(m.user.id) ?? [];
     return {
       kind: "user",
-      key: `user:${userId}`,
-      memberId: primary.id,
-      user: primary.user,
-      memberships: rows,
+      key: `user:${m.user.id}`,
+      memberId: m.id,
+      user: m.user,
       bindings: held,
-      teams: rows
-        .filter((r) => r.scopeKind === "TEAM")
-        .map((r) => ({ pk: r.scopeId, slug: teamNames.get(r.scopeId) ?? null })),
-      lifecycle: primary.lifecycle,
-      lastActiveAt: lastActive ?? null,
-      joinedAt: primary.joinedAt ?? primary.createdAt,
-      admin: held.some((b) => isAdminBinding(b, adminRoles)),
+      teams: (m.teams ?? []).map((t) => ({ id: t.id, slug: t.slug, name: t.name })),
+      lifecycle: m.lifecycle,
+      lastActiveAt: m.lastActiveAt ?? null,
+      joinedAt: m.joinedAt ?? m.createdAt,
+      admin: held.some((b) => b.scopeKind === "ORG" && adminRoles.has(b.role.id)),
     };
   });
+}
 
-  const groups: GroupRow[] = [...byGroup.entries()].map(([externalId, held]) => ({
+/** The fields of an `astroliftPrincipalSearch` GROUP row the list reads. */
+export interface GroupPrincipal {
+  groupExternalId?: string | null;
+  name: string;
+  memberCount?: number | null;
+  bindingsCount?: number | null;
+  mappingsCount?: number | null;
+}
+
+export function groupRow(p: GroupPrincipal): GroupRow {
+  const externalId = p.groupExternalId || p.name;
+  return {
     kind: "group",
     key: `group:${externalId}`,
     externalId,
-    bindings: held,
-    admin: held.some((b) => isAdminBinding(b, adminRoles)),
-  }));
+    memberCount: p.memberCount ?? 0,
+    bindingsCount: p.bindingsCount ?? 0,
+    mappingsCount: p.mappingsCount ?? 0,
+  };
+}
 
-  return { users, groups };
+export function invitationRow(invitation: AstroliftInvitation): InvitationRow {
+  return { kind: "invitation", key: `invitation:${invitation.id}`, invitation };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,26 +203,24 @@ export const PEOPLE_LIST: ListDefinition = {
       options: [
         { value: "user", label: "user" },
         { value: "group", label: "group" },
+        { value: "invitation", label: "invitation" },
       ],
     },
     // Role and team are typed (`role:org_admin`, `team:payments`); the hook
-    // adds the org's roles and named teams as options.
+    // adds the org's roles as options.
     { key: "role", label: "Role" },
     { key: "team", label: "Team" },
     {
-      key: "scope",
-      label: "Scope",
-      options: [
-        { value: "ORG", label: "organization" },
-        { value: "TEAM", label: "team" },
-        { value: "PROJECT", label: "project" },
-        { value: "APP", label: "app" },
-      ],
+      key: "lifecycle",
+      label: "Lifecycle",
+      options: ["active", "pending_invite", "pending_first_login", "suspended", "deactivated"].map(
+        (v) => ({ value: v, label: v.replace(/_/g, " ") })
+      ),
     },
     { key: "active", label: "Last active", options: ACTIVE_OPTIONS },
     {
       key: "status",
-      label: "Status",
+      label: "Invitation status",
       options: ["pending", "accepted", "expired", "revoked"].map((v) => ({ value: v, label: v })),
     },
   ],
@@ -242,7 +239,7 @@ export const PEOPLE_LIST: ListDefinition = {
         key: "groups",
         label: "Groups",
         filters: { kind: "group" },
-        note: "IdP groups that hold a role binding. The resolver does not match group bindings yet, so they grant nothing until it does; the full group list and members need the IdP sync.",
+        note: "IdP groups the organization knows: from members' sign-ins, group grants and group mappings. A group's grants and mappings apply to everyone the identity provider puts in it.",
       },
       { key: "admins", label: "Admins", filters: { admin: "yes" } },
     ],
@@ -252,168 +249,88 @@ export const PEOPLE_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
-/** The definition with the org's roles and named teams as filter options. */
-export function peopleList(roles: readonly AstroliftRole[], teamSlugs: readonly string[]) {
+/** The definition with the org's roles as the Role filter's options. */
+export function peopleList(roles: readonly AstroliftRole[]): ListDefinition {
   return {
     ...PEOPLE_LIST,
     fields: PEOPLE_LIST.fields.map((f) =>
       f.key === "role" && roles.length > 0
         ? { ...f, options: roles.map((r) => ({ value: r.slug, label: r.slug })) }
-        : f.key === "team" && teamSlugs.length > 0
-          ? { ...f, options: teamSlugs.map((s) => ({ value: s, label: s })) }
-          : f
+        : f
     ),
-  } satisfies ListDefinition;
-}
-
-/** Which walks a view needs, so only its queries run. */
-export function viewNeeds(filters: Record<string, string>): {
-  members: boolean;
-  bindings: boolean;
-  invitations: boolean;
-} {
-  if (filters.kind === "invitation") return { members: false, bindings: false, invitations: true };
-  if (filters.kind === "group") return { members: false, bindings: true, invitations: false };
-  return { members: true, bindings: true, invitations: false };
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Filter, sort, page
+// Each view's query
 // ---------------------------------------------------------------------------
 
-const DAY = 24 * 60 * 60 * 1000;
+export type PeopleSource = "members" | "groups" | "invitations";
 
-function activeMatches(lastActiveAt: string | null, want: string, now: number): boolean {
-  if (want === "never") return !lastActiveAt;
-  if (!lastActiveAt) return false;
-  const ago = now - Date.parse(lastActiveAt);
-  if (want === "stale") return ago > 90 * DAY;
-  const days = Number.parseInt(want, 10);
-  return Number.isFinite(days) && ago <= days * DAY;
+/** Which query answers the view: only that one runs. */
+export function sourceOf(filters: Record<string, string>): PeopleSource {
+  if (filters.kind === "invitation") return "invitations";
+  if (filters.kind === "group") return "groups";
+  return "members";
 }
 
-function scopeKinds(row: UserRow | GroupRow): Set<string> {
-  const kinds = new Set(row.bindings.map((b) => b.scopeKind as string));
-  if (row.kind === "user") for (const m of row.memberships) kinds.add(m.scopeKind);
-  return kinds;
+export interface MembersFilter {
+  scopeKind: string[];
+  role?: string[];
+  team?: string[];
+  lifecycle?: string[];
+  mine?: boolean;
+  admin?: boolean;
+  active?: string;
 }
 
-function holdsRole(row: UserRow | GroupRow, role: string): boolean {
-  const want = role.toLowerCase();
-  return row.bindings.some(
-    (b) => b.role.slug.toLowerCase() === want || b.role.name.toLowerCase() === want
-  );
+export interface InvitationsFilter {
+  status?: string[];
+  role?: string[];
 }
 
-function searchMatches(row: PeopleRow, q: string): boolean {
-  if (!q) return true;
-  const hay =
-    row.kind === "group"
-      ? row.externalId
-      : row.kind === "invitation"
-        ? `${row.invitation.email} ${row.invitation.roleSlug ?? ""}`
-        : `${row.user.username} ${row.user.email}`;
-  return hay.toLowerCase().includes(q.toLowerCase());
-}
+/** The members sort keys the list's columns use; invitations spell two of them differently. */
+const INVITATION_SORT: Record<string, string> = { name: "email", joined: "created" };
 
-interface SelectContext {
-  filters: Record<string, string>;
-  /** Applied to groups here; users and invitations were searched on the server. */
+interface ListQuestion {
   q: string;
+  filters: Record<string, string>;
   sort: SortState[];
   page: number;
   pageSize: number;
-  /** The viewer's username, for Mine. */
-  me: string | null;
-  now: number;
 }
 
-function matches(row: PeopleRow, ctx: SelectContext, myTeams: Set<string>): boolean {
-  const f = ctx.filters;
-  if (row.kind === "invitation") {
-    if (f.kind !== "invitation") return false;
-    if (f.status && row.invitation.status !== f.status) return false;
-    if (f.role && (row.invitation.roleSlug ?? "").toLowerCase() !== f.role.toLowerCase())
-      return false;
-    return true;
-  }
-  if (f.kind === "invitation") return false;
-  if (f.kind && row.kind !== f.kind) return false;
-  if (row.kind === "group" && !searchMatches(row, ctx.q)) return false;
-  if (f.admin === "yes" && !row.admin) return false;
-  if (f.role && !holdsRole(row, f.role)) return false;
-  if (f.scope && !scopeKinds(row).has(f.scope)) return false;
-  if (f.team) {
-    if (row.kind !== "user" || !row.teams.some((t) => t.slug === f.team || t.pk === f.team))
-      return false;
-  }
-  if (f.mine === MINE) {
-    if (row.kind !== "user" || !row.teams.some((t) => myTeams.has(t.pk))) return false;
-  }
-  if (f.active) {
-    if (row.kind !== "user" || !activeMatches(row.lastActiveAt, f.active, ctx.now)) return false;
-  }
-  return true;
+/** `astroliftMembersPage`: one ORG row per person, the chips as its filter. */
+export function membersVariables(s: ListQuestion): NumberedVariables<MembersFilter> {
+  const f = s.filters;
+  return numberedVariables(s, {
+    scopeKind: ["ORG"],
+    role: one(f.role),
+    team: one(f.team),
+    lifecycle: one(f.lifecycle),
+    mine: f.mine === MINE ? true : undefined,
+    admin: f.admin === "yes" ? true : undefined,
+    active: f.active || undefined,
+  });
 }
 
-function nameOf(row: PeopleRow): string {
-  return (
-    row.kind === "user"
-      ? row.user.username
-      : row.kind === "group"
-        ? row.externalId
-        : row.invitation.email
-  ).toLowerCase();
+/** `astroliftInvitationsPage`: status and role, sorted by email or when sent. */
+export function invitationsVariables(s: ListQuestion): NumberedVariables<InvitationsFilter> {
+  const sort = s.sort
+    .map((k) => ({ ...k, key: INVITATION_SORT[k.key] ?? k.key }))
+    .filter((k) => ["email", "created", "expires", "status", "role"].includes(k.key));
+  return numberedVariables(
+    { ...s, sort: sort.length ? sort : [{ key: "created", dir: "desc" }] },
+    { status: one(s.filters.status), role: one(s.filters.role) }
+  );
 }
 
-const SORT_VALUE: Record<string, (r: PeopleRow) => string | number> = {
-  name: nameOf,
-  // Never active sorts as the oldest.
-  lastActive: (r) => (r.kind === "user" && r.lastActiveAt ? Date.parse(r.lastActiveAt) : 0),
-  joined: (r) =>
-    r.kind === "user"
-      ? Date.parse(r.joinedAt) || 0
-      : r.kind === "invitation"
-        ? Date.parse(r.invitation.createdAt) || 0
-        : 0,
-  roles: (r) => (r.kind === "invitation" ? 0 : r.bindings.length),
-};
-
-function compare(a: PeopleRow, b: PeopleRow, sort: SortState[]): number {
-  for (const s of sort) {
-    const value = SORT_VALUE[s.key];
-    if (!value) continue;
-    const x = value(a);
-    const y = value(b);
-    if (x < y) return s.dir === "asc" ? -1 : 1;
-    if (x > y) return s.dir === "asc" ? 1 : -1;
-  }
-  return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
-}
-
-/** The viewer's team pks: the TEAM rows of the user whose username is `me`. */
-export function teamsOf(users: readonly UserRow[], me: string | null): Set<string> {
-  const mine = me ? users.find((u) => u.user.username === me) : undefined;
-  return new Set((mine?.teams ?? []).map((t) => t.pk));
-}
-
-/**
- * One numbered page: view filters and chips applied, sorted, sliced.
- * `filtered` is every match, for the CSV export; `totalCount` its size.
- */
-export function selectPeople(
-  rows: readonly PeopleRow[],
-  ctx: SelectContext
-): { rows: PeopleRow[]; totalCount: number; filtered: PeopleRow[] } {
-  const users = rows.filter((r): r is UserRow => r.kind === "user");
-  const myTeams = teamsOf(users, ctx.me);
-  const filtered = rows
-    .filter((r) => matches(r, ctx, myTeams))
-    .sort((a, b) => compare(a, b, ctx.sort));
-  const start = (Math.max(1, ctx.page) - 1) * ctx.pageSize;
+/** `astroliftPrincipalSearch` for IdP groups; it orders by name and takes no sort. */
+export function groupsVariables(s: ListQuestion) {
   return {
-    rows: filtered.slice(start, start + ctx.pageSize),
-    totalCount: filtered.length,
-    filtered,
+    search: s.q.trim() || null,
+    filter: { kind: ["GROUP"] },
+    page: Math.max(1, s.page),
+    pageSize: s.pageSize,
   };
 }

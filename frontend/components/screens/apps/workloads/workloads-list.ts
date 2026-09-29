@@ -4,15 +4,14 @@
  * Scheduled jobs fold in as the cronjob kind: `/apps/<slug>/jobs` lands on
  * `?kind=cronjob`, which is this list's kind chip.
  *
- * Why the filter, sort and page step runs here: `astroliftWorkloadsPage`
- * takes `search` and a cursor only, with no kind filter and no sort. An
- * app's workloads are the few its manifest declares, and `astroliftWorkloads`
- * returns them all, so the hook reads the whole set and this answers the
- * rest exactly, with numbered pages. Pure.
+ * `astroliftWorkloadsPage` answers all of it (#2155): `kinds` holds the
+ * list to those four, the kind and exposure chips go through its `filter`,
+ * search, the column sort and numbered pages through the §5.1 arguments.
+ * Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/list-state";
-import type { AstroliftWorkload, WorkloadKind } from "@/graphql/registry/registry.types";
+import { formatSort, type ListDefinition } from "@/components/list/list-state";
+import type { WorkloadKind } from "@/graphql/registry/registry.types";
 
 export const KIND_LABEL: Record<WorkloadKind, string> = {
   deployment: "Deployment",
@@ -54,42 +53,34 @@ export const APP_WORKLOADS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
-function compare(a: AstroliftWorkload, b: AstroliftWorkload, key: string): number {
-  switch (key) {
-    case "kind":
-      return a.kind.localeCompare(b.kind);
-    case "replicas":
-      return (a.replicas || 0) - (b.replicas || 0);
-    case "name":
-    default:
-      return a.name.localeCompare(b.name) || a.slug.localeCompare(b.slug);
+/** The page query's variables for a list state; the route preloads the default page with them. */
+export function appWorkloadsVariables(
+  appSlug: string,
+  {
+    q,
+    filters,
+    sort,
+    page,
+    pageSize,
+  }: {
+    q: string;
+    filters: Record<string, string>;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
   }
-}
-
-/** Filter, search, sort and page the whole set. Stable: ties break on the slug. */
-export function selectWorkloads(
-  all: AstroliftWorkload[],
-  filters: Record<string, string>,
-  q: string,
-  sort: SortState[],
-  page: number,
-  pageSize: number
-): { rows: AstroliftWorkload[]; totalCount: number } {
-  const needle = q.trim().toLowerCase();
-  const matched = all.filter((w) => {
-    if (filters.kind && w.kind !== filters.kind) return false;
-    if (filters.exposure === "public" && !w.isPublic) return false;
-    if (filters.exposure === "internal" && w.isPublic) return false;
-    if (!needle) return true;
-    return [w.name, w.slug, w.kind, w.schedule ?? ""].some((f) => f.toLowerCase().includes(needle));
-  });
-  const sorted = [...matched].sort((a, b) => {
-    for (const s of sort) {
-      const c = compare(a, b, s.key);
-      if (c !== 0) return s.dir === "asc" ? c : -c;
-    }
-    return a.slug.localeCompare(b.slug);
-  });
-  const start = (Math.max(1, page) - 1) * pageSize;
-  return { rows: sorted.slice(start, start + pageSize), totalCount: matched.length };
+) {
+  const filter: { kind?: string[]; isPublic?: boolean } = {};
+  if (filters.kind) filter.kind = [filters.kind];
+  if (filters.exposure === "public") filter.isPublic = true;
+  if (filters.exposure === "internal") filter.isPublic = false;
+  return {
+    appSlug,
+    kinds: APP_WORKLOAD_KINDS,
+    search: q.trim() || null,
+    filter: Object.keys(filter).length > 0 ? filter : null,
+    sort: formatSort(sort),
+    page: Math.max(1, page),
+    pageSize,
+  };
 }

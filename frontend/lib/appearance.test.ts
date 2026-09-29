@@ -5,6 +5,7 @@ import {
   MIN_ACCENT_CONTRAST,
   STORAGE_KEY,
   accentContrast,
+  appearanceFromServer,
   applyAppearance,
   clearAppearance,
   contrastRatio,
@@ -192,5 +193,28 @@ describe("custom accent", () => {
     applyAppearance({ ...DEFAULT_APPEARANCE, accent: "ice" }, el);
     expect(el.dataset.accent).toBe("ice");
     expect(el.style.getPropertyValue("--brand-primary")).toBe("");
+  });
+});
+
+describe("appearanceFromServer", () => {
+  it("reads the server's empty appearance as never chosen, so the org default applies", () => {
+    expect(appearanceFromServer({})).toBeNull();
+    expect(appearanceFromServer(null)).toBeNull();
+    const orgDefault = { ground: "paper" as const, accent: "copper" as const };
+    expect(resolveAppearance(appearanceFromServer({}), { orgDefault }).value).toEqual({
+      ...DEFAULT_APPEARANCE,
+      ...orgDefault,
+    });
+  });
+
+  it("keeps the server's partial partial, dropping what this build does not know", () => {
+    expect(appearanceFromServer({ accent: "ice", ground: "sepia", sparkle: true })).toEqual({
+      accent: "ice",
+    });
+    expect(
+      resolveAppearance(appearanceFromServer({ accent: "ice" }), {
+        orgDefault: { ground: "paper", accent: "copper" },
+      }).value
+    ).toEqual({ ...DEFAULT_APPEARANCE, ground: "paper", accent: "ice" });
   });
 });

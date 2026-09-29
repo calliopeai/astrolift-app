@@ -61,9 +61,10 @@ function useUserSearch(): PrincipalSearch {
  * The data half of the Check access page (design 3.7): "Can <who> <do what>
  * on <which>?". The question lives in the URL (`who`, `can`, `on`, and
  * `compare` for two people; see check-access-query.ts) so an answer can be
- * linked, and who defaults to the viewer. Only the visible half queries: the
- * diagnosis while checking, the comparison while comparing, each skipped
- * until its inputs are chosen. The scope tree is the nav tree, cache-first.
+ * linked, and who defaults to the viewer. `on` is the check's target scope,
+ * sent to both analyses. Only the visible half queries: the diagnosis while
+ * checking, the comparison while comparing, each skipped until its inputs
+ * are chosen. The scope tree is the nav tree, cache-first.
  */
 export function usePermissionsDiagnostics() {
   const router = useRouter();
@@ -91,8 +92,9 @@ export function usePermissionsDiagnostics() {
   const whoId = whoCleared ? null : (q.who ?? me?.id ?? null);
   const otherId = q.compare || null;
 
-  const explainer = useAccessExplainer(comparing ? null : whoId, comparing ? null : q.can);
-  const compare = useAccessCompare(comparing ? whoId : null, comparing ? otherId : null);
+  // The picked scope is the check's target: the answer is for that object.
+  const explainer = useAccessExplainer(comparing ? null : whoId, comparing ? null : q.can, q.on);
+  const compare = useAccessCompare(comparing ? whoId : null, comparing ? otherId : null, q.on);
 
   function navigate(patch: Partial<CheckAccessQuery>) {
     const next = { ...q, ...patch };

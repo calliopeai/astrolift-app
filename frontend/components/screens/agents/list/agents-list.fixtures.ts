@@ -1,12 +1,12 @@
+import type { SortState } from "@/components/data-table";
 import { fakeController } from "@/components/data-table/fixtures";
 import type {
   AstroliftAgentBox,
   AstroliftAgentEnvironmentSpec,
-  AstroliftAgentListItem,
-  AstroliftAgentLiveStatus,
+  AstroliftAgentFleetRow,
 } from "@/graphql/agents/agents.types";
 
-import { type AgentRow, joinAgents } from "./agents-list";
+import { AGENT_STATUS_ORDER, type AgentRow, toAgentRow } from "./agents-list";
 import type { AgentsListScreenProps } from "./AgentsListScreen";
 import type { BoxesTabViewProps } from "./BoxesTabView";
 import type { ManagedModelSectionViewProps } from "./ManagedModelSectionView";
@@ -25,13 +25,13 @@ const LONG_NAME =
   "An extremely long agent name that keeps going to check wrapping in the registry table cell";
 
 // ---------------------------------------------------------------------------
-// Fleet rows
+// Fleet rows, as `agentFleetPage` returns them
 // ---------------------------------------------------------------------------
 
 export function agent(
   slug: string,
-  patch: Partial<AstroliftAgentListItem> = {}
-): AstroliftAgentListItem {
+  patch: Partial<AstroliftAgentFleetRow> = {}
+): AstroliftAgentFleetRow {
   return {
     id: `wl-${slug}`,
     name: slug,
@@ -47,14 +47,65 @@ export function agent(
     lastRunStatus: "completed",
     lastRunAt: "2026-09-28T09:00:00Z",
     runningCount: 0,
+    status: "idle",
+    modelSource: null,
+    runtime: "",
+    environmentSpecSlug: "",
+    clusterSlugs: [],
+    ownerEmail: "",
+    ownedByMe: false,
     ...patch,
   };
 }
 
-export const FLEET: AstroliftAgentListItem[] = [
-  agent("triage-bot", { name: "Triage bot", runningCount: 2, lastRunStatus: "running" }),
-  agent("nightly-report", { name: "Nightly report", lastRunStatus: "failed", appSlug: "reports" }),
-  agent("paused-sync", { name: "Paused sync", runPaused: true, runMode: "loop" }),
+const SUPPORT_CLUSTERS = ["conflict-astrolift", "eks-us-west-2"];
+const ME_EMAIL = "leo@example.com";
+
+export const FLEET: AstroliftAgentFleetRow[] = [
+  agent("triage-bot", {
+    name: "Triage bot",
+    runningCount: 2,
+    lastRunStatus: "running",
+    status: "running",
+    modelSource: "managed",
+    runtime: "claude",
+    environmentSpecSlug: "triage-bot",
+    clusterSlugs: SUPPORT_CLUSTERS,
+    ownerEmail: ME_EMAIL,
+    ownedByMe: true,
+  }),
+  agent("nightly-report", {
+    name: "Nightly report",
+    lastRunStatus: "failed",
+    appSlug: "reports",
+    status: "failing",
+    modelSource: "api-key",
+    runtime: "codex",
+    environmentSpecSlug: "nightly-report",
+    clusterSlugs: ["gke-eu-west-4"],
+    ownerEmail: "ops@example.com",
+  }),
+  agent("hourly-digest", {
+    name: "Hourly digest",
+    status: "scheduled",
+    modelSource: "gateway",
+    runtime: "claude",
+    environmentSpecSlug: "hourly-digest",
+    clusterSlugs: SUPPORT_CLUSTERS,
+    ownerEmail: "ops@example.com",
+  }),
+  agent("paused-sync", {
+    name: "Paused sync",
+    runPaused: true,
+    runMode: "loop",
+    status: "paused",
+    modelSource: "api-key",
+    runtime: "claude",
+    environmentSpecSlug: "paused-sync",
+    clusterSlugs: SUPPORT_CLUSTERS,
+    ownerEmail: ME_EMAIL,
+    ownedByMe: true,
+  }),
   agent("docs-service", {
     name: "Docs service",
     projectSlug: "docs",
@@ -65,81 +116,47 @@ export const FLEET: AstroliftAgentListItem[] = [
     lastRunStatus: null,
     lastRunAt: null,
   }),
-  agent("no-repo", { name: "No repo", sourceRepo: "", sourceUrl: "", runMode: "custom_mode" }),
+  agent("no-repo", {
+    name: "No repo",
+    sourceRepo: "",
+    sourceUrl: "",
+    runMode: "custom_mode",
+    clusterSlugs: SUPPORT_CLUSTERS,
+    ownerEmail: ME_EMAIL,
+    ownedByMe: true,
+  }),
 ];
 
-function live(
-  workloadId: string,
-  patch: Partial<AstroliftAgentLiveStatus> = {}
-): AstroliftAgentLiveStatus {
-  return {
-    workloadId,
-    workloadSlug: workloadId.replace(/^wl-/, ""),
-    appSlug: "support",
-    runFamily: "task",
-    runMode: "schedule",
-    isPaused: false,
-    isIdle: true,
-    runningCount: 0,
-    lastRunStatus: null,
-    lastRunAt: null,
-    nextScheduledAt: null,
-    ...patch,
-  };
-}
+/** The next firing `agentUpcomingRuns` reports for the scheduled agent. */
+export const NEXT_DIGEST = "2026-09-28T23:00:00Z";
 
-export const LIVE: AstroliftAgentLiveStatus[] = [
-  live("wl-triage-bot", { runningCount: 2, isIdle: false }),
-  live("wl-docs-service", { nextScheduledAt: "2026-09-28T23:00:00Z" }),
-];
+export const AGENT_ROWS: AgentRow[] = FLEET.map((a) =>
+  toAgentRow(a, a.slug === "hourly-digest" ? NEXT_DIGEST : null)
+);
 
-/** Spec slug is the agent slug: triage-bot runs claude on the managed model. */
-const AGENT_SPECS = [
-  { slug: "triage-bot", runtime: "claude", managedModel: true },
-  { slug: "nightly-report", runtime: "codex", managedModel: false },
-  { slug: "paused-sync", runtime: "claude", managedModel: false },
-];
+const LONG_SLUG = "a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping-0123456789abcdef";
 
-const ENVIRONMENTS = [
-  { registeredAppSlug: "support", clusterSlug: "conflict-astrolift" },
-  { registeredAppSlug: "support", clusterSlug: "eks-us-west-2" },
-  { registeredAppSlug: "reports", clusterSlug: "gke-eu-west-4" },
-];
-
-/** The fleet joined the way the hook joins it; the viewer holds a role on `support`. */
-export const AGENT_ROWS: AgentRow[] = joinAgents(FLEET, {
-  live: LIVE,
-  specs: AGENT_SPECS,
-  environments: ENVIRONMENTS,
-  myAppSlugs: new Set(["support"]),
-});
-
-export const LONG_AGENT_ROW: AgentRow = joinAgents(
-  [
-    agent("a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping-0123456789abcdef", {
-      name: LONG_NAME,
-      projectSlug: "a-very-long-project-slug-for-the-coordinates-line",
-      appSlug:
-        "arn:aws:ecs:us-west-2:123456789012:service/astrolift-agents/a-very-long-app-slug-for-the-coordinates-line-and-then-some-more-characters-to-pass-two-hundred",
-      sourceRepo: "calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout",
-      sourceUrl:
-        "https://github.com/calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout/tree/main/agents/triage",
-      lastRunStatus: "timed_out",
-    }),
-  ],
-  {
-    live: [],
-    specs: [
-      {
-        slug: "a-very-long-agent-slug-that-keeps-going-and-going-for-wrapping-0123456789abcdef",
-        runtime: "a-custom-runtime-with-a-long-name",
-        managedModel: false,
-      },
+export const LONG_AGENT_ROW: AgentRow = toAgentRow(
+  agent(LONG_SLUG, {
+    name: LONG_NAME,
+    projectSlug: "a-very-long-project-slug-for-the-coordinates-line",
+    appSlug:
+      "arn:aws:ecs:us-west-2:123456789012:service/astrolift-agents/a-very-long-app-slug-for-the-coordinates-line-and-then-some-more-characters-to-pass-two-hundred",
+    sourceRepo: "calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout",
+    sourceUrl:
+      "https://github.com/calliopeai/an-agent-repository-with-an-unreasonably-long-name-for-layout/tree/main/agents/triage",
+    lastRunStatus: "timed_out",
+    status: "failing",
+    modelSource: "api-key",
+    runtime: "a-custom-runtime-with-a-long-name",
+    environmentSpecSlug: LONG_SLUG,
+    clusterSlugs: [
+      "prd-us-west-2-tenant-shared-workloads-with-a-deliberately-long-slug",
+      "eks-us-west-2",
     ],
-    environments: [],
-    myAppSlugs: new Set(),
-  }
-)[0];
+    ownerEmail: "a.person.with.a.very.long.email.address@a-long-subdomain.example.com",
+  })
+);
 
 /** 60 agents, for numbered pages. */
 export const MANY_AGENT_ROWS: AgentRow[] = Array.from({ length: 60 }, (_, i) => ({
@@ -148,6 +165,66 @@ export const MANY_AGENT_ROWS: AgentRow[] = Array.from({ length: 60 }, (_, i) => 
   slug: `agent-${String(i).padStart(2, "0")}`,
   name: `Agent ${String(i).padStart(2, "0")}`,
 }));
+
+const lower = (s: string | null | undefined) => (s ?? "").toLowerCase();
+
+const SORT_VALUE: Record<string, (a: AgentRow) => string | number> = {
+  name: (a) => a.name.toLowerCase(),
+  status: (a) => AGENT_STATUS_ORDER.indexOf(a.status),
+  lastRun: (a) => (a.lastRunAt ? Date.parse(a.lastRunAt) : 0),
+  project: (a) => a.projectSlug.toLowerCase(),
+};
+
+/**
+ * A stand-in for `agentFleetPage` in stories: the fixture rows filtered,
+ * searched, sorted and sliced the way the server answers the list state.
+ */
+export function serveAgents(
+  rows: AgentRow[],
+  {
+    q,
+    filters,
+    sort,
+    page,
+    pageSize,
+  }: {
+    q: string;
+    filters: Record<string, string>;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+): { rows: AgentRow[]; totalCount: number } {
+  const needle = lower(q.trim());
+  const kept = rows
+    .filter(
+      (a) =>
+        (!filters.owner || a.mine) &&
+        (!filters.paused || a.runPaused) &&
+        (!filters.status || a.status === filters.status) &&
+        (!filters.model || a.model === filters.model) &&
+        (!filters.project || lower(a.projectSlug) === lower(filters.project)) &&
+        (!filters.runtime ||
+          lower(a.runtime) === lower(filters.runtime) ||
+          lower(a.runFamily) === lower(filters.runtime)) &&
+        (!filters.cluster || a.clusters.some((c) => lower(c) === lower(filters.cluster))) &&
+        (!needle ||
+          [a.name, a.slug, a.appSlug, a.projectSlug, a.sourceRepo].some((v) =>
+            lower(v).includes(needle)
+          ))
+    )
+    .sort((a, b) => {
+      for (const s of sort) {
+        const value = SORT_VALUE[s.key];
+        if (!value) continue;
+        const [x, y] = [value(a), value(b)];
+        if (x !== y) return (x < y ? -1 : 1) * (s.dir === "asc" ? 1 : -1);
+      }
+      return a.slug < b.slug ? -1 : 1;
+    });
+  const start = (Math.max(1, page) - 1) * pageSize;
+  return { rows: kept.slice(start, start + pageSize), totalCount: kept.length };
+}
 
 /** Everything the screen takes except `list`, which each story builds. */
 export function listProps(

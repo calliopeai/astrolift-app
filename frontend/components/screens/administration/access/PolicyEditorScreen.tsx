@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConicalIcon, InfoIcon, SearchXIcon } from "lucide-react";
+import { SearchXIcon } from "lucide-react";
 import * as React from "react";
 
 import { SCOPE_NOUN, SCOPE_ORDER } from "@/components/access/access-model";
@@ -11,7 +11,12 @@ import {
   policySentence,
   serializePolicy,
 } from "@/components/access/policy-model";
+import { PolicyConditionHelp } from "@/components/access/PolicyConditionHelp";
 import { PolicySentence } from "@/components/access/PolicySentence";
+import {
+  type PolicySimulation,
+  PolicySimulationPanel,
+} from "@/components/access/PolicySimulationPanel";
 import { EmptyState } from "@/components/EmptyState";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -31,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ScopeKind } from "@/graphql/identity/identity.types";
 import { cn } from "@/lib/utils";
 
+import { PEOPLE_HREF } from "./access-nav";
 import { POLICIES_HREF, policiesCrumbs } from "./policy-routes";
 import type { PolicyInput, usePolicyEditor } from "./use-policy-editor";
 
@@ -51,6 +57,8 @@ export type PolicyEditorScreenProps = ReturnType<typeof usePolicyEditor> & {
   initialStep?: Step;
   /** Stories: seed the draft. */
   initialDraft?: Partial<PolicyDraft>;
+  /** Stories: the review's simulation already answered. */
+  initialSimulation?: PolicySimulation | null;
 };
 
 const slugify = (s: string) =>
@@ -102,10 +110,12 @@ function draftOf(policy: PolicyEditorScreenProps["policy"]): PolicyDraft {
  * fields, so a page with numbered steps. Details, then the rule built as a
  * sentence (`PolicySentence` in edit mode: action, resource, actors and one
  * picker per condition, raw JSON one click away), then a review that states
- * the rule in words before anything is written. The review would simulate
- * the rule against recent decisions; the backend has no simulation and does
- * not evaluate policies yet, so it says both instead. A viewer without
- * `org.update` reads the policy as its sentence. Pure.
+ * the rule in words and runs it through the server's simulation (today's
+ * holders, the last week of recorded decisions) before anything is written.
+ * The resolver enforces policies, and a condition the request cannot answer
+ * denies; the rule step says, from the server's catalog, what each
+ * condition needs. A viewer without `org.update` reads the policy as its
+ * sentence. Pure.
  */
 export function PolicyEditorScreen(props: PolicyEditorScreenProps) {
   const { mode, id, policy, loading, error, onRetry, canManage } = props;
@@ -160,18 +170,49 @@ function Editor({
   saving,
   onSave,
   onCancel,
+  catalog,
+  simulate,
   initialStep = 0,
   initialDraft,
+  initialSimulation = null,
   title,
 }: PolicyEditorScreenProps & { title: string }) {
   const [step, setStep] = React.useState<Step>(initialStep);
   const [draft, setDraft] = React.useState<PolicyDraft>({ ...draftOf(policy), ...initialDraft });
   const [errors, setErrors] = React.useState<Partial<Record<"name" | "slug" | "rule", string>>>({});
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [sim, setSim] = React.useState<{
+    data: PolicySimulation | null;
+    loading: boolean;
+    error: string | null;
+  }>({ data: initialSimulation, loading: false, error: null });
 
   const patch = (next: Partial<PolicyDraft>) => setDraft((d) => ({ ...d, ...next }));
   const slug = draft.slugTouched ? draft.slug : slugify(draft.name);
   const was = policy ? parsePolicy(policy) : null;
+
+  function inputOf(d: PolicyDraft): PolicyInput {
+    return {
+      name: d.name.trim(),
+      slug,
+      description: d.description.trim(),
+      scopeLevel: d.scopeLevel,
+      ...serializePolicy(d.shape),
+    };
+  }
+
+  async function runSimulation(d: PolicyDraft) {
+    setSim({ data: null, loading: true, error: null });
+    try {
+      setSim({ data: await simulate(inputOf(d)), loading: false, error: null });
+    } catch (err) {
+      setSim({
+        data: null,
+        loading: false,
+        error: err instanceof Error ? err.message : "The simulation failed",
+      });
+    }
+  }
 
   function validate(at: Step): boolean {
     const next: typeof errors = {};
@@ -200,19 +241,13 @@ function Editor({
       }
     }
     setStep(target);
+    if (target === 2) void runSimulation(draft);
   }
 
   async function submit() {
     if (!validate(0)) return setStep(0);
     if (!validate(1)) return setStep(1);
-    const input: PolicyInput = {
-      name: draft.name.trim(),
-      slug,
-      description: draft.description.trim(),
-      scopeLevel: draft.scopeLevel,
-      ...serializePolicy(draft.shape),
-    };
-    setSubmitError(await onSave(input));
+    setSubmitError(await onSave(inputOf(draft)));
   }
 
   const changed = was !== null && policySentence(was) !== policySentence(draft.shape);
@@ -330,6 +365,13 @@ function Editor({
               </p>
             )}
             <PolicySentence policy={draft.shape} onChange={(shape) => patch({ shape })} />
+            <PolicyConditionHelp
+              catalog={catalog.conditions}
+              kinds={draft.shape.conditions.map((c) => c.kind).filter((k) => k !== "custom")}
+              loading={catalog.loading}
+              error={catalog.error}
+              className="border-t pt-4"
+            />
           </>
         )}
 
@@ -344,29 +386,19 @@ function Editor({
               )}
             </section>
 
-            <div className="border-warning-border bg-warning/10 flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm">
-              <InfoIcon aria-hidden className="text-warning-fg mt-0.5 size-4 shrink-0" />
-              <p className="min-w-0">
-                Saving stores this rule. The permission check does not evaluate policies yet, so it
-                changes no one&apos;s access until it does.
-              </p>
-            </div>
+            <p className="text-muted-foreground text-sm">
+              Saving puts this rule in force: every permission check evaluates it from then on, and
+              a condition the request cannot answer denies.
+            </p>
 
-            <div className="flex min-w-0 items-start gap-2 rounded-md border border-dashed p-3 text-sm">
-              <FlaskConicalIcon
-                aria-hidden
-                className="text-muted-foreground mt-0.5 size-4 shrink-0"
-              />
-              <p className="text-muted-foreground min-w-0">
-                <span className="text-foreground font-medium">Simulation.</span> Who and what this
-                would have blocked over the last 7 days, and which current holders of{" "}
-                <span className="font-mono [overflow-wrap:anywhere]">
-                  {draft.shape.actionPattern.trim() || "*"}
-                </span>{" "}
-                it touches, needs a backend simulation that does not exist yet. Read the rule above
-                before saving.
-              </p>
-            </div>
+            <PolicySimulationPanel
+              simulation={sim.data}
+              loading={sim.loading}
+              error={sim.error}
+              onRetry={() => void runSimulation(draft)}
+              personHref={(memberId) => `${PEOPLE_HREF}/${memberId}`}
+              className="border-t pt-4"
+            />
 
             <Summary draft={{ ...draft, slug }} />
 

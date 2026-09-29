@@ -98,6 +98,8 @@ def test_trigger_dispatches_workflow_definition_run_input(captured_start):
     assert arg.workflow_run_id.isdigit()
     run = WorkflowRun.objects.get(pk=int(arg.workflow_run_id))
     assert run.workflow_kind == "WorkflowDefinitionRunWorkflow"
+    # An SCM push is an inbound delivery (#2152).
+    assert run.trigger_kind == "webhook"
     # The workflow id mirrors the run pk and is echoed in the dispatch id.
     assert call["workflow_id"] == f"WorkflowDefinitionRunWorkflow-{run.pk}"
 
@@ -190,4 +192,5 @@ def test_scheduled_path_dispatches_workflow_definition_run_input(captured_schedu
     assert arg.workflow_run_id.isdigit()
     run = WorkflowRun.objects.get(pk=int(arg.workflow_run_id))
     assert run.workflow_kind == "WorkflowDefinitionRunWorkflow"
+    assert run.trigger_kind == "schedule"  # (#2152)
     assert action.id == f"WorkflowDefinitionRunWorkflow-{run.pk}"

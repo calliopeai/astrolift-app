@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,13 +9,12 @@ import { ClustersClient } from "./clusters-client";
 
 /**
  * /clusters on the shared list (spec 44 §5.1). The card grid and the table
- * are two renderings of the SAME fleet (#1233), and the fleet is the whole
- * fleet: `astroliftClustersPage` is a keyset walk with no filter, sort or
- * offset argument, so the hook walks every page for the current search
- * (#1230) and filters, sorts and numbers pages over that. A list that sliced
- * the first fetched page in the browser would hide the fleet past it; these
- * tests pin that it does not, that both modes read one fleet, and that the
- * list's states (loading, empty, filtered-empty) show in both.
+ * are two renderings of the SAME page (#1233), and the server answers the
+ * list state (#2150): search, filters, views, sort and the numbered page go
+ * out as `astroliftClustersPage` variables and the rows and `totalCount`
+ * come back. Nothing is filtered or sliced in the browser. These tests pin
+ * the variables, that both modes read one page, and that the list's states
+ * (loading, empty, filtered-empty) show in both.
  */
 
 // Mutable state the hoisted mocks read at call time — `vi.hoisted` runs
@@ -23,26 +22,16 @@ import { ClustersClient } from "./clusters-client";
 const state = vi.hoisted(() => ({
   page: null as null | {
     items: Record<string, unknown>[];
-    nextCursor: string | null;
     totalCount: number | null;
   },
-  /** Pages after the first, by cursor, for the walk. */
-  more: {} as Record<string, { items: Record<string, unknown>[]; nextCursor: string | null }>,
   loading: false,
   variables: [] as Record<string, unknown>[],
-  walked: [] as Record<string, unknown>[],
   qs: "",
   listeners: new Set<() => void>(),
-  client: {
-    query: async ({ variables }: { variables: Record<string, unknown> }) => {
-      state.walked.push(variables);
-      return { data: { astroliftClustersPage: state.more[variables.after as string] } };
-    },
-  },
 }));
 
-// Feed the real hook a mocked transport: the code under test is the walk,
-// the list state and both views, not Apollo.
+// Feed the real hook a mocked transport: the code under test is the list
+// state as variables and both views, not Apollo.
 vi.mock("@apollo/client/react", () => ({
   useQuery: (_q: unknown, opts?: { variables?: Record<string, unknown> }) => {
     if (opts?.variables) state.variables.push(opts.variables);
@@ -54,8 +43,6 @@ vi.mock("@apollo/client/react", () => ({
       refetch: vi.fn().mockResolvedValue({}),
     };
   },
-  // One client for the life of the app, as Apollo's provider gives.
-  useApolloClient: () => state.client,
   useMutation: () => [vi.fn().mockResolvedValue({ data: {} }), { loading: false }],
 }));
 
@@ -137,6 +124,9 @@ const renderClusters = () =>
     </TooltipProvider>
   );
 
+/** What a cold load asks for; `page.tsx` preloads exactly this. */
+const COLD = { search: null, filter: null, sort: "name", page: 1, pageSize: 25 };
+
 const showCards = () => fireEvent.click(screen.getByRole("button", { name: "Card view" }));
 
 describe("ClustersClient", () => {
@@ -146,14 +136,8 @@ describe("ClustersClient", () => {
     localStorage.clear();
     state.loading = false;
     state.variables = [];
-    state.walked = [];
-    state.more = {};
     state.qs = "";
-    state.page = {
-      items: [cluster("prod"), cluster("staging")],
-      nextCursor: null,
-      totalCount: 2,
-    };
+    state.page = { items: [cluster("prod"), cluster("staging")], totalCount: 2 };
   });
 
   it("renders the fleet in the table, each row linking to its cluster", () => {
@@ -166,6 +150,17 @@ describe("ClustersClient", () => {
     expect(within(table).getByText("STAGING")).toBeInTheDocument();
   });
 
+  it("says who registered each cluster", () => {
+    state.page = {
+      items: [cluster("prod", { createdByUsername: "dana" }), cluster("staging")],
+      totalCount: 2,
+    };
+    renderClusters();
+    const table = screen.getByRole("table", { name: "Clusters" });
+    expect(within(table).getByRole("columnheader", { name: "Registered by" })).toBeInTheDocument();
+    expect(within(table).getByText("dana")).toBeInTheDocument();
+  });
+
   it("shows the same rows as cards without a second fetch", () => {
     renderClusters();
     const fetches = state.variables.length;
@@ -175,7 +170,7 @@ describe("ClustersClient", () => {
     expect(screen.getByText("STAGING")).toBeInTheDocument();
     // Re-renders re-read the same query; none asks for a different page.
     expect(new Set(state.variables.slice(fetches).map((v) => JSON.stringify(v)))).toEqual(
-      new Set([JSON.stringify({ search: null, limit: 200 })])
+      new Set([JSON.stringify(COLD)])
     );
   });
 
@@ -187,25 +182,12 @@ describe("ClustersClient", () => {
       target: { value: "prod" },
     });
     // The bar debounces; wait for the term to reach the query.
-    await waitFor(() => expect(state.variables.at(-1)).toEqual({ search: "prod", limit: 200 }));
+    await waitFor(() => expect(state.variables.at(-1)).toEqual({ ...COLD, search: "prod" }));
   });
 
-  it("walks every page past the first, so no cluster is out of reach", async () => {
-    state.page = { items: [cluster("prod")], nextCursor: "c2", totalCount: 3 };
-    state.more = {
-      c2: { items: [cluster("qa")], nextCursor: "c3" },
-      c3: { items: [cluster("staging")], nextCursor: null },
-    };
-    renderClusters();
-    expect(await screen.findByText("STAGING")).toBeInTheDocument();
-    expect(screen.getByText("QA")).toBeInTheDocument();
-    expect(state.walked.map((v) => v.after)).toEqual(["c2", "c3"]);
-  });
-
-  it("numbers pages over the whole fleet", () => {
+  it("numbers pages from the server's totalCount and asks for the page", () => {
     state.page = {
-      items: Array.from({ length: 30 }, (_, i) => cluster(`c-${String(i).padStart(2, "0")}`)),
-      nextCursor: null,
+      items: Array.from({ length: 25 }, (_, i) => cluster(`c-${String(i).padStart(2, "0")}`)),
       totalCount: 30,
     };
     renderClusters();
@@ -214,24 +196,31 @@ describe("ClustersClient", () => {
     expect(screen.getByRole("button", { name: /previous page/i })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
     expect(state.qs).toBe("page=2");
-    expect(screen.getByText("C-29")).toBeInTheDocument();
-    expect(screen.queryByText("C-00")).not.toBeInTheDocument();
+    expect(state.variables.at(-1)).toEqual({ ...COLD, page: 2 });
   });
 
-  it("filters on the Offline view", () => {
-    state.page = {
-      items: [cluster("prod"), cluster("edge", { heartbeatStatus: "offline" })],
-      nextCursor: null,
-      totalCount: 2,
-    };
-    state.qs = "view=offline";
+  it("sends the Offline view, Mine and the chips as the server filter", () => {
+    state.qs = "view=offline&provider=eks";
     renderClusters();
-    expect(screen.getByText("EDGE")).toBeInTheDocument();
-    expect(screen.queryByText("PROD")).not.toBeInTheDocument();
+    expect(state.variables.at(-1)).toEqual({
+      ...COLD,
+      filter: { provider: ["eks"], live: ["offline"] },
+    });
+    act(() => {
+      state.qs = "view=mine";
+      state.listeners.forEach((fn) => fn());
+    });
+    expect(state.variables.at(-1)).toEqual({ ...COLD, filter: { registeredBy: ["me"] } });
+  });
+
+  it("sends a multi-key sort", () => {
+    state.qs = "sort=-lastProbe,name";
+    renderClusters();
+    expect(state.variables.at(-1)).toEqual({ ...COLD, sort: "-lastProbe,name" });
   });
 
   it("renders the shared empty state in the card grid, not nothing", () => {
-    state.page = { items: [], nextCursor: null, totalCount: 0 };
+    state.page = { items: [], totalCount: 0 };
     renderClusters();
     showCards();
     expect(screen.getByText("No clusters registered")).toBeInTheDocument();
@@ -239,7 +228,7 @@ describe("ClustersClient", () => {
   });
 
   it("distinguishes a filtered-empty grid from an empty one", () => {
-    state.page = { items: [], nextCursor: null, totalCount: 0 };
+    state.page = { items: [], totalCount: 0 };
     state.qs = "q=nope";
     renderClusters();
     showCards();

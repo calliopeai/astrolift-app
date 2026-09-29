@@ -5,13 +5,12 @@ import { parseListState } from "@/components/list/list-state";
 
 import { AUDIT_LIST, auditVariables, sinceToIso } from "./audit-list";
 import {
-  type CombinedRun,
-  filterRuns,
-  mergeRuns,
+  fromRunAuditItem,
   outcomeOf,
-  pageRuns,
   RUN_AUDIT_LIST,
   RUN_CSV,
+  type RunAuditItem,
+  runAuditVariables,
 } from "./combined-runs";
 import { COMBINED_RUNS } from "./fixtures";
 
@@ -28,37 +27,46 @@ describe("sinceToIso", () => {
 });
 
 describe("auditVariables", () => {
-  const opts = { pageSize: 100, after: null, viewerId: "usr-1", now: NOW };
+  const opts = { pageSize: 100, after: null, now: NOW };
 
   it("sends the default state as the route's preload does", () => {
     const state = parseListState(AUDIT_LIST, "");
-    expect(auditVariables(state.filters, state.q, opts).variables).toEqual({
+    expect(auditVariables(state.filters, state.q, opts)).toEqual({
       limit: 100,
       after: null,
-      action: null,
-      decision: null,
-      actorId: null,
-      createdAtGte: null,
-      createdAtLte: null,
+      search: null,
+      filter: null,
       includeTotal: true,
     });
   });
 
-  it("resolves Mine to the viewer and waits until the viewer is known", () => {
-    expect(auditVariables({ actor: "me" }, "", opts).variables.actorId).toBe("usr-1");
-    expect(auditVariables({ actor: "me" }, "", { ...opts, viewerId: null }).ready).toBe(false);
+  it("sends Mine as actor me, for the server to resolve", () => {
+    const mine = AUDIT_LIST.views.find((v) => v.key === "mine");
+    expect(auditVariables(mine!.filters, "", opts).filter).toEqual({ actor: ["me"] });
   });
 
-  it("uses the search box as the exact action, with an action chip winning", () => {
-    expect(auditVariables({}, " team.create ", opts).variables.action).toBe("team.create");
-    expect(auditVariables({ action: "org.login" }, "team", opts).variables.action).toBe(
-      "org.login"
+  it("sends the search box as search and each chip as a filter field", () => {
+    const vars = auditVariables(
+      { action: "org.login", target: "role_binding", decision: "DENY", since: "24h" },
+      " team. ",
+      opts
     );
+    expect(vars.search).toBe("team.");
+    expect(vars.filter).toEqual({
+      action: ["org.login"],
+      targetKind: ["role_binding"],
+      decision: ["DENY"],
+      since: "2026-09-26T14:00:00.000Z",
+    });
+  });
+
+  it("leaves an unparseable since out rather than sending it", () => {
+    expect(auditVariables({ since: "yesterday" }, "", opts).filter).toBeNull();
   });
 
   it("the Denied view sends decision DENY", () => {
     const denied = AUDIT_LIST.views.find((v) => v.key === "denied");
-    expect(auditVariables(denied!.filters, "", opts).variables.decision).toBe("DENY");
+    expect(auditVariables(denied!.filters, "", opts).filter).toEqual({ decision: ["DENY"] });
   });
 });
 
@@ -79,39 +87,55 @@ describe("outcomeOf", () => {
   });
 });
 
-describe("mergeRuns", () => {
-  it("orders newest first across sources, runs without a time last", () => {
-    const run = (key: string, at: string) => ({ ...COMBINED_RUNS[0], key, at }) as CombinedRun;
-    const merged = mergeRuns(
-      [run("a", "2026-09-27T10:00:00Z"), run("b", "")],
-      [run("c", "2026-09-27T12:00:00Z")]
-    );
-    expect(merged.map((r) => r.key)).toEqual(["c", "a", "b"]);
-  });
-});
+describe("runAuditVariables", () => {
+  const base = { filters: {}, q: "", sort: RUN_AUDIT_LIST.defaultSort, pageSize: 25, after: null };
 
-describe("filterRuns", () => {
-  it("filters by kind, outcome, Mine and search", () => {
-    expect(filterRuns(COMBINED_RUNS, { kind: "job" }, "", NOW).every((r) => r.kind === "job")).toBe(
-      true
-    );
+  it("asks for the newest page with no filter by default", () => {
+    expect(runAuditVariables(base, NOW)).toEqual({
+      filter: null,
+      search: null,
+      sort: "-at",
+      first: 25,
+      after: null,
+    });
+  });
+
+  it("sends Mine as startedBy me and each chip as a filter field", () => {
+    const mine = RUN_AUDIT_LIST.views.find((v) => v.key === "mine");
+    expect(runAuditVariables({ ...base, filters: mine!.filters }, NOW).filter).toEqual({
+      startedBy: ["me"],
+    });
     expect(
-      filterRuns(COMBINED_RUNS, { outcome: "failed" }, "", NOW).every((r) => r.outcome === "failed")
-    ).toBe(true);
-    const mine = filterRuns(COMBINED_RUNS, { startedBy: "me" }, "", NOW);
-    expect(mine.length).toBeGreaterThan(0);
-    expect(mine.every((r) => r.startedByMe)).toBe(true);
-    expect(
-      filterRuns(COMBINED_RUNS, {}, "CHECKOUT", NOW).every((r) =>
-        `${r.subject} ${r.scope}`.includes("checkout")
+      runAuditVariables(
+        {
+          ...base,
+          filters: {
+            kind: "job",
+            outcome: "failed",
+            trigger: "schedule",
+            app: "checkout",
+            since: "1h",
+          },
+          q: " 7e11 ",
+        },
+        NOW
       )
-    ).toBe(true);
+    ).toMatchObject({
+      search: "7e11",
+      filter: {
+        kind: ["job"],
+        outcome: ["failed"],
+        trigger: ["schedule"],
+        app: ["checkout"],
+        since: "2026-09-27T13:00:00.000Z",
+      },
+    });
   });
 
-  it("drops runs older than since", () => {
-    const recent = filterRuns(COMBINED_RUNS, { since: "1h" }, "", NOW);
-    expect(recent.every((r) => Date.parse(r.at) >= NOW - 3_600_000)).toBe(true);
-    expect(recent.length).toBeLessThan(COMBINED_RUNS.length);
+  it("sends oldest first as `at` and passes the cursor through", () => {
+    expect(
+      runAuditVariables({ ...base, sort: [{ key: "at", dir: "asc" }], after: "c1" }, NOW)
+    ).toMatchObject({ sort: "at", after: "c1" });
   });
 
   it("the kind filter is a declared field, so a typed token becomes a chip", () => {
@@ -119,14 +143,49 @@ describe("filterRuns", () => {
   });
 });
 
-describe("pageRuns", () => {
-  it("walks offset cursors to the end", () => {
-    const first = pageRuns(COMBINED_RUNS, null, 10);
-    expect(first.rows).toHaveLength(10);
-    expect(first.nextCursor).toBe("o:10");
-    const last = pageRuns(COMBINED_RUNS, first.nextCursor, 10);
-    expect(last.rows).toEqual(COMBINED_RUNS.slice(10, 20));
-    expect(last.nextCursor).toBeNull();
+describe("fromRunAuditItem", () => {
+  const row: RunAuditItem = {
+    kind: "deployment",
+    id: "dep-1",
+    subject: "checkout · production",
+    scope: "checkout",
+    agentSlug: "",
+    workflowSlug: "",
+    trigger: "webhook",
+    sourceTrigger: "push",
+    startedByDisplay: "grace@example.com",
+    startedByMe: false,
+    at: "2026-09-27T12:00:00Z",
+    durationSeconds: 84,
+    status: "running",
+    outcome: "succeeded",
+  };
+
+  it("keeps the server's outcome and says both trigger words", () => {
+    const run = fromRunAuditItem(row);
+    expect(run).toMatchObject({
+      key: "deployment:dep-1",
+      outcome: "succeeded",
+      trigger: "webhook · push",
+      startedBy: "grace@example.com",
+      href: "/deployments/dep-1",
+    });
+  });
+
+  it("links each kind to its own detail page", () => {
+    const href = (patch: Partial<RunAuditItem>) => fromRunAuditItem({ ...row, ...patch }).href;
+    expect(href({ kind: "agent", id: "t1" })).toBe("/agents/runs/t1");
+    expect(href({ kind: "workflow", id: "w1", workflowSlug: "nightly-sync" })).toBe(
+      "/workflows/nightly-sync/runs/w1"
+    );
+    expect(href({ kind: "job", id: "j1" })).toBe("/jobs/runs/j1");
+    expect(href({ kind: "task", id: "r1" })).toBe("/tasks/runs/r1");
+  });
+
+  it("reads an unknown trigger as none and an unknown outcome as unknown", () => {
+    const run = fromRunAuditItem({ ...row, trigger: "unknown", sourceTrigger: "", outcome: "odd" });
+    expect(run.trigger).toBe("");
+    expect(run.outcome).toBe("unknown");
   });
 });
 

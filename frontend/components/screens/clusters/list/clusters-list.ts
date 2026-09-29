@@ -1,22 +1,17 @@
 /**
  * The Clusters list declaration (spec 44 §5.1) and the pure pieces the list
  * and detail screens share: the Admin breadcrumb, provider and lifecycle
- * labels, and the filter/sort/page step the hook runs over the fleet.
+ * labels, and the list state spelled as `astroliftClustersPage` variables.
  *
- * Why filtering runs here and not on the server: `astroliftClustersPage`
- * takes `search`, `limit` and `after` only (a `(slug, guid)` keyset walk), so
- * provider, status, the Offline and Mine views, column sort and numbered
- * pages have no server argument yet. The hook walks the whole fleet for the
- * current search and `selectClusters` answers the rest. When the backend
- * grows the §5.1 contract, the hook sends `list.filters` / `sort` / `page`
- * instead and this step goes away; the screen does not change.
+ * The server answers every filter, sort and page (#2150): provider, status,
+ * the Offline view (`live`), Mine (`registeredBy: "me"`), the column sorts
+ * and numbered pages with an exact `totalCount`. Nothing is filtered or
+ * sorted in the browser.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type ListDefinition, formatSort, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import { NAV } from "@/lib/shell/nav-model";
-
-import type { ClusterRow } from "./use-clusters-list";
 
 export type Lifecycle = "registered" | "managing" | "managed" | "error";
 
@@ -40,7 +35,7 @@ export function providerLabel(slug: string): string {
   return PROVIDER_LABEL[slug] ?? slug;
 }
 
-/** The value Mine filters on: clusters whose last setup run the viewer started. */
+/** The value Mine filters on: clusters the viewer registered. */
 export const MINE = "me";
 
 export const CLUSTERS_LIST: ListDefinition = {
@@ -63,14 +58,9 @@ export const CLUSTERS_LIST: ListDefinition = {
   // The server matches name, slug, endpoint, region and provider slug.
   searchPlaceholder: "Search clusters...",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews(
-    { setupBy: MINE },
-    [{ key: "offline", label: "Offline", filters: { live: "offline" } }],
-    {
-      mineNote:
-        "Mine means clusters whose last setup you ran, until clusters record who registered them.",
-    }
-  ),
+  views: standardViews({ registeredBy: MINE }, [
+    { key: "offline", label: "Offline", filters: { live: "offline" } },
+  ]),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
@@ -89,64 +79,50 @@ export function clusterCrumbs(name?: string): Crumb[] {
   return crumbs;
 }
 
-type SortValue = string | number;
+/** The `filter` fields `astroliftClustersPage` declares, by list filter key. */
+const FILTER_KEYS = ["provider", "status", "live", "registeredBy"] as const;
 
-const SORT_VALUE: Record<string, (c: ClusterRow) => SortValue> = {
-  name: (c) => c.name.toLowerCase(),
-  slug: (c) => c.slug,
-  status: (c) => c.lifecycle,
-  provider: (c) => c.providerPluginSlug,
-  region: (c) => c.region,
-  live: (c) => c.heartbeatStatus ?? "never_seen",
-  // Never probed sorts before the oldest probe.
-  lastProbe: (c) => (c.capabilitiesProbedAt ? Date.parse(c.capabilitiesProbedAt) : 0),
-};
-
-function matches(c: ClusterRow, filters: Record<string, string>, me: string | null): boolean {
-  if (filters.provider && c.providerPluginSlug !== filters.provider) return false;
-  if (filters.status && c.lifecycle !== filters.status) return false;
-  if (filters.live && (c.heartbeatStatus ?? "never_seen") !== filters.live) return false;
-  if (filters.setupBy === MINE) {
-    const by = c.lastBootstrapRun?.triggeredByUsername;
-    if (!me || !by || by !== me) return false;
-  }
-  return true;
+export interface ClustersListFilter {
+  provider?: string[];
+  status?: string[];
+  live?: string[];
+  registeredBy?: string[];
 }
 
-function compare(a: ClusterRow, b: ClusterRow, sort: SortState[]): number {
-  for (const s of sort) {
-    const value = SORT_VALUE[s.key];
-    if (!value) continue;
-    const x = value(a);
-    const y = value(b);
-    if (x < y) return s.dir === "asc" ? -1 : 1;
-    if (x > y) return s.dir === "asc" ? 1 : -1;
-  }
-  // The server's own order breaks ties, so a page never reshuffles.
-  return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
+export interface ClustersPageVariables {
+  search: string | null;
+  filter: ClustersListFilter | null;
+  sort: string;
+  page: number;
+  pageSize: number;
 }
 
 /**
- * One numbered page of the fleet: view filters and chips applied, sorted,
- * sliced. `totalCount` is the filtered count, for "1–25 of 140".
+ * The list state as `astroliftClustersPage` variables. `sort` is always
+ * sent, which selects numbered paging on the server. An empty filter is
+ * `null`, so a cold load asks exactly what `app/(app)/clusters/page.tsx`
+ * preloads.
  */
-export function selectClusters(
-  fleet: ClusterRow[],
-  {
-    filters,
-    sort,
-    page,
+export function clustersPageVariables({
+  q,
+  filters,
+  sort,
+  page,
+  pageSize,
+}: {
+  q: string;
+  filters: Record<string, string>;
+  sort: SortState[];
+  page: number;
+  pageSize: number;
+}): ClustersPageVariables {
+  const filter: ClustersListFilter = {};
+  for (const key of FILTER_KEYS) if (filters[key]) filter[key] = [filters[key]];
+  return {
+    search: q.trim() || null,
+    filter: Object.keys(filter).length ? filter : null,
+    sort: formatSort(sort),
+    page: Math.max(1, page),
     pageSize,
-    me,
-  }: {
-    filters: Record<string, string>;
-    sort: SortState[];
-    page: number;
-    pageSize: number;
-    me: string | null;
-  }
-): { rows: ClusterRow[]; totalCount: number } {
-  const kept = fleet.filter((c) => matches(c, filters, me)).sort((a, b) => compare(a, b, sort));
-  const start = (Math.max(1, page) - 1) * pageSize;
-  return { rows: kept.slice(start, start + pageSize), totalCount: kept.length };
+  };
 }

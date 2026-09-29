@@ -24,9 +24,12 @@ makes a sort change safe, from being something each field has to remember.
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import strawberry
+from django.db.models import F, OrderBy
+from django.db.models.expressions import BaseExpression
 
 
 @strawberry.enum(name="AstroliftListSortKey")
@@ -89,3 +92,98 @@ def resolve_sort(
         raise UnsupportedSort(
             f"sort {key.value!r} is not available on this list; supported: {offered}"
         ) from None
+
+
+# ---------------------------------------------------------------------------
+# Multi-key sort for the list contract (spec 44 §5.1, #2149)
+# ---------------------------------------------------------------------------
+#
+# The enum above serves cursor lists, where every order needs a seek clause
+# of its own. Numbered lists page by OFFSET and can take any ordered set of
+# declared keys, so they take the frontend's sort string instead:
+# ``-deployed,name`` is "deployed newest first, then name A to Z", exactly
+# what ``formatSort`` in ``components/list/list-state.ts`` writes and the
+# URL carries. ``ListSortInput`` is the same thing as a typed list, for a
+# list that would rather declare it that way; both parse to the same keys.
+
+
+@strawberry.enum(name="AstroliftSortDirection")
+class SortDirection(enum.Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+@strawberry.input(name="AstroliftListSortInput", description="One key of a multi-key list sort.")
+class ListSortInput:
+    key: str
+    direction: SortDirection = SortDirection.ASC
+
+
+@dataclass(frozen=True)
+class SortKey:
+    """One sort key a list declares: what it orders by, and where NULLs go.
+
+    ``expr`` is a field path (``created_at``, ``project__name``) or any
+    ORM expression (``Lower("name")``, a ``Subquery``). ``nulls_low``
+    puts NULLs below every value, first ascending and last descending,
+    the way the browser sorts "never deployed" before the oldest deploy;
+    leave it unset on a NOT NULL column.
+    """
+
+    expr: str | BaseExpression
+    nulls_low: bool = False
+
+    def order(self, *, descending: bool) -> OrderBy:
+        expr = F(self.expr) if isinstance(self.expr, str) else self.expr
+        if descending:
+            return expr.desc(nulls_last=True) if self.nulls_low else expr.desc()
+        return expr.asc(nulls_first=True) if self.nulls_low else expr.asc()
+
+
+def parse_sort_spec(spec: str | Sequence[ListSortInput] | None) -> list[tuple[str, bool]]:
+    """``"-started,name"`` (or the typed list) as ``[(key, descending)]``.
+
+    Mirrors ``parseSort`` in the frontend: blank parts and a bare ``-``
+    are dropped. A key named twice keeps its first position, since only
+    the first can decide anything.
+    """
+    if spec is None:
+        return []
+    if isinstance(spec, str):
+        pairs = [
+            (part[1:], True) if part.startswith("-") else (part, False)
+            for part in (p.strip() for p in spec.split(","))
+            if part and part != "-"
+        ]
+    else:
+        pairs = [(item.key, item.direction is SortDirection.DESC) for item in spec]
+    seen: set[str] = set()
+    out: list[tuple[str, bool]] = []
+    for key, descending in pairs:
+        if key not in seen:
+            seen.add(key)
+            out.append((key, descending))
+    return out
+
+
+def resolve_list_sort(
+    spec: str | Sequence[ListSortInput] | None,
+    keys: Mapping[str, SortKey],
+    *,
+    default: str,
+    tiebreak: str = "pk",
+) -> list[OrderBy]:
+    """The ORM ``order_by`` for a sort spec over a list's declared keys.
+
+    An empty spec falls back to ``default`` (itself a spec string). An
+    undeclared key raises :class:`UnsupportedSort` for the same reason
+    ``resolve_sort`` refuses: a silently dropped key serves a list in an
+    order nobody asked for. ``tiebreak`` is appended ascending so the
+    order is total and a numbered page never repeats or skips a row.
+    """
+    pairs = parse_sort_spec(spec) or parse_sort_spec(default)
+    unknown = [key for key, _ in pairs if key not in keys]
+    if unknown:
+        offered = ", ".join(sorted(keys))
+        raise UnsupportedSort(f"sort {unknown[0]!r} is not available on this list; supported: {offered}")
+    return [*(keys[key].order(descending=d) for key, d in pairs), F(tiebreak).asc()]

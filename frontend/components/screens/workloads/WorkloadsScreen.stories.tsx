@@ -2,10 +2,15 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
-import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { AREA, LONG_WORKLOADS, MANY_WORKLOADS } from "./workloads.fixtures";
-import { selectWorkloads, WORKLOADS_LIST } from "./workloads-list";
+import {
+  AREA,
+  type AreaWorkload,
+  LONG_WORKLOADS,
+  MANY_WORKLOADS,
+  serveWorkloads,
+} from "./workloads.fixtures";
+import { WORKLOADS_LIST } from "./workloads-list";
 import { WorkloadsScreen, type WorkloadsScreenProps } from "./WorkloadsScreen";
 
 /** Agents › Workloads (spec 44 §4.1, §10.2). */
@@ -18,14 +23,14 @@ export default meta;
 type Story = StoryObj;
 
 type Props = Partial<Omit<WorkloadsScreenProps, "list">> & {
-  workloads?: AstroliftWorkload[];
+  workloads?: AreaWorkload[];
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture workloads, filtered and paged the way the hook does it. */
+/** The screen over fixture workloads, filtered and paged the way the server does it. */
 function Workloads({ workloads = AREA, initial, ...patch }: Props) {
   const list = useLocalListState(WORKLOADS_LIST, initial);
-  const { rows, totalCount } = selectWorkloads(workloads, {
+  const { rows, totalCount } = serveWorkloads(workloads, {
     filters: list.filters,
     q: list.state.q,
     sort: list.state.sort,

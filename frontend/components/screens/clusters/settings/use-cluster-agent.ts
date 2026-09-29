@@ -4,11 +4,7 @@ import { useMutation } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import {
-  DEPLOY_CLUSTER_AGENT,
-  ISSUE_CLUSTER_AGENT_KEY,
-  LIST_CLUSTERS,
-} from "@/graphql/clusters/clusters.queries";
+import { DEPLOY_CLUSTER_AGENT, ISSUE_CLUSTER_AGENT_KEY } from "@/graphql/clusters/clusters.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import type { AgentKeyIssuedData, ClusterWithHeartbeat } from "./types";
@@ -33,14 +29,14 @@ export function useClusterAgent(cluster: ClusterWithHeartbeat) {
     // The mutation flips agentProvisioned + may change the interval;
     // refetch so the card's "provisioned" state and the live badge stay
     // consistent without a reload.
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: ["GetCluster"],
   });
   const [deploy, { loading: deploying }] = useMutation<{
     deployClusterAgent: MutationResult<AgentDeployedData>;
   }>(DEPLOY_CLUSTER_AGENT, {
     // The deploy lands the agent Deployment; the cluster starts pulsing
     // shortly after, so refetch to let the live badge flip to Connected.
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: ["GetCluster"],
   });
   const [issued, setIssued] = React.useState<AgentKeyIssuedData | null>(null);
 

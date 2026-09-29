@@ -187,16 +187,17 @@ function CompareBody({
   );
 }
 
-/** What the backend answers today (design 6, item 8), said once under the answer. */
+/** Who may ask and what the answer covers, said once under the answer. */
 function Scoping({ compare = false }: { compare?: boolean }) {
   return (
     <p className="text-muted-foreground flex max-w-3xl min-w-0 items-start gap-2 text-xs">
       <InfoIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
       <span className="min-w-0">
         {compare
-          ? "Comparing is open to superusers only for now."
-          : "You can check your own access; checking someone else needs a superuser for now."}{" "}
-        Grants through team shares and IdP groups are not in the answer yet.
+          ? "Comparing two people needs org.manage_members."
+          : "You can check your own access; checking someone else needs org.manage_members."}{" "}
+        The answer is the permission check&apos;s own: IdP groups, team shares and the
+        organization&apos;s policies are in it, on the object you pick.
       </span>
     </p>
   );

@@ -10,7 +10,7 @@ import { LIST_PREVIEW_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.qu
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { narrowPreviews, PREVIEWS_LIST, previewsVariables } from "./previews-list";
+import { PREVIEWS_LIST, previewsVariables } from "./previews-list";
 
 interface MutationResultLite {
   ok: boolean;
@@ -37,7 +37,6 @@ export function usePreviews() {
   });
   const data = query.data ?? query.previousData;
   const page = data?.astroliftPreviewEnvironmentsPage;
-  const narrowing = Boolean(list.filters.status || list.filters.openedBy);
 
   const [tearDownMutation, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
@@ -58,7 +57,7 @@ export function usePreviews() {
 
   return {
     list,
-    rows: narrowPreviews(page?.items ?? [], list.filters),
+    rows: page?.items ?? [],
     loading: query.loading && !data,
     stale: query.loading && !query.data && Boolean(data),
     error: query.error && !data ? { message: query.error.message } : null,
@@ -66,7 +65,7 @@ export function usePreviews() {
       void query.refetch();
     },
     nextCursor: page?.nextCursor ?? null,
-    totalCount: narrowing ? null : (page?.totalCount ?? null),
+    totalCount: page?.totalCount ?? null,
     canTearDown: can("app.deploy"),
     tearingDown: tearState.loading,
     tearDown,

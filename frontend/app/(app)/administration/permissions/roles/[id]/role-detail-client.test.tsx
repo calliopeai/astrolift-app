@@ -48,7 +48,19 @@ vi.mock("@apollo/client/react", () => ({
     const data =
       op === "ListRoles"
         ? { astroliftRoles: [OWNER, AUDITOR] }
-        : { astroliftRoleBindingsPage: { items: [], nextCursor: null, totalCount: 0 } };
+        : op === "GetRole"
+          ? {
+              astroliftRole: [OWNER, AUDITOR].find((r) => r.id === options?.variables?.id) ?? null,
+            }
+          : {
+              astroliftRoleBindingsPage: {
+                items: [],
+                nextCursor: null,
+                totalCount: 0,
+                page: 1,
+                pageSize: 25,
+              },
+            };
     return {
       data,
       previousData: undefined,
@@ -94,11 +106,25 @@ describe("RoleDetailClient", () => {
     expect(state.ops).not.toContain("ListRoleBindingsPage");
   });
 
-  it("queries the holders by the role's slug on the Holders tab", () => {
+  it("reads the role on its own, so a role past the flat list's cap still opens", () => {
+    state.ops.length = 0;
+    render(<RoleDetailClient id="r-auditor" tab="permissions" />);
+    expect(state.ops).toContain("GetRole");
+    expect(state.vars.GetRole).toEqual({ id: "r-auditor" });
+  });
+
+  it("queries the holders by the role's id on the Holders tab, a numbered page", () => {
     state.ops.length = 0;
     render(<RoleDetailClient id="r-auditor" tab="holders" />);
     expect(state.ops).toContain("ListRoleBindingsPage");
-    expect(state.vars.ListRoleBindingsPage).toMatchObject({ search: "auditor" });
+    expect(state.vars.ListRoleBindingsPage).toEqual({
+      roleId: "r-auditor",
+      search: null,
+      filter: null,
+      sort: "-created",
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it("says so when the id names no role", () => {

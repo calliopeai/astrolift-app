@@ -41,6 +41,18 @@ export const Full: Story = {
   },
 };
 
+/**
+ * Home's shared deployments read (the newest 100) is full, so it cannot say
+ * how many deploys there are: no count, and View all still goes to the list.
+ */
+export const ReadFull: Story = {
+  args: { count: null },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: /View all/ })).toBeInTheDocument();
+  },
+};
+
 export const Loading: Story = { args: LOADING };
 
 export const Empty: Story = { args: { items: [], count: 0 } };

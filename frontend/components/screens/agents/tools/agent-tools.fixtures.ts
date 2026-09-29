@@ -1,4 +1,6 @@
+import type { SortState } from "@/components/data-table";
 import { ARN200, LONG_URL, SHA64 } from "@/components/screens/agents/skills/agent-skills.fixtures";
+import { lower, selectPage, time } from "@/components/screens/agents/skills/catalog";
 
 import type { ToolDetailScreenProps } from "./ToolDetailScreen";
 import type { ToolDetailTool } from "./use-tool-detail";
@@ -18,6 +20,13 @@ export const TOOLS: ToolRegistryTool[] = [
     adapter: "python_fn",
     handlerRef: "crm.tools.lookup_customer",
     createdAt: "2026-09-01T12:00:00Z",
+    isBuiltin: false,
+    skillId: "sk-crm",
+    skillSlug: "crm",
+    skillName: "CRM",
+    skillIsGlobal: false,
+    createdByEmail: "leo@example.com",
+    createdByMe: true,
   },
   {
     id: "tool-2",
@@ -27,6 +36,13 @@ export const TOOLS: ToolRegistryTool[] = [
     adapter: "python_fn",
     handlerRef: "support.tools.summarize",
     createdAt: "2026-09-02T12:00:00Z",
+    isBuiltin: false,
+    skillId: "sk-support",
+    skillSlug: "support",
+    skillName: "Support",
+    skillIsGlobal: false,
+    createdByEmail: "ops@example.com",
+    createdByMe: false,
   },
   {
     id: "tool-3",
@@ -36,6 +52,13 @@ export const TOOLS: ToolRegistryTool[] = [
     adapter: "http_endpoint",
     handlerRef: "https://billing.example.com/tools/invoice",
     createdAt: "2026-09-03T12:00:00Z",
+    isBuiltin: false,
+    skillId: "sk-billing",
+    skillSlug: "billing",
+    skillName: "Billing",
+    skillIsGlobal: false,
+    createdByEmail: "leo@example.com",
+    createdByMe: true,
   },
   {
     id: "tool-4",
@@ -45,6 +68,13 @@ export const TOOLS: ToolRegistryTool[] = [
     adapter: "mcp_server",
     handlerRef: "mcp://docs.internal:8080",
     createdAt: "2026-09-04T12:00:00Z",
+    isBuiltin: true,
+    skillId: "sk-platform-tools",
+    skillSlug: "platform-tools",
+    skillName: "Platform tools",
+    skillIsGlobal: true,
+    createdByEmail: "",
+    createdByMe: false,
   },
   {
     id: "tool-5",
@@ -54,6 +84,13 @@ export const TOOLS: ToolRegistryTool[] = [
     adapter: "",
     handlerRef: "",
     createdAt: "2026-09-05T12:00:00Z",
+    isBuiltin: false,
+    skillId: "sk-legacy",
+    skillSlug: "legacy",
+    skillName: "Legacy",
+    skillIsGlobal: false,
+    createdByEmail: "",
+    createdByMe: false,
   },
 ];
 
@@ -75,6 +112,13 @@ export const LONG_TOOLS: ToolRegistryTool[] = [
     adapter: "http_endpoint",
     handlerRef: `https://${LONG}.example.com/${LONG}`,
     createdAt: "2026-09-01T12:00:00Z",
+    isBuiltin: false,
+    skillId: "sk-a-skill-with-a-long-slug-for-the-skill-column-that-keeps-going",
+    skillSlug: "a-skill-with-a-long-slug-for-the-skill-column-that-keeps-going",
+    skillName: "A skill with a long name for the skill column that keeps going",
+    skillIsGlobal: false,
+    createdByEmail: "a.person.with.a.very.long.email.address@example.com",
+    createdByMe: false,
   },
   {
     id: "tool-sha",
@@ -84,8 +128,50 @@ export const LONG_TOOLS: ToolRegistryTool[] = [
     adapter: "mcp_server",
     handlerRef: LONG_URL,
     createdAt: "2026-09-02T12:00:00Z",
+    isBuiltin: true,
+    skillId: "sk-platform-tools",
+    skillSlug: "platform-tools",
+    skillName: "Platform tools",
+    skillIsGlobal: true,
+    createdByEmail: "",
+    createdByMe: false,
   },
 ];
+
+/**
+ * A stand-in for `orgToolDefsPage` in stories: the fixture tools filtered,
+ * searched, sorted and sliced the way the server answers the list state.
+ */
+export function serveTools(
+  tools: ToolRegistryTool[],
+  q: {
+    filters: Record<string, string>;
+    q: string;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+) {
+  return selectPage(
+    tools,
+    {
+      matches: (t, f) =>
+        (!f.createdBy || t.createdByMe) &&
+        (!f.builtin || t.isBuiltin === (f.builtin === "1")) &&
+        (!f.adapter || t.adapter === f.adapter) &&
+        (!f.skill || lower(t.skillSlug) === lower(f.skill)),
+      text: (t) => [t.name, t.slug, t.description, t.handlerRef, t.skillSlug],
+      sortValue: {
+        name: (t) => lower(t.name),
+        skill: (t) => lower(t.skillSlug),
+        adapter: (t) => t.adapter,
+        created: (t) => time(t.createdAt),
+      },
+      id: (t) => t.id,
+    },
+    q
+  );
+}
 
 const noopAsync = async () => {};
 

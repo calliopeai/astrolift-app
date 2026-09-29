@@ -80,6 +80,12 @@ _UPDATE_DESIRED_STATE_FIELDS = (
 )
 
 
+def _creator_id() -> int | None:
+    """The caller's user pk, for a service's ``created_by`` (its deployedBy, #2155)."""
+    tenant = get_current_tenant()
+    return tenant.actor_user_id if tenant else None
+
+
 def _requested_isolation(value: str | None) -> str:
     """The isolation mode to store on the row, or ``""`` for unspecified.
 
@@ -399,6 +405,7 @@ class ManagedServiceMutations:
             isolation=isolation,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
+            created_by_id=_creator_id(),
         )
         for spec in agent_specs:
             ManagedServiceAttachment.objects.create(
@@ -733,6 +740,7 @@ class ManagedServiceMutations:
             isolation=isolation,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
+            created_by_id=_creator_id(),
         )
 
         # Fire the workflow that actually provisions the backend resource

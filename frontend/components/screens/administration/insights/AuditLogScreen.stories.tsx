@@ -43,7 +43,7 @@ export const EmptyView: Story = {
   render: () => <Audit feed={{ items: [], hasMore: false }} initial={{ view: "denied" }} />,
 };
 
-/** The action filter matches exactly, so a partial action finds nothing. */
+/** A search and chips that match nothing: the filtered empty state, not the empty one. */
 export const EmptyFiltered: Story = {
   render: () => (
     <Audit
@@ -80,16 +80,18 @@ export const Filtered: Story = {
   ),
 };
 
-/** Target kind has no query argument yet; the page says it narrows the page only. */
-export const TargetKindLocal: Story = {
-  render: () => (
-    <Audit
-      feed={{ items: AUDIT_EVENTS.filter((e) => e.targetKind === "app") }}
-      totalCount={null}
-      targetFilteredLocally
-      initial={{ filters: { target: "app" } }}
-    />
-  ),
+/** A target kind chip: the server narrows the events and the count together. */
+export const TargetKind: Story = {
+  render: () => {
+    const items = AUDIT_EVENTS.filter((e) => e.targetKind === "app");
+    return (
+      <Audit
+        feed={{ items, hasMore: false }}
+        totalCount={items.length}
+        initial={{ filters: { target: "app" } }}
+      />
+    );
+  },
 };
 
 /** Polled events wait behind the pill; the events being read hold still. */

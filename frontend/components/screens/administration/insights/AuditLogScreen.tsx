@@ -68,8 +68,6 @@ export interface AuditLogScreenProps {
   /** The events as a feed: newest first, older ones on the server's cursor. */
   events: AuditEventsFeed;
   totalCount: number | null;
-  /** A target-kind chip narrows the page in hand, not the query (no argument yet). */
-  targetFilteredLocally: boolean;
   retentionDays: number | null;
   exporting: boolean;
   onExport: (format: AuditExportFormat) => void | Promise<void>;
@@ -117,7 +115,6 @@ export function AuditLogScreen({
   list,
   events,
   totalCount,
-  targetFilteredLocally,
   retentionDays,
   exporting,
   onExport: handleExport,
@@ -213,12 +210,6 @@ export function AuditLogScreen({
         }
         renderItem={(row) => <AuditLine row={row} onOpen={() => setActiveRow(row)} />}
       />
-
-      {targetFilteredLocally && (
-        <p className="text-muted-foreground text-xs">
-          The target kind filter narrows this page only; the export covers every target.
-        </p>
-      )}
 
       <AuditDetailsSheet row={activeRow} onOpenChange={(open) => !open && setActiveRow(null)} />
     </div>

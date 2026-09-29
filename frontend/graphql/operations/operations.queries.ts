@@ -103,11 +103,7 @@ export const LIST_EVENTS_PAGE = gql`
 `;
 
 export const LIST_EVENTS_AGGREGATED = gql`
-  query ListEventsAggregated(
-    $limit: Int
-    $eventType: String
-    $aggregateWindowSeconds: Int
-  ) {
+  query ListEventsAggregated($limit: Int, $eventType: String, $aggregateWindowSeconds: Int) {
     astroliftEventsAggregated(
       limit: $limit
       eventType: $eventType
@@ -216,6 +212,13 @@ export const LIST_AUDIT_EVENTS = gql`
   }
 `;
 
+/**
+ * The audit trail (#433) on the list contract (#2151): ``search`` matches an
+ * action prefix, the actor, the target slug or id and the request id;
+ * ``filter`` carries the list's chips (actor and ``subjectUser`` take "me",
+ * ``targetKind`` is case-insensitive). The single-value arguments stay for
+ * the callers that still send them; every argument ANDs with the rest.
+ */
 export const LIST_AUDIT_EVENTS_PAGE = gql`
   query ListAuditEventsPage(
     $limit: Int
@@ -226,6 +229,9 @@ export const LIST_AUDIT_EVENTS_PAGE = gql`
     $createdAtGte: DateTime
     $createdAtLte: DateTime
     $includeTotal: Boolean
+    $search: String
+    $filter: AstroliftAuditEventsFilter
+    $sort: String
   ) {
     astroliftAuditEventsPage(
       limit: $limit
@@ -236,6 +242,9 @@ export const LIST_AUDIT_EVENTS_PAGE = gql`
       createdAtGte: $createdAtGte
       createdAtLte: $createdAtLte
       includeTotal: $includeTotal
+      search: $search
+      filter: $filter
+      sort: $sort
     ) {
       items {
         id

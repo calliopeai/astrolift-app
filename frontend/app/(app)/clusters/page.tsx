@@ -1,3 +1,8 @@
+import { defaultListState } from "@/components/list/list-state";
+import {
+  CLUSTERS_LIST,
+  clustersPageVariables,
+} from "@/components/screens/clusters/list/clusters-list";
 import { LIST_CLUSTERS_PAGE } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
@@ -10,12 +15,11 @@ export const metadata = { title: "Clusters · Astrolift" };
  * instead of skeletons.
  *
  * The variables have to be exactly the ones `useClustersList` sends on a
- * cold load or the preload is a cache miss: no search, and the walk's
- * `WALK_LIMIT`. (The constant is not imported — it lives in a
- * `"use client"` module, whose exports are client references on the
- * server.) A saved `?q=` search falls through to the client fetch.
+ * cold load or the preload is a cache miss, so they come from the same
+ * pure function over the list's default state. A saved `?q=`, filter,
+ * sort or page falls through to the client fetch.
  */
-const FIRST_PAGE = { search: null, limit: 200 };
+const FIRST_PAGE = clustersPageVariables(defaultListState(CLUSTERS_LIST));
 
 export default function ClustersPage() {
   return (

@@ -52,7 +52,11 @@ def dispatch_registered_agent(
     trigger_payload: dict[str, Any] | None = None,
     timeout_seconds: int | None = None,
     trigger: str = "manual",
+    trigger_kind: str,
     client_request_id: str | None = None,
+    brief=None,
+    owner_project_id: int | None = None,
+    owner_team_id: int | None = None,
 ):
     """Create, prepare, queue, and durably dispatch one registered agent.
 
@@ -70,6 +74,16 @@ def dispatch_registered_agent(
     different requester presenting the identical key is a coincidence, not
     a retry, so it dispatches its own independent task rather than either
     conflicting with or returning someone else's.
+
+    ``trigger_kind`` (#2152) is what started the run, in the shared
+    vocabulary of ``core.run_trigger``: required, so no entry point can
+    forget it. The initiator is the requester.
+
+    ``brief`` (#2155, ``retryAgentTask``) freezes that exact Agent Package
+    onto the new task instead of preparing the agent's current one, so a
+    retry runs what the original ran even after the agent re-synced.
+    ``owner_project_id`` / ``owner_team_id`` copy the original task's ownership,
+    so a retry is visible to exactly who could see the run it repeats.
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
@@ -222,7 +236,12 @@ def dispatch_registered_agent(
                 dispatch_input=trigger_payload or None,
                 vnc_enabled=bool(environment_spec and environment_spec.vnc_enabled),
                 created_by_id=requester_id,
+                triggered_by_user_id=requester_id,
+                trigger_kind=trigger_kind,
                 client_request_id=request_id,
+                brief=brief,
+                project_id=owner_project_id,
+                team_id=owner_team_id,
             )
     except IntegrityError:
         # A concurrent caller won the race for this exact key -- the
@@ -242,14 +261,15 @@ def dispatch_registered_agent(
             effective_timeout=effective_timeout,
         )
 
-    try:
-        prepare_agent_task(task, context={"trigger": trigger})
-    except Exception as exc:  # noqa: BLE001 — persist a terminal, inspectable failure
-        settle_preparation_failure(task, exc)
-        raise AgentDispatchError(
-            "precondition",
-            str(exc) or "agent package preparation failed",
-        ) from exc
+    if brief is None:
+        try:
+            prepare_agent_task(task, context={"trigger": trigger})
+        except Exception as exc:  # noqa: BLE001 - persist a terminal, inspectable failure
+            settle_preparation_failure(task, exc)
+            raise AgentDispatchError(
+                "precondition",
+                str(exc) or "agent package preparation failed",
+            ) from exc
 
     task.transition_to(AgentTask.Status.QUEUED)
     try:

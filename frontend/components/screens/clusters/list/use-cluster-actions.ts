@@ -12,13 +12,13 @@ import {
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
-// The Clusters list walks `ListClustersPage`, but LIST_CLUSTERS still backs
-// the cluster detail tabs, /ops, /providers, /administration/metrics and the
-// fleet map. Both have to be refreshed after a lifecycle change or one of
-// the two goes stale — the walk by operation name, since its variables
-// carry the cursor and the search term and no literal variables object
-// names the page the operator is actually looking at.
-const REFETCH_LIST = [{ query: LIST_CLUSTERS }, "ListClustersPage"];
+// The Clusters list reads `ListClustersPage` and the detail header
+// `GetCluster`, while LIST_CLUSTERS still backs /ops, /providers,
+// /administration/metrics and the fleet map. All of them have to be
+// refreshed after a lifecycle change or one goes stale; the page and the
+// detail by operation name, since their variables carry the list state
+// and the slug.
+const REFETCH_LIST = [{ query: LIST_CLUSTERS }, "ListClustersPage", "GetCluster"];
 
 export interface ClusterActions {
   deleting: boolean;

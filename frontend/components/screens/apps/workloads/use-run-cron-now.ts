@@ -31,7 +31,7 @@ export function useRunCronNow(appSlug: string) {
     };
   }>(RUN_JOB_ONCE, {
     // By operation name: the run lists carry cursors and filters.
-    refetchQueries: ["RecentJobRuns", "ListScheduledJobRunsPage"],
+    refetchQueries: ["ListCronJobsPage", "ListScheduledJobRunsPage"],
   });
 
   async function onRun(jobSlug: string, environmentName: string) {

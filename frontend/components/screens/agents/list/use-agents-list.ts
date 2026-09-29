@@ -2,44 +2,35 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
-import * as React from "react";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import {
-  LIST_AGENT_ENVIRONMENT_SPECS,
-  LIST_AGENT_FLEET,
-  LIST_AGENT_LIVE_STATUS,
+  AGENT_FLEET_LIST_PAGE,
+  AGENT_UPCOMING_RUNS,
   LIST_AGENT_TASKS,
 } from "@/graphql/agents/agents.queries";
 import type {
-  AstroliftAgentEnvironmentSpec,
-  AstroliftAgentListItem,
-  AstroliftAgentLiveStatus,
+  AstroliftAgentFleetRow,
+  AstroliftAgentUpcomingRun,
 } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { LIST_MY_APPS_PAGE } from "@/graphql/registry/registry.queries";
 import { useModules } from "@/graphql/user/user.hooks";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { AGENTS_LIST, type AgentRow, joinAgents, selectAgents } from "./agents-list";
+import { AGENTS_LIST, type AgentRow, agentFleetPageVariables, toAgentRow } from "./agents-list";
 
-interface FleetResp {
-  agentFleet: AstroliftAgentListItem[];
+interface FleetPageResp {
+  agentFleetPage: {
+    items: AstroliftAgentFleetRow[];
+    totalCount: number | null;
+    page: number | null;
+    pageSize: number | null;
+  };
 }
-interface LiveResp {
-  agentLiveStatus: AstroliftAgentLiveStatus[];
-}
-interface SpecsResp {
-  agentEnvironmentSpecs: AstroliftAgentEnvironmentSpec[];
-}
-interface EnvsResp {
-  astroliftEnvironments: { registeredAppSlug: string; clusterSlug?: string | null }[];
-}
-interface MyAppsResp {
-  astroliftMyAppsPage: { items: { slug: string }[]; nextCursor?: string | null };
+interface UpcomingResp {
+  agentUpcomingRuns: { items: AstroliftAgentUpcomingRun[] };
 }
 interface RunAgentResp {
   runAstroliftAgent: {
@@ -49,15 +40,14 @@ interface RunAgentResp {
   };
 }
 
-/** The backend's page cap: up to this many of the viewer's apps back Mine. */
-const MY_APPS_LIMIT = 200;
+/** Status is live state; the page re-reads it on the registry's old cadence. */
+const POLL_MS = 15_000;
 
 /**
- * The Agents list: URL list state, the org's fleet joined with live status
- * (polled every 15s, as the registry did), environment specs (model and
- * runtime) and environments (cluster), plus the viewer's apps while Mine is
- * open. Each is one org-wide query the agent frame and the dispatch page read
- * too, so Apollo serves them once. Run now fires `runAstroliftAgent` and
+ * The Agents list: URL list state in, one numbered page of `agentFleetPage`
+ * out (spec 44 §5.1, #2155), polled every 15s. The server filters, searches,
+ * sorts and counts; the hook adds the next firing of each scheduled agent on
+ * the page from `agentUpcomingRuns`. Run now fires `runAstroliftAgent` and
  * opens the agent's Runs tab. The data half of AgentsListScreen.
  */
 export function useAgentsList() {
@@ -69,50 +59,36 @@ export function useAgentsList() {
   const orgId = org?.id ?? "";
   const { canCreate } = useModules();
   const perms = useMyPermissions();
-  const mine = state.view === "mine";
 
-  const fleet = useQuery<FleetResp>(LIST_AGENT_FLEET, {
-    variables: { orgId },
+  const fleet = useQuery<FleetPageResp>(AGENT_FLEET_LIST_PAGE, {
+    variables: agentFleetPageVariables(orgId, {
+      q: state.q,
+      filters: list.filters,
+      sort: state.sort,
+      page: state.page,
+      pageSize: state.pageSize,
+    }),
     skip: !orgId,
+    pollInterval: POLL_MS,
     fetchPolicy: "cache-and-network",
   });
-  const live = useQuery<LiveResp>(LIST_AGENT_LIVE_STATUS, {
-    variables: { orgId, projectSlug: null, workloadId: null },
-    skip: !orgId,
-    pollInterval: 15000,
+  const data = fleet.data ?? fleet.previousData;
+  const items = data?.agentFleetPage.items ?? [];
+
+  // "Next in 3h" for the scheduled agents on this page only. Best effort:
+  // when it fails the rows read "Scheduled".
+  const scheduled = items.filter((a) => a.status === "scheduled").map((a) => a.slug);
+  const upcoming = useQuery<UpcomingResp>(AGENT_UPCOMING_RUNS, {
+    variables: { orgId, agent: scheduled, perAgent: 1, page: 1, pageSize: scheduled.length },
+    skip: !orgId || scheduled.length === 0,
+    pollInterval: POLL_MS,
     fetchPolicy: "cache-and-network",
   });
-  const specs = useQuery<SpecsResp>(LIST_AGENT_ENVIRONMENT_SPECS, {
-    variables: { orgId },
-    skip: !orgId,
-    fetchPolicy: "cache-and-network",
-  });
-  const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: null } });
-  const myApps = useQuery<MyAppsResp>(LIST_MY_APPS_PAGE, {
-    variables: { limit: MY_APPS_LIMIT },
-    skip: !mine,
-  });
-
-  // Model, runtime, cluster and Mine are best effort: when a side query
-  // fails the list still renders and those columns read "unknown".
-  const agents: AgentRow[] = React.useMemo(
-    () =>
-      joinAgents(fleet.data?.agentFleet ?? [], {
-        live: live.data?.agentLiveStatus ?? [],
-        specs: specs.data?.agentEnvironmentSpecs ?? [],
-        environments: envs.data?.astroliftEnvironments ?? [],
-        myAppSlugs: new Set((myApps.data?.astroliftMyAppsPage.items ?? []).map((a) => a.slug)),
-      }),
-    [fleet.data, live.data, specs.data, envs.data, myApps.data]
-  );
-
-  const { rows, totalCount } = selectAgents(agents, {
-    q: state.q,
-    filters: list.filters,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-  });
+  const nextBySlug = new Map<string, string>();
+  for (const u of (upcoming.data ?? upcoming.previousData)?.agentUpcomingRuns.items ?? []) {
+    if (!nextBySlug.has(u.agentSlug)) nextBySlug.set(u.agentSlug, u.scheduledAt);
+  }
+  const rows: AgentRow[] = items.map((a) => toAgentRow(a, nextBySlug.get(a.slug) ?? null));
 
   const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
 
@@ -122,7 +98,9 @@ export function useAgentsList() {
       const result = data?.runAstroliftAgent;
       if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
       toast.success(`Dispatched ${agent.name}`);
-      await client.refetchQueries({ include: [LIST_AGENT_TASKS, LIST_AGENT_FLEET] });
+      await client.refetchQueries({
+        include: [LIST_AGENT_TASKS, AGENT_FLEET_LIST_PAGE],
+      });
       router.push(`/agents/${encodeURIComponent(agent.slug)}/runs`);
       return true;
     } catch (err) {
@@ -132,17 +110,14 @@ export function useAgentsList() {
     }
   }
 
-  const waiting =
-    !orgId || (fleet.loading && !fleet.data) || (mine && myApps.loading && !myApps.data);
-
   return {
     list,
     rows,
-    totalCount,
-    loading: waiting,
-    // Rows answer an older poll or the Mine join is still arriving.
-    stale: fleet.loading && Boolean(fleet.data),
-    error: fleet.error && !fleet.data ? { message: fleet.error.message } : null,
+    totalCount: data?.agentFleetPage.totalCount ?? rows.length,
+    loading: !orgId || (fleet.loading && !data),
+    // Rows on screen answer the previous list state while the next loads.
+    stale: fleet.loading && !fleet.data && Boolean(data),
+    error: fleet.error && !data ? { message: fleet.error.message } : null,
     onRetry: () => void fleet.refetch(),
     // The create affordance follows the Agents module's server-side canCreate
     // (spec 36 §1.3); Run now is `agent.dispatch`, the grant the server checks.

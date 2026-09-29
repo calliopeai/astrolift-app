@@ -4,9 +4,15 @@ import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { IMPORT_SKILLS, LONG_SKILL, MANY_SKILLS, SKILL_ITEMS } from "./agent-skills.fixtures";
+import {
+  IMPORT_SKILLS,
+  LONG_SKILL,
+  MANY_SKILLS,
+  serveSkills,
+  SKILL_ITEMS,
+} from "./agent-skills.fixtures";
 import { ImportSkillsSheet } from "./ImportSkillsSheet";
-import { SKILLS_LIST, type SkillListItem, selectSkills } from "./skills-list";
+import { SKILLS_LIST, type SkillListItem } from "./skills-list";
 import { SkillsListScreen, type SkillsListScreenProps } from "./SkillsListScreen";
 
 const meta: Meta = {
@@ -23,11 +29,11 @@ type Props = Partial<Omit<SkillsListScreenProps, "list">> & {
   importOpen?: boolean;
 };
 
-/** The screen over fixture skills, filtered and paged the way the hook does it. */
+/** The screen over fixture skills, filtered and paged the way the server does it. */
 function Skills({ skills = SKILL_ITEMS, initial, importOpen = false, ...patch }: Props) {
   const list = useLocalListState(SKILLS_LIST, initial);
   const [open, setOpen] = React.useState(importOpen);
-  const { rows, totalCount } = selectSkills(skills, {
+  const { rows, totalCount } = serveSkills(skills, {
     filters: list.filters,
     q: list.state.q,
     sort: list.state.sort,
@@ -63,10 +69,10 @@ export const LoadError: Story = {
   ),
 };
 
-/** Mine stands in as the organization's own skills; its note says so. */
+/** Mine: the skills the viewer wrote or imported. */
 export const Mine: Story = { render: () => <Skills initial={{ view: "mine" }} /> };
 
-/** Imported cannot pick skills out yet: an empty view with a note saying why. */
+/** Imported: the skills that came from a repo or the catalogue. */
 export const Imported: Story = { render: () => <Skills initial={{ view: "imported" }} /> };
 
 /** A chip that matches nothing: "No skills match" and Clear. */

@@ -319,6 +319,21 @@ export function ClustersList(props: ClustersListProps) {
         </span>
       ),
     },
+    {
+      // Who registered it: what the Mine view filters on. The server has no
+      // sort on it, so the header does not sort.
+      id: "registeredBy",
+      header: "Registered by",
+      cellClassName: "max-w-48",
+      cell: (c) => (
+        <span
+          className="text-muted-foreground block min-w-0 truncate font-mono text-xs"
+          title={c.createdByUsername ?? undefined}
+        >
+          {c.createdByUsername || "—"}
+        </span>
+      ),
+    },
   ];
 
   function rowActions(c: ClusterRow) {

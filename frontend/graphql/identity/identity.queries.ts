@@ -19,6 +19,7 @@ export const LIST_ORGANIZATIONS = gql`
       auditLogRetentionDays
       appearanceDefault
       appearanceLocked
+      restrictedSettingsDefault
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
@@ -65,8 +66,9 @@ export const LIST_TEAMS = gql`
  * from codegen today (see ``codegen.ts``). Spreadable fragments are the
  * documented way back in.
  *
- * None of these fields takes a sort argument, so their tables declare no
- * ``sortVariable`` and no ``Column.sortKey``.
+ * The identity lists (teams, roles, members, bindings, policies,
+ * invitations) also take the list contract (#2153): ``filter``, ``sort``,
+ * ``page`` and ``pageSize``, declared on each document below.
  */
 const TEAM_FIELDS = gql`
   fragment TeamFields on AstroliftTeam {
@@ -84,15 +86,39 @@ const TEAM_FIELDS = gql`
   }
 `;
 
+/**
+ * On the list contract (#2153): ``filter`` (``mine``), ``sort`` (name, slug,
+ * created) and ``page`` / ``pageSize``. Any of the last three selects
+ * numbered paging with an exact ``totalCount``; without them it is the
+ * cursor walk the pickers use.
+ */
 export const LIST_TEAMS_PAGE = gql`
   ${TEAM_FIELDS}
-  query ListTeamsPage($search: String, $limit: Int, $after: String) {
-    astroliftTeamsPage(search: $search, limit: $limit, after: $after) {
+  query ListTeamsPage(
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftTeamsListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftTeamsPage(
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...TeamFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -255,6 +281,7 @@ export const GET_ORGANIZATION = gql`
       auditLogRetentionDays
       appearanceDefault
       appearanceLocked
+      restrictedSettingsDefault
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
@@ -314,15 +341,46 @@ const ROLE_FIELDS = gql`
   }
 `;
 
+/**
+ * On the list contract (#2153): ``filter`` (isSystem, scopeLevel,
+ * createdBy), ``sort`` (name, slug, created, scopeLevel, bindings) and
+ * numbered pages. ``bindingsCount`` counts this org's bindings only.
+ */
 export const LIST_ROLES_PAGE = gql`
   ${ROLE_FIELDS}
-  query ListRolesPage($search: String, $limit: Int, $after: String) {
-    astroliftRolesPage(search: $search, limit: $limit, after: $after) {
+  query ListRolesPage(
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftRolesListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftRolesPage(
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...RoleFields
+        bindingsCount
+        duplicatedFrom {
+          id
+          slug
+          name
+          isSystem
+          deleted
+        }
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -346,6 +404,9 @@ export const LIST_MEMBERS = gql`
       lastActiveAt
       createdAt
       deletedAt
+      teamId
+      teamSlug
+      teamName
     }
   }
 `;
@@ -371,15 +432,47 @@ const MEMBER_FIELDS = gql`
   }
 `;
 
+/**
+ * On the list contract (#2153): ``filter`` (scopeKind, lifecycle, role,
+ * team, mine, admin, active), ``sort`` (name, email, created, joined,
+ * lifecycle, lastActive, roles) and numbered pages. ``scopeKind: ["ORG"]``
+ * is one row per person; ``teams`` is set on this query only.
+ */
 export const LIST_MEMBERS_PAGE = gql`
   ${MEMBER_FIELDS}
-  query ListMembersPage($search: String, $limit: Int, $after: String) {
-    astroliftMembersPage(search: $search, limit: $limit, after: $after) {
+  query ListMembersPage(
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftMembersListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftMembersPage(
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...MemberFields
+        teamId
+        teamSlug
+        teamName
+        teams {
+          id
+          slug
+          name
+        }
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -465,13 +558,35 @@ const ROLE_BINDING_FIELDS = gql`
  */
 export const LIST_ROLE_BINDINGS_PAGE = gql`
   ${ROLE_BINDING_FIELDS}
-  query ListRoleBindingsPage($search: String, $appSlug: String, $limit: Int, $after: String) {
-    astroliftRoleBindingsPage(search: $search, appSlug: $appSlug, limit: $limit, after: $after) {
+  query ListRoleBindingsPage(
+    $search: String
+    $appSlug: String
+    $limit: Int
+    $after: String
+    $roleId: GUID
+    $filter: AstroliftRoleBindingsListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftRoleBindingsPage(
+      search: $search
+      appSlug: $appSlug
+      limit: $limit
+      after: $after
+      roleId: $roleId
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...RoleBindingFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -522,15 +637,38 @@ const POLICY_FIELDS = gql`
   }
 `;
 
+/**
+ * On the list contract (#2153): ``filter`` (effect, scopeLevel, createdBy),
+ * ``sort`` (name, slug, created, updated, effect, scopeLevel) and numbered
+ * pages.
+ */
 export const LIST_POLICIES_PAGE = gql`
   ${POLICY_FIELDS}
-  query ListPoliciesPage($search: String, $limit: Int, $after: String) {
-    astroliftPoliciesPage(search: $search, limit: $limit, after: $after) {
+  query ListPoliciesPage(
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftPoliciesListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftPoliciesPage(
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...PolicyFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -744,13 +882,33 @@ const INVITATION_FIELDS = gql`
 // resets the cursor walk rather than paging through a stale question.
 export const LIST_INVITATIONS_PAGE = gql`
   ${INVITATION_FIELDS}
-  query ListInvitationsPage($status: String, $search: String, $limit: Int, $after: String) {
-    astroliftInvitationsPage(status: $status, search: $search, limit: $limit, after: $after) {
+  query ListInvitationsPage(
+    $status: String
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftInvitationsListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftInvitationsPage(
+      status: $status
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...InvitationFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;

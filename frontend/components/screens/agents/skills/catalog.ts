@@ -1,12 +1,13 @@
 /**
  * What the Agents area's catalog lists share (spec 44 §4.4, §5.1): Skills,
  * Tools, Models, Functions and Workloads. The breadcrumb that starts at the
- * area's switcher, and the one client-side step their hooks run while the
- * backend fields return the whole set with no filter, sort or page argument
- * (each view says so in its note; each field is in needsBackend). Pure.
+ * area's switcher, the list state spelled as a numbered page's variables
+ * (the server answers every filter, sort and page, #2155), and the generic
+ * filter, sort and slice step that story fixtures use as the server's
+ * stand-in. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListView } from "@/components/list/list-state";
+import { formatSort, type ListView } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
@@ -37,6 +38,43 @@ export function agentsCrumbs(fn: AgentsFunction, ...tail: Crumb[]): Crumb[] {
   const area = areaSwitcher(NAV, "agents", fn);
   const self: Crumb = tail.length > 0 ? { label: LABEL[fn], href: HREF[fn] } : { label: LABEL[fn] };
   return [area, self, ...tail];
+}
+
+/** The list state a numbered list hook reads. */
+export interface NumberedListQuery {
+  q: string;
+  filters: Record<string, string>;
+  sort: SortState[];
+  page: number;
+  pageSize: number;
+}
+
+export interface NumberedPageVariables<F> {
+  search: string | null;
+  filter: F | null;
+  sort: string;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * The list state as a numbered page's variables: `filter` is what the list
+ * built from its chips and view (an empty one is `null`), `sort` is always
+ * sent, which selects numbered paging on the server, falling back to the
+ * list's default when the person cleared it.
+ */
+export function numberedPageVariables<F extends object>(
+  { q, sort, page, pageSize }: NumberedListQuery,
+  filter: F,
+  defaultSort: SortState[]
+): NumberedPageVariables<F> {
+  return {
+    search: q.trim() || null,
+    filter: Object.keys(filter).length ? filter : null,
+    sort: formatSort(sort.length ? sort : defaultSort),
+    page: Math.max(1, page),
+    pageSize,
+  };
 }
 
 /** The note every client-paged view carries until its field takes the §5.1 arguments. */

@@ -17,7 +17,7 @@ interface BootstrapPlanResp {
 }
 
 interface BootstrapRunsResp {
-  astroliftClusters: { id: string; slug: string; bootstrapRuns: BootstrapRun[] }[];
+  astroliftCluster: { id: string; slug: string; bootstrapRuns: BootstrapRun[] } | null;
 }
 
 /**
@@ -71,8 +71,7 @@ export function useBootstrapPlan(clusterId: string) {
  */
 export function useBootstrapHistory(slug: string) {
   const { data, loading } = useQuery<BootstrapRunsResp>(CLUSTER_BOOTSTRAP_RUNS, {
-    variables: { limit: 10 },
+    variables: { slug, limit: 10 },
   });
-  const cluster = data?.astroliftClusters.find((c) => c.slug === slug);
-  return { runs: cluster?.bootstrapRuns ?? [], loading };
+  return { runs: data?.astroliftCluster?.bootstrapRuns ?? [], loading };
 }

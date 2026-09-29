@@ -40,7 +40,7 @@ export function useNewSkill() {
   const orgId = org?.id ?? "";
 
   const [createSkillMutation, { loading }] = useMutation<CreateSkillData>(CREATE_SKILL, {
-    refetchQueries: ["ListSkills"],
+    refetchQueries: ["ListSkills", "SkillsListPage"],
   });
 
   async function createSkill(fields: NewSkillFields): Promise<SkillErrors> {

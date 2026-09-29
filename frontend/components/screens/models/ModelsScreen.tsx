@@ -50,7 +50,7 @@ const columns: Column<ModelEndpoint>[] = [
   {
     id: "serving",
     header: "Serving",
-    sortKey: "serving",
+    sortKey: "variant",
     cell: (m) => <Badge variant={isHosted(m) ? "default" : "secondary"}>{m.variant}</Badge>,
   },
   {
@@ -113,6 +113,7 @@ export function ModelsScreen({
   rows,
   totalCount,
   loading,
+  stale,
   error,
   onRetry,
 }: ModelsScreenProps) {
@@ -139,6 +140,7 @@ export function ModelsScreen({
       getRowId={(m) => m.id}
       rowHref={(m) => `/models/${m.id}`}
       loading={loading}
+      stale={stale}
       error={error}
       onRetry={onRetry}
       empty={{

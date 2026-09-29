@@ -44,6 +44,7 @@ export function workload(overrides: Partial<AstroliftWorkload> = {}): AstroliftW
     schedule: "",
     storageClass: "",
     storageSize: "",
+    ownedByMe: false,
     volumes: [] as unknown as AstroliftWorkload["volumes"],
     ...overrides,
   };
@@ -90,6 +91,8 @@ const jobRun = (
   workloadSlug: "weekly",
   k8sJobName: `weekly-${id}`,
   status,
+  triggerKind: "scheduled",
+  triggeredByMe: false,
   startedAt,
   endedAt: startedAt,
   durationSeconds,

@@ -7,9 +7,10 @@
  * request between them:
  *
  * - deployments: `LIST_DEPLOYMENTS { limit: 100 }`, the approvals queue's
- *   read. Waiting on you, Failing and Recent deployments read it. It is the
- *   deployments read that carries `statusReason` and `buildError`, which
- *   Failing puts first.
+ *   read. Waiting on you, Failing and Recent deployments read it, so a Home
+ *   render fetches deployments once. It is the deployments read that
+ *   carries `statusReason` and `buildError`, which Failing puts first;
+ *   Recent deployments shows its five newest.
  * - agent runs by status: `LIST_AGENT_TASKS_PAGE`, five of one status with
  *   the total. Failing and Failed runs share the failed five.
  * - the fleet: `LIST_AGENT_FLEET { orgId }`, the Agents list's and the
@@ -96,17 +97,25 @@ interface DeploymentsResp {
   astroliftDeployments: AstroliftDeployment[];
 }
 
-/** The approvals queue's deployments read: the newest 100. */
+/** The approvals queue's page size, and so the shared deployments read's. */
+export const HOME_DEPLOYMENTS_LIMIT = 100;
+
+/**
+ * The approvals queue's deployments read: the newest 100, newest created
+ * first. `capped` says the read is full, so there may be more than it holds.
+ */
 export function useHomeDeployments({ skip = false }: { skip?: boolean } = {}) {
   const q = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
-    variables: { limit: 100 },
+    variables: { limit: HOME_DEPLOYMENTS_LIMIT },
     fetchPolicy: "cache-and-network",
     pollInterval: HOME_POLL_MS,
     skip,
   });
   const data = q.data ?? q.previousData;
+  const deployments = data?.astroliftDeployments ?? NO_DEPLOYMENTS;
   return {
-    deployments: data?.astroliftDeployments ?? NO_DEPLOYMENTS,
+    deployments,
+    capped: deployments.length >= HOME_DEPLOYMENTS_LIMIT,
     ...readState(q, Boolean(data)),
   };
 }

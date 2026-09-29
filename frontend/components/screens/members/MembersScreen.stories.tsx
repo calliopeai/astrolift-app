@@ -6,8 +6,10 @@ import { type ListState, useLocalListState } from "@/components/list/use-list-st
 import { InviteSheet } from "./InviteDialog";
 import {
   BINDINGS,
+  GROUPS,
   INVITATIONS,
   LONG_BINDINGS,
+  LONG_GROUPS,
   LONG_INVITATIONS,
   LONG_MEMBERS,
   MEMBERS,
@@ -27,7 +29,7 @@ export default meta;
 
 type Story = StoryObj;
 
-/** The screen over fixture walks, selected the way the hook selects them. */
+/** The screen over the rows the server would answer the view with. */
 function People({
   initial,
   data,
@@ -40,15 +42,21 @@ function People({
   return <MembersScreen list={list} {...membersProps(list, data, overrides)} />;
 }
 
-/** Users and IdP groups in one list, with the invite sheet wired (closed until clicked). */
+/** Everyone in the org, their roles and teams, with the invite sheet wired (closed until clicked). */
 export const Full: Story = {
   render: () => <People renderInviteDialog={(p) => <InviteSheet {...inviteProps()} {...p} />} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    // A group is a row of the same list as the users.
-    await expect(canvas.getAllByText("okta:release-managers").length).toBeGreaterThan(0);
     await expect(canvas.getByText("grace@example.com")).toBeInTheDocument();
+    // Roles come from the page's bindings, teams from the member row.
+    await expect(canvas.getAllByText("org_admin").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByText("platform").length).toBeGreaterThan(0);
   },
+};
+
+/** More people than a page: the numbers are the server's count. */
+export const ManyPages: Story = {
+  render: () => <People totalCount={312} initial={{ page: 3 }} />,
 };
 
 export const Loading: Story = {
@@ -56,11 +64,11 @@ export const Loading: Story = {
 };
 
 export const Empty: Story = {
-  render: () => <People data={{ members: [], bindings: [], invitations: [] }} />,
+  render: () => <People data={{ members: [], bindings: [], invitations: [], groups: [] }} />,
 };
 
 export const NoMatches: Story = {
-  render: () => <People initial={{ q: "nobody" }} />,
+  render: () => <People data={{ members: [] }} initial={{ q: "nobody" }} />,
 };
 
 export const LoadFailed: Story = {
@@ -74,7 +82,12 @@ export const LoadFailed: Story = {
 
 /** Mine: people who share a team with the viewer (ada is on platform with linus). */
 export const Mine: Story = {
-  render: () => <People initial={{ view: "mine" }} />,
+  render: () => (
+    <People
+      data={{ members: MEMBERS.filter((m) => m.teams?.some((t) => t.slug === "platform")) }}
+      initial={{ view: "mine" }}
+    />
+  ),
 };
 
 /** The Invited view: pending invitations with resend and revoke. */
@@ -91,24 +104,36 @@ export const InvitedEmpty: Story = {
   render: () => <People data={{ invitations: [] }} initial={{ view: "invited" }} />,
 };
 
-/** IdP groups that hold a binding, with the note on what the backend does not do yet. */
+/** IdP groups the org knows, with their members, grants and mappings. */
 export const Groups: Story = {
   render: () => <People initial={{ view: "groups" }} />,
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getAllByText(/12 members/).length).toBeGreaterThan(0);
+  },
+};
+
+export const GroupsEmpty: Story = {
+  render: () => <People data={{ groups: [] }} initial={{ view: "groups" }} />,
 };
 
 /** Holders of an org role that can manage members. */
 export const Admins: Story = {
-  render: () => <People initial={{ view: "admins" }} />,
+  render: () => (
+    <People
+      data={{ members: MEMBERS.filter((m) => ["ada", "grace"].includes(m.user.username)) }}
+      initial={{ view: "admins" }}
+    />
+  ),
 };
 
-/** Filter chips: a scope and a last-active window. */
+/** Filter chips: a role and a last-active window. */
 export const Filtered: Story = {
-  render: () => <People initial={{ filters: { scope: "APP", active: "7d" } }} />,
-};
-
-/** The walk stopped at the cap, and the header says what the filters cover. */
-export const Truncated: Story = {
-  render: () => <People truncated />,
+  render: () => (
+    <People
+      data={{ members: MEMBERS.filter((m) => m.user.username === "grace") }}
+      initial={{ filters: { role: "app-operator", active: "7d" } }}
+    />
+  ),
 };
 
 /** A viewer without org.manage_members: no row menus. */
@@ -125,6 +150,12 @@ export const LongStrings: Story = {
         invitations: [...LONG_INVITATIONS, ...INVITATIONS, ...RESOLVED_INVITATIONS],
       }}
     />
+  ),
+};
+
+export const LongGroups: Story = {
+  render: () => (
+    <People data={{ groups: [...LONG_GROUPS, ...GROUPS] }} initial={{ view: "groups" }} />
   ),
 };
 

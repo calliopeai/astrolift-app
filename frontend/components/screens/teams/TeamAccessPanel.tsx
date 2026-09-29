@@ -4,14 +4,14 @@ import { FolderIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
 import {
-  PrincipalAccessPanel,
-  type PrincipalAccessPanelProps,
-} from "@/components/screens/administration/access/PrincipalAccessPanel";
+  EntityAccessPanel,
+  type EntityAccessPanelProps,
+} from "@/components/screens/administration/access/EntityAccessPanel";
 import type { AstroliftProject } from "@/graphql/identity/identity.types";
 
 export interface TeamAccessPanelProps {
   slug: string;
-  access: PrincipalAccessPanelProps;
+  access: EntityAccessPanelProps;
   reach: {
     projects: AstroliftProject[];
     loading: boolean;
@@ -21,16 +21,17 @@ export interface TeamAccessPanelProps {
 }
 
 /**
- * A team's Access tab (access UX design 3.2): "what does being on payments
- * give you". The grants held at the team (every holder, removable at their
- * source) are the list; what those grants reach, the team's projects and
- * their apps, is a summary beside it (Leo's list rule 3). Pure.
+ * A team's Access tab (access UX design 3.2, 3.3): who has access on the
+ * team and why, from `astroliftAccessOn`: grants on the team and the org
+ * grants that reach it, group grants and mappings, each removable at its
+ * source. What those grants reach, the team's projects and their apps, is a
+ * summary beside it (Leo's list rule 3). Pure.
  */
 export function TeamAccessPanel({ slug, access, reach }: TeamAccessPanelProps) {
   return (
     <div className="grid min-w-0 grid-cols-12 items-start gap-6">
       <div className="col-span-12 min-w-0 xl:col-span-8">
-        <PrincipalAccessPanel {...access} showHolder />
+        <EntityAccessPanel {...access} />
       </div>
       <ListSummary<AstroliftProject>
         span={4}

@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  isRestrictedSettings,
+  PRODUCT_RESTRICTED_SETTINGS,
+  RESTRICTED_SETTINGS,
+  type RestrictedSettings,
+} from "@/lib/display-prefs";
+import { cn } from "@/lib/utils";
 
 import { AdministrationShell } from "./AdministrationShell";
 import type {
@@ -52,6 +59,9 @@ export function OrganizationSettings({
       website: org?.website ?? "",
       auditDays: String(org?.auditLogRetentionDays ?? 365),
       allowProfileEdit: org?.allowUserProfileEdit ?? true,
+      restrictedSettingsDefault: isRestrictedSettings(org?.restrictedSettingsDefault)
+        ? org.restrictedSettingsDefault
+        : PRODUCT_RESTRICTED_SETTINGS,
     }),
     [org]
   );
@@ -59,12 +69,16 @@ export function OrganizationSettings({
   const [website, setWebsite] = React.useState(saved.website);
   const [auditDays, setAuditDays] = React.useState(saved.auditDays);
   const [allowProfileEdit, setAllowProfileEdit] = React.useState(saved.allowProfileEdit);
+  const [restrictedDefault, setRestrictedDefault] = React.useState<RestrictedSettings>(
+    saved.restrictedSettingsDefault
+  );
 
   React.useEffect(() => {
     setName(saved.name);
     setWebsite(saved.website);
     setAuditDays(saved.auditDays);
     setAllowProfileEdit(saved.allowProfileEdit);
+    setRestrictedDefault(saved.restrictedSettingsDefault);
   }, [saved]);
 
   // Each section sends its own edits over the saved values, so saving one
@@ -73,7 +87,10 @@ export function OrganizationSettings({
 
   const generalDirty = Boolean(org) && (name !== saved.name || website !== saved.website);
   const retentionDirty = Boolean(org) && auditDays !== saved.auditDays;
-  const policiesDirty = Boolean(org) && allowProfileEdit !== saved.allowProfileEdit;
+  const policiesDirty =
+    Boolean(org) &&
+    (allowProfileEdit !== saved.allowProfileEdit ||
+      restrictedDefault !== saved.restrictedSettingsDefault);
 
   const sections = [
     {
@@ -195,30 +212,70 @@ export function OrganizationSettings({
           description="Org-wide rules that apply to every member, including the self-service profile editor."
           dirty={policiesDirty}
           saving={saving}
-          onCancel={() => setAllowProfileEdit(saved.allowProfileEdit)}
-          onSave={() => save({ allowProfileEdit })}
+          onCancel={() => {
+            setAllowProfileEdit(saved.allowProfileEdit);
+            setRestrictedDefault(saved.restrictedSettingsDefault);
+          }}
+          onSave={() => save({ allowProfileEdit, restrictedSettingsDefault: restrictedDefault })}
         >
           {orgsLoading ? (
-            <FieldSkeletons count={1} />
+            <FieldSkeletons count={2} />
           ) : (
-            <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={allowProfileEdit}
-                onChange={(e) => setAllowProfileEdit(e.target.checked)}
-              />
-              <span className="min-w-0">
-                <span className="font-medium">Allow users to edit their own profile</span>
-                <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                  Lets users update their first name, last name, and email on{" "}
-                  <code className="font-mono">/settings/profile</code>. Fields managed by the
-                  identity provider stay locked even when this is on — local edits to IdP-claimed
-                  fields would be overwritten on next sign-in. Turn this off for SSO-only
-                  deployments where the IdP is the source of truth.
+            <div className="flex min-w-0 flex-col gap-5">
+              <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={allowProfileEdit}
+                  onChange={(e) => setAllowProfileEdit(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium">Allow users to edit their own profile</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                    Lets users update their first name, last name, and email on{" "}
+                    <code className="font-mono">/settings/profile</code>. Fields managed by the
+                    identity provider stay locked even when this is on — local edits to IdP-claimed
+                    fields would be overwritten on next sign-in. Turn this off for SSO-only
+                    deployments where the IdP is the source of truth.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              <div className="min-w-0 sm:max-w-xl">
+                <p id="restricted-default-label" className="text-sm font-medium">
+                  Settings members can&apos;t change
+                </p>
+                <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                  The default for members who haven&apos;t chosen under Settings › Appearance.
+                  Anyone who picks their own keeps it.
+                </p>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="restricted-default-label"
+                  className="mt-2 grid gap-2 sm:grid-cols-2"
+                >
+                  {(Object.keys(RESTRICTED_SETTINGS) as RestrictedSettings[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={restrictedDefault === key}
+                      onClick={() => setRestrictedDefault(key)}
+                      className={cn(
+                        "border-border hover:border-primary min-w-0 rounded-md border p-3 text-left transition-colors",
+                        restrictedDefault === key && "border-primary ring-primary ring-1"
+                      )}
+                    >
+                      <span className="block text-sm font-semibold">
+                        {RESTRICTED_SETTINGS[key].label}
+                      </span>
+                      <span className="text-muted-foreground block text-xs">
+                        {RESTRICTED_SETTINGS[key].blurb}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </SettingsSection>
       ),

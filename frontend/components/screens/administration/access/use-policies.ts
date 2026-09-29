@@ -10,8 +10,8 @@ import { LIST_POLICIES, LIST_POLICIES_PAGE } from "@/graphql/identity/identity.q
 import type { AstroliftPolicy, MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { POLICIES_LIST } from "./policies-list";
-import { useListPageQuery } from "./use-list-page-query";
+import { POLICIES_LIST, policiesFilter } from "./policies-list";
+import { useNumberedListQuery } from "./use-list-page-query";
 
 interface PoliciesPageResp {
   astroliftPoliciesPage: CursorPage<AstroliftPolicy>;
@@ -21,18 +21,19 @@ interface PoliciesPageResp {
 export function usePolicies() {
   const perms = useMyPermissions();
   const list = useListState(POLICIES_LIST);
-  const page = useListPageQuery<AstroliftPolicy>(
+  const page = useNumberedListQuery<AstroliftPolicy, ReturnType<typeof policiesFilter>>(
     LIST_POLICIES_PAGE,
     list,
-    (d) => (d as PoliciesPageResp | undefined)?.astroliftPoliciesPage
+    (d) => (d as PoliciesPageResp | undefined)?.astroliftPoliciesPage,
+    { toFilter: policiesFilter }
   );
 
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeletePolicy: MutationResult<{ id: string; deleted: boolean }>;
   }>(SOFT_DELETE_POLICY, {
     // LIST_POLICIES still backs the other policy surface; "ListPoliciesPage"
-    // is this list's own walk, which is a different root field and would
-    // otherwise keep showing the deleted row.
+    // is this list's own page, a different root field that would otherwise
+    // keep showing the deleted row.
     refetchQueries: [{ query: LIST_POLICIES }, "ListPoliciesPage"],
     awaitRefetchQueries: true,
   });

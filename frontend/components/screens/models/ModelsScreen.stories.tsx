@@ -3,8 +3,14 @@ import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { type ModelEndpoint, MODELS_LIST, selectModels } from "./models-list";
-import { LONG_MODELS, MANY_MODELS, MODELS, SHA_MODELS } from "./models-providers.fixtures";
+import { type ModelEndpoint, MODELS_LIST } from "./models-list";
+import {
+  LONG_MODELS,
+  MANY_MODELS,
+  MODELS,
+  serveModels,
+  SHA_MODELS,
+} from "./models-providers.fixtures";
 import { ModelsScreen, type ModelsScreenProps } from "./ModelsScreen";
 
 const meta: Meta = {
@@ -20,10 +26,10 @@ type Props = Partial<Omit<ModelsScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture models, filtered and paged the way the hook does it. */
+/** The screen over fixture models, filtered and paged the way the server does it. */
 function Models({ models = MODELS, initial, ...patch }: Props) {
   const list = useLocalListState(MODELS_LIST, initial);
-  const { rows, totalCount } = selectModels(models, {
+  const { rows, totalCount } = serveModels(models, {
     filters: list.filters,
     q: list.state.q,
     sort: list.state.sort,
@@ -36,6 +42,7 @@ function Models({ models = MODELS, initial, ...patch }: Props) {
       rows={rows}
       totalCount={totalCount}
       loading={false}
+      stale={false}
       error={null}
       onRetry={() => {}}
       {...patch}
@@ -78,7 +85,7 @@ export const Endpoints: Story = { render: () => <Models initial={{ view: "endpoi
 /** vLLM and KServe on the org's own GPUs. */
 export const Hosted: Story = { render: () => <Models initial={{ view: "hosted" }} /> };
 
-/** Mine lists every model for now; its note says so. */
+/** Mine: the endpoints the viewer deployed. */
 export const Mine: Story = { render: () => <Models initial={{ view: "mine" }} /> };
 
 export const EmptyFiltered: Story = {

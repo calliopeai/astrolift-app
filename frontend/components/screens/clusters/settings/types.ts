@@ -5,10 +5,10 @@ import type {
 } from "@/graphql/__generated__/operations";
 import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
-// The committed codegen output lags the live backend, so the generated
-// AstroliftTenantCluster doesn't yet carry the heartbeat fields the
-// LIST_CLUSTERS query now selects (#808). Intersect them in locally.
-export type ClusterWithHeartbeat = AstroliftTenantCluster & Partial<ClusterHeartbeatFields>;
+// The schema types heartbeatStatus as a plain String; narrow it to the four
+// values the backend emits (#808).
+export type ClusterWithHeartbeat = AstroliftTenantCluster &
+  Pick<ClusterHeartbeatFields, "heartbeatStatus">;
 
 export type Lifecycle = "registered" | "managing" | "managed" | "error";
 

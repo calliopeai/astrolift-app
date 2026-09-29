@@ -1,37 +1,38 @@
 "use client";
 
-import * as React from "react";
+import { useQuery } from "@apollo/client/react";
 
-import { useWalk } from "@/components/screens/apps/list/use-apps-list";
 import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { areaWorkloads } from "./workloads-list";
+import type { workloadsPageVariables } from "./workloads-list";
 
-// Stable, so the walk's variables key never changes between renders.
-const NO_VARIABLES = {};
+interface WorkloadsPageResp {
+  astroliftWorkloadsPage: { items: AstroliftWorkload[]; totalCount: number | null };
+}
 
 /**
- * Every agent, workflow and function workload in the org: the workload walk
- * with no search (the same variables the Apps list walks with, so the two
- * read one cache entry), narrowed to the Agents area's kinds. The Workloads
- * and Functions lists both read it.
+ * One numbered page of the Agents area's workloads (#2155): the Workloads
+ * and Functions lists each build their variables from their list state
+ * (`workloadsPageVariables`, `functionsPageVariables`) and read the page
+ * here. The server filters, searches, sorts and counts.
  */
-export function useAreaWorkloads() {
-  const walk = useWalk<AstroliftWorkload>(
-    LIST_WORKLOADS_PAGE,
-    "astroliftWorkloadsPage",
-    "after",
-    NO_VARIABLES
-  );
-  const workloads = React.useMemo(() => areaWorkloads(walk.items), [walk.items]);
+export function useAreaWorkloads(variables: ReturnType<typeof workloadsPageVariables>) {
+  const query = useQuery<WorkloadsPageResp>(LIST_WORKLOADS_PAGE, {
+    variables,
+    fetchPolicy: "cache-and-network",
+  });
+  const data = query.data ?? query.previousData;
+  const rows = data?.astroliftWorkloadsPage.items ?? [];
   return {
-    workloads,
-    loading: walk.loading,
-    stale: walk.stale,
-    error: walk.error ? { message: walk.error.message } : null,
+    rows,
+    totalCount: data?.astroliftWorkloadsPage.totalCount ?? rows.length,
+    loading: query.loading && !data && !query.error,
+    // Rows on screen answer the previous list state while the next loads.
+    stale: query.loading && !query.data && Boolean(data),
+    error: query.error ? { message: query.error.message } : null,
     onRetry: () => {
-      void walk.refetch();
+      void query.refetch();
     },
   };
 }

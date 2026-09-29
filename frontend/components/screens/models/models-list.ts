@@ -4,26 +4,43 @@
  * Endpoints are the cloud-served models (Bedrock, Azure OpenAI, Foundry,
  * Vertex); Hosted (GPU) run on the org's own GPUs (vLLM, KServe).
  *
- * Why the step runs here and not on the server: `astroliftModelEndpoints`
- * returns the org's whole list with no argument at all, and an endpoint
- * records the app or project that owns it but not a person. So Mine lists
- * every model, and `selectModels` answers the rest; each view says so. The
- * formatting the list and the detail share lives here too. Pure.
+ * The server answers every view, chip, search, sort and page
+ * (`astroliftModelEndpointsPage`, #2155): Mine is the endpoints the viewer
+ * deployed (`deployedBy: "me"`), and Endpoints and Hosted are variant lists.
+ * The formatting the list and the detail share lives here too. Pure.
  */
-import type { SortState } from "@/components/data-table";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import {
-  clientNote,
-  lower,
-  selectPage,
-  withAllNote,
+  type NumberedListQuery,
+  numberedPageVariables,
 } from "@/components/screens/agents/skills/catalog";
-import type { ListModelEndpointsQuery } from "@/graphql/__generated__/operations";
+import type { AstroliftManagedService } from "@/graphql/__generated__/schema";
 
-export type ModelEndpoint = ListModelEndpointsQuery["astroliftModelEndpoints"][number];
+/** One model endpoint, as the Models list and the detail select it. */
+export type ModelEndpoint = Pick<
+  AstroliftManagedService,
+  | "id"
+  | "name"
+  | "variant"
+  | "status"
+  | "statusError"
+  | "config"
+  | "registeredAppSlug"
+  | "projectSlug"
+  | "ownerScope"
+  | "clusterSlug"
+  | "environmentName"
+  | "deployedByEmail"
+  | "deployedByMe"
+>;
 
-/** Self-hosted variants run on the org's own GPUs; the rest are cloud-served. */
-export const HOSTED = new Set(["vllm", "kserve"]);
+/** Self-hosted variants run on the org's own GPUs. */
+export const HOSTED_VARIANTS = ["vllm", "kserve"];
+
+/** The cloud-served variants, one per provider driver. */
+export const CLOUD_VARIANTS = ["bedrock", "vertex_ai", "azure_openai", "azure_foundry"];
+
+export const HOSTED = new Set(HOSTED_VARIANTS);
 
 export const isHosted = (m: Pick<ModelEndpoint, "variant">) => HOSTED.has(m.variant);
 
@@ -66,8 +83,6 @@ export function modelStatusDot(status: string): "ok" | "warn" | "error" | "muted
   return "muted";
 }
 
-const NOTE = clientNote("the org's model endpoints come in one read");
-
 export const MODELS_LIST: ListDefinition = {
   id: "agents.models",
   fields: [
@@ -86,55 +101,53 @@ export const MODELS_LIST: ListDefinition = {
     // Free text: matched on the cluster slug.
     { key: "cluster", label: "Cluster" },
   ],
-  searchPlaceholder: "Search models, ids, owners…",
+  // The server matches name, variant, owning app and project, and cluster.
+  searchPlaceholder: "Search models, owners, clusters…",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: withAllNote(
-    standardViews(
-      {},
-      [
-        { key: "endpoints", label: "Endpoints", filters: { hosted: "0" }, note: NOTE },
-        { key: "hosted", label: "Hosted (GPU)", filters: { hosted: "1" }, note: NOTE },
-      ],
-      {
-        mineNote: `Mine lists every model until endpoints record who deployed them. ${NOTE}`,
-      }
-    ),
-    NOTE
+  views: standardViews(
+    { deployedBy: "me" },
+    [
+      { key: "endpoints", label: "Endpoints", filters: { hosted: "0" } },
+      { key: "hosted", label: "Hosted (GPU)", filters: { hosted: "1" } },
+    ],
+    {
+      mineNote:
+        "Mine means models you deployed. Endpoints declared in a manifest, or deployed before Astrolift recorded who deployed them, show only in All.",
+    }
   ),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
 
-export function selectModels(
-  models: ModelEndpoint[],
-  q: {
-    filters: Record<string, string>;
-    q: string;
-    sort: SortState[];
-    page: number;
-    pageSize: number;
+export interface ModelEndpointsFilter {
+  status?: string[];
+  variant?: string[];
+  cluster?: string[];
+  ownerScope?: string[];
+  deployedBy?: string[];
+}
+
+/**
+ * The list state as `astroliftModelEndpointsPage` variables. The Endpoints
+ * and Hosted views are variant lists and a Serving chip narrows within them.
+ * A chip outside its view (vllm on Endpoints) can match nothing, and an
+ * empty variant list would read as no filter at all, so that state is
+ * `null`: the hook asks nothing and shows the filtered-empty state.
+ */
+export function modelEndpointsPageVariables(q: NumberedListQuery) {
+  const f = q.filters;
+  const filter: ModelEndpointsFilter = {};
+  if (f.status) filter.status = [f.status];
+  if (f.cluster) filter.cluster = [f.cluster];
+  if (f.owner) filter.ownerScope = [f.owner];
+  if (f.deployedBy) filter.deployedBy = [f.deployedBy];
+  const view = f.hosted === "1" ? HOSTED_VARIANTS : f.hosted === "0" ? CLOUD_VARIANTS : null;
+  if (f.serving) {
+    const serving = f.serving.toLowerCase();
+    if (view && !view.includes(serving)) return null;
+    filter.variant = [serving];
+  } else if (view) {
+    filter.variant = view;
   }
-) {
-  return selectPage(
-    models,
-    {
-      matches: (m, f) => {
-        if (f.hosted === "1" && !isHosted(m)) return false;
-        if (f.hosted === "0" && isHosted(m)) return false;
-        if (f.serving && lower(m.variant) !== lower(f.serving)) return false;
-        if (f.status && lower(m.status) !== lower(f.status)) return false;
-        if (f.owner && m.ownerScope !== f.owner) return false;
-        if (f.cluster && lower(m.clusterSlug) !== lower(f.cluster)) return false;
-        return true;
-      },
-      text: (m) => [m.name, modelId(m), m.variant, m.registeredAppSlug, m.projectSlug],
-      sortValue: {
-        name: (m) => lower(m.name),
-        serving: (m) => m.variant,
-        status: (m) => m.status,
-      },
-      id: (m) => m.id,
-    },
-    q
-  );
+  return numberedPageVariables(q, filter, MODELS_LIST.defaultSort);
 }

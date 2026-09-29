@@ -19,12 +19,7 @@ import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { ActionKind } from "./deployments-format";
-import {
-  DEPLOYMENTS_LIST,
-  deploymentsVariables,
-  narrowDeployments,
-  narrows,
-} from "./deployments-list";
+import { DEPLOYMENTS_LIST, deploymentsVariables } from "./deployments-list";
 
 interface MutationResultLite<T> {
   ok: boolean;
@@ -70,8 +65,7 @@ export function useDeployments() {
   // Fixed per visit: Today's midnight and the since windows do not move
   // under the reader.
   const [now] = React.useState(() => Date.now());
-  const narrowing = narrows(list.filters);
-  const variables = deploymentsVariables(list.filters, state);
+  const variables = deploymentsVariables(list.filters, state, now);
 
   const query = useQuery<DeploymentsPageResp>(LIST_DEPLOYMENTS_PAGE, {
     variables,
@@ -83,9 +77,7 @@ export function useDeployments() {
   const data = query.data ?? query.previousData;
   const page = data?.astroliftDeploymentsPage;
   const items = React.useMemo(() => page?.items ?? [], [page]);
-  const rows = narrowing ? narrowDeployments(items, list.filters, now) : items;
-
-  const held = useHeldRows(rows, (d) => d.id, {
+  const held = useHeldRows(items, (d) => d.id, {
     // New deployments arrive on the first page only.
     live: state.after === null,
     resetKey: JSON.stringify(list.filters) + state.q + state.pageSize,
@@ -211,9 +203,7 @@ export function useDeployments() {
       void refetch();
     },
     nextCursor: page?.nextCursor ?? null,
-    // The server's count is the page's question; a client-side narrowing
-    // makes it a different one, so it is left out.
-    totalCount: narrowing ? null : (page?.totalCount ?? null),
+    totalCount: page?.totalCount ?? null,
     deploymentsById: byId,
     canDeploy,
     canApprove,

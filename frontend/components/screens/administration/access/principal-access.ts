@@ -14,8 +14,9 @@
  *   every scope; a team grant covers that team's projects (the project label
  *   carries its team). An app's project is not in its label, so an app grant
  *   is only ever covered by the org.
- * - The list is the principal's bindings, all in hand, so filter, sort and
- *   the numbered page run here, over at most the principal's own grants.
+ * - The list is the principal's bindings, all in hand (the bindings page
+ *   holds them to the principal on the server), so the `can:` filter, sort
+ *   and the numbered page run here, over at most the principal's own grants.
  */
 import type { SortState } from "@/components/data-table";
 import type { ListDefinition } from "@/components/list/list-state";
@@ -130,9 +131,9 @@ function covering(row: AccessRow, all: readonly AccessRow[]): ScopeRef | null {
 }
 
 /**
- * One row per binding. The bindings are the principal's own (or, on a team's
- * page, everyone's at that team), so every row's source is direct: a binding
- * held through a group needs the backend to say which groups a user is in.
+ * One row per binding. The bindings are the principal's own, so every row's
+ * source is direct; what reaches a person through their IdP groups shows on
+ * each group's page and on an object's Access tab.
  */
 export function buildAccessRows(
   bindings: readonly AstroliftRoleBinding[],
@@ -289,7 +290,3 @@ export function summarizeAccess(rows: readonly AccessRow[]): string | null {
 export function holderLabel(b: AstroliftRoleBinding): string {
   return b.user?.username ?? b.groupExternalId;
 }
-
-/** Said on a group's Access tab until the resolver evaluates group grants (design 1.2). */
-export const GROUP_ACCESS_NOTE =
-  "The permission resolver does not match group grants yet, so these give the group's members nothing until it does. They are listed so they can be reviewed and removed.";

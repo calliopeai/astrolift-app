@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
   DECOMMISSION_CLUSTER,
-  LIST_CLUSTERS,
+  GET_CLUSTER,
   REFRESH_CLUSTER_MANAGEMENT,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
@@ -17,10 +17,13 @@ import { type AstroliftPermission, useMyPermissions } from "@/lib/permissions/us
 import type { ClusterSettingsAccess, ClusterWithHeartbeat, Lifecycle } from "./types";
 
 interface Resp {
-  astroliftClusters: ClusterWithHeartbeat[];
+  astroliftCluster: ClusterWithHeartbeat | null;
 }
 
 const POLL_INTERVAL_MS = 4000;
+
+// The cluster on screen, by operation name: its variables carry the slug.
+const REFETCH_CLUSTER = "GetCluster";
 
 /**
  * The cluster behind the settings tab and every lifecycle mutation it
@@ -30,7 +33,12 @@ const POLL_INTERVAL_MS = 4000;
  * ClusterSettingsScreen.
  */
 export function useClusterSettings(slug: string) {
-  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_CLUSTERS);
+  // One cluster by slug (#2150); the SSR preload answers before the org
+  // cookie is set, so the first client read goes to the network.
+  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(GET_CLUSTER, {
+    variables: { slug },
+    fetchPolicy: "cache-and-network",
+  });
   const perms = useMyPermissions();
   // Optimistic while the permission set loads, as `Can` is: the backend
   // still refuses, and the fields do not flash disabled on first paint.
@@ -42,7 +50,7 @@ export function useClusterSettings(slug: string) {
     users: allow("cluster.users"),
     unregister: allow("cluster.unregister"),
   };
-  const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug) ?? null;
+  const cluster = data?.astroliftCluster ?? null;
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
   React.useEffect(() => {
@@ -57,19 +65,19 @@ export function useClusterSettings(slug: string) {
   const [bring, { loading: bringing }] = useMutation<{
     bringClusterIntoManagement: MutationResult<AstroliftTenantCluster>;
   }>(BRING_CLUSTER_INTO_MANAGEMENT, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: [REFETCH_CLUSTER],
     awaitRefetchQueries: true,
   });
   const [refresh, { loading: refreshing }] = useMutation<{
     refreshClusterManagement: MutationResult<AstroliftTenantCluster>;
   }>(REFRESH_CLUSTER_MANAGEMENT, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: [REFETCH_CLUSTER],
     awaitRefetchQueries: true,
   });
   const [decommission, { loading: decommissioning }] = useMutation<{
     decommissionCluster: MutationResult<AstroliftTenantCluster>;
   }>(DECOMMISSION_CLUSTER, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: [REFETCH_CLUSTER],
     awaitRefetchQueries: true,
   });
 

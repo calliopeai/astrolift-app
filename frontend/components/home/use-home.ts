@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { type ModuleKey, useModules } from "@/graphql/user/user.hooks";
 import { useHomePrefs } from "@/lib/home-prefs";
+import { useUiPrefsStatus } from "@/lib/ui-prefs-sync";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import {
@@ -43,12 +44,15 @@ export function useHomeAccess(): { access: HomeAccess; loading: boolean } {
 
 /**
  * Everything HomeScreen and Account › Home need: the offered layouts, the one
- * drawn, its visible panels, and the save. The saved layout is browser-stored
- * (lib/home-prefs.ts) until #2154 puts it on the profile.
+ * drawn, its visible panels, and the save. The saved layout is on the
+ * person's server preferences, with a browser copy (lib/home-prefs.ts).
  */
 export function useHome() {
   const { access, loading } = useHomeAccess();
   const [prefs, setLayout] = useHomePrefs();
+  // A browser whose copy has no answer waits for the server before asking the
+  // first-sign-in question, which another browser may already have answered.
+  const awaitingServer = useUiPrefsStatus() === "loading" && !prefs.asked;
   // The saved layout is only known after hydration; until then Home shows its
   // skeleton rather than flashing the first-sign-in question.
   const hydrated = React.useSyncExternalStore(
@@ -59,7 +63,7 @@ export function useHome() {
   const layouts = offeredLayouts(access);
   const layout = resolveLayout(prefs.layout, access);
   return {
-    loading: loading || !hydrated,
+    loading: loading || !hydrated || awaitingServer,
     layout,
     layouts,
     panels: layout ? visiblePanels(layout, access) : [],

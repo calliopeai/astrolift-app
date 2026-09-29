@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import type { Principal } from "./access-model";
 import {
@@ -13,6 +14,7 @@ import {
   PAYMENTS_TEAM,
   PREVIEW,
   PREVIEW_MANY,
+  PREVIEW_REFUSED,
   PRINCIPALS,
   ROLES,
   SAM,
@@ -58,6 +60,7 @@ function Flow(props: Partial<GrantAccessFlowProps> & { pool?: Principal[] }) {
       onSubmit={(d) => Promise.resolve(d.principals.map((principal) => ({ principal, ok: true })))}
       onCancel={() => {}}
       onDone={() => {}}
+      expirySupported
       {...rest}
     />
   );
@@ -166,17 +169,21 @@ export const ScopeError: Story = {
   ),
 };
 
-/** Without backend support for an expiry, only Never is offered. */
+/** Never, a number of days, or a date: the grant ends by itself. */
 export const Expiry: Story = { render: () => <Flow initialDraft={READY} initialStep={3} /> };
 
-export const ExpirySupported: Story = {
+export const ExpiryOnDate: Story = {
   render: () => (
     <Flow
       initialDraft={{ ...READY, expiry: { kind: "date", date: "2026-10-31" } }}
       initialStep={3}
-      expirySupported
     />
   ),
+};
+
+/** Where an expiry cannot be set, only Never is offered. */
+export const ExpiryUnsupported: Story = {
+  render: () => <Flow initialDraft={READY} initialStep={3} expirySupported={false} />,
 };
 
 /** The effect, stated before anything is written. */
@@ -184,7 +191,7 @@ export const Review: Story = {
   render: () => <Flow initialDraft={READY} initialStep={4} initialPreview={PREVIEW} />,
 };
 
-/** The preview is today's approximation: it says what it leaves out. */
+/** A group grant: the lists are cut short, the counts are exact, and it reaches the group's future members. */
 export const ReviewMany: Story = {
   render: () => (
     <Flow
@@ -197,6 +204,21 @@ export const ReviewMany: Story = {
 
 export const ReviewLoading: Story = {
   render: () => <Flow initialDraft={READY} initialStep={4} />,
+};
+
+/** Beyond the caller's grant ceiling: the review says why, and Grant stays off. */
+export const ReviewRefused: Story = {
+  render: () => <Flow initialDraft={READY} initialStep={4} initialPreview={PREVIEW_REFUSED} />,
+};
+
+/** Entering the review asks the preview, then shows it. */
+export const ReviewAsks: Story = {
+  render: () => <Flow initialDraft={READY} initialStep={3} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Continue" }));
+    await expect(await c.findByTestId("grant-effect")).toHaveTextContent("2 people gain");
+  },
 };
 
 /** A partly failed submit: who failed and why, in place; Retry sends only them. */
@@ -216,7 +238,7 @@ export const PartialFailure: Story = {
         {
           principal: ENG_GROUP,
           ok: false,
-          error: "A group cannot hold a role yet: the backend grants to users only.",
+          error: "A role binding for this group already exists at this scope.",
         },
       ]}
     />

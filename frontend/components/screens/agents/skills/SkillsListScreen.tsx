@@ -28,6 +28,8 @@ export interface SkillsListScreenProps {
   /** Skills matching the view, filters and search, across all pages. */
   totalCount: number;
   loading: boolean;
+  /** Rows on screen answer the previous list state while the next loads. */
+  stale?: boolean;
   error: { message: string } | null;
   onRetry: () => void;
   /** Opens the Import from repo sheet (`?import=1`). */
@@ -47,6 +49,7 @@ export function SkillsListScreen({
   rows,
   totalCount,
   loading,
+  stale = false,
   error,
   onRetry,
   onImportOpenChange,
@@ -168,6 +171,7 @@ export function SkillsListScreen({
         getRowId={(s) => s.id}
         rowHref={(s) => `/agents/skills/${s.id}`}
         loading={loading}
+        stale={stale}
         error={error}
         onRetry={onRetry}
         empty={empty}

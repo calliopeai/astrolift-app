@@ -22,6 +22,8 @@ export const APP_DEPLOYMENTS_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $filter: AstroliftDeploymentsFilter
+    $sort: String
   ) {
     astroliftDeploymentsPage(
       appSlug: $appSlug
@@ -30,6 +32,8 @@ export const APP_DEPLOYMENTS_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      filter: $filter
+      sort: $sort
     ) {
       items {
         id

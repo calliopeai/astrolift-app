@@ -10,7 +10,7 @@ import {
   LONG_JOB_RUNS,
   runListProps,
 } from "./jobs-tasks.fixtures";
-import { JOB_RUNS_LIST, narrowJobRuns } from "./jobs-list";
+import { JOB_RUNS_LIST, jobRunsVariables } from "./jobs-list";
 import { JobRunsScreen } from "./JobRunsScreen";
 
 const meta: Meta = {
@@ -27,12 +27,16 @@ function Runs({
   ...patch
 }: Partial<JobRunsFixture> & { runs?: AstroliftScheduledJobRun[]; initial?: Partial<ListState> }) {
   const list = useLocalListState(JOB_RUNS_LIST, initial);
-  const f = list.filters;
+  // Stands in for `astroliftScheduledJobRunsPage`, applying what the hook sends.
+  const v = jobRunsVariables(list.filters, list.state);
   const served = runs.filter(
     (r) =>
-      (!f.app || r.registeredAppSlug === f.app) && (!f.workload || r.workloadSlug === f.workload)
+      (!v.appSlug || r.registeredAppSlug === v.appSlug) &&
+      (!v.workloadSlug || r.workloadSlug === v.workloadSlug) &&
+      (!v.filter?.status || v.filter.status.includes(r.status)) &&
+      (!v.filter?.triggeredBy || r.triggeredByMe)
   );
-  return <JobRunsScreen {...runListProps(narrowJobRuns(served, f))} {...patch} list={list} />;
+  return <JobRunsScreen {...runListProps(served)} {...patch} list={list} />;
 }
 
 export const Full: Story = { render: () => <Runs /> };
@@ -46,6 +50,18 @@ export const ErrorState: Story = {
 };
 
 export const Failed: Story = { render: () => <Runs initial={{ view: "failed" }} /> };
+
+/** Mine: the runs the viewer started with Run now. */
+export const Mine: Story = {
+  render: () => (
+    <Runs
+      runs={JOB_RUNS.map((r, i) =>
+        i === 1 ? { ...r, triggerKind: "manual", triggeredByMe: true } : r
+      )}
+      initial={{ view: "mine" }}
+    />
+  ),
+};
 
 /** One job's runs, as a job row opens them. */
 export const OneJob: Story = {
