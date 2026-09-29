@@ -68,6 +68,15 @@ class SkillType:
     is_active: bool
     created_at: dt.datetime
     updated_at: dt.datetime
+    # Who wrote or imported it (#2155): the creator's email, empty for a
+    # platform-seeded skill or one from before this was recorded.
+    created_by_email: str = ""
+    created_by_me: bool = False
+    # Where it came from: repo_import, agent_repo, org_repo or catalogue, and
+    # the pointer it was read from; both empty for a skill written in the UI.
+    source_kind: str = ""
+    source_ref: str = ""
+    is_imported: bool = False
 
 
 @strawberry.type(name="AstroliftToolDef")
@@ -81,6 +90,16 @@ class ToolDefType:
     output_schema: JSON
     handler_ref: str
     created_at: dt.datetime
+    # #2155: pre-installed in the image, the parent skill, the grouping, and
+    # who created it (empty for a seeded or pre-#2155 tool).
+    is_builtin: bool = False
+    skill_id: GUID | None = None
+    skill_slug: str = ""
+    skill_name: str = ""
+    skill_is_global: bool = False
+    capability_group: str = ""
+    created_by_email: str = ""
+    created_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftBrief")
@@ -489,6 +508,14 @@ def agent_trigger_to_type(hook) -> AgentTriggerType:
     )
 
 
+def _creator_email(row) -> str:
+    """The ``created_by`` user's email, or ``""``. List resolvers
+    select_related ``created_by`` so this reads no row of its own."""
+    if row.created_by_id is None:
+        return ""
+    return getattr(row.created_by, "email", "") or ""
+
+
 def skill_to_type(s) -> SkillType:
     return SkillType(
         id=GUID(str(s.guid)),
@@ -501,10 +528,17 @@ def skill_to_type(s) -> SkillType:
         is_active=s.is_active,
         created_at=s.created_at,
         updated_at=s.updated_at,
+        created_by_email=_creator_email(s),
+        created_by_me=_is_viewer(s.created_by_id),
+        source_kind=s.source_kind or "",
+        source_ref=s.source_ref or "",
+        is_imported=bool(s.source_kind),
     )
 
 
 def tool_def_to_type(t) -> ToolDefType:
+    """Project a ToolDef. Reads ``t.skill``; list resolvers select_related it."""
+    skill = t.skill
     return ToolDefType(
         id=GUID(str(t.guid)),
         name=t.name,
@@ -515,6 +549,14 @@ def tool_def_to_type(t) -> ToolDefType:
         output_schema=t.output_schema or {},
         handler_ref=t.handler_ref or "",
         created_at=t.created_at,
+        is_builtin=t.is_builtin,
+        skill_id=GUID(str(skill.guid)),
+        skill_slug=skill.slug,
+        skill_name=skill.name,
+        skill_is_global=skill.is_global,
+        capability_group=t.capability_group or "",
+        created_by_email=_creator_email(t),
+        created_by_me=_is_viewer(t.created_by_id),
     )
 
 
@@ -736,6 +778,23 @@ class AgentListItemType:
     scheduled_scale_to: int | None = None
     scale_up_cron: str = ""
     scale_down_cron: str = ""
+    # The list contract on the fleet (#2155). ``status`` is the list's own
+    # word for what the agent is doing now: running, failing, scheduled,
+    # paused or idle, derived in SQL so it filters and sorts across pages.
+    status: str = "idle"
+    # How the agent reaches its model, from the environment spec that shares
+    # its slug: managed (the cluster's cloud provider), gateway (Zentinelle),
+    # api-key, or null when the agent has no spec of its own.
+    model_source: str | None = None
+    # The spec's catalog runtime (claude, codex...), "" without one.
+    runtime: str = ""
+    environment_spec_slug: str = ""
+    # Cluster slugs its app's environments deploy to, in environment order.
+    cluster_slugs: list[str] = strawberry.field(default_factory=list)
+    # Who registered it: the workload's creator, else its app's. Empty when
+    # neither recorded one.
+    owner_email: str = ""
+    owned_by_me: bool = False
 
 
 @strawberry.type(name="AstroliftAgentListItemPage")
@@ -743,6 +802,146 @@ class AgentListItemPageType:
     items: list[AgentListItemType]
     next_cursor: str | None = strawberry.field(default=None)
     total_count: int | None = strawberry.field(default=None)
+    # Set on a numbered page (``page`` / ``pageSize`` / ``sort`` given), null on a cursor page.
+    page: int | None = strawberry.field(default=None)
+    page_size: int | None = strawberry.field(default=None)
+
+
+@strawberry.input(name="AstroliftAgentFleetFilter")
+class AgentFleetFilterInput:
+    """The Agents list's declared filters (spec 44 §5.1, #2155).
+
+    Unset fields do not filter; set fields combine with AND, and the values
+    of one list field with OR. Slugs and words match case-insensitively.
+    """
+
+    project: list[str] | None = strawberry.field(default=None, description="Project slugs.")
+    status: list[str] | None = strawberry.field(
+        default=None, description="running, failing, scheduled, paused or idle (the row's status)."
+    )
+    model: list[str] | None = strawberry.field(
+        default=None, description="managed, gateway or api-key (the row's modelSource)."
+    )
+    runtime: list[str] | None = strawberry.field(
+        default=None, description="The spec's runtime, or the run family (task, service)."
+    )
+    cluster: list[str] | None = strawberry.field(
+        default=None, description="Cluster slugs; an agent whose app has an environment on one matches."
+    )
+    paused: bool | None = strawberry.field(default=None, description="The run-spec pause switch.")
+    owner: list[str] | None = strawberry.field(
+        default=None, description='User ids, or "me" for the viewer (the Mine view).'
+    )
+
+
+@strawberry.input(name="AstroliftAgentTasksFilter")
+class AgentTasksFilterInput:
+    """Declared filters on ``agentTasksPage`` (#2155)."""
+
+    status: list[str] | None = strawberry.field(default=None, description="Task statuses, any of.")
+    trigger: list[str] | None = strawberry.field(
+        default=None, description="manual, api, schedule, webhook, parent or unknown."
+    )
+    started_by: list[str] | None = strawberry.field(
+        default=None, description='Initiator user ids (as on the row), or "me".'
+    )
+    started_by_me: bool | None = strawberry.field(
+        default=None, description="true: runs the viewer started. false: runs someone or something else did."
+    )
+    agent: list[str] | None = strawberry.field(default=None, description="Agent (workload) slugs.")
+    project: list[str] | None = strawberry.field(default=None, description="Project slugs.")
+
+
+@strawberry.type(name="AstroliftAgentUpcomingRun")
+class AgentUpcomingRunType:
+    """One upcoming scheduled firing of a schedule-mode agent (#2155)."""
+
+    agent_id: GUID
+    agent_slug: str
+    agent_name: str
+    app_slug: str
+    project_slug: str
+    cron_expression: str
+    scheduled_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAgentUpcomingRunPage")
+class AgentUpcomingRunPageType:
+    items: list[AgentUpcomingRunType]
+    total_count: int
+    page: int
+    page_size: int
+
+
+@strawberry.input(name="AstroliftSkillsFilter")
+class SkillsFilterInput:
+    """Declared filters on ``skillsPage`` (#2155)."""
+
+    scope: list[str] | None = strawberry.field(
+        default=None, description="org (the org's own) or global (the platform catalog)."
+    )
+    active: bool | None = strawberry.field(default=None)
+    imported: bool | None = strawberry.field(default=None, description="true: has an import source.")
+    source_kind: list[str] | None = strawberry.field(
+        default=None, description="repo_import, agent_repo, org_repo or catalogue."
+    )
+    created_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
+    agent_type: list[str] | None = strawberry.field(default=None, description="claude, codex or any.")
+
+
+@strawberry.input(name="AstroliftToolDefsFilter")
+class ToolDefsFilterInput:
+    """Declared filters on ``orgToolDefsPage`` (#2155)."""
+
+    skill: list[str] | None = strawberry.field(default=None, description="Parent skill slugs.")
+    adapter: list[str] | None = strawberry.field(
+        default=None, description="python_fn, http_endpoint or mcp_server."
+    )
+    builtin: bool | None = strawberry.field(default=None, description="Pre-installed in the image.")
+    capability_group: list[str] | None = strawberry.field(default=None)
+    scope: list[str] | None = strawberry.field(
+        default=None, description="org or global (the parent skill's)."
+    )
+    created_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
+
+
+@strawberry.type(name="AstroliftSkillPage")
+class SkillPageType:
+    items: list[SkillType]
+    total_count: int
+    page: int
+    page_size: int
+
+
+@strawberry.type(name="AstroliftToolDefPage")
+class ToolDefPageType:
+    items: list[ToolDefType]
+    total_count: int
+    page: int
+    page_size: int
+
+
+@strawberry.input(name="AstroliftAgentSecretStatusFilter")
+class AgentSecretStatusFilterInput:
+    """Declared filters on ``agentEnvironmentSpecSecretStatusPage`` (#2155)."""
+
+    exists: bool | None = strawberry.field(default=None, description="The store holds a value.")
+    failing: bool | None = strawberry.field(
+        default=None, description="true: the presence check reported an error."
+    )
+    provider: list[str] | None = strawberry.field(default=None)
+
+
+@strawberry.type(name="AstroliftAgentSecretStatusPage")
+class AgentSecretStatusPageType:
+    items: list[AgentSecretStatusType]
+    total_count: int
+    page: int
+    page_size: int
+    # Why the whole read could not answer, when it could not: the spec is
+    # not in this org, or the org has no cluster or secret store to probe.
+    # Each ref then reports ``exists: false``; per-ref errors stay on the row.
+    error: str | None = None
 
 
 @strawberry.type(name="AstroliftAgentTaskPage")

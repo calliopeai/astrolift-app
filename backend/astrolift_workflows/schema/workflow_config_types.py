@@ -103,6 +103,28 @@ class WorkflowDefinitionRunType:
     triggered_by_me: bool = False
 
 
+@strawberry.input(name="WorkflowDefinitionRunsFilter")
+class WorkflowDefinitionRunsFilterInput:
+    """Declared filters on ``workflowDefinitionRunsPage`` (#2155).
+
+    Unset fields do not filter; set fields combine with AND, and the values
+    of one list field with OR. Slugs match case-insensitively.
+    """
+
+    status: list[str] | None = strawberry.field(default=None, description="Run statuses, any of.")
+    definition: list[str] | None = strawberry.field(default=None, description="Definition slugs.")
+    project: list[str] | None = strawberry.field(default=None, description="Project slugs.")
+    trigger: list[str] | None = strawberry.field(
+        default=None, description="manual, api, schedule, webhook, parent or unknown."
+    )
+    started_by: list[str] | None = strawberry.field(
+        default=None, description='Initiator user ids (as on the row), or "me".'
+    )
+    started_by_me: bool | None = strawberry.field(
+        default=None, description="true: runs the viewer started. false: runs someone or something else did."
+    )
+
+
 @strawberry.type(name="PendingHumanGate")
 class PendingHumanGateType:
     """One open ``human_gate`` stage execution the caller may decide (#1820).

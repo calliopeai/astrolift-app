@@ -464,6 +464,12 @@ def _resolve_org_skill_repo_connection(org, connection_id: strawberry.ID):
     return conn, None
 
 
+def _actor_user_id() -> int | None:
+    """The caller's user pk for ``created_by``, or None for a token with no person."""
+    tenant = get_current_tenant()
+    return tenant.actor_user_id if tenant else None
+
+
 def _dispatch_actor(info: Info):
     """Build a workflow ``Actor`` for the dispatching caller.
 
@@ -782,6 +788,7 @@ class AgentsMutation:
                 dependencies=list(input.dependencies or []),
                 content_hash=_content_hash(input.content or ""),
                 skill_version=1,
+                created_by_id=_actor_user_id(),
             )
         return gql_success(skill_to_type(skill))
 
@@ -859,6 +866,7 @@ class AgentsMutation:
                 adapter=input.adapter,
                 handler_ref=input.handler_ref or "",
                 implementation_config=input.implementation_config or {},
+                created_by_id=_actor_user_id(),
             )
         return gql_success(tool_def_to_type(tool))
 
@@ -2169,6 +2177,105 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(
+        action="agents.task.retry",
+        target=lambda self, info, id: ("AgentTask", str(id)),
+    )
+    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id", Permission.AGENT_DISPATCH))
+    @tenant_scoped()
+    def retry_agent_task(self, info: Info, id: strawberry.ID) -> MutationResultType[AgentTaskType]:
+        """Run a finished task again with the same brief and inputs (#2155).
+
+        The new task is a fresh dispatch of the same registered agent with
+        the original's frozen Agent Package (its Brief, not the agent's
+        current one), environment spec, trigger payload and timeout, and the
+        original's project and team, so it is visible to whoever could see
+        the run it repeats. The caller is its initiator.
+
+        Refused (PRECONDITION) while the original is still in flight, when
+        it did not run a registered agent (a Brief-only ``launchTask``), when
+        that agent is gone, or when its Brief was revoked; the agent must be
+        run again instead. The caller needs ``agent.dispatch`` on the task
+        and on the agent. Another org's task reads as NOT_FOUND, exactly like
+        one that does not exist.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        guid = read_guid({"id": id}, "id")
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_DISPATCH)
+            .filter(guid=guid, organization_id=org_pk)
+            .select_related("agent_definition", "environment_spec", "brief")
+            .first()
+            if guid
+            else None
+        )
+        if task is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "task not found", field="id")
+        if task.status not in AgentTask.TERMINAL_STATUSES:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"task is still {task.status}; only a finished run can be retried",
+            )
+        workload = (
+            visible_agent_workloads(org_pk, Permission.AGENT_DISPATCH)
+            .filter(
+                pk=task.agent_definition_id,
+                registered_app__organization_id=org_pk,
+                deleted_at__isnull=True,
+            )
+            .first()
+            if task.agent_definition_id is not None
+            else None
+        )
+        if workload is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this task did not run a registered agent you may dispatch; run an agent instead",
+            )
+        brief = task.brief
+        if brief is None or brief.deleted_at is not None or brief.status != Brief.Status.READY:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "the task's agent package is no longer available; run the agent again instead",
+            )
+
+        from astrolift_agents.services.agent_dispatch import (
+            AgentDispatchError,
+            dispatch_registered_agent,
+        )
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        api_token = get_current_api_token()
+        try:
+            retried = dispatch_registered_agent(
+                organization_id=org_pk,
+                team_id=api_token.team_id if api_token is not None else None,
+                agent_slug=workload.slug,
+                workload_id=workload.pk,
+                actor=_dispatch_actor(info),
+                environment_spec_guid=str(task.environment_spec.guid) if task.environment_spec_id else "",
+                trigger_payload=task.dispatch_input or None,
+                timeout_seconds=task.timeout_seconds,
+                trigger="manual",
+                trigger_kind=request_trigger(),
+                brief=brief,
+                owner_project_id=task.project_id,
+                owner_team_id=task.team_id,
+            )
+        except AgentDispatchError as exc:
+            code = {
+                "validation": ErrorCode.VALIDATION.value,
+                "not_found": ErrorCode.NOT_FOUND.value,
+                "precondition": ErrorCode.PRECONDITION.value,
+                "conflict": ErrorCode.CONFLICT.value,
+            }.get(exc.code, ErrorCode.INTERNAL.value)
+            return gql_failure(code, exc.message)
+        return gql_success(agent_task_to_type(retried))
+
+    @strawberry.field
+    @mutation_audit(
         action="agents.box.ensure",
         target=lambda self, info, input, org_id=None: (
             "AgentBox",
@@ -2697,6 +2804,7 @@ class AgentsMutation:
                 repo_url=repo_url,
                 branch=branch,
                 manifest_path=manifest_path,
+                created_by_id=tenant.actor_user_id if tenant else None,
             )
         except InvalidRepoURLError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
