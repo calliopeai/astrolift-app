@@ -94,10 +94,38 @@ class SoftDeleteByGuidInput:
 
 @strawberry.input
 class GrantRoleInput:
-    user_id: str
     role_id: GUID
     scope_kind: str
     scope_guid: GUID  # the target Org/Team/Project/App guid
+    # Exactly one principal: a member of the org by user pk, or an IdP
+    # group by its external id (#2157).
+    user_id: str | None = None
+    group_external_id: str | None = None
+    # A time-boxed grant stops granting at this instant (#2157).
+    expires_at: dt.datetime | None = None
+
+
+@strawberry.input
+class UpdateRoleBindingInput:
+    """Change a binding's role or expiry (#2157). An omitted field is left
+    as it is; ``expiresAt: null`` makes the binding permanent."""
+
+    id: GUID
+    role_id: GUID | None = strawberry.UNSET
+    expires_at: dt.datetime | None = strawberry.UNSET
+
+
+@strawberry.input
+class CreateGroupRoleMappingInput:
+    group_external_id: str
+    role_id: GUID
+    scope_kind: str
+    scope_guid: GUID
+
+
+@strawberry.input
+class DeleteGroupRoleMappingInput:
+    id: GUID
 
 
 @strawberry.input

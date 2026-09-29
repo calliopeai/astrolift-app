@@ -18,10 +18,20 @@ import strawberry
 from django.db.models import Q
 from strawberry.types import Info
 
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    DEFAULT_PAGE_SIZE,
+    GUID,
+    MAX_PAGE_LIMIT,
+    PageType,
+    clamp_limit,
+    keyset_page,
+    numbered_page,
+    search_q,
+)
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.models import (
     ApiToken,
+    GroupRoleMapping,
     IdentityProvider,
     Invitation,
     Member,
@@ -34,6 +44,7 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema.types import (
+    AccessEntryType,
     ActiveSessionType,
     ApiTokenScopeCatalogType,
     ApiTokenScopePresetType,
@@ -42,6 +53,7 @@ from astrolift_identity.schema.types import (
     ApproverUserType,
     AppSummaryType,
     ElevationStatusType,
+    GroupRoleMappingType,
     IdentityProviderType,
     InvitationType,
     MemberType,
@@ -73,6 +85,7 @@ from astrolift_identity.schema.types import (
     role_binding_to_type,
     role_to_type,
     team_to_type,
+    user_to_type,
 )
 from astrolift_identity.scope_visibility import visible_projects, visible_teams
 from astrolift_identity.scopes import team_scope_by_guid
@@ -1325,6 +1338,92 @@ class IdentityQuery:
             )
         )
 
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_group_role_mappings_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        group_external_id: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[GroupRoleMappingType]:
+        """The org's IdP group to role mappings (#2157), numbered pages.
+
+        ``search`` matches the group id and the role slug or name;
+        ``groupExternalId`` narrows to one group exactly.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            qs = GroupRoleMapping.objects.none()
+        else:
+            qs = GroupRoleMapping.objects.select_related("role").filter(organization_id=org_id)
+        if group_external_id is not None:
+            qs = qs.filter(group_external_id=group_external_id.strip())
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "group_external_id", "role__slug", "role__name"))
+        numbered = numbered_page(
+            qs, order_by=["group_external_id", "-created_at", "pk"], page=page, page_size=page_size
+        )
+        items = group_role_mapping_types(numbered.rows, org_id)
+        return PageType(
+            items=items,
+            next_cursor=None,
+            total_count=numbered.total_count,
+            page=numbered.page,
+            page_size=numbered.page_size,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_access_on(
+        self,
+        info: Info,
+        scope_kind: str,
+        scope_id: str,
+        search: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[AccessEntryType]:
+        """Every principal with access on one app, agent, project or team
+        (#2157): bindings on it and on its ancestors (an ancestor binding
+        only when it inherits), user and group bindings, the org's group
+        mappings and, on an app or agent, the team shares. One row per
+        grant, with its source and the id of the row that grants it.
+
+        ``scopeKind`` is APP, AGENT, PROJECT, TEAM or ORG; ``scopeId`` is
+        the object's guid. A scope of another org reads as empty.
+        Numbered pages; the order is users, then groups, then teams, by
+        name.
+        """
+        from astrolift_identity.access import access_on, resolve_target
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        target = resolve_target(scope_kind, scope_id, org_id)
+        rows = access_on(org_id, target) if target is not None else []
+        term = (search or "").strip()
+        if term:
+            rows = [r for r in rows if r.matches(term)]
+        rows.sort(key=lambda r: r.sort_key)
+        size = clamp_limit(page_size, default=DEFAULT_PAGE_SIZE, maximum=MAX_PAGE_LIMIT)
+        number = page if page is not None and page > 0 else 1
+        start = (number - 1) * size
+        return PageType(
+            items=access_entry_types(rows[start : start + size]),
+            next_cursor=None,
+            total_count=len(rows),
+            page=number,
+            page_size=size,
+        )
+
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage."
     )
@@ -1805,3 +1904,91 @@ def _resolve_source_scope_labels(bindings) -> dict[tuple[str, int], str]:
         if key not in labels:
             labels[key] = rb.scope_kind.lower()
     return labels
+
+
+def _scope_guids(pairs) -> dict[tuple[str, int], str]:
+    """``(scope_kind, scope_id) -> guid`` in one query per kind."""
+    from astrolift_registry.models import RegisteredApp
+
+    grouped: dict[str, set[int]] = {}
+    for kind, ident in pairs:
+        grouped.setdefault(kind, set()).add(ident)
+    models = {"ORG": Organization, "TEAM": Team, "PROJECT": Project, "APP": RegisteredApp}
+    out: dict[tuple[str, int], str] = {}
+    for kind, ids in grouped.items():
+        model = models.get(kind)
+        if model is None:
+            continue
+        for pk, guid in model.all_objects.filter(pk__in=ids).values_list("pk", "guid"):
+            out[(kind, pk)] = str(guid)
+    return out
+
+
+def group_role_mapping_types(mappings, org_id: int | None) -> list[GroupRoleMappingType]:
+    """Map a batch of mappings with their scope guids, labels and group
+    sizes, a fixed number of queries per batch."""
+    from astrolift_identity.idp_groups import group_member_counts
+
+    mappings = list(mappings)
+    pairs = {(m.scope_kind, m.scope_id) for m in mappings}
+    guids = _scope_guids(pairs)
+    labels = _resolve_source_scope_labels(mappings)
+    counts = (
+        group_member_counts(org_id, sorted({m.group_external_id for m in mappings}))
+        if org_id is not None
+        else {}
+    )
+    return [
+        GroupRoleMappingType(
+            id=GUID(str(m.guid)),
+            group_external_id=m.group_external_id,
+            role=role_to_type(m.role),
+            scope_kind=m.scope_kind,
+            scope_guid=GUID(guids[(m.scope_kind, m.scope_id)])
+            if (m.scope_kind, m.scope_id) in guids
+            else None,
+            source_scope_label=labels.get((m.scope_kind, m.scope_id), ""),
+            member_count=counts.get(m.group_external_id, 0),
+            created_at=m.created_at,
+        )
+        for m in mappings
+    ]
+
+
+def access_entry_types(rows) -> list[AccessEntryType]:
+    from types import SimpleNamespace
+
+    rows = list(rows)
+    pairs = {(r.scope_kind, r.scope_id) for r in rows}
+    guids = _scope_guids(pairs)
+    labels = _resolve_source_scope_labels(
+        [SimpleNamespace(scope_kind=kind, scope_id=ident) for kind, ident in pairs]
+    )
+
+    def gid(value: str) -> GUID | None:
+        return GUID(value) if value else None
+
+    return [
+        AccessEntryType(
+            principal_kind=r.principal_kind,
+            source=r.source,
+            binding_id=GUID(r.binding_guid),
+            user=user_to_type(r.user) if r.user is not None else None,
+            member_id=gid(r.member_guid),
+            group_external_id=r.group_external_id or None,
+            group_member_count=r.group_member_count,
+            team_id=gid(str(r.team.guid)) if r.team is not None else None,
+            team_slug=r.team.slug if r.team is not None else None,
+            team_name=r.team.name if r.team is not None else None,
+            role=role_to_type(r.role) if r.role is not None else None,
+            access_level=r.access_level or None,
+            share_id=gid(r.share_guid),
+            scope_kind=r.scope_kind,
+            scope_guid=gid(guids.get((r.scope_kind, r.scope_id), "")),
+            source_scope_label=labels.get((r.scope_kind, r.scope_id), ""),
+            inherited=r.inherited,
+            inherits=r.inherits,
+            expires_at=r.expires_at,
+        )
+        for r in rows
+    ]

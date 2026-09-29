@@ -507,9 +507,21 @@ class GrantedScopes:
     team_ids: frozenset[int]
     project_ids: frozenset[int]
     app_ids: frozenset[int]
+    # Scopes held by a non-inheriting grant (``RoleBinding.inherits=False``,
+    # #2157): the team or project row itself, never its projects or apps.
+    # A reader that ignores these under-grants, which is the safe side.
+    exact_team_ids: frozenset[int] = frozenset()
+    exact_project_ids: frozenset[int] = frozenset()
 
     def __bool__(self) -> bool:
-        return self.org or bool(self.team_ids) or bool(self.project_ids) or bool(self.app_ids)
+        return (
+            self.org
+            or bool(self.team_ids)
+            or bool(self.project_ids)
+            or bool(self.app_ids)
+            or bool(self.exact_team_ids)
+            or bool(self.exact_project_ids)
+        )
 
 
 NO_SCOPES = GrantedScopes(org=False, team_ids=frozenset(), project_ids=frozenset(), app_ids=frozenset())

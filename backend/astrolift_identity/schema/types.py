@@ -215,6 +215,57 @@ class RoleBindingType:
     inherits: bool
 
 
+@strawberry.type(name="AstroliftGroupRoleMapping")
+class GroupRoleMappingType:
+    """An IdP group mapped to a role on a scope of the org (#2157). It
+    grants exactly like a group role binding."""
+
+    id: GUID
+    group_external_id: str
+    role: RoleType
+    scope_kind: str
+    scope_guid: GUID | None
+    source_scope_label: str
+    # Active members of the org the IdP last put in the group.
+    member_count: int
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAccessEntry")
+class AccessEntryType:
+    """One grant that reaches an object (#2157): who, through what, from
+    where."""
+
+    principal_kind: str = strawberry.field(description="USER, GROUP or TEAM.")
+    source: str = strawberry.field(
+        description=(
+            "USER_BINDING, GROUP_BINDING, GROUP_MAPPING, or TEAM_SHARE (a team's share on the app, "
+            "or a binding on that team reaching the app through the share)."
+        )
+    )
+    binding_id: GUID = strawberry.field(
+        description="The RoleBinding, GroupRoleMapping or AppTeamAccess share that grants it."
+    )
+    user: UserType | None
+    member_id: GUID | None = strawberry.field(description="The user's ORG membership row.")
+    group_external_id: str | None
+    group_member_count: int | None
+    team_id: GUID | None
+    team_slug: str | None
+    team_name: str | None
+    role: RoleType | None = strawberry.field(description="Null on a team's share row itself.")
+    access_level: str | None = strawberry.field(description="The share level on TEAM_SHARE rows.")
+    share_id: GUID | None
+    scope_kind: str = strawberry.field(description="Where the grant is held.")
+    scope_guid: GUID | None
+    source_scope_label: str
+    inherited: bool = strawberry.field(
+        description="Held on an ancestor (or through a share), not on the object."
+    )
+    inherits: bool
+    expires_at: dt.datetime | None
+
+
 def user_to_type(user) -> UserType:
     return UserType(
         id=str(user.pk),
