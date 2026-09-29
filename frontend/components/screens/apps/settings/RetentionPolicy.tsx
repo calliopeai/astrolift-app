@@ -57,7 +57,7 @@ export function RetentionPolicyView({ saving, onChange, policies }: RetentionPol
           return (
             <div
               key={signal}
-              className="bg-card flex items-center justify-between gap-3 rounded-md border p-3"
+              className="bg-card flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-md border p-3"
             >
               <div className="flex items-center gap-3">
                 <Label className="w-28 shrink-0 text-sm font-medium">{label}</Label>

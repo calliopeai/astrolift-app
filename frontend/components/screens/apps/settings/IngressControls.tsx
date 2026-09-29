@@ -67,10 +67,12 @@ function IngressRow({
   const paused = env.ingressPaused;
 
   return (
-    <div className="bg-card flex items-center justify-between gap-3 rounded-md border p-4">
-      <div className="flex items-center gap-2">
+    <div className="bg-card flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-md border p-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <StatusDot status={paused ? "warn" : "ok"} />
-        <span className="text-sm font-medium capitalize">{env.name}</span>
+        <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere] capitalize">
+          {env.name}
+        </span>
         {paused ? (
           <Badge variant="outline" className="border-warning-border bg-warning/10 text-warning-fg">
             <PauseIcon className="size-3" />
