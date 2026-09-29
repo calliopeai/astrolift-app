@@ -67,6 +67,13 @@ class TenantClusterType:
     Surfaced (not the key itself) so the settings UI can show
     issue-vs-rotate affordances."""
 
+    created_by_username: str | None = None
+    """Who registered the cluster (#2150), the list's Registered by column
+    and what its Mine view matches. Null when registered before the
+    platform recorded it, by the CLI with no user, and on a shared
+    cluster: that row belongs to the platform, not to anyone in the
+    viewer's org."""
+
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
         """Most recent ``astro cluster bootstrap`` invocation for this
@@ -140,6 +147,29 @@ class TenantClusterType:
             .order_by("-ended_at")[:capped]
         )
         return [bootstrap_run_to_type(r) for r in qs]
+
+
+@strawberry.input(name="AstroliftClustersListFilter")
+class ClustersListFilterInput:
+    """The Clusters list's declared filters (spec 44 §5.1, #2150).
+
+    Unset fields do not filter; set fields combine with AND, and the
+    values of one list field with OR.
+    """
+
+    provider: list[str] | None = strawberry.field(
+        default=None, description="Provider plugin slugs, as providerPluginSlug."
+    )
+    status: list[str] | None = strawberry.field(
+        default=None, description="Management lifecycles, as lifecycle (registered, managing, managed, ...)."
+    )
+    live: list[str] | None = strawberry.field(
+        default=None,
+        description="Heartbeat statuses, as heartbeatStatus: never_seen, connected, degraded, offline.",
+    )
+    registered_by: list[str] | None = strawberry.field(
+        default=None, description='Usernames of who registered the cluster; "me" is the viewer.'
+    )
 
 
 @strawberry.type(name="AstroliftManagedDomain")
@@ -330,6 +360,11 @@ def cluster_to_type(cluster) -> TenantClusterType:
             now=now,
         ),
         agent_provisioned=bool(cluster.agent_key_hash),
+        created_by_username=(
+            cluster.created_by.get_username()
+            if cluster.organization_id is not None and cluster.created_by_id is not None
+            else None
+        ),
     )
 
 

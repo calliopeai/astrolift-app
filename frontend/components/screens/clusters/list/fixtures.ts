@@ -1,3 +1,5 @@
+import type { SortState } from "@/components/data-table";
+
 import type { ClusterDetailProps } from "./ClusterDetail";
 import type { ClusterLiveStatsProps } from "./ClusterLiveStats";
 import type { ClustersListProps } from "./ClustersList";
@@ -51,6 +53,7 @@ export const ME = "leo";
 export const CLUSTERS: ClusterRow[] = [
   cluster("prd-us-west-2", {
     name: "Production US West",
+    createdByUsername: ME,
     lastBootstrapRun: {
       id: "run-1",
       status: "succeeded",
@@ -119,6 +122,50 @@ export const FLEET: ClusterRow[] = Array.from({ length: 60 }, (_, i) => {
   const n = String(i + 1).padStart(2, "0");
   return { ...base, id: `cl-fleet-${n}`, slug: `${base.slug}-${n}`, name: `${base.name} ${n}` };
 });
+
+const SORT_VALUE: Record<string, (c: ClusterRow) => string | number> = {
+  name: (c) => c.name.toLowerCase(),
+  slug: (c) => c.slug,
+  status: (c) => c.lifecycle,
+  provider: (c) => c.providerPluginSlug,
+  region: (c) => c.region,
+  live: (c) => c.heartbeatStatus ?? "never_seen",
+  lastProbe: (c) => (c.capabilitiesProbedAt ? Date.parse(c.capabilitiesProbedAt) : 0),
+};
+
+/**
+ * A stand-in for `astroliftClustersPage` in stories: the fixture fleet
+ * filtered, sorted and sliced the way the server answers the list state.
+ */
+export function serveClusters(
+  fleet: ClusterRow[],
+  {
+    filters,
+    sort,
+    page,
+    pageSize,
+  }: { filters: Record<string, string>; sort: SortState[]; page: number; pageSize: number }
+): { rows: ClusterRow[]; totalCount: number } {
+  const kept = fleet
+    .filter(
+      (c) =>
+        (!filters.provider || c.providerPluginSlug === filters.provider) &&
+        (!filters.status || c.lifecycle === filters.status) &&
+        (!filters.live || (c.heartbeatStatus ?? "never_seen") === filters.live) &&
+        (!filters.registeredBy || c.createdByUsername === ME)
+    )
+    .sort((a, b) => {
+      for (const s of sort) {
+        const value = SORT_VALUE[s.key];
+        if (!value) continue;
+        const [x, y] = [value(a), value(b)];
+        if (x !== y) return (x < y ? -1 : 1) * (s.dir === "asc" ? 1 : -1);
+      }
+      return a.slug < b.slug ? -1 : 1;
+    });
+  const start = (Math.max(1, page) - 1) * pageSize;
+  return { rows: kept.slice(start, start + pageSize), totalCount: kept.length };
+}
 
 export const ACTIONS: ClusterActions = {
   deleting: false,

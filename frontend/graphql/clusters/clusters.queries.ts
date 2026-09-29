@@ -79,8 +79,16 @@ export const REVALIDATE_MANAGED_DOMAIN = gql`
   mutation RevalidateManagedDomain($clusterId: GUID!, $zone: String!) {
     revalidateManagedDomain(clusterId: $clusterId, zone: $zone) {
       ok
-      errors { code message field }
-      data { zone signaled message }
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        zone
+        signaled
+        message
+      }
     }
   }
 `;
@@ -156,9 +164,13 @@ export const LIST_CLUSTERS = gql`
  * template-literal constant because this file IS in the codegen document
  * set: ``graphql-tag-pluck`` cannot resolve a bare ``${FIELDS}``
  * interpolation and (with ``noSilentErrors``) fails the run. ``LIST_CLUSTERS``
- * keeps its inline copy until its last consumer is migrated — the cluster
- * detail and settings surfaces still read the whole list from cache — then
- * goes away with them.
+ * keeps its inline copy for /ops, /providers, the fleet map and the admin
+ * metrics; the cluster detail and its tabs read ``GET_CLUSTER`` (#2150).
+ *
+ * The list contract (spec 44 §5.1, #2150): ``filter`` (provider, status,
+ * live, registeredBy), ``sort`` (``-lastProbe,name``) and ``page`` /
+ * ``pageSize``. Any of the last three selects numbered paging on the
+ * server: an exact ``totalCount``, ``page`` and ``pageSize`` echoed.
  */
 const CLUSTER_FIELDS = gql`
   fragment ClusterFields on AstroliftTenantCluster {
@@ -184,6 +196,7 @@ const CLUSTER_FIELDS = gql`
     heartbeatStatus
     heartbeatAgeSeconds
     agentProvisioned
+    createdByUsername
     lastBootstrapRun {
       id
       status
@@ -200,13 +213,47 @@ const CLUSTER_FIELDS = gql`
 
 export const LIST_CLUSTERS_PAGE = gql`
   ${CLUSTER_FIELDS}
-  query ListClustersPage($search: String, $limit: Int, $after: String) {
-    astroliftClustersPage(search: $search, limit: $limit, after: $after) {
+  query ListClustersPage(
+    $search: String
+    $limit: Int
+    $after: String
+    $filter: AstroliftClustersListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftClustersPage(
+      search: $search
+      limit: $limit
+      after: $after
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...ClusterFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+/**
+ * One cluster by slug (#2150): the detail page and every cluster tab.
+ * They used to find their cluster in ``LIST_CLUSTERS``, which stops at 200
+ * rows, so a cluster past the 200th read as "not found" on its own page.
+ * Null when the caller cannot see the cluster.
+ */
+export const GET_CLUSTER = gql`
+  ${CLUSTER_FIELDS}
+  query GetCluster($slug: String!) {
+    astroliftCluster(slug: $slug) {
+      ...ClusterFields
+      oidcAuthConfig
     }
   }
 `;
@@ -261,8 +308,8 @@ export const RECONCILE_CLUSTER_INGRESSES = gql`
 // out when expanded; we don't pull the full history on the cluster
 // list to keep that query light.
 export const CLUSTER_BOOTSTRAP_RUNS = gql`
-  query ClusterBootstrapRuns($limit: Int) {
-    astroliftClusters {
+  query ClusterBootstrapRuns($slug: String!, $limit: Int) {
+    astroliftCluster(slug: $slug) {
       id
       slug
       bootstrapRuns(limit: $limit) {

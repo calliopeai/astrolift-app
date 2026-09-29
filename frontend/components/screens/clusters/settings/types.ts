@@ -7,7 +7,7 @@ import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
 // The committed codegen output lags the live backend, so the generated
 // AstroliftTenantCluster doesn't yet carry the heartbeat fields the
-// LIST_CLUSTERS query now selects (#808). Intersect them in locally.
+// cluster queries now select (#808). Intersect them in locally.
 export type ClusterWithHeartbeat = AstroliftTenantCluster & Partial<ClusterHeartbeatFields>;
 
 export type Lifecycle = "registered" | "managing" | "managed" | "error";

@@ -4,8 +4,8 @@ import { expect, userEvent, within } from "storybook/test";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { ClustersList, type ClustersListProps } from "./ClustersList";
-import { CLUSTERS_LIST, selectClusters } from "./clusters-list";
-import { CLUSTERS, FLEET, LONG_CLUSTER, ME, listProps } from "./fixtures";
+import { CLUSTERS_LIST } from "./clusters-list";
+import { CLUSTERS, FLEET, LONG_CLUSTER, listProps, serveClusters } from "./fixtures";
 import type { ClusterRow } from "./use-clusters-list";
 
 // List or cards is a per-person preference in localStorage; pin it per story
@@ -36,15 +36,14 @@ type Props = Partial<Omit<ClustersListProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over a fixture fleet, filtered and paged the way the hook does it. */
+/** The screen over a fixture fleet, filtered and paged the way the server does it. */
 function Clusters({ fleet = CLUSTERS, initial, ...patch }: Props) {
   const list = useLocalListState(CLUSTERS_LIST, initial);
-  const { rows, totalCount } = selectClusters(fleet, {
+  const { rows, totalCount } = serveClusters(fleet, {
     filters: list.filters,
     sort: list.state.sort,
     page: list.state.page,
     pageSize: list.state.pageSize,
-    me: ME,
   });
   return <ClustersList {...listProps({ rows, totalCount, ...patch })} list={list} />;
 }
@@ -72,7 +71,7 @@ export const ErrorState: Story = {
 /** Rows answer the previous search while the next loads. */
 export const Refetching: Story = { render: () => <Clusters stale /> };
 
-/** Mine: clusters whose last setup run the viewer started. */
+/** Mine: clusters the viewer registered. */
 export const Mine: Story = { render: () => <Clusters initial={{ view: "mine" }} /> };
 
 export const Offline: Story = { render: () => <Clusters initial={{ view: "offline" }} /> };

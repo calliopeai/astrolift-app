@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   COGNITO_USER_POOL_CLIENTS,
   COGNITO_USER_POOLS,
-  LIST_CLUSTERS,
   RECONCILE_CLUSTER_INGRESSES,
   UPDATE_TENANT_CLUSTER,
 } from "@/graphql/clusters/clusters.queries";
@@ -61,7 +60,7 @@ export function useIngressAuth(cluster: AstroliftTenantCluster) {
   const [update, { loading: updating }] = useMutation<{
     updateTenantCluster: MutationResult<AstroliftTenantCluster>;
   }>(UPDATE_TENANT_CLUSTER, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: ["GetCluster"],
     awaitRefetchQueries: true,
   });
   const [reconcile, { loading: reconciling }] = useMutation<{
