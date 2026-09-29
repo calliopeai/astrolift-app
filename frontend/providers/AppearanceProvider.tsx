@@ -11,6 +11,7 @@ import {
   resolveAppearance,
   writeAppearance,
 } from "@/lib/appearance";
+import { saveUiPrefs } from "@/lib/ui-prefs-sync";
 
 interface AppearanceContextValue {
   appearance: Appearance;
@@ -25,6 +26,12 @@ interface AppearanceContextValue {
    * no org query can run.
    */
   setPolicy: (policy: OrgAppearancePolicy | null) => void;
+  /**
+   * Take the person's appearance from their server preferences (#2154),
+   * replacing the browser copy without sending it back. Called by
+   * `UiPreferencesBridge`; `null` means they have never chosen.
+   */
+  applyServerAppearance: (personal: Partial<Appearance> | null) => void;
 }
 
 const AppearanceContext = React.createContext<AppearanceContextValue | null>(null);
@@ -44,9 +51,12 @@ export function AppearanceProvider({
   const [personal, setPersonal] = React.useState<Partial<Appearance> | null>(null);
   const [hydrated, setHydrated] = React.useState(false);
   const [orgPolicy, setOrgPolicy] = React.useState<OrgAppearancePolicy | null>(policy);
+  // The same value as `personal`, readable by the setters without a stale closure.
+  const personalRef = React.useRef<Partial<Appearance> | null>(null);
 
   React.useEffect(() => {
-    setPersonal(readAppearance());
+    personalRef.current = readAppearance();
+    setPersonal(personalRef.current);
     setHydrated(true);
   }, []);
 
@@ -62,11 +72,11 @@ export function AppearanceProvider({
   const setAppearance = React.useCallback(
     (patch: Partial<Appearance>) => {
       if (locked) return;
-      setPersonal((prev) => {
-        const next = { ...(prev ?? {}), ...patch };
-        writeAppearance(next);
-        return next;
-      });
+      const next = { ...(personalRef.current ?? {}), ...patch };
+      personalRef.current = next;
+      setPersonal(next);
+      writeAppearance(next);
+      saveUiPrefs({ appearance: next as Record<string, unknown> });
     },
     [locked]
   );
@@ -75,17 +85,27 @@ export function AppearanceProvider({
   // default" — so it clears storage and hands the decision back to the org.
   const reset = React.useCallback(() => {
     if (locked) return;
+    personalRef.current = null;
     setPersonal(null);
     clearAppearance();
+    saveUiPrefs({ appearance: null });
   }, [locked]);
+
+  const applyServerAppearance = React.useCallback((next: Partial<Appearance> | null) => {
+    personalRef.current = next;
+    setPersonal(next);
+    setHydrated(true);
+    if (next) writeAppearance(next);
+    else clearAppearance();
+  }, []);
 
   const setPolicy = React.useCallback((next: OrgAppearancePolicy | null) => {
     setOrgPolicy(next);
   }, []);
 
   const ctx = React.useMemo(
-    () => ({ appearance: value, locked, setAppearance, reset, setPolicy }),
-    [value, locked, setAppearance, reset, setPolicy]
+    () => ({ appearance: value, locked, setAppearance, reset, setPolicy, applyServerAppearance }),
+    [value, locked, setAppearance, reset, setPolicy, applyServerAppearance]
   );
 
   return <AppearanceContext.Provider value={ctx}>{children}</AppearanceContext.Provider>;

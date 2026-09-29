@@ -5,9 +5,10 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { APPEARANCE } from "./settings-shell-account.fixtures";
 
 /**
- * Settings › Appearance. The preference is read synchronously from local
- * storage, so the page has no loading, empty or error state; the closest
- * real states are the defaults, a custom combination, and the org lock.
+ * Settings › Appearance. The preference paints from the browser copy and the
+ * server settles it in the background, so the page has no loading, empty or
+ * error state; the closest real states are the defaults, a custom
+ * combination, the org lock, and the org default for restricted settings.
  */
 const meta: Meta = { title: "Screens/Settings/Account/AppearanceSettings" };
 export default meta;
@@ -25,6 +26,52 @@ export const CustomCombination: Story = {
       appearance={{ ground: "paper", accent: "ice", density: "cards", corners: 10 }}
     />
   ),
+};
+
+/** The person chose to hide what they can't change; the org default is shown with a way back to it. */
+export const RestrictedOverridesOrg: Story = {
+  render: () => (
+    <AppearanceSettings
+      {...APPEARANCE}
+      restrictedSettings="hide"
+      restrictedSettingsChoice="hide"
+      restrictedSettingsOrgDefault="show"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("radio", { name: /Hide/ })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    await expect(canvas.getByText(/Your organization's default/)).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "Use the organization's default" })
+    ).toBeInTheDocument();
+  },
+};
+
+/** No choice of their own: the org default applies and is named as such. */
+export const RestrictedFollowsOrg: Story = {
+  render: () => (
+    <AppearanceSettings
+      {...APPEARANCE}
+      restrictedSettings="hide"
+      restrictedSettingsChoice={null}
+      restrictedSettingsOrgDefault="hide"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("radio", { name: /Hide/ })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    await expect(canvas.getByText(/Following your organization's default/)).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "Use the organization's default" })
+    ).not.toBeInTheDocument();
+  },
 };
 
 /** An org policy locks the theme: read-only, no reset. */

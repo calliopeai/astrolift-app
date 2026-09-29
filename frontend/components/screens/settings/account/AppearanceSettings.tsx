@@ -67,6 +67,8 @@ export function AppearanceSettings({
   chooseTheme,
   chooseGround,
   restrictedSettings,
+  restrictedSettingsChoice,
+  restrictedSettingsOrgDefault,
   setRestrictedSettings,
 }: ReturnType<typeof useAppearanceSettings>) {
   const activeTheme = THEMES.find(
@@ -264,6 +266,25 @@ export function AppearanceSettings({
               </button>
             ))}
           </div>
+          {restrictedSettingsOrgDefault && (
+            <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="min-w-0">
+                {restrictedSettingsChoice === null
+                  ? "Following your organization's default"
+                  : "Your organization's default"}
+                :{" "}
+                <span className="text-foreground font-medium">
+                  {RESTRICTED_SETTINGS[restrictedSettingsOrgDefault].label}
+                </span>
+                .
+              </span>
+              {restrictedSettingsChoice !== null && (
+                <Button variant="link" size="xs" onClick={() => setRestrictedSettings(null)}>
+                  Use the organization&apos;s default
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

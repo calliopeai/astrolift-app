@@ -3,13 +3,12 @@
 import * as React from "react";
 
 import { type HomeLayoutKey, isHomeLayoutKey } from "@/components/home/registry";
+import { saveUiPrefs, type ServerUiPrefs } from "@/lib/ui-prefs-sync";
 
 /**
- * The person's Home layout (spec 44 §4.3), browser-stored like
- * lib/display-prefs.ts. The spec puts it server side, a `home_layout` key on
- * the profile so it follows the person across browsers; that is #2154 and
- * needs a backend field, so until it lands the choice lives in this browser
- * and a new browser asks the first-sign-in question again.
+ * The person's Home layout (spec 44 §4.3). It lives on the person's server
+ * preferences (#2154, lib/ui-prefs-sync.ts) so it follows them across
+ * browsers; the browser copy is the first paint and the offline fallback.
  *
  * `layout` is validated against the registry: an unknown key reads as unset,
  * and unset means "the default from access". `asked` records that the
@@ -35,6 +34,17 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
   } catch {
     return DEFAULT_HOME_PREFS;
   }
+}
+
+/**
+ * The server's answer as home prefs. It replaces the browser copy outright;
+ * a layout this build does not know reads as unset.
+ */
+export function homePrefsFromServer(
+  server: Pick<ServerUiPrefs, "homeLayout" | "homeLayoutAsked">
+): HomePrefs {
+  const layout = isHomeLayoutKey(server.homeLayout) ? server.homeLayout : null;
+  return { layout, asked: server.homeLayoutAsked || layout !== null };
 }
 
 const listeners = new Set<() => void>();
@@ -74,15 +84,20 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** Take the server's answer as this page's prefs, without sending it back. */
+export function applyServerHomePrefs(server: ServerUiPrefs): void {
+  write(homePrefsFromServer(server));
+}
+
 /**
  * The saved prefs and a setter. `setLayout(key)` saves a choice (and marks
  * the question answered); `setLayout(null)` goes back to the access default.
  */
 export function useHomePrefs(): [HomePrefs, (layout: HomeLayoutKey | null) => void] {
   const prefs = React.useSyncExternalStore(subscribe, read, () => DEFAULT_HOME_PREFS);
-  const setLayout = React.useCallback(
-    (layout: HomeLayoutKey | null) => write({ layout, asked: true }),
-    []
-  );
+  const setLayout = React.useCallback((layout: HomeLayoutKey | null) => {
+    write({ layout, asked: true });
+    saveUiPrefs({ homeLayout: layout, homeLayoutAsked: true });
+  }, []);
   return [prefs, setLayout];
 }

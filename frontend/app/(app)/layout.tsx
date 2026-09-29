@@ -5,6 +5,8 @@ import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { AppShellContainer } from "./_shell/app-shell";
 import { LiveRegionProvider } from "@/providers/LiveRegion";
 import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
+import { AppearancePolicyBridge } from "@/providers/AppearancePolicyBridge";
+import { UiPreferencesBridge } from "@/providers/UiPreferencesBridge";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { getClient } from "@/lib/apollo";
@@ -78,6 +80,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           consumer gates its org-scoped queries on it (#1022). */}
       <ActiveOrgProvider>
         <SkipToContent />
+        {/* The org's house theme and the person's server UI preferences
+            (#135, #2154) reach the browser-stored preferences here. */}
+        <AppearancePolicyBridge />
+        <UiPreferencesBridge />
         <AppShellContainer>{children}</AppShellContainer>
         <ScmCallbackToast />
         <SessionExpiredModal />

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
@@ -17,6 +18,7 @@ import {
   trustedDomainsLoading,
   trustedDomainsLong,
   modulesLong,
+  ORG_HIDES_RESTRICTED,
   ORG_LONG,
 } from "./fixtures";
 import { HouseThemeCard } from "./HouseThemeCard";
@@ -87,11 +89,18 @@ export const Width768: Story = {
 };
 
 /** One section at a time, chosen by `?section=`, as the route mounts it. */
-function SingleSection({ initial }: { initial: string }) {
+function SingleSection({
+  initial,
+  org = orgSettings.org,
+}: {
+  initial: string;
+  org?: typeof orgSettings.org;
+}) {
   const section = useLocalSettingsSection(initial);
   return (
     <OrganizationSettings
       {...orgSettings}
+      org={org}
       section={section}
       houseTheme={<HouseThemeCard {...houseTheme} />}
       trustedDomains={<TrustedDomains {...trustedDomains} />}
@@ -102,4 +111,23 @@ function SingleSection({ initial }: { initial: string }) {
 
 export const TrustedDomainsSection: Story = {
   render: () => <SingleSection initial="trusted-domains" />,
+};
+
+/**
+ * User policies with the org default for settings members can't change set to
+ * hide (#2154). It applies to members who haven't chosen for themselves.
+ */
+export const RestrictedSettingsDefault: Story = {
+  render: () => <SingleSection initial="user-policies" org={ORG_HIDES_RESTRICTED} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole("radiogroup", { name: "Settings members can't change" });
+    const hide = within(group).getByRole("radio", { name: /Hide/ });
+    const show = within(group).getByRole("radio", { name: /Show read-only/ });
+    await expect(hide).toHaveAttribute("aria-checked", "true");
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.click(show);
+    await expect(show).toHaveAttribute("aria-checked", "true");
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeEnabled();
+  },
 };

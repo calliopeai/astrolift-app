@@ -10,16 +10,22 @@ import { useAppearance } from "@/providers/AppearanceProvider";
 export function useAppearanceSettings() {
   const { appearance, locked, setAppearance, reset } = useAppearance();
   const { setTheme } = useTheme();
-  const [display, setDisplay] = useDisplayPrefs();
+  const [display, setRestrictedChoice] = useDisplayPrefs();
 
   return {
     appearance,
     locked,
     setAppearance,
     reset,
+    /** What applies: the person's choice, else the org default. */
     restrictedSettings: display.restrictedSettings,
-    setRestrictedSettings(restrictedSettings: RestrictedSettings) {
-      setDisplay({ restrictedSettings });
+    /** The person's own choice; null follows the organization. */
+    restrictedSettingsChoice: display.restrictedSettingsChoice,
+    /** The organization's default (Admin › Organization), once known. */
+    restrictedSettingsOrgDefault: display.restrictedSettingsOrgDefault,
+    /** Choose show or hide; `null` goes back to the organization's default. */
+    setRestrictedSettings(restrictedSettings: RestrictedSettings | null) {
+      setRestrictedChoice(restrictedSettings);
     },
     // Choosing a theme also decides light vs dark, so keep next-themes in step.
     chooseTheme(ground: Ground, accent: Accent) {
