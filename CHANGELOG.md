@@ -32,6 +32,9 @@
   org-level spec-update grant. Team-scoped credentials cannot create,
   update or delete shared specs even when their user has an org role;
   shared reads and owned-spec registration remain available.
+  Registering against a team-shared recipe also requires its owning team's
+  spec-update grant and respects the credential's team ceiling; a project
+  grant alone cannot rewrite the recipe used by the team's other projects.
   `core/tests/test_surface_guardrail_1866.py` walks the served GraphQL
   schemas, the URL conf, the WebSocket routes and the MCP registry, and
   fails on any route without a declared scope that is not on its allowlist;

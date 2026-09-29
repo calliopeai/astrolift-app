@@ -702,6 +702,76 @@ def test_team_token_cannot_register_against_shared_spec_with_org_grant(world):
         spec_for_registration(organization=world.org, slug="shared-env", app=world.medops_app)
 
 
+@pytest.mark.parametrize("owner_grant", [False, True])
+def test_registration_writes_team_shared_recipe_only_with_owner_grant(world, owner_grant):
+    from astrolift_agents.services.agent_importers import import_agent_spec
+    from astrolift_agents.services.imported_agent_registration import (
+        ImportedAgentRegistrationError,
+        persist_imported_agent_package,
+    )
+    from astrolift_registry.models import RegisteredApp
+
+    world.medops_spec.project = None
+    world.medops_spec.save(update_fields=["project"])
+    grant(world, Permission.AGENT_CREATE, Permission.AGENT_ENV_SPEC_UPDATE, kind="PROJECT")
+    if owner_grant:
+        grant(world, Permission.AGENT_ENV_SPEC_UPDATE, kind="TEAM")
+    package = import_agent_spec(
+        "agents_md",
+        {"name": "Replacement bot", "content": "Review changes."},
+        options={"runtime_image": "example/agent:2"},
+    ).package
+    with member(world, selected=True), team_token(world):
+        if owner_grant:
+            result = persist_imported_agent_package(
+                project=world.medops_project, package=package, slug="medops-env"
+            )
+            assert result.environment_spec.pk == world.medops_spec.pk
+        else:
+            with pytest.raises(ImportedAgentRegistrationError, match="team-shared"):
+                persist_imported_agent_package(
+                    project=world.medops_project, package=package, slug="medops-env"
+                )
+    world.medops_spec.refresh_from_db()
+    assert world.medops_spec.image_tag == ("example/agent:2" if owner_grant else "example/agent:1")
+    assert RegisteredApp.objects.filter(organization=world.org, slug="medops-env").exists() is owner_grant
+
+
+def test_manifest_sync_cannot_rewrite_team_shared_spec_with_project_grants(world):
+    from astrolift_agents.services.project_membership import SpecOwnedElsewhere
+    from astrolift_registry.services.manifest_sync import _upsert_agent_environment_spec
+
+    world.medops_spec.project = None
+    world.medops_spec.slug = world.medops_agent.slug
+    world.medops_spec.save(update_fields=["project", "slug"])
+    grant(world, Permission.AGENT_UPDATE, Permission.AGENT_ENV_SPEC_UPDATE, kind="PROJECT")
+    with member(world, selected=True), pytest.raises(SpecOwnedElsewhere, match="team-shared"):
+        _upsert_agent_environment_spec(
+            app=world.medops_app,
+            workload_slug=world.medops_agent.slug,
+            raw_manifest=SimpleNamespace(raw={"environment": {"CHANGED": "yes"}}),
+            source_repo="https://example.com/agent.git",
+            deploy_branch="main",
+            manifest_path="astrolift.toml",
+        )
+    world.medops_spec.refresh_from_db()
+    assert world.medops_spec.image_tag == "example/agent:1" and world.medops_spec.env_vars == {}
+
+
+def test_team_token_cannot_rewrite_another_teams_shared_recipe_with_org_grant(world):
+    from astrolift_agents.services.project_membership import SpecOwnedElsewhere, spec_for_registration
+
+    world.platform_spec.project = None
+    world.platform_spec.save(update_fields=["project"])
+    grant(world, Permission.AGENT_ENV_SPEC_UPDATE, kind="ORG")
+    with (
+        member(world, selected=True),
+        team_token(world),
+        pytest.raises(SpecOwnedElsewhere, match="team-shared"),
+    ):
+        spec_for_registration(organization=world.org, slug="platform-env", app=world.platform_app)
+
+
 # ---------------------------------------------------------------------------
 # Dispatch Service REST: log and meter ingest
 # ---------------------------------------------------------------------------

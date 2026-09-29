@@ -32,14 +32,15 @@ def spec_for_registration(*, organization, slug: str, app):
     """The environment spec an agent registration writes under ``slug`` (#1866).
 
     The live spec with that slug when ``app``'s agents may run with it, with
-    an explicit org write grant for an org-shared recipe; otherwise a new,
+    an explicit owner write grant for a team- or org-shared recipe; otherwise a new,
     unsaved spec owned by the app's project and team. A slug naming another
     scope's spec raises :class:`SpecOwnedElsewhere`, so registering an agent
     can never rewrite another team's image and secret bindings.
     """
     from astrolift_agents.models import AgentEnvironmentSpec
     from astrolift_agents.visibility import check_org_shared_spec_write, spec_usable_by_app
-    from core.permissions import PermissionDenied
+    from astrolift_identity.api_tokens import get_current_api_token
+    from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
 
     spec = (
         AgentEnvironmentSpec.objects.filter(organization=organization, slug=slug, deleted_at__isnull=True)
@@ -60,6 +61,20 @@ def spec_for_registration(*, organization, slug: str, app):
         except PermissionDenied as exc:
             raise SpecOwnedElsewhere(
                 f"org-shared environment spec {slug!r} requires an org-scoped update grant; "
+                "give this agent another slug to create an owned spec"
+            ) from exc
+    elif spec.project_id is None:
+        scope = PermissionScope(kind=ScopeKind.TEAM, id=spec.team_id)
+        try:
+            token = get_current_api_token()
+            if token is not None and token.team_id is not None and token.team_id != spec.team_id:
+                raise PermissionDenied(
+                    Permission.AGENT_ENV_SPEC_UPDATE, scope, "spec owner is outside the credential's team"
+                )
+            check_permission(Permission.AGENT_ENV_SPEC_UPDATE, scope=scope)
+        except PermissionDenied as exc:
+            raise SpecOwnedElsewhere(
+                f"team-shared environment spec {slug!r} requires an update grant for its owning team; "
                 "give this agent another slug to create an owned spec"
             ) from exc
     return spec
